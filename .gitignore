@@ -1,3 +1,5 @@
 node_modules
+<<<<<<< HEAD
 .tmp.driveupload/
 local-login/profile/
+>>>>>>> f9d1889 (Commit inicial: projeto Docker com Puppeteer)
