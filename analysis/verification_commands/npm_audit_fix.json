@@ -1,0 +1,6 @@
+{
+  "error": {
+    "summary": "process terminated",
+    "detail": "SIGINT"
+  }
+}

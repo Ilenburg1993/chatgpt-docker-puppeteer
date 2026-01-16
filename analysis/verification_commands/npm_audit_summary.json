@@ -1,0 +1,11 @@
+{
+  "vulnerabilities": {
+    "info": 0,
+    "low": 1,
+    "moderate": 0,
+    "high": 5,
+    "critical": 0,
+    "total": 6
+  },
+  "summary": 0
+}

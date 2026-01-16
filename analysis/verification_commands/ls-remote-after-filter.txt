@@ -1,0 +1,6 @@
+8047e64ffc7adba87605440a3a349e8aaf51c7d8	HEAD
+f2f8d09a5af9044fcd8f8e9d1faa10952174d863	refs/heads/ci/secret-scan-test
+8047e64ffc7adba87605440a3a349e8aaf51c7d8	refs/heads/main
+8047e64ffc7adba87605440a3a349e8aaf51c7d8	refs/tags/remediation-final-2026-01-16
+8a4d91cb28d986e8a840e8389e210c2474e15aa7	refs/tags/v1.0.0
+62cd97aa2b6957b95f0ef65b093f7f496488966b	refs/tags/v1.0.0^{}
