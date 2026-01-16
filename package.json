@@ -36,7 +36,7 @@
     "reset:hard": "npm run clean && npm run clean:queue",
 
     "// --- TESTING ---": "Suítes de teste de integração",
-    "test": "npm run test:win",
+    "test": "node scripts/run-tests.js",
     "test:win": "powershell -ExecutionPolicy Bypass -File scripts/run_all_tests.ps1",
     "test:linux": "bash scripts/run_all_tests.sh",
     "test:lock": "node tests/test_lock.js",
