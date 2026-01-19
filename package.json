@@ -98,7 +98,7 @@
     "tree-kill": "^1.2.2",
     "user-agents": "^1.1.364",
     "uuid": "^11.0.5",
-    "zod": "^3.25.76"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
