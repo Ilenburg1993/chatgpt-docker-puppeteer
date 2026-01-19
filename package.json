@@ -90,7 +90,7 @@
     "ghost-cursor": "^1.1.18",
     "js-yaml": "^4.1.0",
     "pm2": "^5.4.3",
-    "puppeteer": "^21.11.0",
+    "puppeteer": "^24.35.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "socket.io": "^4.8.3",
