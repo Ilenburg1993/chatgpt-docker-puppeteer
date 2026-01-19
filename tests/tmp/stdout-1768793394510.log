@@ -1,0 +1,17 @@
+/workspaces/chatgpt-docker-puppeteer/src/infra/ipc_client.js:36
+        this.state = IPCConnState.DISCONNECTED;
+                                  ^
+
+TypeError: Cannot read properties of undefined (reading 'DISCONNECTED')
+    at IPCClient._initializeState [90m(/workspaces/chatgpt-docker-puppeteer/[39msrc/infra/ipc_client.js:36:35[90m)[39m
+    at new IPCClient [90m(/workspaces/chatgpt-docker-puppeteer/[39msrc/infra/ipc_client.js:28:14[90m)[39m
+    at Object.<anonymous> [90m(/workspaces/chatgpt-docker-puppeteer/[39msrc/infra/ipc_client.js:295:18[90m)[39m
+[90m    at Module._compile (node:internal/modules/cjs/loader:1529:14)[39m
+[90m    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)[39m
+[90m    at Module.load (node:internal/modules/cjs/loader:1275:32)[39m
+[90m    at Module._load (node:internal/modules/cjs/loader:1096:12)[39m
+[90m    at Module.require (node:internal/modules/cjs/loader:1298:19)[39m
+[90m    at require (node:internal/modules/helpers:182:18)[39m
+    at Object.<anonymous> [90m(/workspaces/chatgpt-docker-puppeteer/[39msrc/core/forensics.js:17:13[90m)[39m
+
+Node.js v20.19.2
