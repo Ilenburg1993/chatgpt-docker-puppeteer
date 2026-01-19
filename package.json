@@ -48,6 +48,7 @@
     "reset:hard": "npm run clean && npm run clean:queue && npm run clean:logs",
     "test": "node scripts/run-tests.js",
     "test:health": "node tests/test_health_endpoint.js",
+    "test:config": "node tests/test_config_validation.js",
     "test:win": "powershell -ExecutionPolicy Bypass -File scripts/run_all_tests.ps1",
     "test:linux": "bash scripts/run_all_tests.sh",
     "test:lock": "node tests/test_lock.js",
