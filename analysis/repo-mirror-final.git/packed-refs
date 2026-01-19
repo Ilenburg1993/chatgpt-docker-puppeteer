@@ -1,8 +1,0 @@
-# pack-refs with: peeled fully-peeled sorted 
-d291b8547b9b93a17cf05e6423ccfbfde81e57d8 refs/heads/ci/secret-scan-test
-8047e64ffc7adba87605440a3a349e8aaf51c7d8 refs/heads/main
-29de158efe1fbed724e049a5912f245e052a029a refs/original/refs/heads/main
-1caccb2dd25974a428c7f4b62feec077f04a49e6 refs/tags/remediation-final-2026-01-16
-^04c402ccf01c125736343b9529b4d780e3144ab8
-18bf5dac068ff32c988f4f3cc3e169d5e9b7d2b6 refs/tags/v1.0.0
-^d291b8547b9b93a17cf05e6423ccfbfde81e57d8

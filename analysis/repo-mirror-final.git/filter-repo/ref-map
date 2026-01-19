@@ -1,6 +1,0 @@
-old                                      new                                      ref
-62cd97aa2b6957b95f0ef65b093f7f496488966b d291b8547b9b93a17cf05e6423ccfbfde81e57d8 refs/heads/ci/secret-scan-test
-908528c360a60a109d92314a2fb2a98579f2fec5 8047e64ffc7adba87605440a3a349e8aaf51c7d8 refs/heads/main
-ecc2243a5289f499d92919ff8e77d1e6edc2b92f 29de158efe1fbed724e049a5912f245e052a029a refs/original/refs/heads/main
-a6d00d44651d6dc5db9df45ce1e5e48329ede109 1caccb2dd25974a428c7f4b62feec077f04a49e6 refs/tags/remediation-final-2026-01-16
-8a4d91cb28d986e8a840e8389e210c2474e15aa7 18bf5dac068ff32c988f4f3cc3e169d5e9b7d2b6 refs/tags/v1.0.0
