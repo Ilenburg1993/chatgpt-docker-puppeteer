@@ -1,5 +1,12 @@
 # chatgpt-docker-puppeteer
 
+[![CI](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/workflows/CI/badge.svg)](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/actions)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+🤖 **Autonomous AI agent for browser automation with Puppeteer** - Domain-driven task processing with adaptive validation and real-time monitoring.
+
 Note: this project is developed from an LLM-agnostic perspective — tools and
 integrations are intended to work with any large language model (LLM) or
 provider. References to specific models in code or examples are illustrative
