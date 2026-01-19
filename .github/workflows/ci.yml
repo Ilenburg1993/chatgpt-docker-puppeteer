@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    - name: Install dependencies (if package.json present)
+      # Run install with the shell appropriate for the runner
+      # Linux install
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        if [ -f package.json ]; then npm ci; fi
+
+    - name: Install dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        if (Test-Path -Path package.json) { npm ci }
+
+    - name: Run lint (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        if npm run | grep -q "lint"; then npm run lint; fi
+
+    - name: Run tests (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        if npm run | grep -q "test"; then npm test --if-present; fi
+
+    - name: Run lint (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        if (npm run | Select-String "lint") { npm run lint }
+
+    - name: Run tests (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        if (npm run | Select-String "test") { npm test --if-present }

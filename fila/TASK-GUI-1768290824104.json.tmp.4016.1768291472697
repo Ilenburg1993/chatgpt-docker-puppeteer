@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "id": "TASK-GUI-1768290824104",
+    "version": "3.0",
+    "created_at": "2026-01-13T07:53:44.104Z",
+    "priority": 1,
+    "source": "gui"
+  },
+  "spec": {
+    "target": "chatgpt",
+    "model": "gpt-5",
+    "payload": {
+      "user_message": "Tarefa TESTE"
+    },
+    "config": {
+      "reset_context": false
+    }
+  },
+  "policy": {
+    "max_attempts": 3,
+    "timeout_ms": "auto",
+    "dependencies": []
+  },
+  "state": {
+    "status": "PENDING",
+    "attempts": 0,
+    "history": []
+  },
+  "status": "FAILED",
+  "erro": "Schema Error: [\n  {\n    \"received\": \"gui\",\n    \"code\": \"invalid_enum_value\",\n    \"options\": [\n      \"manual\",\n      \"api\",\n      \"orchestrator\",\n      \"bulk\"\n    ],\n    \"path\": [\n      \"meta\",\n      \"source\"\n    ],\n    \"message\": \"Invalid enum value. Expected 'manual' | 'api' | 'orchestrator' | 'bulk', received 'gui'\"\n  }\n]"
+}

@@ -1,0 +1,8 @@
+{
+  "detect_secrets_clean": 0,
+  "detect_secrets_legacy": 0,
+  "gitleaks-clean-final.json": "error",
+  "gitleaks-legacy-final.json": "error",
+  "trufflehog-clean-final.json": "error",
+  "trufflehog-legacy-final.json": "error"
+}

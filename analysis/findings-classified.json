@@ -1,0 +1,300 @@
+{
+  "generated_at": "2026-01-16T00:31:03.643004Z",
+  "total_findings": 32,
+  "results": [
+    {
+      "source": "/tmp/actions-check/fetch.log",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "Start: Fri 16 Jan 2026 12:21:21 AM UTC\nQuerying runs for branch ci/secret-scan-test\nruns API HTTP=401\nBad credentials\nAuthentication to GitHub API failed or no access (HTTP=401). See /tmp/actions-chec",
+        "entropy": 4.983660456482416,
+        "length": 211
+      }
+    },
+    {
+      "source": "/tmp/actions-check/runs.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/actions-check/validate-token.log",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "Start: Fri 16 Jan 2026 12:22:18 AM UTC\nGITHUB_TOKEN is not set in this environment.\nExport it with: export GITHUB_TOKEN=ghp_xxx",
+        "entropy": 4.928919465341054,
+        "length": 127
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-1768520442.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-1768520457.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-clean-1768521232.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-clean-1768521300.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-filesystem-1768520873.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-filesystem-1768520899.baseline",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "Traceback (most recent call last):\n  File \"/home/node/.local/bin/detect-secrets\", line 7, in <module>\n    sys.exit(main())\n  File \"/home/node/.local/lib/python3.9/site-packages/detect_secrets/main.py\"",
+        "entropy": 4.816005459387658,
+        "length": 1339
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-filesystem-1768520908.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-full-1768521493.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/detect-secrets-tracked-1768520985.baseline",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-combined-1768521065.json",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==",
+        "entropy": 5.450853351567259,
+        "length": 88
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-combined-1768521065.json",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==",
+        "entropy": 5.513020112783388,
+        "length": 88
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-combined-1768521065.json",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==",
+        "entropy": 5.450853351567259,
+        "length": 88
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-combined-1768521065.json",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==",
+        "entropy": 5.513020112783388,
+        "length": 88
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-findings.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,1128 @@\n+{\n+  \"name\": \"local-login\",\n+  \"version\": \"1.0.0\",\n+  \"lockfileVersion\": 3,\n+  \"requires\": true,\n+  \"packages\": {\n+    \"\": {\n+      \"name\": \"local-login\",\n+      \"version\": \"1.0.0\""
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-findings.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,4108 @@\n+{\r\n+  \"name\": \"agente-chatgpt-puppeteer\",\r\n+  \"version\": \"3.3.0\",\r\n+  \"lockfileVersion\": 3,\r\n+  \"requires\": true,\r\n+  \"packages\": {\r\n+    \"\": {\r\n+      \"name\": \"agente-chatgpt-pupp"
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-git-findings.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,1128 @@\n+{\n+  \"name\": \"local-login\",\n+  \"version\": \"1.0.0\",\n+  \"lockfileVersion\": 3,\n+  \"requires\": true,\n+  \"packages\": {\n+    \"\": {\n+      \"name\": \"local-login\",\n+      \"version\": \"1.0.0\""
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-git-findings.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,4108 @@\n+{\r\n+  \"name\": \"agente-chatgpt-puppeteer\",\r\n+  \"version\": \"3.3.0\",\r\n+  \"lockfileVersion\": 3,\r\n+  \"requires\": true,\r\n+  \"packages\": {\r\n+    \"\": {\r\n+      \"name\": \"agente-chatgpt-pupp"
+      }
+    },
+    {
+      "source": "/tmp/trufflehog-git-full-1768521493.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/collect-1768523121.log",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "Collecting vscode-server logs: /tmp/vscode-term-logs/collect-1768523121.log\n1768370378.0445710940 /home/node/.vscode-server/data/logs/20260114T055937/remoteTelemetry.log\n1768370378.3605889330 /home/no",
+        "entropy": 5.306294273068061,
+        "length": 10000
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/last-collect.log",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "Collecting vscode-server logs: /tmp/vscode-term-logs/collect-1768523121.log\n1768370378.0445710940 /home/node/.vscode-server/data/logs/20260114T055937/remoteTelemetry.log\n1768370378.3605889330 /home/no",
+        "entropy": 5.306294273068061,
+        "length": 10000
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/latest-logs.txt",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "/home/node/.vscode-server/data/logs/20260115T214857/ptyhost.log\n/home/node/.vscode-server/data/logs/20260115T214857/exthost1/dbaeumer.vscode-eslint/ESLint.log\n/home/node/.vscode-server/data/logs/20260",
+        "entropy": 4.813739729500721,
+        "length": 899
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/log-files.txt",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "1768370378.0445710940 /home/node/.vscode-server/data/logs/20260114T055937/remoteTelemetry.log\n1768370378.3605889330 /home/node/.vscode-server/data/logs/20260114T055937/ptyhost.log\n1768370379.480652159",
+        "entropy": 4.997979328319292,
+        "length": 5591
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/pty-files-index.txt",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "1 /home/node/.vscode-server/data/logs/20260114T074558/ptyhost.log\n2 /home/node/.vscode-server/data/logs/20260114T055937/ptyhost.log\n3 /home/node/.vscode-server/data/logs/20260115T214857/ptyhost.log\n4 ",
+        "entropy": 4.66140551432732,
+        "length": 263
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/pty-files.txt",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "/home/node/.vscode-server/data/logs/20260114T074558/ptyhost.log\n/home/node/.vscode-server/data/logs/20260114T055937/ptyhost.log\n/home/node/.vscode-server/data/logs/20260115T214857/ptyhost.log\n/home/no",
+        "entropy": 4.606080750224486,
+        "length": 255
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/ptyhost.20260114T055937.before.log",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/ptyhost.20260114T074558.before.log",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/ptyhost.20260115T053448.before.log",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/ptyhost.20260115T214857.before.log",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "/tmp/vscode-term-logs/trace-change.txt",
+      "classification": {
+        "classification": "suspicious",
+        "severity": "P1",
+        "reason": "high-entropy string",
+        "sample": "Found settings: /home/node/.vscode-server/data/Machine/settings.json\nUpdated /home/node/.vscode-server/data/Machine/settings.json with window.logLevel=trace (jq)\ncopied /home/node/.vscode-server/data/",
+        "entropy": 4.917727015838033,
+        "length": 685
+      }
+    }
+  ],
+  "counts": {
+    "whitelisted": 4,
+    "suspicious": 14,
+    "ok": 14
+  },
+  "severity_counts": {
+    "P0": 0,
+    "P1": 14,
+    "informational": 0
+  }
+}

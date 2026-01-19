@@ -1,0 +1,8 @@
+SCANNING CLEAN REPO: analysis/repo-verify
+package-lock.json:44:        "js-tokens": "^4.0.0",
+package-lock.json:2137:    "node_modules/js-tokens": {
+package-lock.json:2139:      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
+src/core/schemas.js:68:    max_tokens: z.number().optional(),
+src/core/schemas.js:114:      token_estimate: z.number().default(0),
+src/driver/modules/triage.js:33:    const passwordInput = document.querySelector('input[type="password"]');
+src/driver/modules/triage.js:34:    if (passwordInput && passwordInput.offsetParent !== null) {

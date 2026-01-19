@@ -1,0 +1,12 @@
+{
+  "fila": [
+    {
+      "id": "task-001",
+      "prompt": "Explique em um parágrafo o que é ontologia negativa.",
+      "status": "PENDING",
+      "prioridade": 1,
+      "criadoEm": "2026-01-12T21:00:00Z",
+      "resultado": null
+    }
+  ]
+}

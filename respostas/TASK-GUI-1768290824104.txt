@@ -1,0 +1,2 @@
+Perfeito. A tarefa-teste está registrada.
+Quer especificar o objetivo ou o tipo de teste (por exemplo: técnico, conceitual, operacional, de escrita, de auditoria etc.) para que eu possa executá-la conforme o padrão que deseja?

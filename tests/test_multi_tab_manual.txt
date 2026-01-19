@@ -1,0 +1,15 @@
+TESTE MANUAL: multi-tab policy
+
+Objetivo:
+  Verificar que, com 2 abas do ChatGPT abertas, o agente aborta com erro MULTI_TAB_DETECTED.
+
+Procedimento:
+1) Abra o Chrome com remote debugging (porta 9222) e abra 2 abas no ChatGPT (duas conversas diferentes).
+2) Inicie o agente manualmente (no root do projeto):
+     node index.js
+3) Observe o console/arquivo de log 'logs/agente_*.log'.
+4) Deve ocorrer erro fatal com mensagem 'MULTI_TAB_DETECTED' e a lista de titles/urls das abas.
+5) Interprete o resultado: se o agente abortou com essa mensagem -> PASS.
+
+Observação:
+- Este teste é manual porque abrir 2 abas e garantir que o agente as veja consistentemente é uma ação humana.

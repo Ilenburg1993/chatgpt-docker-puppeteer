@@ -1,0 +1,81 @@
+{
+  "name": "agente-chatgpt-puppeteer",
+  "version": "1.0.0",
+  "description": "Agente autônomo Modular (Audit Level 19) com arquitetura Domain-Driven, sistema adaptativo de latência, SADI e gestão via PM2.",
+  "private": true,
+  "main": "index.js",
+  "directories": {
+    "lib": "src",
+    "test": "tests",
+    "scripts": "scripts"
+  },
+  "scripts": {
+    "// --- LIFECYCLE (DEV) ---": "Execução direta para desenvolvimento",
+    "start": "node index.js",
+    "dev": "nodemon index.js --ignore fila/ --ignore logs/",
+    "// --- LIFECYCLE (PROD/PM2) ---": "Execução robusta em background",
+    "daemon:start": "pm2 start ecosystem.config.js",
+    "daemon:stop": "pm2 stop agente-gpt dashboard-web",
+    "daemon:restart": "pm2 restart all",
+    "daemon:monit": "pm2 monit",
+    "daemon:logs": "pm2 logs --lines 50",
+    "daemon:kill": "pm2 delete all",
+    "// --- QUEUE MANAGEMENT ---": "Ferramentas de manipulação da fila",
+    "queue:status": "node scripts/status_fila.js",
+    "queue:add": "node scripts/gerador_tarefa.js",
+    "queue:import": "node scripts/importar_prompts.js",
+    "queue:graph": "node scripts/visualizar_fila.js > fila.dot && echo [INFO] Arquivo 'fila.dot' gerado.",
+    "queue:flow": "node scripts/flow_manager.js",
+    "// --- MAINTENANCE & DIAGNOSTICS ---": "Limpeza e análise forense",
+    "clean": "node -e \"const fs=require('fs'); ['logs', 'tmp', 'RUNNING.lock'].forEach(p => fs.rmSync(p, {recursive:true, force:true})); console.log('[OK] Ambiente limpo.');\"",
+    "clean:queue": "node -e \"const fs=require('fs'); const path=require('path'); const D='fila'; if(fs.existsSync(D)) fs.readdirSync(D).filter(f=>f.endsWith('.json')).forEach(f=>fs.rmSync(path.join(D,f))); console.log('[OK] Fila limpa.');\"",
+    "diagnose": "node scripts/analisar_crash.js",
+    "reset:hard": "npm run clean && npm run clean:queue",
+    "// --- TESTING ---": "Suítes de teste de integração",
+    "test": "node scripts/run-tests.js",
+    "test:win": "powershell -ExecutionPolicy Bypass -File scripts/run_all_tests.ps1",
+    "test:linux": "bash scripts/run_all_tests.sh",
+    "test:lock": "node tests/test_lock.js",
+    "test:stall": "node tests/test_stall_mitigation.js",
+    "test:schema": "node tests/test_schema_validation.js"
+  },
+  "keywords": [
+    "chatgpt",
+    "puppeteer",
+    "automation",
+    "adaptive-latency",
+    "robust-agent",
+    "pm2"
+  ],
+  "dependencies": {
+    "compression": "^1.7.4",
+    "express": "^4.18.2",
+    "ghost-cursor": "^1.1.18",
+    "js-yaml": "^4.1.0",
+    "pm2": "^5.3.0",
+    "puppeteer": "^21.5.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "socket.io": "^4.7.2",
+    "socket.io-client": "^4.8.3",
+    "tree-kill": "^1.2.2",
+    "user-agents": "^1.0.1428",
+    "uuid": "^13.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "os": [
+    "win32",
+    "linux",
+    "darwin"
+  ],
+  "author": "Dev",
+  "license": "ISC"
+}

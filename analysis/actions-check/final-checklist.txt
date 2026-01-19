@@ -1,0 +1,28 @@
+Final Checklist — repository scrub summary
+
+Completed:
+- Created backups: analysis/backups/
+- Performed mirror-based history rewrite removing `local-login/`, `profile/`, `node_modules/`
+- Expired reflogs and ran `git gc --prune=now --aggressive` on mirror
+- Force-pushed cleaned mirror to origin
+- Removed `refs/original/*` where present
+- Verified fresh clone in analysis/repo-verify shows no historical references to removed paths
+- Downloaded and scanned CI workflow artifacts to analysis/actions-check/
+- Created rotation and support issues on GitHub:
+  - Rotation: https://github.com/Rajude/chatgpt-docker-puppeteer/issues/15
+  - Support (server GC): https://github.com/Rajude/chatgpt-docker-puppeteer/issues/16
+
+Remaining / optional:
+- Rotate provider credentials (GitHub PATs, AWS keys, DB passwords) — action required by owner
+- Confirm forks/mirrors do not retain sensitive objects
+- Host-side GC confirmation from GitHub support
+- Re-run external secret scanners and validate
+
+Audit artifacts location:
+- analysis/backups/
+- analysis/repo-mirror-final.git (bare mirror)
+- analysis/repo-verify/
+- analysis/actions-check/
+- analysis/notifications/
+
+Generated: 2026-01-16

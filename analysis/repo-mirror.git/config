@@ -1,0 +1,10 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/Rajude/chatgpt-docker-puppeteer.git
+	tagOpt = --no-tags
+	fetch = +refs/*:refs/*
+	mirror = true

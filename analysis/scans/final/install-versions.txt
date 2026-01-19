@@ -1,0 +1,8 @@
+detect-secrets: 
+1.5.0
+
+truffleHog: 
+Version: 2.2.1
+
+ gitleaks: 
+not-installed

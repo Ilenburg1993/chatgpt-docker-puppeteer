@@ -1,0 +1,342 @@
+[2026-01-16T04:45:41.003Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:45:41.003Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:46:24.724Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:46:24.724Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:48:45.054Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:48:45.054Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:49:01.258Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-16T04:49:01.257Z] INFO  [-] [ADAPTIVE] Memória estatística carregada e validada.
+[2026-01-17T04:07:01.227Z] INFO  [-] [BOOT] >>> Iniciando Subsistema Mission Control (Modular) <<<
+[2026-01-17T04:07:01.454Z] DEBUG [-] [BOOT] Gestor de ciclo de vida (Shutdown) ativo.
+[2026-01-17T04:07:01.462Z] INFO  [-] [HTTP] Mission Control ativo em: http://localhost:3000
+[2026-01-17T04:07:01.462Z] INFO  [-] [SOCKET] Inicializando barramento de eventos realtime...
+[2026-01-17T04:07:01.464Z] DEBUG [-] [BOOT] Barramento de eventos Socket.io acoplado.
+[2026-01-17T04:07:01.466Z] INFO  [-] [STREAMER] Monitoramento de log operacional ativo.
+[2026-01-17T04:07:01.466Z] INFO  [-] [TELEMETRY] Iniciando ciclo de monitoramento de hardware.
+[2026-01-17T04:07:01.468Z] INFO  [-] [BOOT] Motores de telemetria e streaming ativos.
+[2026-01-17T04:07:01.468Z] INFO  [-] [API] Mapeando endpoints de controle e telemetria...
+[2026-01-17T04:07:01.469Z] INFO  [-] [API] Todos os domínios de rota injetados com sucesso.
+[2026-01-17T04:07:01.469Z] DEBUG [-] [BOOT] Endpoints de API injetados no Express.
+[2026-01-17T04:07:01.469Z] INFO  [-] [WATCHER] Iniciando monitoramento da fila de tarefas.
+[2026-01-17T04:07:01.470Z] INFO  [-] [LOG_WATCHER] Iniciando monitoramento de integridade do log.
+[2026-01-17T04:07:01.471Z] INFO  [-] [BOOT] Watchers de infraestrutura operacionais.
+[2026-01-17T04:07:01.471Z] INFO  [-] [BOOT] Subsistema Mission Control totalmente operacional na porta 3000
+[2026-01-17T04:07:04.131Z] INFO  [-] [PM2_BUS] Escuta de eventos de processo ativa.
+[2026-01-17T04:08:38.198Z] DEBUG [-] [WATCHER] Mudança na fila detectada. Notificando Dashboard.
+[2026-01-17T04:11:58.792Z] INFO  [-] [LIFECYCLE] Sinal SIGINT recebido. Iniciando encerramento atômico...
+[2026-01-17T04:11:58.792Z] DEBUG [-] [LIFECYCLE] Desativando watchers de filesystem...
+[2026-01-17T04:11:58.793Z] INFO  [-] [WATCHER] Monitoramento de fila encerrado.
+[2026-01-17T04:11:58.793Z] DEBUG [-] [LIFECYCLE] Encerrando barramentos de telemetria e eventos...
+[2026-01-17T04:11:58.794Z] INFO  [-] [TELEMETRY] Ciclo de monitoramento encerrado.
+[2026-01-17T04:11:58.794Z] DEBUG [-] [LIFECYCLE] Encerrando servidor HTTP e Sockets...
+[2026-01-17T04:11:58.795Z] INFO  [-] [HTTP] Servidor encerrado.
+[2026-01-17T04:11:58.795Z] INFO  [-] [LIFECYCLE] Subsistema Server encerrado com sucesso.
+[2026-01-17T05:34:25.558Z] INFO  [-] [PRIME] >>> Iniciando Mission Control Prime V50 <<<
+[2026-01-17T05:34:25.559Z] DEBUG [-] [PRIME] Gestor de ciclo de vida ativo.
+[2026-01-17T05:34:25.562Z] INFO  [-] [ENGINE] Servidor HTTP ativo em: http://localhost:3000
+[2026-01-17T05:34:25.565Z] INFO  [-] [ENGINE] Inicializando hub de eventos realtime...
+[2026-01-17T05:34:25.566Z] DEBUG [-] [PRIME] Barramento de eventos Socket.io acoplado.
+[2026-01-17T05:34:25.567Z] INFO  [-] [API] Injetando malha de rotas e escudos de proteção...
+[2026-01-17T05:34:25.567Z] INFO  [-] [API] Malha de rotas e Error Boundary consolidados.
+[2026-01-17T05:34:25.568Z] DEBUG [-] [PRIME] Endpoints de API injetados.
+[2026-01-17T05:34:25.569Z] INFO  [-] [LOG_TAIL] Streaming de log operacional ativo.
+[2026-01-17T05:34:25.570Z] INFO  [-] [TELEMETRY_HW] Ativando pulso de monitoramento de hardware.
+[2026-01-17T05:34:25.571Z] INFO  [-] [PRIME] Motores de telemetria e streaming operacionais.
+[2026-01-17T05:34:25.571Z] INFO  [-] [FS_WATCHER] Monitoramento da fila de tarefas ativado.
+[2026-01-17T05:34:25.572Z] INFO  [-] [LOG_WATCHER] Vigilância de integridade do log operacional ativa.
+[2026-01-17T05:34:25.573Z] INFO  [-] [PRIME] Watchers de infraestrutura ativos.
+[2026-01-17T05:34:25.573Z] INFO  [-] [PRIME] MCC V50 totalmente operacional na porta 3000
+[2026-01-17T05:34:25.582Z] INFO  [-] [PM2_BRIDGE] Escuta de eventos de processo ativa.
+[2026-01-17T05:35:35.614Z] INFO  [-] [LIFECYCLE] Sinal SIGINT detectado. Iniciando sequência de encerramento...
+[2026-01-17T05:35:35.615Z] DEBUG [-] [LIFECYCLE] Finalizando observadores de disco...
+[2026-01-17T05:35:35.625Z] INFO  [-] [FS_WATCHER] Monitoramento de fila encerrado.
+[2026-01-17T05:35:35.626Z] DEBUG [-] [LIFECYCLE] Encerrando barramentos de dados vivos...
+[2026-01-17T05:35:35.627Z] INFO  [-] [TELEMETRY_HW] Monitoramento de hardware encerrado.
+[2026-01-17T05:35:35.627Z] INFO  [-] [LOG_TAIL] Streaming de log encerrado.
+[2026-01-17T05:35:35.628Z] INFO  [-] [PM2_BRIDGE] Ponte de eventos encerrada.
+[2026-01-17T05:35:35.628Z] DEBUG [-] [LIFECYCLE] Encerrando servidor HTTP e Sockets...
+[2026-01-17T05:35:35.629Z] INFO  [-] [ENGINE] Servidor HTTP encerrado.
+[2026-01-17T05:35:35.630Z] INFO  [-] [LIFECYCLE] Subsistema Mission Control encerrado com sucesso.
+[2026-01-17T14:08:15.051Z] WARN  [-] [IDENTITY] Novo DNA gerado (Nascimento): 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:08:15.061Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:09:19.182Z] WARN  [-] [IPC] Falha na descoberta de porta: Unexpected token 'C', "CONTEUDO_I"... is not valid JSON
+[2026-01-17T14:13:38.105Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:13:38.135Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 8MYqIDRYNph0I0fvAAAB).
+[2026-01-17T14:13:43.145Z] WARN  [-] [HUB] Handshake Timeout para 8MYqIDRYNph0I0fvAAAB. Encerrando.
+[2026-01-17T14:13:43.159Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: FzVkOjvI8tIxxbpXAAAD).
+[2026-01-17T14:13:43.162Z] ERROR [-] [HUB] Handshake rejeitado para FzVkOjvI8tIxxbpXAAAD: [
+  {
+    "validation": "uuid",
+    "code": "invalid_string",
+    "message": "Invalid uuid",
+    "path": [
+      "robot_id"
+    ]
+  },
+  {
+    "validation": "uuid",
+    "code": "invalid_string",
+    "message": "Invalid uuid",
+    "path": [
+      "instance_id"
+    ]
+  }
+]
+[2026-01-17T14:13:48.171Z] WARN  [-] [HUB] Handshake Timeout para FzVkOjvI8tIxxbpXAAAD. Encerrando.
+[2026-01-17T14:15:40.541Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:15:40.569Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: -OwkRvCRYWtMdeJzAAAB).
+[2026-01-17T14:15:45.582Z] WARN  [-] [HUB] Handshake Timeout para -OwkRvCRYWtMdeJzAAAB. Encerrando.
+[2026-01-17T14:15:45.594Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 9Rtw0DWyn9topdBPAAAD).
+[2026-01-17T14:15:45.599Z] ERROR [-] [HUB] Handshake rejeitado para 9Rtw0DWyn9topdBPAAAD: Protocol Drift: Server 2.0.0 vs Agent 1.0.0
+[2026-01-17T14:15:45.603Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: WypiPzQUUcM5JGtEAAAF).
+[2026-01-17T14:15:50.603Z] WARN  [-] [HUB] Handshake Timeout para 9Rtw0DWyn9topdBPAAAD. Encerrando.
+[2026-01-17T14:15:50.606Z] WARN  [-] [HUB] Handshake Timeout para WypiPzQUUcM5JGtEAAAF. Encerrando.
+[2026-01-17T14:19:42.947Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:19:42.954Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T14:19:42.980Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: xco5I6mMXgTEp5xVAAAB).
+[2026-01-17T14:19:42.981Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:23:11.022Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:23:11.025Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:23:11.029Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T14:23:11.054Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: BrwzBeSJaDhcYOd4AAAB).
+[2026-01-17T14:23:11.055Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:23:11.059Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 56828b3b-22f9-480f-8550-d910c6961bd8
+[2026-01-17T14:23:11.061Z] INFO  [-] [IPC] Handshake Homologado. Sessão: BrwzBeSJaDhcYOd4AAAB
+[2026-01-17T14:25:02.540Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:25:02.547Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:25:02.548Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:25:02.573Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: _1RwNDkyLHcoBooFAAAB).
+[2026-01-17T14:25:02.575Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:25:02.578Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida e8399994-eb61-448e-b52d-3a19be845c2f
+[2026-01-17T14:25:02.579Z] INFO  [-] [IPC] Handshake Homologado. Sessão: _1RwNDkyLHcoBooFAAAB
+[2026-01-17T14:27:17.260Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:27:17.265Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:27:17.266Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:27:17.295Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 7TQ7B-Rf_OUSIRGFAAAB).
+[2026-01-17T14:27:17.297Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:27:17.299Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida c773d739-625a-4453-a8ea-653f6c0b182d
+[2026-01-17T14:27:17.301Z] INFO  [-] [IPC] Handshake Homologado. Sessão: 7TQ7B-Rf_OUSIRGFAAAB
+[2026-01-17T14:29:02.109Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:29:02.115Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:29:02.116Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:29:02.142Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: AApF8P3wVck5jNsTAAAB).
+[2026-01-17T14:29:02.144Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:29:02.147Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida cc6da6ae-39e9-446d-a061-778603de715e
+[2026-01-17T14:29:02.148Z] INFO  [-] [IPC] Handshake Homologado. Sessão: AApF8P3wVck5jNsTAAAB
+[2026-01-17T14:31:14.399Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:31:14.405Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:31:14.406Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:31:14.432Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: RB_R83qLbmP6e9_TAAAB).
+[2026-01-17T14:31:14.433Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:31:14.436Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 28c70a4b-d2bf-41d8-a21e-6bf39ce14232
+[2026-01-17T14:31:14.437Z] INFO  [-] [IPC] Handshake Homologado. Sessão: RB_R83qLbmP6e9_TAAAB
+[2026-01-17T14:32:54.787Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:32:54.792Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:32:54.795Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:32:54.820Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: aADFTB_ub7IEjlHAAAAB).
+[2026-01-17T14:32:54.821Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:32:54.825Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 64f7f270-7920-4aae-ade0-5dd8082cb0d8
+[2026-01-17T14:32:54.826Z] INFO  [-] [IPC] Handshake Homologado. Sessão: aADFTB_ub7IEjlHAAAAB
+[2026-01-17T14:37:10.208Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:37:10.214Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:37:10.216Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:37:10.241Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: A6vDFFexjbWg0rOyAAAB).
+[2026-01-17T14:37:10.242Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:37:10.246Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 37f329d8-3645-4cb9-9e28-7a283305f575
+[2026-01-17T14:37:10.248Z] INFO  [-] [IPC] Handshake Homologado. Sessão: A6vDFFexjbWg0rOyAAAB
+[2026-01-17T14:38:02.934Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:38:02.940Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:38:02.941Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:38:02.967Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: ZD8gYIMr96CI4_bwAAAB).
+[2026-01-17T14:38:02.968Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:38:02.971Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida a6b85cf0-3078-4435-8923-9489dba461c8
+[2026-01-17T14:38:02.972Z] INFO  [-] [IPC] Handshake Homologado. Sessão: ZD8gYIMr96CI4_bwAAAB
+[2026-01-17T14:38:03.472Z] DEBUG [trace-f8dc83d0-a21b-4f53-b112-4fb6f4f5294c] [HUB] Comando cmd:engine:pause enviado para agent:5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:38:03.474Z] ERROR [-] [IPC] Violação de Protocolo: [
+  {
+    "validation": "uuid",
+    "code": "invalid_string",
+    "message": "Invalid uuid",
+    "path": [
+      "ids",
+      "correlation_id"
+    ]
+  }
+]
+[2026-01-17T14:40:06.494Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:40:06.500Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:40:06.501Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3007...
+[2026-01-17T14:40:06.527Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: O74rtV_Jm5SEngVfAAAB).
+[2026-01-17T14:40:06.528Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:40:06.531Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 7b2be1bb-14b9-4226-aef8-9e38eb4cede6
+[2026-01-17T14:40:06.532Z] INFO  [-] [IPC] Handshake Homologado. Sessão: O74rtV_Jm5SEngVfAAAB
+[2026-01-17T14:40:07.025Z] DEBUG [bf78c0d7-2c1b-4eea-8f97-e4738b80ef98] [HUB] Comando cmd:engine:pause enviado para agent:5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:40:07.028Z] DEBUG [bf78c0d7-2c1b-4eea-8f97-e4738b80ef98] [IPC] Executando: cmd:engine:pause
+[2026-01-17T14:43:15.619Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:43:15.620Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:43:15.624Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T14:43:15.649Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: ZWynOKBtwqQqzqHzAAAB).
+[2026-01-17T14:43:15.651Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:43:15.654Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida adc4e375-7bc7-4caa-8c0b-c197336e77d9
+[2026-01-17T14:43:15.655Z] INFO  [-] [IPC] Handshake Homologado. Sessão: ZWynOKBtwqQqzqHzAAAB
+[2026-01-17T14:45:52.181Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:45:52.184Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:45:52.187Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T14:45:52.212Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 9zPdF9xvR6UDn8ULAAAB).
+[2026-01-17T14:45:52.213Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:45:52.216Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida a71a8de5-57cf-4ac1-98c8-821c56e34bd5
+[2026-01-17T14:45:52.218Z] INFO  [-] [IPC] Handshake Homologado. Sessão: 9zPdF9xvR6UDn8ULAAAB
+[2026-01-17T14:47:48.845Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:47:48.847Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:47:48.851Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T14:47:48.877Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: Ls4_BPXo0C8JlffZAAAB).
+[2026-01-17T14:47:48.877Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:47:48.880Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 38cf386e-95a4-452a-895d-9bfbc4cf2a4d
+[2026-01-17T14:47:48.882Z] INFO  [-] [IPC] Handshake Homologado. Sessão: Ls4_BPXo0C8JlffZAAAB
+[2026-01-17T14:49:42.635Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T14:49:42.637Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T14:49:42.640Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T14:49:42.666Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: SoskLjICOt6iD1DnAAAB).
+[2026-01-17T14:49:42.667Z] DEBUG [-] [IPC] Conexão física OK. Iniciando Handshake...
+[2026-01-17T14:49:42.670Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida afdcd8ce-4b3b-431a-9a21-7dd63e108875
+[2026-01-17T14:49:42.672Z] INFO  [-] [IPC] Handshake Homologado. Sessão: SoskLjICOt6iD1DnAAAB
+[2026-01-17T14:49:42.674Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: forced close
+[2026-01-17T14:49:42.675Z] WARN  [-] [IPC] Transporte interrompido: transport close
+[2026-01-17T15:02:22.442Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:02:22.444Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T15:02:22.447Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:02:22.475Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 08H2iYoagYgTLXveAAAB).
+[2026-01-17T15:02:22.476Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:02:22.479Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida ac5d6b83-294e-47e9-90ad-76887a0750c3
+[2026-01-17T15:02:22.480Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T15:02:22.482Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: forced close
+[2026-01-17T15:02:22.484Z] WARN  [-] [IPC] Transporte interrompido: transport close
+[2026-01-17T15:02:24.497Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:02:24.497Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:02:24.498Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:05:15.762Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:05:15.765Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T15:05:15.769Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:05:15.798Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 8D4uhuKm0IeaWDPlAAAB).
+[2026-01-17T15:05:15.799Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:05:15.802Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e | Vida 3c264287-b257-435d-8a5d-b3a2fa0b6529
+[2026-01-17T15:05:15.803Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T15:05:15.805Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: forced close
+[2026-01-17T15:05:15.807Z] WARN  [-] [IPC] Transporte interrompido: transport close
+[2026-01-17T15:05:17.818Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:05:17.819Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:05:17.820Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:09:27.933Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:09:27.935Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T15:09:27.938Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:09:27.964Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: G-YDS-04jdWO2FYUAAAB).
+[2026-01-17T15:09:27.965Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:09:27.968Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:09:27.969Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T15:09:27.971Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: forced close
+[2026-01-17T15:09:27.973Z] WARN  [-] [IPC] Transporte interrompido: transport close
+[2026-01-17T15:09:29.980Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:09:29.981Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:09:29.985Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:16:30.165Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:16:30.167Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T15:16:30.178Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:16:30.223Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: C0QmldCF5b-BA3CRAAAB).
+[2026-01-17T15:16:30.226Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:16:30.230Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:16:30.231Z] INFO  [-] [IPC] Handshake Homologado. Sessão: C0QmldCF5b-BA3CRAAAB
+[2026-01-17T15:16:30.233Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: forced close
+[2026-01-17T15:16:30.239Z] WARN  [-] [IPC] Transporte interrompido: transport close
+[2026-01-17T15:16:32.249Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:16:32.250Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:16:32.251Z] DEBUG [-] [IPC] Offline. Bufferizando evento: evt:task:progress
+[2026-01-17T15:18:46.501Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:18:46.503Z] INFO  [-] [HUB] Mission Control Hub V500 Online (IPC 2.0 Enabled).
+[2026-01-17T15:18:46.507Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:18:46.533Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:23:26.419Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:23:26.420Z] INFO  [-] [HUB] Mission Control Hub V505 Online (IPC 2.0 Enabled).
+[2026-01-17T15:23:26.424Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:23:26.449Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:29:48.098Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:29:48.099Z] INFO  [-] [HUB] Mission Control Hub V510 Online (IPC 2.0 Enabled).
+[2026-01-17T15:29:48.103Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:29:48.128Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:34:01.668Z] INFO  [-] [IPC] Cliente resetado e destruído.
+[2026-01-17T15:34:01.672Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:34:01.672Z] INFO  [-] [HUB] Mission Control Hub V510 Online (IPC 2.0 Enabled).
+[2026-01-17T15:34:01.676Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3006...
+[2026-01-17T15:34:01.701Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: koR5DXZLawf5GyscAAAB).
+[2026-01-17T15:34:01.702Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:34:01.705Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:34:01.706Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T15:34:01.707Z] INFO  [-] [HUB] Encerrando barramento e limpando conexões...
+[2026-01-17T15:34:01.708Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: server namespace disconnect
+[2026-01-17T15:34:01.712Z] INFO  [-] [HUB] Barramento Socket.io limpo com sucesso.
+[2026-01-17T15:34:03.717Z] DEBUG [-] [IPC] Offline. Bufferizando: evt:task:progress
+[2026-01-17T15:34:03.717Z] DEBUG [-] [IPC] Offline. Bufferizando: evt:task:progress
+[2026-01-17T15:34:03.718Z] DEBUG [-] [IPC] Offline. Bufferizando: evt:task:progress
+[2026-01-17T15:34:03.718Z] INFO  [-] [HUB] Mission Control Hub V510 Online (IPC 2.0 Enabled).
+[2026-01-17T15:39:11.531Z] INFO  [-] [FACTORY] 1 targets mapeados.
+[2026-01-17T15:39:11.534Z] INFO  [-] [HUB] Mission Control Hub V510 Online (IPC 2.0 Enabled).
+[2026-01-17T15:39:11.539Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:39:11.540Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3008...
+[2026-01-17T15:39:11.566Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: n5g70mojG5h3K3G4AAAB).
+[2026-01-17T15:39:11.567Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:39:11.570Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:39:11.571Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T15:39:11.572Z] INFO  [-] 🚀 Execution Engine v1.3.0 Online (IPC 2.0 Enabled)
+[2026-01-17T15:39:11.576Z] INFO  [c579901c-ddee-444b-9c71-4735ca6fe4df] >>> Processando: task-test-51
+[2026-01-17T15:39:11.583Z] DEBUG [c579901c-ddee-444b-9c71-4735ca6fe4df] [LIFECYCLE] Adquirindo driver para tarefa: task-test-51
+[2026-01-17T15:39:11.584Z] ERROR [c579901c-ddee-444b-9c71-4735ca6fe4df] [LIFECYCLE] Falha na aquisição do driver: page.isClosed is not a function
+[2026-01-17T15:39:11.584Z] ERROR [c579901c-ddee-444b-9c71-4735ca6fe4df] [ENGINE] Falha na tarefa: page.isClosed is not a function
+[2026-01-17T15:39:11.585Z] FATAL [task-test-51] Gerando DUMP FORENSE em: D:\chatgpt-docker-puppeteer\logs\crash_reports\crash_2026-01-17T15-39-11-585Z_task-test-51
+[2026-01-17T15:39:11.590Z] DEBUG [c579901c-ddee-444b-9c71-4735ca6fe4df] [LIFECYCLE] Liberando recursos da tarefa: task-test-51
+[2026-01-17T15:39:14.603Z] WARN  [-] [ENGINE] Resfriamento: 19s
+[2026-01-17T15:41:53.247Z] INFO  [-] [FACTORY] 1 targets mapeados.
+[2026-01-17T15:41:53.250Z] INFO  [-] [HUB] Mission Control Hub V510 Online (IPC 2.0 Enabled).
+[2026-01-17T15:41:53.255Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:41:53.256Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3008...
+[2026-01-17T15:41:53.282Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 010eVGUQPy8QSe5IAAAB).
+[2026-01-17T15:41:53.283Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T15:41:53.286Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T15:41:53.287Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T15:41:53.288Z] INFO  [-] 🚀 Execution Engine v1.3.0 Online (IPC 2.0 Enabled)
+[2026-01-17T15:41:53.294Z] INFO  [32a87543-32d0-42ba-96a0-df149d944173] >>> Processando: task-test-51
+[2026-01-17T15:41:53.298Z] DEBUG [32a87543-32d0-42ba-96a0-df149d944173] [LIFECYCLE] Adquirindo driver para tarefa: task-test-51
+[2026-01-17T15:41:53.299Z] ERROR [32a87543-32d0-42ba-96a0-df149d944173] [LIFECYCLE] Falha na aquisição do driver: page.isClosed is not a function
+[2026-01-17T15:41:53.300Z] ERROR [32a87543-32d0-42ba-96a0-df149d944173] [ENGINE] Falha na tarefa: page.isClosed is not a function
+[2026-01-17T15:41:53.301Z] FATAL [task-test-51] Gerando DUMP FORENSE em: D:\chatgpt-docker-puppeteer\logs\crash_reports\crash_2026-01-17T15-41-53-300Z_task-test-51
+[2026-01-17T15:41:53.305Z] DEBUG [32a87543-32d0-42ba-96a0-df149d944173] [LIFECYCLE] Liberando recursos da tarefa: task-test-51
+[2026-01-17T15:41:56.316Z] WARN  [-] [ENGINE] Resfriamento: 17s
+[2026-01-17T16:01:45.034Z] INFO  [-] [FACTORY] 1 targets mapeados.
+[2026-01-17T16:01:45.037Z] INFO  [-] [HUB] Mission Control Hub V510 Online (IPC 2.0 Enabled).
+[2026-01-17T16:01:45.042Z] INFO  [-] [IDENTITY] DNA carregado: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T16:01:45.043Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3008...
+[2026-01-17T16:01:45.069Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: 76HWrVYlkmqW7UBzAAAB).
+[2026-01-17T16:01:45.071Z] DEBUG [-] [IPC] Transporte OK. Iniciando Handshake...
+[2026-01-17T16:01:45.073Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-17T16:01:45.075Z] INFO  [-] [IPC] Handshake Homologado.
+[2026-01-17T16:01:45.075Z] INFO  [-] 🚀 Execution Engine v1.3.0 Online (IPC 2.0 Enabled)
+[2026-01-17T16:01:45.081Z] INFO  [0c22ac30-fb8a-42bd-8a3b-42cf80196d9f] >>> Processando: task-test-51
+[2026-01-17T16:01:45.085Z] DEBUG [0c22ac30-fb8a-42bd-8a3b-42cf80196d9f] [LIFECYCLE] Adquirindo driver para tarefa: task-test-51
+[2026-01-17T16:01:45.086Z] ERROR [0c22ac30-fb8a-42bd-8a3b-42cf80196d9f] [LIFECYCLE] Falha na aquisição do driver: page.isClosed is not a function
+[2026-01-17T16:01:45.087Z] ERROR [0c22ac30-fb8a-42bd-8a3b-42cf80196d9f] [ENGINE] Falha na tarefa: page.isClosed is not a function
+[2026-01-17T16:01:45.088Z] FATAL [task-test-51] Gerando DUMP FORENSE em: D:\chatgpt-docker-puppeteer\logs\crash_reports\crash_2026-01-17T16-01-45-087Z_task-test-51
+[2026-01-17T16:01:45.092Z] DEBUG [0c22ac30-fb8a-42bd-8a3b-42cf80196d9f] [LIFECYCLE] Liberando recursos da tarefa: task-test-51
+[2026-01-17T16:01:48.100Z] WARN  [-] [ENGINE] Resfriamento: 19s
+[2026-01-18T12:06:03.769Z] INFO  [-] [HUB] Mission Control Hub V600 Online (IPC 2.0 Native).
+[2026-01-18T12:06:03.810Z] INFO  [-] [FS_WATCHER] Sensor de filesystem da fila em prontidão.
+[2026-01-18T12:06:03.812Z] INFO  [-] [IDENTITY] DNA carregado com sucesso: 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-18T12:06:03.814Z] INFO  [-] [IPC] Conectando ao barramento em http://localhost:3010...
+[2026-01-18T12:06:03.840Z] DEBUG [-] [HUB] Tentativa de acoplamento de agente (ID: BOSSgMmmf-NygGaTAAAB).
+[2026-01-18T12:06:03.841Z] DEBUG [-] [IPC] Transporte físico OK. Iniciando Handshake...
+[2026-01-18T12:06:03.843Z] INFO  [-] [HUB] Maestro Homologado: DNA 5feb3238-980b-4a57-8a56-37464ad3229e
+[2026-01-18T12:06:03.844Z] INFO  [-] [IPC] Handshake Homologado. Sessão: BOSSgMmmf-NygGaTAAAB
+[2026-01-18T12:06:03.848Z] INFO  [-] [DNA_STORE] DNA Evoluído: v5 por TEST_SADI_EVOLUTION
+[2026-01-18T12:06:03.849Z] INFO  [-] [FS_WATCHER] Sensor de filesystem desativado.
+[2026-01-18T12:06:03.850Z] INFO  [-] [HUB] Encerrando barramento e limpando conexões...
+[2026-01-18T12:06:03.851Z] WARN  [-] [HUB] Maestro 5feb3238-980b-4a57-8a56-37464ad3229e desconectado. Causa: server namespace disconnect
+[2026-01-18T12:06:03.854Z] WARN  [-] [IPC] Transporte encerrado: io server disconnect
+[2026-01-18T12:06:03.856Z] INFO  [-] [HUB] Barramento Socket.io limpo com sucesso.
+[2026-01-18T12:06:03.856Z] INFO  [-] [IPC] Transporte encerrado manualmente.

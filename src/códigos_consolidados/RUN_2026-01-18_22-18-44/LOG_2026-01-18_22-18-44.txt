@@ -1,0 +1,18 @@
+DATA_INICIO: 2026-01-18 22:18:44
+ROOT: D:\chatgpt-docker-puppeteer\src
+
+ARQUIVOS_JS_COPIADOS: 140
+
+RENOMEACOES_AUTOMATICAS:
+- D:\chatgpt-docker-puppeteer\src\shared\ipcNEWOLD\constants.js -> D:\chatgpt-docker-puppeteer\src\códigos_consolidados\RUN_2026-01-18_22-18-44\shared\constants__ipcNEWOLD.js
+- D:\chatgpt-docker-puppeteer\src\shared\ipcNEWOLD\envelope.js -> D:\chatgpt-docker-puppeteer\src\códigos_consolidados\RUN_2026-01-18_22-18-44\shared\envelope__ipcNEWOLD.js
+- D:\chatgpt-docker-puppeteer\src\shared\ipcNEWOLD\schemas.js -> D:\chatgpt-docker-puppeteer\src\códigos_consolidados\RUN_2026-01-18_22-18-44\shared\schemas__ipcNEWOLD.js
+- D:\chatgpt-docker-puppeteer\src\nerv\transport\framing.js -> D:\chatgpt-docker-puppeteer\src\códigos_consolidados\RUN_2026-01-18_22-18-44\nerv\framing__transport.js
+- D:\chatgpt-docker-puppeteer\src\kernel\policy_engine\policy_engine.js -> D:\chatgpt-docker-puppeteer\src\códigos_consolidados\RUN_2026-01-18_22-18-44\kernel\policy_engine__policy_engine.js
+- D:\chatgpt-docker-puppeteer\src\kernel\state\observation_store.js -> D:\chatgpt-docker-puppeteer\src\códigos_consolidados\RUN_2026-01-18_22-18-44\kernel\observation_store__state.js
+
+ERROS:
+Nenhum erro.
+
+DATA_FIM: 2026-01-18 22:18:44
+DURACAO: 0.15 segundos

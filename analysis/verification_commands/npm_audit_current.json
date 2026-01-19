@@ -1,0 +1,217 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@puppeteer/browsers": {
+      "name": "@puppeteer/browsers",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "tar-fs"
+      ],
+      "effects": [
+        "puppeteer",
+        "puppeteer-core"
+      ],
+      "range": "1.4.2 - 2.2.3",
+      "nodes": [
+        "node_modules/@puppeteer/browsers"
+      ],
+      "fixAvailable": {
+        "name": "puppeteer",
+        "version": "24.35.0",
+        "isSemVerMajor": true
+      }
+    },
+    "pm2": {
+      "name": "pm2",
+      "severity": "low",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1112031,
+          "name": "pm2",
+          "dependency": "pm2",
+          "title": "pm2 Regular Expression Denial of Service vulnerability",
+          "url": "https://github.com/advisories/GHSA-x5gf-qvw8-r2rm",
+          "severity": "low",
+          "cwe": [
+            "CWE-400",
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 4.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=6.0.14"
+        }
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/pm2"
+      ],
+      "fixAvailable": false
+    },
+    "puppeteer": {
+      "name": "puppeteer",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@puppeteer/browsers",
+        "puppeteer-core"
+      ],
+      "effects": [],
+      "range": "18.2.0 - 22.13.0",
+      "nodes": [
+        "node_modules/puppeteer"
+      ],
+      "fixAvailable": {
+        "name": "puppeteer",
+        "version": "24.35.0",
+        "isSemVerMajor": true
+      }
+    },
+    "puppeteer-core": {
+      "name": "puppeteer-core",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@puppeteer/browsers",
+        "ws"
+      ],
+      "effects": [
+        "puppeteer"
+      ],
+      "range": "11.0.0 - 22.13.0",
+      "nodes": [
+        "node_modules/puppeteer-core"
+      ],
+      "fixAvailable": {
+        "name": "puppeteer",
+        "version": "24.35.0",
+        "isSemVerMajor": true
+      }
+    },
+    "tar-fs": {
+      "name": "tar-fs",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1109534,
+          "name": "tar-fs",
+          "dependency": "tar-fs",
+          "title": "tar-fs has a symlink validation bypass if destination directory is predictable with a specific tarball",
+          "url": "https://github.com/advisories/GHSA-vj76-c3g6-qr5v",
+          "severity": "high",
+          "cwe": [
+            "CWE-22",
+            "CWE-61"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=3.0.0 <3.1.1"
+        },
+        {
+          "source": 1109542,
+          "name": "tar-fs",
+          "dependency": "tar-fs",
+          "title": "tar-fs can extract outside the specified dir with a specific tarball",
+          "url": "https://github.com/advisories/GHSA-8cj5-5rvv-wf4v",
+          "severity": "high",
+          "cwe": [
+            "CWE-22"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=3.0.0 <3.0.9"
+        },
+        {
+          "source": 1109551,
+          "name": "tar-fs",
+          "dependency": "tar-fs",
+          "title": "tar-fs Vulnerable to Link Following and Path Traversal via Extracting a Crafted tar File",
+          "url": "https://github.com/advisories/GHSA-pq67-2wwv-3xjx",
+          "severity": "high",
+          "cwe": [
+            "CWE-22"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+          },
+          "range": ">=3.0.0 <3.0.7"
+        }
+      ],
+      "effects": [
+        "@puppeteer/browsers"
+      ],
+      "range": "3.0.0 - 3.1.0",
+      "nodes": [
+        "node_modules/tar-fs"
+      ],
+      "fixAvailable": {
+        "name": "puppeteer",
+        "version": "24.35.0",
+        "isSemVerMajor": true
+      }
+    },
+    "ws": {
+      "name": "ws",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1098392,
+          "name": "ws",
+          "dependency": "ws",
+          "title": "ws affected by a DoS when handling a request with many HTTP headers",
+          "url": "https://github.com/advisories/GHSA-3h5v-q93c-6h6q",
+          "severity": "high",
+          "cwe": [
+            "CWE-476"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=8.0.0 <8.17.1"
+        }
+      ],
+      "effects": [
+        "puppeteer-core"
+      ],
+      "range": "8.0.0 - 8.17.0",
+      "nodes": [
+        "node_modules/ws"
+      ],
+      "fixAvailable": {
+        "name": "puppeteer",
+        "version": "24.35.0",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 0,
+      "high": 5,
+      "critical": 0,
+      "total": 6
+    },
+    "dependencies": {
+      "prod": 329,
+      "dev": 15,
+      "optional": 7,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 350
+    }
+  }
+}

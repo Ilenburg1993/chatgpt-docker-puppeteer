@@ -1,0 +1,8 @@
+{
+  "detect-secrets-clean-final3.json": 0,
+  "detect-secrets-legacy-final3.json": 0,
+  "gitleaks-clean-final3.json": 0,
+  "gitleaks-legacy-final3.json": 0,
+  "trufflehog-clean-final3.json": 9,
+  "trufflehog-legacy-final3.json": "error"
+}

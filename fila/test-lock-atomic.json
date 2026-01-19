@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "id": "test-lock-atomic",
+    "version": "3.0",
+    "created_at": "2026-01-16T04:49:00.962Z",
+    "priority": 5,
+    "source": "test_suite",
+    "tags": [
+      "test"
+    ]
+  },
+  "spec": {
+    "target": "chatgpt",
+    "model": "gpt-5",
+    "payload": {
+      "user_message": "Teste de Lock Atomicidade"
+    },
+    "config": {
+      "reset_context": false
+    }
+  },
+  "policy": {
+    "max_attempts": 3,
+    "timeout_ms": 30000,
+    "dependencies": []
+  },
+  "state": {
+    "status": "PENDING",
+    "attempts": 0,
+    "started_at": null,
+    "history": []
+  }
+}

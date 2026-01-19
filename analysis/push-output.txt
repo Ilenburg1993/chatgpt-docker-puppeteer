@@ -1,0 +1,29 @@
+01:06:09.941163 git.c:476               trace: built-in: git push --mirror origin
+01:06:09.954374 run-command.c:667       trace: run_command: GIT_DIR=.git git remote-https origin https://@github.com/Rajude/chatgpt-docker-puppeteer.git
+01:06:09.954413 run-command.c:759       trace: start_command: /usr/local/libexec/git-core/git remote-https origin https://@github.com/Rajude/chatgpt-docker-puppeteer.git
+01:06:09.961743 git.c:772               trace: exec: git-remote-https origin https://@github.com/Rajude/chatgpt-docker-puppeteer.git
+01:06:09.961895 run-command.c:667       trace: run_command: git-remote-https origin https://@github.com/Rajude/chatgpt-docker-puppeteer.git
+01:06:09.961915 run-command.c:759       trace: start_command: /usr/local/libexec/git-core/git-remote-https origin https://@github.com/Rajude/chatgpt-docker-puppeteer.git
+01:06:10.234145 run-command.c:667       trace: run_command: 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f get'
+01:06:10.234172 run-command.c:759       trace: start_command: /bin/sh -c 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f get' 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f get'
+01:06:10.291148 run-command.c:667       trace: run_command: 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f get'
+01:06:10.291197 run-command.c:759       trace: start_command: /bin/sh -c 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f get' 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f get'
+01:06:10.366931 run-command.c:667       trace: run_command: /vscode/vscode-server/bin/linux-x64/585eba7c0c34fd6b30faac7c62a42050bfbc0086/extensions/git/dist/askpass.sh 'Username for '\''https://github.com'\'': '
+01:06:10.366965 run-command.c:759       trace: start_command: /vscode/vscode-server/bin/linux-x64/585eba7c0c34fd6b30faac7c62a42050bfbc0086/extensions/git/dist/askpass.sh 'Username for '\''https://github.com'\'': '
+01:06:10.901310 run-command.c:667       trace: run_command: /vscode/vscode-server/bin/linux-x64/585eba7c0c34fd6b30faac7c62a42050bfbc0086/extensions/git/dist/askpass.sh 'Password for '\''https://6267555@github.com'\'': '
+01:06:10.901335 run-command.c:759       trace: start_command: /vscode/vscode-server/bin/linux-x64/585eba7c0c34fd6b30faac7c62a42050bfbc0086/extensions/git/dist/askpass.sh 'Password for '\''https://6267555@github.com'\'': '
+01:06:11.166199 run-command.c:667       trace: run_command: 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f store'
+01:06:11.166248 run-command.c:759       trace: start_command: /bin/sh -c 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f store' 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f store'
+01:06:11.228941 run-command.c:667       trace: run_command: 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f store'
+01:06:11.228968 run-command.c:759       trace: start_command: /bin/sh -c 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f store' 'f() { /home/node/.vscode-server/bin/585eba7c0c34fd6b30faac7c62a42050bfbc0086/node /tmp/vscode-remote-containers-a475d5e4-c450-4cd3-b0c3-4a568d9224a2.js git-credential-helper $*; }; f store'
+warning: redirecting to https://github.com/Rajude/chatgpt-docker-puppeteer.git/
+01:06:11.290177 run-command.c:667       trace: run_command: git send-pack --stateless-rpc --helper-status --thin --no-progress https://github.com/Rajude/chatgpt-docker-puppeteer.git/ --stdin
+01:06:11.290217 run-command.c:759       trace: start_command: /usr/local/libexec/git-core/git send-pack --stateless-rpc --helper-status --thin --no-progress https://github.com/Rajude/chatgpt-docker-puppeteer.git/ --stdin
+01:06:11.301056 git.c:476               trace: built-in: git send-pack --stateless-rpc --helper-status --thin --no-progress https://github.com/Rajude/chatgpt-docker-puppeteer.git/ --stdin
+01:06:11.325369 run-command.c:667       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+01:06:11.325423 run-command.c:759       trace: start_command: /usr/local/libexec/git-core/git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+01:06:11.333611 git.c:476               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+To https://github.com/Rajude/chatgpt-docker-puppeteer.git
+ + 72a6bf6...908528c main -> main (forced update)
+ - [deleted]         origin/main
+ * [new reference]   refs/original/refs/heads/main -> refs/original/refs/heads/main

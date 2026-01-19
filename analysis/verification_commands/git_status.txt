@@ -1,0 +1,12 @@
+?? .github/workflows/git-secrets-scan.yml
+?? .github/workflows/pre-commit.yml
+?? .github/workflows/secret-scan-schedule.yml
+?? .github/workflows/secret-scan.yml
+?? .secrets.baseline
+?? CHANGELOG.md
+?? "DOCUMENTA\303\207\303\203O/PROTOCOLOS.docx"
+?? SECURITY_SCAN_POLICY.md
+?? analysis/
+?? gitleaks_asset.tar.gz
+?? scripts/setup-dev-tools.sh
+?? tools/

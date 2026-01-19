@@ -1,0 +1,139 @@
+{
+  "generated_at": "2026-01-16T02:39:33.412615Z",
+  "total_findings": 17,
+  "results": [
+    {
+      "source": "analysis/scans/final/gitleaks-clean-final.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/gitleaks-clean-final2.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/gitleaks-clean-final3.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/gitleaks-legacy-final.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/gitleaks-legacy-final2.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/gitleaks-legacy-final3.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-clean-final.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-clean-final2.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-clean-final3.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,4108 @@\n+{\r\n+  \"name\": \"agente-chatgpt-puppeteer\",\r\n+  \"version\": \"3.3.0\",\r\n+  \"lockfileVersion\": 3,\r\n+  \"requires\": true,\r\n+  \"packages\": {\r\n+    \"\": {\r\n+      \"name\": \"agente-chatgpt-pupp"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-clean-final4.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-legacy-final.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-legacy-final2.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-legacy-final3.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,1128 @@\n+{\n+  \"name\": \"local-login\",\n+  \"version\": \"1.0.0\",\n+  \"lockfileVersion\": 3,\n+  \"requires\": true,\n+  \"packages\": {\n+    \"\": {\n+      \"name\": \"local-login\",\n+      \"version\": \"1.0.0\""
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-legacy-final3.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -1,1128 +0,0 @@\n-{\n-  \"name\": \"local-login\",\n-  \"version\": \"1.0.0\",\n-  \"lockfileVersion\": 3,\n-  \"requires\": true,\n-  \"packages\": {\n-    \"\": {\n-      \"name\": \"local-login\",\n-      \"version\": \"1.0.0\""
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-legacy-final3.json",
+      "classification": {
+        "classification": "whitelisted",
+        "reason": "integrity/lockfile marker",
+        "sample": "@@ -0,0 +1,4108 @@\n+{\r\n+  \"name\": \"agente-chatgpt-puppeteer\",\r\n+  \"version\": \"3.3.0\",\r\n+  \"lockfileVersion\": 3,\r\n+  \"requires\": true,\r\n+  \"packages\": {\r\n+    \"\": {\r\n+      \"name\": \"agente-chatgpt-pupp"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-triage-4.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    },
+    {
+      "source": "analysis/scans/final/trufflehog-triage.json",
+      "classification": {
+        "classification": "ok",
+        "reason": "no indicators found"
+      }
+    }
+  ],
+  "counts": {
+    "whitelisted": 4,
+    "suspicious": 0,
+    "ok": 13
+  },
+  "severity_counts": {
+    "P0": 0,
+    "P1": 0,
+    "informational": 0
+  }
+}

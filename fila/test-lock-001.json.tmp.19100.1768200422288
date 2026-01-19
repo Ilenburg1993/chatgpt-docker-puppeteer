@@ -1,0 +1,9 @@
+{
+  "id": "test-lock-001",
+  "prompt": "Responda \"lock test\".",
+  "status": "RUNNING",
+  "prioridade": 1,
+  "dependsOn": [],
+  "criadoEm": "2026-01-12T06:46:56.509Z",
+  "startedEm": "2026-01-12T06:47:02.288Z"
+}

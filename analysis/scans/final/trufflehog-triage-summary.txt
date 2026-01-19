@@ -1,0 +1,4 @@
+TruffleHog triage summary
+{'critical': 0, 'high': 0, 'low': 0}
+
+Top 10 items:

@@ -1,0 +1,13 @@
+SCANNING LEGACY REPO (from bundle): analysis/backups/repo-before-final-purge.bundle
+.github/workflows/secret-scan-dispatch.yml:8:    name: Run secret scanners
+.github/workflows/secret-scan-dispatch.yml:28:          name: secret-scan-reports
+.pre-commit-config.yaml:10:  - repo: https://github.com/Yelp/detect-secrets
+.pre-commit-config.yaml:13:      - id: detect-secrets
+.pre-commit-config.yaml:14:        args: ["--baseline", ".secrets.baseline"]
+package-lock.json:44:        "js-tokens": "^4.0.0",
+package-lock.json:2137:    "node_modules/js-tokens": {
+package-lock.json:2139:      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
+src/core/schemas.js:68:    max_tokens: z.number().optional(),
+src/core/schemas.js:114:      token_estimate: z.number().default(0),
+src/driver/modules/triage.js:33:    const passwordInput = document.querySelector('input[type="password"]');
+src/driver/modules/triage.js:34:    if (passwordInput && passwordInput.offsetParent !== null) {

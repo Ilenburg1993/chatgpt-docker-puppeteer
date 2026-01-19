@@ -1,0 +1,3 @@
+total_strings=200
+nonwhitelist_blocks=200
+top_files:

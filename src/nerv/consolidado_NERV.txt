@@ -1,0 +1,3355 @@
+/* ==========================================================================
+   src/nerv/buffers/backpressure.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: buffers/
+   Arquivo: backpressure.js
+
+   Papel:
+   - Centralizar a sinalização técnica de backpressure
+   - Padronizar eventos de pressão de filas
+   - Tornar visível o estado físico do fluxo
+
+   IMPORTANTE:
+   - NÃO bloqueia execução
+   - NÃO decide descarte
+   - NÃO altera fluxo
+   - NÃO interpreta causa ou consequência
+   - Atua apenas como observador técnico
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Fábrica do backpressure
+=========================== */
+
+/**
+ * Cria um observador técnico de backpressure.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createBackpressure({ telemetry }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('backpressure requer telemetry válida');
+  }
+
+  /**
+   * Emite sinal técnico de pressão.
+   *
+   * @param {Object} info
+   * @param {string} info.buffer
+   * Nome do buffer (ex.: inbound, outbound)
+   *
+   * @param {number} info.size
+   * Tamanho atual da fila
+   *
+   * @param {number|null} info.limit
+   * Limite técnico configurado
+   */
+  function signal({ buffer, size, limit }) {
+    telemetry.emit('nerv:buffer:pressure', {
+      buffer,
+      size,
+      limit
+    });
+  }
+
+  /**
+   * Emite sinal técnico de normalização (pressão aliviada).
+   */
+  function relief({ buffer, size }) {
+    telemetry.emit('nerv:buffer:relief', {
+      buffer,
+      size
+    });
+  }
+
+  return Object.freeze({
+    signal,
+    relief
+  });
+}
+
+module.exports = createBackpressure;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/buffers/buffers.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: buffers/
+   Arquivo: buffers.js
+
+   Papel:
+   - Compor as filas técnicas inbound e outbound
+   - Centralizar configuração de limites técnicos
+   - Expor interface mínima e neutra para uso pelo NERV
+   - Conectar buffers à telemetria e backpressure
+
+   IMPORTANTE:
+   - NÃO decide prioridade
+   - NÃO interpreta envelopes
+   - NÃO conhece Kernel, Driver ou Server
+   - NÃO interfere no fluxo lógico
+   - Atua apenas como infraestrutura técnica
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const createOutboundQueue = require('./outbound_queue');
+const createInboundQueue = require('./inbound_queue');
+const createBackpressure = require('./backpressure');
+
+/* ===========================
+   Fábrica do subsistema buffers
+=========================== */
+
+/**
+ * Cria o subsistema de buffers do NERV.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ *
+ * @param {Object} [deps.limits]
+ * Limites técnicos opcionais:
+ * - outbound
+ * - inbound
+ */
+function createBuffers({ telemetry, limits = {} }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('buffers requer telemetry válida');
+  }
+
+  const backpressure = createBackpressure({ telemetry });
+
+  const outbound = createOutboundQueue({
+    telemetry,
+    maxSize: limits.outbound ?? null
+  });
+
+  const inbound = createInboundQueue({
+    telemetry,
+    maxSize: limits.inbound ?? null
+  });
+
+  /* ===========================
+     API pública do módulo
+  =========================== */
+
+  return Object.freeze({
+    /* Outbound */
+
+    enqueueOutbound(item) {
+      const ok = outbound.enqueue(item);
+      if (!ok) {
+        backpressure.signal({
+          buffer: 'outbound',
+          size: outbound.size(),
+          limit: limits.outbound ?? null
+        });
+      }
+      return ok;
+    },
+
+    dequeueOutbound() {
+      return outbound.dequeue();
+    },
+
+    outboundSize() {
+      return outbound.size();
+    },
+
+    /* Inbound */
+
+    enqueueInbound(item) {
+      const ok = inbound.enqueue(item);
+      if (!ok) {
+        backpressure.signal({
+          buffer: 'inbound',
+          size: inbound.size(),
+          limit: limits.inbound ?? null
+        });
+      }
+      return ok;
+    },
+
+    dequeueInbound() {
+      return inbound.dequeue();
+    },
+
+    inboundSize() {
+      return inbound.size();
+    },
+
+    /* Estado técnico */
+
+    isIdle() {
+      return outbound.size() === 0 && inbound.size() === 0;
+    },
+
+    clear() {
+      outbound.clear();
+      inbound.clear();
+    }
+  });
+}
+
+module.exports = createBuffers;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/buffers/inbound_queue.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: buffers/
+   Arquivo: inbound_queue.js
+
+   Papel:
+   - Gerenciar fila técnica FIFO de entrada (inbound)
+   - Isolar o transporte da camada de recepção
+   - Aplicar backpressure físico por limite de tamanho
+   - Emitir telemetria técnica sobre pressão e drenagem
+
+   IMPORTANTE:
+   - NÃO interpreta envelopes
+   - NÃO prioriza mensagens
+   - NÃO decide descarte lógico
+   - NÃO conhece Kernel, Driver ou Server
+   - Ordem de chegada é sempre preservada
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Cria uma fila isolada.
+ */
+function createQueue() {
+  return [];
+}
+
+/* ===========================
+   Fábrica da fila inbound
+=========================== */
+
+/**
+ * Cria a fila técnica de entrada.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV (observação técnica).
+ *
+ * @param {number|null} deps.maxSize
+ * Limite máximo técnico da fila (opcional).
+ */
+function createInboundQueue({ telemetry, maxSize = null }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('inbound_queue requer telemetry válida');
+  }
+
+  const queue = createQueue();
+
+  /* ===========================
+     Operações internas
+  =========================== */
+
+  /**
+   * Verifica se a fila atingiu o limite técnico.
+   */
+  function isFull() {
+    return typeof maxSize === 'number' && queue.length >= maxSize;
+  }
+
+  /* ===========================
+     API pública do módulo
+  =========================== */
+
+  /**
+   * Enfileira item na fila inbound.
+   *
+   * @param {*} item
+   * Item opaco (frame ou estrutura técnica)
+   * @returns {boolean} true se aceito, false se recusado por pressão
+   */
+  function enqueue(item) {
+    if (isFull()) {
+      telemetry.emit('nerv:buffer:inbound:pressure', {
+        size: queue.length,
+        limit: maxSize
+      });
+      return false;
+    }
+
+    queue.push(item);
+
+    telemetry.emit('nerv:buffer:inbound:enqueue', {
+      size: queue.length
+    });
+
+    return true;
+  }
+
+  /**
+   * Remove e retorna o próximo item da fila.
+   *
+   * @returns {*} item ou null se vazio
+   */
+  function dequeue() {
+    if (queue.length === 0) {
+      return null;
+    }
+
+    const item = queue.shift();
+
+    telemetry.emit('nerv:buffer:inbound:dequeue', {
+      size: queue.length
+    });
+
+    return item;
+  }
+
+  /**
+   * Retorna o tamanho atual da fila.
+   */
+  function size() {
+    return queue.length;
+  }
+
+  /**
+   * Indica se a fila está vazia.
+   */
+  function isEmpty() {
+    return queue.length === 0;
+  }
+
+  /**
+   * Limpa a fila (uso técnico/diagnóstico).
+   */
+  function clear() {
+    queue.length = 0;
+
+    telemetry.emit('nerv:buffer:inbound:cleared');
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    enqueue,
+    dequeue,
+    size,
+    isEmpty,
+    clear
+  });
+}
+
+module.exports = createInboundQueue;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/buffers/outbound_queue.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: buffers/
+   Arquivo: outbound_queue.js
+
+   Papel:
+   - Gerenciar fila técnica FIFO de saída (outbound)
+   - Aplicar backpressure físico por limites de tamanho
+   - Sinalizar disponibilidade de itens para envio
+   - Emitir telemetria técnica sobre pressão e escoamento
+
+   IMPORTANTE:
+   - NÃO interpreta envelopes
+   - NÃO prioriza mensagens
+   - NÃO decide descarte lógico
+   - NÃO conhece Kernel, Driver ou Server
+   - Ordem de chegada é sempre preservada
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Cria um array vazio isolado.
+ */
+function createQueue() {
+  return [];
+}
+
+/* ===========================
+   Fábrica da fila outbound
+=========================== */
+
+/**
+ * Cria a fila técnica de saída.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV (observação técnica).
+ *
+ * @param {number|null} deps.maxSize
+ * Limite máximo técnico da fila (opcional).
+ */
+function createOutboundQueue({ telemetry, maxSize = null }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('outbound_queue requer telemetry válida');
+  }
+
+  const queue = createQueue();
+
+  /* ===========================
+     Operações internas
+  =========================== */
+
+  /**
+   * Verifica se a fila atingiu limite técnico.
+   */
+  function isFull() {
+    return typeof maxSize === 'number' && queue.length >= maxSize;
+  }
+
+  /* ===========================
+     API pública do módulo
+  =========================== */
+
+  /**
+   * Enfileira item na fila outbound.
+   *
+   * @param {*} item
+   * Item opaco (frame, bytes ou estrutura técnica)
+   * @returns {boolean} true se aceito, false se recusado por pressão
+   */
+  function enqueue(item) {
+    if (isFull()) {
+      telemetry.emit('nerv:buffer:outbound:pressure', {
+        size: queue.length,
+        limit: maxSize
+      });
+      return false;
+    }
+
+    queue.push(item);
+
+    telemetry.emit('nerv:buffer:outbound:enqueue', {
+      size: queue.length
+    });
+
+    return true;
+  }
+
+  /**
+   * Remove e retorna o próximo item da fila.
+   *
+   * @returns {*} item ou null se vazio
+   */
+  function dequeue() {
+    if (queue.length === 0) {
+      return null;
+    }
+
+    const item = queue.shift();
+
+    telemetry.emit('nerv:buffer:outbound:dequeue', {
+      size: queue.length
+    });
+
+    return item;
+  }
+
+  /**
+   * Retorna o tamanho atual da fila.
+   */
+  function size() {
+    return queue.length;
+  }
+
+  /**
+   * Indica se a fila está vazia.
+   */
+  function isEmpty() {
+    return queue.length === 0;
+  }
+
+  /**
+   * Limpa a fila (uso técnico/diagnóstico).
+   */
+  function clear() {
+    queue.length = 0;
+
+    telemetry.emit('nerv:buffer:outbound:cleared');
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    enqueue,
+    dequeue,
+    size,
+    isEmpty,
+    clear
+  });
+}
+
+module.exports = createOutboundQueue;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/correlation/correlation_context.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: correlation/
+   Arquivo: correlation_context.js
+
+   Papel:
+   - Fornecer uma camada de CONTEXTO DE LEITURA sobre correlações
+   - Facilitar inspeção, auditoria e observabilidade
+   - Preservar causalidade aberta (sem encerramento, sem decisão)
+
+   IMPORTANTE:
+   - NÃO armazena dados (isso é papel do correlation_store)
+   - NÃO interpreta eventos
+   - NÃO decide sucesso/falha
+   - NÃO encerra correlações
+   - NÃO deduz causalidade
+   - NÃO influencia fluxo do NERV
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Verifica se valor é string não vazia.
+ */
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
+/**
+ * Clona array de registros de forma segura.
+ */
+function cloneRecords(records) {
+  return Array.isArray(records) ? records.slice() : [];
+}
+
+/* ===========================
+   Fábrica do contexto de correlação
+=========================== */
+
+/**
+ * Cria o contexto de leitura de correlações.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.store
+ * Instância de correlation_store (armazenamento histórico).
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV (observação técnica).
+ */
+function createCorrelationContext({ store, telemetry }) {
+  if (!store) {
+    throw new Error('correlation_context requer store válido');
+  }
+
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('correlation_context requer telemetry válida');
+  }
+
+  /* ===========================
+     Operações de leitura
+  =========================== */
+
+  /**
+   * Retorna o histórico completo de uma correlação.
+   *
+   * @param {string} correlationId
+   * @returns {Array<Object>}
+   */
+  function getHistory(correlationId) {
+    if (!isNonEmptyString(correlationId)) {
+      return [];
+    }
+
+    const history = cloneRecords(store.get(correlationId));
+
+    telemetry.emit('nerv:correlation:read', {
+      correlation_id: correlationId,
+      size: history.length
+    });
+
+    return history;
+  }
+
+  /**
+   * Verifica se uma correlação existe.
+   *
+   * @param {string} correlationId
+   * @returns {boolean}
+   */
+  function exists(correlationId) {
+    if (!isNonEmptyString(correlationId)) {
+      return false;
+    }
+
+    return store.has(correlationId);
+  }
+
+  /**
+   * Retorna o tamanho do histórico de uma correlação.
+   *
+   * @param {string} correlationId
+   * @returns {number}
+   */
+  function size(correlationId) {
+    if (!isNonEmptyString(correlationId)) {
+      return 0;
+    }
+
+    return store.size(correlationId);
+  }
+
+  /**
+   * Retorna lista de todas as correlações existentes.
+   * Uso exclusivo para auditoria/diagnóstico.
+   *
+   * @returns {Array<string>}
+   */
+  function list() {
+    const ids = store.list();
+
+    telemetry.emit('nerv:correlation:list', {
+      count: ids.length
+    });
+
+    return ids.slice();
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    getHistory,
+    exists,
+    size,
+    list
+  });
+}
+
+module.exports = createCorrelationContext;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/correlation/correlation_store.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: correlation/
+   Arquivo: correlation_store.js
+
+   Papel:
+   - Armazenar registros históricos correlacionados por correlation_id
+   - Preservar ordem de chegada dos fatos
+   - Permitir leitura e auditoria do histórico
+   - Emitir telemetria técnica sobre crescimento e criação
+
+   IMPORTANTE:
+   - NÃO encerra correlação
+   - NÃO decide sucesso/falha
+   - NÃO deduz causalidade
+   - NÃO descarta eventos por tempo lógico
+   - NÃO interpreta payload
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Retorna timestamp técnico de chegada.
+ */
+function now() {
+  return Date.now();
+}
+
+/**
+ * Cria um mapa sem protótipo para evitar colisões.
+ */
+function emptyMap() {
+  return Object.create(null);
+}
+
+/* ===========================
+   Fábrica do store de correlação
+=========================== */
+
+/**
+ * Cria o armazenamento histórico de correlações.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV (observação técnica).
+ *
+ * @param {Object} [deps.limits]
+ * Limites técnicos opcionais (ex.: maxEntries por correlação).
+ */
+function createCorrelationStore({ telemetry, limits = {} }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('correlation_store requer telemetry válida');
+  }
+
+  const store = emptyMap();
+
+  const MAX_ENTRIES =
+    typeof limits.maxEntries === 'number' ? limits.maxEntries : null;
+
+  /* ===========================
+     Operações internas
+  =========================== */
+
+  /**
+   * Cria uma nova correlação, se ainda não existir.
+   */
+  function ensureCorrelation(correlationId) {
+    if (!store[correlationId]) {
+      store[correlationId] = [];
+
+      telemetry.emit('nerv:correlation:created', {
+        correlation_id: correlationId
+      });
+    }
+  }
+
+  /**
+   * Cria um registro técnico mínimo a partir de um envelope.
+   * Payload permanece opaco (não armazenado integralmente).
+   */
+  function createRecord(envelope) {
+    return Object.freeze({
+      timestamp: now(),
+      kind: envelope.kind,
+      msg_id: envelope.ids ? envelope.ids.msg_id : null
+    });
+  }
+
+  /* ===========================
+     API pública do módulo
+  =========================== */
+
+  /**
+   * Registra um envelope em sua correlação.
+   *
+   * @param {string} correlationId
+   * @param {Object} envelope
+   */
+  function append(correlationId, envelope) {
+    if (typeof correlationId !== 'string') {
+      return;
+    }
+
+    ensureCorrelation(correlationId);
+
+    const records = store[correlationId];
+    records.push(createRecord(envelope));
+
+    telemetry.emit('nerv:correlation:append', {
+      correlation_id: correlationId,
+      size: records.length
+    });
+
+    // Limite técnico opcional (não causal)
+    if (MAX_ENTRIES && records.length > MAX_ENTRIES) {
+      telemetry.emit('nerv:correlation:size_exceeded', {
+        correlation_id: correlationId,
+        size: records.length,
+        limit: MAX_ENTRIES
+      });
+    }
+  }
+
+  /**
+   * Retorna cópia do histórico de uma correlação.
+   *
+   * @param {string} correlationId
+   * @returns {Array}
+   */
+  function get(correlationId) {
+    if (!store[correlationId]) {
+      return [];
+    }
+
+    return store[correlationId].slice();
+  }
+
+  /**
+   * Verifica se uma correlação existe.
+   *
+   * @param {string} correlationId
+   * @returns {boolean}
+   */
+  function has(correlationId) {
+    return Boolean(store[correlationId]);
+  }
+
+  /**
+   * Retorna o tamanho do histórico de uma correlação.
+   *
+   * @param {string} correlationId
+   * @returns {number}
+   */
+  function size(correlationId) {
+    if (!store[correlationId]) {
+      return 0;
+    }
+
+    return store[correlationId].length;
+  }
+
+  /**
+   * Lista todos os correlation_ids existentes.
+   * Uso exclusivo para auditoria/diagnóstico.
+   *
+   * @returns {Array<string>}
+   */
+  function list() {
+    return Object.keys(store);
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    append,
+    get,
+    has,
+    size,
+    list
+  });
+}
+
+module.exports = createCorrelationStore;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/emission/emission.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: emission/
+   Arquivo: emission.js
+
+   Papel:
+   - Compor o módulo de emissão do NERV
+   - Expor interface declarativa mínima para emissão
+   - Encaminhar envelopes para o pipeline técnico correto
+
+   IMPORTANTE:
+   - NÃO cria envelopes
+   - NÃO decide quando emitir
+   - NÃO espera respostas
+   - NÃO interpreta payload
+   - NÃO garante entrega
+   - NÃO conhece Kernel, Driver ou política
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const createEmitCommand = require('./emit_command');
+const createEmitEvent = require('./emit_event');
+const createEmitAck = require('./emit_ack');
+
+/* ===========================
+   Fábrica do módulo emission
+=========================== */
+
+/**
+ * Cria o módulo de emissão do NERV.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.envelopes
+ * Sistema de envelopes (normalização + validação estrutural).
+ *
+ * @param {Object} deps.buffers
+ * Subsistema de buffers (fila outbound).
+ *
+ * @param {Object} deps.correlation
+ * Sistema de correlação histórica.
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createEmission({
+  envelopes,
+  buffers,
+  correlation,
+  telemetry
+}) {
+  if (!envelopes || !buffers || !correlation || !telemetry) {
+    throw new Error('emission requer dependências completas');
+  }
+
+  /* =========================================================
+     Composição dos emissores
+  ========================================================= */
+
+  const commandEmitter = createEmitCommand({
+    envelopes,
+    buffers,
+    correlation,
+    telemetry
+  });
+
+  const eventEmitter = createEmitEvent({
+    envelopes,
+    buffers,
+    correlation,
+    telemetry
+  });
+
+  const ackEmitter = createEmitAck({
+    envelopes,
+    buffers,
+    correlation,
+    telemetry
+  });
+
+  /* =========================================================
+     Interface pública do módulo
+  ========================================================= */
+
+  return Object.freeze({
+    emitCommand: commandEmitter.emitCommand,
+    emitEvent: eventEmitter.emitEvent,
+    emitAck: ackEmitter.emitAck
+  });
+}
+
+module.exports = createEmission;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/emission/emit_ack.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: emission/
+   Arquivo: emit_ack.js
+
+   Papel:
+   - Emitir envelopes do tipo ACK de forma PURAMENTE TÉCNICA
+   - Registrar confirmação de RECEBIMENTO FÍSICO
+   - Nunca fechar causalidade nem indicar sucesso lógico
+
+   IMPORTANTE:
+   - ACK NÃO é resposta semântica
+   - ACK NÃO encerra correlação
+   - ACK NÃO garante entrega
+   - ACK NÃO indica sucesso
+   - ACK NÃO altera fluxo do sistema
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Fábrica do emissor de ACK
+=========================== */
+
+/**
+ * Cria o emissor técnico de ACKs.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.envelopes
+ * Sistema de envelopes (normalização + validação estrutural).
+ *
+ * @param {Object} deps.buffers
+ * Subsistema de buffers (fila outbound).
+ *
+ * @param {Object} deps.correlation
+ * Sistema de correlação histórica.
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createEmitAck({
+  envelopes,
+  buffers,
+  correlation,
+  telemetry
+}) {
+  if (!envelopes || !buffers || !correlation || !telemetry) {
+    throw new Error('emit_ack requer dependências completas');
+  }
+
+  /* ===========================
+     Operação de emissão
+  =========================== */
+
+  /**
+   * Emite um envelope ACK técnico.
+   *
+   * @param {Object} envelope
+   * Envelope estruturalmente válido do tipo ACK.
+   */
+  function emitAck(envelope) {
+    telemetry.emit('nerv:emission:attempt', {
+      kind: 'ACK'
+    });
+
+    let normalized;
+
+    try {
+      // 1. Normalização estrutural
+      normalized = envelopes.normalize(envelope);
+
+      // 2. Validação estrutural
+      envelopes.assertValid(normalized);
+    } catch (error) {
+      telemetry.emit('nerv:emission:rejected', {
+        kind: 'ACK',
+        reason: 'estrutura',
+        message: error.message
+      });
+      return;
+    }
+
+    // 3. Registro histórico (ACK também é fato)
+    if (normalized.ids && normalized.ids.correlation_id) {
+      correlation.append(
+        normalized.ids.correlation_id,
+        normalized
+      );
+    }
+
+    // 4. Enfileiramento outbound
+    const accepted = buffers.enqueueOutbound(normalized);
+
+    if (!accepted) {
+      telemetry.emit('nerv:emission:enqueue_failed', {
+        kind: 'ACK'
+      });
+      return;
+    }
+
+    // 5. Telemetria de sucesso técnico
+    telemetry.emit('nerv:emission:success', {
+      kind: 'ACK'
+    });
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    emitAck
+  });
+}
+
+module.exports = createEmitAck;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/emission/emit_command.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: emission/
+   Arquivo: emit_command.js
+
+   Papel:
+   - Emitir envelopes do tipo COMMAND de forma unilateral
+   - Executar o pipeline técnico de saída do NERV
+   - Registrar telemetria e correlação de forma observável
+
+   IMPORTANTE:
+   - NÃO cria envelopes
+   - NÃO interpreta payload
+   - NÃO espera resposta
+   - NÃO decide retry
+   - NÃO garante entrega
+   - NÃO conhece Kernel, Driver ou política
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Fábrica do emissor de COMMAND
+=========================== */
+
+/**
+ * Cria o emissor técnico de COMMANDs.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.envelopes
+ * Sistema de envelopes (normalização + validação estrutural).
+ *
+ * @param {Object} deps.buffers
+ * Subsistema de buffers (fila outbound).
+ *
+ * @param {Object} deps.correlation
+ * Sistema de correlação histórica.
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createEmitCommand({
+  envelopes,
+  buffers,
+  correlation,
+  telemetry
+}) {
+  if (!envelopes || !buffers || !correlation || !telemetry) {
+    throw new Error('emit_command requer dependências completas');
+  }
+
+  /* ===========================
+     Operação de emissão
+  =========================== */
+
+  /**
+   * Emite um envelope COMMAND.
+   *
+   * @param {Object} envelope
+   * Envelope estruturalmente válido.
+   */
+  function emitCommand(envelope) {
+    telemetry.emit('nerv:emission:attempt', {
+      kind: 'COMMAND'
+    });
+
+    let normalized;
+
+    try {
+      // 1. Normalização estrutural
+      normalized = envelopes.normalize(envelope);
+
+      // 2. Validação estrutural
+      envelopes.assertValid(normalized);
+    } catch (error) {
+      telemetry.emit('nerv:emission:rejected', {
+        kind: 'COMMAND',
+        reason: 'estrutura',
+        message: error.message
+      });
+      return;
+    }
+
+    // 3. Registro histórico de correlação
+    if (normalized.ids && normalized.ids.correlation_id) {
+      correlation.append(
+        normalized.ids.correlation_id,
+        normalized
+      );
+    }
+
+    // 4. Enfileiramento outbound
+    const accepted = buffers.enqueueOutbound(normalized);
+
+    if (!accepted) {
+      telemetry.emit('nerv:emission:enqueue_failed', {
+        kind: 'COMMAND'
+      });
+      return;
+    }
+
+    // 5. Telemetria de sucesso técnico
+    telemetry.emit('nerv:emission:success', {
+      kind: 'COMMAND'
+    });
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    emitCommand
+  });
+}
+
+module.exports = createEmitCommand;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/emission/emit_event.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: emission/
+   Arquivo: emit_event.js
+
+   Papel:
+   - Emitir envelopes do tipo EVENT de forma unilateral
+   - Executar o pipeline técnico de saída do NERV
+   - Registrar telemetria e correlação de forma observável
+
+   IMPORTANTE:
+   - NÃO cria envelopes
+   - NÃO interpreta payload
+   - NÃO espera resposta
+   - NÃO decide retry
+   - NÃO garante entrega
+   - NÃO conhece Kernel, Driver ou política
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Fábrica do emissor de EVENT
+=========================== */
+
+/**
+ * Cria o emissor técnico de EVENTs.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.envelopes
+ * Sistema de envelopes (normalização + validação estrutural).
+ *
+ * @param {Object} deps.buffers
+ * Subsistema de buffers (fila outbound).
+ *
+ * @param {Object} deps.correlation
+ * Sistema de correlação histórica.
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createEmitEvent({
+  envelopes,
+  buffers,
+  correlation,
+  telemetry
+}) {
+  if (!envelopes || !buffers || !correlation || !telemetry) {
+    throw new Error('emit_event requer dependências completas');
+  }
+
+  /* ===========================
+     Operação de emissão
+  =========================== */
+
+  /**
+   * Emite um envelope EVENT.
+   *
+   * @param {Object} envelope
+   * Envelope estruturalmente válido.
+   */
+  function emitEvent(envelope) {
+    telemetry.emit('nerv:emission:attempt', {
+      kind: 'EVENT'
+    });
+
+    let normalized;
+
+    try {
+      // 1. Normalização estrutural
+      normalized = envelopes.normalize(envelope);
+
+      // 2. Validação estrutural
+      envelopes.assertValid(normalized);
+    } catch (error) {
+      telemetry.emit('nerv:emission:rejected', {
+        kind: 'EVENT',
+        reason: 'estrutura',
+        message: error.message
+      });
+      return;
+    }
+
+    // 3. Registro histórico de correlação
+    if (normalized.ids && normalized.ids.correlation_id) {
+      correlation.append(
+        normalized.ids.correlation_id,
+        normalized
+      );
+    }
+
+    // 4. Enfileiramento outbound
+    const accepted = buffers.enqueueOutbound(normalized);
+
+    if (!accepted) {
+      telemetry.emit('nerv:emission:enqueue_failed', {
+        kind: 'EVENT'
+      });
+      return;
+    }
+
+    // 5. Telemetria de sucesso técnico
+    telemetry.emit('nerv:emission:success', {
+      kind: 'EVENT'
+    });
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    emitEvent
+  });
+}
+
+module.exports = createEmitEvent;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/envelopes/normalizer.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: envelopes/
+   Arquivo: normalizer.js
+
+   Papel:
+   - Normalizar envelopes de forma PURAMENTE estrutural
+   - Preencher valores default obrigatórios
+   - Garantir coerência formal mínima antes do transporte interno
+
+   IMPORTANTE:
+   - NÃO interpreta payload
+   - NÃO altera significado
+   - NÃO corrige erros lógicos
+   - NÃO decide nada
+   - NÃO depende de contexto externo
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const {
+  PROTOCOL_VERSION,
+  ENVELOPE_KIND
+} = require('./schemas');
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Cria uma cópia rasa segura de objeto simples.
+ * Evita mutação do envelope original.
+ */
+function cloneObject(obj) {
+  return Object.assign({}, obj);
+}
+
+/**
+ * Retorna timestamp atual em milissegundos.
+ * Valor técnico, não semântico.
+ */
+function now() {
+  return Date.now();
+}
+
+/* ===========================
+   Normalização estrutural
+=========================== */
+
+/**
+ * Normaliza a estrutura do header.
+ * Preenche defaults obrigatórios se ausentes.
+ */
+function normalizeHeader(header = {}) {
+  const normalized = cloneObject(header);
+
+  if (typeof normalized.version !== 'number') {
+    normalized.version = PROTOCOL_VERSION;
+  }
+
+  if (typeof normalized.timestamp !== 'number') {
+    normalized.timestamp = now();
+  }
+
+  // source é obrigatório estruturalmente,
+  // mas sua ausência será tratada pela validação, não aqui
+  return normalized;
+}
+
+/**
+ * Normaliza a estrutura dos identificadores.
+ * NÃO gera UUIDs automaticamente.
+ */
+function normalizeIds(ids = {}) {
+  return cloneObject(ids);
+}
+
+/**
+ * Normaliza o envelope completo.
+ *
+ * @param {Object} envelope
+ * @returns {Object} novo envelope normalizado
+ *
+ * OBS:
+ * - Não valida (isso é papel do validator)
+ * - Não altera payload
+ * - Não corrige estrutura inválida
+ */
+function normalizeEnvelope(envelope) {
+  if (!envelope || typeof envelope !== 'object') {
+    return envelope;
+  }
+
+  const normalized = cloneObject(envelope);
+
+  normalized.header = normalizeHeader(envelope.header);
+  normalized.ids = normalizeIds(envelope.ids);
+
+  // kind é preservado se válido; validação decide
+  if (typeof normalized.kind !== 'string') {
+    normalized.kind = envelope.kind;
+  }
+
+  // payload é completamente opaco
+  normalized.payload = envelope.payload;
+
+  // Campos opcionais preservados sem interpretação
+  if ('ack_for' in envelope) {
+    normalized.ack_for = envelope.ack_for;
+  }
+
+  return normalized;
+}
+
+/* ===========================
+   Interface pública do módulo
+=========================== */
+
+module.exports = Object.freeze({
+  normalizeEnvelope
+});
+
+
+---
+
+/* ==========================================================================
+   src/nerv/envelopes/schemas.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: envelopes/
+   Arquivo: schemas.js
+
+   Papel:
+   - Definir a estrutura canônica do envelope IPC
+   - Centralizar constantes estruturais
+   - Fornecer validadores puramente formais (sem semântica)
+
+   IMPORTANTE:
+   - Este módulo NÃO interpreta payload
+   - Este módulo NÃO decide nada
+   - Este módulo NÃO conhece Kernel, Driver ou Server
+   - Este módulo valida APENAS forma estrutural
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Constantes canônicas
+=========================== */
+
+/**
+ * Versão atual do protocolo IPC/NERV.
+ * Deve ser incrementada apenas por decisão arquitetural.
+ */
+const PROTOCOL_VERSION = 1;
+
+/**
+ * Tipos estruturais permitidos.
+ * Tipagem NOMINAL, não semântica.
+ */
+const ENVELOPE_KIND = Object.freeze({
+  COMMAND: 'COMMAND',
+  EVENT: 'EVENT',
+  ACK: 'ACK'
+});
+
+/**
+ * Campos obrigatórios por seção.
+ * Usado apenas para verificação estrutural.
+ */
+const REQUIRED_FIELDS = Object.freeze({
+  header: ['version', 'timestamp', 'source'],
+  ids: ['msg_id', 'correlation_id'],
+  envelope: ['header', 'ids', 'kind', 'payload']
+});
+
+/* ===========================
+   Utilitários estruturais
+=========================== */
+
+/**
+ * Verifica se um valor é um objeto simples.
+ */
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Verifica se um valor é um UUID válido (forma).
+ * Nenhuma semântica associada.
+ */
+function isUUID(value) {
+  if (typeof value !== 'string') return false;
+
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  return uuidRegex.test(value);
+}
+
+/**
+ * Verifica se o tipo do envelope é permitido.
+ */
+function isValidKind(kind) {
+  return Object.values(ENVELOPE_KIND).includes(kind);
+}
+
+/* ===========================
+   Validação estrutural
+=========================== */
+
+/**
+ * Valida a estrutura mínima do header.
+ * NÃO interpreta valores.
+ */
+function validateHeader(header) {
+  if (!isObject(header)) {
+    return 'header deve ser um objeto';
+  }
+
+  for (const field of REQUIRED_FIELDS.header) {
+    if (!(field in header)) {
+      return `header.${field} é obrigatório`;
+    }
+  }
+
+  if (typeof header.version !== 'number') {
+    return 'header.version deve ser numérico';
+  }
+
+  if (typeof header.timestamp !== 'number') {
+    return 'header.timestamp deve ser numérico';
+  }
+
+  if (typeof header.source !== 'string') {
+    return 'header.source deve ser string';
+  }
+
+  // target é opcional e opaco
+  if ('target' in header && typeof header.target !== 'string') {
+    return 'header.target deve ser string se presente';
+  }
+
+  return null;
+}
+
+/**
+ * Valida a estrutura dos identificadores.
+ */
+function validateIds(ids) {
+  if (!isObject(ids)) {
+    return 'ids deve ser um objeto';
+  }
+
+  for (const field of REQUIRED_FIELDS.ids) {
+    if (!(field in ids)) {
+      return `ids.${field} é obrigatório`;
+    }
+  }
+
+  if (!isUUID(ids.msg_id)) {
+    return 'ids.msg_id deve ser UUID válido';
+  }
+
+  if (!isUUID(ids.correlation_id)) {
+    return 'ids.correlation_id deve ser UUID válido';
+  }
+
+  return null;
+}
+
+/**
+ * Valida a estrutura completa do envelope.
+ * Retorna null se válido, ou string descrevendo o erro estrutural.
+ */
+function validateEnvelopeStructure(envelope) {
+  if (!isObject(envelope)) {
+    return 'envelope deve ser um objeto';
+  }
+
+  for (const field of REQUIRED_FIELDS.envelope) {
+    if (!(field in envelope)) {
+      return `campo obrigatório ausente: ${field}`;
+    }
+  }
+
+  const headerError = validateHeader(envelope.header);
+  if (headerError) return headerError;
+
+  const idsError = validateIds(envelope.ids);
+  if (idsError) return idsError;
+
+  if (!isValidKind(envelope.kind)) {
+    return `kind inválido: ${envelope.kind}`;
+  }
+
+  // Payload é propositalmente opaco
+  if (!isObject(envelope.payload)) {
+    return 'payload deve ser um objeto';
+  }
+
+  return null;
+}
+
+/* ===========================
+   API estrutural do módulo
+=========================== */
+
+/**
+ * Verifica se o envelope é estruturalmente válido.
+ * Retorna booleano.
+ */
+function isValidEnvelope(envelope) {
+  return validateEnvelopeStructure(envelope) === null;
+}
+
+/**
+ * Asserção estrutural.
+ * Lança erro técnico se inválido.
+ */
+function assertValidEnvelope(envelope) {
+  const error = validateEnvelopeStructure(envelope);
+  if (error) {
+    throw new Error(`Envelope inválido (estrutura): ${error}`);
+  }
+}
+
+/* ===========================
+   Exportação canônica
+=========================== */
+
+module.exports = Object.freeze({
+  PROTOCOL_VERSION,
+  ENVELOPE_KIND,
+  isValidEnvelope,
+  assertValidEnvelope
+});
+
+
+---
+
+/* ==========================================================================
+   src/nerv/envelopes/validator.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: envelopes/
+   Arquivo: validator.js
+
+   Papel:
+   - Orquestrar a validação estrutural de envelopes
+   - Tornar falhas estruturais observáveis via telemetria
+   - Garantir que apenas envelopes FORMALMENTE válidos
+     avancem no fluxo interno do NERV
+
+   IMPORTANTE:
+   - NÃO interpreta payload
+   - NÃO classifica sucesso/falha lógica
+   - NÃO toma decisões
+   - NÃO corrige envelopes
+   - NÃO conhece Kernel, Driver ou Server
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const {
+  isValidEnvelope,
+  assertValidEnvelope,
+  PROTOCOL_VERSION
+} = require('./schemas');
+
+/* ===========================
+   Fábrica do validador
+=========================== */
+
+/**
+ * Cria um validador estrutural de envelopes.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV (observação técnica).
+ */
+function createEnvelopeValidator({ telemetry }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('validator requer telemetry válida');
+  }
+
+  /**
+   * Valida envelope de forma segura.
+   * Não lança exceção — retorna booleano.
+   */
+  function validate(envelope) {
+    const valid = isValidEnvelope(envelope);
+
+    if (!valid) {
+      telemetry.emit('nerv:envelope:invalid', {
+        reason: 'estrutura',
+        envelope_preview: previewEnvelope(envelope)
+      });
+    }
+
+    return valid;
+  }
+
+  /**
+   * Asserta validade estrutural.
+   * Lança erro técnico se inválido.
+   */
+  function assert(envelope) {
+    try {
+      assertValidEnvelope(envelope);
+    } catch (error) {
+      telemetry.emit('nerv:envelope:rejected', {
+        reason: 'estrutura',
+        error: error.message,
+        envelope_preview: previewEnvelope(envelope)
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica compatibilidade de versão do protocolo.
+   * NÃO decide upgrade/downgrade.
+   */
+  function checkProtocolVersion(envelope) {
+    if (
+      envelope &&
+      envelope.header &&
+      typeof envelope.header.version === 'number' &&
+      envelope.header.version !== PROTOCOL_VERSION
+    ) {
+      telemetry.emit('nerv:envelope:protocol_mismatch', {
+        expected: PROTOCOL_VERSION,
+        received: envelope.header.version
+      });
+    }
+  }
+
+  /**
+   * Produz uma visualização segura e parcial do envelope
+   * para fins de observabilidade (sem payload).
+   */
+  function previewEnvelope(envelope) {
+    if (!envelope || typeof envelope !== 'object') {
+      return null;
+    }
+
+    return {
+      kind: envelope.kind,
+      ids: envelope.ids || null,
+      header: envelope.header
+        ? {
+            version: envelope.header.version,
+            source: envelope.header.source,
+            target: envelope.header.target || null
+          }
+        : null
+    };
+  }
+
+  /* ===========================
+     Interface pública do validador
+  =========================== */
+
+  return Object.freeze({
+    validate,             // boolean
+    assert,               // lança erro técnico
+    checkProtocolVersion  // apenas observação
+  });
+}
+
+/* ===========================
+   Exportação canônica
+=========================== */
+
+module.exports = createEnvelopeValidator;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/health/health.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: health/
+   Arquivo: health.js
+
+   Papel:
+   - Agregar sinais técnicos de saúde do NERV
+   - Manter snapshot observável do estado operacional
+   - Expor métricas brutas e estados derivados NÃO decisórios
+
+   IMPORTANTE:
+   - NÃO decide ações
+   - NÃO aciona correções
+   - NÃO interfere no fluxo
+   - NÃO conhece Kernel, Driver ou política
+   - Atua apenas como observador técnico
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Retorna timestamp atual.
+ */
+function now() {
+  return Date.now();
+}
+
+/**
+ * Clona objeto simples (snapshot defensivo).
+ */
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/* ===========================
+   Fábrica do módulo health
+=========================== */
+
+/**
+ * Cria o módulo de saúde técnica do NERV.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ *
+ * @param {Object} [deps.thresholds]
+ * Limiares técnicos opcionais (observacionais):
+ * - maxOutboundBuffer
+ * - maxInboundBuffer
+ */
+function createHealth({ telemetry, thresholds = {} }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('health requer telemetry válida');
+  }
+
+  /* =========================================================
+     Estado interno observável
+  ========================================================= */
+
+  const state = {
+    timestamp: now(),
+
+    transport: {
+      connected: null,
+      reconnecting: false,
+      lastError: null
+    },
+
+    buffers: {
+      inbound: 0,
+      outbound: 0
+    },
+
+    activity: {
+      lastEmission: null,
+      lastReception: null
+    }
+  };
+
+  const listeners = new Set();
+
+  /* =========================================================
+     Operações internas
+  ========================================================= */
+
+  function update(partial) {
+    Object.assign(state, partial);
+    state.timestamp = now();
+
+    telemetry.emit('nerv:health:update', {
+      snapshot: state
+    });
+
+    for (const handler of listeners) {
+      try {
+        handler(clone(state));
+      } catch (_) {
+        // health nunca propaga falhas
+      }
+    }
+  }
+
+  function checkThresholds() {
+    if (
+      typeof thresholds.maxOutboundBuffer === 'number' &&
+      state.buffers.outbound >= thresholds.maxOutboundBuffer
+    ) {
+      telemetry.emit('nerv:health:anomaly', {
+        type: 'outbound_buffer_pressure',
+        value: state.buffers.outbound,
+        limit: thresholds.maxOutboundBuffer
+      });
+    }
+
+    if (
+      typeof thresholds.maxInboundBuffer === 'number' &&
+      state.buffers.inbound >= thresholds.maxInboundBuffer
+    ) {
+      telemetry.emit('nerv:health:anomaly', {
+        type: 'inbound_buffer_pressure',
+        value: state.buffers.inbound,
+        limit: thresholds.maxInboundBuffer
+      });
+    }
+  }
+
+  /* =========================================================
+     API pública (observacional)
+  ========================================================= */
+
+  /**
+   * Ingestão genérica de eventos técnicos.
+   * Não interpreta, apenas atualiza estado.
+   *
+   * @param {string} type
+   * @param {Object} data
+   */
+  function report(type, data = {}) {
+    switch (type) {
+      case 'transport:connected':
+        update({
+          transport: {
+            ...state.transport,
+            connected: true,
+            lastError: null
+          }
+        });
+        break;
+
+      case 'transport:disconnected':
+        update({
+          transport: {
+            ...state.transport,
+            connected: false
+          }
+        });
+        break;
+
+      case 'transport:error':
+        update({
+          transport: {
+            ...state.transport,
+            lastError: data.message || 'erro físico'
+          }
+        });
+        break;
+
+      case 'buffer:update':
+        update({
+          buffers: {
+            inbound:
+              typeof data.inbound === 'number'
+                ? data.inbound
+                : state.buffers.inbound,
+            outbound:
+              typeof data.outbound === 'number'
+                ? data.outbound
+                : state.buffers.outbound
+          }
+        });
+        checkThresholds();
+        break;
+
+      case 'emission':
+        update({
+          activity: {
+            ...state.activity,
+            lastEmission: now()
+          }
+        });
+        break;
+
+      case 'reception':
+        update({
+          activity: {
+            ...state.activity,
+            lastReception: now()
+          }
+        });
+        break;
+
+      default:
+        // eventos desconhecidos são ignorados
+        break;
+    }
+  }
+
+  /**
+   * Retorna snapshot atual de saúde.
+   */
+  function getStatus() {
+    telemetry.emit('nerv:health:snapshot');
+    return clone(state);
+  }
+
+  /**
+   * Registra handler observacional de mudanças.
+   */
+  function onChange(handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('onChange requer função');
+    }
+
+    listeners.add(handler);
+
+    return () => {
+      listeners.delete(handler);
+    };
+  }
+
+  /* =========================================================
+     Exportação canônica
+  ========================================================= */
+
+  return Object.freeze({
+    report,
+    getStatus,
+    onChange
+  });
+}
+
+module.exports = createHealth;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/NERV.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Arquivo: NERV.js
+
+   Estatuto:
+   - COMPOSITOR ESTRUTURAL PURO
+   - NÃO executa fluxo
+   - NÃO registra callbacks internos
+   - NÃO drena buffers
+   - NÃO reage a eventos
+   - NÃO decide
+   - NÃO interpreta
+
+   Este arquivo apenas CONSTRÓI e EXPÕE o NERV.
+========================================================================== */
+
+/* ===========================
+   Imports canônicos
+=========================== */
+
+// Núcleo estrutural
+const createEnvelopes = require('./envelopes/envelopes');
+const createCorrelation = require('./correlation/correlation_store');
+const createTelemetry = require('./telemetry/ipc_telemetry');
+
+// Infraestrutura
+const createBuffers = require('./buffers/buffers');
+const createTransport = require('./transport/transport');
+
+// Fronteiras semânticas neutras
+const createEmission = require('./emission/emission');
+const createReception = require('./reception/reception');
+const createHealth = require('./health/health');
+
+/* ===========================
+   Fábrica do NERV
+=========================== */
+
+/**
+ * Cria o subsistema NERV.
+ *
+ * @param {Object} config
+ * Configurações estruturais:
+ * - transport: { adapter, reconnect? }
+ * - buffers: { inbound?, outbound? }
+ * - health: { thresholds? }
+ */
+function createNERV(config = {}) {
+  /* =========================================================
+     1. Telemetria (base observacional)
+  ========================================================= */
+
+  const telemetry = createTelemetry({
+    namespace: 'nerv'
+  });
+
+  /* =========================================================
+     2. Envelopes (forma e validação estrutural)
+  ========================================================= */
+
+  const envelopes = createEnvelopes();
+
+  /* =========================================================
+     3. Correlação (histórico factual)
+  ========================================================= */
+
+  const correlation = createCorrelation();
+
+  /* =========================================================
+     4. Buffers (FIFO técnico)
+  ========================================================= */
+
+  const buffers = createBuffers({
+    telemetry,
+    limits: config.buffers || {}
+  });
+
+  /* =========================================================
+     5. Transporte físico
+  ========================================================= */
+
+  if (!config.transport || !config.transport.adapter) {
+    throw new Error('NERV requer transport.adapter');
+  }
+
+  const transport = createTransport({
+    telemetry,
+    adapter: config.transport.adapter,
+    reconnect: config.transport.reconnect
+  });
+
+  /* =========================================================
+     6. Emissão (ato unilateral)
+  ========================================================= */
+
+  const emission = createEmission({
+    envelopes,
+    buffers,
+    correlation,
+    telemetry
+  });
+
+  /* =========================================================
+     7. Recepção (fronteira factual)
+  ========================================================= */
+
+  const reception = createReception({
+    envelopes,
+    correlation,
+    telemetry
+  });
+
+  /* =========================================================
+     8. Health (observação de vitalidade)
+  ========================================================= */
+
+  const health = createHealth({
+    telemetry,
+    thresholds: config.health?.thresholds || {}
+  });
+
+  /* =========================================================
+     9. Interface pública do NERV
+  ========================================================= */
+
+  return Object.freeze({
+    /* Emissão */
+    emitCommand: emission.emitCommand,
+    emitEvent: emission.emitEvent,
+    emitAck: emission.emitAck,
+
+    /* Recepção */
+    receive: reception.receive,
+    onReceive: reception.onReceive,
+
+    /* Buffers (exposição explícita; sem auto-drain) */
+    buffers,
+
+    /* Transporte (controle externo) */
+    transport,
+
+    /* Health (observação) */
+    health,
+
+    /* Telemetria (observação avançada) */
+    telemetry
+  });
+}
+
+module.exports = createNERV;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/reception/receive.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: reception/
+   Arquivo: receive.js
+
+   Papel:
+   - Receber frames inbound já reconstruídos
+   - Desserializar e normalizar envelopes
+   - Validar apenas a ESTRUTURA
+   - Registrar fatos recebidos
+   - Notificar handlers de forma isolada
+
+   IMPORTANTE:
+   - NÃO interpreta payload
+   - NÃO decide consequências
+   - NÃO gera ACK automaticamente
+   - NÃO aciona Kernel ou Driver
+   - NÃO bloqueia o fluxo
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Executa handlers de forma isolada.
+ * Falhas são capturadas e observadas.
+ */
+function safeCall(handler, envelope, telemetry) {
+  try {
+    handler(envelope);
+  } catch (error) {
+    telemetry.emit('nerv:reception:handler_error', {
+      message: error.message
+    });
+  }
+}
+
+/* ===========================
+   Fábrica do receptor
+=========================== */
+
+/**
+ * Cria o módulo de recepção bruta do NERV.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.envelopes
+ * Sistema de envelopes (normalização + validação estrutural).
+ *
+ * @param {Object} deps.correlation
+ * Sistema de correlação histórica.
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createReception({
+  envelopes,
+  correlation,
+  telemetry
+}) {
+  if (!envelopes || !correlation || !telemetry) {
+    throw new Error('reception requer dependências completas');
+  }
+
+  const handlers = new Set();
+
+  /* ===========================
+     Operação principal
+  =========================== */
+
+  /**
+   * Recebe um frame inbound já desserializado
+   * (objeto bruto ou buffer convertido).
+   *
+   * @param {*} raw
+   */
+  function receive(raw) {
+    telemetry.emit('nerv:reception:frame_received');
+
+    let envelope;
+
+    try {
+      // 1. Desserialização técnica (se necessário)
+      envelope =
+        typeof raw === 'string'
+          ? JSON.parse(raw)
+          : raw;
+    } catch (error) {
+      telemetry.emit('nerv:reception:deserialization_failed', {
+        message: error.message
+      });
+      return;
+    }
+
+    let normalized;
+
+    try {
+      // 2. Normalização estrutural
+      normalized = envelopes.normalize(envelope);
+
+      // 3. Validação estrutural
+      envelopes.assertValid(normalized);
+    } catch (error) {
+      telemetry.emit('nerv:reception:invalid_envelope', {
+        message: error.message
+      });
+      return;
+    }
+
+    // 4. Registro histórico de correlação
+    if (normalized.ids && normalized.ids.correlation_id) {
+      correlation.append(
+        normalized.ids.correlation_id,
+        normalized
+      );
+    }
+
+    telemetry.emit('nerv:reception:accepted', {
+      kind: normalized.kind
+    });
+
+    // 5. Notificação de handlers
+    for (const handler of handlers) {
+      safeCall(handler, normalized, telemetry);
+    }
+  }
+
+  /**
+   * Registra handler de recepção.
+   *
+   * @param {Function} handler
+   */
+  function onReceive(handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('handler de recepção deve ser função');
+    }
+
+    handlers.add(handler);
+
+    return () => {
+      handlers.delete(handler);
+    };
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    receive,
+    onReceive
+  });
+}
+
+module.exports = createReception;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/reception/reception.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: reception/
+   Arquivo: reception.js
+
+   Papel:
+   - Compor o módulo de recepção do NERV
+   - Expor interface mínima e neutra de entrada de fatos
+   - Encapsular a recepção bruta e notificação de handlers
+
+   IMPORTANTE:
+   - NÃO interpreta payload
+   - NÃO decide consequências
+   - NÃO aciona Kernel ou Driver
+   - NÃO gera ACK automaticamente
+   - NÃO bloqueia fluxo
+   - Atua apenas como fronteira factual
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const createReceive = require('./receive');
+
+/* ===========================
+   Fábrica do módulo reception
+=========================== */
+
+/**
+ * Cria o módulo de recepção do NERV.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.envelopes
+ * Sistema de envelopes (normalização + validação estrutural).
+ *
+ * @param {Object} deps.correlation
+ * Sistema de correlação histórica.
+ *
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ */
+function createReception({
+  envelopes,
+  correlation,
+  telemetry
+}) {
+  if (!envelopes || !correlation || !telemetry) {
+    throw new Error('reception requer dependências completas');
+  }
+
+  /* =========================================================
+     Composição do receptor factual
+  ========================================================= */
+
+  const receiver = createReceive({
+    envelopes,
+    correlation,
+    telemetry
+  });
+
+  /* =========================================================
+     Interface pública do módulo
+  ========================================================= */
+
+  return Object.freeze({
+    /**
+     * Recebe um frame inbound já desserializado.
+     * Ato puramente factual.
+     */
+    receive: receiver.receive,
+
+    /**
+     * Registra handler para envelopes recebidos.
+     */
+    onReceive: receiver.onReceive
+  });
+}
+
+module.exports = createReception;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/telemetry/ipc_telemetry.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: telemetry/
+   Arquivo: ipc_telemetry.js
+
+   Papel:
+   - Registrar eventos técnicos do NERV
+   - Coletar métricas de observabilidade
+   - Expor subscrição passiva a eventos
+   - Fornecer snapshots de métricas
+
+   IMPORTANTE:
+   - NÃO altera fluxo
+   - NÃO bloqueia execução
+   - NÃO decide
+   - NÃO interpreta sucesso/falha
+   - Falhas internas NÃO quebram o NERV
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Retorna timestamp atual em milissegundos.
+ */
+function now() {
+  return Date.now();
+}
+
+/**
+ * Garante execução segura de handlers de telemetria.
+ * Qualquer erro é isolado e ignorado.
+ */
+function safeCall(handler, payload) {
+  try {
+    handler(payload);
+  } catch (_) {
+    // Falha silenciosa: telemetria nunca interfere
+  }
+}
+
+/* ===========================
+   Fábrica de telemetria
+=========================== */
+
+/**
+ * Cria o sistema de telemetria do NERV.
+ *
+ * @param {Object} config
+ * Configuração estritamente técnica (opcional):
+ * - enabled: boolean
+ */
+function createIPCTelemetry(config = {}) {
+  const enabled = config.enabled !== false;
+
+  /* ===========================
+     Estado interno (técnico)
+  =========================== */
+
+  const subscribers = new Set();
+
+  const metrics = {
+    counters: Object.create(null),
+    gauges: Object.create(null),
+    timestamps: Object.create(null)
+  };
+
+  /* ===========================
+     Funções internas
+  =========================== */
+
+  /**
+   * Incrementa contador técnico.
+   */
+  function incCounter(name, value = 1) {
+    metrics.counters[name] = (metrics.counters[name] || 0) + value;
+  }
+
+  /**
+   * Atualiza gauge técnico.
+   */
+  function setGauge(name, value) {
+    metrics.gauges[name] = value;
+  }
+
+  /**
+   * Registra timestamp técnico.
+   */
+  function mark(name) {
+    metrics.timestamps[name] = now();
+  }
+
+  /* ===========================
+     API pública do módulo
+  =========================== */
+
+  /**
+   * Emite um evento técnico de telemetria.
+   *
+   * @param {string} type
+   * Nome do evento técnico (ex.: nerv:envelope:sent)
+   *
+   * @param {Object} [meta]
+   * Metadados técnicos opcionais (nunca semânticos)
+   */
+  function emit(type, meta = null) {
+    if (!enabled) return;
+
+    const event = {
+      timestamp: now(),
+      type,
+      meta: meta || undefined
+    };
+
+    // Atualizações internas de métricas (não causais)
+    incCounter(`event:${type}`);
+    mark(`last:${type}`);
+
+    // Notifica subscritores de forma isolada
+    for (const handler of subscribers) {
+      safeCall(handler, event);
+    }
+  }
+
+  /**
+   * Subscrição passiva a eventos de telemetria.
+   *
+   * @param {Function} handler
+   */
+  function on(handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('telemetry.on requer função');
+    }
+
+    subscribers.add(handler);
+
+    // Retorna função de unsubscribe (opcional)
+    return () => {
+      subscribers.delete(handler);
+    };
+  }
+
+  /**
+   * Retorna snapshot das métricas atuais.
+   * Leitura pura, sem efeitos colaterais.
+   */
+  function stats() {
+    return {
+      counters: { ...metrics.counters },
+      gauges: { ...metrics.gauges },
+      timestamps: { ...metrics.timestamps }
+    };
+  }
+
+  /**
+   * Reseta métricas internas.
+   * Uso permitido apenas para testes.
+   */
+  function reset() {
+    metrics.counters = Object.create(null);
+    metrics.gauges = Object.create(null);
+    metrics.timestamps = Object.create(null);
+  }
+
+  /* ===========================
+     Exportação do módulo
+  =========================== */
+
+  return Object.freeze({
+    emit,
+    on,
+    stats,
+    reset,
+
+    // APIs técnicas opcionais para outros módulos
+    _incCounter: incCounter,
+    _setGauge: setGauge,
+    _mark: mark
+  });
+}
+
+module.exports = createIPCTelemetry;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/telemetry/metrics.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: telemetry/
+   Arquivo: metrics.js
+
+   Papel:
+   - Fornecer estruturas técnicas para coleta de métricas
+   - Padronizar contadores, gauges e timestamps
+   - Oferecer snapshots imutáveis para leitura externa
+
+   IMPORTANTE:
+   - NÃO emite eventos
+   - NÃO interfere em fluxo
+   - NÃO decide
+   - NÃO interpreta significado
+   - NÃO depende de Kernel, Driver ou Server
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Retorna timestamp atual em milissegundos.
+ */
+function now() {
+  return Date.now();
+}
+
+/**
+ * Cria um objeto sem protótipo para evitar colisões.
+ */
+function emptyMap() {
+  return Object.create(null);
+}
+
+/* ===========================
+   Fábrica de métricas
+=========================== */
+
+/**
+ * Cria um repositório técnico de métricas.
+ *
+ * @returns {Object}
+ * Estrutura contendo operações puramente técnicas.
+ */
+function createMetrics() {
+  const counters = emptyMap();
+  const gauges = emptyMap();
+  const timestamps = emptyMap();
+
+  /* ===========================
+     Operações internas
+  =========================== */
+
+  function incCounter(name, value = 1) {
+    counters[name] = (counters[name] || 0) + value;
+  }
+
+  function setGauge(name, value) {
+    gauges[name] = value;
+  }
+
+  function mark(name) {
+    timestamps[name] = now();
+  }
+
+  /* ===========================
+     Leitura (snapshot)
+  =========================== */
+
+  function snapshot() {
+    return {
+      counters: { ...counters },
+      gauges: { ...gauges },
+      timestamps: { ...timestamps }
+    };
+  }
+
+  function reset() {
+    for (const k in counters) delete counters[k];
+    for (const k in gauges) delete gauges[k];
+    for (const k in timestamps) delete timestamps[k];
+  }
+
+  /* ===========================
+     Exportação técnica
+  =========================== */
+
+  return Object.freeze({
+    incCounter,
+    setGauge,
+    mark,
+    snapshot,
+    reset
+  });
+}
+
+module.exports = createMetrics;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/transport/connection.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: transport/
+   Arquivo: connection.js
+
+   Papel:
+   - Implementar uma conexão física genérica e neutra
+   - Enviar e receber frames OPACOS
+   - Gerir ciclo de vida técnico (start/stop)
+   - Emitir telemetria técnica sobre estado e tráfego
+
+   IMPORTANTE:
+   - NÃO interpreta frames
+   - NÃO valida envelopes
+   - NÃO decide retry lógico
+   - NÃO garante entrega
+   - NÃO conhece Kernel, Driver, Server ou Dashboard
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Executa handlers de forma segura.
+ * Falhas são isoladas e ignoradas.
+ */
+function safeCall(handler, payload) {
+  try {
+    handler(payload);
+  } catch (_) {
+    // transporte nunca falha semanticamente
+  }
+}
+
+/* ===========================
+   Fábrica da conexão
+=========================== */
+
+/**
+ * Cria uma conexão física genérica.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ *
+ * @param {Object} deps.adapter
+ * Adaptador físico concreto (ex.: IPC, socket, pipe).
+ * Deve expor:
+ *  - start()
+ *  - stop()
+ *  - send(frame)
+ *  - onReceive(handler)
+ *  - onError(handler) [opcional]
+ */
+function createConnection({ telemetry, adapter }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('connection requer telemetry válida');
+  }
+
+  if (!adapter) {
+    throw new Error('connection requer adapter físico');
+  }
+
+  const receiveHandlers = new Set();
+  let started = false;
+
+  /* ===========================
+     Conexões internas
+  =========================== */
+
+  if (typeof adapter.onReceive === 'function') {
+    adapter.onReceive((frame) => {
+      telemetry.emit('nerv:transport:receive', {
+        size: frame ? frame.length || null : null
+      });
+
+      for (const handler of receiveHandlers) {
+        safeCall(handler, frame);
+      }
+    });
+  }
+
+  if (typeof adapter.onError === 'function') {
+    adapter.onError((error) => {
+      telemetry.emit('nerv:transport:error', {
+        message: error ? error.message : 'erro físico'
+      });
+    });
+  }
+
+  /* ===========================
+     API pública do módulo
+  =========================== */
+
+  /**
+   * Inicializa a conexão física.
+   */
+  function start() {
+    if (started) return;
+
+    started = true;
+    telemetry.emit('nerv:transport:start');
+
+    if (typeof adapter.start === 'function') {
+      adapter.start();
+    }
+
+    telemetry.emit('nerv:transport:connected');
+  }
+
+  /**
+   * Encerra a conexão física.
+   */
+  function stop() {
+    if (!started) return;
+
+    started = false;
+    telemetry.emit('nerv:transport:stop');
+
+    if (typeof adapter.stop === 'function') {
+      adapter.stop();
+    }
+
+    telemetry.emit('nerv:transport:disconnected');
+  }
+
+  /**
+   * Envia frame opaco pelo meio físico.
+   *
+   * @param {*} frame
+   */
+  function send(frame) {
+    telemetry.emit('nerv:transport:send', {
+      size: frame ? frame.length || null : null
+    });
+
+    if (typeof adapter.send === 'function') {
+      adapter.send(frame);
+    }
+  }
+
+  /**
+   * Registra handler de recepção de frames.
+   *
+   * @param {Function} handler
+   */
+  function onReceive(handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('onReceive requer função');
+    }
+
+    receiveHandlers.add(handler);
+
+    return () => {
+      receiveHandlers.delete(handler);
+    };
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    start,
+    stop,
+    send,
+    onReceive
+  });
+}
+
+module.exports = createConnection;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/transport/framing.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: transport/
+   Arquivo: framing.js
+
+   Papel:
+   - Empacotar dados opacos em frames transportáveis
+   - Reconstruir frames a partir de chunks recebidos
+   - Garantir delimitação física entre mensagens
+
+   IMPORTANTE:
+   - NÃO interpreta conteúdo
+   - NÃO valida envelopes
+   - NÃO decide lógica de transporte
+   - NÃO conhece COMMAND/EVENT/ACK
+   - Atua exclusivamente no nível físico
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Converte inteiro para buffer de 4 bytes (big-endian).
+ */
+function intToBuffer(value) {
+  const buf = Buffer.allocUnsafe(4);
+  buf.writeUInt32BE(value, 0);
+  return buf;
+}
+
+/**
+ * Lê inteiro de buffer de 4 bytes (big-endian).
+ */
+function bufferToInt(buf) {
+  return buf.readUInt32BE(0);
+}
+
+/* ===========================
+   Empacotamento (outbound)
+=========================== */
+
+/**
+ * Empacota um frame opaco adicionando prefixo de tamanho.
+ *
+ * @param {Buffer|Uint8Array} payload
+ * @returns {Buffer}
+ */
+function pack(payload) {
+  if (!Buffer.isBuffer(payload)) {
+    payload = Buffer.from(payload);
+  }
+
+  const length = payload.length;
+  const header = intToBuffer(length);
+
+  return Buffer.concat([header, payload]);
+}
+
+/* ===========================
+   Desempacotamento (inbound)
+=========================== */
+
+/**
+ * Cria um desempacotador de frames.
+ *
+ * Mantém buffer interno apenas para reconstrução física.
+ */
+function createUnpacker() {
+  let buffer = Buffer.alloc(0);
+
+  /**
+   * Processa chunk recebido do meio físico.
+   *
+   * @param {Buffer|Uint8Array} chunk
+   * @param {Function} onFrame
+   * Callback chamado para cada frame completo reconstruído.
+   */
+  function push(chunk, onFrame) {
+    if (!Buffer.isBuffer(chunk)) {
+      chunk = Buffer.from(chunk);
+    }
+
+    buffer = Buffer.concat([buffer, chunk]);
+
+    while (buffer.length >= 4) {
+      const frameLength = bufferToInt(buffer.slice(0, 4));
+
+      if (buffer.length < 4 + frameLength) {
+        // aguarda mais dados
+        return;
+      }
+
+      const frame = buffer.slice(4, 4 + frameLength);
+      buffer = buffer.slice(4 + frameLength);
+
+      onFrame(frame);
+    }
+  }
+
+  return Object.freeze({
+    push
+  });
+}
+
+/* ===========================
+   Exportação canônica
+=========================== */
+
+module.exports = Object.freeze({
+  pack,
+  createUnpacker
+});
+
+
+---
+
+/* ==========================================================================
+   src/nerv/transport/reconnect.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: transport/
+   Arquivo: reconnect.js
+
+   Papel:
+   - Implementar política TÉCNICA de reconexão do meio físico
+   - Reagir apenas a estados de conexão (up/down)
+   - Emitir telemetria observacional sobre tentativas
+
+   IMPORTANTE:
+   - NÃO interpreta causa lógica da falha
+   - NÃO decide sucesso/falha semântica
+   - NÃO bloqueia o NERV
+   - NÃO conhece Kernel, Driver ou Server
+   - Atua apenas no plano físico
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Executa função de forma segura.
+ */
+function safeCall(fn) {
+  try {
+    fn();
+  } catch (_) {
+    // falha física não deve propagar
+  }
+}
+
+/**
+ * Retorna timestamp atual.
+ */
+function now() {
+  return Date.now();
+}
+
+/* ===========================
+   Fábrica do reconector
+=========================== */
+
+/**
+ * Cria um controlador técnico de reconexão.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ *
+ * @param {Function} deps.start
+ * Função técnica para iniciar o transporte.
+ *
+ * @param {Function} deps.stop
+ * Função técnica para encerrar o transporte.
+ *
+ * @param {Object} [deps.policy]
+ * Política técnica opcional:
+ * - interval (ms)
+ * - maxAttempts (null = infinito)
+ */
+function createReconnect({
+  telemetry,
+  start,
+  stop,
+  policy = {}
+}) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('reconnect requer telemetry válida');
+  }
+
+  if (typeof start !== 'function' || typeof stop !== 'function') {
+    throw new Error('reconnect requer start/stop válidos');
+  }
+
+  const interval = typeof policy.interval === 'number' ? policy.interval : 1000;
+  const maxAttempts =
+    typeof policy.maxAttempts === 'number' ? policy.maxAttempts : null;
+
+  let attempts = 0;
+  let active = false;
+  let timer = null;
+
+  /* ===========================
+     Operações internas
+  =========================== */
+
+  function schedule() {
+    if (timer) return;
+
+    timer = setTimeout(() => {
+      timer = null;
+      tryReconnect();
+    }, interval);
+  }
+
+  function tryReconnect() {
+    if (!active) return;
+
+    if (maxAttempts !== null && attempts >= maxAttempts) {
+      telemetry.emit('nerv:transport:reconnect:exhausted', {
+        attempts
+      });
+      return;
+    }
+
+    attempts += 1;
+
+    telemetry.emit('nerv:transport:reconnect:attempt', {
+      attempt: attempts,
+      timestamp: now()
+    });
+
+    safeCall(stop);
+    safeCall(start);
+
+    schedule();
+  }
+
+  /* ===========================
+     API pública
+  =========================== */
+
+  function startReconnecting() {
+    if (active) return;
+
+    active = true;
+    attempts = 0;
+
+    telemetry.emit('nerv:transport:reconnect:start');
+    schedule();
+  }
+
+  function stopReconnecting() {
+    if (!active) return;
+
+    active = false;
+
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+
+    telemetry.emit('nerv:transport:reconnect:stop');
+  }
+
+  /* ===========================
+     Exportação canônica
+  =========================== */
+
+  return Object.freeze({
+    start: startReconnecting,
+    stop: stopReconnecting
+  });
+}
+
+module.exports = createReconnect;
+
+
+---
+
+/* ==========================================================================
+   src/nerv/transport/transport.js
+   Subsistema: NERV — Neural Event Relay Vector
+   Módulo: transport/
+   Arquivo: transport.js
+
+   Papel:
+   - Compor o subsistema de transporte físico do NERV
+   - Conectar framing, conexão e reconexão
+   - Expor interface técnica mínima ao NERV
+
+   IMPORTANTE:
+   - NÃO interpreta frames
+   - NÃO valida envelopes
+   - NÃO decide retry lógico
+   - NÃO garante entrega
+   - NÃO conhece Kernel, Driver ou Server
+   - Atua exclusivamente no plano físico
+
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const createConnection = require('./connection');
+const createReconnect = require('./reconnect');
+const framing = require('./framing');
+
+/* ===========================
+   Fábrica do transporte
+=========================== */
+
+/**
+ * Cria o subsistema de transporte físico do NERV.
+ *
+ * @param {Object} deps
+ * @param {Object} deps.telemetry
+ * Interface de telemetria do NERV.
+ *
+ * @param {Object} deps.adapter
+ * Adaptador físico concreto (IPC, socket, pipe etc).
+ *
+ * @param {Object} [deps.reconnect]
+ * Política técnica opcional de reconexão.
+ */
+function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
+  if (!telemetry || typeof telemetry.emit !== 'function') {
+    throw new Error('transport requer telemetry válida');
+  }
+
+  if (!adapter) {
+    throw new Error('transport requer adapter físico');
+  }
+
+  /* =========================================================
+     1. Framing (empacotamento físico)
+  ========================================================= */
+
+  const unpacker = framing.createUnpacker();
+
+  /* =========================================================
+     2. Conexão física
+  ========================================================= */
+
+  const connection = createConnection({
+    telemetry,
+    adapter: {
+      ...adapter,
+
+      // Recebe chunks brutos do meio físico
+      onReceive(handler) {
+        adapter.onReceive((chunk) => {
+          unpacker.push(chunk, handler);
+        });
+      }
+    }
+  });
+
+  /* =========================================================
+     3. Reconexão técnica (opcional)
+  ========================================================= */
+
+  const reconnect = reconnectPolicy
+    ? createReconnect({
+        telemetry,
+        start: connection.start,
+        stop: connection.stop,
+        policy: reconnectPolicy
+      })
+    : null;
+
+  /* =========================================================
+     4. API pública do transporte
+  ========================================================= */
+
+  /**
+   * Inicializa o transporte físico.
+   */
+  function start() {
+    telemetry.emit('nerv:transport:starting');
+    connection.start();
+  }
+
+  /**
+   * Encerra o transporte físico.
+   */
+  function stop() {
+    telemetry.emit('nerv:transport:stopping');
+
+    if (reconnect) {
+      reconnect.stop();
+    }
+
+    connection.stop();
+  }
+
+  /**
+   * Envia frame opaco pelo meio físico.
+   *
+   * @param {Buffer|Uint8Array} frame
+   */
+  function send(frame) {
+    const packed = framing.pack(frame);
+    connection.send(packed);
+  }
+
+  /**
+   * Registra handler para frames recebidos.
+   *
+   * @param {Function} handler
+   */
+  function onReceive(handler) {
+    connection.onReceive(handler);
+  }
+
+  /* =========================================================
+     Exportação canônica
+  ========================================================= */
+
+  return Object.freeze({
+    start,
+    stop,
+    send,
+    onReceive
+  });
+}
+
+module.exports = createTransport;

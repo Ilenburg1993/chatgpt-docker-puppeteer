@@ -1,0 +1,287 @@
+ROOT: D:\chatgpt-docker-puppeteer\src
+DATA_DA_EXTRACAO: 2026-01-18 22:18:44
+
+core\bootstrap_state_schema.js — 1165 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas\bootstrap_state_schema.js
+core\budget_manager.js — 1377 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\limits\budget_manager.js
+core\code_logic.js — 1075 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\extractors\code_logic.js
+core\config.js — 5471 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\config.js
+core\context_core.js — 1015 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\context_core.js
+core\context_engine.js — 6789 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\engine\context_engine.js
+core\dna_schema.js — 3269 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas\dna_schema.js
+core\doctor.js — 7359 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\doctor.js
+core\environment_resolver.js — 4149 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\environment_resolver.js
+core\execution_engine.js — 17065 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\execution_engine.js
+core\forensics.js — 5252 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\forensics.js
+core\guardrails.js — 954 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\limits\guardrails.js
+core\i18n.js — 5749 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\i18n.js
+core\identity.js — 604 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\transformers\identity.js
+core\identity_manager.js — 4110 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\identity_manager.js
+core\infra_failure_policy.js — 4615 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\infra_failure_policy.js
+core\json_logic.js — 1394 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\extractors\json_logic.js
+core\logger.js — 5103 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\logger.js
+core\memory.js — 836 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\memory.js
+core\metadata.js — 1144 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\transformers\metadata.js
+core\ref_parser.js — 1322 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\parsing\ref_parser.js
+core\schema_core.js — 1689 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas\schema_core.js
+core\schemas.js — 968 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas.js
+core\shared_types.js — 2904 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas\shared_types.js
+core\summary.js — 1275 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\context\transformers\summary.js
+core\task_healer.js — 3736 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas\task_healer.js
+core\task_schema.js — 4776 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\core\schemas\task_schema.js
+driver\BaseDriver.js — 7719 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\core\BaseDriver.js
+driver\ChatGPTDriver.js — 9907 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\targets\ChatGPTDriver.js
+driver\DriverLifecycleManager.js — 6548 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\DriverLifecycleManager.js
+driver\TargetDriver.js — 7249 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\core\TargetDriver.js
+driver\analyzer.js — 12403 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\analyzer.js
+driver\biomechanics_engine.js — 9985 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\biomechanics_engine.js
+driver\factory.js — 6767 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\factory.js
+driver\frame_navigator.js — 5487 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\frame_navigator.js
+driver\handle_manager.js — 1753 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\handle_manager.js
+driver\human.js — 7064 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\human.js
+driver\input_resolver.js — 6108 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\input_resolver.js
+driver\recovery_system.js — 5238 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\recovery_system.js
+driver\stabilizer.js — 9068 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\stabilizer.js
+driver\state_persistence.js — 219 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\state_persistence.js
+driver\submission_controller.js — 5042 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\submission_controller.js
+driver\telemetry_bridge.js — 5130 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\telemetry_bridge.js
+driver\triage.js — 8273 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\driver\modules\triage.js
+effectors\io_effector.js — 3888 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\effectors\io_effector.js
+effectors\task_effector.js — 6296 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\effectors\task_effector.js
+infra\ConnectionOrchestrator.js — 9591 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\ConnectionOrchestrator.js
+infra\atomic_write.js — 1894 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\fs\atomic_write.js
+infra\buffer.js — 2399 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\ipc\buffer.js
+infra\cache.js — 4500 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\queue\cache.js
+infra\control_store.js — 897 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\fs\control_store.js
+infra\dna_store.js — 4894 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\storage\dna_store.js
+infra\fs_core.js — 851 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\fs\fs_core.js
+infra\fs_utils.js — 3287 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\fs\fs_utils.js
+infra\io.js — 6360 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\io.js
+infra\ipc_client.js — 10939 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\ipc_client.js
+infra\lock_manager.js — 5005 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\locks\lock_manager.js
+infra\paths.js — 2004 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\fs\paths.js
+infra\process_guard.js — 1913 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\locks\process_guard.js
+infra\query_engine.js — 3588 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\queue\query_engine.js
+infra\response_store.js — 3727 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\storage\response_store.js
+infra\safe_read.js — 2380 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\fs\safe_read.js
+infra\scheduler.js — 4068 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\queue\scheduler.js
+infra\socket_io_adapter.js — 4660 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\transport\socket_io_adapter.js
+infra\system.js — 6251 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\system.js
+infra\task_loader.js — 6004 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\queue\task_loader.js
+infra\task_store.js — 3951 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\infra\storage\task_store.js
+kernel\core.js — 8058 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\core.js
+kernel\execution_engine.js — 9363 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\execution_engine\execution_engine.js
+kernel\kernel.js — 6912 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\kernel.js
+kernel\kernel_loop.js — 10499 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\kernel_loop\kernel_loop.js
+kernel\kernel_nerv_bridge.js — 9351 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\nerv_bridge\kernel_nerv_bridge.js
+kernel\kernel_nerv_integration.js — 233 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\example\kernel_nerv_integration.js
+kernel\kernel_telemetry.js — 8905 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\telemetry\kernel_telemetry.js
+kernel\observation_store.js — 10391 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\observation_store\observation_store.js
+kernel\observation_store__state.js — 3126 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\state\observation_store.js
+kernel\policy_engine.js — 5837 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\policies\policy_engine.js
+kernel\policy_engine__policy_engine.js — 10424 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\policy_engine\policy_engine.js
+kernel\state_persistence.js — 228 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\adapters\state_persistence.js
+kernel\task_executor.js — 4989 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\adapters\task_executor.js
+kernel\task_runtime.js — 9913 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\task_runtime\task_runtime.js
+kernel\task_store.js — 4450 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\kernel\state\task_store.js
+logic\adaptive.js — 7689 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\adaptive.js
+logic\format_rules.js — 3880 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\validation\rules\format_rules.js
+logic\physical_rules.js — 2260 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\validation\rules\physical_rules.js
+logic\scan_engine.js — 5731 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\validation\scan_engine.js
+logic\semantic_rules.js — 2887 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\validation\rules\semantic_rules.js
+logic\validation_core.js — 3535 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\validation\validation_core.js
+logic\validator.js — 746 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\logic\validator.js
+nerv\backpressure - NEWOLD.js — 3213 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\buffers\backpressure - NEWOLD.js
+nerv\backpressure.js — 2106 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\buffers\backpressure.js
+nerv\buffers.js — 3159 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\buffers\buffers.js
+nerv\connection.js — 4276 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\transport\connection.js
+nerv\core.js — 202 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\core.js
+nerv\correlation_context.js — 3807 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\correlation\correlation_context.js
+nerv\correlation_store.js — 4882 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\correlation\correlation_store.js
+nerv\emission.js — 2681 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\emission\emission.js
+nerv\emit_ack.js — 3162 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\emission\emit_ack.js
+nerv\emit_command.js — 3202 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\emission\emit_command.js
+nerv\emit_event.js — 3170 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\emission\emit_event.js
+nerv\framing.js — 8153 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\framing.js
+nerv\framing__transport.js — 2976 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\transport\framing.js
+nerv\health.js — 6095 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\health\health.js
+nerv\inbound_queue.js — 3624 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\buffers\inbound_queue.js
+nerv\ipc_telemetry.js — 4524 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\telemetry\ipc_telemetry.js
+nerv\metrics.js — 2577 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\telemetry\metrics.js
+nerv\nerv.js — 4582 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\nerv.js
+nerv\normalizer.js — 3242 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\envelopes\normalizer.js
+nerv\outbound_queue.js — 3651 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\buffers\outbound_queue.js
+nerv\receive.js — 3988 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\reception\receive.js
+nerv\reception.js — 2382 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\reception\reception.js
+nerv\reconnect.js — 3847 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\transport\reconnect.js
+nerv\schemas.js — 5340 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\envelopes\schemas.js
+nerv\transport.js — 4036 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\transport\transport.js
+nerv\validator.js — 3770 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\nerv\envelopes\validator.js
+server\app.js — 3315 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\engine\app.js
+server\dna.js — 4925 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\api\controllers\dna.js
+server\error_handler.js — 3110 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\middleware\error_handler.js
+server\fs_watcher.js — 3774 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\watchers\fs_watcher.js
+server\hardware.js — 3833 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\realtime\telemetry\hardware.js
+server\lifecycle.js — 5493 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\engine\lifecycle.js
+server\log_tail.js — 5177 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\realtime\streams\log_tail.js
+server\log_watcher.js — 3997 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\watchers\log_watcher.js
+server\main.js — 5507 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\main.js
+server\pm2_bridge.js — 4546 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\realtime\bus\pm2_bridge.js
+server\reconcilier.js — 6556 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\supervisor\reconcilier.js
+server\remediation.js — 4572 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\supervisor\remediation.js
+server\request_id.js — 1977 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\middleware\request_id.js
+server\router.js — 3415 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\api\router.js
+server\schema_guard.js — 3423 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\middleware\schema_guard.js
+server\server.js — 3786 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\engine\server.js
+server\socket.js — 9355 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\engine\socket.js
+server\system.js — 7560 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\api\controllers\system.js
+server\tasks.js — 7871 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\server\api\controllers\tasks.js
+shared\constants.js — 4407 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\shared\ipc\constants.js
+shared\constants__ipcNEWOLD.js — 4289 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\shared\ipcNEWOLD\constants.js
+shared\envelope.js — 4801 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\shared\ipc\envelope.js
+shared\envelope__ipcNEWOLD.js — 4978 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\shared\ipcNEWOLD\envelope.js
+shared\schemas.js — 6836 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\shared\ipc\schemas.js
+shared\schemas__ipcNEWOLD.js — 4798 bytes
+    ORIGEM: D:\chatgpt-docker-puppeteer\src\shared\ipcNEWOLD\schemas.js
+
+TOTAL:
+- Arquivos: 140
+- Tamanho total: 656827 bytes

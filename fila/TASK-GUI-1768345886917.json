@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "id": "TASK-GUI-1768345886917",
+    "version": "3.0",
+    "created_at": "2026-01-13T23:11:26.917Z",
+    "priority": 1,
+    "source": "gui",
+    "tags": []
+  },
+  "spec": {
+    "target": "chatgpt",
+    "model": "gpt-5",
+    "payload": {
+      "user_message": "teste X1"
+    },
+    "config": {
+      "reset_context": false,
+      "require_history": true,
+      "output_format": "markdown"
+    }
+  },
+  "policy": {
+    "max_attempts": 3,
+    "timeout_ms": "auto",
+    "dependencies": []
+  },
+  "state": {
+    "status": "RUNNING",
+    "worker_id": null,
+    "attempts": 1,
+    "started_at": "2026-01-13T23:11:28.689Z",
+    "completed_at": null,
+    "history": []
+  }
+}

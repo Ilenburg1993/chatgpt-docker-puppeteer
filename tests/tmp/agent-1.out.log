@@ -1,0 +1,5 @@
+[2026-01-12T06:47:05.843Z] INFO  [-] Agente iniciado
+[2026-01-12T06:47:05.914Z] INFO  [-] User interaction monitor instalado
+[2026-01-12T06:47:14.941Z] INFO  [test-control-001] Processando tarefa selecionada
+[2026-01-12T06:47:14.942Z] INFO  [test-control-001] Run lock criado (atomic)
+[2026-01-12T06:47:14.945Z] INFO  [test-control-001] Tentativa de foco DOM híbrido (1)
