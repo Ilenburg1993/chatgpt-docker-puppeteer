@@ -6,7 +6,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Dependencies
 # -----------------------------------------------------------------------------
-FROM node:20-slim AS deps
+FROM node:25-slim AS deps
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN npm ci --only=production --ignore-scripts
 # -----------------------------------------------------------------------------
 # Stage 2: Production Image
 # -----------------------------------------------------------------------------
-FROM node:20-slim
+FROM node:25-slim
 
 # Install only essential tools (no Chrome/Chromium - uses remote debugging)
 RUN apt-get update && apt-get install -y \
