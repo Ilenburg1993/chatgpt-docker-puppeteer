@@ -1,0 +1,20 @@
+# Code Owners - Automatic review requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @Ilenburg1993
+
+# Critical core files
+/src/core/ @Ilenburg1993
+/src/kernel/ @Ilenburg1993
+/src/nerv/ @Ilenburg1993
+
+# Infrastructure and deployment
+/Dockerfile @Ilenburg1993
+/ecosystem.config.js @Ilenburg1993
+/.github/workflows/ @Ilenburg1993
+
+# Configuration files
+/config.json @Ilenburg1993
+/dynamic_rules.json @Ilenburg1993
+/package.json @Ilenburg1993
