@@ -1,22 +1,12 @@
 # =============================================================================
 # Development Dockerfile for chatgpt-docker-puppeteer
-# Includes dev dependencies and hot reload
+# Uses remote Chrome via debugging protocol + hot reload
 # =============================================================================
 
 FROM node:20
 
-# Install Chromium and required libraries
+# Install only essential tools (uses remote Chrome)
 RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-driver \
-    fonts-liberation \
-    fonts-noto-color-emoji \
-    libnss3 \
-    libxss1 \
-    libgbm1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
     curl \
     ca-certificates \
     --no-install-recommends \
@@ -25,10 +15,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Configure Puppeteer
+# Configure to use remote Chrome
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    NODE_ENV=development
+    NODE_ENV=development \
+    CHROME_REMOTE_DEBUGGING_PORT=9222
 
 # Install dependencies (including dev)
 COPY package*.json ./
@@ -44,6 +34,7 @@ RUN mkdir -p fila respostas logs profile
 VOLUME ["/app/fila", "/app/respostas", "/app/logs", "/app/profile", "/app/node_modules"]
 
 EXPOSE 3008
+EXPOSE 9229
 
 # Start with nodemon for hot reload
 CMD ["npm", "run", "dev"]

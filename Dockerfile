@@ -1,6 +1,6 @@
 # =============================================================================
 # Multi-stage Dockerfile for chatgpt-docker-puppeteer
-# Optimized for production with Puppeteer support
+# Uses remote Chrome via debugging protocol (host.docker.internal:9222)
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -21,18 +21,8 @@ RUN npm ci --only=production --ignore-scripts
 # -----------------------------------------------------------------------------
 FROM node:20-slim
 
-# Install Chromium and required libraries for Puppeteer
+# Install only essential tools (no Chrome/Chromium - uses remote debugging)
 RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-driver \
-    fonts-liberation \
-    fonts-noto-color-emoji \
-    libnss3 \
-    libxss1 \
-    libgbm1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
     curl \
     ca-certificates \
     --no-install-recommends \
@@ -41,11 +31,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Configure Puppeteer to use system Chromium
+# Configure to use remote Chrome via debugging protocol
+# Default: host.docker.internal:9222 (Docker Desktop Windows/Mac)
+# Override with CHROME_WS_ENDPOINT environment variable
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     NODE_ENV=production \
-    TZ=UTC
+    TZ=UTC \
+    CHROME_REMOTE_DEBUGGING_PORT=9222
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules

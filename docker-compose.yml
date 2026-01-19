@@ -3,6 +3,10 @@ version: '3.8'
 services:
   # =============================================================================
   # Main Agent Service
+  # Requires Chrome running on host with remote debugging:
+  # "C:\Program Files\Google\Chrome\Application\chrome.exe"
+  #   --remote-debugging-port=9222
+  #   --user-data-dir="C:\chrome-automation-profile"
   # =============================================================================
   agent:
     build:
@@ -14,8 +18,11 @@ services:
     environment:
       - NODE_ENV=production
       - TZ=America/Sao_Paulo
-      # Uncomment to configure specific settings
-      # - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      # Chrome remote debugging connection
+      # host.docker.internal works on Docker Desktop (Windows/Mac)
+      # For Linux, use: --add-host=host.docker.internal:host-gateway
+      - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+      # Optional settings
       # - MAX_RETRIES=3
       # - LOG_LEVEL=info
     
@@ -62,6 +69,7 @@ services:
 
   # =============================================================================
   # Optional: Development Service
+  # Requires Chrome with remote debugging on host
   # =============================================================================
   agent-dev:
     build:
@@ -74,6 +82,7 @@ services:
     environment:
       - NODE_ENV=development
       - TZ=America/Sao_Paulo
+      - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
     
     volumes:
       # Mount entire source for hot reload
