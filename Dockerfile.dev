@@ -3,7 +3,7 @@
 # Uses remote Chrome via debugging protocol + hot reload
 # =============================================================================
 
-FROM node:20
+FROM node:25
 
 # Install only essential tools (uses remote Chrome)
 RUN apt-get update && apt-get install -y \
