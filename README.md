@@ -1,11 +1,14 @@
 # chatgpt-docker-puppeteer
 
-![CI Status](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/workflows/CI/badge.svg)
-![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+[![CI](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/actions/workflows/ci.yml/badge.svg)](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/actions/workflows/ci.yml)
+![Node.js Version](https://img.shields.io/badge/node-%E2%89%A520.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+![Development Status](https://img.shields.io/badge/status-pre--v1.0-yellow)
 
 **Autonomous agent system for controlling Large Language Models (ChatGPT, Gemini) via browser automation using Puppeteer and Chrome remote debugging.**
+
+> ⚠️ **Development Status**: This project is actively under construction and has not reached v1.0 yet. Features and APIs may change.
 
 ---
 
@@ -277,6 +280,8 @@ npm run lint
 ```
 
 ### Testing
+
+> **Note**: Tests are under active development (pre-v1.0). Some tests may be incomplete or failing.
 
 ```bash
 # All tests
