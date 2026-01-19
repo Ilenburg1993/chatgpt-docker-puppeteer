@@ -18,6 +18,83 @@ const ROOT = path.resolve(__dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
 const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 
+/**
+ * Verifica conectividade com Chrome Remote Debugging.
+ * @returns {Promise<object>} Status da conexão com Chrome.
+ */
+async function probeChromeConnection() {
+    const endpoint = process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || 'http://localhost:9222';
+    const httpEndpoint = endpoint.replace('ws://', 'http://').replace('wss://', 'https://');
+    
+    try {
+        const versionUrl = `${httpEndpoint}/json/version`;
+        const result = await probeConnectivity(versionUrl);
+        
+        if (!result.ok) {
+            return {
+                connected: false,
+                endpoint: httpEndpoint,
+                error: 'Chrome not responding',
+                latency_ms: result.ms
+            };
+        }
+        
+        // Tenta buscar informações detalhadas do Chrome
+        return new Promise((resolve) => {
+            const client = httpEndpoint.startsWith('https') ? https : http;
+            const req = client.get(versionUrl, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const info = JSON.parse(data);
+                        resolve({
+                            connected: true,
+                            endpoint: httpEndpoint,
+                            version: info['Browser'] || 'Unknown',
+                            protocol: info['Protocol-Version'] || 'Unknown',
+                            user_agent: info['User-Agent'] || 'Unknown',
+                            ws_endpoint: info['webSocketDebuggerUrl'] || endpoint,
+                            latency_ms: result.ms
+                        });
+                    } catch {
+                        resolve({
+                            connected: true,
+                            endpoint: httpEndpoint,
+                            version: 'Unknown',
+                            latency_ms: result.ms
+                        });
+                    }
+                });
+            });
+            req.on('error', (err) => {
+                resolve({
+                    connected: false,
+                    endpoint: httpEndpoint,
+                    error: err.message,
+                    latency_ms: 0
+                });
+            });
+            req.setTimeout(5000, () => {
+                req.destroy();
+                resolve({
+                    connected: false,
+                    endpoint: httpEndpoint,
+                    error: 'Connection timeout',
+                    latency_ms: 5000
+                });
+            });
+        });
+    } catch (err) {
+        return {
+            connected: false,
+            endpoint: httpEndpoint,
+            error: err.message,
+            latency_ms: 0
+        };
+    }
+}
+
 // --- GESTÃO DE TENDÊNCIAS (PERSISTÊNCIA DE BASELINE) ---
 async function getTrends() {
     try {
@@ -125,14 +202,27 @@ async function validateDNASanity() {
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
+    const io = require('../infra/io'); // Carrega dinamicamente para evitar ciclos
 
     const targets = ['https://www.google.com', ... (CONFIG.allowedDomains || []).map(d => `https://${d}`)];
-    const [networkResults, storage, dna, lag] = await Promise.all([
+    const [networkResults, storage, dna, lag, chrome] = await Promise.all([
         Promise.all(targets.map(url => probeConnectivity(url))),
         checkStorageSLA(),
         validateDNASanity(),
-        new Promise(r => { const s = Date.now(); setImmediate(() => r(Date.now() - s)); })
+        new Promise(r => { const s = Date.now(); setImmediate(() => r(Date.now() - s)); }),
+        probeChromeConnection()
     ]);
+    
+    // Estatísticas da fila
+    let queueStats = { pending: 0, running: 0, total: 0 };
+    try {
+        const tasks = await io.loadAllTasks();
+        queueStats = {
+            pending: tasks.filter(t => t.status === 'PENDING').length,
+            running: tasks.filter(t => t.status === 'RUNNING').length,
+            total: tasks.length
+        };
+    } catch { /* Fail-safe */ }
 
     const metrics = getHardwareMetrics();
     
@@ -143,6 +233,12 @@ async function runFullCheck() {
 
     const issues = [];
     const manifest = [];
+    
+    // Verificação de Chrome
+    if (!chrome.connected) {
+        issues.push(`Chrome remote debugging não conectado: ${chrome.error || 'Unknown error'}`);
+        manifest.push({ op: 'START_CHROME', target: 'chrome_debugging', impact: 'critical' });
+    }
 
     if (networkResults.some(n => !n.ok)) {
         issues.push("Conectividade instável com provedores de IA.");
@@ -176,9 +272,12 @@ async function runFullCheck() {
             network: targets.map((url, i) => ({ url, ...networkResults[i] })),
             storage: storage,
             dna: dna,
+            chrome: chrome,
+            queue: queueStats,
             system: {
                 ...metrics,
-                event_loop_lag_ms: lag
+                event_loop_lag_ms: lag,
+                uptime_seconds: Math.floor(process.uptime())
             }
         },
         recovery_manifest: {
@@ -189,4 +288,4 @@ async function runFullCheck() {
     };
 }
 
-module.exports = { runFullCheck, getHardwareMetrics };
+module.exports = { runFullCheck, getHardwareMetrics, probeChromeConnection };

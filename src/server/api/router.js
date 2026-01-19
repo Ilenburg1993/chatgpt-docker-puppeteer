@@ -25,6 +25,62 @@ function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');
 
     /* --------------------------------------------------------------------------
+       0. ENDPOINT DE SAÚDE SIMPLIFICADO (Para Docker Healthcheck)
+    -------------------------------------------------------------------------- */
+    
+    /**
+     * GET /api/health
+     * Endpoint simplificado de health check para Docker e monitoramento.
+     * Retorna status básico: uptime, Chrome connection, queue stats.
+     */
+    app.get('/api/health', async (req, res) => {
+        try {
+            const doctor = require('../../core/doctor');
+            const io = require('../../infra/io');
+            
+            // Verificação rápida de Chrome (timeout curto)
+            const chrome = await doctor.probeChromeConnection();
+            
+            // Estatísticas básicas da fila
+            let queueStats = { pending: 0, running: 0 };
+            try {
+                const tasks = await io.loadAllTasks();
+                queueStats = {
+                    pending: tasks.filter(t => t.status === 'PENDING').length,
+                    running: tasks.filter(t => t.status === 'RUNNING').length
+                };
+            } catch { /* Fail-safe */ }
+            
+            const status = chrome.connected ? 'ok' : 'degraded';
+            const httpCode = chrome.connected ? 200 : 503;
+            
+            res.status(httpCode).json({
+                status: status,
+                timestamp: new Date().toISOString(),
+                uptime: Math.floor(process.uptime()),
+                chrome: {
+                    connected: chrome.connected,
+                    endpoint: chrome.endpoint,
+                    version: chrome.version || null,
+                    latency_ms: chrome.latency_ms
+                },
+                queue: queueStats,
+                memory: {
+                    usage_mb: Math.floor(process.memoryUsage().heapUsed / 1024 / 1024),
+                    total_mb: Math.floor(process.memoryUsage().heapTotal / 1024 / 1024)
+                }
+            });
+        } catch (e) {
+            log('ERROR', `[HEALTH] Falha no health check: ${e.message}`);
+            res.status(503).json({
+                status: 'error',
+                timestamp: new Date().toISOString(),
+                error: e.message
+            });
+        }
+    });
+
+    /* --------------------------------------------------------------------------
        1. MAPEAMENTO DE DOMÍNIOS SOBERANOS
     -------------------------------------------------------------------------- */
 
