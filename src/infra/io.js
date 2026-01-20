@@ -43,12 +43,12 @@ module.exports = {
     cleanupOrphans: async () => {
         let totalCleaned = 0;
         const targetDirs = [PATHS.QUEUE, PATHS.RESPONSE, path.dirname(PATHS.IDENTITY)];
-        
+
         for (const dir of targetDirs) {
             try {
                 const files = await fs.readdir(dir);
                 const tmpFiles = files.filter(f => f.includes('.tmp'));
-                
+
                 for (const file of tmpFiles) {
                     await fs.unlink(path.join(dir, file)).catch(() => {});
                     totalCleaned++;
@@ -61,7 +61,7 @@ module.exports = {
     /* ==========================================================================
        2. GESTÃO DE TAREFAS (COM AUTO-INVALIDAÇÃO DE CACHE)
     ========================================================================== */
-    
+
     /**
      * Salva uma tarefa e invalida o cache em RAM da fila imediatamente.
      * [P5.2 FIX] Invalida ANTES do write para garantir consistency mesmo em crash.
@@ -82,7 +82,7 @@ module.exports = {
     },
 
     loadTask: taskStore.loadTask,
-    clearQueue: taskStore.clearQueue, 
+    clearQueue: taskStore.clearQueue,
 
     /* ==========================================================================
        3. GESTÃO DE RESULTADOS (ARTEFATOS)
@@ -101,7 +101,7 @@ module.exports = {
     /* ==========================================================================
        5. DNA, IDENTIDADE E LOCKS (SOBERANIA GENÔMICA)
     ========================================================================== */
-    
+
     /**
      * Recupera o DNA completo (dynamic_rules.json).
      */
@@ -124,17 +124,17 @@ module.exports = {
      * Deve ser chamado quando o disco sofre alteração externa (Watcher).
      */
     invalidateDnaCache: dnaStore.invalidateCache,
-    
+
     /**
      * Recupera a Identidade Soberana do robô de forma assíncrona.
      */
     getIdentity: async () => await fsCore.safeReadJSON(PATHS.IDENTITY),
-    
+
     /**
      * Persiste a Identidade Soberana de forma atômica.
      */
     saveIdentity: async (data) => await fsCore.atomicWrite(
-        PATHS.IDENTITY, 
+        PATHS.IDENTITY,
         JSON.stringify(data, null, 2)
     ),
 
@@ -144,8 +144,8 @@ module.exports = {
     /* ==========================================================================
        6. INTELIGÊNCIA DE FILA (ORQUESTRAÇÃO)
     ========================================================================== */
-    getQueue: queueCache.getQueue,       
-    setCacheDirty: queueCache.markDirty, 
+    getQueue: queueCache.getQueue,
+    setCacheDirty: queueCache.markDirty,
     loadNextTask: taskLoader.loadNextTask,
     bulkRetryFailed: taskLoader.bulkRetryFailed,
 

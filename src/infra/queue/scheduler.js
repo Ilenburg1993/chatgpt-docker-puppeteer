@@ -4,7 +4,7 @@
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
    Responsabilidade: Algoritmo puro para filtrar e ordenar tarefas elegíveis.
                      Otimizado para alta frequência e grandes volumes.
-   
+
    CONTRATO DE SOBERANIA:
      - Entrada: Snapshot estável da fila (Array de objetos).
      - Saída: Novo Array ordenado por prioridade e cronologia.
@@ -13,7 +13,7 @@
 
 /**
  * Filtra e ordena as tarefas elegíveis para execução imediata.
- * 
+ *
  * @param {Array} allTasks - Snapshot estável da fila carregado em RAM.
  * @param {string|null} targetFilter - Nome da IA alvo (ex: 'chatgpt').
  * @returns {Array} Lista de tarefas prontas para o motor de execução.
@@ -38,10 +38,10 @@ function getNextEligible(allTasks, targetFilter = null) {
     // 3. FILTRAGEM DE ELEGIBILIDADE
     const eligible = allTasks.filter(t => {
         // Validação de Integridade Mínima (Schema V4 Guard)
-        if (!t?.state || !t?.meta || !t?.policy) return false;
+        if (!t?.state || !t?.meta || !t?.policy) {return false;}
 
         // A. Check de Estado: Apenas tarefas pendentes entram no motor
-        if (t.state.status !== 'PENDING') return false;
+        if (t.state.status !== 'PENDING') {return false;}
 
         // B. Time-lock (Agendamento): Verifica se a hora de execução já chegou
         if (t.policy.execute_after && new Date(t.policy.execute_after) > now) {
@@ -53,18 +53,18 @@ function getNextEligible(allTasks, targetFilter = null) {
         if (deps && deps.length > 0) {
             for (const depId of deps) {
                 const parent = taskMap.get(depId);
-                
+
                 // Se o pai não existe no snapshot, assumimos que ainda não foi criado
-                if (!parent) return false; 
-                
+                if (!parent) {return false;}
+
                 const pStatus = parent.state.status;
-                
+
                 // Bloqueio Estrito: Se o pai falhou ou foi pulado, o filho fica travado
                 // (O Loader eventualmente marcará este filho como SKIPPED)
-                if (pStatus === 'FAILED' || pStatus === 'SKIPPED') return false;
-                
+                if (pStatus === 'FAILED' || pStatus === 'SKIPPED') {return false;}
+
                 // Só libera se o pai estiver concluído com sucesso
-                if (pStatus !== 'DONE') return false;
+                if (pStatus !== 'DONE') {return false;}
             }
         }
 
@@ -82,12 +82,12 @@ function getNextEligible(allTasks, targetFilter = null) {
     return eligible.sort((a, b) => {
         const pA = a.meta.priority || 0;
         const pB = b.meta.priority || 0;
-        
-        if (pB !== pA) return pB - pA;
-        
+
+        if (pB !== pA) {return pB - pA;}
+
         // Comparação léxica de strings ISO-8601 (Alta performance)
-        if (a.meta.created_at < b.meta.created_at) return -1;
-        if (a.meta.created_at > b.meta.created_at) return 1;
+        if (a.meta.created_at < b.meta.created_at) {return -1;}
+        if (a.meta.created_at > b.meta.created_at) {return 1;}
         return 0;
     });
 }

@@ -36,7 +36,7 @@ if (!fs.existsSync(QUEUE_DIR)) {
     console.error("❌ Erro: Pasta 'fila' não encontrada.");
     process.exit(1);
 }
-if (MODE_HTML && !fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+if (MODE_HTML && !fs.existsSync(PUBLIC_DIR)) {fs.mkdirSync(PUBLIC_DIR, { recursive: true });}
 
 const files = fs.readdirSync(QUEUE_DIR).filter(f => f.endsWith('.json'));
 const tasks = [];
@@ -55,9 +55,9 @@ if (MODE_HTML) {
         const status = getStatus(t);
         const attempts = getAttempts(t);
         const prio = getPrio(t);
-        
+
         let label = `${getId(t)}\n[${status}]`;
-        if (attempts > 0) label += `\nRetry: ${attempts}`;
+        if (attempts > 0) {label += `\nRetry: ${attempts}`;}
 
         return {
             id: getId(t),
@@ -80,9 +80,9 @@ if (MODE_HTML) {
     tasks.forEach(t => {
         getDeps(t).forEach(depId => {
             const exists = tasks.some(x => getId(x) === depId);
-            edges.push({ 
-                from: depId, 
-                to: getId(t), 
+            edges.push({
+                from: depId,
+                to: getId(t),
                 arrows: 'to',
                 dashes: !exists,
                 color: exists ? '#8b949e' : '#f85149',
@@ -154,13 +154,13 @@ if (MODE_HTML) {
     console.log('  rankdir=LR; bgcolor="#0d1117";');
     console.log('  node [shape=box, style="filled,rounded", fontname="Arial", fontcolor="#ffffff", color="#30363d"];');
     console.log('  edge [color="#8b949e", arrowsize=0.7];');
-    
+
     tasks.forEach(t => {
         const id = getId(t);
         const status = getStatus(t);
         const color = COLORS[status] || '#ffffff';
         console.log(`  "${id}" [label="${id}\\n(${status})", fillcolor="${color}"];`);
-        
+
         getDeps(t).forEach(depId => {
             const exists = tasks.some(x => getId(x) === depId);
             const edgeColor = exists ? '#8b949e' : '#f85149';

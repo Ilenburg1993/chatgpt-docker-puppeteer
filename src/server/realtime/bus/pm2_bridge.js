@@ -2,7 +2,7 @@
    src/server/realtime/bus/pm2_bridge.js
    Audit Level: 700 — PM2 Event Bridge (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Capturar eventos de ciclo de vida do Agente no PM2 
+   Responsabilidade: Capturar eventos de ciclo de vida do Agente no PM2
                      e transmitir via barramento Socket.io para o Mission Control.
    Sincronizado com: system.js V45, engine/socket.js V600, main.js V700.
 ========================================================================== */
@@ -28,7 +28,7 @@ let reconnectTimer = null;
  * Implementa lógica de auto-recuperação e reconexão resiliente.
  */
 function init() {
-    if (isBusActive) return;
+    if (isBusActive) {return;}
 
     // Limpeza de timers de reconexão pendentes
     if (reconnectTimer) {
@@ -73,7 +73,7 @@ function init() {
                     };
 
                     log('DEBUG', `[PM2_BRIDGE] Evento de Processo: ${payload.event} (${payload.status})`);
-                    
+
                     // Notifica o Dashboard através do Hub Central de Sockets
                     notify('status_update', payload);
                 }
@@ -89,10 +89,10 @@ function init() {
  * Garante que a ponte se recupere caso o daemon do PM2 seja reiniciado.
  */
 function _startHealthCheck() {
-    if (healthCheckInterval) clearInterval(healthCheckInterval);
+    if (healthCheckInterval) {clearInterval(healthCheckInterval);}
 
     healthCheckInterval = setInterval(() => {
-        if (!isBusActive) return;
+        if (!isBusActive) {return;}
 
         pm2Raw.list((err) => {
             if (err) {
@@ -113,12 +113,12 @@ function stop() {
         clearInterval(healthCheckInterval);
         healthCheckInterval = null;
     }
-    
+
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
     }
-    
+
     isBusActive = false;
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
 }

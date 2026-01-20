@@ -2,7 +2,7 @@
    src/logic/validation/rules/format_rules.js
    Audit Level: 100 — Industrial Hardening (Structural Integrity - Platinum)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Validar a conformidade estrutural (JSON, Markdown) e 
+   Responsabilidade: Validar a conformidade estrutural (JSON, Markdown) e
                      padrões sintáticos (Regex) do conteúdo.
    Sincronizado com: scan_engine.js (V1.1), context_engine.js (V1.1).
 ========================================================================== */
@@ -10,7 +10,7 @@
 /**
  * Valida se o conteúdo contém um JSON íntegro via análise de profundidade de pilha.
  * [HARDENING] Inclui verificação de sinal de aborto para interromper processamento longo.
- * 
+ *
  * @param {string} content - Conteúdo acumulado para validação.
  * @param {AbortSignal} [signal] - Sinal de cancelamento opcional.
  * @returns {object} { ok: boolean, reason: string|null }
@@ -31,7 +31,7 @@ function validateJSON(content, signal = null) {
         }
 
         if (content[i] === '{') {
-            if (depth === 0) start = i;
+            if (depth === 0) {start = i;}
             depth++;
         } else if (content[i] === '}') {
             depth--;
@@ -40,7 +40,7 @@ function validateJSON(content, signal = null) {
                 try {
                     JSON.parse(jsonCandidate);
                     found = true;
-                    break; 
+                    break;
                 } catch (e) {
                     return { ok: false, reason: `JSON_CORRUPTED: Estrutura inválida. ${e.message}` };
                 }
@@ -57,23 +57,23 @@ function validateJSON(content, signal = null) {
 
 /**
  * Valida se o conteúdo atende a um padrão Regex específico.
- * 
+ *
  * @param {string} content - Conteúdo a ser testado.
  * @param {string} patternStr - String da expressão regular.
  * @param {AbortSignal} [signal] - Sinal de cancelamento.
  */
 function validateRegex(content, patternStr, signal = null) {
-    if (!patternStr) return { ok: true, reason: null };
-    if (signal?.aborted) return { ok: false, reason: 'VALIDATION_ABORTED' };
-    
+    if (!patternStr) {return { ok: true, reason: null };}
+    if (signal?.aborted) {return { ok: false, reason: 'VALIDATION_ABORTED' };}
+
     try {
         const regex = new RegExp(patternStr, 'i');
         const matches = regex.test(content);
 
         if (!matches) {
-            return { 
-                ok: false, 
-                reason: `PATTERN_MISMATCH: O conteúdo não atende ao padrão exigido.` 
+            return {
+                ok: false,
+                reason: `PATTERN_MISMATCH: O conteúdo não atende ao padrão exigido.`
             };
         }
         return { ok: true, reason: null };

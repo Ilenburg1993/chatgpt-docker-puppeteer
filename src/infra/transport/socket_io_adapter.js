@@ -2,7 +2,7 @@
    src/infra/transport/socket_io_adapter.js
    Audit Level: 590 — Physical Transport Layer (Socket.io Implementation)
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Envelopar a biblioteca 'socket.io-client'.
      - Traduzir eventos de rede física para eventos do NERV.
      - Garantir que erros de conexão não derrubem o processo.
@@ -20,25 +20,25 @@ const EventEmitter = require('events');
 function createSocketAdapter(config) {
     // Bus de eventos para comunicar mudanças de estado ao NERV Core
     const events = new EventEmitter();
-    
+
     // Adiciona handler de erro padrão para evitar crashes
     events.on('error', (errorData) => {
         // Log silencioso - erros de conexão são esperados durante shutdown
         if (!_shuttingDown) {
             // Apenas emite no log interno, não propaga
-            events.emit('log', { 
-                level: 'DEBUG', 
-                msg: `[TRANSPORT] Connection error: ${errorData.msg}` 
+            events.emit('log', {
+                level: 'DEBUG',
+                msg: `[TRANSPORT] Connection error: ${errorData.msg}`
             });
         }
     });
-    
+
     // Instância nativa do socket (inicializada em start)
     let socket = null;
-    
+
     // Handler injetado pelo NERV para receber dados
     let inboundHandler = null;
-    
+
     // Flag de shutdown para evitar erros durante desligamento
     let _shuttingDown = false;
 
@@ -46,7 +46,7 @@ function createSocketAdapter(config) {
      * Inicia a conexão física.
      */
     function start() {
-        if (socket) return; // Já iniciado
+        if (socket) {return;} // Já iniciado
 
         // Configuração de robustez padrão
         const opts = {
@@ -83,11 +83,11 @@ function createSocketAdapter(config) {
         // 3. Erros de Conexão (silenciado durante shutdown)
         socket.on('connect_error', (err) => {
             // Ignora erros de conexão se já estamos desligando
-            if (_shuttingDown) return;
-            
-            events.emit('error', { 
-                code: 'CONNECTION_ERROR', 
-                msg: err.message 
+            if (_shuttingDown) {return;}
+
+            events.emit('error', {
+                code: 'CONNECTION_ERROR',
+                msg: err.message
             });
         });
 
@@ -98,9 +98,9 @@ function createSocketAdapter(config) {
                 try {
                     inboundHandler(rawFrame);
                 } catch (err) {
-                    events.emit('error', { 
-                        code: 'INBOUND_HANDLER_FAIL', 
-                        msg: `Erro ao processar pacote de entrada: ${err.message}` 
+                    events.emit('error', {
+                        code: 'INBOUND_HANDLER_FAIL',
+                        msg: `Erro ao processar pacote de entrada: ${err.message}`
                     });
                 }
             }
@@ -111,11 +111,11 @@ function createSocketAdapter(config) {
      * Encerra a conexão física.
      */
     function stop() {        _shuttingDown = true;        if (socket) {
-            socket.removeAllListeners();
-            socket.disconnect();
-            socket = null;
-            events.emit('disconnect');
-        }
+        socket.removeAllListeners();
+        socket.disconnect();
+        socket = null;
+        events.emit('disconnect');
+    }
     }
 
     /**

@@ -22,7 +22,7 @@ function notFound(req, res, next) {
 /**
  * Middleware Global de Erros (500).
  * Captura qualquer exceção lançada nos controllers ou middlewares anteriores.
- * 
+ *
  * @param {Error} err - Objeto de erro capturado.
  * @param {object} req - Request Express.
  * @param {object} res - Response Express.
@@ -32,7 +32,7 @@ function errorHandler(err, req, res, next) {
     // 1. Determinação do Status Code
     // Se o status já foi definido (ex: 404), mantém. Caso contrário, assume falha interna (500).
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    
+
     // 2. Extração de Metadados de Rastreabilidade
     const requestId = req.id || 'no-request-id';
 
@@ -52,8 +52,8 @@ function errorHandler(err, req, res, next) {
     // 4. Registro na Auditoria (Para Governança)
     // Apenas erros críticos (>= 500) são auditados para evitar ruído com 404s
     if (statusCode >= 500) {
-        audit('SERVER_ERROR', { 
-            msg: err.message, 
+        audit('SERVER_ERROR', {
+            msg: err.message,
             path: req.originalUrl,
             status: statusCode,
             request_id: requestId
@@ -63,7 +63,7 @@ function errorHandler(err, req, res, next) {
     // 5. Resposta Padronizada ao Dashboard
     res.status(statusCode).json({
         success: false,
-        error: statusCode === 404 ? "Recurso não encontrado" : "Erro interno do servidor",
+        error: statusCode === 404 ? 'Recurso não encontrado' : 'Erro interno do servidor',
         request_id: requestId,
         details: errorDetails
     });

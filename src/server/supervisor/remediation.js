@@ -2,7 +2,7 @@
    src/server/supervisor/remediation.js
    Audit Level: 700 — Remediation Logic Engine (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Atuar como a inteligência prescritiva do sistema. 
+   Responsabilidade: Atuar como a inteligência prescritiva do sistema.
                      Traduz diagnósticos de stall em manobras de autocura.
    Sincronizado com: reconciler.js V700, triage.js V70, constants.js V400.
 ========================================================================== */
@@ -15,15 +15,15 @@ const { log } = require('../../../core/logger');
  * Define a manobra tática para cada patologia detectada na interface.
  */
 const RemediationPolicy = Object.freeze({
-    
+
     // --- 1. COLAPSOS DE INFRAESTRUTURA FÍSICA ---
-    
+
     'BROWSER_FROZEN': {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
         retryTask: true
     },
-    
+
     'TERMINAL_INFRA_FAILURE': {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'CRITICAL',
@@ -100,7 +100,7 @@ const RemediationPolicy = Object.freeze({
 class RemediationEngine {
     /**
      * Avalia um diagnóstico técnico e prescreve a manobra de autocura.
-     * 
+     *
      * @param {object} diagnosis - Payload do evento STALL_DETECTED vindo do Driver.
      * @returns {object|null} Prescrição técnica ou null se não houver ação necessária.
      */
@@ -121,7 +121,7 @@ class RemediationEngine {
 
         /**
          * Objeto de Prescrição:
-         * Retornamos apenas os parâmetros lógicos. A execução via SocketHub 
+         * Retornamos apenas os parâmetros lógicos. A execução via SocketHub
          * é responsabilidade exclusiva do Reconciliador.
          */
         return {

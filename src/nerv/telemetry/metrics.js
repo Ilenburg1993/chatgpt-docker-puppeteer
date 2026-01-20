@@ -27,14 +27,14 @@
  * Retorna timestamp atual em milissegundos.
  */
 function now() {
-  return Date.now();
+    return Date.now();
 }
 
 /**
  * Cria um objeto sem protótipo para evitar colisões.
  */
 function emptyMap() {
-  return Object.create(null);
+    return Object.create(null);
 }
 
 /* ===========================
@@ -48,55 +48,55 @@ function emptyMap() {
  * Estrutura contendo operações puramente técnicas.
  */
 function createMetrics() {
-  const counters = emptyMap();
-  const gauges = emptyMap();
-  const timestamps = emptyMap();
+    const counters = emptyMap();
+    const gauges = emptyMap();
+    const timestamps = emptyMap();
 
-  /* ===========================
+    /* ===========================
      Operações internas
   =========================== */
 
-  function incCounter(name, value = 1) {
-    counters[name] = (counters[name] || 0) + value;
-  }
+    function incCounter(name, value = 1) {
+        counters[name] = (counters[name] || 0) + value;
+    }
 
-  function setGauge(name, value) {
-    gauges[name] = value;
-  }
+    function setGauge(name, value) {
+        gauges[name] = value;
+    }
 
-  function mark(name) {
-    timestamps[name] = now();
-  }
+    function mark(name) {
+        timestamps[name] = now();
+    }
 
-  /* ===========================
+    /* ===========================
      Leitura (snapshot)
   =========================== */
 
-  function snapshot() {
-    return {
-      counters: { ...counters },
-      gauges: { ...gauges },
-      timestamps: { ...timestamps }
-    };
-  }
+    function snapshot() {
+        return {
+            counters: { ...counters },
+            gauges: { ...gauges },
+            timestamps: { ...timestamps }
+        };
+    }
 
-  function reset() {
-    for (const k in counters) delete counters[k];
-    for (const k in gauges) delete gauges[k];
-    for (const k in timestamps) delete timestamps[k];
-  }
+    function reset() {
+        for (const k in counters) {delete counters[k];}
+        for (const k in gauges) {delete gauges[k];}
+        for (const k in timestamps) {delete timestamps[k];}
+    }
 
-  /* ===========================
+    /* ===========================
      Exportação técnica
   =========================== */
 
-  return Object.freeze({
-    incCounter,
-    setGauge,
-    mark,
-    snapshot,
-    reset
-  });
+    return Object.freeze({
+        incCounter,
+        setGauge,
+        mark,
+        snapshot,
+        reset
+    });
 }
 
 module.exports = createMetrics;

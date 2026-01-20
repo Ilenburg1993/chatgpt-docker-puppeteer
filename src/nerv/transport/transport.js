@@ -42,105 +42,105 @@ const framing = require('./framing');
  * Política técnica opcional de reconexão.
  */
 function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('transport requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('transport requer telemetry válida');
+    }
 
-  if (!adapter) {
-    throw new Error('transport requer adapter físico');
-  }
+    if (!adapter) {
+        throw new Error('transport requer adapter físico');
+    }
 
-  /* =========================================================
+    /* =========================================================
      1. Framing (empacotamento físico)
   ========================================================= */
 
-  const unpacker = framing.createUnpacker();
+    const unpacker = framing.createUnpacker();
 
-  /* =========================================================
+    /* =========================================================
      2. Conexão física
   ========================================================= */
 
-  const connection = createConnection({
-    telemetry,
-    adapter: {
-      ...adapter,
+    const connection = createConnection({
+        telemetry,
+        adapter: {
+            ...adapter,
 
-      // Recebe chunks brutos do meio físico
-      onReceive(handler) {
-        adapter.onReceive((chunk) => {
-          unpacker.push(chunk, handler);
-        });
-      }
-    }
-  });
+            // Recebe chunks brutos do meio físico
+            onReceive(handler) {
+                adapter.onReceive((chunk) => {
+                    unpacker.push(chunk, handler);
+                });
+            }
+        }
+    });
 
-  /* =========================================================
+    /* =========================================================
      3. Reconexão técnica (opcional)
   ========================================================= */
 
-  const reconnect = reconnectPolicy
-    ? createReconnect({
-        telemetry,
-        start: connection.start,
-        stop: connection.stop,
-        policy: reconnectPolicy
-      })
-    : null;
+    const reconnect = reconnectPolicy
+        ? createReconnect({
+            telemetry,
+            start: connection.start,
+            stop: connection.stop,
+            policy: reconnectPolicy
+        })
+        : null;
 
-  /* =========================================================
+    /* =========================================================
      4. API pública do transporte
   ========================================================= */
 
-  /**
+    /**
    * Inicializa o transporte físico.
    */
-  function start() {
-    telemetry.emit('nerv:transport:starting');
-    connection.start();
-  }
-
-  /**
-   * Encerra o transporte físico.
-   */
-  function stop() {
-    telemetry.emit('nerv:transport:stopping');
-
-    if (reconnect) {
-      reconnect.stop();
+    function start() {
+        telemetry.emit('nerv:transport:starting');
+        connection.start();
     }
 
-    connection.stop();
-  }
+    /**
+   * Encerra o transporte físico.
+   */
+    function stop() {
+        telemetry.emit('nerv:transport:stopping');
 
-  /**
+        if (reconnect) {
+            reconnect.stop();
+        }
+
+        connection.stop();
+    }
+
+    /**
    * Envia frame opaco pelo meio físico.
    *
    * @param {Buffer|Uint8Array} frame
    */
-  function send(frame) {
-    const packed = framing.pack(frame);
-    connection.send(packed);
-  }
+    function send(frame) {
+        const packed = framing.pack(frame);
+        connection.send(packed);
+    }
 
-  /**
+    /**
    * Registra handler para frames recebidos.
    *
    * @param {Function} handler
    */
-  function onReceive(handler) {
-    connection.onReceive(handler);
-  }
+    function onReceive(handler) {
+        connection.onReceive(handler);
+    }
 
-  /* =========================================================
+    /* =========================================================
      Exportação canônica
   ========================================================= */
 
-  return Object.freeze({
-    start,
-    stop,
-    send,
-    onReceive
-  });
+    return Object.freeze({
+        start,
+        stop,
+        send,
+        onReceive
+    });
 }
 
 module.exports = createTransport;

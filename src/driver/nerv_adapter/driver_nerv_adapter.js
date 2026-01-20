@@ -2,14 +2,14 @@
    src/driver/nerv_adapter/driver_nerv_adapter.js
    Subsistema: DRIVER — NERV Adapter
    Audit Level: 800 — Critical Decoupling Layer (Singularity Edition)
-   
+
    Responsabilidade:
    - Adaptar NERV (pub/sub) para o domínio do DRIVER
    - Gerenciar instâncias de DriverLifecycleManager
    - Escutar COMMANDS vindos do KERNEL via NERV
    - Emitir EVENTS de telemetria do driver via NERV
    - Garantir ZERO acoplamento direto com outros subsistemas
-   
+
    Princípios:
    - NÃO importa KERNEL, SERVER ou INFRA diretamente
    - NÃO acessa filesystem diretamente (usa KERNEL para decisões)
@@ -28,16 +28,16 @@ class DriverNERVAdapter {
      * @param {Object} config - Configuração do sistema
      */
     constructor(nerv, browserPool, config) {
-        if (!nerv) throw new Error('[DriverNERVAdapter] NERV instance required');
-        if (!browserPool) throw new Error('[DriverNERVAdapter] BrowserPool required');
-        
+        if (!nerv) {throw new Error('[DriverNERVAdapter] NERV instance required');}
+        if (!browserPool) {throw new Error('[DriverNERVAdapter] BrowserPool required');}
+
         this.nerv = nerv;
         this.browserPool = browserPool;
         this.config = config;
-        
+
         // Mapa de drivers ativos: taskId -> DriverLifecycleManager
         this.activeDrivers = new Map();
-        
+
         // Estatísticas observacionais
         this.stats = {
             tasksExecuted: 0,
@@ -45,10 +45,10 @@ class DriverNERVAdapter {
             driversCrashed: 0,
             vitalsEmitted: 0
         };
-        
+
         // Setup de listeners NERV
         this._setupListeners();
-        
+
         log('INFO', '[DriverNERVAdapter] Inicializado e conectado ao NERV');
     }
 
@@ -60,12 +60,12 @@ class DriverNERVAdapter {
         // Escuta comandos do tipo DRIVER_* vindos do KERNEL
         this.nerv.onReceive((envelope) => {
             // Filtra apenas mensagens para o domínio DRIVER
-            if (envelope.messageType !== MessageType.COMMAND) return;
-            if (!envelope.actionCode.startsWith('DRIVER_')) return;
-            
+            if (envelope.messageType !== MessageType.COMMAND) {return;}
+            if (!envelope.actionCode.startsWith('DRIVER_')) {return;}
+
             this._handleDriverCommand(envelope).catch(err => {
                 log('ERROR', `[DriverNERVAdapter] Erro ao processar comando: ${err.message}`, envelope.correlationId);
-                
+
                 // Emite evento de falha
                 this._emitEvent(ActionCode.DRIVER_ERROR, {
                     error: err.message,
@@ -74,7 +74,7 @@ class DriverNERVAdapter {
                 }, envelope.correlationId);
             });
         });
-        
+
         log('DEBUG', '[DriverNERVAdapter] Listeners configurados para DRIVER_* commands');
     }
 
@@ -83,22 +83,22 @@ class DriverNERVAdapter {
      */
     async _handleDriverCommand(envelope) {
         const { actionCode, payload, correlationId } = envelope;
-        
+
         log('DEBUG', `[DriverNERVAdapter] Recebido comando: ${actionCode}`, correlationId);
-        
+
         switch (actionCode) {
             case ActionCode.DRIVER_EXECUTE_TASK:
                 await this._executeTask(payload, correlationId);
                 break;
-                
+
             case ActionCode.DRIVER_ABORT:
                 await this._abortTask(payload, correlationId);
                 break;
-                
+
             case ActionCode.DRIVER_HEALTH_CHECK:
                 await this._performHealthCheck(payload, correlationId);
                 break;
-                
+
             default:
                 log('WARN', `[DriverNERVAdapter] Comando desconhecido: ${actionCode}`, correlationId);
         }
@@ -110,48 +110,48 @@ class DriverNERVAdapter {
      */
     async _executeTask(payload, correlationId) {
         const { task } = payload;
-        
+
         if (!task || !task.meta || !task.meta.id) {
             throw new Error('Task inválida recebida via NERV');
         }
-        
+
         const taskId = task.meta.id;
-        
+
         log('INFO', `[DriverNERVAdapter] Iniciando execução: ${taskId}`, correlationId);
-        
+
         // 1. Verifica se já existe driver para essa task
         if (this.activeDrivers.has(taskId)) {
             log('WARN', `[DriverNERVAdapter] Task ${taskId} já possui driver ativo`, correlationId);
             return;
         }
-        
+
         let page = null;
         let lifecycleManager = null;
-        
+
         try {
             // 2. Aloca página do pool
             page = await this.browserPool.allocate(task.spec.target);
-            
+
             // 3. Cria DriverLifecycleManager
             lifecycleManager = new DriverLifecycleManager(page, task, this.config);
             this.activeDrivers.set(taskId, lifecycleManager);
-            
+
             // 4. Adquire driver da Factory
             const driver = await lifecycleManager.acquire();
-            
+
             // 5. Conecta listeners de telemetria do driver
             this._attachDriverTelemetry(driver, taskId, correlationId);
-            
+
             // 6. Emite evento de início
             this._emitEvent(ActionCode.DRIVER_TASK_STARTED, {
                 taskId,
                 target: task.spec.target,
                 driverType: driver.constructor.name
             }, correlationId);
-            
+
             // 7. Executa a tarefa (método execute do driver)
             const result = await driver.execute(task.spec.prompt);
-            
+
             // 8. Emite evento de conclusão
             this._emitEvent(ActionCode.DRIVER_TASK_COMPLETED, {
                 taskId,
@@ -161,27 +161,27 @@ class DriverNERVAdapter {
                     duration: Date.now() - task.meta.created_at
                 }
             }, correlationId);
-            
+
             this.stats.tasksExecuted++;
-            
+
         } catch (error) {
             log('ERROR', `[DriverNERVAdapter] Falha na execução: ${error.message}`, correlationId);
-            
+
             this._emitEvent(ActionCode.DRIVER_TASK_FAILED, {
                 taskId,
                 error: error.message,
                 errorType: error.constructor.name
             }, correlationId);
-            
+
             this.stats.driversCrashed++;
-            
+
         } finally {
             // 9. Libera recursos
             if (lifecycleManager) {
                 await lifecycleManager.release();
                 this.activeDrivers.delete(taskId);
             }
-            
+
             if (page) {
                 await this.browserPool.release(page);
             }
@@ -193,24 +193,24 @@ class DriverNERVAdapter {
      */
     async _abortTask(payload, correlationId) {
         const { taskId } = payload;
-        
+
         const lifecycleManager = this.activeDrivers.get(taskId);
-        
+
         if (!lifecycleManager) {
             log('WARN', `[DriverNERVAdapter] Task ${taskId} não encontrada para abortar`, correlationId);
             return;
         }
-        
+
         log('INFO', `[DriverNERVAdapter] Abortando task: ${taskId}`, correlationId);
-        
+
         await lifecycleManager.release();
         this.activeDrivers.delete(taskId);
-        
+
         this._emitEvent(ActionCode.DRIVER_TASK_ABORTED, {
             taskId,
             reason: 'USER_REQUESTED'
         }, correlationId);
-        
+
         this.stats.tasksAborted++;
     }
 
@@ -224,9 +224,9 @@ class DriverNERVAdapter {
             stats: { ...this.stats },
             browserPoolHealth: await this.browserPool.getHealth()
         };
-        
+
         this._emitEvent(ActionCode.DRIVER_HEALTH_REPORT, health, correlationId);
-        
+
         log('DEBUG', `[DriverNERVAdapter] Health check: ${this.activeDrivers.size} drivers ativos`, correlationId);
     }
 
@@ -243,7 +243,7 @@ class DriverNERVAdapter {
                 timestamp: new Date().toISOString()
             }, correlationId);
         });
-        
+
         // Listener para progresso
         driver.on('progress', (data) => {
             this._emitEvent(ActionCode.DRIVER_VITAL, {
@@ -252,10 +252,10 @@ class DriverNERVAdapter {
                 data,
                 timestamp: new Date().toISOString()
             }, correlationId);
-            
+
             this.stats.vitalsEmitted++;
         });
-        
+
         // Listener para anomalias (se disponível)
         if (typeof driver.on === 'function') {
             driver.on('anomaly', (data) => {
@@ -280,7 +280,7 @@ class DriverNERVAdapter {
             payload,
             correlationId
         });
-        
+
         log('DEBUG', `[DriverNERVAdapter] Evento emitido: ${actionCode}`, correlationId);
     }
 
@@ -290,9 +290,9 @@ class DriverNERVAdapter {
      */
     async shutdown() {
         log('INFO', `[DriverNERVAdapter] Iniciando shutdown (${this.activeDrivers.size} drivers ativos)`);
-        
+
         const shutdownPromises = [];
-        
+
         for (const [taskId, lifecycleManager] of this.activeDrivers.entries()) {
             shutdownPromises.push(
                 lifecycleManager.release().catch(err => {
@@ -300,10 +300,10 @@ class DriverNERVAdapter {
                 })
             );
         }
-        
+
         await Promise.all(shutdownPromises);
         this.activeDrivers.clear();
-        
+
         log('INFO', '[DriverNERVAdapter] Shutdown concluído');
     }
 

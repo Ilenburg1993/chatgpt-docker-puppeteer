@@ -2,7 +2,7 @@
    src/infra/queue/task_loader.js
    Audit Level: 700 — Sovereign Task Loader (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar a ingestão de tarefas, realizar a auto-cura de 
+   Responsabilidade: Orquestrar a ingestão de tarefas, realizar a auto-cura de
                      processos zumbis e gerenciar transições de estado em lote.
    Sincronizado com: cache.js V700, task_store.js V700, scheduler.js V100.
 ========================================================================== */
@@ -14,9 +14,9 @@ const CONFIG = require('../../core/config');
 const { log } = require('../../core/logger');
 
 /**
- * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima 
+ * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima
  * tarefa elegível para o motor de execução.
- * 
+ *
  * @param {string|null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
  * @returns {Promise<object|null>}
  */
@@ -25,19 +25,19 @@ async function loadNextTask(targetFilter = null) {
     const allTasks = await cache.getQueue();
     const now = Date.now();
 
-    if (!allTasks || allTasks.length === 0) return null;
+    if (!allTasks || allTasks.length === 0) {return null;}
 
     // [OPTIMIZATION] Indexação O(N) para resolução rápida de dependências
     const taskMap = new Map();
     for (const t of allTasks) {
-        if (t?.meta?.id) taskMap.set(t.meta.id, t);
+        if (t?.meta?.id) {taskMap.set(t.meta.id, t);}
     }
 
     let queueWasMutated = false;
 
     // 2. CICLO DE HIGIENE E CURA
     for (const originalTask of allTasks) {
-        let task = originalTask; 
+        let task = originalTask;
         let isModified = false;
 
         // A. Auto-Cura de Zumbis (Tarefas presas em RUNNING por crash do sistema)
@@ -48,7 +48,7 @@ async function loadNextTask(targetFilter = null) {
             if (!isNaN(startedAt) && (now - startedAt > recoveryThreshold)) {
                 // Clone-on-Write: Isolamento para não sujar o cache prematuramente
                 task = JSON.parse(JSON.stringify(originalTask));
-                
+
                 task.state.status = 'FAILED';
                 task.state.last_error = 'RECOVERY_TRIGGERED: Timeout de execução (Zumbi)';
                 task.state.completed_at = new Date().toISOString();
@@ -57,7 +57,7 @@ async function loadNextTask(targetFilter = null) {
                     event: 'SYSTEM_RECOVERY',
                     msg: 'Agente zumbi detectado e movido para FAILED.'
                 });
-                
+
                 isModified = true;
                 log('WARN', `[LOADER] Zumbi resgatado: ${task.meta.id}`);
             }
@@ -71,12 +71,12 @@ async function loadNextTask(targetFilter = null) {
             });
 
             if (hasFailedParent) {
-                if (!isModified) task = JSON.parse(JSON.stringify(originalTask));
+                if (!isModified) {task = JSON.parse(JSON.stringify(originalTask));}
 
                 task.state.status = 'SKIPPED';
                 task.state.last_error = 'CASCADE_FAILURE: Dependência falhou ou foi anulada.';
                 task.state.completed_at = new Date().toISOString();
-                
+
                 isModified = true;
                 log('DEBUG', `[LOADER] Tarefa ${task.meta.id} marcada como SKIPPED por dependência.`);
             }
@@ -112,7 +112,7 @@ async function bulkRetryFailed() {
     const allTasks = await cache.getQueue();
     const failedTasks = allTasks.filter(t => t?.state?.status === 'FAILED');
 
-    if (failedTasks.length === 0) return 0;
+    if (failedTasks.length === 0) {return 0;}
 
     log('INFO', `[LOADER] Iniciando Bulk Retry para ${failedTasks.length} tarefas.`);
 
@@ -120,7 +120,7 @@ async function bulkRetryFailed() {
     for (const originalTask of failedTasks) {
         try {
             const task = JSON.parse(JSON.stringify(originalTask));
-            
+
             task.state.status = 'PENDING';
             task.state.last_error = null;
             task.state.history.push({
@@ -136,7 +136,7 @@ async function bulkRetryFailed() {
         }
     }
 
-    if (count > 0) cache.markDirty();
+    if (count > 0) {cache.markDirty();}
     return count;
 }
 

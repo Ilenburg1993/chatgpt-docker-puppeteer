@@ -1,21 +1,21 @@
 /* ==========================================================================
    src/infra/ipc_client.js — IPC ACK Resilience Patch (V800)
-   
+
    INSTRUÇÕES DE APLICAÇÃO:
-   
+
    Este patch adiciona tratamento robusto de erros em sendAck() no IPCClient.
    Se o arquivo ipc_client.js não existir no src/infra/, este patch documenta
    a implementação esperada para o módulo NERV.
-   
-   LOCALIZAÇÃO ALTERNATIVA: 
+
+   LOCALIZAÇÃO ALTERNATIVA:
    - Se usando NERV: src/nerv/ipc/client.js
    - Se legado: src/infra/ipc_client.js (código consolidado)
-   
+
 ========================================================================== */
 
 /**
  * CORREÇÃO P1.3: IPC ACK Resilience
- * 
+ *
  * Problema: Se sendAck() falhar (socket desconectado), exceção não é tratada.
  * Solução: Wrap sendAck em try-catch e transiciona para DISCONNECTED.
  */
@@ -60,7 +60,7 @@ async _processCommand(envelope) {
         // Socket morto: registra e marca desconexão
         log('ERROR', `[IPC] ACK perdido para ${msg_id}: ${ackErr.message}`, correlation_id);
         this.state = IPCConnState.DISCONNECTED;
-        
+
         // Opcional: emite evento de desconexão forçada
         this.emit('forced_disconnect', { reason: 'ACK_SEND_FAILED', error: ackErr.message });
     }
@@ -85,16 +85,16 @@ async _processCommand(envelope) {
 async function testACKResilience() {
     const client = createIPCClient();
     await client.connect('localhost', 3000);
-    
+
     // Envia comando
     client.sendCommand('TEST_COMMAND', { data: 'test' });
-    
+
     // Simula desconexão abrupta ANTES do ACK
     client.socket.destroy();
-    
+
     // Aguarda processamento interno
     await sleep(100);
-    
+
     // Valida que cliente detectou desconexão
     assert(client.state === 'DISCONNECTED', 'Cliente deve estar DISCONNECTED');
     assert(client.socket === null, 'Socket deve ser nullado');
@@ -110,14 +110,14 @@ Se o sistema usa NERV Protocol, a correção deve ser aplicada em:
 src/nerv/reception/receive.js:
 
 function createReception({ envelopes, correlation, telemetry }) {
-    
+
     function processIncoming(raw) {
         const envelope = envelopes.normalize(raw);
-        
+
         // Executa handlers de forma isolada
         try {
             safeCall(handler, envelope, telemetry);
-            
+
             // [V800] Tenta enviar ACK
             try {
                 sendAck(envelope.id, { status: 'ACCEPTED' });
@@ -127,7 +127,7 @@ function createReception({ envelopes, correlation, telemetry }) {
                     error: ackErr.message
                 });
             }
-            
+
         } catch (error) {
             // Handler falhou
             try {
@@ -141,7 +141,7 @@ function createReception({ envelopes, correlation, telemetry }) {
             }
         }
     }
-    
+
     return { processIncoming };
 }
 */

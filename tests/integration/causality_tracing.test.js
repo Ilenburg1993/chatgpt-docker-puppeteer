@@ -16,21 +16,21 @@ async function runCausalityTest() {
     const PORT = 3007;
     const httpServer = http.createServer();
     const ioServer = socketHub.init(httpServer);
-    
+
     // [FIX] O ID deve ser um UUID PURO para passar na validação do Zod
-    const correlationIdOriginal = uuidv4(); 
+    const correlationIdOriginal = uuidv4();
     let ackReceived = false;
     let progressReceived = false;
 
     ioServer.on('connection', (socket) => {
         socket.on('message', (envelope) => {
-            if (envelope.ids?.correlation_id !== correlationIdOriginal) return;
-            if (envelope.ack_for) ackReceived = true;
-            if (envelope.kind === IPCEvent.TASK_PROGRESS) progressReceived = true;
+            if (envelope.ids?.correlation_id !== correlationIdOriginal) {return;}
+            if (envelope.ack_for) {ackReceived = true;}
+            if (envelope.kind === IPCEvent.TASK_PROGRESS) {progressReceived = true;}
         });
     });
 
-    await new Promise(r => httpServer.listen(PORT, r));
+    await new Promise(r => { httpServer.listen(PORT, r); });
     await identityManager.initialize();
     const myRobotId = identityManager.robotId;
 
@@ -43,19 +43,19 @@ async function runCausalityTest() {
 
     console.log(`> [ACTION] Aguardando autorização do Maestro...`);
     for (let i = 0; i < 20; i++) {
-        if (ipc.isConnected()) break;
-        await new Promise(r => setTimeout(r, 500));
+        if (ipc.isConnected()) {break;}
+        await new Promise(r => { setTimeout(r, 500); });
     }
 
     if (!ipc.isConnected()) {
-        console.error("❌ [FAIL] Maestro não autorizou a tempo.");
+        console.error('❌ [FAIL] Maestro não autorizou a tempo.');
         process.exit(1);
     }
 
     console.log(`> [ACTION] Dashboard disparando comando com ID: ${correlationIdOriginal}`);
-    socketHub.sendCommand(IPCCommand.ENGINE_PAUSE, { 
-        reason: 'audit', 
-        correlation_id: correlationIdOriginal 
+    socketHub.sendCommand(IPCCommand.ENGINE_PAUSE, {
+        reason: 'audit',
+        correlation_id: correlationIdOriginal
     }, myRobotId);
 
     // Verificação final
@@ -65,7 +65,7 @@ async function runCausalityTest() {
             httpServer.close();
             process.exit(0);
         }
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => { setTimeout(r, 500); });
     }
 
     console.error(`❌ [FAIL] Timeout. ACK: ${ackReceived} | Progress: ${progressReceived}`);

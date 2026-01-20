@@ -14,17 +14,17 @@ const { CORRUPT_DIR, MAX_JSON_SIZE, sleep } = require('./fs_utils');
  * Utiliza loop iterativo em vez de recursão para prevenir Stack Overflow.
  */
 async function safeReadJSON(filepath) {
-    if (!fss.existsSync(filepath)) return null;
+    if (!fss.existsSync(filepath)) {return null;}
 
     let attempts = 0;
     while (attempts < 5) {
         try {
             const stats = await fs.stat(filepath);
-            if (stats.size > MAX_JSON_SIZE) throw new Error('FILE_TOO_LARGE');
+            if (stats.size > MAX_JSON_SIZE) {throw new Error('FILE_TOO_LARGE');}
 
             const content = await fs.readFile(filepath, 'utf-8');
-            if (!content.trim()) throw new Error('EMPTY_FILE');
-            
+            if (!content.trim()) {throw new Error('EMPTY_FILE');}
+
             return JSON.parse(content);
 
         } catch (readErr) {
@@ -38,7 +38,7 @@ async function safeReadJSON(filepath) {
             // Tratamento de integridade (JSON malformado ou gigante)
             const fileName = path.basename(filepath);
             const badFile = path.join(CORRUPT_DIR, `${fileName}.${Date.now()}.bad`);
-            
+
             try {
                 await fs.rename(filepath, badFile);
                 console.error(`[FS] Quarentena: ${fileName} isolado por erro de integridade.`);

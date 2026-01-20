@@ -4,4 +4,4 @@
    Responsabilidade: Retorno do conteúdo original sem modificações.
 ========================================================================== */
 
-module.exports = (content) => (content || "").trim();
+module.exports = (content) => (content || '').trim();

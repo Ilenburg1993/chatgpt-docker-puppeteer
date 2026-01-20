@@ -31,11 +31,11 @@
  * Interface de telemetria do NERV.
  */
 function createBackpressure({ telemetry }) {
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('backpressure requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('backpressure requer telemetry válida');
+    }
 
-  /**
+    /**
    * Emite sinal técnico de pressão.
    *
    * @param {Object} info
@@ -48,28 +48,28 @@ function createBackpressure({ telemetry }) {
    * @param {number|null} info.limit
    * Limite técnico configurado
    */
-  function signal({ buffer, size, limit }) {
-    telemetry.emit('nerv:buffer:pressure', {
-      buffer,
-      size,
-      limit
-    });
-  }
+    function signal({ buffer, size, limit }) {
+        telemetry.emit('nerv:buffer:pressure', {
+            buffer,
+            size,
+            limit
+        });
+    }
 
-  /**
+    /**
    * Emite sinal técnico de normalização (pressão aliviada).
    */
-  function relief({ buffer, size }) {
-    telemetry.emit('nerv:buffer:relief', {
-      buffer,
-      size
-    });
-  }
+    function relief({ buffer, size }) {
+        telemetry.emit('nerv:buffer:relief', {
+            buffer,
+            size
+        });
+    }
 
-  return Object.freeze({
-    signal,
-    relief
-  });
+    return Object.freeze({
+        signal,
+        relief
+    });
 }
 
 module.exports = createBackpressure;

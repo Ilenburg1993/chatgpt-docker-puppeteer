@@ -28,14 +28,14 @@
  * Verifica se valor é string não vazia.
  */
 function isNonEmptyString(value) {
-  return typeof value === 'string' && value.length > 0;
+    return typeof value === 'string' && value.length > 0;
 }
 
 /**
  * Clona array de registros de forma segura.
  */
 function cloneRecords(records) {
-  return Array.isArray(records) ? records.slice() : [];
+    return Array.isArray(records) ? records.slice() : [];
 }
 
 /* ===========================
@@ -53,93 +53,93 @@ function cloneRecords(records) {
  * Interface de telemetria do NERV (observação técnica).
  */
 function createCorrelationContext({ store, telemetry }) {
-  if (!store) {
-    throw new Error('correlation_context requer store válido');
-  }
+    if (!store) {
+        throw new Error('correlation_context requer store válido');
+    }
 
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('correlation_context requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('correlation_context requer telemetry válida');
+    }
 
-  /* ===========================
+    /* ===========================
      Operações de leitura
   =========================== */
 
-  /**
+    /**
    * Retorna o histórico completo de uma correlação.
    *
    * @param {string} correlationId
    * @returns {Array<Object>}
    */
-  function getHistory(correlationId) {
-    if (!isNonEmptyString(correlationId)) {
-      return [];
+    function getHistory(correlationId) {
+        if (!isNonEmptyString(correlationId)) {
+            return [];
+        }
+
+        const history = cloneRecords(store.get(correlationId));
+
+        telemetry.emit('nerv:correlation:read', {
+            correlation_id: correlationId,
+            size: history.length
+        });
+
+        return history;
     }
 
-    const history = cloneRecords(store.get(correlationId));
-
-    telemetry.emit('nerv:correlation:read', {
-      correlation_id: correlationId,
-      size: history.length
-    });
-
-    return history;
-  }
-
-  /**
+    /**
    * Verifica se uma correlação existe.
    *
    * @param {string} correlationId
    * @returns {boolean}
    */
-  function exists(correlationId) {
-    if (!isNonEmptyString(correlationId)) {
-      return false;
+    function exists(correlationId) {
+        if (!isNonEmptyString(correlationId)) {
+            return false;
+        }
+
+        return store.has(correlationId);
     }
 
-    return store.has(correlationId);
-  }
-
-  /**
+    /**
    * Retorna o tamanho do histórico de uma correlação.
    *
    * @param {string} correlationId
    * @returns {number}
    */
-  function size(correlationId) {
-    if (!isNonEmptyString(correlationId)) {
-      return 0;
+    function size(correlationId) {
+        if (!isNonEmptyString(correlationId)) {
+            return 0;
+        }
+
+        return store.size(correlationId);
     }
 
-    return store.size(correlationId);
-  }
-
-  /**
+    /**
    * Retorna lista de todas as correlações existentes.
    * Uso exclusivo para auditoria/diagnóstico.
    *
    * @returns {Array<string>}
    */
-  function list() {
-    const ids = store.list();
+    function list() {
+        const ids = store.list();
 
-    telemetry.emit('nerv:correlation:list', {
-      count: ids.length
-    });
+        telemetry.emit('nerv:correlation:list', {
+            count: ids.length
+        });
 
-    return ids.slice();
-  }
+        return ids.slice();
+    }
 
-  /* ===========================
+    /* ===========================
      Exportação canônica
   =========================== */
 
-  return Object.freeze({
-    getHistory,
-    exists,
-    size,
-    list
-  });
+    return Object.freeze({
+        getHistory,
+        exists,
+        size,
+        list
+    });
 }
 
 module.exports = createCorrelationContext;

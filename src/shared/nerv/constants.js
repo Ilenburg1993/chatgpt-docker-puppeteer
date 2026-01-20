@@ -4,7 +4,7 @@
    Módulo: Protocol (Linguagem Universal)
    Audit Level: 500 — NERV Protocol Canonical Vocabulary
    Status: CONSTITUTIONAL (Singularity Edition)
-   
+
    Responsabilidade: Gramática formal do protocolo NERV
    - Define MessageType (ontologia: COMMAND, EVENT, ACK)
    - Define ActionCode (vocabulário semântico extensível)
@@ -29,9 +29,9 @@ const PROTOCOL_VERSION = '2.0.0';
  * Conjunto fechado. Nunca extensível.
  */
 const MessageType = Object.freeze({
-  COMMAND: 'COMMAND', // Intenção declarada de ação futura
-  EVENT: 'EVENT',     // Observação registrada de algo ocorrido
-  ACK: 'ACK'          // Confirmação técnica de transporte
+    COMMAND: 'COMMAND', // Intenção declarada de ação futura
+    EVENT: 'EVENT',     // Observação registrada de algo ocorrido
+    ACK: 'ACK'          // Confirmação técnica de transporte
 });
 
 /**
@@ -43,23 +43,23 @@ const MessageType = Object.freeze({
  * Nunca redefine o tipo ontológico.
  */
 const ActionCode = Object.freeze({
-  // ---- TASK / EXECUTION (examples) ----
-  TASK_START: 'TASK_START',
-  TASK_CANCEL: 'TASK_CANCEL',
-  TASK_OBSERVED: 'TASK_OBSERVED',
-  TASK_FAILED_OBSERVED: 'TASK_FAILED_OBSERVED',
+    // ---- TASK / EXECUTION (examples) ----
+    TASK_START: 'TASK_START',
+    TASK_CANCEL: 'TASK_CANCEL',
+    TASK_OBSERVED: 'TASK_OBSERVED',
+    TASK_FAILED_OBSERVED: 'TASK_FAILED_OBSERVED',
 
-  // ---- DRIVER / ENVIRONMENT (observational) ----
-  DRIVER_ANOMALY: 'DRIVER_ANOMALY',
-  DRIVER_STATE_OBSERVED: 'DRIVER_STATE_OBSERVED',
+    // ---- DRIVER / ENVIRONMENT (observational) ----
+    DRIVER_ANOMALY: 'DRIVER_ANOMALY',
+    DRIVER_STATE_OBSERVED: 'DRIVER_STATE_OBSERVED',
 
-  // ---- TRANSPORT / IPC (technical events) ----
-  TRANSPORT_TIMEOUT: 'TRANSPORT_TIMEOUT',
-  TRANSPORT_RETRYING: 'TRANSPORT_RETRYING',
-  CHANNEL_DEGRADED: 'CHANNEL_DEGRADED',
+    // ---- TRANSPORT / IPC (technical events) ----
+    TRANSPORT_TIMEOUT: 'TRANSPORT_TIMEOUT',
+    TRANSPORT_RETRYING: 'TRANSPORT_RETRYING',
+    CHANNEL_DEGRADED: 'CHANNEL_DEGRADED',
 
-  // ---- ACK (technical only) ----
-  ACK_RECEIVED: 'ACK_RECEIVED'
+    // ---- ACK (technical only) ----
+    ACK_RECEIVED: 'ACK_RECEIVED'
 });
 
 /**
@@ -70,13 +70,13 @@ const ActionCode = Object.freeze({
  * Não define soberania. Não define decisão.
  */
 const ActorRole = Object.freeze({
-  KERNEL: 'KERNEL',
-  SERVER: 'SERVER',
-  INFRA: 'INFRA',
-  OBSERVER: 'OBSERVER'
-  // Explicitamente ausentes:
-  // - DRIVER
-  // - DASHBOARD
+    KERNEL: 'KERNEL',
+    SERVER: 'SERVER',
+    INFRA: 'INFRA',
+    OBSERVER: 'OBSERVER'
+    // Explicitamente ausentes:
+    // - DRIVER
+    // - DASHBOARD
 });
 
 /**
@@ -87,11 +87,11 @@ const ActorRole = Object.freeze({
  * Não possuem semântica de mundo.
  */
 const ChannelState = Object.freeze({
-  INACTIVE: 'INACTIVE',
-  HANDSHAKE: 'HANDSHAKE',
-  ACTIVE: 'ACTIVE',
-  DEGRADED: 'DEGRADED',
-  SILENT: 'SILENT'
+    INACTIVE: 'INACTIVE',
+    HANDSHAKE: 'HANDSHAKE',
+    ACTIVE: 'ACTIVE',
+    DEGRADED: 'DEGRADED',
+    SILENT: 'SILENT'
 });
 
 /**
@@ -102,11 +102,11 @@ const ChannelState = Object.freeze({
  * Nunca utilizados para decisão de negócio.
  */
 const TechnicalCode = Object.freeze({
-  BUFFERED: 'BUFFERED',
-  REPLAYED: 'REPLAYED',
-  DELIVERED: 'DELIVERED',
-  DROPPED: 'DROPPED',
-  HANDSHAKE_FAILED: 'HANDSHAKE_FAILED'
+    BUFFERED: 'BUFFERED',
+    REPLAYED: 'REPLAYED',
+    DELIVERED: 'DELIVERED',
+    DROPPED: 'DROPPED',
+    HANDSHAKE_FAILED: 'HANDSHAKE_FAILED'
 });
 
 /**
@@ -125,10 +125,10 @@ const TechnicalCode = Object.freeze({
  */
 
 module.exports = Object.freeze({
-  PROTOCOL_VERSION,
-  MessageType,
-  ActionCode,
-  ActorRole,
-  ChannelState,
-  TechnicalCode
+    PROTOCOL_VERSION,
+    MessageType,
+    ActionCode,
+    ActorRole,
+    ChannelState,
+    TechnicalCode
 });

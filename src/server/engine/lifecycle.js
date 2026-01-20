@@ -2,7 +2,7 @@
    src/server/engine/lifecycle.js
    Audit Level: 600 — Sovereign Lifecycle & Shutdown (IPC 2.0 Singularity)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar o encerramento atômico e ordenado de todos 
+   Responsabilidade: Orquestrar o encerramento atômico e ordenado de todos
                      os componentes do subsistema Server e limpeza de estado.
    Sincronizado com: main.js V51, server.js V100, socket.js V600.
 ========================================================================== */
@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const server = require('./server');
-const socketHub = require('./socket'); 
+const socketHub = require('./socket');
 const pm2Bridge = require('../realtime/bus/pm2_bridge');
 const logTail = require('../realtime/streams/log_tail');
 const hardwareTelemetry = require('../realtime/telemetry/hardware');
@@ -32,11 +32,11 @@ let isShuttingDown = false;
 /**
  * Realiza o encerramento gracioso de todos os módulos do Mission Control.
  * Estratégia: Desativação em cascata reversa (Periferia -> Núcleo).
- * 
+ *
  * @param {string} signal - O sinal de interrupção (ex: SIGINT, SIGTERM).
  */
 async function gracefulShutdown(signal) {
-    if (isShuttingDown) return;
+    if (isShuttingDown) {return;}
     isShuttingDown = true;
 
     log('WARN', `[LIFECYCLE] Sinal ${signal} detectado. Iniciando Protocolo de Encerramento...`);
@@ -51,15 +51,15 @@ async function gracefulShutdown(signal) {
         // 1. DESATIVAÇÃO DOS OBSERVADORES (WATCHERS)
         // Corta a entrada de novos eventos do sistema de arquivos.
         log('DEBUG', '[LIFECYCLE] Finalizando observadores de disco...');
-        if (fsWatcher && typeof fsWatcher.stop === 'function') fsWatcher.stop();
-        if (logWatcher && typeof logWatcher.stop === 'function') logWatcher.stop();
+        if (fsWatcher && typeof fsWatcher.stop === 'function') {fsWatcher.stop();}
+        if (logWatcher && typeof logWatcher.stop === 'function') {logWatcher.stop();}
 
         // 2. DESATIVAÇÃO DOS MOTORES DE TELEMETRIA E STREAMING
         // Interrompe o fluxo de dados de hardware e barramentos externos.
         log('DEBUG', '[LIFECYCLE] Encerrando barramentos de dados vivos...');
-        if (hardwareTelemetry && typeof hardwareTelemetry.stop === 'function') hardwareTelemetry.stop();
-        if (logTail && typeof logTail.stop === 'function') logTail.stop();
-        if (pm2Bridge && typeof pm2Bridge.stop === 'function') pm2Bridge.stop();
+        if (hardwareTelemetry && typeof hardwareTelemetry.stop === 'function') {hardwareTelemetry.stop();}
+        if (logTail && typeof logTail.stop === 'function') {logTail.stop();}
+        if (pm2Bridge && typeof pm2Bridge.stop === 'function') {pm2Bridge.stop();}
 
         // 3. DESATIVAÇÃO DO HUB DE EVENTOS (SOCKET.IO)
         // [V600] Desconecta agentes e limpa o Registry de forma assíncrona.
@@ -85,9 +85,9 @@ async function gracefulShutdown(signal) {
         await server.stop();
 
         log('INFO', '[LIFECYCLE] Subsistema Mission Control encerrado com sucesso.');
-        
+
         clearTimeout(forceExitTimeout);
-        
+
         // Encerramento do processo com código de sucesso.
         process.exit(0);
 
@@ -105,7 +105,7 @@ function listenToSignals() {
     // Sinais de interrupção padrão (Ctrl+C, PM2 Stop)
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    
+
     // Captura de falhas catastróficas para evitar encerramento "sujo" da infraestrutura
     process.on('uncaughtException', (err) => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);

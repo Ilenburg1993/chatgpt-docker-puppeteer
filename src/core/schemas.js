@@ -12,7 +12,7 @@ module.exports = {
     TaskSchema: schemaCore.TaskSchema,
     DnaSchema: schemaCore.DnaSchema,
     parseTask: schemaCore.parseTask,
-    
+
     // Expõe o acesso ao núcleo completo para novos módulos
     core: schemaCore
 };

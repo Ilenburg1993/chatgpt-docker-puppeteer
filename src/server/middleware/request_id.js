@@ -2,7 +2,7 @@
    src/server/middleware/request_id.js
    Audit Level: 600 — Transactional DNA Injector (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Garantir que toda requisição HTTP possua um identificador 
+   Responsabilidade: Garantir que toda requisição HTTP possua um identificador
                      único universal (UUID) para rastreabilidade de ponta a ponta.
    Sincronizado com: error_handler.js V600, app.js V100.
 ========================================================================== */
@@ -17,7 +17,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /**
  * Middleware de Injeção de Identidade de Requisição.
- * 
+ *
  * @param {object} req - Request Express.
  * @param {object} res - Response Express.
  * @param {function} next - Próximo middleware.

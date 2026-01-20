@@ -2,7 +2,7 @@
    src/core/schemas/dna_schema.js
    Audit Level: 100 — Industrial Hardening (Evolutionary DNA - Platinum)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Definir a estrutura das regras dinâmicas e seletores 
+   Responsabilidade: Definir a estrutura das regras dinâmicas e seletores
                      aprendidos pelo SADI. Garante a integridade da evolução.
    Sincronizado com: BaseDriver.js (V255), stabilizer.js (V41), io.js (V36).
 ========================================================================== */
@@ -22,7 +22,7 @@ const SelectorProtocolSchema = z.object({
     framePath: z.string().nullable().default(null),
     // [FIX 1.5] Sincronia de Protocolo: timestamp deve ser Unix Epoch em ms
     // Alinhado com Date.now() usado no Driver e no Stabilizer para evitar dessincronia.
-    timestamp: z.number().optional() 
+    timestamp: z.number().optional()
 });
 
 /**
@@ -36,7 +36,7 @@ const DomainRulesSchema = z.object({
             SelectorProtocolSchema      // Moderno: Protocolo estruturado SADI V10+
         ])
     ).default({}),
-    
+
     // Sobrescritas de comportamento aprendidas ou manuais
     behavior_overrides: z.object({
         idle_sleep_ms: z.number().optional(),
@@ -61,7 +61,7 @@ const DnaSchema = z.object({
 
     // Regras globais de fallback (Padrões universais de chat)
     global_selectors: z.record(z.array(z.string())).default({
-        input_box: ["textarea", "div[contenteditable='true']", "[role='textbox']"],
+        input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
         send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
     })
 }).passthrough();

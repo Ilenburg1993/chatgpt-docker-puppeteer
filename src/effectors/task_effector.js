@@ -2,7 +2,7 @@
    src/effectors/task_effector.js
    Audit Level: 920 — The Puppet Master
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Instanciar e controlar o DriverLifecycleManager (Código Legado).
      - Traduzir ordens do Kernel em chamadas de driver.
      - Traduzir eventos do driver em observações para o Kernel.
@@ -27,7 +27,7 @@ class TaskEffector {
         this.nerv = nerv;
         this.config = config;
         this.emitObservation = onObservation; // Canal de retorno para o Kernel
-        
+
         this.activeManager = null; // Instância única do driver atual
     }
 
@@ -53,18 +53,18 @@ class TaskEffector {
             // Como ainda não temos 'page' (o factory cria), passamos null ou adaptamos.
             // Analisando o DriverLifecycleManager.js antigo, ele parece receber a page no construtor.
             // Precisamos de um passo anterior: Factory.
-            
+
             // ADAPTAÇÃO: Vamos usar o factory.js diretamente ou deixar o Lifecycle gerenciar?
             // Para simplificar a transição, vamos assumir que o LifecycleManager possui um método start()
             // que resolve a página. Se não tiver, precisaremos instanciar a factory aqui.
-            
+
             // *Solução Híbrida Segura:*
             // Vamos criar o manager e injetar um "Mock Page" ou usar a factory aqui se necessário.
             // Dado que o user mandou 'factory.js', vamos usá-lo para obter a página.
-            
+
             const factory = require('../driver/factory');
             const page = await factory.getPage(); // Assumindo que existe algo assim ou createPage
-            
+
             this.activeManager = new DriverLifecycleManager(page, taskPayload, this.config);
 
             // 2. Wiretapping (Grampo)
@@ -87,10 +87,10 @@ class TaskEffector {
      * Aborta a execução imediatamente (PROPOSE_TERMINATE_TASK).
      */
     async abort() {
-        if (!this.activeManager) return;
+        if (!this.activeManager) {return;}
 
         console.log('[TASK EFFECTOR] Enviando sinal de aborto para o driver...');
-        
+
         try {
             // Usa o AbortController do driver legado se existir
             if (this.activeManager.abortController) {
@@ -98,10 +98,10 @@ class TaskEffector {
             } else if (typeof this.activeManager.stop === 'function') {
                 await this.activeManager.stop();
             }
-            
+
             // Limpeza forçada
             this.activeManager = null;
-            
+
         } catch (err) {
             console.error('[TASK EFFECTOR] Erro ao abortar driver:', err);
         }
@@ -115,11 +115,11 @@ class TaskEffector {
         // Se o Manager legado emitir eventos (EventEmitter), ouvimos aqui.
         // Se não, dependemos dele chamar callbacks.
         // Assumindo que podemos injetar um 'telemetryBridge' modificado ou ouvir eventos.
-        
+
         // Exemplo: Redirecionando logs vitais
         // Isso requer que alteremos levemente o DriverLifecycleManager para emitir eventos
         // OU usamos um Proxy.
-        
+
         // POR ENQUANTO: Vamos assumir que o erro no .run() é a principal fonte de sinal.
     }
 

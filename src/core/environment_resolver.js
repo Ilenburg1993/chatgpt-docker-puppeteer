@@ -2,7 +2,7 @@
    src/core/environment_resolver.js
    Audit Level: 700 — Sovereign Environment Decision Protocol (Singularity)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Identificar o alvo operacional (IA) com base no contexto 
+   Responsabilidade: Identificar o alvo operacional (IA) com base no contexto
                      do navegador e metadados de domínio.
    Sincronizado com: driver/factory.js V50, execution_engine.js V1.4.0.
 ========================================================================== */
@@ -13,7 +13,7 @@ class EnvironmentResolver {
     /**
      * Resolve o ambiente atual com base no contexto do navegador.
      * Implementa análise multi-fatorial para garantir precisão industrial.
-     * 
+     *
      * @param {object} ctx - Contexto de execução { browser, page }.
      * @returns {object} { target, confidence, reason, metadata }
      */
@@ -25,7 +25,7 @@ class EnvironmentResolver {
 
         try {
             const urlString = ctx.page.url();
-            
+
             // 2. FILTRO DE RUÍDO (Páginas Internas / Vazio)
             if (!urlString || urlString === 'about:blank' || !urlString.startsWith('http')) {
                 return this._reject('INVALID_URL_PROTOCOL', 0, { url: urlString });
@@ -44,7 +44,7 @@ class EnvironmentResolver {
             for (const target of availableTargets) {
                 /**
                  * Lógica de Correspondência Estrita:
-                 * Verificamos se o nome do alvo (ex: 'chatgpt') é um segmento 
+                 * Verificamos se o nome do alvo (ex: 'chatgpt') é um segmento
                  * exato do domínio ou se é o sufixo principal.
                  */
                 if (domainSegments.includes(target)) {
@@ -52,7 +52,7 @@ class EnvironmentResolver {
                     matchQuality = 1.0; // Segmento exato (ex: chatgpt.com)
                     break;
                 }
-                
+
                 if (hostname.endsWith(`.${target}`)) {
                     identifiedTarget = target;
                     matchQuality = 0.9; // Sufixo (ex: openai.chatgpt)

@@ -48,7 +48,7 @@ function init() {
             if (event === 'rename') {
                 /**
                  * ROTAÇÃO DETECTADA:
-                 * O handle atual tornou-se inválido. Precisamos descartar o 
+                 * O handle atual tornou-se inválido. Precisamos descartar o
                  * watcher e aguardar o novo arquivo ser estabilizado no disco.
                  */
                 log('DEBUG', '[LOG_WATCHER] Inode alterado (Rotação). Re-sincronizando...');
@@ -79,11 +79,11 @@ function _handleRotation() {
 
 /**
  * Agenda uma tentativa de reinicialização do observador.
- * 
+ *
  * @param {number} ms - Tempo de espera em milissegundos.
  */
 function _scheduleReconnect(ms) {
-    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    if (reconnectTimeout) {clearTimeout(reconnectTimeout);}
     reconnectTimeout = setTimeout(() => {
         init();
     }, ms);
@@ -102,7 +102,7 @@ function stop() {
         }
         watcher = null;
     }
-    
+
     if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;

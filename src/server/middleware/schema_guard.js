@@ -2,7 +2,7 @@
    src/server/middleware/schema_guard.js
    Audit Level: 600 — API Integrity Guard (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Validar payloads de entrada contra Schemas Zod, garantindo 
+   Responsabilidade: Validar payloads de entrada contra Schemas Zod, garantindo
                      a integridade dos dados antes do processamento lógico.
    Sincronizado com: core/schemas V100, logger.js V40, request_id.js V600.
 ========================================================================== */
@@ -12,7 +12,7 @@ const { log, audit } = require('../../core/logger');
 /**
  * Factory de Validação: Cria um middleware Express para um Schema específico.
  * Atua como o "Guarda de Fronteira" para as intenções de negócio.
- * 
+ *
  * @param {z.ZodSchema} schema - O Schema Zod (ex: TaskSchema) para validação.
  * @returns {Function} Middleware Express (req, res, next).
  */
@@ -24,7 +24,7 @@ const schemaGuard = (schema) => (req, res, next) => {
         log('WARN', `[GUARD] Tentativa de requisição com payload vazio.`, requestId);
         return res.status(400).json({
             success: false,
-            error: "Payload vazio detectado. A operação exige um corpo JSON íntegro.",
+            error: 'Payload vazio detectado. A operação exige um corpo JSON íntegro.',
             request_id: requestId
         });
     }
@@ -56,7 +56,7 @@ const schemaGuard = (schema) => (req, res, next) => {
         // 5. Resposta de Rejeição (400 Bad Request)
         return res.status(400).json({
             success: false,
-            error: "O payload enviado viola o contrato de dados do sistema.",
+            error: 'O payload enviado viola o contrato de dados do sistema.',
             request_id: requestId,
             details: errorDetails
         });
@@ -65,14 +65,14 @@ const schemaGuard = (schema) => (req, res, next) => {
     /**
      * SUCESSO E CURA:
      * Substituímos o req.body original pelo dado retornado pelo Zod (result.data).
-     * 
+     *
      * Por que isso é vital?
-     * O Zod aplica valores padrão (defaults), remove campos extras não autorizados 
-     * e realiza coerções de tipo (ex: string para número). Isso garante que o 
+     * O Zod aplica valores padrão (defaults), remove campos extras não autorizados
+     * e realiza coerções de tipo (ex: string para número). Isso garante que o
      * Controller receba um objeto "limpo" e confiável.
      */
     req.body = result.data;
-    
+
     next();
 };
 

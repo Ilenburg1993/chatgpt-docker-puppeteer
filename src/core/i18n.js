@@ -15,17 +15,17 @@ const VOCAB_FILE = path.join(ROOT, 'vocabulary.json');
 
 // --- DICIONÁRIO SEMENTE (IMUTÁVEL NO CÓDIGO) ---
 const BASE_VOCAB = {
-  "en": {
-    error_indicators: ["network error", "something went wrong", "policy violation", "limit reached", "connection lost", "error generating"],
-    close_actions: ["ok", "okay", "next", "close", "dismiss", "accept", "skip", "done", "got it"],
-    input_placeholders: ["message", "ask", "prompt", "type", "search"]
-  },
-  "pt": {
-    error_indicators: ["erro de rede", "algo deu errado", "violação", "limite atingido", "conexão perdida", "erro ao gerar"],
-    close_actions: ["próximo", "fechar", "entendi", "aceitar", "pular", "concluir", "ok"],
-    input_placeholders: ["mensagem", "pergunte", "digite", "conversar", "envie", "busca"]
-  },
-  "blocked": ["search", "find", "filter", "buscar", "pesquisar", "filtrar", "feedback", "report", "history", "histórico"]
+    'en': {
+        error_indicators: ['network error', 'something went wrong', 'policy violation', 'limit reached', 'connection lost', 'error generating'],
+        close_actions: ['ok', 'okay', 'next', 'close', 'dismiss', 'accept', 'skip', 'done', 'got it'],
+        input_placeholders: ['message', 'ask', 'prompt', 'type', 'search']
+    },
+    'pt': {
+        error_indicators: ['erro de rede', 'algo deu errado', 'violação', 'limite atingido', 'conexão perdida', 'erro ao gerar'],
+        close_actions: ['próximo', 'fechar', 'entendi', 'aceitar', 'pular', 'concluir', 'ok'],
+        input_placeholders: ['mensagem', 'pergunte', 'digite', 'conversar', 'envie', 'busca']
+    },
+    'blocked': ['search', 'find', 'filter', 'buscar', 'pesquisar', 'filtrar', 'feedback', 'report', 'history', 'histórico']
 };
 
 let vocabCache = null;
@@ -54,7 +54,7 @@ async function atomicWrite(filepath, content) {
             }
         }
     } catch (e) {
-        if (fs.existsSync(tmp)) try { fs.unlinkSync(tmp); } catch (_) {}
+        if (fs.existsSync(tmp)) {try { fs.unlinkSync(tmp); } catch (_) {}}
         throw e;
     }
 }
@@ -63,7 +63,7 @@ async function atomicWrite(filepath, content) {
  * Normaliza códigos de idioma (ex: 'pt-BR' -> 'pt', 'EN_US' -> 'en')
  */
 function normalizeLang(langCode) {
-    if (!langCode || typeof langCode !== 'string') return 'en';
+    if (!langCode || typeof langCode !== 'string') {return 'en';}
     return langCode.split(/[-_]/)[0].toLowerCase();
 }
 
@@ -75,7 +75,7 @@ function normalizeLang(langCode) {
  * Carrega o vocabulário com detecção de corrupção física.
  */
 async function loadVocab() {
-    if (vocabCache) return vocabCache;
+    if (vocabCache) {return vocabCache;}
 
     try {
         if (fs.existsSync(VOCAB_FILE)) {
@@ -101,15 +101,15 @@ async function loadVocab() {
 async function getTerms(category, langCode = 'en') {
     const v = await loadVocab();
     const lang = normalizeLang(langCode);
-    
+
     // Usamos um Set para garantir unicidade
     const terms = new Set();
-    
+
     // 1. Prioridade: Idioma Detectado
     if (v[lang] && v[lang][category]) {
         v[lang][category].forEach(t => terms.add(t.toLowerCase()));
     }
-    
+
     // 2. Fallback: Inglês (Sempre incluído como segurança universal)
     if (lang !== 'en' && v['en'] && v['en'][category]) {
         v['en'][category].forEach(t => terms.add(t.toLowerCase()));
@@ -122,11 +122,11 @@ async function getTerms(category, langCode = 'en') {
  * Aprende e persiste um novo termo após validação semântica.
  */
 async function learnTerm(langCode, category, term) {
-    if (!term || typeof term !== 'string' || term.length < 3) return;
-    
+    if (!term || typeof term !== 'string' || term.length < 3) {return;}
+
     const v = await loadVocab();
     const lang = normalizeLang(langCode);
-    const cleanTerm = term.toLowerCase().trim().replace(/[.!?]$/, "");
+    const cleanTerm = term.toLowerCase().trim().replace(/[.!?]$/, '');
 
     // 1. Proteção contra Envenenamento (Blocklist)
     if (v.blocked.some(bad => cleanTerm.includes(bad))) {
@@ -134,9 +134,9 @@ async function learnTerm(langCode, category, term) {
     }
 
     // 2. Inicialização de estrutura se o idioma for novo (ex: 'fr', 'de')
-    if (!v[lang]) v[lang] = {};
-    if (!v[lang][category]) v[lang][category] = [];
-    
+    if (!v[lang]) {v[lang] = {};}
+    if (!v[lang][category]) {v[lang][category] = [];}
+
     // 3. Persistência Idempotente
     if (!v[lang][category].includes(cleanTerm)) {
         v[lang][category].push(cleanTerm);

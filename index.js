@@ -2,7 +2,7 @@
 /* ==========================================================================
    index.js
    Entry Point Proxy - Delegates to src/main.js
-   
+
    This file exists for compatibility with:
    - package.json "main" field
    - Docker CMD

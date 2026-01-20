@@ -2,7 +2,7 @@
    src/infra/storage/task_store.js
    Audit Level: 700 — Sovereign Task Storage (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Persistência física de objetos Task no disco e operações 
+   Responsabilidade: Persistência física de objetos Task no disco e operações
                      de manutenção de integridade da fila.
    Sincronizado com: paths.js V700, fs_core.js V700, schemas.js V500.
 ========================================================================== */
@@ -29,7 +29,7 @@ async function saveTask(task) {
 
         // Escrita Atômica: Previne corrupção de JSON em caso de crash
         await atomicWrite(filepath, JSON.stringify(validatedTask, null, 2));
-        
+
         return validatedTask;
     } catch (e) {
         throw new Error(`[TASK_STORE] Falha ao persistir tarefa: ${e.message}`);
@@ -75,7 +75,7 @@ function listTaskFiles() {
 /**
  * Limpeza Cirúrgica da Fila: Remove todas as tarefas, EXCETO as que estão em execução.
  * Garante a continuidade do trabalho do Maestro durante limpezas administrativas.
- * 
+ *
  * @returns {Promise<object>} Relatório de limpeza { deleted: number, preserved: number }
  */
 async function clearQueue() {

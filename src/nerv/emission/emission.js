@@ -45,49 +45,49 @@ const createEmitAck = require('./emit_ack');
  * Interface de telemetria do NERV.
  */
 function createEmission({
-  envelopes,
-  buffers,
-  correlation,
-  telemetry
+    envelopes,
+    buffers,
+    correlation,
+    telemetry
 }) {
-  if (!envelopes || !buffers || !correlation || !telemetry) {
-    throw new Error('emission requer dependências completas');
-  }
+    if (!envelopes || !buffers || !correlation || !telemetry) {
+        throw new Error('emission requer dependências completas');
+    }
 
-  /* =========================================================
+    /* =========================================================
      Composição dos emissores
   ========================================================= */
 
-  const commandEmitter = createEmitCommand({
-    envelopes,
-    buffers,
-    correlation,
-    telemetry
-  });
+    const commandEmitter = createEmitCommand({
+        envelopes,
+        buffers,
+        correlation,
+        telemetry
+    });
 
-  const eventEmitter = createEmitEvent({
-    envelopes,
-    buffers,
-    correlation,
-    telemetry
-  });
+    const eventEmitter = createEmitEvent({
+        envelopes,
+        buffers,
+        correlation,
+        telemetry
+    });
 
-  const ackEmitter = createEmitAck({
-    envelopes,
-    buffers,
-    correlation,
-    telemetry
-  });
+    const ackEmitter = createEmitAck({
+        envelopes,
+        buffers,
+        correlation,
+        telemetry
+    });
 
-  /* =========================================================
+    /* =========================================================
      Interface pública do módulo
   ========================================================= */
 
-  return Object.freeze({
-    emitCommand: commandEmitter.emitCommand,
-    emitEvent: eventEmitter.emitEvent,
-    emitAck: ackEmitter.emitAck
-  });
+    return Object.freeze({
+        emitCommand: commandEmitter.emitCommand,
+        emitEvent: eventEmitter.emitEvent,
+        emitAck: ackEmitter.emitAck
+    });
 }
 
 module.exports = createEmission;

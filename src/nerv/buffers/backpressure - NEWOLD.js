@@ -2,7 +2,7 @@
    src/nerv/buffers/backpressure.js
    Audit Level: 550 — Neural Pressure Sensor
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Monitorar o tamanho das filas de saída (Outbox).
      - Emitir sinais de 'ALTA PRESSÃO' para o Kernel reduzir a carga.
      - Prevenir OOM (Out of Memory) em picos de tráfego.

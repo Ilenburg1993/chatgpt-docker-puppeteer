@@ -2,7 +2,7 @@
    src/server/api/controllers/dna.js
    Audit Level: 700 — Intelligence & DNA Controller (Traceability Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Gerenciar as configurações mestras e a evolução do genoma 
+   Responsabilidade: Gerenciar as configurações mestras e a evolução do genoma
                      de seletores (SADI) com rastreabilidade total.
    Sincronizado com: io.js V700, request_id.js V600, schemas.js V410.
 ========================================================================== */
@@ -37,10 +37,10 @@ router.get('/', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_DNA] Falha ao ler config.json: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Erro ao acessar base de configuração.",
-            request_id: req.id 
+            error: 'Erro ao acessar base de configuração.',
+            request_id: req.id
         });
     }
 });
@@ -52,32 +52,32 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
     try {
         if (!req.body || typeof req.body !== 'object') {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
-                error: "Payload de configuração inválido.",
+                error: 'Payload de configuração inválido.',
                 request_id: req.id
             });
         }
 
         // Auditoria administrativa da mutação vinculada ao Request ID
-        await audit('UPDATE_CONFIG', { 
-            user: 'GUI', 
+        await audit('UPDATE_CONFIG', {
+            user: 'GUI',
             request_id: req.id,
-            timestamp: new Date().toISOString() 
+            timestamp: new Date().toISOString()
         });
-        
+
         // Persistência blindada contra quedas de energia/processo
         await io.atomicWrite(CONFIG_PATH, JSON.stringify(req.body, null, 2));
-        
-        res.json({ 
+
+        res.json({
             success: true,
             request_id: req.id
         });
     } catch (e) {
         log('ERROR', `[API_DNA] Falha ao persistir configuração: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Falha catastrófica na escrita do arquivo.",
+            error: 'Falha catastrófica na escrita do arquivo.',
             request_id: req.id
         });
     }
@@ -95,8 +95,8 @@ router.put('/', async (req, res) => {
 router.get('/dna', async (req, res) => {
     try {
         const dna = await io.getDna();
-        if (!dna) throw new Error("DNA_NOT_FOUND");
-        
+        if (!dna) {throw new Error('DNA_NOT_FOUND');}
+
         res.json({
             success: true,
             dna,
@@ -104,9 +104,9 @@ router.get('/dna', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_DNA] Falha ao recuperar DNA: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Erro ao acessar o genoma do sistema.",
+            error: 'Erro ao acessar o genoma do sistema.',
             request_id: req.id
         });
     }
@@ -118,23 +118,23 @@ router.get('/dna', async (req, res) => {
  */
 router.put('/dna', async (req, res) => {
     try {
-        await audit('UPDATE_DNA', { 
-            user: 'GUI', 
-            request_id: req.id 
+        await audit('UPDATE_DNA', {
+            user: 'GUI',
+            request_id: req.id
         });
-        
+
         // A fachada io.saveDna realiza a validação nativa antes de tocar no disco
         await io.saveDna(req.body);
-        
-        res.json({ 
+
+        res.json({
             success: true,
             request_id: req.id
         });
     } catch (e) {
         log('WARN', `[API_DNA] Evolução de DNA rejeitada: ${e.message}`, req.id);
-        res.status(400).json({ 
+        res.status(400).json({
             success: false,
-            error: "O novo DNA viola o contrato de integridade: " + e.message,
+            error: `O novo DNA viola o contrato de integridade: ${  e.message}`,
             request_id: req.id
         });
     }

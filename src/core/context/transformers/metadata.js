@@ -8,17 +8,17 @@
  * Extrai propriedades específicas do estado da tarefa.
  */
 function extractTaskMetadata(task, transformType) {
-    if (!task || !task.state) return "UNKNOWN";
+    if (!task || !task.state) {return 'UNKNOWN';}
 
     switch (transformType.toUpperCase()) {
         case 'STATUS':
-            return task.state.status || "UNKNOWN";
+            return task.state.status || 'UNKNOWN';
         case 'METRICS':
             return JSON.stringify(task.state.metrics || {}, null, 2);
         case 'ERROR':
-            return task.state.last_error || "NONE";
+            return task.state.last_error || 'NONE';
         default:
-            return "UNKNOWN_METADATA_REQUEST";
+            return 'UNKNOWN_METADATA_REQUEST';
     }
 }
 

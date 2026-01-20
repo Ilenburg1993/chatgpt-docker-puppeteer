@@ -29,11 +29,11 @@
  * Falhas são isoladas e ignoradas.
  */
 function safeCall(handler, payload) {
-  try {
-    handler(payload);
-  } catch (_) {
+    try {
+        handler(payload);
+    } catch (_) {
     // transporte nunca falha semanticamente
-  }
+    }
 }
 
 /* ===========================
@@ -57,119 +57,119 @@ function safeCall(handler, payload) {
  *  - onError(handler) [opcional]
  */
 function createConnection({ telemetry, adapter }) {
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('connection requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('connection requer telemetry válida');
+    }
 
-  if (!adapter) {
-    throw new Error('connection requer adapter físico');
-  }
+    if (!adapter) {
+        throw new Error('connection requer adapter físico');
+    }
 
-  const receiveHandlers = new Set();
-  let started = false;
+    const receiveHandlers = new Set();
+    let started = false;
 
-  /* ===========================
+    /* ===========================
      Conexões internas
   =========================== */
 
-  if (typeof adapter.onReceive === 'function') {
-    adapter.onReceive((frame) => {
-      telemetry.emit('nerv:transport:receive', {
-        size: frame ? frame.length || null : null
-      });
+    if (typeof adapter.onReceive === 'function') {
+        adapter.onReceive((frame) => {
+            telemetry.emit('nerv:transport:receive', {
+                size: frame ? frame.length || null : null
+            });
 
-      for (const handler of receiveHandlers) {
-        safeCall(handler, frame);
-      }
-    });
-  }
+            for (const handler of receiveHandlers) {
+                safeCall(handler, frame);
+            }
+        });
+    }
 
-  if (typeof adapter.onError === 'function') {
-    adapter.onError((error) => {
-      telemetry.emit('nerv:transport:error', {
-        message: error ? error.message : 'erro físico'
-      });
-    });
-  }
+    if (typeof adapter.onError === 'function') {
+        adapter.onError((error) => {
+            telemetry.emit('nerv:transport:error', {
+                message: error ? error.message : 'erro físico'
+            });
+        });
+    }
 
-  /* ===========================
+    /* ===========================
      API pública do módulo
   =========================== */
 
-  /**
+    /**
    * Inicializa a conexão física.
    */
-  function start() {
-    if (started) return;
+    function start() {
+        if (started) {return;}
 
-    started = true;
-    telemetry.emit('nerv:transport:start');
+        started = true;
+        telemetry.emit('nerv:transport:start');
 
-    if (typeof adapter.start === 'function') {
-      adapter.start();
+        if (typeof adapter.start === 'function') {
+            adapter.start();
+        }
+
+        telemetry.emit('nerv:transport:connected');
     }
 
-    telemetry.emit('nerv:transport:connected');
-  }
-
-  /**
+    /**
    * Encerra a conexão física.
    */
-  function stop() {
-    if (!started) return;
+    function stop() {
+        if (!started) {return;}
 
-    started = false;
-    telemetry.emit('nerv:transport:stop');
+        started = false;
+        telemetry.emit('nerv:transport:stop');
 
-    if (typeof adapter.stop === 'function') {
-      adapter.stop();
+        if (typeof adapter.stop === 'function') {
+            adapter.stop();
+        }
+
+        telemetry.emit('nerv:transport:disconnected');
     }
 
-    telemetry.emit('nerv:transport:disconnected');
-  }
-
-  /**
+    /**
    * Envia frame opaco pelo meio físico.
    *
    * @param {*} frame
    */
-  function send(frame) {
-    telemetry.emit('nerv:transport:send', {
-      size: frame ? frame.length || null : null
-    });
+    function send(frame) {
+        telemetry.emit('nerv:transport:send', {
+            size: frame ? frame.length || null : null
+        });
 
-    if (typeof adapter.send === 'function') {
-      adapter.send(frame);
+        if (typeof adapter.send === 'function') {
+            adapter.send(frame);
+        }
     }
-  }
 
-  /**
+    /**
    * Registra handler de recepção de frames.
    *
    * @param {Function} handler
    */
-  function onReceive(handler) {
-    if (typeof handler !== 'function') {
-      throw new Error('onReceive requer função');
+    function onReceive(handler) {
+        if (typeof handler !== 'function') {
+            throw new Error('onReceive requer função');
+        }
+
+        receiveHandlers.add(handler);
+
+        return () => {
+            receiveHandlers.delete(handler);
+        };
     }
 
-    receiveHandlers.add(handler);
-
-    return () => {
-      receiveHandlers.delete(handler);
-    };
-  }
-
-  /* ===========================
+    /* ===========================
      Exportação canônica
   =========================== */
 
-  return Object.freeze({
-    start,
-    stop,
-    send,
-    onReceive
-  });
+    return Object.freeze({
+        start,
+        stop,
+        send,
+        onReceive
+    });
 }
 
 module.exports = createConnection;

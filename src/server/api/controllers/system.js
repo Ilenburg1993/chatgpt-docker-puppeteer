@@ -32,7 +32,7 @@ const { ROOT } = require('../../../infra/fs/fs_utils');
 router.get('/agents', (req, res) => {
     try {
         const registry = socketHub.getRegistry();
-        
+
         const agents = registry.map(entry => ({
             robot_id: entry.identity.robot_id,
             instance_id: entry.identity.instance_id,
@@ -51,10 +51,10 @@ router.get('/agents', (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha ao listar agentes: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Falha ao acessar o Registry de Agentes.",
-            request_id: req.id 
+            error: 'Falha ao acessar o Registry de Agentes.',
+            request_id: req.id
         });
     }
 });
@@ -68,7 +68,7 @@ router.post('/agents/:id/command', async (req, res) => {
     const { command, payload } = req.body;
 
     if (!command) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
             error: "O campo 'command' é obrigatório para execução remota.",
             request_id: req.id
@@ -77,18 +77,18 @@ router.post('/agents/:id/command', async (req, res) => {
 
     try {
         // Auditoria obrigatória da intenção de comando administrativo
-        await audit('REMOTE_COMMAND', { 
-            target_robot: id, 
-            command, 
+        await audit('REMOTE_COMMAND', {
+            target_robot: id,
+            command,
             payload,
-            request_id: req.id 
+            request_id: req.id
         });
 
         // Tenta enviar via Hub (Roteamento por sala privada agent:ID)
         const msgId = socketHub.sendCommand(command, payload || {}, id);
 
         if (!msgId) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
                 error: `Agente ${id} não localizado ou offline.`,
                 request_id: req.id
@@ -104,9 +104,9 @@ router.post('/agents/:id/command', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Falha interna no barramento de comando.",
+            error: 'Falha interna no barramento de comando.',
             request_id: req.id
         });
     }
@@ -129,9 +129,9 @@ router.get('/health', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha no motor de diagnóstico: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Falha ao executar diagnóstico de saúde.",
+            error: 'Falha ao executar diagnóstico de saúde.',
             request_id: req.id
         });
     }
@@ -150,9 +150,9 @@ router.get('/status', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha ao obter status do processo: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Falha ao obter status do processo.",
+            error: 'Falha ao obter status do processo.',
             request_id: req.id
         });
     }
@@ -177,7 +177,7 @@ router.post('/control/:action', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             error: `Falha ao executar comando de processo: ${action}`,
             request_id: req.id
@@ -193,10 +193,10 @@ router.get('/locks', async (req, res) => {
     try {
         const files = await fs.readdir(ROOT);
         const lockFiles = files.filter(f => f.startsWith('RUNNING_') && f.endsWith('.lock'));
-        
+
         const locks = await Promise.all(lockFiles.map(async f => {
             const content = await io.safeReadJSON(path.join(ROOT, f));
-            if (!content) return null;
+            if (!content) {return null;}
             return {
                 target: f.replace('RUNNING_', '').replace('.lock', ''),
                 ...content
@@ -210,9 +210,9 @@ router.get('/locks', async (req, res) => {
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha ao listar travas: ${e.message}`, req.id);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: "Falha ao listar travas ativas no sistema.",
+            error: 'Falha ao listar travas ativas no sistema.',
             request_id: req.id
         });
     }

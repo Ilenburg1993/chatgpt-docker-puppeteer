@@ -10,14 +10,14 @@
 /**
  * Avalia uma linha de texto individual em busca de violações semânticas.
  * Projetado para ser invocado dentro de um loop de stream (Single-Pass).
- * 
+ *
  * @param {string} line - Linha de texto atual.
  * @param {Array<string>} forbiddenTerms - Lista consolidada e PRÉ-NORMALIZADA.
  * @returns {string|null} O termo original encontrado ou null se a linha estiver limpa.
  */
 function evaluateLine(line, forbiddenTerms) {
     // 1. Guardrail de entrada: Evita processamento em linhas vazias ou sem regras
-    if (!line || !forbiddenTerms || forbiddenTerms.length === 0) return null;
+    if (!line || !forbiddenTerms || forbiddenTerms.length === 0) {return null;}
 
     // 2. Normalização única por linha (Otimização de Memória)
     const normalizedLine = line.toLowerCase();
@@ -31,7 +31,7 @@ function evaluateLine(line, forbiddenTerms) {
 /**
  * Prepara a lista consolidada de termos (Sistema + Usuário).
  * Realiza a higienização e normalização prévia para ganho de performance.
- * 
+ *
  * @param {Array<string>} systemTerms - Termos vindos do i18n.js.
  * @param {Array<string>} userTerms - Termos definidos na Task Spec.
  * @returns {Array<string>} Lista de termos únicos, limpos e em minúsculas.
@@ -46,14 +46,14 @@ function compileForbiddenList(systemTerms = [], userTerms = []) {
 
     // 3. Filtragem e Normalização (Hardening V68)
     return combined
-        .filter(t => 
-            typeof t === 'string' && 
+        .filter(t =>
+            typeof t === 'string' &&
             t.trim().length > 2 // [FIX] Impede falsos-positivos com conectores curtos
         )
         .map(t => t.trim().toLowerCase());
 }
 
-module.exports = { 
-    evaluateLine, 
-    compileForbiddenList 
+module.exports = {
+    evaluateLine,
+    compileForbiddenList
 };

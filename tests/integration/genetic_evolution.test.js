@@ -19,18 +19,18 @@ async function runEvolutionTest() {
     const PORT = 3010;
     const httpServer = http.createServer();
     socketHub.init(httpServer);
-    
+
     // Ativa o vigia de disco para o teste
     fsWatcher.init();
 
     try {
         // 1. SETUP: Identidade e Conexão
         await identityManager.initialize();
-        await new Promise(r => httpServer.listen(PORT, r));
+        await new Promise(r => { httpServer.listen(PORT, r); });
         await ipc.connect(PORT);
 
         // Aguarda autorização do Handshake
-        while (!ipc.isConnected()) { await new Promise(r => setTimeout(r, 200)); }
+        while (!ipc.isConnected()) { await new Promise(r => { setTimeout(r, 200); }); }
         console.log(`> [SETUP] Maestro conectado e vigia de disco ativo.`);
 
         // 2. ESTADO INICIAL
@@ -40,11 +40,11 @@ async function runEvolutionTest() {
 
         // 3. SIMULAÇÃO DE APRENDIZADO (Discovery)
         console.log(`\n🧬 [ACTION] SADI descobriu novo seletor: ${testSelector}`);
-        
+
         // Criamos um novo DNA baseado no atual
         const currentDna = await io.getDna();
         const updatedDna = { ...currentDna };
-        
+
         // Injetamos a nova regra no namespace do ChatGPT
         updatedDna.targets['chatgpt.com'] = {
             selectors: {
@@ -59,29 +59,29 @@ async function runEvolutionTest() {
 
         // 5. VALIDAÇÃO DA REATIVIDADE
         console.log(`> [WAIT] Aguardando sinal IPC e invalidação de cache...`);
-        
+
         let success = false;
         const start = Date.now();
 
         while (Date.now() - start < 10000) {
-            // Consultamos o IO. Se o cache foi invalidado pelo sinal IPC, 
+            // Consultamos o IO. Se o cache foi invalidado pelo sinal IPC,
             // ele lerá o novo valor do disco.
             const freshRules = await io.getTargetRules('chatgpt.com');
-            
+
             if (freshRules.selectors.input_box.includes(testSelector)) {
                 console.log(`   [REACTIVE] Maestro detectou a mudança!`);
                 console.log(`   [REACTIVE] Novo seletor em RAM: ${freshRules.selectors.input_box[0]}`);
                 success = true;
                 break;
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => { setTimeout(r, 500); });
         }
 
         if (success) {
             console.log(`\n✅ [PASS] Ciclo de Evolução Genética validado com sucesso.`);
             console.log(`   Fluxo: Discovery -> Disk -> Watcher -> IPC -> RAM Refresh.`);
         } else {
-            throw new Error("O Maestro não atualizou o DNA em RAM após a escrita no disco.");
+            throw new Error('O Maestro não atualizou o DNA em RAM após a escrita no disco.');
         }
 
     } catch (err) {
@@ -93,7 +93,7 @@ async function runEvolutionTest() {
         await socketHub.stop();
         httpServer.close();
         await ipc.disconnect();
-        console.log("Audit Phase 6.1: COMPLETE\n");
+        console.log('Audit Phase 6.1: COMPLETE\n');
         process.exit(0);
     }
 }

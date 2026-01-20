@@ -22,7 +22,7 @@ const MAX_AUDIT_SIZE = 2 * 1024 * 1024;  // 2MB para auditoria (conforme requisi
 const MAX_ARCHIVES = 5;                  // Mantém 5 arquivos de histórico por tipo
 
 // Garante a existência do diretório de logs
-if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+if (!fs.existsSync(LOG_DIR)) {fs.mkdirSync(LOG_DIR, { recursive: true });}
 
 /* ==========================================================================
    SISTEMA DE GESTÃO DE ARQUIVOS (ROTAÇÃO E LIMPEZA)
@@ -40,7 +40,13 @@ function cleanOldFiles(prefix) {
 
         if (files.length > MAX_ARCHIVES) {
             files.slice(MAX_ARCHIVES).forEach(f => {
-                try { fs.unlinkSync(path.join(LOG_DIR, f.name)); } catch (e) {}
+                try {
+                    fs.unlinkSync(path.join(LOG_DIR, f.name));
+                } catch (_e) {
+                    // Ignore cleanup errors
+                }
+                    // Ignora erros ao deletar arquivos antigos
+                }
             });
         }
     } catch (e) {
@@ -53,14 +59,14 @@ function cleanOldFiles(prefix) {
  */
 function rotateFile(filePath, prefix, maxSize) {
     try {
-        if (!fs.existsSync(filePath)) return;
+        if (!fs.existsSync(filePath)) {return;}
         const stats = fs.statSync(filePath);
-        
+
         if (stats.size > maxSize) {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const ext = path.extname(filePath) || '.log';
             const archivePath = path.join(LOG_DIR, `${prefix}${timestamp}.bak${ext}`);
-            
+
             fs.renameSync(filePath, archivePath);
             cleanOldFiles(prefix);
         }
@@ -78,15 +84,21 @@ function rotateFile(filePath, prefix, maxSize) {
  */
 function log(level, msg, taskId = '-') {
     rotateFile(LOG_FILE, 'agente_', MAX_LOG_SIZE);
-    
+
     const ts = new Date().toISOString();
     let content = msg;
-    if (msg instanceof Error) content = `${msg.message}\n${msg.stack}`;
-    else if (typeof msg === 'object') try { content = JSON.stringify(msg); } catch (_) { content = String(msg); }
+    if (msg instanceof Error) {content = `${msg.message}\n${msg.stack}`;}
+    else if (typeof msg === 'object') {try { content = JSON.stringify(msg); } catch (_) { /* Use String fallback */ content = String(msg); }}
 
     const line = `[${ts}] ${level.padEnd(5)} [${taskId}] ${content}`;
     console.log(line);
-    try { fs.appendFileSync(LOG_FILE, line + '\n', 'utf-8'); } catch (e) {}
+    try {
+        fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
+    } catch (_e) {
+        // Silent failure - console.log already logged
+    }
+        // Falha silenciosa - console.log já registrou
+    }
 }
 
 /**
@@ -95,10 +107,10 @@ function log(level, msg, taskId = '-') {
  */
 function audit(action, details) {
     rotateFile(AUDIT_FILE, 'audit_', MAX_AUDIT_SIZE);
-    
+
     const ts = new Date().toISOString();
     const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(details)}\n`;
-    
+
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
     } catch (e) {
@@ -112,14 +124,16 @@ function audit(action, details) {
  */
 function metric(name, payload) {
     rotateFile(METRICS_FILE, 'metrics_', MAX_LOG_SIZE);
-    
+
     try {
-        const entry = JSON.stringify(Object.assign({ 
-            ts: new Date().toISOString(), 
-            metric: name 
+        const entry = JSON.stringify(Object.assign({
+            ts: new Date().toISOString(),
+            metric: name
         }, payload || {}));
-        fs.appendFileSync(METRICS_FILE, entry + '\n', 'utf-8');
-    } catch (e) {}
+        fs.appendFileSync(METRICS_FILE, `${entry}\\n`, 'utf-8');
+    } catch (_e) {
+        // Silent failure - metrics are non-critical
+    }
 }
 
 // --- INICIALIZAÇÃO (HYGIENE CHECK) ---

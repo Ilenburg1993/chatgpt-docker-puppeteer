@@ -13,7 +13,7 @@ const { log } = require('../../core/logger');
 
 /**
  * Realiza a auditoria completa de qualidade de um resultado em disco.
- * 
+ *
  * @param {object} task - Objeto da tarefa (Schema V4).
  * @param {string} filePath - Caminho absoluto para o arquivo de resposta.
  * @param {AbortSignal} [signal] - Sinal soberano para interrupção imediata.
@@ -25,7 +25,7 @@ async function validateTaskResult(task, filePath, signal = null) {
     try {
         // 1. CHECK DE ABORTO PRECOCE
         // Impede o início da validação se a tarefa já foi cancelada pelo Maestro.
-        if (signal?.aborted) throw new Error('VALIDATION_ABORTED');
+        if (signal?.aborted) {throw new Error('VALIDATION_ABORTED');}
 
         log('DEBUG', `[VALIDATOR] Iniciando auditoria de qualidade para tarefa: ${taskId}`);
 
@@ -60,9 +60,9 @@ async function validateTaskResult(task, filePath, signal = null) {
 
         // 7. TRATAMENTO DE FALHA CATASTRÓFICA
         log('ERROR', `[VALIDATOR] Colapso na orquestração: ${valErr.message}`, taskId);
-        return { 
-            ok: false, 
-            reason: `VALIDATOR_INTERNAL_ERROR: ${valErr.message}` 
+        return {
+            ok: false,
+            reason: `VALIDATOR_INTERNAL_ERROR: ${valErr.message}`
         };
     }
 }

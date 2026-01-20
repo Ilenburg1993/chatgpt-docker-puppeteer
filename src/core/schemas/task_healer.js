@@ -13,30 +13,30 @@ const { log } = require('../logger');
 /**
  * HEAL_TASK: O Motor de Normalização e Cura.
  * Transforma qualquer input bruto em uma estrutura V4 perfeita.
- * 
+ *
  * @param {object} raw - Objeto bruto vindo da fila, API ou scripts.
  * @returns {object} Tarefa validada e curada conforme o Schema V4.
  */
 function healTask(raw) {
     if (!raw || typeof raw !== 'object') {
-        throw new Error("[HEALER] Input inválido: A tarefa deve ser um objeto.");
+        throw new Error('[HEALER] Input inválido: A tarefa deve ser um objeto.');
     }
 
     // 1. CONSTRUÇÃO ESTRUTURADA (Otimização de Performance - Fix 1.3)
-    // Em vez de JSON.parse(JSON.stringify()), construímos a nova estrutura 
+    // Em vez de JSON.parse(JSON.stringify()), construímos a nova estrutura
     // preservando dados que já estejam no formato V4.
     const task = {
         meta: { ...raw.meta },
-        spec: { 
-            ...raw.spec, 
+        spec: {
+            ...raw.spec,
             payload: { ...raw.spec?.payload },
             parameters: { ...raw.spec?.parameters },
             validation: { ...raw.spec?.validation },
             config: { ...raw.spec?.config }
         },
         policy: { ...raw.policy },
-        state: { 
-            ...raw.state, 
+        state: {
+            ...raw.state,
             metrics: { ...raw.state?.metrics },
             history: Array.isArray(raw.state?.history) ? [...raw.state.history] : []
         },

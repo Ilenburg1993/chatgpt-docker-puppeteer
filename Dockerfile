@@ -76,6 +76,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD node scripts/healthcheck.js
 
 # Use dumb-init to handle signals properly and reap zombie processes
-# Entry point is src/main.js (not index.js which doesn't exist)
+# PM2 runtime runs both agente-gpt and dashboard-web from ecosystem.config.js
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "src/main.js"]
+CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]

@@ -41,78 +41,78 @@
  * Interface de telemetria do NERV.
  */
 function createEmitEvent({
-  envelopes,
-  buffers,
-  correlation,
-  telemetry
+    envelopes,
+    buffers,
+    correlation,
+    telemetry
 }) {
-  if (!envelopes || !buffers || !correlation || !telemetry) {
-    throw new Error('emit_event requer dependências completas');
-  }
+    if (!envelopes || !buffers || !correlation || !telemetry) {
+        throw new Error('emit_event requer dependências completas');
+    }
 
-  /* ===========================
+    /* ===========================
      Operação de emissão
   =========================== */
 
-  /**
+    /**
    * Emite um envelope EVENT.
    *
    * @param {Object} envelope
    * Envelope estruturalmente válido.
    */
-  function emitEvent(envelope) {
-    telemetry.emit('nerv:emission:attempt', {
-      kind: 'EVENT'
-    });
+    function emitEvent(envelope) {
+        telemetry.emit('nerv:emission:attempt', {
+            kind: 'EVENT'
+        });
 
-    let normalized;
+        let normalized;
 
-    try {
-      // 1. Normalização estrutural
-      normalized = envelopes.normalize(envelope);
+        try {
+            // 1. Normalização estrutural
+            normalized = envelopes.normalize(envelope);
 
-      // 2. Validação estrutural
-      envelopes.assertValid(normalized);
-    } catch (error) {
-      telemetry.emit('nerv:emission:rejected', {
-        kind: 'EVENT',
-        reason: 'estrutura',
-        message: error.message
-      });
-      return;
+            // 2. Validação estrutural
+            envelopes.assertValid(normalized);
+        } catch (error) {
+            telemetry.emit('nerv:emission:rejected', {
+                kind: 'EVENT',
+                reason: 'estrutura',
+                message: error.message
+            });
+            return;
+        }
+
+        // 3. Registro histórico de correlação
+        if (normalized.ids && normalized.ids.correlation_id) {
+            correlation.append(
+                normalized.ids.correlation_id,
+                normalized
+            );
+        }
+
+        // 4. Enfileiramento outbound
+        const accepted = buffers.enqueueOutbound(normalized);
+
+        if (!accepted) {
+            telemetry.emit('nerv:emission:enqueue_failed', {
+                kind: 'EVENT'
+            });
+            return;
+        }
+
+        // 5. Telemetria de sucesso técnico
+        telemetry.emit('nerv:emission:success', {
+            kind: 'EVENT'
+        });
     }
 
-    // 3. Registro histórico de correlação
-    if (normalized.ids && normalized.ids.correlation_id) {
-      correlation.append(
-        normalized.ids.correlation_id,
-        normalized
-      );
-    }
-
-    // 4. Enfileiramento outbound
-    const accepted = buffers.enqueueOutbound(normalized);
-
-    if (!accepted) {
-      telemetry.emit('nerv:emission:enqueue_failed', {
-        kind: 'EVENT'
-      });
-      return;
-    }
-
-    // 5. Telemetria de sucesso técnico
-    telemetry.emit('nerv:emission:success', {
-      kind: 'EVENT'
-    });
-  }
-
-  /* ===========================
+    /* ===========================
      Exportação canônica
   =========================== */
 
-  return Object.freeze({
-    emitEvent
-  });
+    return Object.freeze({
+        emitEvent
+    });
 }
 
 module.exports = createEmitEvent;

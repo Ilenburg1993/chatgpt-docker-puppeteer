@@ -27,18 +27,18 @@
  * Executa função de forma segura.
  */
 function safeCall(fn) {
-  try {
-    fn();
-  } catch (_) {
+    try {
+        fn();
+    } catch (_) {
     // falha física não deve propagar
-  }
+    }
 }
 
 /**
  * Retorna timestamp atual.
  */
 function now() {
-  return Date.now();
+    return Date.now();
 }
 
 /* ===========================
@@ -64,98 +64,98 @@ function now() {
  * - maxAttempts (null = infinito)
  */
 function createReconnect({
-  telemetry,
-  start,
-  stop,
-  policy = {}
+    telemetry,
+    start,
+    stop,
+    policy = {}
 }) {
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('reconnect requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('reconnect requer telemetry válida');
+    }
 
-  if (typeof start !== 'function' || typeof stop !== 'function') {
-    throw new Error('reconnect requer start/stop válidos');
-  }
+    if (typeof start !== 'function' || typeof stop !== 'function') {
+        throw new Error('reconnect requer start/stop válidos');
+    }
 
-  const interval = typeof policy.interval === 'number' ? policy.interval : 1000;
-  const maxAttempts =
+    const interval = typeof policy.interval === 'number' ? policy.interval : 1000;
+    const maxAttempts =
     typeof policy.maxAttempts === 'number' ? policy.maxAttempts : null;
 
-  let attempts = 0;
-  let active = false;
-  let timer = null;
+    let attempts = 0;
+    let active = false;
+    let timer = null;
 
-  /* ===========================
+    /* ===========================
      Operações internas
   =========================== */
 
-  function schedule() {
-    if (timer) return;
+    function schedule() {
+        if (timer) {return;}
 
-    timer = setTimeout(() => {
-      timer = null;
-      tryReconnect();
-    }, interval);
-  }
-
-  function tryReconnect() {
-    if (!active) return;
-
-    if (maxAttempts !== null && attempts >= maxAttempts) {
-      telemetry.emit('nerv:transport:reconnect:exhausted', {
-        attempts
-      });
-      return;
+        timer = setTimeout(() => {
+            timer = null;
+            tryReconnect();
+        }, interval);
     }
 
-    attempts += 1;
+    function tryReconnect() {
+        if (!active) {return;}
 
-    telemetry.emit('nerv:transport:reconnect:attempt', {
-      attempt: attempts,
-      timestamp: now()
-    });
+        if (maxAttempts !== null && attempts >= maxAttempts) {
+            telemetry.emit('nerv:transport:reconnect:exhausted', {
+                attempts
+            });
+            return;
+        }
 
-    safeCall(stop);
-    safeCall(start);
+        attempts += 1;
 
-    schedule();
-  }
+        telemetry.emit('nerv:transport:reconnect:attempt', {
+            attempt: attempts,
+            timestamp: now()
+        });
 
-  /* ===========================
+        safeCall(stop);
+        safeCall(start);
+
+        schedule();
+    }
+
+    /* ===========================
      API pública
   =========================== */
 
-  function startReconnecting() {
-    if (active) return;
+    function startReconnecting() {
+        if (active) {return;}
 
-    active = true;
-    attempts = 0;
+        active = true;
+        attempts = 0;
 
-    telemetry.emit('nerv:transport:reconnect:start');
-    schedule();
-  }
-
-  function stopReconnecting() {
-    if (!active) return;
-
-    active = false;
-
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
+        telemetry.emit('nerv:transport:reconnect:start');
+        schedule();
     }
 
-    telemetry.emit('nerv:transport:reconnect:stop');
-  }
+    function stopReconnecting() {
+        if (!active) {return;}
 
-  /* ===========================
+        active = false;
+
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+
+        telemetry.emit('nerv:transport:reconnect:stop');
+    }
+
+    /* ===========================
      Exportação canônica
   =========================== */
 
-  return Object.freeze({
-    start: startReconnecting,
-    stop: stopReconnecting
-  });
+    return Object.freeze({
+        start: startReconnecting,
+        stop: stopReconnecting
+    });
 }
 
 module.exports = createReconnect;

@@ -9,11 +9,11 @@
  * Padrão suportado: {{REF:CRITERIA|TRANSFORM}} ou {{REF:CRITERIA}}
  */
 function parseReferences(text) {
-    if (!text || typeof text !== 'string' || !text.includes('{{REF:')) return [];
+    if (!text || typeof text !== 'string' || !text.includes('{{REF:')) {return [];}
 
     // Regex robusta para capturar critérios e transformadores opcionais
     const regex = /\{\{REF:([a-zA-Z0-9._\-:]+)(?:\|([a-zA-Z0-9]+))?\}\}/g;
-    
+
     return Array.from(text.matchAll(regex)).map(match => ({
         fullMatch: match[0],      // A tag completa para substituição
         criteria: match[1],       // ID, LAST ou TAG:name

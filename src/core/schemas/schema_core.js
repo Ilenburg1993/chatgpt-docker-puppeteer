@@ -31,7 +31,7 @@ module.exports = {
 
     // 4. Contratos de Bootstrap / Infra
     BootstrapStateSchema,
-    
+
     /**
      * parseTask: O ponto de entrada oficial para novas tarefas.
      * Utiliza o motor de cura para garantir compatibilidade e integridade.

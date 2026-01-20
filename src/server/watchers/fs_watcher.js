@@ -7,13 +7,13 @@
      - Atuar como SENSOR FÍSICO do filesystem (Fila de Tarefas).
      - Detectar indícios de mudança (nível de Inode/Escrita).
      - Sinalizar barramentos de dados (UI / Maestro / Cache).
-     
+
    PROIBIÇÕES EXPLÍCITAS (Protocolo de Desacoplamento):
      ❌ Não aplicar lógica de cache ou interpretação de JSON.
      ❌ Não aplicar debounce ou janelas temporais.
      ❌ Não inferir consistência de dados.
 
-   Toda autoridade de consolidação temporal e semântica pertence 
+   Toda autoridade de consolidação temporal e semântica pertence
    exclusivamente ao sistema de infraestrutura (cache.js).
 ========================================================================== */
 
@@ -37,7 +37,7 @@ let signaling = false;
  * Monitora a pasta física definida na Fachada de IO.
  */
 function init() {
-    if (fsWatcher) return;
+    if (fsWatcher) {return;}
 
     const queuePath = io.QUEUE_DIR;
 
@@ -74,7 +74,7 @@ function init() {
  * NÃO executa lógica. Apenas sinaliza indícios.
  */
 function _signalChange() {
-    if (signaling) return;
+    if (signaling) {return;}
     signaling = true;
 
     try {

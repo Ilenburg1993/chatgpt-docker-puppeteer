@@ -25,7 +25,7 @@ function assert(description, fn) {
 console.log(`\n🧪 [TEST] Iniciando Auditoria de Identidade Soberana\n`);
 
 // --- CENÁRIO 1: IDENTIDADE PERFEITA ---
-assert("Deve aceitar uma identidade completa e válida", () => {
+assert('Deve aceitar uma identidade completa e válida', () => {
     const validIdentity = {
         robot_id: uuidv4(),
         instance_id: uuidv4(),
@@ -38,27 +38,27 @@ assert("Deve aceitar uma identidade completa e válida", () => {
 });
 
 // --- CENÁRIO 2: DNA (ROBOT_ID) INVÁLIDO ---
-assert("Deve rejeitar se o robot_id não for um UUID", () => {
+assert('Deve rejeitar se o robot_id não for um UUID', () => {
     const invalidDna = {
-        robot_id: "ROBO-DO-GUI-001", // Não é UUID
+        robot_id: 'ROBO-DO-GUI-001', // Não é UUID
         instance_id: uuidv4(),
         role: IPCActor.MAESTRO,
         capabilities: []
     };
     const result = RobotIdentitySchema.safeParse(invalidDna);
-    if (result.success) throw new Error("O Schema aceitou um DNA que não segue o padrão UUID.");
+    if (result.success) {throw new Error('O Schema aceitou um DNA que não segue o padrão UUID.');}
 });
 
 // --- CENÁRIO 3: PAPEL (ROLE) INVÁLIDO ---
-assert("Deve rejeitar se o papel (role) for desconhecido", () => {
+assert('Deve rejeitar se o papel (role) for desconhecido', () => {
     const invalidRole = {
         robot_id: uuidv4(),
         instance_id: uuidv4(),
-        role: "actor:hacker", // Papel inexistente
+        role: 'actor:hacker', // Papel inexistente
         capabilities: []
     };
     const result = RobotIdentitySchema.safeParse(invalidRole);
-    if (result.success) throw new Error("O Schema aceitou um papel não homologado.");
+    if (result.success) {throw new Error('O Schema aceitou um papel não homologado.');}
 });
 
 // --- CENÁRIO 4: CAPACIDADES MALFORMADAS ---
@@ -67,10 +67,10 @@ assert("Deve rejeitar se 'capabilities' não for um array de strings", () => {
         robot_id: uuidv4(),
         instance_id: uuidv4(),
         role: IPCActor.MAESTRO,
-        capabilities: "SUPER_PODERES" // Deveria ser array
+        capabilities: 'SUPER_PODERES' // Deveria ser array
     };
     const result = RobotIdentitySchema.safeParse(invalidCaps);
-    if (result.success) throw new Error("O Schema aceitou capacidades fora de um array.");
+    if (result.success) {throw new Error('O Schema aceitou capacidades fora de um array.');}
 });
 
 console.log(`\n--------------------------------------------------`);
@@ -78,4 +78,4 @@ console.log(`RELATÓRIO: ${results.pass} Passaram | ${results.fail} Falharam`);
 console.log(`ESTADO: ${results.fail === 0 ? 'INTEGRIDADE TOTAL' : 'IDENTIDADE COMPROMETIDA'}`);
 console.log(`--------------------------------------------------\n`);
 
-if (results.fail > 0) process.exit(1);
+if (results.fail > 0) {process.exit(1);}

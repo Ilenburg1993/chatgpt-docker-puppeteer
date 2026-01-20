@@ -21,7 +21,7 @@ class IPCBuffer {
     /**
      * Adiciona um envelope à fila de espera.
      * Implementa política de descarte FIFO se o limite for atingido.
-     * 
+     *
      * @param {object} envelope - O Envelope V2 validado.
      */
     enqueue(envelope) {
@@ -30,22 +30,22 @@ class IPCBuffer {
             const dropped = this.queue.shift();
             log('WARN', `[BUFFER] Outbox lotada. Descartando mensagem antiga: ${dropped.kind}`);
         }
-        
+
         this.queue.push(envelope);
     }
 
     /**
      * Extrai todas as mensagens acumuladas para transmissão.
      * Limpa a fila atômicamente após a leitura.
-     * 
+     *
      * @returns {Array} Lista de envelopes em ordem cronológica.
      */
     flush() {
-        if (this.queue.length === 0) return [];
-        
+        if (this.queue.length === 0) {return [];}
+
         const pending = [...this.queue];
         this.queue = [];
-        
+
         log('INFO', `[BUFFER] Liberando ${pending.length} mensagens para sincronização retroativa.`);
         return pending;
     }

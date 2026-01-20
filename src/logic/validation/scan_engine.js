@@ -2,9 +2,9 @@
    src/logic/validation/scan_engine.js
    Audit Level: 100 — Industrial Hardening (Async Stream Engine - Platinum)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar a leitura eficiente do arquivo e a aplicação 
+   Responsabilidade: Orquestrar a leitura eficiente do arquivo e a aplicação
                      simultânea de múltiplas regras de auditoria em um único passo.
-   Sincronizado com: format_rules.js (V1.1), physical_rules.js (V1.0), 
+   Sincronizado com: format_rules.js (V1.1), physical_rules.js (V1.0),
                      semantic_rules.js (V1.1), fs_utils.js (V2.5).
 ========================================================================== */
 
@@ -18,7 +18,7 @@ const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/f
 
 /**
  * Executa a auditoria completa em uma única passagem de leitura.
- * 
+ *
  * @param {object} task - Objeto da tarefa (Schema V4).
  * @param {string} filePath - Caminho do arquivo em disco.
  * @param {Array<string>} systemErrorTerms - Termos de erro globais (i18n).
@@ -27,12 +27,12 @@ const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/f
  */
 async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = null) {
     let fileStream = null;
-    
+
     try {
         // 1. AUDITORIA FÍSICA (Metadados Assíncronos)
         const stats = await fsp.stat(filePath);
         const physicalCheck = checkPhysicalIntegrity(task, stats);
-        if (!physicalCheck.ok) return physicalCheck;
+        if (!physicalCheck.ok) {return physicalCheck;}
 
         // 2. PREPARAÇÃO DA VARREDURA
         const userForbidden = task.spec?.validation?.forbidden_terms || [];
@@ -55,15 +55,15 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         // 4. LOOP DE VARREDURA (LINHA A LINHA)
         for await (const line of rl) {
             // Check de aborto manual para garantir interrupção entre linhas
-            if (signal?.aborted) throw new Error('VALIDATION_ABORTED');
+            if (signal?.aborted) {throw new Error('VALIDATION_ABORTED');}
 
             // A. Check Semântico (Interrompe no primeiro erro detectado - Fail Fast)
             const violation = evaluateLine(line, forbiddenList);
             if (violation) {
-                fileStream.destroy(); 
-                return { 
-                    ok: false, 
-                    reason: `FORBIDDEN_CONTENT: Detectada recusa ou erro da IA: "${violation}"` 
+                fileStream.destroy();
+                return {
+                    ok: false,
+                    reason: `FORBIDDEN_CONTENT: Detectada recusa ou erro da IA: "${violation}"`
                 };
             }
 
@@ -74,32 +74,32 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         }
 
         // 5. AUDITORIA ESTRUTURAL (Pós-Stream)
-        const fullContent = shouldAccumulate ? contentBuffer.join('\n') : "";
+        const fullContent = shouldAccumulate ? contentBuffer.join('\n') : '';
 
         // Se o arquivo era grande demais para o buffer, mas exigia JSON/Regex, falhamos por segurança
         if (!shouldAccumulate && (formatRequired === 'json' || patternRequired)) {
-            return { 
-                ok: false, 
-                reason: 'FILE_TOO_LARGE: Conteúdo excede o limite (1MB) para validação estrutural.' 
+            return {
+                ok: false,
+                reason: 'FILE_TOO_LARGE: Conteúdo excede o limite (1MB) para validação estrutural.'
             };
         }
 
         // Validação JSON (Propaga sinal de aborto para o parser)
         if (formatRequired === 'json') {
             const jsonCheck = validateJSON(fullContent, signal);
-            if (!jsonCheck.ok) return jsonCheck;
+            if (!jsonCheck.ok) {return jsonCheck;}
         }
 
         // Validação Markdown
         if (formatRequired === 'markdown' || formatRequired === 'code') {
             const mdCheck = validateMarkdownCode(fullContent);
-            if (!mdCheck.ok) return mdCheck;
+            if (!mdCheck.ok) {return mdCheck;}
         }
 
         // Validação de Padrão (Regex - Propaga sinal de aborto)
         if (patternRequired) {
             const regexCheck = validateRegex(fullContent, patternRequired, signal);
-            if (!regexCheck.ok) return regexCheck;
+            if (!regexCheck.ok) {return regexCheck;}
         }
 
         return { ok: true, reason: null };
@@ -109,10 +109,10 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         if (scanErr.name === 'AbortError' || scanErr.message === 'VALIDATION_ABORTED') {
             return { ok: false, reason: 'VALIDATION_CANCELLED: Operação interrompida pelo usuário.' };
         }
-        
-        return { 
-            ok: false, 
-            reason: `VALIDATION_CRASH: Falha no motor de varredura. Erro: ${scanErr.message}` 
+
+        return {
+            ok: false,
+            reason: `VALIDATION_CRASH: Falha no motor de varredura. Erro: ${scanErr.message}`
         };
     } finally {
         // [FIX] Garantia de fechamento de handle (Zero-Leak Policy)

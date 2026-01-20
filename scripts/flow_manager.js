@@ -17,13 +17,13 @@ function sanitize(name) {
 }
 
 function atomicWrite(filepath, content) {
-    const tmp = filepath + '.tmp.' + Date.now();
+    const tmp = `${filepath  }.tmp.${  Date.now()}`;
     fs.writeFileSync(tmp, content, 'utf-8');
     fs.renameSync(tmp, filepath);
 }
 
 // Garante infraestrutura
-[BLUEPRINTS_DIR, QUEUE_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+[BLUEPRINTS_DIR, QUEUE_DIR].forEach(d => { if (!fs.existsSync(d)) {fs.mkdirSync(d, { recursive: true });} });
 
 // --- ARGUMENTOS ---
 
@@ -50,7 +50,7 @@ Exemplo:
 // --- PARSER DE AGENDAMENTO ---
 
 function parseSchedule(input) {
-    if (!input) return null;
+    if (!input) {return null;}
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
         const val = parseInt(match[1]);
@@ -83,7 +83,7 @@ try {
     const defaults = doc.defaults || {};
 
     console.log(`\n📘 PROJETO: ${doc.project} (ID: ${projectPrefix})`);
-    if (executeAfterDate) console.log(`   ⏱️ AGENDAMENTO: ${new Date(executeAfterDate).toLocaleString()}`);
+    if (executeAfterDate) {console.log(`   ⏱️ AGENDAMENTO: ${new Date(executeAfterDate).toLocaleString()}`);}
     console.log(`   🛠️ MODO: ${isDryRun ? 'SIMULAÇÃO (DRY-RUN)' : 'EXECUÇÃO'}`);
 
     // 1. Mapeamento de IDs
@@ -91,7 +91,7 @@ try {
     const idMap = {}; // ID Curto -> ID Real do Sistema
 
     doc.tasks.forEach(t => {
-        if (!t.id) throw new Error("Uma das tarefas não possui o campo 'id' obrigatório.");
+        if (!t.id) {throw new Error("Uma das tarefas não possui o campo 'id' obrigatório.");}
         const realId = `${projectPrefix}-${sanitize(t.id)}`;
         idMap[t.id] = realId;
         tasks.push({ ...t, realId });
@@ -102,7 +102,7 @@ try {
     tasks.forEach(t => {
         const deps = t.depends_on || [];
         deps.forEach(d => {
-            if (!idMap[d]) throw new Error(`Dependência quebrada: '${t.id}' refere-se a '${d}', que não existe.`);
+            if (!idMap[d]) {throw new Error(`Dependência quebrada: '${t.id}' refere-se a '${d}', que não existe.`);}
         });
         adj[t.id] = deps;
     });
@@ -114,8 +114,8 @@ try {
         stack.add(v);
         for (const neighbor of (adj[v] || [])) {
             if (!visited.has(neighbor)) {
-                if (hasCycle(neighbor)) return true;
-            } else if (stack.has(neighbor)) return true;
+                if (hasCycle(neighbor)) {return true;}
+            } else if (stack.has(neighbor)) {return true;}
         }
         stack.delete(v);
         return false;
@@ -123,7 +123,7 @@ try {
 
     for (const t of tasks) {
         if (!visited.has(t.id)) {
-            if (hasCycle(t.id)) throw new Error(`ERRO: Ciclo de dependência detectado na tarefa '${t.id}'.`);
+            if (hasCycle(t.id)) {throw new Error(`ERRO: Ciclo de dependência detectado na tarefa '${t.id}'.`);}
         }
     }
 
@@ -135,10 +135,10 @@ try {
 
     tasks.forEach(t => {
         const realDeps = (t.depends_on || []).map(d => idMap[d]);
-        
+
         // Suporte a {{REF:LAST}}
         if (t.prompt.includes('{{REF:LAST}}') && previousTaskId) {
-            if (!realDeps.includes(previousTaskId)) realDeps.push(previousTaskId);
+            if (!realDeps.includes(previousTaskId)) {realDeps.push(previousTaskId);}
         }
 
         // Resolução de Referências no Prompt
@@ -151,17 +151,17 @@ try {
         const taskObj = {
             meta: {
                 id: t.realId,
-                version: "3.0",
+                version: '3.0',
                 created_at: new Date().toISOString(),
                 priority: t.prio || defaults.prio || 5,
-                source: "flow_manager",
+                source: 'flow_manager',
                 tags: [doc.project, t.id, ...(defaults.tags || [])]
             },
             spec: {
-                target: t.target || defaults.target || "chatgpt",
-                model: t.model || defaults.model || "gpt-5",
+                target: t.target || defaults.target || 'chatgpt',
+                model: t.model || defaults.model || 'gpt-5',
                 payload: {
-                    system_message: t.system || defaults.system || "",
+                    system_message: t.system || defaults.system || '',
                     user_message: finalPrompt
                 },
                 config: {
@@ -170,15 +170,15 @@ try {
             },
             policy: {
                 max_attempts: t.max_attempts || defaults.max_attempts || 3,
-                timeout_ms: t.timeout_ms || defaults.timeout_ms || "auto",
+                timeout_ms: t.timeout_ms || defaults.timeout_ms || 'auto',
                 dependencies: realDeps,
                 execute_after: executeAfterDate
             },
-            state: { status: "PENDING", attempts: 0, history: [] }
+            state: { status: 'PENDING', attempts: 0, history: [] }
         };
 
         const filePath = path.join(QUEUE_DIR, `${t.realId}.json`);
-        let action = "CREATE";
+        let action = 'CREATE';
 
         if (fs.existsSync(filePath)) {
             try {
@@ -189,14 +189,14 @@ try {
                     previousTaskId = t.realId;
                     return;
                 }
-                action = "UPDATE";
-            } catch (e) { action = "REPAIR"; }
+                action = 'UPDATE';
+            } catch (e) { action = 'REPAIR'; }
         }
 
         if (!isDryRun) {
             atomicWrite(filePath, JSON.stringify(taskObj, null, 2));
             console.log(`   [${action}] ${t.id} -> ${t.realId}`);
-            action === "CREATE" ? created++ : updated++;
+            action === 'CREATE' ? created++ : updated++;
         } else {
             console.log(`   [DRY] ${action}: ${t.id} (Deps: ${realDeps.length})`);
         }

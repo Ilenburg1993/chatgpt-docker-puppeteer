@@ -23,7 +23,7 @@ const { log } = require('../../logger');
  */
 async function applyTransform(content, transform, targetTask) {
     const type = (transform || 'RAW').toUpperCase();
-    
+
     switch (type) {
         case 'SUMMARY': return smartTruncate(content, 2000);
         case 'JSON':    return extractJsonByStack(content);
@@ -46,27 +46,27 @@ async function applyTransform(content, transform, targetTask) {
  */
 async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {
     // 1. GUARDRAILS: Validação de segurança e aborto
-    if (signal?.aborted) throw new Error('CONTEXT_RESOLUTION_ABORTED');
+    if (signal?.aborted) {throw new Error('CONTEXT_RESOLUTION_ABORTED');}
     assertSafetyDepth(depth);
-    
-    if (!text || !text.includes('{{REF:')) return text;
+
+    if (!text || !text.includes('{{REF:')) {return text;}
 
     // Inicializa o gestor de orçamento no nível 0 da recursão
     const currentBudget = budget || new BudgetManager();
 
     // 2. PARSING: Identifica todas as intenções de referência
     const refs = parseReferences(text);
-    if (refs.length === 0) return text;
+    if (refs.length === 0) {return text;}
 
     let resolvedText = text;
     const projectId = currentTask?.meta?.project_id || 'default';
 
     for (const ref of refs) {
         // Check de aborto em cada iteração do loop para resposta imediata
-        if (signal?.aborted) throw new Error('CONTEXT_RESOLUTION_ABORTED');
+        if (signal?.aborted) {throw new Error('CONTEXT_RESOLUTION_ABORTED');}
 
         try {
-            // [FIX 3.4] Check de Orçamento Preventivo: 
+            // [FIX 3.4] Check de Orçamento Preventivo:
             // Se não há mais espaço, nem tentamos buscar ou ler dados.
             if (currentBudget.getRemaining() <= 0) {
                 resolvedText = resolvedText.split(ref.fullMatch).join(`[OVERFLOW]`);
@@ -101,12 +101,12 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
             }
 
             // 5. EXTRAÇÃO E TRANSFORMAÇÃO
-            let injectedContent = "";
+            let injectedContent = '';
 
             // Caso A: Referência ao PROMPT original (Metadado da Spec)
             if (ref.transform === 'PROMPT') {
-                injectedContent = targetTask.spec?.payload?.user_message || "";
-            } 
+                injectedContent = targetTask.spec?.payload?.user_message || '';
+            }
             // Caso B: Referência ao RESULTADO (I/O de arquivo físico)
             else {
                 // O io.loadResponse já respeita o sinal de aborto e o teto de 1MB
@@ -118,7 +118,7 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
             if (!currentBudget.allocate(injectedContent.length)) {
                 log('WARN', `Orçamento de contexto excedido para ${ref.criteria}. Aplicando truncamento.`);
                 const remaining = currentBudget.getRemaining();
-                injectedContent = injectedContent.slice(0, Math.max(0, remaining)) + "... [TRUNCATED]";
+                injectedContent = `${injectedContent.slice(0, Math.max(0, remaining))  }... [TRUNCATED]`;
                 currentBudget.allocate(injectedContent.length);
             }
 

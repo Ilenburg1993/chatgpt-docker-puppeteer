@@ -38,7 +38,7 @@ async function getAgentStatus() {
         await pm2p.connect();
         const list = await pm2p.describe(AGENTE_NAME);
         const app = list && list[0];
-        
+
         if (!app) {
             return { agent: 'stopped', memory: 0, uptime: 0 };
         }
@@ -77,9 +77,9 @@ async function controlAgent(action) {
                         script: './index.js',
                         node_args: '--expose-gc',
                         max_memory_restart: '1G',
-                        env: { 
-                            NODE_ENV: "production",
-                            FORCE_COLOR: "1" 
+                        env: {
+                            NODE_ENV: 'production',
+                            FORCE_COLOR: '1'
                         }
                     });
                 }
@@ -96,7 +96,7 @@ async function controlAgent(action) {
             case 'kill_daemon':
                 return new Promise((res) => {
                     exec('npx pm2 kill', (err) => {
-                        if (err) log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);
+                        if (err) {log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);}
                         res({ success: !err });
                     });
                 });
@@ -126,11 +126,11 @@ function killProcess(pid) {
         }
 
         log('FATAL', `Executando Kill Switch no PID ${pid}...`);
-        
+
         treeKill(pid, 'SIGKILL', (err) => {
             if (err) {
                 log('ERROR', `Falha ao matar PID ${pid}: ${err.message}`);
-                killChromeGlobal(); 
+                killChromeGlobal();
             } else {
                 log('INFO', `Processo ${pid} e filhos encerrados.`);
             }
@@ -145,22 +145,22 @@ function killProcess(pid) {
 function killChromeGlobal() {
     return new Promise((resolve) => {
         log('WARN', 'Executando Kill Global no Chrome (Fallback)...');
-        const cmd = process.platform === 'win32' 
-            ? 'taskkill /F /IM chrome.exe /T' 
+        const cmd = process.platform === 'win32'
+            ? 'taskkill /F /IM chrome.exe /T'
             : 'pkill -9 chrome';
-            
+
         exec(cmd, (err) => {
-            if (err) log('WARN', `Falha no Kill Global: ${err.message}`);
-            else log('INFO', 'Todos os Chromes encerrados.');
+            if (err) {log('WARN', `Falha no Kill Global: ${err.message}`);}
+            else {log('INFO', 'Todos os Chromes encerrados.');}
             resolve();
         });
     });
 }
 
-module.exports = { 
-    getAgentStatus, 
-    controlAgent, 
-    killProcess, 
+module.exports = {
+    getAgentStatus,
+    controlAgent,
+    killProcess,
     killChromeGlobal,
     pm2Raw: pm2 // Expõe a instância bruta para o bus de eventos realtime
 };

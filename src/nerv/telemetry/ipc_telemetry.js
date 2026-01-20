@@ -28,7 +28,7 @@
  * Retorna timestamp atual em milissegundos.
  */
 function now() {
-  return Date.now();
+    return Date.now();
 }
 
 /**
@@ -36,11 +36,11 @@ function now() {
  * Qualquer erro é isolado e ignorado.
  */
 function safeCall(handler, payload) {
-  try {
-    handler(payload);
-  } catch (_) {
+    try {
+        handler(payload);
+    } catch (_) {
     // Falha silenciosa: telemetria nunca interfere
-  }
+    }
 }
 
 /* ===========================
@@ -55,50 +55,50 @@ function safeCall(handler, payload) {
  * - enabled: boolean
  */
 function createIPCTelemetry(config = {}) {
-  const enabled = config.enabled !== false;
+    const enabled = config.enabled !== false;
 
-  /* ===========================
+    /* ===========================
      Estado interno (técnico)
   =========================== */
 
-  const subscribers = new Set();
+    const subscribers = new Set();
 
-  const metrics = {
-    counters: Object.create(null),
-    gauges: Object.create(null),
-    timestamps: Object.create(null)
-  };
+    const metrics = {
+        counters: Object.create(null),
+        gauges: Object.create(null),
+        timestamps: Object.create(null)
+    };
 
-  /* ===========================
+    /* ===========================
      Funções internas
   =========================== */
 
-  /**
+    /**
    * Incrementa contador técnico.
    */
-  function incCounter(name, value = 1) {
-    metrics.counters[name] = (metrics.counters[name] || 0) + value;
-  }
+    function incCounter(name, value = 1) {
+        metrics.counters[name] = (metrics.counters[name] || 0) + value;
+    }
 
-  /**
+    /**
    * Atualiza gauge técnico.
    */
-  function setGauge(name, value) {
-    metrics.gauges[name] = value;
-  }
+    function setGauge(name, value) {
+        metrics.gauges[name] = value;
+    }
 
-  /**
+    /**
    * Registra timestamp técnico.
    */
-  function mark(name) {
-    metrics.timestamps[name] = now();
-  }
+    function mark(name) {
+        metrics.timestamps[name] = now();
+    }
 
-  /* ===========================
+    /* ===========================
      API pública do módulo
   =========================== */
 
-  /**
+    /**
    * Emite um evento técnico de telemetria.
    *
    * @param {string} type
@@ -107,80 +107,80 @@ function createIPCTelemetry(config = {}) {
    * @param {Object} [meta]
    * Metadados técnicos opcionais (nunca semânticos)
    */
-  function emit(type, meta = null) {
-    if (!enabled) return;
+    function emit(type, meta = null) {
+        if (!enabled) {return;}
 
-    const event = {
-      timestamp: now(),
-      type,
-      meta: meta || undefined
-    };
+        const event = {
+            timestamp: now(),
+            type,
+            meta: meta || undefined
+        };
 
-    // Atualizações internas de métricas (não causais)
-    incCounter(`event:${type}`);
-    mark(`last:${type}`);
+        // Atualizações internas de métricas (não causais)
+        incCounter(`event:${type}`);
+        mark(`last:${type}`);
 
-    // Notifica subscritores de forma isolada
-    for (const handler of subscribers) {
-      safeCall(handler, event);
+        // Notifica subscritores de forma isolada
+        for (const handler of subscribers) {
+            safeCall(handler, event);
+        }
     }
-  }
 
-  /**
+    /**
    * Subscrição passiva a eventos de telemetria.
    *
    * @param {Function} handler
    */
-  function on(handler) {
-    if (typeof handler !== 'function') {
-      throw new Error('telemetry.on requer função');
+    function on(handler) {
+        if (typeof handler !== 'function') {
+            throw new Error('telemetry.on requer função');
+        }
+
+        subscribers.add(handler);
+
+        // Retorna função de unsubscribe (opcional)
+        return () => {
+            subscribers.delete(handler);
+        };
     }
 
-    subscribers.add(handler);
-
-    // Retorna função de unsubscribe (opcional)
-    return () => {
-      subscribers.delete(handler);
-    };
-  }
-
-  /**
+    /**
    * Retorna snapshot das métricas atuais.
    * Leitura pura, sem efeitos colaterais.
    */
-  function stats() {
-    return {
-      counters: { ...metrics.counters },
-      gauges: { ...metrics.gauges },
-      timestamps: { ...metrics.timestamps }
-    };
-  }
+    function stats() {
+        return {
+            counters: { ...metrics.counters },
+            gauges: { ...metrics.gauges },
+            timestamps: { ...metrics.timestamps }
+        };
+    }
 
-  /**
+    /**
    * Reseta métricas internas.
    * Uso permitido apenas para testes.
    */
-  function reset() {
-    metrics.counters = Object.create(null);
-    metrics.gauges = Object.create(null);
-    metrics.timestamps = Object.create(null);
-  }
+    function reset() {
+        metrics.counters = Object.create(null);
+        metrics.gauges = Object.create(null);
+        metrics.timestamps = Object.create(null);
+    }
 
-  /* ===========================
+    /* ===========================
      Exportação do módulo
   =========================== */
 
-  return Object.freeze({
-    emit,
-    on,
-    stats,
-    reset,
+    return Object.freeze({
+        emit,
+        on,
+        stats,
+        reset,
 
-    // APIs técnicas opcionais para outros módulos
-    _incCounter: incCounter,
-    _setGauge: setGauge,
-    _mark: mark
-  });
+        // APIs técnicas opcionais para outros módulos
+        _incCounter: incCounter,
+        _setGauge: setGauge,
+        _mark: mark
+    });
 }
 
 module.exports = createIPCTelemetry;

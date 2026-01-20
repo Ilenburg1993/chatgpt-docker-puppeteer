@@ -7,13 +7,13 @@
 ========================================================================== */
 
 const { z } = require('zod');
-const { 
-    ID_SCHEMA, 
-    TIMESTAMP_SCHEMA, 
-    CLEAN_STRING_SCHEMA, 
-    PRIORITY_SCHEMA, 
-    SOURCE_SCHEMA, 
-    STATUS_SCHEMA 
+const {
+    ID_SCHEMA,
+    TIMESTAMP_SCHEMA,
+    CLEAN_STRING_SCHEMA,
+    PRIORITY_SCHEMA,
+    SOURCE_SCHEMA,
+    STATUS_SCHEMA
 } = require('./shared_types');
 
 /**
@@ -21,10 +21,10 @@ const {
  */
 const MetaSchema = z.object({
     id: ID_SCHEMA,
-    project_id: ID_SCHEMA.default("default"),
+    project_id: ID_SCHEMA.default('default'),
     parent_id: ID_SCHEMA.optional(),      // Para árvores de tarefas
     correlation_id: ID_SCHEMA.optional(), // Para agrupamento de fluxos
-    version: z.string().default("4.0"),
+    version: z.string().default('4.0'),
     created_at: TIMESTAMP_SCHEMA,
     priority: PRIORITY_SCHEMA,
     source: SOURCE_SCHEMA,
@@ -37,9 +37,9 @@ const MetaSchema = z.object({
 const SpecSchema = z.object({
     target: z.string().min(1), // Ex: 'chatgpt', 'gemini'
     model: z.string().default('auto'),
-    
+
     payload: z.object({
-        system_message: CLEAN_STRING_SCHEMA.default(""),
+        system_message: CLEAN_STRING_SCHEMA.default(''),
         user_message: CLEAN_STRING_SCHEMA, // Sanitização automática via shared_types
         context: z.string().optional()     // Buffer para injeções manuais
     }),
@@ -88,7 +88,7 @@ const StateSchema = z.object({
     started_at: TIMESTAMP_SCHEMA.nullable().default(null),
     completed_at: TIMESTAMP_SCHEMA.nullable().default(null),
     last_error: z.string().nullable().default(null),
-    
+
     metrics: z.object({
         duration_ms: z.number().default(0),
         token_estimate: z.number().default(0),

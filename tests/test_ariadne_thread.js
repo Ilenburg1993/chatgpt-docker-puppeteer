@@ -36,9 +36,9 @@ async function runTest(name, testFn, timeoutMs = 5000) {
     process.stdout.write(`\n=== ${name} ===\n`);
     
     try {
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), timeoutMs)
-        );
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout')), timeoutMs);
+        });
         
         await Promise.race([testFn(), timeoutPromise]);
         
@@ -263,7 +263,7 @@ async function test7_EndToEndMessageFlow() {
         }
         
         // Aguarda mensagem
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => { setTimeout(resolve, 100));
         
         if (!messageReceived) {
             throw new Error('Mensagem não foi recebida (loop quebrado)');

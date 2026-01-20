@@ -2,7 +2,7 @@
    src/kernel/state/observation_store.js
    Audit Level: 810 — Short-Term Sensory Memory
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Armazenar buffer de observações pendentes (Fila de Entrada).
      - Manter histórico recente para debugging (Blackbox).
      - Garantir processamento ordenado (FIFO).
@@ -52,7 +52,7 @@ class ObservationStore {
      */
     markProcessed(processedItems) {
         const idsToRemove = new Set(processedItems.map(o => o.id));
-        
+
         // Remove da fila de pendentes
         this.pending = this.pending.filter(obs => !idsToRemove.has(obs.id));
 

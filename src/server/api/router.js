@@ -2,8 +2,8 @@
    src/server/api/router.js
    Audit Level: 700 — Sovereign API Gateway (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Ponto central de roteamento do Mission Control Prime. 
-                     Orquestra a hierarquia de namespaces e sela a malha de 
+   Responsabilidade: Ponto central de roteamento do Mission Control Prime.
+                     Orquestra a hierarquia de namespaces e sela a malha de
                      proteção (Error Boundary) da API.
    Sincronizado com: controllers/tasks.js V700, controllers/system.js V700,
                      controllers/dna.js V700, middleware/error_handler.js V600.
@@ -18,7 +18,7 @@ const { log } = require('../../core/logger');
 /**
  * Aplica a malha de rotas à instância do Express.
  * Define a topologia lógica da API e injeta os escudos de integridade.
- * 
+ *
  * @param {object} app - Instância do Express vinda de engine/app.js.
  */
 function applyRoutes(app) {
@@ -27,7 +27,7 @@ function applyRoutes(app) {
     /* --------------------------------------------------------------------------
        0. ENDPOINT DE SAÚDE SIMPLIFICADO (Para Docker Healthcheck)
     -------------------------------------------------------------------------- */
-    
+
     /**
      * GET /api/health
      * Endpoint simplificado de health check para Docker e monitoramento.
@@ -37,10 +37,10 @@ function applyRoutes(app) {
         try {
             const doctor = require('../../core/doctor');
             const io = require('../../infra/io');
-            
+
             // Verificação rápida de Chrome (timeout curto)
             const chrome = await doctor.probeChromeConnection();
-            
+
             // Estatísticas básicas da fila
             let queueStats = { pending: 0, running: 0 };
             try {
@@ -50,10 +50,10 @@ function applyRoutes(app) {
                     running: tasks.filter(t => t.status === 'RUNNING').length
                 };
             } catch { /* Fail-safe */ }
-            
+
             const status = chrome.connected ? 'ok' : 'degraded';
             const httpCode = chrome.connected ? 200 : 503;
-            
+
             res.status(httpCode).json({
                 status: status,
                 timestamp: new Date().toISOString(),
@@ -98,7 +98,7 @@ function applyRoutes(app) {
      * Namespace: /api/system
      * Responsável pelo inventário IPC 2.0 (/agents), saúde (Doctor) e processos.
      */
-    app.use('/api/system', systemController); 
+    app.use('/api/system', systemController);
 
     /**
      * DOMÍNIO DE INTELIGÊNCIA E CONFIGURAÇÃO (DNA e Parâmetros)
@@ -109,7 +109,7 @@ function applyRoutes(app) {
 
     /* --------------------------------------------------------------------------
        2. ESCUDOS DE PROTEÇÃO (ERROR BOUNDARY)
-       Estratégia: Garantir que nenhuma requisição órfã ou falha lógica escape 
+       Estratégia: Garantir que nenhuma requisição órfã ou falha lógica escape
        do sistema sem um tratamento padronizado e rastreável.
     -------------------------------------------------------------------------- */
 

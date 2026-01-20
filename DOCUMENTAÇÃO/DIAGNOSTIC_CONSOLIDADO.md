@@ -183,8 +183,7 @@ console.log/error diretos:    26 encontrados ⚠️  (devem usar logger)
                       │
     ┌─────────────────▼──────────────────────┐
     │         DOMAIN (Business Logic)        │
-    │  ├─ logic/ (7%)   - Validação         │
-    │  └─ effectors/    - Side Effects      │
+    │  └─ logic/ (7%)   - Validação         │
     └─────────────────┬──────────────────────┘
                       │
     ┌─────────────────▼──────────────────────┐

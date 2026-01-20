@@ -18,13 +18,13 @@ const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1]) 
 // Cores ANSI
 const C = {
     RESET: '\x1b[0m', BRIGHT: '\x1b[1m', DIM: '\x1b[2m',
-    RED: '\x1b[31m', GREEN: '\x1b[32m', YELLOW: '\x1b[33m', 
+    RED: '\x1b[31m', GREEN: '\x1b[32m', YELLOW: '\x1b[33m',
     CYAN: '\x1b[36m', WHITE: '\x1b[37m', BLUE: '\x1b[34m'
 };
 
 const STATUS_COLORS = {
     PENDING: C.DIM + C.WHITE, RUNNING: C.BRIGHT + C.YELLOW,
-    DONE: C.GREEN, FAILED: C.RED, PAUSED: C.CYAN, 
+    DONE: C.GREEN, FAILED: C.RED, PAUSED: C.CYAN,
     SCHEDULED: C.BLUE, SKIPPED: C.DIM + C.WHITE
 };
 
@@ -41,10 +41,10 @@ const getSchedule = (t) => t.policy?.execute_after;
 const getTags = (t) => t.meta?.tags || [];
 
 function timeAgo(isoDate) {
-    if (!isoDate) return '-';
+    if (!isoDate) {return '-';}
     const sec = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
-    if (sec < 60) return `${sec}s`;
-    if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+    if (sec < 60) {return `${sec}s`;}
+    if (sec < 3600) {return `${Math.floor(sec / 60)}m`;}
     return `${Math.floor(sec / 3600)}h`;
 }
 
@@ -69,7 +69,7 @@ function render() {
             const tags = getTags(t);
 
             // Filtro de Tag
-            if (TAG_FILTER && !tags.includes(TAG_FILTER)) return;
+            if (TAG_FILTER && !tags.includes(TAG_FILTER)) {return;}
 
             // Lógica de Agendamento
             const schedule = getSchedule(t);
@@ -78,7 +78,7 @@ function render() {
             }
 
             stats.TOTAL++;
-            if (stats[status] !== undefined) stats[status]++;
+            if (stats[status] !== undefined) {stats[status]++;}
 
             // Telemetria de Tempo (últimas 20 tarefas concluídas para média móvel)
             if (status === 'DONE') {
@@ -96,9 +96,9 @@ function render() {
                 schedule, tags
             };
 
-            if (status === 'FAILED') recentFailures.push(taskData);
+            if (status === 'FAILED') {recentFailures.push(taskData);}
             if (['RUNNING', 'PENDING', 'PAUSED', 'SCHEDULED'].includes(status)) {
-                if (!ONLY_FAILED) activeTasks.push(taskData);
+                if (!ONLY_FAILED) {activeTasks.push(taskData);}
             }
         } catch (e) { /* arquivo sendo escrito */ }
     });
@@ -108,18 +108,18 @@ function render() {
     const avgMs = recentDurations.length > 0 ? recentDurations.reduce((a, b) => a + b) / recentDurations.length : 0;
     const etaMin = Math.round((avgMs * stats.PENDING) / 60000);
 
-    if (WATCH_MODE) console.clear();
-    
+    if (WATCH_MODE) {console.clear();}
+
     console.log(`${C.BRIGHT}${C.CYAN}=== MISSION CONTROL DASHBOARD ===${C.RESET}`);
-    
+
     // Barra de Progresso
     const width = 40;
     const donePct = stats.TOTAL ? stats.DONE / stats.TOTAL : 0;
     const barLen = Math.round(donePct * width);
     const bar = '█'.repeat(barLen) + '░'.repeat(width - barLen);
     console.log(`Progresso: [${C.GREEN}${bar}${C.RESET}] ${(donePct * 100).toFixed(1)}%`);
-    if (etaMin > 0) console.log(`${C.DIM}ETA p/ Fila: ~${etaMin} min (baseado nas últimas ${recentDurations.length} tarefas)${C.RESET}\n`);
-    else console.log('');
+    if (etaMin > 0) {console.log(`${C.DIM}ETA p/ Fila: ~${etaMin} min (baseado nas últimas ${recentDurations.length} tarefas)${C.RESET}\n`);}
+    else {console.log('');}
 
     // Linha de Status
     console.log(`${C.BRIGHT}TOTAL: ${stats.TOTAL}${C.RESET} | ${C.GREEN}DONE: ${stats.DONE}${C.RESET} | ${C.YELLOW}RUN: ${stats.RUNNING}${C.RESET} | PEND: ${stats.PENDING} | ${C.BLUE}SCHED: ${stats.SCHEDULED}${C.RESET} | ${C.RED}FAIL: ${stats.FAILED}${C.RESET}`);
@@ -152,8 +152,8 @@ function render() {
         });
     }
 
-    if (WATCH_MODE) console.log(`\n${C.DIM}Atualizando a cada 2s... Ctrl+C para sair.${C.RESET}`);
+    if (WATCH_MODE) {console.log(`\n${C.DIM}Atualizando a cada 2s... Ctrl+C para sair.${C.RESET}`);}
 }
 
 render();
-if (WATCH_MODE) setInterval(render, 2000);
+if (WATCH_MODE) {setInterval(render, 2000);}

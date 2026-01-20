@@ -2,7 +2,7 @@
    src/infra/storage/response_store.js
    Audit Level: 700 — Sovereign Response Storage (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Recuperação segura, resiliente e higienizada de arquivos 
+   Responsabilidade: Recuperação segura, resiliente e higienizada de arquivos
                      de resposta (.txt) gerados pelas IAs.
    Sincronizado com: paths.js V700, fs_utils.js V700.
 ========================================================================== */
@@ -18,22 +18,22 @@ const { sleep, cleanText } = require('../fs/fs_utils');
 /**
  * Lê o conteúdo de uma resposta anterior com blindagem de memória e I/O.
  * Utiliza loop iterativo para garantir estabilidade da pilha em retries.
- * 
+ *
  * @param {string} taskId - ID da tarefa alvo.
  * @param {AbortSignal} signal - Sinal para interromper leitura longa.
  * @returns {Promise<string|null>} Conteúdo limpo ou null se não localizado.
  */
 async function loadResponse(taskId, signal = null) {
-    const filename = taskId.replace(/[^a-zA-Z0-9._-]/g, '_') + '.txt';
+    const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')  }.txt`;
     const filepath = path.join(PATHS.RESPONSE, filename);
 
-    if (!fss.existsSync(filepath)) return null;
+    if (!fss.existsSync(filepath)) {return null;}
 
     let attempts = 0;
     while (attempts < 5) {
         try {
             // 1. Check de Aborto Precoce (Soberania do Kernel)
-            if (signal?.aborted) throw new Error('OPERATION_ABORTED');
+            if (signal?.aborted) {throw new Error('OPERATION_ABORTED');}
 
             // 2. Validação de Tamanho (Proteção contra Out-of-Memory)
             const stats = await fs.stat(filepath);
@@ -42,9 +42,9 @@ async function loadResponse(taskId, signal = null) {
             }
 
             // 3. Leitura Assíncrona com suporte a sinal de cancelamento
-            const content = await fs.readFile(filepath, { 
-                encoding: 'utf-8', 
-                signal: signal 
+            const content = await fs.readFile(filepath, {
+                encoding: 'utf-8',
+                signal: signal
             });
 
             // 4. Sanitização Universal (Remoção de caracteres de controle)
@@ -75,9 +75,9 @@ async function loadResponse(taskId, signal = null) {
  * @param {string} taskId - ID da tarefa cujo resultado deve ser removido.
  */
 async function deleteResponse(taskId) {
-    const filename = taskId.replace(/[^a-zA-Z0-9._-]/g, '_') + '.txt';
+    const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')  }.txt`;
     const filepath = path.join(PATHS.RESPONSE, filename);
-    
+
     try {
         if (fss.existsSync(filepath)) {
             await fs.unlink(filepath);

@@ -2,21 +2,21 @@
    src/kernel/policies/policy_engine.js
    Audit Level: 830 — The Constitutional Court
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Avaliar o estado atual contra as regras de negócio.
      - Transformar observações em propostas de ação.
      - Garantir que o robô não viole limites de segurança (Retries, Timeouts).
 ========================================================================== */
 
-const { 
-    ActionCode, 
-    MessageType 
+const {
+    ActionCode,
+    MessageType
 } = require('../../shared/nerv/constants');
 
 class PolicyEngine {
     constructor(config) {
         this.config = config;
-        
+
         // Regras Constitucionais (Hardcoded por segurança)
         this.MAX_RETRIES = config.MAX_RETRIES || 3;
         this.COOLDOWN_MS = config.COOLDOWN_MS || 5000;
@@ -35,13 +35,13 @@ class PolicyEngine {
         // 1. Avaliação de Observações (Reação a Estímulos Externos)
         for (const obs of observations) {
             const reaction = this._reactToObservation(obs, state);
-            if (reaction) proposals.push(reaction);
+            if (reaction) {proposals.push(reaction);}
         }
 
         // 2. Avaliação de Estado (Regras de Negócio Contínuas)
         // Ex: Se estou falhando muito, desista.
         const stateProposals = this._evaluateStateHealth(state);
-        if (stateProposals) proposals.push(...stateProposals);
+        if (stateProposals) {proposals.push(...stateProposals);}
 
         return proposals;
     }
@@ -58,13 +58,13 @@ class PolicyEngine {
                     action: 'ACTIVATE_TASK', // Comando interno para o TaskEffector
                     payload: obs.payload
                 };
-            } else {
-                // Se já estou ocupado, rejeite educadamente.
-                return {
-                    action: 'EMIT_EVENT',
-                    payload: this._createRejectionEnvelope(obs, 'BUSY')
-                };
             }
+            // Se já estou ocupado, rejeite educadamente.
+            return {
+                action: 'EMIT_EVENT',
+                payload: this._createRejectionEnvelope(obs, 'BUSY')
+            };
+
         }
 
         // LEI 2: Se o sistema reporta alta pressão -> Pausa técnica.
@@ -82,13 +82,13 @@ class PolicyEngine {
         // LEI 3: Limite de Tentativas (Retry Policy)
         // Se a tarefa atual falhou mais que o permitido -> Aborte.
         if (state.status === 'RUNNING' && state.failures > 0) {
-            
+
             if (state.failures > this.MAX_RETRIES) {
                 console.error(`[POLICY] Limite de falhas excedido (${state.failures}/${this.MAX_RETRIES}). Abortando.`);
-                
+
                 // 1. Matar o processo do driver
                 proposals.push({ action: 'ABORT_TASK', reason: 'MAX_RETRIES_EXCEEDED' });
-                
+
                 // 2. Avisar o servidor
                 proposals.push({
                     action: 'EMIT_EVENT',
@@ -134,9 +134,9 @@ class PolicyEngine {
             messageType: MessageType.EVENT,
             actionCode: ActionCode.TASK_FAILED,
             correlationId: task?.meta?.correlation_id, // Mantém o fio de Ariadne
-            payload: { 
+            payload: {
                 task_id: task?.meta?.id,
-                reason 
+                reason
             }
         });
     }

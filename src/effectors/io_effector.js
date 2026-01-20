@@ -2,7 +2,7 @@
    src/effectors/io_effector.js
    Audit Level: 900 — Persistence Muscle
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Executar ordens de persistência do Kernel.
      - Isolar o Kernel de erros de I/O (Disco cheio, permissão).
      - Garantir atomicidade na escrita do estado.
@@ -10,7 +10,7 @@
 
 // Importa o IO legado (A ponte com o sistema de arquivos existente)
 // Nota: Ajuste o caminho conforme sua estrutura real. Assumindo que io.js está em src/infra/
-const io = require('../infra/io'); 
+const io = require('../infra/io');
 
 class IOEffector {
     /**
@@ -59,7 +59,7 @@ class IOEffector {
 
                 // Chama o infra/io.js existente (que já tem atomic write)
                 await io.saveTask(taskPayload);
-                
+
                 this.lastSaveTimestamp = now;
                 console.log(`[IO EFFECTOR] Estado persistido com sucesso. Task ID: ${taskPayload.meta.id}`);
             } else {

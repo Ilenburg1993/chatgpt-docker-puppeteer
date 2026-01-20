@@ -41,82 +41,82 @@ const createBackpressure = require('./backpressure');
  * - inbound
  */
 function createBuffers({ telemetry, limits = {} }) {
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('buffers requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('buffers requer telemetry válida');
+    }
 
-  const backpressure = createBackpressure({ telemetry });
+    const backpressure = createBackpressure({ telemetry });
 
-  const outbound = createOutboundQueue({
-    telemetry,
-    maxSize: limits.outbound ?? null
-  });
+    const outbound = createOutboundQueue({
+        telemetry,
+        maxSize: limits.outbound ?? null
+    });
 
-  const inbound = createInboundQueue({
-    telemetry,
-    maxSize: limits.inbound ?? null
-  });
+    const inbound = createInboundQueue({
+        telemetry,
+        maxSize: limits.inbound ?? null
+    });
 
-  /* ===========================
+    /* ===========================
      API pública do módulo
   =========================== */
 
-  return Object.freeze({
+    return Object.freeze({
     /* Outbound */
 
-    enqueueOutbound(item) {
-      const ok = outbound.enqueue(item);
-      if (!ok) {
-        backpressure.signal({
-          buffer: 'outbound',
-          size: outbound.size(),
-          limit: limits.outbound ?? null
-        });
-      }
-      return ok;
-    },
+        enqueueOutbound(item) {
+            const ok = outbound.enqueue(item);
+            if (!ok) {
+                backpressure.signal({
+                    buffer: 'outbound',
+                    size: outbound.size(),
+                    limit: limits.outbound ?? null
+                });
+            }
+            return ok;
+        },
 
-    dequeueOutbound() {
-      return outbound.dequeue();
-    },
+        dequeueOutbound() {
+            return outbound.dequeue();
+        },
 
-    outboundSize() {
-      return outbound.size();
-    },
+        outboundSize() {
+            return outbound.size();
+        },
 
-    /* Inbound */
+        /* Inbound */
 
-    enqueueInbound(item) {
-      const ok = inbound.enqueue(item);
-      if (!ok) {
-        backpressure.signal({
-          buffer: 'inbound',
-          size: inbound.size(),
-          limit: limits.inbound ?? null
-        });
-      }
-      return ok;
-    },
+        enqueueInbound(item) {
+            const ok = inbound.enqueue(item);
+            if (!ok) {
+                backpressure.signal({
+                    buffer: 'inbound',
+                    size: inbound.size(),
+                    limit: limits.inbound ?? null
+                });
+            }
+            return ok;
+        },
 
-    dequeueInbound() {
-      return inbound.dequeue();
-    },
+        dequeueInbound() {
+            return inbound.dequeue();
+        },
 
-    inboundSize() {
-      return inbound.size();
-    },
+        inboundSize() {
+            return inbound.size();
+        },
 
-    /* Estado técnico */
+        /* Estado técnico */
 
-    isIdle() {
-      return outbound.size() === 0 && inbound.size() === 0;
-    },
+        isIdle() {
+            return outbound.size() === 0 && inbound.size() === 0;
+        },
 
-    clear() {
-      outbound.clear();
-      inbound.clear();
-    }
-  });
+        clear() {
+            outbound.clear();
+            inbound.clear();
+        }
+    });
 }
 
 module.exports = createBuffers;

@@ -37,7 +37,6 @@ src/
 │   ├── core/
 │   ├── modules/
 │   └── targets/
-├── effectors/      (ações do sistema)
 ├── infra/          (I/O, locks, queue, storage, transport)
 │   ├── fs/
 │   ├── ipc/

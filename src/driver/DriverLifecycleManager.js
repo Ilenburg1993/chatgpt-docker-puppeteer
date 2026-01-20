@@ -4,7 +4,7 @@
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
    Responsabilidade: Gerenciar o ciclo de vida do driver para uma tarefa única.
                      Orquestrar a fiação sensorial e a soberania de interrupção.
-   Sincronizado com: ExecutionEngine V1.6.0, BaseDriver V700, 
+   Sincronizado com: ExecutionEngine V1.6.0, BaseDriver V700,
                      TelemetryBridge V500, ipc_client V600.
 ========================================================================== */
 
@@ -22,14 +22,14 @@ class DriverLifecycleManager {
         this.task = task;
         this.config = config;
         this.driver = null;
-        
+
         // [V700] Sinal Soberano Único: O "Kill Switch" local da tarefa.
         this.abortController = new AbortController();
-        
+
         // [IPC 2.0] Identidade e Causalidade
         this.taskId = task.meta.id;
         this.correlationId = task.meta.correlation_id || task.meta.id;
-        
+
         // Bind de métodos para preservação de contexto em barramentos de eventos
         this._handleStateChange = this._handleStateChange.bind(this);
         this._handleProgress = this._handleProgress.bind(this);
@@ -42,7 +42,7 @@ class DriverLifecycleManager {
     async acquire() {
         try {
             log('DEBUG', `[LIFECYCLE] Iniciando aquisição de driver para tarefa: ${this.taskId}`, this.correlationId);
-            
+
             // 1. Obtém instância da Factory injetando o sinal de aborto da tarefa
             this.driver = driverFactory.getDriver(
                 this.task.spec.target,
@@ -63,7 +63,7 @@ class DriverLifecycleManager {
             // Garante que o objeto Task reflita a máquina de estados do Driver.
             this.driver.removeAllListeners('state_change');
             this.driver.removeAllListeners('progress');
-            
+
             this.driver.on('state_change', this._handleStateChange);
             this.driver.on('progress', this._handleProgress);
 
@@ -81,7 +81,7 @@ class DriverLifecycleManager {
      */
     async release() {
         log('DEBUG', `[LIFECYCLE] Iniciando sequência de liberação: ${this.taskId}`, this.correlationId);
-        
+
         // 1. Aciona o sinal de aborto (Propagação física para o motor de automação)
         if (!this.abortController.signal.aborted) {
             this.abortController.abort();
@@ -112,15 +112,15 @@ class DriverLifecycleManager {
      */
     async _handleStateChange(data) {
         // Validação de Token de Segurança
-        if (this.task.meta.id !== this.taskId) return;
-        
+        if (this.task.meta.id !== this.taskId) {return;}
+
         this.task.state.status = data.to;
-        this.task.state.history.push({ 
-            ts: new Date().toISOString(), 
-            event: 'DRIVER_STATE_CHANGE', 
-            msg: `Transição: ${data.from} -> ${data.to}` 
+        this.task.state.history.push({
+            ts: new Date().toISOString(),
+            event: 'DRIVER_STATE_CHANGE',
+            msg: `Transição: ${data.from} -> ${data.to}`
         });
-        
+
         log('DEBUG', `[LIFECYCLE] Driver State: ${data.to}`, this.correlationId);
     }
 
@@ -128,8 +128,8 @@ class DriverLifecycleManager {
      * Atualiza a estimativa de progresso da tarefa no objeto persistente.
      */
     async _handleProgress(data) {
-        if (this.task.meta.id !== this.taskId) return;
-        
+        if (this.task.meta.id !== this.taskId) {return;}
+
         // Estimativa baseada no volume de dados processados (Bytes/Chars)
         const estimated = Math.min(99, Math.round((data.length / 5000) * 100));
         this.task.state.progress_estimate = estimated;

@@ -15,14 +15,14 @@ async function runResilienceTest() {
 
     const PORT = 3006;
     let httpServer;
-    let receivedSteps = [];
+    const receivedSteps = [];
     const testSessionId = uuidv4();
 
     const startServer = async () => {
         await socketHub.stop();
         httpServer = http.createServer();
         const io = socketHub.init(httpServer);
-        
+
         io.on('connection', (socket) => {
             socket.on('message', (envelope) => {
                 if (envelope.payload?.test_session === testSessionId) {
@@ -34,34 +34,34 @@ async function runResilienceTest() {
                 }
             });
         });
-        return new Promise(r => httpServer.listen(PORT, r));
+        return new Promise(r => { httpServer.listen(PORT, r); });
     };
 
     try {
         // --- LIMPEZA INICIAL ---
-        await ipc.destroy(); 
+        await ipc.destroy();
         await identityManager.initialize();
 
         // --- ROUND 1: CONEXÃO ---
         await startServer();
         console.log(`> [SETUP] Servidor Online.`);
-        
+
         await ipc.connect(PORT);
-        
+
         // Espera autorização ativa
         let ready = false;
         for(let i=0; i<20; i++) {
             if(ipc.isConnected()) { ready = true; break; }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => { setTimeout(r, 500); });
         }
-        if (!ready) throw new Error("Falha autorização Round 1.");
+        if (!ready) {throw new Error('Falha autorização Round 1.');}
         console.log(`> [SETUP] Maestro autorizado.`);
 
         // --- ROUND 2: BLACKOUT ---
         console.log(`\n⚠️ [ACTION] Iniciando Blackout...`);
         await socketHub.stop();
-        await new Promise(r => httpServer.close(r));
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => { httpServer.close(r); });
+        await new Promise(r => { setTimeout(r, 2000); });
 
         // --- ROUND 3: TELEMETRIA OFFLINE ---
         console.log(`> [ACTION] Gerando eventos no buffer...`);
@@ -84,10 +84,10 @@ async function runResilienceTest() {
                 httpServer.close();
                 process.exit(0);
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => { setTimeout(r, 500); });
         }
 
-        throw new Error("Timeout no replay do buffer.");
+        throw new Error('Timeout no replay do buffer.');
 
     } catch (err) {
         console.error(`\n❌ [FAIL] ${err.message}`);

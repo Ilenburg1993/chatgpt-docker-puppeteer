@@ -2,7 +2,7 @@
    src/server/realtime/streams/log_tail.js
    Audit Level: 700 — Resilient Log Streamer (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Monitorar o arquivo de log operacional e transmitir 
+   Responsabilidade: Monitorar o arquivo de log operacional e transmitir
                      novas linhas em tempo real para o Dashboard.
    Sincronizado com: paths.js V700, socket.js V600, logger.js V40.
 ========================================================================== */
@@ -57,7 +57,7 @@ function init() {
                  * Reiniciamos o motor para capturar o novo arquivo que será criado.
                  */
                 internalLog('DEBUG', '[LOG_TAIL] Inode alterado (Rotação). Re-anexando handle...');
-                setTimeout(init, 1000); 
+                setTimeout(init, 1000);
                 return;
             }
 
@@ -81,31 +81,31 @@ function init() {
  */
 async function _streamLastChunk() {
     logReadActive = true;
-    
+
     try {
         const stats = await fsp.stat(LOG_FILE);
-        
+
         /**
          * Lógica de Janela Deslizante:
-         * Lemos apenas os últimos 2KB de dados. Isso garante performance 
+         * Lemos apenas os últimos 2KB de dados. Isso garante performance
          * instantânea mesmo que o arquivo de log tenha centenas de megabytes.
          */
-        const bufferSize = 2048; 
+        const bufferSize = 2048;
         const start = Math.max(0, stats.size - bufferSize);
-        
-        const stream = fs.createReadStream(LOG_FILE, { 
-            start, 
+
+        const stream = fs.createReadStream(LOG_FILE, {
+            start,
             encoding: 'utf-8',
-            highWaterMark: bufferSize 
+            highWaterMark: bufferSize
         });
-        
+
         stream.on('data', (chunk) => {
             // Transmite o fragmento para o barramento soberano
             notify('log_stream', chunk.toString());
         });
 
         const release = () => { logReadActive = false; };
-        
+
         stream.on('end', release);
         stream.on('close', release);
         stream.on('error', (err) => {

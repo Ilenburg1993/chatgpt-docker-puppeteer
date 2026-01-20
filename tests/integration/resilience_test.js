@@ -16,7 +16,7 @@ async function testBufferReplay() {
     await ipc.connect(3002);
     console.log('> Conectado. Derrubando servidor em 1s...');
 
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => { setTimeout(r, 1000); });
     server.close(); // Blackout simulado
     console.log('⚠️ [BLACKOUT] Servidor Offline.');
 
@@ -32,7 +32,7 @@ async function testBufferReplay() {
 
     return new Promise((resolve) => {
         let receivedCount = 0;
-        
+
         // O Hub do servidor deve receber os eventos retransmitidos
         socketHub.getIO().on('connection', (socket) => {
             socket.on('message', (envelope) => {

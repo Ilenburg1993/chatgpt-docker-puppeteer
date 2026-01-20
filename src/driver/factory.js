@@ -2,9 +2,9 @@
    src/driver/factory.js
    Audit Level: 700 — Reactive Driver Factory (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Descoberta, instanciação Lazy-Load e gestão reativa de 
+   Responsabilidade: Descoberta, instanciação Lazy-Load e gestão reativa de
                      cache de drivers com suporte a sinais soberanos.
-   Sincronizado com: TargetDriver.js V700, BaseDriver V700, 
+   Sincronizado com: TargetDriver.js V700, BaseDriver V700,
                      DriverLifecycleManager V700.
 ========================================================================== */
 
@@ -59,7 +59,7 @@ try {
 
 /**
  * Obtém ou cria a instância do driver com injeção de sinal e sincronia de config.
- * 
+ *
  * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt').
  * @param {object} page - Instância ativa da página do Puppeteer.
  * @param {object} config - Configuração da tarefa (clonada para imutabilidade).
@@ -83,21 +83,21 @@ function getDriver(targetName, page, config, signal) {
     // C. REAPROVEITAMENTO (Nível 2: Target)
     if (instances.has(key)) {
         const cachedInstance = instances.get(key);
-        
+
         if (!cachedInstance.destroyed) {
             // [R5] Sincronia Paramétrica: Atualiza a configuração para a nova missão
             if (config && typeof config === 'object') {
                 cachedInstance.config = { ...config };
             }
-            
+
             // [R3] Sincronia de Sinal: O driver deve obedecer ao novo sinal de aborto
             cachedInstance.signal = signal;
-            
+
             log('DEBUG', `[FACTORY] Reaproveitando driver em cache: ${cachedInstance.name}`);
             return cachedInstance;
         }
         // Se a instância estava marcada como destruída, removemos do mapa
-        instances.delete(key); 
+        instances.delete(key);
     }
 
     // D. INSTANCIAÇÃO (Lazy-Loading dinâmico)
@@ -128,7 +128,7 @@ function getDriver(targetName, page, config, signal) {
 
         instances.set(key, instance);
         log('INFO', `[FACTORY] Novo Driver '${instance.name}' acoplado com sucesso.`);
-        
+
         return instance;
 
     } catch (e) {
@@ -140,7 +140,7 @@ function getDriver(targetName, page, config, signal) {
 /**
  * Invalidação Global (R4): Limpeza profunda de uma sessão.
  * Garante que todos os drivers vinculados a uma aba sejam destruídos.
- * 
+ *
  * @param {object} page - Instância da página do Puppeteer.
  */
 async function invalidatePageCache(page) {
@@ -157,14 +157,14 @@ async function invalidatePageCache(page) {
                 log('WARN', `[FACTORY] Erro no descarte do driver '${name}': ${e.message}`);
             }
         }
-        
+
         instances.clear();
         pageInstanceCache.delete(page);
     }
 }
 
-module.exports = { 
-    getDriver, 
-    invalidatePageCache, 
-    availableTargets: Object.keys(driverRegistry) 
+module.exports = {
+    getDriver,
+    invalidatePageCache,
+    availableTargets: Object.keys(driverRegistry)
 };

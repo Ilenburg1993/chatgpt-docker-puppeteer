@@ -25,12 +25,12 @@ async function runHandshakeTest() {
 
         // 3. Cenário A: Conexão com Versão Incompatível
         // Simularemos um erro forçando a versão no manager temporariamente
-        const originalVersion = identityManager.capabilities; 
+        const originalVersion = identityManager.capabilities;
         // (Apenas para ilustração, em um teste real usaríamos mocks)
 
         // 4. Cenário B: Fluxo Nominal (Sucesso)
         console.log(`> Tentando acoplar Maestro (DNA: ${dna})...`);
-        
+
         await ipc.connect(3001);
 
         return new Promise((resolve, reject) => {

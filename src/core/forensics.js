@@ -30,14 +30,14 @@ const CAPTURE_TIMEOUT_MS = 5000;
  */
 async function createCrashDump(page, error, taskId = 'unknown', correlationId = 'unknown') {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    
+
     // Fallbacks seguros caso o erro ocorra antes da inicialização da identidade
     const robotId = identityManager.getRobotId() || 'uninitialized';
     const instanceId = identityManager.getInstanceId() || 'boot-phase';
-    
+
     const dumpId = `crash_${timestamp}_${taskId}`;
     const folder = path.join(PATHS.REPORTS, dumpId);
-    
+
     try {
         // 1. PREPARAÇÃO DO AMBIENTE
         await fs.mkdir(folder, { recursive: true });
@@ -68,7 +68,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         if (page && !page.isClosed()) {
             await Promise.race([
                 _captureVisualEvidence(page, folder, correlationId),
-                new Promise((_, reject) => 
+                new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('BROWSER_CAPTURE_TIMEOUT')), CAPTURE_TIMEOUT_MS)
                 )
             ]).catch(err => {
@@ -101,10 +101,10 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
  */
 async function _captureVisualEvidence(page, folder, correlationId) {
     // A. Screenshot (JPEG comprimido para performance)
-    await page.screenshot({ 
-        path: path.join(folder, 'screenshot.jpg'), 
-        quality: 40, 
-        type: 'jpeg' 
+    await page.screenshot({
+        path: path.join(folder, 'screenshot.jpg'),
+        quality: 40,
+        type: 'jpeg'
     });
 
     // B. Snapshot do DOM (Legibilidade Preservada)

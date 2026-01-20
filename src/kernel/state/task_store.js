@@ -2,7 +2,7 @@
    src/kernel/state/task_store.js
    Audit Level: 820 — Long-Term Working Memory
    Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: 
+   Responsabilidade:
      - Manter a "Verdade Única" sobre a tarefa ativa.
      - Rastrear contadores de falha para decisão de política.
      - Permitir hidratação (recovery) pós-crash.
@@ -33,7 +33,7 @@ class TaskStore {
             if (fs.existsSync(STATE_FILE_PATH)) {
                 const raw = fs.readFileSync(STATE_FILE_PATH, 'utf8');
                 const state = JSON.parse(raw);
-                
+
                 // Validação mínima para evitar carregar lixo
                 if (state && state.meta && state.meta.id) {
                     this.activeTask = state;
@@ -63,11 +63,11 @@ class TaskStore {
                 history: []
             }
         };
-        
+
         this.failureCount = 0;
         this.lastError = null;
         this.status = 'RUNNING'; // Assume intenção de rodar
-        
+
         console.log(`[KERNEL MEMORY] Nova tarefa estagiada: ${this.activeTask.meta.id}`);
     }
 
@@ -78,7 +78,7 @@ class TaskStore {
     recordFailure(errorPayload) {
         this.failureCount++;
         this.lastError = errorPayload;
-        
+
         // Atualiza histórico interno da tarefa
         if (this.activeTask && this.activeTask.state) {
             this.activeTask.state.last_error = errorPayload;

@@ -25,7 +25,7 @@ class BudgetManager {
      * Registra o consumo e retorna true se permitido, false se estourou.
      */
     allocate(length) {
-        if (!this.hasBudget(length)) return false;
+        if (!this.hasBudget(length)) {return false;}
         this.consumed += length;
         return true;
     }

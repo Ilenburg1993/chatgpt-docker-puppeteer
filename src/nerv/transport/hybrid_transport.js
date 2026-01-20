@@ -24,7 +24,7 @@ const EventEmitter = require('events');
 
 /**
  * Cria transporte híbrido com suporte local + remoto.
- * 
+ *
  * @param {Object} config
  * @param {string} config.mode - 'local' | 'hybrid'
  * @param {Object} [config.socketAdapter] - Adapter Socket.io (se mode='hybrid')
@@ -54,10 +54,10 @@ function createHybridTransport({ mode = 'local', socketAdapter = null, telemetry
             socketAdapter.onReceive((frame) => {
                 try {
                     const envelope = JSON.parse(frame);
-                    
+
                     // Emite no bus local também (para listeners locais)
                     localBus.emit('message', envelope);
-                    
+
                     // Notifica handlers registrados
                     handlers.forEach(handler => {
                         try {
@@ -95,7 +95,7 @@ function createHybridTransport({ mode = 'local', socketAdapter = null, telemetry
 
     /**
      * Envia mensagem (local via EventEmitter, remoto via Socket.io).
-     * 
+     *
      * @param {Object} envelope - Envelope NERV normalizado
      */
     function send(envelope) {
@@ -123,7 +123,7 @@ function createHybridTransport({ mode = 'local', socketAdapter = null, telemetry
 
     /**
      * Registra handler para receber mensagens.
-     * 
+     *
      * @param {Function} handler - (envelope) => void
      * @returns {Function} Unsubscribe function
      */
@@ -147,7 +147,7 @@ function createHybridTransport({ mode = 'local', socketAdapter = null, telemetry
 
     /**
      * Registra listener para actionCode específico.
-     * 
+     *
      * @param {string} actionCode - Código de ação (ex: 'TASK_START')
      * @param {Function} handler - (envelope) => void
      * @returns {Function} Unsubscribe function
@@ -168,7 +168,7 @@ function createHybridTransport({ mode = 'local', socketAdapter = null, telemetry
 
     /**
      * Registra listener para actor específico.
-     * 
+     *
      * @param {string} actor - Actor (ex: 'KERNEL', 'DRIVER', 'SERVER')
      * @param {Function} handler - (envelope) => void
      * @returns {Function} Unsubscribe function

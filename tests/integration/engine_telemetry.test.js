@@ -17,9 +17,9 @@ async function runEngineTelemetryTest() {
     const PORT = 3008;
     const httpServer = http.createServer();
     const ioServer = socketHub.init(httpServer);
-    
+
     const testCorrelationId = uuidv4();
-    let eventsReceived = [];
+    const eventsReceived = [];
 
     // 1. MOCKS DE INFRAESTRUTURA
     const mockOrchestrator = {
@@ -39,7 +39,7 @@ async function runEngineTelemetryTest() {
     const io = require('../../src/infra/io');
     const originalLoad = io.loadNextTask;
     io.loadNextTask = async () => ({
-        meta: { id: "task-test-51", correlation_id: testCorrelationId, priority: 5, created_at: new Date().toISOString() },
+        meta: { id: 'task-test-51', correlation_id: testCorrelationId, priority: 5, created_at: new Date().toISOString() },
         spec: { target: 'chatgpt', payload: { user_message: 'Hello' } },
         state: { status: 'PENDING', attempts: 0, history: [] }
     });
@@ -54,14 +54,14 @@ async function runEngineTelemetryTest() {
         });
     });
 
-    await new Promise(r => httpServer.listen(PORT, r));
+    await new Promise(r => { httpServer.listen(PORT, r); });
     await identityManager.initialize();
-    
+
     console.log(`> [ACTION] Conectando Maestro e iniciando Engine...`);
     await ipc.connect(PORT);
 
     // Aguarda conexão real
-    while(!ipc.isConnected()) { await new Promise(r => setTimeout(r, 200)); }
+    while(!ipc.isConnected()) { await new Promise(r => { setTimeout(r, 200); }); }
 
     engine.start();
 
@@ -71,7 +71,7 @@ async function runEngineTelemetryTest() {
         if (eventsReceived.includes(IPCEvent.TASK_COMPLETED)) {
             console.log(`\n✅ [PASS] Pipeline de telemetria validado.`);
             console.log(`   Eventos capturados: ${eventsReceived.join(' -> ')}`);
-            
+
             await engine.stop();
             await ipc.disconnect();
             await socketHub.stop();
@@ -79,10 +79,10 @@ async function runEngineTelemetryTest() {
             io.loadNextTask = originalLoad;
             process.exit(0);
         }
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => { setTimeout(r, 500); });
     }
 
-    console.error("❌ [FAIL] Pipeline incompleto. Eventos recebidos: " + eventsReceived.join(', '));
+    console.error(`❌ [FAIL] Pipeline incompleto. Eventos recebidos: ${  eventsReceived.join(', ')}`);
     process.exit(1);
 }
 

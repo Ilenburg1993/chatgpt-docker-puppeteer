@@ -2,7 +2,7 @@
    src/infra/storage/dna_store.js
    Audit Level: 730 — Sovereign Genomic Storage (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Gestão da persistência, integridade e evolução do genoma 
+   Responsabilidade: Gestão da persistência, integridade e evolução do genoma
                      de interface (dynamic_rules.json).
    Sincronizado com: paths.js V700, fs_core.js V700, dna_schema.js V100.
 ========================================================================== */
@@ -25,7 +25,7 @@ const DEFAULT_DNA = {
     },
     targets: {},
     global_selectors: {
-        input_box: ["textarea", "div[contenteditable='true']", "[role='textbox']"],
+        input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
         send_button: ["button[type='submit']", "[data-testid='send-button']"]
     }
 };
@@ -38,23 +38,23 @@ let cachedDna = null;
 /**
  * Recupera o DNA completo do sistema.
  * Implementa cache em RAM com fallback para disco e inicialização V4 Gold.
- * 
+ *
  * @returns {Promise<object>} Objeto DNA validado.
  */
 async function getDna() {
     // 1. Hit de Cache (Performance O(1))
-    if (cachedDna) return cachedDna;
+    if (cachedDna) {return cachedDna;}
 
     // 2. Leitura de Disco
     const rawDna = await safeReadJSON(PATHS.RULES);
-    
+
     if (!rawDna) {
         log('WARN', '[DNA_STORE] dynamic_rules.json ausente. Inicializando estrutura V4 Gold.');
         await saveDna(DEFAULT_DNA, 'system_init');
         cachedDna = DEFAULT_DNA;
         return cachedDna;
     }
-    
+
     try {
         // 3. Validação de Fronteira (Zod)
         cachedDna = DnaSchema.parse(rawDna);
@@ -67,7 +67,7 @@ async function getDna() {
 
 /**
  * Persiste a evolução do DNA, atualizando metadados e invalidando o cache.
- * 
+ *
  * @param {object} dna - Novo objeto de DNA.
  * @param {string} author - Identificador da entidade que evoluiu o DNA (ex: 'SADI_V19').
  */
@@ -84,13 +84,13 @@ async function saveDna(dna, author = 'system') {
 
         // 2. Validação Estrita antes da Persistência
         const validatedDna = DnaSchema.parse(newDna);
-        
+
         // 3. Escrita Atômica (Prevenção de Corrupção)
         await atomicWrite(PATHS.RULES, JSON.stringify(validatedDna, null, 2));
-        
+
         // 4. Sincronia de Cache
         cachedDna = validatedDna;
-        
+
         log('INFO', `[DNA_STORE] DNA Evoluído: v${validatedDna._meta.version} por ${author}`);
         return true;
     } catch (e) {
@@ -101,24 +101,24 @@ async function saveDna(dna, author = 'system') {
 
 /**
  * Recupera as regras específicas para um domínio IA com lógica de fallback.
- * 
+ *
  * @param {string} domain - Ex: 'chatgpt.com'.
  * @returns {Promise<object>} Regras do alvo mescladas com globais.
  */
 async function getTargetRules(domain) {
     const dna = await getDna();
     const targetKey = (domain || 'unknown').toLowerCase();
-    
+
     const targetData = dna.targets[targetKey];
 
-    // Se o alvo existe e possui seletores, retorna-os. 
+    // Se o alvo existe e possui seletores, retorna-os.
     // Caso contrário, faz o fallback para o padrão universal de chat.
     if (targetData && targetData.selectors && Object.keys(targetData.selectors).length > 0) {
         return targetData;
     }
 
-    return { 
-        selectors: dna.global_selectors, 
+    return {
+        selectors: dna.global_selectors,
         behavior_overrides: {},
         source: 'global_fallback'
     };

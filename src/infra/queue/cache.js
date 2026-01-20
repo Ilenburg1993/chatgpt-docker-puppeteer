@@ -2,7 +2,7 @@
    src/infra/queue/cache.js
    Audit Level: 700 — Sovereign Queue Observer (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: 
+   Responsabilidade:
      - Autoridade central de OBSERVAÇÃO da fila de tarefas.
      - Produção de snapshot consistente do estado do disco em RAM.
      - Colapso de múltiplos gatilhos em uma única varredura (Debounce).
@@ -70,7 +70,7 @@ async function scanQueue() {
         try {
             const files = listTaskFiles();
             const results = await Promise.all(files.map(loadTask));
-            
+
             // Filtra nulos (falhas de leitura) e atualiza o estado global
             globalQueueCache = results.filter(Boolean);
             lastFullScan = Date.now();
@@ -91,7 +91,7 @@ async function scanQueue() {
  * Sinais de sensores (Watchers) apenas marcam o cache como sujo e chamam esta função.
  */
 function openObservationWindow() {
-    if (windowTimer) return;
+    if (windowTimer) {return;}
 
     windowTimer = setTimeout(async () => {
         windowTimer = null;

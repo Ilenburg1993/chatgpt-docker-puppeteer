@@ -66,7 +66,7 @@ class IdentityManager {
     /**
      * Retorna o objeto de identidade completo e validado.
      * Esta é a ÚNICA saída autorizada para o Handshake do IPC 2.0.
-     * 
+     *
      * @returns {object} Identidade homologada conforme o Shared Kernel.
      */
     getFullIdentity() {

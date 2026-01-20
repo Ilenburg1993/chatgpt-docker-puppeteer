@@ -17,25 +17,25 @@ async function runBiomechanicalTest() {
     const PORT = 3009;
     const httpServer = http.createServer();
     socketHub.init(httpServer);
-    await new Promise(r => httpServer.listen(PORT, r));
+    await new Promise(r => { httpServer.listen(PORT, r); });
 
     // 1. SETUP DO CLIENTE E BRIDGE
     await ipc.connect(PORT);
     const bridge = new TelemetryBridge(null); // Driver mockado como null
-    const testCorrelationId = "trace-biomech-123";
+    const testCorrelationId = 'trace-biomech-123';
     bridge.setContext(testCorrelationId);
 
     console.log(`> [SETUP] Bridge configurada com Throttling de 150ms.`);
 
     return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("Falha na recepção de pulsos")), 10000);
+        const timeout = setTimeout(() => reject(new Error('Falha na recepção de pulsos')), 10000);
         let mouseEventsCount = 0;
         let sadiEventsCount = 0;
 
         // O Servidor monitora a rajada de telemetria
         socketHub.getIO().on('connection', (socket) => {
             socket.on('message', (envelope) => {
-                if (envelope.ids.correlation_id !== testCorrelationId) return;
+                if (envelope.ids.correlation_id !== testCorrelationId) {return;}
 
                 if (envelope.kind === IPCEvent.HUMAN_PULSE && envelope.payload.type === 'MOUSE_MOVE') {
                     mouseEventsCount++;
@@ -51,7 +51,7 @@ async function runBiomechanicalTest() {
                 // Recebeu o SADI e recebeu o Mouse (mesmo com rajada, o throttle deve limitar)
                 if (sadiEventsCount === 1 && mouseEventsCount >= 1) {
                     clearTimeout(timeout);
-                    
+
                     // Validação de Throttling: Se enviamos 100 e chegaram 100, o throttle falhou.
                     // Em 500ms de teste, deveriam chegar no máximo 4 eventos (1 a cada 150ms).
                     if (mouseEventsCount > 10) {
@@ -69,7 +69,7 @@ async function runBiomechanicalTest() {
 
         // 2. SIMULAÇÃO DE RAJADA (BURST)
         console.log(`> [ACTION] Disparando 100 movimentos de mouse e 1 SADI Scan...`);
-        
+
         // Emite percepção visual
         bridge.emitSadiPerception('#send-btn', 'SEARCHING', 0.8);
 
@@ -78,12 +78,12 @@ async function runBiomechanicalTest() {
         const interval = setInterval(() => {
             bridge.emitMouseMovement(100 + moves, 200 + moves);
             moves++;
-            if (moves >= 100) clearInterval(interval);
+            if (moves >= 100) {clearInterval(interval);}
         }, 5); // 5ms entre movimentos (muito rápido para o IPC)
     });
 }
 
-runBiomechanicalTest().then(() => console.log("Audit Phase 5.2: SUCCESS\n")).catch(err => {
+runBiomechanicalTest().then(() => console.log('Audit Phase 5.2: SUCCESS\n')).catch(err => {
     console.error(`❌ [FAIL] Erro no pulso biomecânico: ${err.message}`);
     process.exit(1);
 });

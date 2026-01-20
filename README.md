@@ -1,337 +1,287 @@
 # chatgpt-docker-puppeteer
 
-[![CI](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/actions/workflows/ci.yml/badge.svg)](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-38%2F38%20(em%20consolida%C3%A7%C3%A3o)-yellow)](tests/)
 ![Node.js Version](https://img.shields.io/badge/node-%E2%89%A520.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-![Development Status](https://img.shields.io/badge/status-pre--v1.0-yellow)
+![Status](https://img.shields.io/badge/status-pre--v1.0-orange)
+![Stability](https://img.shields.io/badge/stability-unstable-red)
 
-**Autonomous agent system for controlling Large Language Models (ChatGPT, Gemini) via browser automation using Puppeteer and Chrome remote debugging.**
+**Sistema de agente autônomo para controle de Large Language Models (ChatGPT, Gemini) via automação de browser usando Puppeteer e Chrome remote debugging.**
 
-> ⚠️ **Development Status**: This project is actively under construction and has not reached v1.0 yet. Features and APIs may change.
+> ⚠️ **Status de Desenvolvimento**: Este projeto está em **desenvolvimento ativo** e **NÃO atingiu v1.0 stable**. A fase de testes e consolidação está em andamento. Features, APIs e comportamentos podem mudar sem aviso prévio. **NÃO use em produção**.
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Clone repository
+# 1. Clone o repositório
 git clone https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
 cd chatgpt-docker-puppeteer
 
-# 2. Install dependencies
+# 2. Instale dependências
 npm install
 
-# 3. Start Chrome with remote debugging
+# 3. Inicie o Chrome com remote debugging
 # Windows:
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation"
 
 # Linux/macOS:
-google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation-profile"
+google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation"
 
-# 4. Configure environment
-cp .env.example .env
-
-# 5. Run agent
+# 4. Execute o agente
 npm run dev
 
-# 6. Access dashboard
-# Open http://localhost:3008
+# 5. Acesse o dashboard
+# Abra http://localhost:3008
 ```
 
-**Complete setup guide**: [DOCUMENTAÇÃO/QUICK_START.md](DOCUMENTAÇÃO/QUICK_START.md)
+**Guia completo**: [DOCUMENTAÇÃO/QUICK_START.md](DOCUMENTAÇÃO/QUICK_START.md)
 
 ---
 
-## 📋 What is This?
+## 📋 O Que é Este Projeto?
 
-This project provides an **autonomous agent** that:
-- Controls LLM chatbots (ChatGPT, Gemini) through browser automation
-- Processes tasks from a file-based queue (`fila/`)
-- Saves AI responses to `respostas/`
-- Provides real-time monitoring via web dashboard
-- Uses Chrome remote debugging (not bundled Chromium)
+Sistema de **agente autônomo** que:
+- Controla chatbots LLM (ChatGPT, Gemini) através de automação de browser
+- Processa tarefas de uma fila baseada em arquivos JSON (`fila/`)
+- Salva respostas de IA em `respostas/`
+- Fornece monitoramento em tempo real via dashboard web
+- Usa Chrome remote debugging (sem Chromium embarcado)
 
-### Architecture
+### Arquitetura NERV (IPC 2.0)
 
 ```
-┌──────────┐      ┌──────────────┐      ┌────────────┐
-│  Client  │─────▶│  Dashboard   │◀────▶│ Socket.io  │
-│          │      │  (Port 3008) │      │ Real-time  │
-└──────────┘      └──────┬───────┘      └────────────┘
-                         │
-                         ▼
-                  ┌──────────────┐
-                  │  Task Engine │
-                  │  (Processor) │
-                  └──────┬───────┘
-                         │
-                         ▼
-                  ┌──────────────┐
-                  │  Puppeteer   │
-                  └──────┬───────┘
-                         │
-                    WebSocket
-                         │
-                  ┌──────▼───────┐
-                  │ Chrome :9222 │
-                  │ (Host System)│
-                  └──────┬───────┘
-                         │
-                         ▼
-              ┌──────────────────────┐
-              │   LLM Websites       │
-              │ ChatGPT / Gemini     │
-              └──────────────────────┘
+                  NERV (Pub/Sub - Canal Universal)
+                            ↕
+              ┌─────────────┼─────────────┐
+              │             │             │
+           KERNEL        DRIVER        SERVER
+              │             │             │
+         TaskQueue    BrowserPool    Dashboard
+              │             │             │
+         (Fila JSON)  (Puppeteer)   (Socket.io)
+                            ↓
+                     Chrome :9222 (Host)
+                            ↓
+                    ChatGPT / Gemini
 ```
 
----
-
-## 📚 Documentation
-
-- **[Quick Start Guide](DOCUMENTAÇÃO/QUICK_START.md)** - Get running in 10 minutes
-- **[API Documentation](DOCUMENTAÇÃO/API.md)** - REST API & WebSocket reference
-- **[Architecture Guide](DOCUMENTAÇÃO/ARCHITECTURE.md)** - System design & components
-- **[Configuration Guide](DOCUMENTAÇÃO/CONFIGURATION.md)** - All settings explained
-- **[Docker Setup](DOCKER_SETUP.md)** - Windows containerization guide
-- **[Deployment Guide](DOCUMENTAÇÃO/DEPLOYMENT.md)** - Production deployment
-- **[Contributing](CONTRIBUTING.md)** - Development workflow
+**Princípios:**
+- **Zero-coupling**: Comunicação apenas via NERV (pub/sub)
+- **Sovereign interruption**: AbortController para interrupção autônoma
+- **Schema validation**: Zod para validação de dados
+- **Adaptive backoff**: Retry inteligente com backoff exponencial
 
 ---
 
-## ✨ Features
+## 📚 Documentação
 
-- **Browser Automation**: Puppeteer-based control of LLM web interfaces
-- **Chrome Remote Debugging**: Connect to existing Chrome (no bundled browser)
-- **Queue System**: File-based task queue with PID-based locking
-- **Real-time Dashboard**: Monitor tasks via Socket.io
-- **Incremental Collection**: Stream responses as they're generated
-- **Quality Validation**: Configurable response validation rules
-- **Retry Logic**: Adaptive backoff with failure classification
-- **Hot Reload**: Dynamic configuration updates without restart
-- **Docker Ready**: Multi-stage builds, ~150MB image
-- **Process Management**: PM2 for production deployments
+- **[Guia de Arquitetura](DOCUMENTAÇÃO/ARCHITECTURE.md)** - Arquitetura completa do sistema
+- **[Referência de API](DOCUMENTAÇÃO/API.md)** - APIs públicas dos módulos
+- **[Guia de Configuração](DOCUMENTAÇÃO/CONFIGURATION.md)** - Todos os parâmetros explicados
+- **[Guia de Testes](DOCUMENTAÇÃO/TESTING.md)** - Framework de testes e como criar novos
+- **[Guia de Deploy](DOCUMENTAÇÃO/DEPLOYMENT.md)** - Deploy para produção (Docker/PM2)
+- **[Como Contribuir](CONTRIBUTING.md)** - Workflow de desenvolvimento
+- **[FAQ](DOCUMENTAÇÃO/FAQ.md)** - Problemas comuns e troubleshooting
 
 ---
 
-## 🛠 Tech Stack
+## ✨ Features Principais
 
-- **Node.js**: ≥20.0.0
-- **Puppeteer**: 21.11.0 (browser automation)
-- **Express**: 4.22.1 (web server)
-- **Socket.io**: 4.8.3 (real-time communication)
-- **PM2**: 5.4.3 (process management)
-- **Zod**: 3.25.76 (schema validation)
+### Core
+- ✅ **Automação de Browser**: Controle via Puppeteer
+- ✅ **Chrome Remote Debugging**: Conexão com Chrome existente
+- ✅ **Sistema de Fila**: Queue baseada em arquivos JSON com lock PID
+- ✅ **Dashboard Real-time**: Monitoramento via Socket.io
+- ✅ **Coleta Incremental**: Streaming de respostas conforme são geradas
+- ✅ **Validação de Qualidade**: Regras configuráveis de validação
+
+### Arquitetura
+- ✅ **NERV (IPC 2.0)**: Canal universal de comunicação pub/sub
+- ✅ **Zero-coupling**: Desacoplamento completo entre módulos
+- ✅ **Retry Adaptativo**: Backoff exponencial com classificação de falhas
+- ✅ **Hot-reload**: Atualização de config sem restart
+- ✅ **Process Management**: PM2 para produção
+- ✅ **Schema Validation**: Zod para contratos de dados
+
+### Operacional
+- ✅ **Docker Ready**: Imagens multi-stage (~150MB)
+- ✅ **Health Checks**: Endpoints de saúde do sistema
+- ✅ **Telemetria**: Logs estruturados e métricas
+- ✅ **Forensics**: Dumps automáticos em crashes
+
+> ⚠️ **Nota**: Features marcadas como ✅ indicam implementação atual, mas ainda em fase de consolidação de testes.
+
+---
+
+## 🛠 Stack Tecnológica
+
+- **Node.js**: ≥20.0.0 (runtime)
+- **Puppeteer**: 21.11.0 (automação de browser)
+- **Express**: 4.22.1 (servidor web)
+- **Socket.io**: 4.8.3 (comunicação real-time)
+- **PM2**: 5.4.3 (gerenciamento de processos)
+- **Zod**: 3.25.76 (validação de schemas)
 - **Docker**: Multi-stage builds
 
 ---
 
-## 📦 Project Structure
+## 📦 Estrutura do Projeto
 
 ```
 chatgpt-docker-puppeteer/
 ├── src/
-│   ├── core/              # Execution engine & schemas
-│   ├── driver/            # LLM-specific automation drivers
-│   ├── infra/             # Queue, locks, IPC
-│   ├── kernel/            # Task lifecycle management
-│   ├── nerv/              # Inter-process communication
-│   └── server/            # Web dashboard
-├── scripts/               # Utility scripts
-├── tests/                 # Test suites
-├── fila/                  # Task queue (JSON files)
-├── respostas/             # AI responses
-├── logs/                  # Application logs
-├── profile/               # Browser profiles
-├── DOCUMENTAÇÃO/          # Complete documentation
-└── public/                # Dashboard static files
+│   ├── core/              # Motor de execução e schemas
+│   ├── driver/            # Drivers de automação específicos por LLM
+│   ├── infra/             # Queue, locks, storage
+│   ├── kernel/            # Gerenciamento de ciclo de vida de tasks
+│   ├── nerv/              # Sistema de comunicação IPC 2.0
+│   └── server/            # Dashboard web
+├── scripts/               # Scripts utilitários
+├── tests/                 # Suites de testes
+├── fila/                  # Fila de tarefas (arquivos JSON)
+├── respostas/             # Respostas de IA
+├── logs/                  # Logs da aplicação
+├── DOCUMENTAÇÃO/          # Documentação completa
+└── public/                # Arquivos estáticos do dashboard
 ```
 
 ---
 
-## 🚢 Deployment
+## 🧪 Testes
 
-### Docker (Recommended)
+**Status Atual:** 38/38 testes passando (em consolidação)
 
 ```bash
-# Build and start
-make build
-make start
+# Executar todos os testes
+npm test
 
-# Check health
-make health
+# Testes unitários (P1-P5 - Correções críticas)
+npm run test:p1
 
-# View logs
-make logs
+# Testes E2E (Fio de Ariadne - Conectividade)
+npm run test:e2e
+
+# Testes de integração (Driver-NERV)
+npm run test:integration
 ```
 
-See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed instructions.
+> ⚠️ **Importante**: Os testes atuais validam a arquitetura e funcionalidades críticas, mas a **fase de consolidação de testes ainda não terminou**. Novos testes estão sendo criados para cobrir cenários de produção, performance e edge cases.
 
-### Native (PM2)
+**Documentação completa**: [DOCUMENTAÇÃO/TESTING.md](DOCUMENTAÇÃO/TESTING.md)
+
+---
+
+## 🚢 Deploy
+
+### Docker (Recomendado para desenvolvimento)
 
 ```bash
-# Install PM2 globally
+# Build e start
+docker-compose up -d
+
+# Verificar saúde
+curl http://localhost:3008/api/health
+
+# Ver logs
+docker-compose logs -f
+```
+
+### PM2 (Para produção)
+
+```bash
+# Instalar PM2 globalmente
 npm install -g pm2
 
-# Start agent
+# Iniciar agente
 npm run daemon:start
 
-# Monitor
+# Monitorar
 pm2 status
-pm2 logs chatgpt-agent
+pm2 logs agente-gpt
 ```
 
-See [DOCUMENTAÇÃO/DEPLOYMENT.md](DOCUMENTAÇÃO/DEPLOYMENT.md) for production setup.
+**Guia completo**: [DOCUMENTAÇÃO/DEPLOYMENT.md](DOCUMENTAÇÃO/DEPLOYMENT.md)
 
 ---
 
-## 🔧 Configuration
+## 🔧 Configuração
 
-### Environment Variables
+### Principais Arquivos
 
-Key settings in `.env`:
+| Arquivo | Propósito | Hot-reload |
+|---------|-----------|------------|
+| `config.json` | Configuração principal do sistema | ✅ Sim |
+| `dynamic_rules.json` | Seletores CSS e regras por target | ✅ Sim |
+| `.env` | Variáveis de ambiente | ❌ Requer restart |
 
-```bash
-NODE_ENV=production
-PORT=3008
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
-MAX_WORKERS=3
-LOG_LEVEL=info
-```
+### Exemplo de Task
 
-See [.env.example](.env.example) for all variables.
-
-### Main Configuration
-
-`config.json`:
 ```json
 {
+  "id": "task-001",
   "target": "chatgpt",
-  "maxRetries": 3,
-  "timeout": 30000,
-  "logLevel": "info"
+  "prompt": "Explique computação quântica de forma simples",
+  "state": "PENDING"
 }
 ```
 
-See [DOCUMENTAÇÃO/CONFIGURATION.md](DOCUMENTAÇÃO/CONFIGURATION.md) for complete reference.
+**Guia completo**: [DOCUMENTAÇÃO/CONFIGURATION.md](DOCUMENTAÇÃO/CONFIGURATION.md)
 
 ---
 
-## 📊 Usage Examples
+## 📊 Uso
 
-### Create a Task
+### Criar uma Task
 
-**Via CLI:**
 ```bash
+# Via CLI
 npm run queue:add
+
+# Via script
+node scripts/gerador_tarefa.js
 ```
 
-**Via API:**
-```bash
-curl -X POST http://localhost:3008/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "task-001",
-    "target": "chatgpt",
-    "prompt": "Explain quantum computing"
-  }'
-```
+### Monitorar Execução
 
-### Monitor Progress
+- **Dashboard**: http://localhost:3008
+- **Logs**: `tail -f logs/agent.log`
+- **Health**: http://localhost:3008/api/health
 
-**Dashboard**: http://localhost:3008
+### Obter Resultados
 
-**WebSocket**:
-```javascript
-const socket = io('http://localhost:3008');
-socket.on('task:completed', (data) => {
-  console.log('Result:', data.result);
-});
-```
-
-### Get Results
-
-Results saved to `respostas/task-001.txt`
+Respostas salvas em `respostas/{taskId}.txt`
 
 ---
 
-## 🧪 Development
+## 🤝 Contribuindo
 
-### Prerequisites
-
-- Node.js ≥20.0.0
-- Chrome browser
-- npm ≥10.0.0
-
-### Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-
-# Development mode (hot reload)
-npm run dev
-
-# Lint code
-npm run lint
-```
-
-### Testing
-
-> **Note**: Tests are under active development (pre-v1.0). Some tests may be incomplete or failing.
-
-```bash
-# All tests
-npm test
-
-# Specific test suite
-npm run test:lock
-npm run test:linux
-
-# Chrome connection test
-node test-puppeteer.js
-```
+Contribuições são bem-vindas! Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para:
+- Setup de desenvolvimento
+- Padrões de código
+- Formato de commits
+- Processo de pull request
 
 ---
 
-## 🤝 Contributing
+## 📝 Licença
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Development setup
-- Coding conventions
-- Commit message format
-- Pull request process
-
----
-
-## 📝 License
-
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - veja [LICENSE](LICENSE) para detalhes.
 
 ---
 
 ## 🔗 Links
 
-- **Repository**: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer
+- **Repositório**: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer
 - **Issues**: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/issues
-- **Discussions**: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/discussions
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
-
----
-
-## 🆘 Support
-
-**Issues**: Found a bug? [Open an issue](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/issues)
-
-**Questions**: Have a question? [Start a discussion](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/discussions)
-
-**Diagnostics**: Run `npm run diagnose` for automated troubleshooting
 
 ---
 
 ## ⚠️ Disclaimer
 
-This tool is for educational and automation purposes. Ensure compliance with the Terms of Service of any platforms you interact with. Use responsibly.
+Esta ferramenta é para fins educacionais e de automação. Certifique-se de estar em conformidade com os Termos de Serviço das plataformas com as quais você interage. Use com responsabilidade.
+
+**Lembrete**: Este projeto está em **desenvolvimento ativo** e **não é stable**. Use por sua conta e risco.

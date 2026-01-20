@@ -4,7 +4,7 @@
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
    Responsabilidade: Atuar como o Control Plane do sistema. Monitorar a frota,
                      detectar desvios (drifts) e orquestrar a autocura.
-   Sincronizado com: engine/socket.js V600, remediation.js V600, 
+   Sincronizado com: engine/socket.js V600, remediation.js V600,
                      shared/nerv/constants.js (NERV Protocol 2.0)
 ========================================================================== */
 
@@ -17,7 +17,7 @@ class SupervisorReconciler {
     constructor() {
         this.checkInterval = null;
         this.isListening = false;
-        
+
         // Limiares de tolerância operacional (NASA Standard)
         this.HEARTBEAT_THRESHOLD_MS = 30000; // 30s sem sinal = Agente Zumbi
         this.STALL_THRESHOLD_MS = 300000;    // 5min na mesma etapa = Stall Lógico
@@ -28,8 +28,8 @@ class SupervisorReconciler {
      * Garante que o sistema entre em modo de monitoramento contínuo.
      */
     start() {
-        if (this.checkInterval) return;
-        
+        if (this.checkInterval) {return;}
+
         log('INFO', '[RECONCILER] Iniciando vigilância e loop de reconciliação soberana.');
 
         // 1. Loop de Monitoramento Periódico (Pull/Reconcile)
@@ -44,8 +44,8 @@ class SupervisorReconciler {
      * Implementa proteção contra duplicidade de listeners em reinicializações.
      */
     _attachSensoryListeners() {
-        if (this.isListening) return;
-        
+        if (this.isListening) {return;}
+
         const io = socketHub.getIO();
         if (!io) {
             log('WARN', '[RECONCILER] Barramento indisponível. Re-tentando acoplamento em 5s...');
@@ -54,7 +54,7 @@ class SupervisorReconciler {
         }
 
         /**
-         * Intercepta eventos de diagnóstico (STALL_DETECTED) no milissegundo 
+         * Intercepta eventos de diagnóstico (STALL_DETECTED) no milissegundo
          * em que são emitidos pelo robô, permitindo reação instantânea do Supervisor.
          */
         io.on('connection', (socket) => {
@@ -97,7 +97,7 @@ class SupervisorReconciler {
 
     /**
      * Processa um alerta de Stall e aplica a manobra de remediação prescrita.
-     * 
+     *
      * @param {string} robotId - Identidade do robô que emitiu o alerta.
      * @param {object} envelope - O Envelope IPC contendo o diagnóstico técnico.
      */
@@ -115,11 +115,11 @@ class SupervisorReconciler {
 
             // Despacha o comando de correção via Unicast (Sala privada do robô)
             socketHub.sendCommand(
-                prescription.command, 
-                { 
+                prescription.command,
+                {
                     ...prescription.params,
                     correlation_id: correlationId // Preserva o Fio de Ariadne para rastreabilidade
-                }, 
+                },
                 robotId
             );
         }
@@ -130,7 +130,7 @@ class SupervisorReconciler {
      * @param {string} robotId - ID do robô alvo.
      */
     _attemptEmergencyPing(robotId) {
-        socketHub.sendCommand(ActionCode.ENGINE_RESUME, { 
+        socketHub.sendCommand(ActionCode.ENGINE_RESUME, {
             reason: 'RECONCILER_HEARTBEAT_RECOVERY',
             correlation_id: `sys-rec-${Date.now()}`
         }, robotId);

@@ -40,32 +40,32 @@ async function runDiscoveryTest() {
 
         // Chamamos o método privado de descoberta (acesso via colchetes para teste)
         const discoveredPort = ipc['_discoverPort'](3000);
-        
+
         check(`Deve detectar a porta ${customPort} a partir do arquivo`, discoveredPort === customPort);
 
         // --- CENÁRIO 2: FALLBACK PARA PORTA PADRÃO (ARQUIVO AUSENTE) ---
-        if (fs.existsSync(STATE_FILE)) fs.unlinkSync(STATE_FILE);
+        if (fs.existsSync(STATE_FILE)) {fs.unlinkSync(STATE_FILE);}
         console.log(`> [SETUP] estado.json removido.`);
 
         const fallbackPort = ipc['_discoverPort'](3000);
         check(`Deve usar a porta padrão (3000) quando o arquivo estiver ausente`, fallbackPort === 3000);
 
         // --- CENÁRIO 3: RESILIÊNCIA A ARQUIVO CORROMPIDO ---
-        fs.writeFileSync(STATE_FILE, "CONTEUDO_INVALIDO_JSON", 'utf-8');
+        fs.writeFileSync(STATE_FILE, 'CONTEUDO_INVALIDO_JSON', 'utf-8');
         console.log(`> [SETUP] estado.json corrompido propositalmente.`);
 
         const resiliencePort = ipc['_discoverPort'](3000);
         check(`Deve ignorar JSON inválido e usar o fallback com segurança`, resiliencePort === 3000);
 
         // Limpeza final
-        if (fs.existsSync(STATE_FILE)) fs.unlinkSync(STATE_FILE);
+        if (fs.existsSync(STATE_FILE)) {fs.unlinkSync(STATE_FILE);}
 
         console.log(`\n--------------------------------------------------`);
         console.log(`RELATÓRIO: ${results.pass} Passaram | ${results.fail} Falharam`);
         console.log(`ESTADO: ${results.fail === 0 ? 'DESCOBERTA DETERMINÍSTICA' : 'FALHA DE RASTREIO'}`);
         console.log(`--------------------------------------------------\n`);
 
-        if (results.fail > 0) process.exit(1);
+        if (results.fail > 0) {process.exit(1);}
 
     } catch (err) {
         console.error(`\n❌ [CRITICAL] Erro inesperado no teste: ${err.message}`);

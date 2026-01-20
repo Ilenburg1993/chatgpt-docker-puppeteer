@@ -28,7 +28,7 @@
  * Cria uma fila isolada.
  */
 function createQueue() {
-  return [];
+    return [];
 }
 
 /* ===========================
@@ -46,105 +46,105 @@ function createQueue() {
  * Limite máximo técnico da fila (opcional).
  */
 function createInboundQueue({ telemetry, maxSize = null }) {
-  if (!telemetry || typeof telemetry.emit !== 'function') {
-    throw new Error('inbound_queue requer telemetry válida');
-  }
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+        throw new Error('inbound_queue requer telemetry válida');
+    }
 
-  const queue = createQueue();
+    const queue = createQueue();
 
-  /* ===========================
+    /* ===========================
      Operações internas
   =========================== */
 
-  /**
+    /**
    * Verifica se a fila atingiu o limite técnico.
    */
-  function isFull() {
-    return typeof maxSize === 'number' && queue.length >= maxSize;
-  }
+    function isFull() {
+        return typeof maxSize === 'number' && queue.length >= maxSize;
+    }
 
-  /* ===========================
+    /* ===========================
      API pública do módulo
   =========================== */
 
-  /**
+    /**
    * Enfileira item na fila inbound.
    *
    * @param {*} item
    * Item opaco (frame ou estrutura técnica)
    * @returns {boolean} true se aceito, false se recusado por pressão
    */
-  function enqueue(item) {
-    if (isFull()) {
-      telemetry.emit('nerv:buffer:inbound:pressure', {
-        size: queue.length,
-        limit: maxSize
-      });
-      return false;
+    function enqueue(item) {
+        if (isFull()) {
+            telemetry.emit('nerv:buffer:inbound:pressure', {
+                size: queue.length,
+                limit: maxSize
+            });
+            return false;
+        }
+
+        queue.push(item);
+
+        telemetry.emit('nerv:buffer:inbound:enqueue', {
+            size: queue.length
+        });
+
+        return true;
     }
 
-    queue.push(item);
-
-    telemetry.emit('nerv:buffer:inbound:enqueue', {
-      size: queue.length
-    });
-
-    return true;
-  }
-
-  /**
+    /**
    * Remove e retorna o próximo item da fila.
    *
    * @returns {*} item ou null se vazio
    */
-  function dequeue() {
-    if (queue.length === 0) {
-      return null;
+    function dequeue() {
+        if (queue.length === 0) {
+            return null;
+        }
+
+        const item = queue.shift();
+
+        telemetry.emit('nerv:buffer:inbound:dequeue', {
+            size: queue.length
+        });
+
+        return item;
     }
 
-    const item = queue.shift();
-
-    telemetry.emit('nerv:buffer:inbound:dequeue', {
-      size: queue.length
-    });
-
-    return item;
-  }
-
-  /**
+    /**
    * Retorna o tamanho atual da fila.
    */
-  function size() {
-    return queue.length;
-  }
+    function size() {
+        return queue.length;
+    }
 
-  /**
+    /**
    * Indica se a fila está vazia.
    */
-  function isEmpty() {
-    return queue.length === 0;
-  }
+    function isEmpty() {
+        return queue.length === 0;
+    }
 
-  /**
+    /**
    * Limpa a fila (uso técnico/diagnóstico).
    */
-  function clear() {
-    queue.length = 0;
+    function clear() {
+        queue.length = 0;
 
-    telemetry.emit('nerv:buffer:inbound:cleared');
-  }
+        telemetry.emit('nerv:buffer:inbound:cleared');
+    }
 
-  /* ===========================
+    /* ===========================
      Exportação canônica
   =========================== */
 
-  return Object.freeze({
-    enqueue,
-    dequeue,
-    size,
-    isEmpty,
-    clear
-  });
+    return Object.freeze({
+        enqueue,
+        dequeue,
+        size,
+        isEmpty,
+        clear
+    });
 }
 
 module.exports = createInboundQueue;

@@ -12,7 +12,7 @@ const { sleep } = require('./fs_utils');
 async function atomicWrite(filepath, content) {
     const uuid = crypto.randomBytes(4).toString('hex');
     const tmpPath = `${filepath}.tmp.${process.pid}.${uuid}`;
-    
+
     try {
         // [FIX 1.2] Escrita assíncrona para não bloquear o Event Loop
         await fs.writeFile(tmpPath, content, 'utf-8');
@@ -38,7 +38,7 @@ async function atomicWrite(filepath, content) {
             }
         }
     } catch (err) {
-        if (fss.existsSync(tmpPath)) await fs.unlink(tmpPath).catch(() => {});
+        if (fss.existsSync(tmpPath)) {await fs.unlink(tmpPath).catch(() => {});}
         throw err;
     }
 }

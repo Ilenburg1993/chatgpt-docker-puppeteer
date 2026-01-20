@@ -39,11 +39,11 @@ const nerv = createNerv({
 // 3. Monitorar Telemetria (Os Sinais Vitais)
 nerv.telemetry.on('nerv:state:change', (data) => {
     console.log(`[NERV STATE] ${data.from} -> ${data.to}`);
-    
+
     if (data.to === 'READY') {
         console.log('\n✅ SUCESSO! O NERV completou o Handshake e está pronto para combate.');
         console.log('Enviando ping de teste em 3 segundos...');
-        
+
         setTimeout(sendTestPing, 3000);
     }
 });
@@ -72,7 +72,7 @@ nerv.connect();
 // Função auxiliar para enviar dados após conectar
 function sendTestPing() {
     console.log('[DIAGNOSTIC] Disparando Envelope de Teste...');
-    
+
     const pingEnvelope = createEnvelope({
         actor: ActorRole.MAESTRO,
         target: ActorRole.SERVER,
@@ -87,7 +87,7 @@ function sendTestPing() {
 
     nerv.send(pingEnvelope);
     console.log('[DIAGNOSTIC] Envelope enviado para a Outbox.');
-    
+
     // Encerrar teste após 5 segundos
     setTimeout(() => {
         console.log('\n[DIAGNOSTIC] Encerrando teste e desconectando...');

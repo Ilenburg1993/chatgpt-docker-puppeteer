@@ -25,11 +25,11 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 async function probeChromeConnection() {
     const endpoint = process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || 'http://localhost:9222';
     const httpEndpoint = endpoint.replace('ws://', 'http://').replace('wss://', 'https://');
-    
+
     try {
         const versionUrl = `${httpEndpoint}/json/version`;
         const result = await probeConnectivity(versionUrl);
-        
+
         if (!result.ok) {
             return {
                 connected: false,
@@ -38,7 +38,7 @@ async function probeChromeConnection() {
                 latency_ms: result.ms
             };
         }
-        
+
         // Tenta buscar informações detalhadas do Chrome
         return new Promise((resolve) => {
             const client = httpEndpoint.startsWith('https') ? https : http;
@@ -98,7 +98,7 @@ async function probeChromeConnection() {
 // --- GESTÃO DE TENDÊNCIAS (PERSISTÊNCIA DE BASELINE) ---
 async function getTrends() {
     try {
-        if (!fs.existsSync(TREND_FILE)) return { ram: [], cpu: [], io: [] };
+        if (!fs.existsSync(TREND_FILE)) {return { ram: [], cpu: [], io: [] };}
         const data = await fsp.readFile(TREND_FILE, 'utf-8');
         return JSON.parse(data);
     } catch { return { ram: [], cpu: [], io: [] }; }
@@ -106,7 +106,7 @@ async function getTrends() {
 
 async function saveTrends(trends) {
     try {
-        const limit = 50; 
+        const limit = 50;
         const simplified = {
             ram: trends.ram.slice(-limit),
             cpu: trends.cpu.slice(-limit),
@@ -132,7 +132,7 @@ function getHardwareMetrics() {
     return {
         cpu_load: os.loadavg()[0].toFixed(2),
         ram_usage_pct: ((1 - (freeMem / totalMem)) * 100).toFixed(1),
-        ram_free_gb: (freeMem / 1024 / 1024 / 1024).toFixed(2) + 'GB',
+        ram_free_gb: `${(freeMem / 1024 / 1024 / 1024).toFixed(2)  }GB`,
         ts: Date.now()
     };
 }
@@ -163,7 +163,7 @@ async function checkStorageSLA() {
     let writeOk = false;
 
     try {
-        await fsp.writeFile(testFile, "X".repeat(1024 * 1024)); 
+        await fsp.writeFile(testFile, 'X'.repeat(1024 * 1024));
         await fsp.readFile(testFile);
         await fsp.unlink(testFile);
         ioLatency = Date.now() - t0;
@@ -187,7 +187,7 @@ async function checkStorageSLA() {
  */
 async function validateDNASanity() {
     const rulesPath = path.join(ROOT, 'dynamic_rules.json');
-    if (!fs.existsSync(rulesPath)) return { ok: false, msg: 'DNA_MISSING' };
+    if (!fs.existsSync(rulesPath)) {return { ok: false, msg: 'DNA_MISSING' };}
     try {
         const dna = JSON.parse(await fsp.readFile(rulesPath, 'utf-8'));
         const hasSelectors = dna.selectors && Object.keys(dna.selectors).length > 0;
@@ -212,7 +212,7 @@ async function runFullCheck() {
         new Promise(r => { const s = Date.now(); setImmediate(() => r(Date.now() - s)); }),
         probeChromeConnection()
     ]);
-    
+
     // Estatísticas da fila
     let queueStats = { pending: 0, running: 0, total: 0 };
     try {
@@ -225,7 +225,7 @@ async function runFullCheck() {
     } catch { /* Fail-safe */ }
 
     const metrics = getHardwareMetrics();
-    
+
     trends.ram.push(parseFloat(metrics.ram_usage_pct));
     trends.cpu.push(parseFloat(metrics.cpu_load));
     trends.io.push(storage.latency_ms);
@@ -233,7 +233,7 @@ async function runFullCheck() {
 
     const issues = [];
     const manifest = [];
-    
+
     // Verificação de Chrome
     if (!chrome.connected) {
         issues.push(`Chrome remote debugging não conectado: ${chrome.error || 'Unknown error'}`);
@@ -241,11 +241,11 @@ async function runFullCheck() {
     }
 
     if (networkResults.some(n => !n.ok)) {
-        issues.push("Conectividade instável com provedores de IA.");
+        issues.push('Conectividade instável com provedores de IA.');
         manifest.push({ op: 'NETWORK_RETRY', target: 'adapter', impact: 'low' });
     }
     if (storage.latency_ms > 1000) {
-        issues.push("Latência de disco extrema detectada.");
+        issues.push('Latência de disco extrema detectada.');
         manifest.push({ op: 'FS_CLEANUP', target: 'tmp_folder', impact: 'medium' });
     }
     if (!dna.ok) {
@@ -253,14 +253,14 @@ async function runFullCheck() {
         manifest.push({ op: 'RESTORE_DNA', target: 'dynamic_rules.json', impact: 'high' });
     }
     if (parseFloat(metrics.ram_usage_pct) > 90) {
-        issues.push("Saturação de memória RAM (>90%).");
+        issues.push('Saturação de memória RAM (>90%).');
         manifest.push({ op: 'PROCESS_RESTART', target: 'agente-gpt', impact: 'high' });
     }
 
     return {
         meta: {
-            version: "39.0",
-            engine: "Universal_Physician",
+            version: '39.0',
+            engine: 'Universal_Physician',
             timestamp: new Date().toISOString(),
             duration_ms: Date.now() - t0
         },

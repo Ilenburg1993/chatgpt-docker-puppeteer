@@ -2,7 +2,7 @@
    src/server/main.js
    Audit Level: 750 — Mission Control Prime Bootstrapper (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar o boot sequencial de todos os subsistemas do 
+   Responsabilidade: Orquestrar o boot sequencial de todos os subsistemas do
                      servidor e persistir o estado para descoberta IPC.
    Sincronizado com: lifecycle.js V600, server.js V100, socket.js V600,
                      router.js V700, supervisor/reconciler.js V700.
@@ -34,14 +34,14 @@ const logWatcher = require('./watchers/log_watcher');
 
 // 6. Utilidades de Core e Infra
 const { log } = require('../core/logger');
-const PATHS = require('../infra/fs/paths'); 
+const PATHS = require('../infra/fs/paths');
 const { PROTOCOL_VERSION } = require('../shared/nerv/constants');
 
 /**
  * === BOOTSTRAP ANCHOR ===
  * Persiste o estado do servidor para descoberta dinâmica pelo Maestro.
  * Executado após a definição da porta física e antes da lógica interativa.
- * 
+ *
  * @param {number} port - Porta final alocada pelo algoritmo de Port Hunting.
  */
 function persistServerState(port) {
@@ -69,7 +69,7 @@ function persistServerState(port) {
         log('DEBUG', `[BOOT] Descoberta persistida em estado.json (Porta: ${port})`);
     } catch (err) {
         log('ERROR', `[BOOT] Falha crítica ao registrar estado de descoberta: ${err.message}`);
-        throw err; 
+        throw err;
     }
 }
 

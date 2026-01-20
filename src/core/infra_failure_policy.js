@@ -2,7 +2,7 @@
    src/core/infra_failure_policy.js
    Audit Level: 700 — Sovereign Infra Failure Escalation Protocol
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Decidir, executar e reportar manobras de emergência 
+   Responsabilidade: Decidir, executar e reportar manobras de emergência
                      sobre a infraestrutura física (Navegador/Processos).
    Sincronizado com: system.js V45, ipc_client.js V600, constants.js V400.
 ========================================================================== */
@@ -17,7 +17,7 @@ class InfraFailurePolicy {
     /**
      * Escala uma falha de infraestrutura conforme a severidade técnica.
      * Transforma um erro passivo em uma decisão ativa de governança.
-     * 
+     *
      * @param {object} params
      * @param {object} params.ctx - Contexto de execução { browser, page }.
      * @param {string} params.reason - Código do erro (ex: BROWSER_FROZEN).
@@ -26,7 +26,7 @@ class InfraFailurePolicy {
      */
     async escalate({ ctx, reason, error, correlationId }) {
         const traceId = correlationId || 'sys-infra-escalation';
-        
+
         log('WARN', `[POLICY] Avaliando escalada de infraestrutura: ${reason}`, traceId);
 
         // 1. EXTRAÇÃO DE EVIDÊNCIA FÍSICA (PID)

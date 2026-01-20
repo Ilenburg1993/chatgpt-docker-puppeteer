@@ -27,10 +27,10 @@ const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
  */
 function ensureInfrastructure() {
     const criticalDirs = [
-        PATHS.QUEUE, 
-        PATHS.RESPONSE, 
-        PATHS.LOGS, 
-        PATHS.CORRUPT, 
+        PATHS.QUEUE,
+        PATHS.RESPONSE,
+        PATHS.LOGS,
+        PATHS.CORRUPT,
         PATHS.REPORTS
     ];
 
@@ -53,7 +53,7 @@ function ensureInfrastructure() {
  * @returns {string} Nome higienizado e seguro.
  */
 function sanitizeFilename(name) {
-    if (!name || typeof name !== 'string') return `unknown_${Date.now()}`;
+    if (!name || typeof name !== 'string') {return `unknown_${Date.now()}`;}
     // Remove qualquer coisa que não seja alfanumérico, ponto, traço ou sublinhado
     return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 64);
 }
@@ -64,8 +64,8 @@ function sanitizeFilename(name) {
  * @returns {string} Texto limpo.
  */
 function cleanText(text) {
-    if (!text || typeof text !== 'string') return '';
-    return text.replace(CONTROL_CHARS_REGEX, "").trim();
+    if (!text || typeof text !== 'string') {return '';}
+    return text.replace(CONTROL_CHARS_REGEX, '').trim();
 }
 
 /**
@@ -77,10 +77,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 module.exports = {
     // Re-exporta os caminhos para manter compatibilidade com a Fachada de IO
     ...PATHS,
-    
+
     // Constantes de utilidade
     CONTROL_CHARS_REGEX,
-    
+
     // Funções de suporte
     ensureInfrastructure,
     sanitizeFilename,

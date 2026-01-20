@@ -28,7 +28,7 @@ const agentRegistry = new Map();
 /**
  * Inicializa o barramento de eventos acoplando-o ao motor HTTP.
  * Implementa lógica de reset automático para suporte a testes e reconexões.
- * 
+ *
  * @param {object} httpServer - Instância ativa do servidor HTTP.
  * @returns {object} A instância do Socket.io configurada.
  */
@@ -42,9 +42,9 @@ function init(httpServer) {
     log('INFO', '[HUB] Mission Control Hub V600 Online (IPC 2.0 Native).');
 
     ioInstance = new Server(httpServer, {
-        cors: { 
-            origin: "*", 
-            methods: ["GET", "POST"] 
+        cors: {
+            origin: '*',
+            methods: ['GET', 'POST']
         },
         transports: ['websocket'],
         pingTimeout: 10000,
@@ -54,7 +54,7 @@ function init(httpServer) {
     ioInstance.on('connection', (socket) => {
         // 1. FILTRO DE INFRAESTRUTURA (Token de Acesso)
         const token = socket.handshake.auth?.token;
-        const isAgentAttempt = token === "SYSTEM_MAESTRO_PRIME";
+        const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
 
         if (isAgentAttempt) {
             log('DEBUG', `[HUB] Tentativa de acoplamento de agente (ID: ${socket.id}).`);
@@ -69,7 +69,7 @@ function init(httpServer) {
             if (socket.robot_id) {
                 agentRegistry.delete(socket.robot_id);
                 log('WARN', `[HUB] Maestro ${socket.robot_id} desconectado. Causa: ${reason}`);
-                
+
                 // Notifica os terminais sobre a queda do agente para atualização de UI
                 ioInstance.to('dashboards').emit('hub:agent_offline', { robot_id: socket.robot_id });
             }
@@ -122,15 +122,15 @@ function _setupMaestroProtocol(socket) {
             // O Maestro entra em salas privadas para comandos direcionados (Unicast)
             socket.join('system_agents');
             socket.join(`agent:${identity.robot_id}`);
-            
+
             log('INFO', `[HUB] Maestro Homologado: DNA ${identity.robot_id}`);
 
             // Resposta de Autorização (Handshake ACK)
-            socket.emit('handshake:authorized', { 
-                session_id: socket.id, 
-                server_ts: Date.now() 
+            socket.emit('handshake:authorized', {
+                session_id: socket.id,
+                server_ts: Date.now()
             });
-            
+
             // Notifica Dashboards sobre o novo agente pronto para missões
             ioInstance.to('dashboards').emit('hub:agent_online', identity);
 
@@ -143,12 +143,12 @@ function _setupMaestroProtocol(socket) {
 
     // 2. RECEPTOR DE MENSAGENS ESTRUTURADAS (Envelope V2)
     socket.on('message', (rawEnvelope) => {
-        if (!socket.authorized) return;
+        if (!socket.authorized) {return;}
 
         try {
             // Validação Nativa de Integridade de Envelope
             const envelope = validateIPCEnvelope(rawEnvelope);
-            
+
             /**
              * ROTEAMENTO DE TELEMETRIA:
              * Toda mensagem vinda do Maestro (Eventos, ACKs, Logs) é retransmitida
@@ -173,27 +173,27 @@ function _setupMaestroProtocol(socket) {
 
 /**
  * Envia um comando estruturado para um robô específico ou para todos.
- * 
+ *
  * @param {string} command - Constante ActionCode (ex: ENGINE_PAUSE).
  * @param {object} payload - Conteúdo útil do comando.
  * @param {string} [robotId] - ID do robô alvo. Se nulo, envia para todos (Broadcast).
  * @returns {string} O msg_id gerado para rastreamento de ACK.
  */
 function sendCommand(command, payload, robotId = null) {
-    if (!ioInstance) return null;
+    if (!ioInstance) {return null;}
 
     const msgId = uuidv4();
     const correlationId = payload.correlation_id || uuidv4();
 
     const envelope = {
-        header: { 
-            version: PROTOCOL_VERSION, 
-            timestamp: Date.now(), 
-            source: ActorRole.MISSION_CONTROL 
+        header: {
+            version: PROTOCOL_VERSION,
+            timestamp: Date.now(),
+            source: ActorRole.MISSION_CONTROL
         },
-        ids: { 
-            msg_id: msgId, 
-            correlation_id: correlationId 
+        ids: {
+            msg_id: msgId,
+            correlation_id: correlationId
         },
         kind: command,
         payload
@@ -201,7 +201,7 @@ function sendCommand(command, payload, robotId = null) {
 
     const target = robotId ? `agent:${robotId}` : 'system_agents';
     ioInstance.to(target).emit('message', envelope);
-    
+
     log('DEBUG', `[HUB] Comando ${command} enviado para ${target}`, correlationId);
     return msgId;
 }
@@ -214,13 +214,13 @@ function sendCommand(command, payload, robotId = null) {
 async function stop() {
     if (ioInstance) {
         log('INFO', '[HUB] Encerrando barramento e limpando conexões...');
-        
+
         // Força a desconexão de todos os clientes ativos (Agentes e Dashboards)
         const sockets = await ioInstance.fetchSockets();
         for (const s of sockets) {
             s.disconnect(true);
         }
-        
+
         await new Promise((resolve) => {
             ioInstance.close(() => {
                 ioInstance = null;
@@ -237,16 +237,16 @@ async function stop() {
  * Notify: Broadcast global informativo para todos os conectados.
  */
 function notify(event, data) {
-    if (!ioInstance) return false;
+    if (!ioInstance) {return false;}
     ioInstance.emit(event, data);
     return true;
 }
 
-module.exports = { 
-    init, 
-    sendCommand, 
+module.exports = {
+    init,
+    sendCommand,
     notify,
     stop,
     getRegistry: () => Array.from(agentRegistry.values()),
-    getIO: () => ioInstance 
+    getIO: () => ioInstance
 };

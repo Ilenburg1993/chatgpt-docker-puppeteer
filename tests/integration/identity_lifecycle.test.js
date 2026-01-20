@@ -1,7 +1,7 @@
 /* ==========================================================================
    tests/integration/identity_lifecycle.test.js
    Audit Level: 400 — Identity Persistence Audit (Phase 2.1)
-   Responsabilidade: Validar o nascimento, reconhecimento e a unicidade de 
+   Responsabilidade: Validar o nascimento, reconhecimento e a unicidade de
                      instância do robô no disco.
 ========================================================================== */
 
@@ -27,18 +27,18 @@ async function runIdentityTest() {
         const dna1 = identityManager.robotId;
         const instance1 = identityManager.instanceId;
 
-        if (!dna1 || dna1.length < 30) throw new Error("Falha ao gerar DNA no nascimento.");
+        if (!dna1 || dna1.length < 30) {throw new Error('Falha ao gerar DNA no nascimento.');}
         console.log(`✅ [PASS] Nascimento: Novo DNA gerado -> ${dna1}`);
 
         // --- PASSO 2: SIMULAR REBOOT (RE-INICIALIZAÇÃO) ---
         console.log(`> [ACTION] Simulando reinicialização do processo...`);
-        
+
         // Forçamos uma nova instância do manager (simulando novo boot)
         // Nota: Como o manager é um singleton, vamos apenas re-executar o init
         // mas o instanceId deve ser resetado manualmente para o teste ser fiel
         const oldInstanceId = identityManager.instanceId;
-        identityManager.instanceId = require('uuid').v4(); 
-        
+        identityManager.instanceId = require('uuid').v4();
+
         await identityManager.initialize();
         const dna2 = identityManager.robotId;
         const instance2 = identityManager.instanceId;
@@ -51,7 +51,7 @@ async function runIdentityTest() {
 
         // --- PASSO 4: VALIDAÇÃO DE INSTÂNCIA ---
         if (instance1 === instance2) {
-            throw new Error("Falha: O instance_id não mudou após o reboot.");
+            throw new Error('Falha: O instance_id não mudou após o reboot.');
         }
         console.log(`✅ [PASS] Unicidade: Nova instância detectada (${instance2}).`);
 

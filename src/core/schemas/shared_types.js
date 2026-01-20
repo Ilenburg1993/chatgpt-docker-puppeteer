@@ -2,7 +2,7 @@
    src/core/schemas/shared_types.js
    Audit Level: 100 — Industrial Hardening (Atomic Type Definitions - Platinum)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Definição de tipos primitivos universais e regras de 
+   Responsabilidade: Definição de tipos primitivos universais e regras de
                      sanitização atômica para todo o ecossistema.
    Sincronizado com: fs_utils.js (V2.5), task_healer.js (V1.1).
 ========================================================================== */
@@ -16,9 +16,9 @@ const { cleanText } = require('../../infra/fs/fs_utils');
  * e garante compatibilidade absoluta com sistemas de arquivos Windows/Linux.
  */
 const ID_SCHEMA = z.string()
-    .regex(/^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/, "ID inválido: Não pode ser vazio, começar com ponto ou conter caracteres especiais.")
-    .min(1, "ID não pode ser vazio.")
-    .max(64, "ID excede o limite de 64 caracteres.");
+    .regex(/^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/, 'ID inválido: Não pode ser vazio, começar com ponto ou conter caracteres especiais.')
+    .min(1, 'ID não pode ser vazio.')
+    .max(64, 'ID excede o limite de 64 caracteres.');
 
 /**
  * TIMESTAMP_SCHEMA: Padronização absoluta para datas ISO-8601.
@@ -27,7 +27,7 @@ const ID_SCHEMA = z.string()
  * malformadas sejam mascaradas como 'agora'.
  */
 const TIMESTAMP_SCHEMA = z.string()
-    .datetime({ message: "Data inválida: Deve seguir o padrão ISO-8601." })
+    .datetime({ message: 'Data inválida: Deve seguir o padrão ISO-8601.' })
     .default(() => new Date().toISOString());
 
 /**
@@ -51,25 +51,25 @@ const PRIORITY_SCHEMA = z.number()
  * SOURCE_SCHEMA: Origem da intenção.
  */
 const SOURCE_SCHEMA = z.enum([
-    'manual',           
-    'api',              
-    'gui',              
-    'flow_manager',     
-    'self_generated',   
-    'bulk_import'       
+    'manual',
+    'api',
+    'gui',
+    'flow_manager',
+    'self_generated',
+    'bulk_import'
 ]).default('manual');
 
 /**
  * STATUS_SCHEMA: Estados permitidos no ciclo de vida.
  */
 const STATUS_SCHEMA = z.enum([
-    'PENDING',    
-    'RUNNING',    
-    'DONE',       
-    'FAILED',     
-    'PAUSED',     
-    'SKIPPED',    
-    'STALLED'     
+    'PENDING',
+    'RUNNING',
+    'DONE',
+    'FAILED',
+    'PAUSED',
+    'SKIPPED',
+    'STALLED'
 ]).default('PENDING');
 
 module.exports = {

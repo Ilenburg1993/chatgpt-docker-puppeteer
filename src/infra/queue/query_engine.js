@@ -22,7 +22,7 @@ async function getProjectContext(projectId) {
     // Adquire snapshot estável e imutável
     const allTasks = Object.freeze(await cache.getQueue());
     const safeProjectId = projectId || 'default';
-    
+
     return allTasks
         .filter(task => {
             // [V700] Blindagem contra tarefas malformadas ou parciais
@@ -32,10 +32,10 @@ async function getProjectContext(projectId) {
         })
         .sort((a, b) => {
             // Ordenação cronológica reversa baseada no término da tarefa
-            const dateA = a?.state?.completed_at || "";
-            const dateB = b?.state?.completed_at || "";
-            if (dateB < dateA) return -1;
-            if (dateB > dateA) return 1;
+            const dateA = a?.state?.completed_at || '';
+            const dateB = b?.state?.completed_at || '';
+            if (dateB < dateA) {return -1;}
+            if (dateB > dateA) {return 1;}
             return 0;
         });
 }
@@ -45,7 +45,7 @@ async function getProjectContext(projectId) {
  * @param {string} taskId - ID da tarefa.
  */
 async function findById(taskId) {
-    if (!taskId) return null;
+    if (!taskId) {return null;}
 
     const allTasks = await cache.getQueue();
     // Busca linear O(N) sobre o snapshot de RAM
@@ -64,11 +64,11 @@ async function findLast(projectId) {
  * Localiza a última tarefa concluída que possui uma tag específica.
  */
 async function findLastByTag(projectId, tag) {
-    if (!tag) return null;
+    if (!tag) {return null;}
     const context = await getProjectContext(projectId);
-    
+
     // Assegura que a busca respeite a coleção de tags da tarefa
-    return context.find(task => 
+    return context.find(task =>
         Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)
     ) || null;
 }
@@ -77,11 +77,11 @@ async function findLastByTag(projectId, tag) {
  * Localiza a primeira tarefa (mais antiga) concluída com uma tag específica.
  */
 async function findFirstByTag(projectId, tag) {
-    if (!tag) return null;
+    if (!tag) {return null;}
     const context = await getProjectContext(projectId);
-    
+
     // Inverte a cronologia do contexto para encontrar a semente do projeto
-    return [...context].reverse().find(task => 
+    return [...context].reverse().find(task =>
         Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)
     ) || null;
 }
