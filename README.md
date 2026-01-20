@@ -75,6 +75,16 @@ Sistema de **agente autônomo** que:
 - **Sovereign interruption**: AbortController para interrupção autônoma
 - **Schema validation**: Zod para validação de dados
 - **Adaptive backoff**: Retry inteligente com backoff exponencial
+- **Typed constants**: Centralized constants (`src/core/constants/`) eliminam magic strings
+
+**Componentes Core:**
+
+- **`src/core/constants/`**: Typed constants (STATUS_VALUES, CONNECTION_MODES, LOG_CATEGORIES)
+- **`src/nerv/`**: Event bus com pub/sub, buffers, correlation, telemetry
+- **`src/kernel/`**: Task execution engine com policy engine e runtime
+- **`src/driver/`**: Target-specific automation (ChatGPT, Gemini drivers)
+- **`src/infra/`**: Browser pool, locks, queue, storage (tasks/responses/DNA)
+- **`src/server/`**: Dashboard API (Express + Socket.io)
 
 ---
 

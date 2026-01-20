@@ -72,6 +72,26 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Forensics**: Automatic crash dumps with page screenshots on failures
 - **Health Monitoring**: Heartbeat checks for infra stability; consecutive failure counters trigger cooldowns
 
+## Constants Usage Patterns
+
+- **Always import from** `src/core/constants/`:
+  ```javascript
+  const { STATUS_VALUES, TASK_STATES } = require('../core/constants/tasks');
+  const { CONNECTION_MODES, BROWSER_STATES } = require('../core/constants/browser');
+  const { LOG_CATEGORIES } = require('../core/constants/logging');
+  ```
+- **Never use magic strings** for:
+  - Task status values → Use `STATUS_VALUES.PENDING`, `STATUS_VALUES.RUNNING`, etc.
+  - Connection modes → Use `CONNECTION_MODES.HYBRID`, `CONNECTION_MODES.LAUNCHER`, etc.
+  - Log categories → Use `LOG_CATEGORIES.TASK_LIFECYCLE`, `LOG_CATEGORIES.BROWSER_CONNECT`, etc.
+- **Use *_ARRAY variants** for Zod enum validation:
+  ```javascript
+  const { STATUS_VALUES_ARRAY } = require('../core/constants/tasks');
+  const statusSchema = z.enum(STATUS_VALUES_ARRAY); // ['PENDING', 'RUNNING', ...]
+  ```
+- **Automated migration**: Run `scripts/apply-all-codemods.sh` to transform magic strings
+- **Import paths**: Codemods auto-calculate relative paths using `path.relative()`
+
 ## Common Pitfalls
 
 - Avoid direct file writes; use `io.saveTask()` for atomic persistence
@@ -82,6 +102,7 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Never import STATES from ConnectionOrchestrator** without using it (triggers ESLint no-unused-vars)
 - **P5.2 Bug**: markDirty() must be called BEFORE saveTask/deleteTask in io.js (cache invalidation order)
 - **Browser Pool**: Always use launcher mode in tests unless external Chrome is confirmed available
+- **Constants First**: Always use typed constants from `src/core/constants/` instead of magic strings
 
 ## Known Issues (as of Jan 2026)
 
