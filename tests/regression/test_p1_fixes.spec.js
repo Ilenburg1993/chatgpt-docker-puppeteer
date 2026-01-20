@@ -10,7 +10,7 @@
 
 const path = require('path');
 const fs = require('fs').promises;
-const { acquireLock, releaseLock } = require('../src/infra/locks/lock_manager');
+const { acquireLock, releaseLock } = require('../../src/infra/locks/lock_manager');
 
 const ROOT = path.resolve(__dirname, '..');
 const LOCK_DIR = ROOT;

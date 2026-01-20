@@ -8,7 +8,7 @@
 ========================================================================== */
 
 const path = require('path');
-const HandleManager = require('../src/driver/modules/handle_manager');
+const HandleManager = require('../../src/driver/modules/handle_manager');
 
 // ============================================================================
 // TEST 1: Shutdown - Isolamento de Erros Por Fase

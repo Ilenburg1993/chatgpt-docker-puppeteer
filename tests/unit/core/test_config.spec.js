@@ -104,7 +104,7 @@ try {
 // Test 3: config.js Zod schema loads without errors
 console.log('\n> Testing Zod schema integration...');
 try {
-    const CONFIG = require('../src/core/config');
+    const CONFIG = require('../../../src/core/config');
 
     // Check exports
     if (!CONFIG.reload) {
@@ -128,7 +128,7 @@ try {
 // Test 4: .gitignore includes sensitive patterns
 console.log('\n> Testing .gitignore security patterns...');
 try {
-    const gitignorePath = path.join(__dirname, '../.gitignore');
+    const gitignorePath = path.join(__dirname, '../../../.gitignore');
     if (!fs.existsSync(gitignorePath)) {
         throw new Error('.gitignore not found');
     }

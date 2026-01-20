@@ -14,7 +14,7 @@ console.log('> Validating health endpoint implementation...');
 
 try {
     // Check doctor.js exports
-    const doctor = require('../src/core/doctor');
+    const doctor = require('../../../src/core/doctor');
     if (!doctor.probeChromeConnection) {
         throw new Error('probeChromeConnection not exported from doctor.js');
     }

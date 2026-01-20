@@ -3,7 +3,7 @@
  * Valida todos os modos de conexão e configurações
  */
 
-const { ConnectionOrchestrator, STATES } = require('../src/infra/ConnectionOrchestrator');
+const { ConnectionOrchestrator, STATES } = require('../../../src/infra/ConnectionOrchestrator');
 
 console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
 

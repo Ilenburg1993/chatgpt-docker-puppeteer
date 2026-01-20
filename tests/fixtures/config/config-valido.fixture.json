@@ -1,0 +1,51 @@
+{
+    "browser": {
+        "headless": true,
+        "executablePath": "",
+        "args": [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--disable-gpu"
+        ],
+        "defaultViewport": {
+            "width": 1280,
+            "height": 720
+        }
+    },
+    "connection": {
+        "mode": "launcher",
+        "launcherConfig": {
+            "headless": true,
+            "profilePath": "./profile"
+        }
+    },
+    "targets": {
+        "gemini": {
+            "url": "https://gemini.google.com",
+            "selectors": {
+                "textbox": "textarea[aria-label='Prompt']",
+                "sendButton": "button[aria-label='Send']"
+            }
+        },
+        "chatgpt": {
+            "url": "https://chat.openai.com",
+            "selectors": {
+                "textbox": "#prompt-textarea",
+                "sendButton": "button[data-testid='send-button']"
+            }
+        }
+    },
+    "execution": {
+        "maxRetries": 3,
+        "timeout": 60000,
+        "pollingInterval": 500,
+        "adaptiveLatency": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/agente.log",
+        "maxFileSize": 10485760
+    }
+}

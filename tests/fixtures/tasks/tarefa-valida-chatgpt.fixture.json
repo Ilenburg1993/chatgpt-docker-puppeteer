@@ -1,0 +1,24 @@
+{
+    "id": "teste-002-chatgpt",
+    "target": "chatgpt",
+    "prompt": "Explique o que é inteligência artificial em uma frase.",
+    "status": "PENDING",
+    "priority": 7,
+    "createdAt": "2026-01-20T10:00:00.000Z",
+    "updatedAt": "2026-01-20T10:00:00.000Z",
+    "metadata": {
+        "source": "fixture",
+        "testMode": true
+    },
+    "spec": {
+        "maxRetries": 3,
+        "timeout": 60000,
+        "validation": {
+            "minLength": 20,
+            "forbiddenTerms": [
+                "erro",
+                "falha"
+            ]
+        }
+    }
+}

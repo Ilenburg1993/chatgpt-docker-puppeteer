@@ -1,0 +1,6 @@
+{
+    "browser": {
+        "headless": "invalid_boolean_value",
+        "args": "should_be_array"
+    }
+}

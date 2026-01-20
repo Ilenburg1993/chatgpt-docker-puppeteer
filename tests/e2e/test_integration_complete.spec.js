@@ -3,8 +3,8 @@
  * Valida: ConnectionOrchestrator + BrowserPoolManager + Cache + Limpeza
  */
 
-const { ConnectionOrchestrator } = require('../src/infra/ConnectionOrchestrator');
-const BrowserPoolManager = require('../src/infra/browser_pool/pool_manager');
+const { ConnectionOrchestrator } = require('../../src/infra/ConnectionOrchestrator');
+const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
 
 console.log('🔬 Teste de Integração Completo\n');
 

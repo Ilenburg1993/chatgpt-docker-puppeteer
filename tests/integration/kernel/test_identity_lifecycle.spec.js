@@ -7,8 +7,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const identityManager = require('../../src/core/identity_manager');
-const io = require('../../src/infra/io');
+const identityManager = require('../../../src/core/identity_manager');
+const io = require('../../../src/infra/io');
 
 // Caminho físico do DNA (Sincronizado com identity_manager.js)
 const IDENTITY_FILE = path.join(io.ROOT, 'src/infra/storage/robot_identity.json');

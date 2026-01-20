@@ -1,5 +1,5 @@
 const path = require('path');
-const config = require('../src/core/config');
+const config = require('../../src/core/config');
 
 console.log('🚀 Testando sequência de boot...\n');
 
@@ -11,7 +11,7 @@ console.log('🚀 Testando sequência de boot...\n');
 
     // FASE 2: Identity
     console.log('FASE 2: Identity Manager');
-    const identity = require('../src/core/identity_manager');
+    const identity = require('../../src/core/identity_manager');
     await identity.initialize();
     console.log('  Robot ID:', `${identity.getRobotId().substring(0, 8)}...`);
     console.log('  Instance ID:', `${identity.getInstanceId().substring(0, 8)}...`);
@@ -19,7 +19,7 @@ console.log('🚀 Testando sequência de boot...\n');
 
     // FASE 3: NERV
     console.log('FASE 3: NERV Transport');
-    const { createNERV } = require('../src/nerv/nerv');
+    const { createNERV } = require('../../src/nerv/nerv');
     const nerv = await createNERV({ mode: 'local' });
     const nervStatus = nerv.getStatus();
     console.log('  Mode:', nervStatus.mode);
@@ -28,7 +28,7 @@ console.log('🚀 Testando sequência de boot...\n');
 
     // FASE 4: BrowserPool
     console.log('FASE 4: BrowserPool Manager');
-    const BrowserPoolManager = require('../src/infra/browser_pool/pool_manager');
+    const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
     const pool = new BrowserPoolManager({
         poolSize: 1,
         chromium: {
@@ -49,8 +49,8 @@ console.log('🚀 Testando sequência de boot...\n');
         messageReceived = true;
     });
 
-    const { createEnvelope } = require('../src/shared/nerv/envelope');
-    const { MessageType, ActionCode, ActorRole } = require('../src/shared/nerv/constants');
+    const { createEnvelope } = require('../../src/shared/nerv/envelope');
+    const { MessageType, ActionCode, ActorRole } = require('../../src/shared/nerv/constants');
 
     const envelope = createEnvelope({
         actor: ActorRole.KERNEL,

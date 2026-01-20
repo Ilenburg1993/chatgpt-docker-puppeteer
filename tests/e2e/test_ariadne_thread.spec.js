@@ -15,7 +15,7 @@
    7. Shutdown gracioso
 ========================================================================== */
 
-const { boot, shutdown } = require('../src/main');
+const { boot, shutdown } = require('../../src/main');
 const path = require('path');
 
 console.log(`
@@ -61,7 +61,7 @@ async function test1_BootSequence() {
         console.log('  (BrowserPool desabilitado para testes sem Chrome externo)');
 
         // Temporariamente mocka o BrowserPool para não tentar conectar
-        const BrowserPoolManager = require('../src/infra/browser_pool/pool_manager');
+        const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
         const originalInitialize = BrowserPoolManager.prototype.initialize;
         const originalGetHealth = BrowserPoolManager.prototype.getHealth;
         const originalShutdown = BrowserPoolManager.prototype.shutdown;

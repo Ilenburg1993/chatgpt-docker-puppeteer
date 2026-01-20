@@ -1,0 +1,8 @@
+{
+    "dna": "robot-550e8400-e29b-41d4-a716-446655440000",
+    "nascimento": "2026-01-20T10:00:00.000Z",
+    "versao": "1.0.0",
+    "hostname": "test-host",
+    "platform": "linux",
+    "nodeVersion": "v20.19.2"
+}

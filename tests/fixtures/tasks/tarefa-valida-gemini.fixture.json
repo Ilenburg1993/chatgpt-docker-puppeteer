@@ -1,0 +1,25 @@
+{
+    "id": "teste-001-gemini",
+    "target": "gemini",
+    "prompt": "Qual é a capital da França?",
+    "status": "PENDING",
+    "priority": 5,
+    "createdAt": "2026-01-20T10:00:00.000Z",
+    "updatedAt": "2026-01-20T10:00:00.000Z",
+    "metadata": {
+        "source": "fixture",
+        "testMode": true
+    },
+    "spec": {
+        "maxRetries": 3,
+        "timeout": 60000,
+        "validation": {
+            "minLength": 10,
+            "forbiddenTerms": [
+                "erro",
+                "falha",
+                "desculpe"
+            ]
+        }
+    }
+}
