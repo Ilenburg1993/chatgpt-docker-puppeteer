@@ -163,6 +163,48 @@ function validateEnvelope(envelope) {
   return true;
 }
 
+/**
+ * Valida a identidade de um robô/agente.
+ * Garante que todos os campos obrigatórios estão presentes e válidos.
+ */
+function validateRobotIdentity(identity) {
+  if (!identity || typeof identity !== 'object') {
+    violation('Identity must be a plain object');
+  }
+  
+  if (!identity.robot_id || typeof identity.robot_id !== 'string') {
+    violation('robot_id is required and must be a string');
+  }
+  
+  if (!identity.instance_id || typeof identity.instance_id !== 'string') {
+    violation('instance_id is required and must be a string');
+  }
+  
+  if (!identity.role || !Object.values(ActorRole).includes(identity.role)) {
+    violation(`role must be one of: ${Object.values(ActorRole).join(', ')}`);
+  }
+  
+  if (!identity.version || typeof identity.version !== 'string') {
+    violation('version is required and must be a string');
+  }
+  
+  if (!Array.isArray(identity.capabilities)) {
+    violation('capabilities must be an array');
+  }
+  
+  return identity;
+}
+
+/**
+ * Valida um envelope de IPC (InterProcess Communication).
+ * Wrapper para manter compatibilidade com código legado.
+ */
+function validateIPCEnvelope(envelope) {
+  return validateEnvelope(envelope);
+}
+
 module.exports = {
-  validateEnvelope
+  validateEnvelope,
+  validateRobotIdentity,
+  validateIPCEnvelope
 };

@@ -67,6 +67,7 @@ function createKernel({
   ========================================================= */
 
   const telemetry = new KernelTelemetry({
+    nerv,  // Passa NERV para telemetria
     source: 'kernel',
     retention: 1000,
     ...telemetryOptions

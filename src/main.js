@@ -98,10 +98,15 @@ async function boot() {
         log('INFO', '[BOOT] Fase 4/6: Inicializando KERNEL');
         
         const kernel = await createKernel({
-            nerv,
-            config: CONFIG,
-            browserPool, // Passa referência para alocação de recursos
-            cycleInterval: CONFIG.KERNEL_CYCLE_INTERVAL || 50 // 50ms = 20 Hz
+            nerv,  // Passa NERV diretamente
+            telemetry: {
+                source: 'kernel',
+                retention: 1000
+            },
+            policy: {},
+            loop: {
+                cycleInterval: CONFIG.KERNEL_CYCLE_INTERVAL || 50 // 50ms = 20 Hz
+            }
         });
         
         log('INFO', '[BOOT] ✅ KERNEL online (loop 20 Hz)');
