@@ -78,16 +78,24 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
   ```javascript
   const { STATUS_VALUES, TASK_STATES } = require('../core/constants/tasks');
   const { CONNECTION_MODES, BROWSER_STATES } = require('../core/constants/browser');
-  const { LOG_CATEGORIES } = require('../core/constants/logging');
+  // Note: LOG_CATEGORIES is documentation-only, not imported
   ```
 - **Never use magic strings** for:
   - Task status values → Use `STATUS_VALUES.PENDING`, `STATUS_VALUES.RUNNING`, etc.
   - Connection modes → Use `CONNECTION_MODES.HYBRID`, `CONNECTION_MODES.LAUNCHER`, etc.
-  - Log categories → Use `LOG_CATEGORIES.TASK_LIFECYCLE`, `LOG_CATEGORIES.BROWSER_CONNECT`, etc.
+  - Log levels → Use severity levels directly: `log('INFO', msg)`, `log('ERROR', msg)`
+  - **LOG_CATEGORIES**: Documentation reference only; not used as runtime constants
 - **Use *_ARRAY variants** for Zod enum validation:
   ```javascript
   const { STATUS_VALUES_ARRAY } = require('../core/constants/tasks');
   const statusSchema = z.enum(STATUS_VALUES_ARRAY); // ['PENDING', 'RUNNING', ...]
+  ```
+- **Logging pattern**: Use severity levels + descriptive tags in messages:
+  ```javascript
+  const { log } = require('./core/logger');
+  log('INFO', '[BOOT] System starting...');    // ✓ Correct
+  log('ERROR', '[LIFECYCLE] Task failed');      // ✓ Correct
+  log(LOG_CATEGORIES.BOOT, 'Message');           // ✗ Not used in this codebase
   ```
 - **Automated migration**: Run `scripts/apply-all-codemods.sh` to transform magic strings
 - **Import paths**: Codemods auto-calculate relative paths using `path.relative()`

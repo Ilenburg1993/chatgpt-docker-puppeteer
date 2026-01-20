@@ -9,14 +9,16 @@ Major refactoring to eliminate magic strings through centralized typed constants
 - **Constants Infrastructure** (`src/core/constants/`)
     - `tasks.js`: 11 STATUS_VALUES + 4 TASK_STATES with Zod-compatible arrays
     - `browser.js`: 6 CONNECTION_MODES + 4 BROWSER_STATES
-    - `logging.js`: 49 LOG_CATEGORIES organized by frequency (high/medium/standard)
+    - `logging.js`: 49 LOG_CATEGORIES as documentation reference (not transformed)
     - `index.js`: Barrel export for centralized imports
+    - **Note**: LOG_CATEGORIES serves as vocabulary reference; logger uses severity levels (INFO/ERROR) not category constants
 - **Automated Code Transformation** (`scripts/`)
     - `apply-all-codemods.sh`: Master orchestration script with timestamped backups
     - `transform-status-values.js`: 51 transformations across 20 files
     - `transform-connection-modes.js`: 22 transformations across 7 files
-    - `transform-log-categories.js`: Ready for LOG_CATEGORIES migration (not yet applied)
+    - `transform-log-categories.js`: Template codemod (not applicable to this codebase - see notes)
     - Dynamic import path resolution using `path.relative()` for nested files
+    - **LOG_CATEGORIES Note**: Not transformed because logger uses severity levels (INFO/ERROR/WARN) as first argument, not functional categories
 - **Code Quality Infrastructure**
     - Prettier configuration (`.prettierrc`, `.prettierignore`)
     - `eslint-plugin-i18next` v6.1.3 for magic string detection

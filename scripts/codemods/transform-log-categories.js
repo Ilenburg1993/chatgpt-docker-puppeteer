@@ -1,7 +1,22 @@
 /**
  * Codemod: Replace log category magic strings with constants
  *
- * Transforms:
+ * ⚠️ NOTE: This codemod is INTENTIONALLY NOT APPLIED to this codebase.
+ *
+ * Reason: The logging system uses standard severity levels (INFO, ERROR, WARN, DEBUG, FATAL)
+ * as the first argument, not functional categories. Functional categories like [BOOT],
+ * [LIFECYCLE], etc. appear as descriptive tags WITHIN log messages, not as standalone strings.
+ *
+ * Example current usage:
+ *   log('INFO', '[BOOT] System starting...')  ✓ Correct pattern
+ *   log(LOG_CATEGORIES.BOOT, 'Message')      ✗ Not used in this codebase
+ *
+ * The LOG_CATEGORIES constant (src/core/constants/logging.js) serves as:
+ * - Documentation reference for available category tags
+ * - Standard vocabulary for message prefixes
+ * - Future-proofing if pattern changes
+ *
+ * Transforms (if needed in other codebases):
  *   '[BOOT]' → LOG_CATEGORIES.BOOT (in strings)
  *   'BOOT' → LOG_CATEGORIES.BOOT (standalone)
  *
@@ -22,6 +37,11 @@ module.exports = function (fileInfo, api) {
     const root = j(fileInfo.source);
     const constantsPath = path.join(process.cwd(), 'src/core/constants/logging.js');
     const importPath = getImportPath(fileInfo.path, constantsPath);
+
+    // Skip if this is the constants file itself (prevent circular import)
+    if (fileInfo.path === constantsPath || fileInfo.path.endsWith('constants/logging.js')) {
+        return null;
+    }
 
     // Log categories to replace (top 20 most used)
     const LOG_CATEGORIES = [
@@ -50,11 +70,32 @@ module.exports = function (fileInfo, api) {
     let hasChanges = false;
     let needsImport = false;
 
-    // Replace standalone literal strings
+    // Find log() calls and replace category strings
+    root.find(j.CallExpression, {
+        callee: { name: 'log' }
+    }).forEach(path => {
+        const args = path.value.arguments;
+        if (args.length > 0 && args[0].type === 'Literal' && typeof args[0].value === 'string') {
+            const category = args[0].value;
+            // Check if it's one of our LOG_CATEGORIES
+            if (LOG_CATEGORIES.includes(category)) {
+                // Replace with member expression
+                args[0] = j.memberExpression(j.identifier('LOG_CATEGORIES'), j.identifier(category));
+                hasChanges = true;
+                needsImport = true;
+            }
+        }
+    });
+
+    // Also replace standalone literal strings (for other use cases)
     LOG_CATEGORIES.forEach(category => {
         root.find(j.Literal, { value: category }).forEach(path => {
-            // Skip if in object key position
+            // Skip if already handled by log() transformation above
             const parent = path.parent;
+            if (parent.value.type === 'CallExpression' && parent.value.callee.name === 'log') {
+                return;
+            }
+            // Skip if in object key position
             if (parent.value.type === 'Property' && parent.value.key === path.value) {
                 return;
             }
