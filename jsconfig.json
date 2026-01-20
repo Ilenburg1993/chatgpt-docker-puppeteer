@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    /* Plataforma e módulos */
+    "target": "ES2024",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    /* Ativar verificação completa em JavaScript */
+    "checkJs": true,
+
+    /* Modo estrito máximo */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    /* Interoperabilidade e robustez */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* JSX e extensões */
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true
+  },
+
+  /* Definir explicitamente o escopo do projeto semântico */
+  "include": [
+    "src",
+    "scripts",
+    "*.js"
+  ],
+
+  /* Excluir artefatos e dependências */
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/node_modules/**"
+  ]
+}

@@ -1,0 +1,332 @@
+PROJETO: chatgpt-docker-puppeteer
+.
+├── .devcontainer/ [conteúdo oculto]
+├── .git/ [conteúdo oculto]
+├── .github/ [conteúdo oculto]
+├── .tmp.driveupload/ [conteúdo oculto]
+├── analysis/ [conteúdo oculto]
+├── DOCUMENTAÇÃO/
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   ├── CONFIG_FILES.md
+│   ├── CONFIGURATION.md
+│   ├── DEPLOYMENT.md
+│   ├── DOC-SISTEMA.docx
+│   ├── DOCUMENTAÇÃO GERAL 2.0.docx
+│   ├── DOCUMENTAÇÃO GERAL 2.0.pdf
+│   ├── DOCUMENTAÇÃO GERAL 2.0.txt
+│   ├── DOCUMENTAÇÃO GERAL.docx
+│   ├── DOCUMENTAÇÃO GERAL.txt
+│   ├── HEALTH_ENDPOINT.md
+│   ├── IPC 2.0.docx
+│   ├── ipc 2.0.pdf
+│   ├── NERV.docx
+│   ├── NERV.pdf
+│   ├── PROTOCOLOS.docx
+│   ├── PROTOCOLOS.txt
+│   ├── QUICK_START.md
+│   ├── SECURITY.md
+│   └── SINGULARIDADE.pdf
+├── fila/
+│   ├── corrupted/
+│   ├── TASK-GUI-1768290824104.json.tmp.4016.1768291472697
+│   ├── TASK-GUI-1768345886917.json
+│   ├── task-test-51.json
+│   ├── test-lock-001.json.tmp.19100.1768200422288
+│   └── test-lock-atomic.json
+├── local-login/ [conteúdo oculto]
+├── logs/
+│   ├── crash_reports/
+│   │   ├── crash_2026-01-17T15-39-11-585Z_task-test-51/
+│   │   ├── crash_2026-01-17T15-41-53-300Z_task-test-51/
+│   │   └── crash_2026-01-17T16-01-45-087Z_task-test-51/
+│   ├── agente_current.log
+│   ├── audit.log
+│   └── health_trends.json
+├── node_modules/ [conteúdo oculto]
+├── profile/ [conteúdo oculto]
+├── public/
+│   ├── css/
+│   │   └── style.css
+│   ├── js/
+│   │   └── app.js
+│   └── index.html
+├── respostas/
+│   ├── task-001.txt
+│   ├── TASK-GUI-1768290824104.txt
+│   └── TASK-GUI-1768292704476.txt
+├── scripts/
+│   ├── flow_manager.js
+│   ├── gerador_tarefa.js
+│   ├── importar_prompts.js
+│   ├── run-tests.js
+│   ├── run_all_tests.ps1
+│   ├── run_all_tests.sh
+│   ├── setup-dev-tools.sh
+│   ├── status_fila.js
+│   ├── test_schema_validation.js
+│   └── visualizar_fila.js
+├── src/
+│   ├── core/
+│   │   ├── context/
+│   │   │   ├── engine/
+│   │   │   │   └── context_engine.js
+│   │   │   ├── extractors/
+│   │   │   │   ├── code_logic.js
+│   │   │   │   └── json_logic.js
+│   │   │   ├── limits/
+│   │   │   │   ├── budget_manager.js
+│   │   │   │   └── guardrails.js
+│   │   │   ├── parsing/
+│   │   │   │   └── ref_parser.js
+│   │   │   ├── transformers/
+│   │   │   │   ├── identity.js
+│   │   │   │   ├── metadata.js
+│   │   │   │   └── summary.js
+│   │   │   └── context_core.js
+│   │   ├── schemas/
+│   │   │   ├── bootstrap_state_schema.js
+│   │   │   ├── dna_schema.js
+│   │   │   ├── schema_core.js
+│   │   │   ├── shared_types.js
+│   │   │   ├── task_healer.js
+│   │   │   └── task_schema.js
+│   │   ├── config.js
+│   │   ├── doctor.js
+│   │   ├── environment_resolver.js
+│   │   ├── execution_engine.js
+│   │   ├── forensics.js
+│   │   ├── i18n.js
+│   │   ├── identity_manager.js
+│   │   ├── infra_failure_policy.js
+│   │   ├── logger.js
+│   │   ├── memory.js
+│   │   └── schemas.js
+│   ├── driver/
+│   │   ├── core/
+│   │   │   ├── BaseDriver.js
+│   │   │   └── TargetDriver.js
+│   │   ├── modules/
+│   │   │   ├── analyzer.js
+│   │   │   ├── biomechanics_engine.js
+│   │   │   ├── frame_navigator.js
+│   │   │   ├── handle_manager.js
+│   │   │   ├── human.js
+│   │   │   ├── input_resolver.js
+│   │   │   ├── recovery_system.js
+│   │   │   ├── stabilizer.js
+│   │   │   ├── submission_controller.js
+│   │   │   ├── telemetry_bridge.js
+│   │   │   └── triage.js
+│   │   ├── targets/
+│   │   │   └── ChatGPTDriver.js
+│   │   ├── DriverLifecycleManager.js
+│   │   ├── factory.js
+│   │   └── state_persistence.js
+│   ├── effectors/
+│   │   ├── io_effector.js
+│   │   └── task_effector.js
+│   ├── infra/
+│   │   ├── fs/
+│   │   │   ├── atomic_write.js
+│   │   │   ├── control_store.js
+│   │   │   ├── fs_core.js
+│   │   │   ├── fs_utils.js
+│   │   │   ├── paths.js
+│   │   │   └── safe_read.js
+│   │   ├── ipc/
+│   │   │   └── buffer.js
+│   │   ├── locks/
+│   │   │   ├── lock_manager.js
+│   │   │   └── process_guard.js
+│   │   ├── queue/
+│   │   │   ├── cache.js
+│   │   │   ├── query_engine.js
+│   │   │   ├── scheduler.js
+│   │   │   └── task_loader.js
+│   │   ├── storage/
+│   │   │   ├── dna_store.js
+│   │   │   ├── response_store.js
+│   │   │   ├── robot_identity.json
+│   │   │   └── task_store.js
+│   │   ├── transport/
+│   │   │   └── socket_io_adapter.js
+│   │   ├── ConnectionOrchestrator.js
+│   │   ├── io.js
+│   │   ├── ipc_client.js
+│   │   └── system.js
+│   ├── kernel/
+│   │   ├── adapters/
+│   │   │   ├── state_persistence.js
+│   │   │   └── task_executor.js
+│   │   ├── example/
+│   │   │   └── kernel_nerv_integration.js
+│   │   ├── execution_engine/
+│   │   │   └── execution_engine.js
+│   │   ├── kernel_loop/
+│   │   │   └── kernel_loop.js
+│   │   ├── nerv_bridge/
+│   │   │   └── kernel_nerv_bridge.js
+│   │   ├── observation_store/
+│   │   │   └── observation_store.js
+│   │   ├── policies/
+│   │   │   └── policy_engine.js
+│   │   ├── policy_engine/
+│   │   │   └── policy_engine.js
+│   │   ├── state/
+│   │   │   ├── observation_store.js
+│   │   │   └── task_store.js
+│   │   ├── task_runtime/
+│   │   │   └── task_runtime.js
+│   │   ├── telemetry/
+│   │   │   └── kernel_telemetry.js
+│   │   ├── consolidado_KERNEL.txt
+│   │   ├── DOC.docx
+│   │   ├── kernel.js
+│   │   └── TUDO.py
+│   ├── logic/
+│   │   ├── validation/
+│   │   │   ├── rules/
+│   │   │   │   ├── format_rules.js
+│   │   │   │   ├── physical_rules.js
+│   │   │   │   └── semantic_rules.js
+│   │   │   ├── scan_engine.js
+│   │   │   └── validation_core.js
+│   │   ├── adaptive.js
+│   │   └── validator.js
+│   ├── nerv/
+│   │   ├── buffers/
+│   │   │   ├── backpressure - NEWOLD.js
+│   │   │   ├── backpressure.js
+│   │   │   ├── buffers.js
+│   │   │   ├── inbound_queue.js
+│   │   │   └── outbound_queue.js
+│   │   ├── correlation/
+│   │   │   ├── correlation_context.js
+│   │   │   └── correlation_store.js
+│   │   ├── emission/
+│   │   │   ├── emission.js
+│   │   │   ├── emit_ack.js
+│   │   │   ├── emit_command.js
+│   │   │   └── emit_event.js
+│   │   ├── envelopes/
+│   │   │   ├── normalizer.js
+│   │   │   ├── schemas.js
+│   │   │   └── validator.js
+│   │   ├── health/
+│   │   │   └── health.js
+│   │   ├── reception/
+│   │   │   ├── receive.js
+│   │   │   └── reception.js
+│   │   ├── telemetry/
+│   │   │   ├── ipc_telemetry.js
+│   │   │   └── metrics.js
+│   │   ├── transport/
+│   │   │   ├── connection.js
+│   │   │   ├── framing.js
+│   │   │   ├── reconnect.js
+│   │   │   └── transport.js
+│   │   ├── nerv.js
+│   │   └── TUDO.py
+│   ├── server/
+│   │   ├── api/
+│   │   │   ├── controllers/
+│   │   │   │   ├── dna.js
+│   │   │   │   ├── system.js
+│   │   │   │   └── tasks.js
+│   │   │   └── router.js
+│   │   ├── engine/
+│   │   │   ├── app.js
+│   │   │   ├── lifecycle.js
+│   │   │   ├── server.js
+│   │   │   └── socket.js
+│   │   ├── middleware/
+│   │   │   ├── error_handler.js
+│   │   │   ├── request_id.js
+│   │   │   └── schema_guard.js
+│   │   ├── realtime/
+│   │   │   ├── bus/
+│   │   │   │   └── pm2_bridge.js
+│   │   │   ├── streams/
+│   │   │   │   └── log_tail.js
+│   │   │   └── telemetry/
+│   │   │       └── hardware.js
+│   │   ├── supervisor/
+│   │   │   ├── reconcilier.js
+│   │   │   └── remediation.js
+│   │   ├── watchers/
+│   │   │   ├── fs_watcher.js
+│   │   │   └── log_watcher.js
+│   │   └── main.js
+│   ├── shared/
+│   │   ├── ipc/
+│   │   │   ├── constants.js
+│   │   │   ├── envelope.js
+│   │   │   └── schemas.js
+│   │   └── ipcNEWOLD/
+│   │       ├── constants.js
+│   │       ├── envelope.js
+│   │       └── schemas.js
+│   ├── CONSOLIDAÇÃO.py
+│   ├── copiar_com_cabecalho_e_log.py
+│   ├── driver.rar.old
+│   ├── kernel.rar
+│   └── nerv.rar
+├── tests/
+│   ├── integration/
+│   │   ├── biomechanical_pulse.test.js
+│   │   ├── causality_tracing.test.js
+│   │   ├── discovery.test.js
+│   │   ├── engine_telemetry.test.js
+│   │   ├── genetic_evolution.test.js
+│   │   ├── handshake_security.test.js
+│   │   ├── identity_lifecycle.test.js
+│   │   ├── ipc_tester.js
+│   │   ├── resilience_buffer.test.js
+│   │   └── resilience_test.js
+│   ├── tmp/
+│   ├── unit/
+│   │   ├── ipc_envelope.test.js
+│   │   └── ipc_identity.test.js
+│   ├── helpers.js
+│   ├── test_config_validation.js
+│   ├── test_control_pause.js
+│   ├── test_health_endpoint.js
+│   ├── test_lock.js
+│   ├── test_multi_tab_manual.txt
+│   ├── test_running_recovery.js
+│   ├── test_stall_mitigation.js
+│   └── test_stall_simulation_manual.txt
+├── tools/
+│   ├── bin/ [conteúdo oculto]
+│   └── outputs/
+│       └── estrutura_projeto.txt
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── .pre-commit-config.yaml
+├── .secrets.baseline
+├── CHANGELOG.md
+├── colect.py
+├── config.json
+├── CONTRIBUTING.md
+├── docker-compose.yml
+├── DOCKER_SETUP.md
+├── Dockerfile
+├── Dockerfile.dev
+├── dynamic_rules.json
+├── ecosystem.config.js
+├── fila.json
+├── index.js
+├── INICIAR_TUDO.BAT
+├── LICENSE
+├── Makefile
+├── package.json
+├── prompts.txt
+├── README.md
+├── rodar_agente.bat
+├── SECURITY_SCAN_POLICY.md
+├── server.js.old
+├── src.rar
+├── test-puppeteer.js
+└── test_nerv_pulse.js

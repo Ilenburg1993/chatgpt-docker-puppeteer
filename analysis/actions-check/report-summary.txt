@@ -1,0 +1,17 @@
+Actions artifact scan summary
+
+- Artifacts downloaded to: analysis/actions-check/
+- Secrets matches file: analysis/actions-check/secrets-found.txt
+- Number of matches: 8 (see file)
+- Quick interpretation: matches are metadata and refs in workflow outputs (refs/original/*, workflow path strings), no high-confidence API keys, no PEM private key blocks, no detected AKIA/ghp_/xoxb- tokens.
+
+Recommended verification steps (automated):
+1) Run a second-pass gitleaks locally over `analysis/repo-verify` or a new mirror clone.
+2) If any sensitive tokens are confirmed, follow the rotation checklist in analysis/notifications/rotation-draft.md.
+
+Files of interest produced here:
+- analysis/actions-check/secrets-found.txt
+- analysis/actions-check/recent_runs.json
+- analysis/actions-check/recent_runs_summary.txt
+
+Generated: 2026-01-16

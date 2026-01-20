@@ -1,0 +1,875 @@
+Aqui está a Documentação Técnica Consolidada: Projeto Singularity (Maestro & Mission Control).
+Este documento foi estruturado para servir como o manual definitivo de integração para novos engenheiros de software, cobrindo desde a filosofia de design até os detalhes mais profundos da implementação física e lógica.
+
+?? Documentação Técnica Mestra: Projeto Singularity
+Versão: 2.0 (The Singularity Edition)
+Audit Level: 700 — Mission Critical Standard
+Status: CONSOLIDADO
+
+?? Sumário
+1. Arquitetura da Singularidade (Visão Geral)
+2. O Shared Kernel & IPC 2.0 (O Sistema Nervoso)
+3. O Kernel de Execução (The Core)
+4. A Camada Física (Driver & SADI)
+5. Infraestrutura e Persistência
+6. Mission Control & Supervisor
+7. Operação e Qualidade
+8. Insights para o Novo Engenheiro
+9. O Horizonte de Evolução (Realidade Atual)
+10. Vetores de Expansão (Roadmap)
+11. A Doutrina da Ordem (Protocolos)
+
+?? Capítulo 1: Arquitetura da Singularidade
+1.1 Filosofia: Protocolo 11
+O sistema opera sob o Protocolo 11 (Zero-Bug Tolerance). A integridade dos dados e a estabilidade do ambiente são soberanas sobre a velocidade de execução. Preferimos um reboot controlado a uma execução incerta.
+1.2 Topologia Distribuída
+O ecossistema é dividido em três entidades independentes:
+* Mission Control Prime (Server): O cérebro administrativo e hub de eventos.
+* Maestro (Executor): O motor de execução soberano que controla o navegador.
+* Supervisor (Reconciliador): O sistema imunológico que observa desvios e aplica a autocura.
+1.3 Fluxo Macro de Missão
+1. Ingestão: Tarefa JSON entra na /fila.
+2. Sinalização: FS_WATCHER detecta e emite cache_dirty via IPC.
+3. Resolução: ContextEngine resolve referências recursivas {{REF:...}}.
+4. Execução: BaseDriver opera a interface via SADI V19 e Biomecânica.
+5. Telemetria: Pulsos sensoriais são enviados em tempo real ao Dashboard.
+6. Forense: Em caso de erro, uma "caixa-preta" ( screenshot/DOM ) é gerada.
+
+?? Capítulo 2: O Shared Kernel & IPC 2.0
+2.1 A Constituição (src/shared/ipc/)
+O Shared Kernel é a única fonte da verdade para a comunicação. Ele impede o Semantic Drift entre o Servidor e o Maestro.
+* Ontologia (constants.js): Define Atores, Comandos (cmd:) e Eventos (evt:).
+* Validação Nativa (schemas.js): Validação ultra-veloz com if e regex puros, sem dependências externas, para garantir latência zero na telemetria.
+2.2 O Envelope Canônico V2
+Nenhuma mensagem viaja "nua". O envelope garante:
+* Correlation ID: O "Fio de Ariadne" que vincula um clique no Dashboard ao log no Driver.
+* Version Lock: Impede que versões incompatíveis de protocolo se comuniquem.
+2.3 Resiliência Offline
+O ipc_client.js possui uma Outbox (Buffer) de 2000 mensagens. Se a rede cair, o Maestro represa a telemetria e realiza um Replay Atômico após o Handshake de reconexão.
+
+?? Capítulo 3: O Kernel de Execução
+3.1 Maestro Bootstrapper (index.js)
+Atua como a Sovereign Wiring Authority. Não executa lógica, apenas "fia" os sistemas:
+1. Higieniza o disco (cleanupOrphans).
+2. Carrega configurações assíncronas (CONFIG.reload).
+3. Batiza o robô (identityManager).
+4. Liga os comandos IPC ao motor.
+3.2 Execution Engine (src/core/execution_engine.js)
+Máquina de estados pura (V1.8.0). Gerencia o ciclo atômico:
+* Backoff Inteligente: Evita "morte térmica" por falhas repetitivas.
+* Ganchos de Remediação: Métodos prontos para rebootInfrastructure e clearCaches sob ordem do Supervisor.
+3.3 Context Engine
+Resolve a inteligência do prompt:
+* Recursividade: Resolve tags aninhadas até 3 níveis.
+* Transformadores: Filtra JSON, CODE ou gera SUMMARY (resumos).
+* Budget Manager: Garante que o prompt não exceda o limite de tokens da IA.
+
+?? Capítulo 4: A Camada Física
+4.1 SADI V19 (Percepção Visual)
+O Sovereign Adaptive Dynamic Interface não usa seletores fixos:
+* DNA Vetorial: Identifica botões por assinaturas de caminhos SVG.
+* Shadow DOM Piercing: Atravessa camadas de encapsulamento que o Puppeteer padrão ignora.
+* Sonar de Oclusão: Verifica se o elemento está visível ou coberto por popups.
+4.2 Biomecânica Humana
+* Human Jitter: Movimentação de mouse via Curvas de Bézier e variância Gaussiana.
+* Digitação Estocástica: Simula erros reais, backspaces e ritmos de voo entre teclas.
+* Fadiga: Introduz pausas aleatórias para mimetizar o comportamento humano.
+
+?? Capítulo 5: Infraestrutura e Persistência
+5.1 Integridade Atômica
+* Shadow Paging: Uso de atomic_write.js (.tmp -> rename) para evitar corrupção.
+* Paths Authority: O arquivo paths.js é a bússola única do sistema, eliminando dependências circulares.
+5.2 Cache de Fila (3 Níveis)
+1. Lvl 1 (Disco): Persistência bruta.
+2. Lvl 2 (RAM Cache): Snapshot estável para performance.
+3. Lvl 3 (Query Engine): Buscas complexas indexadas em memória.
+5.3 Lock Manager
+Exclusão mútua baseada em arquivo com Liveness Check. Verifica se o PID gravado na trava ainda existe no SO antes de quebrar um lock órfão.
+
+?? Capítulo 6: Mission Control & Supervisor
+6.1 API Gateway & Hub
+O servidor modularizado (V600+) gerencia a malha:
+* Registry: Inventário vivo de robôs por robot_id.
+* Unicast Routing: Envia comandos para robôs específicos via salas privadas do Socket.io.
+* Request ID: DNA transacional em cada chamada HTTP.
+6.2 Reconciliador & Autocura
+O reconcilier.js executa o loop de controle:
+1. Observe: Coleta telemetria.
+2. Diff: Detecta Drifts (ex: robô silencioso ou travado).
+3. Act: Consulta a remediation.js e dispara ordens de correção (Reboot/Retry).
+
+?? Capítulo 7: Operação e Qualidade
+7.1 Suíte de Certificação
+Testes de integração (tests/integration/) provam o sistema:
+* handshake_security: Valida a quarentena.
+* resilience_buffer: Valida o replay pós-blackout.
+* genetic_evolution: Valida o aprendizado do SADI flutuando para o Maestro.
+7.2 Ferramental CLI
+* flow_manager.js: Orquestra projetos complexos via YAML.
+* status_fila.js: Dashboard de terminal com cálculo de ETA.
+* visualizar_fila.js: Gera grafos topológicos em HTML.
+
+?? Capítulo 8: "Se eu fosse engenheiro, o que gostaria de saber?"
+* Soberania de Domínio: O Driver é cego para a rede. O Core é cego para o disco (usa a Fachada). O Shared Kernel é a lei absoluta.
+* Correlation ID: É o rastro sagrado. Se você criar um evento e esquecer de propagar o ID, você "cegou" o sistema.
+* Atomic Writes: Nunca use fs.writeFileSync. Use a Fachada de IO. No Windows, escritas diretas corrompem arquivos em caso de crash.
+* SADI não é CSS: Ele usa assinaturas vetoriais. Se a classe do botão mudar, ele continua achando o alvo pelo desenho do ícone.
+* Memory Management: Rodamos com --expose-gc. O ExecutionEngine limpa a RAM manualmente após cada tarefa para evitar o inchaço do Puppeteer.
+
+?? Capítulo 9: O Horizonte de Evolução
+* Autocura Embrionária: Atualmente reativa. O objetivo é torná-la preditiva.
+* Dashboard V1: A interface visual atual está obsoleta e será reconstruída para suportar a telemetria do IPC 2.0.
+* Suíte de Testes: Em fase de migração para o padrão Audit 700. Algumas integrações E2E ainda exigem validação manual.
+
+?? Capítulo 10: Vetores de Expansão
+* Autocura Preditiva: Monitorar degradação de performance antes do erro ocorrer.
+* DAG Execution: Migrar de fila linear para Grafos de Dependência complexos.
+* SADI 2.0: Auto-correção genômica (o robô atualiza seu próprio DNA ao notar mudanças de UI).
+* Memória de Longo Prazo: Implementação de RAG local com banco vetorial para continuidade cognitiva entre tarefas.
+
+?? Capítulo 11: A Doutrina da Ordem
+* Escrita Atômica: É o dogma contra a corrupção de dados.
+* Causalidade: É a ferramenta contra o caos do tempo relativo em sistemas distribuídos.
+* Soberania de Camada: É o que permite ao sistema ser modular e testável.
+* Fail-Fast: Se o dado violar o contrato, o sistema deve parar. Tentar "adivinhar" é o caminho para o desastre.
+
+?? Nota Final ao Engenheiro
+Mantenha a Causalidade. Respeite a Soberania. Confie nos Testes.
+A Singularidade não é um estado final, é um processo contínuo de evolução.
+Bem-vindo à equipe.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?? Capítulo 1: Arquitetura da Singularidade (Visão Geral)
+Bem-vindo à fundação do projeto. Como novo engenheiro, sua primeira lição é entender que este sistema não é um "script de automação", mas um Kernel de Execução Distribuído. Ele foi projetado para ser antifrágil: ele não apenas resiste a erros, mas utiliza a telemetria desses erros para se auto-corrigir.
+
+1. A Filosofia: Protocolo 11
+O projeto opera sob o Protocolo 11 (Zero-Bug Tolerance). Isso significa que:
+* Integridade acima de Velocidade: É preferível abortar uma tarefa e reiniciar o ambiente do que prosseguir com dados incertos.
+* Escrita Atômica: Nenhum dado é gravado diretamente; usamos Shadow Paging (.tmp -> rename) para evitar corrupção.
+* Soberania de Domínio: O Driver não sabe o que é rede; o Servidor não sabe como clicar em botões; o Kernel orquestra ambos sem conhecer seus detalhes internos.
+
+2. Topologia do Sistema
+O ecossistema é dividido em três entidades soberanas que se comunicam via IPC 2.0 (Inter-Process Communication):
+A. Mission Control Prime (O Servidor)
+Localizado em src/server/. É o cérebro administrativo.
+* API Gateway: Ponto de entrada para o Dashboard e sistemas externos.
+* Event Hub: Um barramento Socket.io que centraliza o tráfego de mensagens.
+* Registry: Mantém o inventário em tempo real de todos os robôs ativos.
+B. Maestro (O Kernel de Execução)
+Localizado em index.js e src/core/. É o músculo cognitivo.
+* Execution Engine: Uma máquina de estados pura que processa o ciclo de vida das tarefas.
+* Identity Manager: Garante que o robô tenha um DNA persistente (robot_id) e uma vida efêmera (instance_id).
+* Driver Lifecycle: Gerencia a ignição e o descarte dos drivers físicos do navegador.
+C. Supervisor (O Reconciliador)
+Localizado em src/server/supervisor/. É o sistema imunológico.
+* Reconciliation Loop: Compara o estado desejado (Fila) com o estado real (Telemetria do Maestro).
+* Remediation Engine: Prescreve manobras de autocura (ex: Reboot do Browser) quando detecta anomalias.
+
+3. O Fluxo Macro de uma Tarefa
+Para entender como o código se move, siga este rastro:
+1. Ingestão: Uma tarefa entra na pasta /fila (via API ou Script).
+2. Vigilância: O FS_WATCHER detecta o arquivo e sinaliza o cache_dirty via IPC.
+3. Aquisição: O Maestro, ao notar o sinal, limpa seu cache em RAM e pede a próxima tarefa ao io.loadNextTask().
+4. Resolução: O ContextEngine resolve referências recursivas (ex: {{REF:ID}}) para montar o prompt final.
+5. Execução: O BaseDriver utiliza o SADI V19 para enxergar a interface e a Biomecânica para digitar humanamente.
+6. Telemetria: Durante a execução, o TelemetryBridge envia "pulsos" (coordenadas de mouse, progresso) para o Dashboard.
+7. Validação: Após a resposta da IA, o validator.js realiza uma varredura single-pass no arquivo para garantir qualidade.
+8. Conclusão: O rastro de causalidade (Correlation ID) fecha o ciclo, movendo a tarefa para DONE e liberando os recursos.
+
+4. Por que "Singularidade"?
+Chamamos esta arquitetura de Singularidade porque o robô possui Consciência Situacional. Ele sabe quando está em um domínio desconhecido, sabe quando a CPU está lenta e sabe quando a IA está tentando bloqueá-lo (Captcha/Limit). Ele não falha silenciosamente; ele narra sua própria jornada.
+?? Capítulo 2: O Shared Kernel & IPC 2.0 (O Sistema Nervoso)
+Neste capítulo, estudaremos a "Constituição" do projeto. Em sistemas distribuídos, o maior risco não é a falha da rede, mas o Semantic Drift (quando o emissor e o receptor param de se entender). O Shared Kernel é a barreira física contra esse caos.
+
+1. O Shared Kernel: A Fonte Única da Verdade (SSOT)
+Localizado em src/shared/ipc/, este diretório é o único código que deve ser espelhado ou compartilhado entre o Servidor e o Maestro. Ele define a lei.
+A. A Ontologia (constants.js)
+Eliminamos as "Strings Mágicas". Se você quiser pausar o motor, não usará 'pause', mas sim IPCCommand.ENGINE_PAUSE.
+* Atores (IPCActor): Quem tem permissão para falar (MISSION_CONTROL, MAESTRO, SUPERVISOR).
+* Comandos (IPCCommand): Intenções imperativas que exigem uma resposta (ACK).
+* Eventos (IPCEvent): Fatos declarativos (ex: TASK_PROGRESS, STALL_DETECTED).
+B. Validação Nativa (schemas.js)
+Para atingir o Audit Level 700, migramos a validação do sistema nervoso de bibliotecas pesadas (Zod) para Validação Nativa (Vanilla JS).
+* Performance: Validações com if e regex são ordens de magnitude mais rápidas para telemetria de alta frequência.
+* Segurança: Cada envelope que chega é reconstruído do zero, impedindo ataques de poluição de protótipo.
+
+2. O Envelope Canônico V2
+Nenhuma informação viaja "nua" pelo socket. Toda mensagem é empacotada em um envelope estruturado:
+code JavaScript
+downloadcontent_copy
+expand_less
+{
+  header: { version: "2.0.0", source: "actor:maestro", timestamp: 173... },
+  ids: { msg_id: "uuid-v4", correlation_id: "uuid-v4" },
+  kind: "evt:task:progress",
+  payload: { step: "TYPING", percent: 45 },
+  ack_for: "uuid-v4-opcional"
+}
+
+3. O Fio de Ariadne (Correlation ID)
+Este é o conceito mais importante para a sua sanidade como engenheiro de depuração.
+* O Problema: Como saber qual clique no Dashboard causou aquele erro específico no log do Driver?
+* A Solução: O correlation_id. Ele nasce no Servidor (intenção do usuário), viaja para o Maestro, entra no Kernel, é passado para o Driver e volta em cada evento de telemetria.
+* Regra de Ouro: Nunca gere um novo evento em resposta a um comando sem propagar o correlation_id original.
+
+4. A Cerimônia de Handshake (Protocolo de Confiança)
+A conexão física (Socket.io) é apenas o começo. O IPC 2.0 impõe uma máquina de estados de conexão:
+1. Quarentena (QUARANTINE): O socket conecta, mas o servidor ignora qualquer mensagem de domínio.
+2. Apresentação (HANDSHAKING): O Maestro envia sua Identidade Soberana (DNA do robô + Capacidades técnicas).
+3. Homologação (AUTHORIZED): O servidor valida a versão do protocolo e o ID. Se aprovado, o canal de comando é liberado.
+
+5. Resiliência: O Buffer Offline (Outbox)
+O sistema nervoso é resiliente a "blackouts". Se o servidor cair, o ipc_client.js não descarta os dados. Ele utiliza o buffer.js para:
+* Represar até 2000 mensagens em RAM.
+* Realizar o Replay Atômico assim que o Handshake for refeito, garantindo que o Dashboard recupere todo o histórico da tarefa perdida durante a queda.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?? Capítulo 3: O Kernel de Execução (The Core)
+Neste capítulo, exploraremos o Cérebro do Maestro. Se o IPC 2.0 é o sistema nervoso, o Core é onde reside a consciência operacional e a máquina de estados que garante que cada tarefa seja executada como uma transação atômica e protegida.
+
+1. O Maestro (index.js): Autoridade de Fiação
+O index.js (V350+) não executa lógica de negócio; ele atua como a Sovereign Wiring Authority. Sua função é:
+1. Higiene de Boot: Chamar a infraestrutura para limpar arquivos órfãos e carregar a configuração assíncrona.
+2. Ignição de Identidade: Garantir que o robô tenha um DNA antes de qualquer ação.
+3. Fiação (Wiring): Conectar os comandos do IPC 2.0 aos métodos do motor (ex: cmd:pause -> engine.pause()).
+4. Governança de Ciclo de Vida: Capturar sinais do sistema operacional e garantir um encerramento gracioso (Graceful Shutdown).
+
+2. Execution Engine: A Máquina de Estados Soberana
+Localizado em src/core/execution_engine.js (V1.8.0), este é o motor que dita o ritmo do robô.
+A. O Ciclo Atômico de Trabalho
+O motor opera em um loop infinito, mas cada tarefa é tratada com isolamento total:
+* Aquisição de Contexto: Obtém a aba do navegador via ConnectionOrchestrator.
+* Resolução de Ambiente: Usa o EnvironmentResolver para identificar se a URL atual é um alvo válido (ex: ChatGPT).
+* Cura de Dados: Antes de rodar, a tarefa passa pelo TaskHealer para garantir o padrão V4 Gold.
+* Lock de Exclusão Mútua: Garante que nenhum outro Maestro toque nesta tarefa simultaneamente.
+B. Ganchos de Autocura (Remediation Ready)
+Diferente de versões anteriores, o Kernel V1.8.0 possui métodos de intervenção remota:
+* rebootInfrastructure: Mata o processo do browser e reinicia o ciclo.
+* clearCaches: Invalida o DNA e o cache de percepção local.
+* abortTask: Interrompe a tarefa física via AbortSignal.
+
+3. Context Engine: O Cérebro Cognitivo
+Localizado em src/core/context/, este subsistema resolve a complexidade dos prompts antes de enviá-los ao Driver.
+A. Resolução Recursiva {{REF}}
+O motor permite que tarefas dependam de resultados de tarefas anteriores.
+* Exemplo: Analise este código: {{REF:TASK-123|CODE}}.
+* Recursividade: Se a tarefa referenciada também tiver uma tag, o motor mergulha até 3 níveis de profundidade para resolver tudo.
+B. Transformadores Semânticos
+O motor não injeta apenas texto bruto. Ele pode filtrar a informação:
+* JSON: Extrai apenas o objeto {...} via Stack-Parsing.
+* CODE: Extrai apenas blocos delimitados por triple backticks.
+* SUMMARY: Trunca o texto de forma inteligente preservando a gramática.
+C. Budget Manager (Gestão de Volume)
+Para evitar o estouro de contexto das IAs, o BudgetManager monitora o comprimento da string final. Se exceder o limite (ex: 500k caracteres), ele aplica truncamento preventivo e emite um alerta.
+
+4. Governança de Falhas e Forense
+O Core é responsável por decidir o que fazer quando o "mundo físico" quebra.
+* Infra Failure Policy: Decide se um erro de rede exige apenas um log ou a "sentença de morte" do processo do navegador (Kill PID).
+* Forensics (V710): Em caso de erro catastrófico, gera um dump assíncrono contendo metadados, rastro de causalidade, logs de console do browser e snapshot do DOM (preservando o CSS para análise humana).
+
+5. Identity Manager: O DNA do Robô
+Garante que o robô deixe de ser um "socket anônimo".
+* DNA (robot_id): Identificador persistente gravado no disco.
+* Vida (instance_id): Identificador efêmero gerado a cada boot.
+* Capabilities: O robô declara ao servidor o que ele consegue fazer (ex: SADI_V19, BROWSER_CTRL).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?? Capítulo 4: A Camada Física (Driver & SADI)
+Neste capítulo, estudaremos os músculos e os sentidos do robô. A Camada Física é responsável por traduzir as intenções lógicas do Kernel em interações reais dentro do navegador. O maior desafio aqui é a Soberania do Driver: ele deve ser capaz de operar em um ambiente hostil (interfaces que mudam, proteções anti-bot) sem depender de seletores CSS fixos.
+
+1. Arquitetura de Drivers: O Contrato Soberano
+O sistema utiliza uma hierarquia de classes para garantir que qualquer nova IA possa ser adicionada sem reescrever o motor principal.
+* TargetDriver.js (A Lei): Classe abstrata que define o que um driver deve fazer (ex: sendPrompt, captureState). Ela gerencia a máquina de estados interna (IDLE, TYPING, WAITING).
+* BaseDriver.js (O Orquestrador): Contém a lógica universal de automação. Ele coordena os 6 subsistemas modulares (Biomecânica, Recuperação, Navegação, etc.) e emite "sinais vitais" via canal de eventos.
+* ChatGPTDriver.js (O Especialista): Implementa as particularidades da OpenAI, como a Poda de Pensamento (Thought Pruning) para modelos o1/o3 e a detecção de botões de auto-continuação.
+
+2. SADI V19: A Percepção Visual (The Eyes)
+O SADI (Sovereign Adaptive Dynamic Interface), localizado em analyzer.js, é o que torna o robô imune a mudanças de layout.
+A. Identificação por DNA Vetorial
+Em vez de confiar que o botão de enviar tem a classe .btn-primary, o SADI procura por Assinaturas SVG. Ele escaneia os caminhos (path d=...) dos ícones para encontrar o desenho universal de um "avião de papel" ou de um "círculo de stop".
+B. Sonar de Oclusão e Shadow DOM
+* Penetração: O SADI atravessa recursivamente múltiplos níveis de Shadow DOM e IFrames, algo que seletores padrão do Puppeteer falham em fazer.
+* Sonar: Antes de clicar, o robô executa um "sonar síncrono" para verificar se o elemento não está coberto por um modal, popup ou se está com opacidade zero.
+
+3. Biomecânica Humana (The Hands)
+Localizado em biomechanics_engine.js e human.js, este subsistema mimetiza o comportamento humano para evitar detecção por sistemas de segurança (WAFs).
+* Human Jitter (Mouse): O cursor não se move em linha reta. Ele utiliza Curvas de Bézier e variância Gaussiana para simular o tremor natural e a imperfeição do movimento humano.
+* Ritmo de Digitação: A velocidade de digitação varia caractere por caractere. O robô simula o "tempo de voo" entre teclas e introduz erros (typos) baseados na proximidade física das teclas no layout QWERTY, corrigindo-os com Backspace logo em seguida.
+* Fadiga Estocástica: Após longos períodos digitando, o robô simula pequenas pausas de "cansaço" ou distração, movendo o mouse aleatoriamente para manter a sessão ativa.
+
+4. Triage & Estabilização (The Instincts)
+O robô possui "instintos" para detectar quando algo está errado antes mesmo de o Kernel perceber.
+* Stabilizer (V500): Antes de qualquer ação, o estabilizador mede a Entropia do DOM (se a página ainda está mudando) e o Lag do Event Loop da CPU. Ele só libera a ação quando a interface está em "repouso absoluto".
+* Triage (V70): Realiza "autópsias" em tempo real. Se a IA para de responder, o Triage escaneia a tela em busca de sintomas como:
+o Cloudflare Challenges (Captcha).
+o Quota Limits (Limite de mensagens).
+o Visual Errors (Alertas vermelhos na interface).
+
+5. Telemetry Bridge: O Sistema Sensorial
+A telemetry_bridge.js é o "nervo" que conecta o Driver ao IPC 2.0.
+* Throttling: Ela filtra os dados biomecânicos (ex: envia a posição do mouse apenas a cada 150ms) para não inundar o servidor, mas garante que o Dashboard mostre um "fantasma" do robô agindo em tempo real.
+
+?? Capítulo 5: Infraestrutura e Persistência
+Neste capítulo, estudaremos o sistema circulatório e esquelético do projeto. Em um sistema que opera 24/7, a maior ameaça não é um erro de lógica, mas a corrupção de dados. Se o computador travar enquanto um arquivo JSON está sendo escrito, o robô pode acordar "amnésico" ou incapacitado. A nossa infraestrutura foi desenhada para tornar isso impossível.
+
+1. Arquitetura "Ciclo Zero" (Paths & Utils)
+Para atingir o Audit Level 700, implementamos o desacoplamento físico total.
+* paths.js (A Bússola): É o nível mais baixo do sistema. Ele centraliza todos os caminhos de pastas e arquivos. Nenhum outro módulo de infraestrutura calcula caminhos; eles consultam a Bússola. Isso eliminou as Dependências Circulares que assombravam as versões anteriores.
+* fs_utils.js (Higiene Física): Provê a limpeza de caracteres de controle ASCII e garante que as pastas críticas (fila, respostas, logs, corrupted) existam antes da ignição do motor.
+
+2. Integridade Atômica: Shadow Paging
+O sistema utiliza o padrão Atomic Write (localizado em src/infra/fs/atomic_write.js) para todas as gravações de disco.
+1. Escrita em Sombra: O dado é gravado primeiro em um arquivo temporário (.tmp).
+2. Validação: O sistema garante que a escrita foi concluída no buffer do SO.
+3. Rename Atômico: O arquivo temporário é renomeado para o nome final.
+* Resultado: No disco, ou o arquivo está na versão antiga e íntegra, ou na versão nova e íntegra. Nunca existe um estado intermediário corrompido.
+
+3. Inteligência de Fila em 3 Níveis
+A gestão de tarefas (src/infra/queue/) opera em uma hierarquia de eficiência:
+* Nível 1: Disco (A Verdade): Os arquivos .json na pasta /fila são a fonte soberana.
+* Nível 2: Cache RAM (cache.js): Um snapshot em memória que evita leituras constantes de disco. Ele utiliza um Watcher Físico (fs_watcher.js) que sinaliza quando o cache está "sujo" (markDirty), forçando uma atualização apenas quando necessário.
+* Nível 3: Query Engine (query_engine.js): Uma camada lógica que executa buscas complexas (ex: "buscar última tarefa com a tag X") sobre o cache em RAM, garantindo respostas em microssegundos para o motor de contexto.
+
+4. Lock Manager: Exclusão Mútua Soberana
+Como o sistema pode rodar em múltiplos processos (Maestro + Dashboard + Scripts), usamos travas físicas (.lock) para evitar que dois processos operem o mesmo robô.
+* Liveness Check (process_guard.js): Diferente de sistemas comuns, o nosso Lock Manager verifica se o PID (Process ID) gravado na trava ainda existe no Sistema Operacional.
+* Auto-Cura: Se o Maestro crashar e deixar um arquivo .lock para trás, o próximo processo detectará que aquele PID não existe mais e "quebrará" a trava automaticamente, restaurando a operatividade.
+
+5. Ingestão e Cura (Task Healer)
+A infraestrutura não confia no que vem de fora.
+* safe_read.js: Se um JSON estiver malformado, ele é movido para uma pasta /corrupted (quarentena) em vez de crashar o robô.
+* task_healer.js: Um motor de retrocompatibilidade que converte tarefas de versões antigas (V1, V2, V3) para o padrão V4 Gold em tempo real, garantindo que o Kernel sempre receba objetos perfeitos.
+
+6. A Fachada Unificada (io.js)
+Para o desenvolvedor, toda essa complexidade é invisível. O src/infra/io.js expõe uma interface simples e limpa.
+* Regra para o Engenheiro: Nunca importe arquivos internos da pasta infra/fs ou infra/storage. Use sempre a fachada io.js. Ela garante que o cache seja invalidado e que a atomicidade seja respeitada.
+
+?? Fim do Capítulo 5
+Próximo Passo: No Capítulo 6: Mission Control & Supervisor, veremos como o Servidor gerencia a frota de robôs, como a API Gateway protege o sistema e como o Supervisor executa a Autocura (Self-Healing).
+Podemos prosseguir para o Capítulo 6?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?? Capítulo 6: Mission Control & Supervisor
+Neste capítulo, estudaremos o Control Plane (Plano de Controle) do sistema. Localizado em src/server/, o Mission Control Prime não é apenas um servidor web; é o centro de comando que gerencia a frota de robôs, valida a soberania das comunicações e executa a inteligência de Autocura (Self-Healing).
+
+1. O Gateway Soberano (API & Router)
+A API foi desenhada para ser o único ponto de entrada para o Dashboard e sistemas externos.
+* Soberania de Domínio: Seguimos a "Opção A" de arquitetura, onde cada domínio (Tarefas, Sistema, DNA) possui seu próprio Domain Controller. Isso elimina a redundância e centraliza a lógica de negócio.
+* Request ID (DNA Transacional): Cada requisição HTTP recebe um UUID único no middleware request_id.js. Esse ID é propagado para os logs e auditorias, permitindo rastrear um erro na interface até a linha de código no servidor.
+* Error Boundary: O error_handler.js garante que nenhuma falha técnica (500) vaze detalhes da infraestrutura para o usuário, retornando sempre um JSON padronizado e auditado.
+
+2. O Hub de Distribuição (Socket.io V600)
+O src/server/engine/socket.js é o coração do barramento IPC 2.0. Ele gerencia o tráfego de dados "vivos".
+A. Protocolo de Quarentena e Handshake
+Diferente de sockets comuns, o nosso Hub impõe uma cerimônia de entrada:
+1. Quarentena: O robô conecta, mas não pode enviar nem receber ordens.
+2. Handshake V2: O robô apresenta sua Identidade Soberana. O servidor valida o DNA e a versão do protocolo.
+3. Promoção: Se homologado, o robô é movido para salas privadas (agent:robot_id) e salas globais (system_agents).
+B. Roteamento Inteligente
+* Unicast: Comandos específicos (ex: "Robô A, reinicie seu browser") são enviados apenas para a sala do robô alvo.
+* Broadcast de Telemetria: Eventos vindos do robô (ex: "Tarefa concluída") são retransmitidos para a sala dashboards, alimentando a interface em tempo real.
+
+3. O Reconciliador Soberano (Supervisor)
+Localizado em src/server/supervisor/reconciler.js, este componente implementa a inteligência de monitoramento ativo.
+* Loop de Reconciliação: A cada 10 segundos, o Reconciliador executa o ciclo Observe -> Diff -> Act.
+o Observe: Coleta o estado de todos os robôs no Registry.
+o Diff: Compara o last_seen (última vez visto) com o limiar de 30 segundos.
+o Act: Se um robô estiver em silêncio (Zumbi), o Reconciliador dispara uma manobra de recuperação.
+* Reação Reativa: O Supervisor também "escuta" o barramento. Se um robô emitir um sinal de STALL_DETECTED, o Supervisor interrompe o loop e age instantaneamente.
+
+4. Remediation Engine: A Farmacopeia
+O remediation.js é o repositório de sabedoria tática do sistema. Ele traduz Sintomas em Ações:
+Sintoma (Triage)Ação Prescrita (Remediation)ImpactoBROWSER_FROZENBROWSER_REBOOTAlta SeveridadeCAPTCHA_CHALLENGEENGINE_PAUSE + NotificaçãoCríticoLOGICAL_LOOPCACHE_CLEAR + TASK_RETRYMédia SeveridadeLIMIT_REACHEDENGINE_PAUSE (Cooldown 1h)Média Severidade
+5. Telemetria de Realtime
+O servidor provê fluxos contínuos de dados para o Dashboard:
+* Hardware Pulse: Amostragem de CPU e RAM a cada 5s via hardware.js.
+* Log Streaming: Um "tail -f" resiliente via log_tail.js que sobrevive à rotação de arquivos no Windows.
+* PM2 Bridge: Captura eventos do sistema operacional (ex: processo caiu) e avisa a interface.
+
+?? Fim do Capítulo 6
+Próximo Passo: No Capítulo 7: Operação e Qualidade, encerraremos a documentação estudando a suíte de testes, as ferramentas de linha de comando (CLI) e como realizar o deploy seguro via PM2.
+Podemos prosseguir para o Capítulo final?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?? Capítulo 7: Operação e Qualidade
+Neste capítulo final, estudaremos como manter, testar e escalar o organismo digital. Para um engenheiro de sistemas, a operação é onde a teoria encontra a realidade do hardware. Implementamos um conjunto de ferramentas de Linha de Comando (CLI) e uma Suíte de Testes de Integração que permitem gerenciar o sistema com precisão cirúrgica, mesmo sem uma interface gráfica.
+
+1. A Suíte de Testes (Certificação Técnica)
+No Audit Level 700, os testes não são opcionais; eles são a prova de que a "Constituição" está sendo seguida. Nossa suíte em tests/ é dividida em blocos lógicos:
+* Bloco 1: Validação de Contrato (Unitários): Testam os schemas nativos (ipc_envelope.test.js) para garantir que o sistema bloqueia dados sujos.
+* Bloco 2: O Sujeito (Persistência): Validam o ciclo de vida do DNA (identity_lifecycle.test.js) e a descoberta de porta (discovery.test.js).
+* Bloco 3: A Cerimônia (Segurança): Testam o Handshake e a Quarentena (handshake_security.test.js).
+* Bloco 4: O Sistema Nervoso (Resiliência): Provam que o buffer offline funciona (resilience_buffer.test.js) e que o rastro de causalidade é mantido (causality_tracing.test.js).
+* Bloco 5: O Pulso (Integração): Validam a telemetria real do motor e do driver (engine_telemetry.test.js).
+
+2. Ferramental de CLI (The Power Tools)
+Localizadas em scripts/, estas ferramentas permitem operar a fila e os fluxos de trabalho:
+* flow_manager.js (Enterprise Grade): O ponto mais alto da automação. Lê arquivos YAML (Blueprints), detecta ciclos de dependência e injeta projetos inteiros na fila com um único comando.
+* gerador_tarefa.js: Um assistente interativo para criar tarefas rápidas no padrão V4 Gold.
+* importar_prompts.js: Realiza a ingestão em lote (Bulk Import) com deduplicação via MD5, garantindo que o robô nunca processe o mesmo prompt duas vezes.
+* status_fila.js: Um dashboard de terminal com cálculo de ETA (Tempo Estimado de Conclusão) e telemetria de progresso.
+* visualizar_fila.js: Gera um mapa topológico (Grafo) da fila em HTML, permitindo ver as conexões entre tarefas.
+
+3. Orquestração de Processos (PM2)
+O sistema é gerenciado pelo PM2 (Process Manager 2) através do arquivo ecosystem.config.js.
+* agente-gpt (O Worker): Roda o Kernel. Possui a flag --expose-gc para limpeza manual de memória e monitoramento de vazamento (max_memory_restart: 1G).
+* dashboard-web (O MCC): Roda o Servidor Modular.
+* Comandos Essenciais:
+o pm2 start ecosystem.config.js (Inicia a Singularidade).
+o pm2 monit (Monitora CPU/RAM e logs em tempo real).
+o pm2 logs (Acesso ao fluxo de telemetria).
+
+4. Protocolos de Manutenção e Higiene
+Um sistema antifrágil exige limpeza constante:
+* Higiene de Boot: O Maestro sempre inicia chamando io.cleanupOrphans() para remover arquivos temporários de sessões crashadas.
+* Diagnóstico Preditivo: O arquivo src/core/doctor.js realiza check-ups de latência de rede, velocidade de disco e integridade do DNA.
+* Forense Ativa: Se o robô falhar, a pasta logs/crash_reports/ conterá a "caixa-preta" (meta.json, screenshot.jpg, dom_snapshot.html). Dica: Use esses arquivos para atualizar o dynamic_rules.json quando a interface da IA mudar.
+
+5. Conselhos para o Novo Engenheiro
+1. Nunca quebre a Causalidade: Ao adicionar um novo evento, certifique-se de que o correlation_id está sendo propagado.
+2. Respeite a Soberania: Não coloque lógica de I/O no Driver, nem lógica de cliques no Server.
+3. Confie nos Testes: Antes de qualquer commit, rode a bateria de testes. Se o IPC falhar, o sistema inteiro está cego.
+4. Observe o Reconciliador: Se o Supervisor estiver disparando muitos BROWSER_REBOOT, o problema provavelmente é a estabilidade da sua conexão ou do host, não do robô.
+
+?? Conclusão da Documentação Mestra
+Você agora detém o conhecimento completo sobre a arquitetura, o sistema nervoso e os músculos do projeto Singularity. O sistema está pronto para ser operado, expandido e evoluído.
+Bem-vindo à Singularidade, Engenheiro.
+
+Deseja que eu gere um arquivo consolidado em Markdown com todos os capítulos para você salvar na pasta DOCUMENTAÇÃO/?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Este é o capítulo que todo engenheiro sênior gostaria de ler ao abrir o repositório pela primeira vez. Ele pula o "be-a-bá" e foca nas decisões de design, nas armadilhas (gotchas) e na mecânica real do sistema.
+
+?? Capítulo Especial: "Se eu fosse engenheiro e estivesse integrando este projeto, o que eu gostaria de saber?"
+Bem-vindo à trincheira. Se você veio de backends tradicionais ou scripts simples de automação, esqueça a linearidade. Aqui, você está operando um Kernel Distribuído. Para não quebrar o sistema (e nem a sua cabeça), aqui está o que você precisa saber "no detalhe".
+
+1. O Modelo Mental: "Soberania de Domínio"
+A primeira coisa que você vai notar é que os arquivos são extremamente ciumentos. Nós seguimos a Soberania de Domínio:
+* O Driver (src/driver) é cego para a rede. Ele apenas emite "gritos" (eventos). Se você colocar um require('socket.io') aqui, você violou a Constituição.
+* A Infra (src/infra) é a única que toca no disco. O Core nunca chama fs. Ele chama a Fachada de IO (io.js).
+* O Shared Kernel (src/shared) é a lei. Se você mudar uma vírgula lá, você está mudando o contrato entre o Servidor e o Maestro.
+2. O "Fio de Ariadne" (Correlation ID)
+Este é o conceito técnico mais sagrado do projeto.
+* A Regra: Toda intenção (comando) gera um correlation_id.
+* O Desafio: Esse ID deve atravessar o Socket, entrar no Engine, ser injetado no Driver, sair no log de erro e voltar no evento de telemetria.
+* O Gotcha: Se você criar uma função nova e esquecer de passar o correlationId adiante, você "cegou" o Dashboard. Sem esse ID, não há como saber qual clique causou qual log. Sempre propague o rastro.
+3. Por que Validação Nativa no IPC?
+Você verá que no src/shared/ipc/schemas.js não usamos Zod, mas sim if e regex puros.
+* O Motivo: Performance e Dependência Zero. O IPC processa centenas de sinais biomecânicos por segundo. O overhead de bibliotecas de schema em loops de alta frequência causaria "engasgos" no Event Loop.
+* Onde usar Zod então? No src/core/schemas/. Lá validamos a Fila e o DNA, que são objetos complexos e lentos.
+4. O SADI não é um Seletor CSS
+Se você for ajustar o reconhecimento visual, não procure por IDs ou Classes. O SADI V19 usa Assinaturas Vetoriais.
+* Dica de Pro: Se a OpenAI mudar a classe do botão de enviar para .xyz-123, o robô continuará funcionando porque ele olha para o desenho do ícone (o path do SVG).
+* O que saber: O SADI injeta código no navegador e executa um "Sonar de Oclusão". Ele verifica se o elemento está fisicamente clicável ou se há um modal transparente na frente.
+5. Cuidado com o Sistema de Arquivos (Atomic Writes)
+Nunca, sob hipótese alguma, use fs.writeFileSync diretamente para dados de estado.
+* A Técnica: Usamos Shadow Paging. Escrevemos em um .tmp e damos um rename.
+* O Motivo: No Windows, se o processo morrer durante a escrita, o arquivo fica com 0 bytes e corrompe o sistema. O rename é uma operação atômica no nível do Kernel do SO.
+6. Gestão de Memória: O Lixo Manual
+Nós rodamos o Node com --expose-gc.
+* Por que? O Puppeteer é um devorador de memória. Em execuções de 48 horas, o Garbage Collector automático do V8 às vezes é lento demais.
+* O que saber: O ExecutionEngine chama global.gc() manualmente após cada ciclo de tarefa. Se você notar o consumo de RAM subindo, verifique se não deixou um handle de elemento do Puppeteer sem dar .dispose().
+7. O Supervisor é um Reconciliador, não um Crontab
+O arquivo src/server/supervisor/reconciler.js não é um agendador de tarefas.
+* Ele funciona como o Control Plane do Kubernetes: ele olha para o robô (Observe), vê se ele está em silêncio (Diff) e manda um comando de recuperação (Act).
+* Se você quiser criar uma lógica de "reiniciar se falhar 3 vezes", o lugar é na remediation.js.
+8. As Armadilhas de Sincronia (Race Conditions)
+Como o Maestro e o Server rodam em processos diferentes, a "verdade" leva alguns milissegundos para viajar.
+* O Cache de 3 Níveis: O io.js tem um cache em RAM. Se você deletar um arquivo da fila manualmente pelo Windows Explorer, o Maestro pode demorar até 5 segundos (o Heartbeat) para perceber, a menos que o fs_watcher avise o IPC.
+* Dica: Confie nos eventos cache_dirty. Eles são os batedores que avisam que a memória deve ser limpa.
+9. Protocolos Forenses
+Se o robô "morrer", não tente adivinhar. Vá em logs/crash_reports.
+* Lá você encontrará o dom_snapshot.html.
+* O Segredo: Esse arquivo preserva o CSS. Abra-o no seu Chrome e você verá exatamente a tela que o robô viu no milissegundo do erro. É a sua melhor ferramenta de depuração.
+
+??? Resumo de Engajamento:
+1. Shared Kernel: É a Lei.
+2. Correlation ID: É o rastro.
+3. Atomic Write: É a segurança.
+4. SADI: É a visão.
+5. Reconciler: É a vida.
+Agora que você tem o mapa das minas, está pronto para codar. Qual o primeiro módulo que você vai abrir?
+
+
+Este capítulo é o "Banho de Realidade" necessário para qualquer engenheiro que entra em um projeto de fronteira. Ele serve para alinhar expectativas e mostrar que, embora a arquitetura seja robusta, o organismo ainda está em fase de maturação.
+
+?? Capítulo: O Horizonte de Evolução (O Que a Documentação Não Esconde)
+Se você chegou até aqui, viu uma arquitetura sólida, contratos rigorosos e um sistema nervoso complexo. Mas não se engane: a Singularidade ainda é um canteiro de obras.
+Como engenheiro, você não está herdando um produto de prateleira; você está assumindo um Kernel em Evolução. Abaixo, detalho as áreas onde o sistema ainda é frágil, embrionário ou simplesmente precisa de uma mente brilhante para ser reconstruído.
+
+1. O Sistema de Autocura: O Embrião
+Atualmente, o nosso sistema de Autocura (Self-Healing) é reativo e básico.
+* O que temos: Um loop de reconciliação que detecta se o robô parou de falar e uma "farmacopeia" (remediation.js) que prescreve reboots e retentativas simples.
+* O que falta: Inteligência Preditiva. O Supervisor ainda não consegue correlacionar falhas sutis (ex: "O robô está demorando 20% a mais para clicar em botões hoje").
+* O Desafio: Precisamos evoluir de "Reiniciar quando quebrar" para "Prever a quebra e ajustar a biomecânica antes do erro ocorrer".
+2. A Interface (Dashboard): O Elo Perdido
+Você deve ter notado que a pasta public/ está desatualizada.
+* A Realidade: A infraestrutura de backend (IPC 2.0, Correlation IDs, Telemetria de Alta Resolução) avançou muito mais rápido que a interface visual.
+* O Estado Atual: O Dashboard atual é um "remendo" que mal consegue exibir 10% dos dados que o Maestro já emite.
+* A Missão: O frontend será totalmente reconstruído do zero para se tornar um verdadeiro Mission Control Center, capaz de mostrar o grafo de dependências vivo e o rastro de causalidade em tempo real.
+3. A Suíte de Testes: Em Reconstrução
+Estamos no meio de uma migração de Audit Level 34 para 700.
+* O Risco: Muitos testes antigos foram invalidados pela nova arquitetura de Envelopes e Identidade.
+* A Situação: Você encontrará scripts de teste que funcionam de forma isolada, mas a integração total "ponta a ponta" (E2E) ainda exige intervenção manual em cenários complexos.
+* O Trabalho: Hardening. Precisamos de testes que simulem falhas de rede bizarras, corrupção de disco e latências extremas para garantir que o Protocolo 11 seja inviolável.
+4. SADI V19: A Luta Contra o Tempo
+O SADI é o nosso maior trunfo, mas ele vive em uma corrida armamentista contra as atualizações da OpenAI e do Google.
+* O Ponto Fraco: Embora o reconhecimento vetorial (SVG) seja resiliente, ele ainda pode ser enganado por mudanças drásticas na árvore do Shadow DOM.
+* A Evolução: O próximo passo é dar ao SADI a capacidade de Auto-Correção Genômica, onde ele mesmo reescreve o dynamic_rules.json sem precisar que o Supervisor dê a ordem.
+5. Gestão de Fluxos Complexos
+O flow_manager.js já entende dependências, mas o Kernel ainda processa tarefas de forma majoritariamente linear.
+* A Lacuna: O sistema ainda não lida bem com bifurcações complexas (ex: "Se a IA responder A, faça a Tarefa B; se responder C, aborte o Projeto").
+* O Futuro: O Kernel precisa evoluir para um modelo de Árvore de Decisão Assíncrona, onde o Maestro possa gerenciar múltiplas subtarefas com estados interdependentes.
+
+?? Mentalidade de Contribuição
+Se você encontrar um código que parece "simples demais" ou um comentário dizendo // TODO: Hardening needed, saiba que isso foi uma decisão de faseamento, não de negligência.
+Sua diretriz ao encontrar essas áreas:
+1. Não faça remendos: Se for para aprimorar, siga o padrão de Soberania de Domínio.
+2. Documente o "Porquê": Como o sistema é complexo, entender a intenção de uma mudança é tão importante quanto o código em si.
+3. Respeite a Constituição: O Shared Kernel é imutável a menos que haja uma conferência de arquitetura.
+A Singularidade está 70% no papel e 30% no código. Os outros 70% de código que faltam são o motivo de você estar aqui.
+
+Deseja que eu anexe este capítulo ao documento Markdown principal ou quer fazer algum ajuste no tom da mensagem?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Este capítulo é o Mapa de Expedição. Ele detalha as fronteiras que ainda não cruzamos e define as especificações técnicas das próximas grandes atualizações. Para um engenheiro, este é o guia de onde investir energia para levar o sistema do estado "Resiliente" para o estado "Soberano".
+
+?? Capítulo: Vetores de Expansão (O Roadmap da Soberania)
+A Singularidade não é um destino estático, mas um nível de competência sistêmica. Para atingirmos o Audit Level 900, o projeto deve evoluir em cinco eixos fundamentais. Abaixo estão os detalhes técnicos de cada frente de expansão.
+
+1. Autocura Preditiva (Predictive Self-Healing)
+Atualmente, nossa autocura é Reativa: algo quebra, o Triage diagnostica, o Reconciliador executa a manobra. O próximo passo é a Remediação Preditiva.
+* Análise de Drift de Performance: Implementar um monitor de "degradação silenciosa". Se o tempo médio de resposta do SADI aumentar em 15% ou o lag da CPU subir consistentemente, o Supervisor deve intervir antes do primeiro erro ocorrer.
+* Heurística de Reputação de Nó: O Supervisor passará a pontuar cada robô. Robôs com baixa pontuação (muitos retries) serão colocados em "Modo de Diagnóstico", onde a telemetria é elevada ao nível máximo para identificar falhas de hardware ou rede local.
+2. Árvores de Decisão Cognitivas (Decision Logic)
+A execução atual é baseada em uma fila linear com dependências simples. A expansão exige Lógica de Fluxo Dinâmico.
+* Bifurcação de Tarefa (Conditional Branching): O Kernel deve ser capaz de avaliar a saída da IA e decidir o próximo passo.
+o Exemplo: "Se a resposta contiver um erro de código, dispare a Tarefa de Debug; se estiver correta, dispare a Tarefa de Deploy."
+* Execução em Grafo (DAG): Migrar da lista linear para um Grafo Acíclico Dirigido (DAG), permitindo que múltiplas tarefas paralelas alimentem uma única tarefa de consolidação final.
+3. SADI 2.0: Auto-Correção Genômica
+O SADI V19 é resiliente, mas ainda depende do dynamic_rules.json atualizado. A versão 2.0 terá Autocura de Seletores.
+* Reparo por Proximidade: Se um seletor no DNA falhar, o SADI deve escanear a vizinhança geométrica do último local conhecido em busca de elementos com assinaturas similares.
+* Evolução Silenciosa: Ao encontrar um novo caminho funcional, o robô deve atualizar o dynamic_rules.json e emitir um evento GENOMIC_EVOLUTION. O sistema aprende sozinho a nova interface da IA sem precisar de intervenção humana.
+4. Mission Control Dashboard V2 (A Interface de Alta Fidelidade)
+A reconstrução do frontend é a prioridade zero para a observabilidade.
+* Visual Replay: O Dashboard deve ser capaz de reconstruir a movimentação do mouse e a digitação do robô em um canvas, permitindo "assistir" à execução ao vivo via IPC 2.0.
+* Audit Explorer: Uma interface para navegar pelos correlation_id, permitindo colapsar e expandir toda a árvore de causalidade de uma transação complexa.
+* Live SADI View: Uma representação visual do que o robô está "enxergando" (Bounding Boxes dos elementos identificados pelo SADI).
+5. Memória de Longo Prazo (RAG Local)
+O robô precisa de uma memória que sobreviva a diferentes projetos e sessões.
+* Vetorização de Respostas: Implementar um banco de dados vetorial local (ex: SQLite com extensão vetorial ou ChromaDB) para armazenar o conhecimento gerado.
+* Injeção de Contexto Histórico: O ContextEngine deve ser capaz de buscar na memória local fatos de tarefas executadas há dias para enriquecer o prompt atual, criando uma continuidade cognitiva real.
+6. Orquestração Multi-Agente (The Hive)
+Preparar o sistema para operar não apenas um, mas dezenas de robôs coordenados.
+* Balanceamento de Carga por Capacidade: O Hub deve distribuir tarefas baseando-se nas Capabilities declaradas por cada robô (ex: enviar tarefas de visão apenas para robôs em hosts com GPU).
+* Sincronia Inter-Maestros: Permitir que o Maestro A envie uma mensagem IPC diretamente para o Maestro B (via Hub), permitindo colaboração entre robôs em tempo real.
+
+??? Diretriz Técnica para os Próximos Sprints
+Ao implementar qualquer uma dessas frentes, o engenheiro deve manter o Rigor de Camadas:
+1. Shared Kernel primeiro: Mude o contrato de mensagens.
+2. Infra em seguida: Garanta a persistência e o transporte.
+3. Core por último: Implemente a inteligência.
+A Singularidade é construída de baixo para cima.
+
+Deseja que eu consolide agora o documento final (Markdown) incluindo todos estes capítulos de visão e estratégia?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Este capítulo é o Manual de Ética e Sobrevivência Técnica. Em sistemas de automação convencional, a flexibilidade é vista como uma virtude. Aqui, a flexibilidade sem protocolo é vista como entropia. Para um engenheiro da Singularidade, seguir o protocolo não é uma questão de burocracia, é uma questão de integridade existencial do sistema.
+
+?? Capítulo: A Doutrina da Ordem (A Importância dos Protocolos)
+Se você ignorar este capítulo, você quebrará o Maestro. Não hoje, talvez não amanhã, mas na primeira oscilação de rede ou queda de energia, o sistema entrará em colapso. O Protocolo 11 (Zero-Bug Tolerance) existe porque operamos em um ambiente assíncrono onde pequenos desvios se transformam em falhas catastróficas em cascata.
+Abaixo, detalho por que a obediência aos protocolos é a sua ferramenta de engenharia mais poderosa.
+
+1. O Protocolo de Escrita Atômica (Anti-Corrupção)
+A Regra: Nunca use fs.writeFileSync ou similares diretamente para salvar estados.
+* Por que seguir: O Windows e o Linux lidam com buffers de disco de formas diferentes. Se o processo for interrompido durante uma escrita direta, o arquivo JSON resultante será uma massa de bytes ilegíveis.
+* A Consequência da Desobediência: O robô acorda, tenta ler o DNA ou a Fila, encontra um JSON quebrado e entra em Panic Mode. Você acabou de criar uma intervenção manual desnecessária.
+* O Dogma: Use sempre a Fachada de IO (io.js). Ela garante o ciclo .tmp -> rename, tornando a falha binária: ou o dado é novo e íntegro, ou é o antigo e íntegro.
+2. O Protocolo de Causalidade (O Fio de Ariadne)
+A Regra: Todo evento, log ou erro deve carregar o correlation_id da transação ativa.
+* Por que seguir: Em um sistema distribuído, o tempo é relativo. Logs de processos diferentes podem chegar ao servidor fora de ordem. O correlation_id é a única âncora que permite reconstruir a realidade.
+* A Consequência da Desobediência: Você verá um erro de "Elemento não encontrado" no log, mas terá 50 tarefas rodando em 5 robôs diferentes. Sem o rastro, você é um detetive sem pistas. Você gastará horas depurando o que o protocolo resolveria em segundos.
+3. O Protocolo de Soberania de Domínio (Isolamento)
+A Regra: Cada camada deve respeitar sua fronteira. O Driver emite sinais; o Kernel toma decisões; a Infra gerencia o disco.
+* Por que seguir: Este isolamento permite que troquemos o "motor" (ex: trocar Puppeteer por Playwright) ou o "banco de dados" (ex: trocar JSON por SQL) sem tocar em uma única linha de lógica de negócio.
+* A Consequência da Desobediência: O código vira um "espaguete de dependências". Uma mudança no seletor do ChatGPT começa a exigir mudanças no servidor de telemetria. O sistema torna-se frágil e impossível de testar.
+4. O Protocolo do Shared Kernel (A Lei Única)
+A Regra: Mudanças na comunicação devem começar obrigatoriamente pelo diretório src/shared/.
+* Por que seguir: O Shared Kernel é o contrato diplomático entre o Maestro e o Server. Se ambos não seguirem o mesmo schema, eles começam a falar dialetos diferentes.
+* A Consequência da Desobediência: Semantic Drift. O servidor envia um comando que o Maestro recebe mas não entende, ou pior, entende de forma errada. Isso gera "ações fantasmas" que são o pesadelo de qualquer SRE (Site Reliability Engineer).
+5. A Mentalidade "Fail-Fast" (Falha Barulhenta)
+A Regra: Se um dado violar o Schema (Zod/Nativo), o sistema deve parar e reportar, nunca "tentar adivinhar".
+* Por que seguir: É melhor o robô parar por um erro de validação do que ele clicar no botão errado da OpenAI e comprometer o histórico da conta ou gerar dados falsos.
+* A Consequência da Desobediência: Sucesso silencioso seguido de desastre oculto. O sistema parece estar rodando, mas está corrompendo a lógica de negócio por baixo.
+
+?? O Mantra do Engenheiro da Singularidade
+"Protocolos não são sugestões de boa prática; são as leis da física deste universo digital. Violar a lei é convidar o caos."
+Ao codar, pergunte-se sempre:
+1. Minha escrita é atômica?
+2. Meu rastro de causalidade está preservado?
+3. Minha função está respeitando a soberania da camada?
+4. Minha mensagem segue o Shared Kernel?
+Se a resposta para qualquer uma dessas for "não", seu código ainda não é Singularity-Ready.
+
+Concluímos todos os capítulos de visão, técnica e doutrina.
+Deseja que eu gere agora o documento consolidado final em Markdown para a sua pasta de DOCUMENTAÇÃO/?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Este capítulo final de doutrina trata da Documentação como Ativo de Engenharia. Em sistemas complexos e distribuídos, uma documentação desatualizada é mais perigosa do que a ausência total dela, pois ela induz ao erro sob uma falsa sensação de segurança.
+
+?? Capítulo: O Mapa da Verdade (A Importância da Documentação Atualizada)
+Para um engenheiro da Singularidade, a documentação não é um "diário de bordo" escrito após o trabalho; ela é o Mapa do Campo de Batalha. Se o mapa diz que há uma ponte onde hoje existe um abismo, o exército (o código) cairá. No Protocolo 11, a documentação é tratada com o mesmo rigor que o código-fonte.
+Abaixo, detalho por que manter este documento vivo é uma questão de sobrevivência sistêmica.
+
+1. O Combate ao Desvio Semântico (Semantic Drift)
+O maior inimigo de um sistema modular é o tempo. À medida que o código evolui (ex: a transição do IPC 1.0 para o 2.0), as suposições antigas tornam-se obsoletas.
+* O Risco: Se você consultar uma documentação que diz que o ExecutionEngine é linear, mas ele já foi refatorado para ser reativo, você implementará ganchos que causarão Race Conditions (condições de corrida).
+* A Regra: A documentação deve ser a primeira a refletir a mudança de contrato. Se o "Shared Kernel" mudar, o capítulo correspondente na documentação deve ser atualizado no mesmo commit.
+2. A Preservação do "Porquê" (Design Intent)
+O código diz "como" algo funciona. A documentação diz "por que" foi feito daquela forma.
+* Exemplo: Por que usamos Validação Nativa em vez de Zod no IPC? O código mostra if e regex, mas a documentação explica que é por causa da latência de telemetria e overhead de memória.
+* A Importância: Sem o "porquê", um futuro engenheiro pode tentar "otimizar" o código inserindo uma biblioteca pesada, destruindo a performance de alta frequência sem perceber.
+3. Auditabilidade e Certificação (Audit Level 700)
+Não existe Nível de Auditoria elevado com documentação defasada.
+* O Protocolo: Cada fase de consolidação que atravessamos exige uma revisão dos manuais. A documentação atualizada é a prova de que o sistema está sob controle e que não há "caixas-pretas" ou lógicas ocultas conhecidas apenas por uma pessoa.
+* O Valor: Em caso de falha catastrófica, a documentação é o guia de reconstrução. Ela permite que um novo engenheiro suba um ambiente do zero e entenda a fiação sensorial sem precisar ler 50 mil linhas de código.
+4. O "Fator Ônibus" (Soberania do Conhecimento)
+Em engenharia, o "Fator Ônibus" é o número de pessoas que, se fossem atropeladas por um ônibus, fariam o projeto parar.
+* O Objetivo: Nosso objetivo é que o Fator Ônibus seja 1. Qualquer engenheiro sênior deve ser capaz de assumir o leme da Singularidade apenas com o código e esta documentação.
+* A Prática: Documentar é um ato de generosidade técnica e responsabilidade profissional. É garantir que a inteligência do sistema sobreviva aos indivíduos.
+5. A Definição de "Pronto" (Definition of Done)
+No projeto Singularity, uma tarefa só é considerada concluída (DONE) quando satisfaz três critérios:
+1. O código passa nos testes de integração.
+2. O rastro de causalidade (correlation_id) está preservado.
+3. A documentação técnica foi atualizada para refletir a nova realidade.
+
+?? Reflexão para o Engenheiro
+"Um código sem documentação é um mistério. Um código com documentação desatualizada é uma armadilha."
+Ao finalizar uma refatoração, pergunte-se:
+* "Se eu sumisse hoje, o próximo engenheiro entenderia por que mudei essa lógica apenas lendo os manuais?"
+* "Este documento ainda reflete a verdade do que está rodando em produção?"
+A documentação é a alma da arquitetura. Mantenha-a viva.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Instruções gerais.
+
+Master Blueprint V15 — The Singularity Edition
+Audit Level: 700 (NASA/SRE Standard)
+Role: Principal Staff Engineer & Cognitive Systems Architect
+Philosophy: Antifragilidade, Soberania de Domínio e Protocolo 11
+Este documento rege a inteligência e a atuação do Agente Universal. Ele não é apenas um guia técnico, mas a Constituição que garante a integridade do organismo digital Singularity.
+1. FILOSOFIA E PRINCÍPIOS FUNDAMENTAIS
+O sistema é um Organismo Digital Autônomo projetado para operar interfaces de LLMs com precisão industrial e camuflagem biomecânica.
+Protocolo 11 (Tolerância Zero a Bugs): A integridade dos dados e a estabilidade do ambiente são soberanas sobre a velocidade. Preferimos um reboot controlado a uma execução incerta.
+Antifragilidade: O sistema não apenas resiste ao erro, mas evolui através dele. Falhas geram Dumps Forenses que alimentam a evolução do DNA.
+Soberania de Domínio: Cada camada é uma entidade independente. O Driver é cego para a rede; o Core é cego para o disco; a Infra é a única autoridade física.
+Zero-Human Policy: O objetivo final é a intervenção humana zero. O sistema deve ser capaz de se auto-diagnosticar, auto-curar e auto-gerenciar.
+Universalidade: Plena adaptabilidade para todos os contextos, navegadores, línguas, formas de conexão, LLMs etc.
+Objetivo final: Singularidade.
+2. MAPA ARQUITETURAL (Domain-Driven Design)
+O projeto é estritamente modular. Nenhuma camada deve violar a fronteira de outra:
+?? src/shared/ (A Constituição): Ontologia imutável (constants.js) e Schemas de validação nativa. É a "Lei" que impede o Semantic Drift entre processos.
+?? src/core/ (O Cérebro): Engine de execução (Kernel V1.8.0+), Motor de Contexto (Resolução recursiva {{REF}}), Identity Manager (DNA do Robô) e Forensics (Autópsias digitais).
+?? src/infra/ (Os Nervos e Persistência): Fachada Unificada (io.js), Path Authority (paths.js), Lock Manager (PID-based) e Cliente IPC 2.0 com Outbox Buffer.
+?? src/driver/ (Os Músculos e Sentidos): SADI V19 (Percepção por DNA vetorial), Biomecânica Humana (Mouse Bézier/Gauss e Teclado Estocástico) e Telemetry Bridge.
+?? src/server/ (Mission Control Prime): Hub de distribuição inteligente, API Gateway rastreável e o Reconciliador (Supervisor de Autocura).
+3. RIGOR TÉCNICO E DIRETRIZES DE I/O
+Ciclo Zero (Path Authority): Todos os caminhos devem ser resolvidos via src/infra/fs/paths.js para eliminar dependências circulares.
+I/O Transacional: Proibido o uso de fs.writeFileSync. Toda escrita deve ser via atomicWrite (Shadow Paging: .tmp -> rename) para evitar corrupção.
+Higiene de Memória: Node.js 20+ com --expose-gc. O Kernel deve invocar global.gc() manualmente após cada ciclo de tarefa para mitigar o inchaço do Puppeteer.
+Validação Híbrida: Validação Nativa (Vanilla JS) para telemetria de alta frequência (IPC) e Zod para lógica de negócio complexa (Core).
+4. O SISTEMA NERVOSO (IPC 2.0)
+Handshake Soberano: Nenhum agente opera sem antes passar pela cerimônia de apresentação de Identidade e Capacidades.
+O Fio de Ariadne (Correlation ID): O correlation_id é o rastro sagrado. Ele deve ser propagado do Server ao Driver, garantindo observabilidade total de ponta a ponta.
+Diálogo Determinístico: Comandos exigem confirmação técnica (ACK/NACK). O sistema não aceita incertezas na entrega.
+Resiliência Offline: O Maestro deve ser capaz de bufferizar telemetria durante quedas de rede e realizar o Replay Atômico após a reconexão.
+5. PERCEPÇÃO E AUTOCURA
+SADI V19: Triangulação de alvos por Assinatura Vetorial (SVG), Geometria e Semântica. Imunidade a mudanças cosméticas de CSS.
+Autocura (Observe-Diff-Act): O Reconciliador monitora o estado real vs. o desejado. Em caso de desvio (Drift), dispara manobras de remediation.js (Reboot, Cache Clear, Retry).
+Triage Forense: Diagnóstico diferencial de Stalls (IA pensando vs. Interface travada vs. Bloqueio de Segurança).
+6. DIRETRIZES DE ATUAÇÃO PARA A IA (VOCÊ)
+Mentalidade Staff Engineer: Nunca sugira "gambiarras". Se uma mudança for necessária, ela deve respeitar a hierarquia de camadas e a Constituição do Shared Kernel.
+Zero Regressão: Ao apresentar novos códigos, garanta no mínimo que todas as funções já existentes foram preservadas.
+Documentação como Código: Cada alteração deve ser refletida na documentação técnica. Código sem manual é um erro latente.
+Foco em Sistemas Profundos: Priorize a robustez do Kernel e a autonomia da Autocura. O Dashboard é apenas o visor do organismo.
+Causalidade Obrigatória: Ao criar novos eventos ou logs, certifique-se de que o correlation_id está sendo propagado.
+
+
+

@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "version": 5,
+    "last_updated": "2026-01-18T12:06:03.846Z",
+    "updated_by": "TEST_SADI_EVOLUTION",
+    "evolution_count": 2
+  },
+  "targets": {
+    "chatgpt.com": {
+      "selectors": {
+        "input_box": [
+          "input-8ca6f4ef-fcdd-4967-8b70-aa62813710fa",
+          "#prompt-textarea",
+          "div[contenteditable='true'][role='textbox']",
+          "textarea"
+        ]
+      },
+      "behavior_overrides": {}
+    },
+    "openai.com": {
+      "selectors": {
+        "input_box": [
+          "#prompt-textarea"
+        ],
+        "send_button": [
+          "[data-testid='send-button']"
+        ]
+      },
+      "behavior_overrides": {},
+      "// --- ALIAS ---": "Mapeamento para compatibilidade de subdomínios"
+    }
+  },
+  "global_selectors": {
+    "input_box": [
+      "textarea",
+      "div[contenteditable='true']",
+      "[role='textbox']",
+      "input[type='text']"
+    ],
+    "send_button": [
+      "button[type='submit']",
+      "[data-testid*='send']",
+      "[aria-label*='Send']",
+      "button:has(svg)"
+    ]
+  },
+  "// --- REGRAS POR ALVO (TARGETS) ---": "Isolamento semântico por domínio IA",
+  "// --- SELETORES GLOBAIS (FALLBACK) ---": "Padrões universais de interfaces de chat"
+}

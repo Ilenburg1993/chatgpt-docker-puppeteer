@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Control - Agente GPT</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside>
+        <h1>🚀 Mission Control <span style="font-size:0.5em; opacity:0.5; margin-left:auto">v3.2</span></h1>
+        
+        <!-- HUD -->
+        <div class="status-grid">
+            <div class="status-card">
+                <div><span id="status-agent" class="led"></span> Agente</div>
+                <div id="val-uptime" class="status-val">-</div>
+            </div>
+            <div class="status-card">
+                <div>Memória</div>
+                <div id="val-memory" class="status-val">-</div>
+            </div>
+        </div>
+
+        <!-- Controles -->
+        <h2>Operação</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+            <button id="btn-start" class="btn-start" onclick="control('start')">▶ Iniciar</button>
+            <button id="btn-stop" class="btn-stop" onclick="control('stop')">⏸ Pausar</button>
+        </div>
+        <button class="btn-restart" onclick="control('restart')">🔄 Reiniciar Robô</button>
+        
+        <h2>Diagnóstico</h2>
+        <button class="btn-neutral" onclick="openDiagnostics()">🩺 Check-up</button>
+        <button class="btn-neutral" onclick="openCrashGallery()">📸 Galeria de Erros</button>
+        <button class="btn-kill" onclick="control('kill_daemon')" style="margin-top:10px;">☠ KILL SWITCH</button>
+
+        <!-- Criador Rápido -->
+        <h2>Tarefa Rápida</h2>
+        <select id="inp-target">
+            <option value="chatgpt">ChatGPT</option>
+            <option value="gemini">Gemini</option>
+        </select>
+        <select id="inp-model">
+            <option value="gpt-5">GPT-5</option>
+            <option value="gpt-4o">GPT-4o</option>
+        </select>
+        <textarea id="inp-system" rows="2" placeholder="System Prompt..."></textarea>
+        <textarea id="inp-prompt" rows="4" placeholder="User Prompt..."></textarea>
+        
+        <label style="font-size:0.75rem; color:#8b949e; display:block; margin-bottom:5px;">Agendar (Opcional):</label>
+        <input type="datetime-local" id="inp-schedule">
+
+        <div style="display: flex; gap: 5px;">
+            <input type="number" id="inp-prio" value="5" placeholder="Prio" style="width: 60px;">
+            <button class="btn-neutral" onclick="addTask()">Adicionar</button>
+        </div>
+
+        <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+             <button class="btn-neutral" onclick="openTaskWizard()">✨ Criar Avançada</button>
+        </div>
+        
+        <div style="margin-top: 10px;">
+            <button class="btn-neutral btn-sm" onclick="clearQueue()">🗑️ Limpar Fila</button>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main>
+        <!-- Fila -->
+        <div style="display: flex; flex-direction: column; height: 100%;">
+            <div class="panel-header">
+                <h2>Fila de Execução</h2>
+                <span style="font-size: 0.8rem; color: #666;">Clique no card para editar</span>
+            </div>
+            <div id="taskList" class="task-list"></div>
+        </div>
+
+        <!-- Terminal -->
+        <div style="display: flex; flex-direction: column; height: 100%;">
+            <div class="panel-header">
+                <h2>Terminal de Logs</h2>
+                <span style="font-size: 0.7rem; color: #444;">agente_current.log</span>
+            </div>
+            <div id="terminal" class="terminal"></div>
+        </div>
+    </main>
+
+    <!-- MODAL UNIVERSAL -->
+    <div id="taskModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span id="modalTitle" style="color:#fff; font-weight:bold;">Detalhes</span>
+                <button style="width:auto; padding:5px;" onclick="closeModal()">✕</button>
+            </div>
+            <div id="modalContent" class="modal-body"></div>
+            <div id="modalFooter" class="modal-footer"></div>
+        </div>
+    </div>
+    
+    <!-- MODAL WIZARD (Separado para layout específico) -->
+    <div id="wizardModal" class="modal-overlay">
+        <div class="modal" style="width: 600px;">
+            <div class="modal-header">
+                <span style="color:#fff; font-weight:bold;">Nova Tarefa Avançada</span>
+                <button style="width:auto; padding:5px;" onclick="closeWizard()">✕</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+                <label>Prompt do Usuário *</label>
+                <textarea id="wiz-prompt" rows="4"></textarea>
+                
+                <label>System Prompt (Persona)</label>
+                <textarea id="wiz-system" rows="2"></textarea>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div>
+                        <label>Modelo</label>
+                        <select id="wiz-model">
+                            <option value="gpt-5">GPT-5</option>
+                            <option value="gpt-4o">GPT-4o</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Prioridade</label>
+                        <input type="number" id="wiz-prio" value="5">
+                    </div>
+                </div>
+
+                <label>Tags (separadas por vírgula)</label>
+                <input type="text" id="wiz-tags" placeholder="livro, cap1, rascunho">
+
+                <label>Depende de (IDs separados por vírgula)</label>
+                <input type="text" id="wiz-deps" placeholder="TASK-123, TASK-456">
+                
+                <label>Agendar para</label>
+                <input type="datetime-local" id="wiz-schedule">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-neutral" onclick="closeWizard()">Cancelar</button>
+                <button class="btn-start" onclick="submitWizard()">Criar Tarefa</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

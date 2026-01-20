@@ -1,0 +1,19 @@
+TESTE MANUAL: simulação de stall / aba congelada
+
+Objetivo:
+  Verificar que o agente detecta TAB_UNRESPONSIVE ou STALL_DETECTED_* quando a aba do ChatGPT trava.
+
+Procedimento (exemplo com DevTools):
+1) Abra o Chrome com remote debugging (porta 9222).
+2) Abra uma aba com ChatGPT e abra DevTools (F12).
+3) No painel Console, execute (para congelar a thread por 10s):
+     const t0 = Date.now(); while(Date.now() - t0 < 10000) {};
+   (ou use CPU throttling para simular lentidão.)
+4) Enquanto a aba está travada, inicie o agente e submeta uma tarefa grande (prompt).
+5) Observe os logs (logs/agente_*.log) e metrics.log; deve constar eventos
+   'TAB_UNRESPONSIVE' ou 'stall_*'.
+6) Se o agente marcar a tarefa como FAILED com razões apropriadas -> PASS.
+
+Observações:
+- Cuidado: congelar a aba prejudica a interação. Faça testes controlados.
+- Alternativa: inserir delays na rede / throttling de CPU via DevTools.

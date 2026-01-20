@@ -1,0 +1,5 @@
+908528c360a60a109d92314a2fb2a98579f2fec5 Add CI workflow, README note about LLM-agnostic and pre-commit config
+01e4201155d6abc85a0c80ba6fbef5962120b5a0 Add pre-commit config
+677bc0eabfc044780e86e60344fd67e91707ecf2 Remove browser profile and ignore local-login/profile
+45bd05722e1ab68b8f29e373a7c32fc76b41e831 Ignore temporary .tmp.driveupload files
+f9d18892889f5b20a62211333d243ff55b9b4c80 Commit inicial: projeto Docker com Puppeteer
