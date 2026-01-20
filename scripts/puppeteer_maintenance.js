@@ -83,7 +83,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
         console.log('  ✅ Cache removed');
         console.log('  ⚠️  Chromium será baixado novamente na próxima execução');
       } catch (error) {
-        console.log('  ❌ Erro:', error.message);
+        console.log('  ❌ Erro:', error instanceof Error ? error.message : String(error));
       }
     }
     console.log();
