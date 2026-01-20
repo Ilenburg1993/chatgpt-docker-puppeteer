@@ -16,6 +16,8 @@
    - Logs estruturados para auditoria
 ========================================================================== */
 
+// @ts-nocheck - Suprime warnings TypeScript para propriedades dinâmicas e tipos implícitos
+
 const { log } = require('./core/logger');
 const CONFIG = require('./core/config');
 const identityManager = require('./core/identity_manager');
@@ -52,8 +54,8 @@ async function boot() {
         log('DEBUG', '[BOOT] Configurações carregadas');
         
         // Garante identidade do robô (robot_id)
-        await identityManager.ensureIdentity();
-        const identity = identityManager.getIdentity();
+        await identityManager.initialize();
+        const identity = identityManager.getFullIdentity();
         log('INFO', `[BOOT] Identidade estabelecida: ${identity.robot_id}`);
         
         // Garbage collection inicial (se disponível)
@@ -108,20 +110,30 @@ async function boot() {
         log('INFO', '[BOOT] Fase 5/6: Inicializando Adapters');
         
         // Driver Adapter (DRIVER ↔ NERV)
-        const driverAdapter = new DriverNERVAdapter(nerv, {
-            config: CONFIG,
-            browserPool
-        });
-        await driverAdapter.initialize();
+        const driverAdapter = new DriverNERVAdapter(nerv, browserPool, CONFIG);
+        // DriverNERVAdapter não tem método initialize() - setup é feito no constructor
         log('INFO', '[BOOT] ✅ DriverNERVAdapter online');
         
         // Server Adapter (SERVER ↔ NERV)
-        const serverAdapter = new ServerNERVAdapter(nerv, {
-            config: CONFIG,
-            port: CONFIG.SERVER_PORT || 3333
+        // Cria HTTP server + Socket.io hub para o ServerNERVAdapter
+        const http = require('http');
+        const socketModule = require('./server/engine/socket');
+        
+        const httpServer = http.createServer();
+        const socketHub = socketModule.init(httpServer);
+        
+        const serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
+        
+        // Inicia o servidor HTTP
+        const serverPort = CONFIG.SERVER_PORT || 3333;
+        await new Promise((resolve, reject) => {
+            httpServer.listen(serverPort, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
         });
-        await serverAdapter.initialize();
-        log('INFO', `[BOOT] ✅ ServerNERVAdapter online (porta ${CONFIG.SERVER_PORT || 3333})`);
+        
+        log('INFO', `[BOOT] ✅ ServerNERVAdapter online (porta ${serverPort})`);
         
         // ===== FASE 6: FINALIZAÇÃO =====
         const bootDuration = Date.now() - bootStartTime;
