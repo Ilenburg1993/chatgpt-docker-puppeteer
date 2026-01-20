@@ -76,11 +76,7 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
     const orch4 = new ConnectionOrchestrator({
         mode: 'launcher',
         headless: 'new',
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--window-size=1280,720'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1280,720']
     });
 
     const browser4 = await orch4.connect();

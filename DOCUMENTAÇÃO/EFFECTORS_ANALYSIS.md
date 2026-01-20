@@ -19,6 +19,7 @@
 ### 2.1 TaskEffector (`src/effectors/task_effector.js`)
 
 **Responsabilidades declaradas**:
+
 - Instanciar e controlar `DriverLifecycleManager`
 - Traduzir ordens do Kernel em chamadas de driver
 - Traduzir eventos do driver em observações para o Kernel
@@ -26,6 +27,7 @@
 **Problemas identificados**:
 
 #### Problema 1: **Duplicação com DriverNERVAdapter**
+
 O `DriverNERVAdapter` (`src/driver/nerv_adapter/driver_nerv_adapter.js`) JÁ FAZ TUDO que o TaskEffector promete:
 
 ```javascript
@@ -33,16 +35,16 @@ O `DriverNERVAdapter` (`src/driver/nerv_adapter/driver_nerv_adapter.js`) JÁ FAZ
 async _executeTask(payload, correlationId) {
     // 2. Aloca página do pool
     page = await this.browserPool.allocate(task.spec.target);
-    
+
     // 3. Cria DriverLifecycleManager  ✅ MESMA COISA
     lifecycleManager = new DriverLifecycleManager(page, task, this.config);
-    
+
     // 4. Adquire driver da Factory  ✅ MESMA COISA
     const driver = await lifecycleManager.acquire();
-    
+
     // 5. Conecta listeners de telemetria  ✅ MESMA COISA
     this._attachDriverTelemetry(driver, taskId, correlationId);
-    
+
     // 6-8. Emite eventos via NERV  ✅ TRADUÇÃO KERNEL↔DRIVER
     this._emitEvent(ActionCode.DRIVER_TASK_STARTED, {...}, correlationId);
     const result = await driver.execute(task.spec.prompt);
@@ -98,6 +100,7 @@ this._emitEvent(ActionCode.DRIVER_TASK_STARTED, {...}, correlationId);
 ### 2.2 IOEffector (`src/effectors/io_effector.js`)
 
 **Responsabilidades declaradas**:
+
 - Executar ordens de persistência do Kernel
 - Isolar o Kernel de erros de I/O
 - Garantir atomicidade na escrita do estado
@@ -107,11 +110,13 @@ this._emitEvent(ActionCode.DRIVER_TASK_STARTED, {...}, correlationId);
 #### Problema 1: **Duplicação com io.js e State Persistence**
 
 O módulo `src/infra/io.js` JÁ FORNECE:
+
 - ✅ Escrita atômica (L200-250: atomic write com rename)
 - ✅ Isolamento de erros (try/catch em todas as operações)
 - ✅ Throttle de salvamento (cache reativo com debounce)
 
 O `src/kernel/adapters/state_persistence.js` JÁ FORNECE:
+
 - ✅ Interface entre Kernel e I/O
 - ✅ Salvamento periódico do estado
 - ✅ Proteção contra concorrência
@@ -129,7 +134,7 @@ async saveTask(task) {
 
 ```javascript
 // io_effector.js (L31-36)
-if (!force && (now - this.lastSaveTimestamp < this.saveInterval)) {
+if (!force && now - this.lastSaveTimestamp < this.saveInterval) {
     return; // Ignora silenciosamente ❌ PERDA DE DADOS
 }
 ```
@@ -144,16 +149,16 @@ Grep não encontrou nenhum uso de `new IOEffector` ou `require('./effectors/io_e
 
 ## 3. Mapeamento de Responsabilidades
 
-| Responsabilidade | TaskEffector (obsoleto) | Implementação Atual |
-|------------------|-------------------------|---------------------|
-| Instanciar DriverLifecycleManager | ✗ task_effector.js | ✅ DriverNERVAdapter.js (L136) |
-| Traduzir Kernel→Driver | ✗ Callbacks diretos | ✅ DriverNERVAdapter.js (L80-106) |
-| Traduzir Driver→Kernel | ✗ Não implementado | ✅ DriverNERVAdapter.js (L240-280) |
-| Emitir eventos NERV | ✗ Bypass com callback | ✅ DriverNERVAdapter._emitEvent() |
-| Salvar estado | ✗ io_effector.js | ✅ src/kernel/adapters/state_persistence.js |
-| Atomic write | ✗ Não implementado | ✅ src/infra/io.js (L220-235) |
-| Throttle I/O | ✗ Perde dados | ✅ io.js cache reativo |
-| Isolamento de erros | ✗ try/catch simples | ✅ io.js + error classification |
+| Responsabilidade                  | TaskEffector (obsoleto) | Implementação Atual                         |
+| --------------------------------- | ----------------------- | ------------------------------------------- |
+| Instanciar DriverLifecycleManager | ✗ task_effector.js      | ✅ DriverNERVAdapter.js (L136)              |
+| Traduzir Kernel→Driver            | ✗ Callbacks diretos     | ✅ DriverNERVAdapter.js (L80-106)           |
+| Traduzir Driver→Kernel            | ✗ Não implementado      | ✅ DriverNERVAdapter.js (L240-280)          |
+| Emitir eventos NERV               | ✗ Bypass com callback   | ✅ DriverNERVAdapter.\_emitEvent()          |
+| Salvar estado                     | ✗ io_effector.js        | ✅ src/kernel/adapters/state_persistence.js |
+| Atomic write                      | ✗ Não implementado      | ✅ src/infra/io.js (L220-235)               |
+| Throttle I/O                      | ✗ Perde dados           | ✅ io.js cache reativo                      |
+| Isolamento de erros               | ✗ try/catch simples     | ✅ io.js + error classification             |
 
 **Cobertura**: 100% das responsabilidades dos effectors já estão implementadas em módulos consolidados.
 
@@ -162,21 +167,24 @@ Grep não encontrou nenhum uso de `new IOEffector` ou `require('./effectors/io_e
 ## 4. Evidências de Código Morto
 
 ### Teste 1: Busca por imports
+
 ```bash
 grep -r "require.*effector" src/
 # Resultado: NENHUM import fora do próprio diretório effectors/
 ```
 
 ### Teste 2: Busca por instanciação
+
 ```bash
 grep -r "new TaskEffector\|new IOEffector" src/
 # Resultado: NENHUMA instanciação
 ```
 
 ### Teste 3: Busca por referências
+
 ```bash
 grep -r "TaskEffector\|IOEffector" src/ | grep -v "^src/effectors/"
-# Resultado: 
+# Resultado:
 # - src/kernel/policies/policy_engine.js:58 → COMENTÁRIO antigo
 # - src/kernel/policies/policy_engine.js:99 → COMENTÁRIO antigo
 ```
@@ -231,22 +239,26 @@ Responsabilidade: Instanciar e controlar o DriverLifecycleManager (Código Legad
 ## 7. Impacto da Remoção
 
 ### Risco: **ZERO**
+
 - ✅ Nenhum módulo importa os effectors
 - ✅ Nenhum teste depende dos effectors
 - ✅ Toda funcionalidade já reimplementada em módulos NERV
 
 ### Benefícios:
+
 1. **Redução de confusão**: Elimina camada fantasma da arquitetura
 2. **Documentação mais clara**: Menos módulos para explicar
 3. **Manutenção reduzida**: Menos código para manter
 4. **Arquitetura mais limpa**: Somente 8 subsistemas ao invés de 9
 
 ### Arquivos a deletar:
+
 ```
 src/effectors/
 ├── task_effector.js    (146 linhas)
 └── io_effector.js      (93 linhas)
 ```
+
 **Total**: 239 linhas de código morto
 
 ---
@@ -256,6 +268,7 @@ src/effectors/
 ### ✅ DELETAR COMPLETAMENTE
 
 **Justificativa**:
+
 1. Código 100% morto (nenhum uso na codebase)
 2. Duplicação total com DriverNERVAdapter e io.js
 3. Viola princípios da arquitetura NERV (callbacks diretos)
@@ -278,6 +291,7 @@ npm test
 ### Documentação:
 
 Atualizar todos os documentos para remover menções aos effectors:
+
 - [SYSTEM_ANALYSIS_COMPLETE.md](SYSTEM_ANALYSIS_COMPLETE.md) — Remover seção EFFECTORS
 - README.md — Já não menciona effectors
 - ARCHITECTURE.md (futuro) — Não incluir effectors
@@ -292,6 +306,7 @@ Os **effectors** são **vestígios de uma arquitetura anterior** (pré-NERV) que
 - **infra/io.js + kernel/adapters/state_persistence.js** (substitui IOEffector)
 
 Mantê-los na codebase:
+
 - ❌ Gera confusão arquitetural
 - ❌ Aumenta superfície de manutenção
 - ❌ Polui a documentação
@@ -303,6 +318,7 @@ Mantê-los na codebase:
 
 **Assinatura Técnica**:  
 Análise baseada em:
+
 - Leitura completa dos 2 effectors (239 linhas)
 - Grep search em toda codebase (0 usos encontrados)
 - Comparação com DriverNERVAdapter (implementação atual)

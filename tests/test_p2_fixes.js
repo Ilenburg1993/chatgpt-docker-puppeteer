@@ -28,7 +28,9 @@ async function testShutdownPhaseIsolation() {
                     name: 'Phase1-Success',
                     fn: async () => {
                         // Fase que funciona
-                        await new Promise(resolve => { setTimeout(resolve, 10));
+                        await new Promise(resolve => {
+                            setTimeout(resolve, 10);
+                        });
                     }
                 },
                 {
@@ -42,7 +44,9 @@ async function testShutdownPhaseIsolation() {
                     name: 'Phase3-Success',
                     fn: async () => {
                         // Fase após falha (deve executar mesmo assim)
-                        await new Promise(resolve => { setTimeout(resolve, 10));
+                        await new Promise(resolve => {
+                            setTimeout(resolve, 10);
+                        });
                     }
                 },
                 {
@@ -56,7 +60,9 @@ async function testShutdownPhaseIsolation() {
                     name: 'Phase5-Success',
                     fn: async () => {
                         // Última fase (deve executar)
-                        await new Promise(resolve => { setTimeout(resolve, 10));
+                        await new Promise(resolve => {
+                            setTimeout(resolve, 10);
+                        });
                     }
                 }
             ];
@@ -120,7 +126,6 @@ async function testShutdownPhaseIsolation() {
 
         console.log('✅ TEST 1 PASSOU: Isolamento de erros implementado corretamente\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 1 FALHOU:', error.message);
         return false;
@@ -145,7 +150,9 @@ async function testHandleManagerAbort() {
             mockHandles.push({
                 dispose: async () => {
                     // Simula dispose lento (500ms cada)
-                    await new Promise(resolve => { setTimeout(resolve, 500));
+                    await new Promise(resolve => {
+                        setTimeout(resolve, 500);
+                    });
                 }
             });
         }
@@ -189,7 +196,6 @@ async function testHandleManagerAbort() {
 
         console.log('✅ TEST 2 PASSOU: AbortController funcionando corretamente\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 2 FALHOU:', error.message);
         return false;
@@ -212,7 +218,9 @@ async function testHandleManagerComplete() {
         for (let i = 0; i < 5; i++) {
             mockHandles.push({
                 dispose: async () => {
-                    await new Promise(resolve => { setTimeout(resolve, 50));
+                    await new Promise(resolve => {
+                        setTimeout(resolve, 50);
+                    });
                 }
             });
         }
@@ -246,7 +254,6 @@ async function testHandleManagerComplete() {
 
         console.log('✅ TEST 3 PASSOU: Cleanup completo sem abort\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 3 FALHOU:', error.message);
         return false;
@@ -266,11 +273,31 @@ async function testHandleManagerWithErrors() {
 
         // Mix de handles: alguns funcionam, outros falham
         const mockHandles = [
-            { dispose: async () => { /* OK */ } },
-            { dispose: async () => { throw new Error('DISPOSE_ERROR_1'); } },
-            { dispose: async () => { /* OK */ } },
-            { dispose: async () => { throw new Error('DISPOSE_ERROR_2'); } },
-            { dispose: async () => { /* OK */ } }
+            {
+                dispose: async () => {
+                    /* OK */
+                }
+            },
+            {
+                dispose: async () => {
+                    throw new Error('DISPOSE_ERROR_1');
+                }
+            },
+            {
+                dispose: async () => {
+                    /* OK */
+                }
+            },
+            {
+                dispose: async () => {
+                    throw new Error('DISPOSE_ERROR_2');
+                }
+            },
+            {
+                dispose: async () => {
+                    /* OK */
+                }
+            }
         ];
 
         mockHandles.forEach(h => manager.register(h));
@@ -291,7 +318,6 @@ async function testHandleManagerWithErrors() {
 
         console.log('✅ TEST 4 PASSOU: Erros individuais não travam cleanup\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 4 FALHOU:', error.message);
         return false;
@@ -354,7 +380,6 @@ async function testCodeValidation() {
 
         console.log('✅ TEST 5 PASSOU: Código validado\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 5 FALHOU:', error.message);
         return false;

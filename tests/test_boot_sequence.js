@@ -13,8 +13,8 @@ console.log('🚀 Testando sequência de boot...\n');
     console.log('FASE 2: Identity Manager');
     const identity = require('../src/core/identity_manager');
     await identity.initialize();
-    console.log('  Robot ID:', `${identity.getRobotId().substring(0, 8)  }...`);
-    console.log('  Instance ID:', `${identity.getInstanceId().substring(0, 8)  }...`);
+    console.log('  Robot ID:', `${identity.getRobotId().substring(0, 8)}...`);
+    console.log('  Instance ID:', `${identity.getInstanceId().substring(0, 8)}...`);
     console.log('  ✅ Identity inicializado\n');
 
     // FASE 3: NERV
@@ -44,7 +44,7 @@ console.log('🚀 Testando sequência de boot...\n');
     console.log('FASE 5: Teste de Integração (NERV + Browser)');
 
     let messageReceived = false;
-    nerv.onReceive((envelope) => {
+    nerv.onReceive(envelope => {
         console.log('  📨 NERV recebeu:', envelope.type.action_code);
         messageReceived = true;
     });
@@ -62,7 +62,9 @@ console.log('🚀 Testando sequência de boot...\n');
 
     nerv.emit(envelope);
 
-    await new Promise(resolve => { setTimeout(resolve, 100));
+    await new Promise(resolve => {
+        setTimeout(resolve, 100);
+    });
 
     if (messageReceived) {
         console.log('  ✅ Comunicação NERV operacional\n');

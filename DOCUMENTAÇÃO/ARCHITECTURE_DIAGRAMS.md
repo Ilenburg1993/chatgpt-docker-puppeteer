@@ -28,11 +28,11 @@ C4Container
     Container(engine, "Execution Engine", "Node.js", "Loop principal de processamento de tarefas")
     Container(queue, "Queue Manager", "File-based", "Gerenciamento de fila em JSON")
     Container(driver, "Driver System", "Puppeteer", "Abstração para diferentes targets")
-    
+
     ContainerDb(fila, "Task Queue", "JSON Files", "fila/*.json")
     ContainerDb(respostas, "Response Store", "Text Files", "respostas/*.txt")
     ContainerDb(config, "Configuration", "JSON", "config.json, dynamic_rules.json")
-    
+
     System_Ext(chrome, "Chrome CDP", "Remote debugging")
 
     Rel(dashboard, engine, "Monitora/Controla", "WebSocket")
@@ -65,15 +65,15 @@ sequenceDiagram
         Engine->>Queue: getNextTask()
         Queue-->>Engine: task
         Engine->>Queue: acquireLock(task)
-        
+
         Engine->>Driver: execute(task)
         Driver->>Chrome: connect(CDP)
         Chrome-->>Driver: page
-        
+
         Driver->>Chrome: navigate(LLM_URL)
         Driver->>Chrome: typePrompt(text)
         Driver->>Chrome: submit()
-        
+
         loop Incremental Collection
             Chrome->>LLM: HTTP Request
             LLM-->>Chrome: Response chunks
@@ -83,7 +83,7 @@ sequenceDiagram
             Engine->>Dashboard: emit progress
             Dashboard-->>User: Real-time update
         end
-        
+
         Driver-->>Engine: final response
         Engine->>Engine: validate(response)
         Engine->>Queue: saveResponse(task)
@@ -221,26 +221,26 @@ graph TB
         Message[Message Layer<br/>Emission + Reception]
         Buffer[Buffering Layer<br/>Queues + Backpressure]
         Correlation[Correlation Layer<br/>Context Management]
-        
+
         Transport --> Message
         Message --> Buffer
         Buffer --> Correlation
     end
-    
+
     subgraph "Protocol"
         Envelope[Envelope Format]
         Schema[Schema Validation]
         Ack[Acknowledgment]
-        
+
         Envelope --> Schema
         Schema --> Ack
     end
-    
+
     Correlation --> Envelope
-    
+
     Agent1[Agent Process 1] -.->|emit| Transport
     Transport -.->|receive| Agent2[Agent Process 2]
-    
+
     style Transport fill:#87CEEB
     style Message fill:#98FB98
     style Buffer fill:#DDA0DD
@@ -263,7 +263,7 @@ erDiagram
         int retries
         string status
     }
-    
+
     RESPONSE {
         string taskId FK
         string content
@@ -271,7 +271,7 @@ erDiagram
         int collectionTime
         object telemetry
     }
-    
+
     FAILURE {
         string taskId FK
         string type
@@ -280,7 +280,7 @@ erDiagram
         timestamp timestamp
         string forensicsPath
     }
-    
+
     CONFIG ||--|{ RULE : contains
     CONFIG {
         int maxRetries
@@ -288,7 +288,7 @@ erDiagram
         object healthCheck
         array targets
     }
-    
+
     RULE {
         string name
         object condition
@@ -303,12 +303,12 @@ erDiagram
 graph TB
     subgraph "Host Machine"
         Chrome[Chrome :9222<br/>Remote Debug]
-        
+
         subgraph "PM2 Ecosystem"
             Agent[Agent Process<br/>index.js]
             Dashboard[Dashboard Process<br/>Port 3008]
         end
-        
+
         subgraph "File System"
             Queue[fila/]
             Responses[respostas/]
@@ -316,23 +316,23 @@ graph TB
             Config[config.json]
         end
     end
-    
+
     subgraph "Docker (Optional)"
         Container[Node Container]
         Volume[Mounted Volumes]
     end
-    
+
     Agent -.->|CDP| Chrome
     Dashboard -->|HTTP| User[Users]
     Agent -->|Read/Write| Queue
     Agent -->|Write| Responses
     Agent -->|Write| Logs
     Agent -->|Read| Config
-    
+
     Container -.->|Bind Mount| Volume
     Volume -.-> Queue
     Volume -.-> Responses
-    
+
     style Chrome fill:#FF6347
     style Agent fill:#4682B4
     style Dashboard fill:#32CD32
@@ -346,18 +346,18 @@ graph LR
     B --> C{Thresholds}
     C -->|Within| D[Continue]
     C -->|Exceeded| E[Alert]
-    
+
     B --> F[Metrics Store]
     F --> G[Health Endpoint]
     G --> H[Dashboard]
-    
+
     E --> I[Apply Backoff]
     I --> J[Cooldown]
-    
+
     D --> K[Task End]
     K --> L[Update Trends]
     L --> F
-    
+
     style E fill:#FF6347
     style D fill:#90EE90
     style L fill:#87CEEB
@@ -370,22 +370,22 @@ graph TD
     A[Task Failed] --> B{Classify Error}
     B -->|Infrastructure| C[Infra Counter++]
     B -->|Task Error| D[Task Counter++]
-    
+
     C --> E{Infra Failures > Threshold?}
     D --> F{Task Retries > Max?}
-    
+
     E -->|Yes| G[Cooldown<br/>Exponential: 2^n * base]
     E -->|No| H[Immediate Retry]
-    
+
     F -->|Yes| I[Mark as DEAD]
     F -->|No| J[Retry with Delay<br/>Linear: n * interval]
-    
+
     G --> K[Wait Period]
     K --> L[Resume Processing]
-    
+
     J --> M[Re-queue Task]
     I --> N[Move to Failed]
-    
+
     style G fill:#FF6347
     style I fill:#8B0000
     style H fill:#90EE90
@@ -397,15 +397,18 @@ graph TD
 ## 🛠️ Como Gerar Imagens dos Diagramas
 
 ### Opção 1: VS Code (Recomendado)
+
 ```bash
 # Instale a extensão Mermaid Preview
 code --install-extension bierner.markdown-mermaid
 ```
 
 ### Opção 2: GitHub
+
 Abra este arquivo no GitHub - renderização automática.
 
 ### Opção 3: CLI (se precisar de PNGs)
+
 ```bash
 # Usando mmdc (Mermaid CLI)
 npm install -g @mermaid-js/mermaid-cli
@@ -413,6 +416,7 @@ mmdc -i ARCHITECTURE_DIAGRAMS.md -o output/diagrams/
 ```
 
 ### Opção 4: Online
+
 Visite: https://mermaid.live/
 
 ---

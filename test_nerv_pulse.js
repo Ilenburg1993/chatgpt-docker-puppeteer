@@ -37,7 +37,7 @@ const nerv = createNerv({
 });
 
 // 3. Monitorar Telemetria (Os Sinais Vitais)
-nerv.telemetry.on('nerv:state:change', (data) => {
+nerv.telemetry.on('nerv:state:change', data => {
     console.log(`[NERV STATE] ${data.from} -> ${data.to}`);
 
     if (data.to === 'READY') {
@@ -48,19 +48,19 @@ nerv.telemetry.on('nerv:state:change', (data) => {
     }
 });
 
-nerv.telemetry.on('nerv:log', (data) => {
+nerv.telemetry.on('nerv:log', data => {
     console.log(`[NERV LOG] [${data.level}] ${data.msg}`);
 });
 
-nerv.telemetry.on('nerv:error', (err) => {
+nerv.telemetry.on('nerv:error', err => {
     console.error(`[NERV ERROR]`, err);
 });
 
-nerv.telemetry.on('nerv:dropped', (data) => {
+nerv.telemetry.on('nerv:dropped', data => {
     console.warn(`[NERV DROP] Motivo: ${data.reason}`);
 });
 
-nerv.telemetry.on('nerv:inbound', (envelope) => {
+nerv.telemetry.on('nerv:inbound', envelope => {
     console.log(`[NERV INBOUND] Recebido envelope tipo: ${envelope.type.kind}/${envelope.type.action}`);
     // Se recebermos um Pong ou ACK, o teste passou completo
 });
@@ -77,7 +77,7 @@ function sendTestPing() {
         actor: ActorRole.MAESTRO,
         target: ActorRole.SERVER,
         messageType: MessageType.EVENT, // Apenas um evento informativo
-        actionCode: 'HEARTBEAT',        // Simulando um batimento
+        actionCode: 'HEARTBEAT', // Simulando um batimento
         payload: {
             uptime: process.uptime(),
             cpu: 0.1,
@@ -97,7 +97,7 @@ function sendTestPing() {
 }
 
 // Tratamento de Erro Global
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', err => {
     console.error('CRASH:', err);
     process.exit(1);
 });

@@ -23,6 +23,7 @@ Este documento identifica, cataloga e analisa **casos críticos** (race conditio
 **Linhas**: 68-95
 
 **Problema**:
+
 ```javascript
 // Caso B: Lock Órfão
 if (!isProcessAlive(currentLock.pid)) {
@@ -36,22 +37,25 @@ if (!isProcessAlive(currentLock.pid)) {
 ```
 
 **Análise**:
+
 - ✅ Há validação de PID antes de deletar lock órfão
 - ✅ Há recheck para evitar TOCTOU (Time-of-check to time-of-use)
 - ⚠️ **Gap**: Entre `isProcessAlive()` e `safeReadJSON()`, outro processo pode adquirir o lock
 - ⚠️ **Gap**: Se dois processos detectarem o órfão simultaneamente, ambos deletarão o arquivo
 
-**Impacto**: MÉDIO  
+**Impacto**: MÉDIO
+
 - Em cenários de alta concorrência (≥3 agentes simultâneos), pode haver double-acquisition temporária
 - Mitigado pela flag `wx` na criação do lock (atômica)
 
 **Recomendação**:
+
 ```javascript
 // Usar fs.rename() + wx como lock atômico de dois estágios
 const tempLock = `${lockFile}.${process.pid}.tmp`;
 await fs.writeFile(tempLock, JSON.stringify(lockData));
 try {
-    await fs.rename(tempLock, lockFile);  // Atômico no filesystem
+    await fs.rename(tempLock, lockFile); // Atômico no filesystem
     return true;
 } catch (err) {
     await fs.unlink(tempLock).catch(() => {});
@@ -69,6 +73,7 @@ try {
 **Linhas**: 21-50
 
 **Problema**:
+
 ```javascript
 async clearAll() {
     const clearWithTimeout = Promise.race([
@@ -81,8 +86,8 @@ async clearAll() {
         new Promise((_, rej) => setTimeout(() => rej(new Error('CLEAR_TIMEOUT')), 3000))
     ]);
 
-    try { 
-        await clearWithTimeout; 
+    try {
+        await clearWithTimeout;
     } catch (timeoutErr) {
         // Fire-and-forget
         Promise.all(orphans.map(h => h.dispose().catch(() => {}))).catch(() => {});
@@ -91,16 +96,19 @@ async clearAll() {
 ```
 
 **Análise**:
+
 - ✅ Timeout de 3s para evitar travamento
 - ✅ Fire-and-forget para handles órfãos
 - ⚠️ **Gap**: Promise.race não cancela a promise perdedora
 - ⚠️ **Gap**: Se timeout ocorrer, a promise de cleanup continua rodando em background sem rastreamento
 
-**Impacto**: BAIXO  
+**Impacto**: BAIXO
+
 - Handles órfãos serão coletados pelo GC do Puppeteer eventualmente
 - Memória não cresce indefinidamente (WeakMap limpa referências)
 
 **Recomendação**:
+
 ```javascript
 // Usar AbortController para cancelar cleanup em timeout
 const controller = new AbortController();
@@ -128,6 +136,7 @@ try {
 **Linhas**: 176-186
 
 **Problema**:
+
 ```javascript
 async _processCommand(envelope) {
     const { msg_id, correlation_id } = envelope.ids;
@@ -141,15 +150,18 @@ async _processCommand(envelope) {
 ```
 
 **Análise**:
+
 - ✅ Try-catch captura exceções síncronas
 - ⚠️ **Gap**: Se `this.sendAck()` falhar (socket desconectado), não há tratamento
 - ⚠️ **Gap**: Se `_emitInternal` retornar promise rejeitada, ela é capturada, mas ACK pode não ser enviado se socket cair
 
-**Impacto**: MÉDIO  
+**Impacto**: MÉDIO
+
 - Em caso de desconexão abrupta, ACKs podem ser perdidos
 - Mission Control pode ficar esperando ACK indefinidamente
 
 **Recomendação**:
+
 ```javascript
 async _processCommand(envelope) {
     const { msg_id, correlation_id } = envelope.ids;
@@ -183,41 +195,45 @@ async _processCommand(envelope) {
 **Linhas**: 66-80
 
 **Problema**:
+
 ```javascript
 async initialize() {
     if (this.initialized) {
         log('WARN', '[BrowserPool] Pool já inicializado');
         return;
     }
-    
+
     log('INFO', `[BrowserPool] Inicializando pool com ${this.config.poolSize} instâncias...`);
-    
+
     const orchestrator = new ConnectionOrchestrator(this.config.chromium);
     // ...
 }
 ```
 
 **Análise**:
+
 - ✅ Check de `this.initialized` previne reinicialização
 - ⚠️ **Gap**: Não há lock entre check e início da inicialização
 - ⚠️ **Gap**: Se `initialize()` for chamado 2x em rápida sucessão, ambos passam pelo if
 
-**Impacto**: MÉDIO  
+**Impacto**: MÉDIO
+
 - Pool pode tentar conectar 2x ao mesmo browser
 - ConnectionOrchestrator pode criar instâncias duplicadas
 
 **Recomendação**:
+
 ```javascript
 async initialize() {
     if (this.initialized) return;
     if (this._initPromise) return this._initPromise;  // Retorna promise existente
-    
+
     this._initPromise = (async () => {
         log('INFO', `[BrowserPool] Inicializando pool...`);
         // ... lógica de inicialização
         this.initialized = true;
     })();
-    
+
     return this._initPromise;
 }
 ```
@@ -240,13 +256,14 @@ async submit(ctx, selector, taskId) {
         log('WARN', '[SUBMISSION] Bloqueio de duplicidade ativo. Ignorando comando.', correlationId);
         return;
     }
-    
+
     this.submissionLock = Date.now();
     // ...
 }
 ```
 
 **Análise**:
+
 - ✅ Lock temporal de 10s (LOCK_DURATION) previne cliques duplos
 - ✅ Log de WARN para debug
 - ✅ Retorno imediato sem exceção
@@ -264,24 +281,25 @@ async submit(ctx, selector, taskId) {
 
 ```javascript
 class ConnectionOrchestrator {
-  constructor(options = {}) {
-    // Handlers referenciados para remoção limpa
-    this._onDisconnect = this._handleDisconnect.bind(this);
-    this._onTargetDestroyed = this._handleTargetDestroyed.bind(this);
-  }
-
-  cleanup() {
-    if (this.browser) {
-      this.browser.off('disconnected', this._onDisconnect);
-      this.browser.off('targetdestroyed', this._onTargetDestroyed);
+    constructor(options = {}) {
+        // Handlers referenciados para remoção limpa
+        this._onDisconnect = this._handleDisconnect.bind(this);
+        this._onTargetDestroyed = this._handleTargetDestroyed.bind(this);
     }
-    this.browser = null;
-    this.page = null;
-  }
+
+    cleanup() {
+        if (this.browser) {
+            this.browser.off('disconnected', this._onDisconnect);
+            this.browser.off('targetdestroyed', this._onTargetDestroyed);
+        }
+        this.browser = null;
+        this.page = null;
+    }
 }
 ```
 
 **Análise**:
+
 - ✅ Handlers armazenados como bound functions para remoção correta
 - ✅ `cleanup()` remove listeners explicitamente
 - ✅ Referências nulladas para assist GC
@@ -296,33 +314,37 @@ class ConnectionOrchestrator {
 **Linhas**: 101-120
 
 **Problema**:
+
 ```javascript
 async applyTier(recoveryErr, attempt, taskId) {
     // ...
-    default: 
+    default:
         // Tier 3: Manobra Nuclear (Surgical Process Kill)
         log('FATAL', `[RECOVERY] Tier 3 (Nuclear) atingido. Matando processo do navegador.`, correlationId);
-        
+
         const browser = this.driver.page.browser();
         const pid = browser?.process?.()?.pid;
         if (pid) {
             await system.killProcess(pid);  // ⚠️ Sem timeout
         }
-        
+
         throw recoveryErr;
 }
 ```
 
 **Análise**:
+
 - ✅ Usa `system.killProcess()` (wrapper para SIGKILL)
 - ⚠️ **Gap**: Se processo estiver em estado D (uninterruptible sleep), `kill()` pode travar
 - ⚠️ **Gap**: Sem timeout para a operação de kill
 
-**Impacto**: BAIXO  
+**Impacto**: BAIXO
+
 - Raro processo entrar em estado D (requer I/O crítico de disco)
 - ExecutionEngine tem timeout superior que eventualmente abortará
 
 **Recomendação**:
+
 ```javascript
 const killWithTimeout = Promise.race([
     system.killProcess(pid),
@@ -395,6 +417,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
 **Linhas**: 156-175 (função shutdown)
 
 **Problema**:
+
 ```javascript
 log('INFO', '[SHUTDOWN] 1/6: Parando execução de novas tarefas...');
 await kernel.stop();
@@ -409,21 +432,24 @@ const cleanedProfiles = await ConnectionOrchestrator.cleanupTempProfiles();
 ```
 
 **Análise**:
+
 - ✅ Shutdown em 6 fases ordenadas (núcleo → periferia)
 - ⚠️ **Gap**: Se `kernel.stop()` falhar com exceção, as fases seguintes não executam
 - ⚠️ **Gap**: Sem finally block para garantir limpeza mínima
 
-**Impacto**: BAIXO  
+**Impacto**: BAIXO
+
 - Raro kernel.stop() falhar (método idempotente)
 - SO limpa recursos ao término do processo
 
 **Recomendação**:
+
 ```javascript
 async function shutdown(signal) {
     const phases = [
         { name: 'Kernel', fn: () => kernel.stop() },
         { name: 'BrowserPool', fn: () => browserPool.close() },
-        { name: 'NERV', fn: () => nerv.disconnect() },
+        { name: 'NERV', fn: () => nerv.disconnect() }
         // ...
     ];
 
@@ -488,13 +514,13 @@ _applyDecisions(proposals, context) {
 function listenToSignals() {
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    
-    process.on('uncaughtException', (err) => {
+
+    process.on('uncaughtException', err => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
         gracefulShutdown('UNCAUGHT_EXCEPTION');
     });
 
-    process.on('unhandledRejection', (reason) => {
+    process.on('unhandledRejection', reason => {
         log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
         gracefulShutdown('UNHANDLED_REJECTION');
     });
@@ -541,20 +567,21 @@ async escalate({ ctx, reason, error, correlationId }) {
 
 ## 📊 Matriz de Riscos
 
-| Caso | Arquivo | Severidade | Probabilidade | Impacto | Prioridade |
-|------|---------|------------|---------------|---------|-----------|
-| 1. Lock Race | lock_manager.js | MÉDIA | BAIXA (≥3 agentes) | MÉDIO | MÉDIA |
-| 2. Handle Timeout Leak | handle_manager.js | BAIXA | BAIXA | BAIXO | BAIXA |
-| 3. IPC ACK Loss | ipc_client.js | MÉDIA | MÉDIA (rede instável) | MÉDIO | MÉDIA |
-| 4. Pool Init Race | pool_manager.js | MÉDIA | BAIXA (boot rápido) | MÉDIO | MÉDIA |
-| 5. Double Submit | submission_controller.js | ✅ PROTEGIDO | - | - | - |
-| 6. Event Listener Leak | ConnectionOrchestrator.js | ✅ PROTEGIDO | - | - | - |
-| 7. Kill Timeout | recovery_system.js | BAIXA | MUITO BAIXA | BAIXO | BAIXA |
-| 8. Schema Bypass | execution_engine.js | ✅ PROTEGIDO | - | - | - |
-| 9. Forensics Freeze | forensics.js | ✅ PROTEGIDO | - | - | - |
-| 10. Shutdown Partial | main.js | BAIXA | BAIXA | BAIXO | BAIXA |
+| Caso                   | Arquivo                   | Severidade   | Probabilidade         | Impacto | Prioridade |
+| ---------------------- | ------------------------- | ------------ | --------------------- | ------- | ---------- |
+| 1. Lock Race           | lock_manager.js           | MÉDIA        | BAIXA (≥3 agentes)    | MÉDIO   | MÉDIA      |
+| 2. Handle Timeout Leak | handle_manager.js         | BAIXA        | BAIXA                 | BAIXO   | BAIXA      |
+| 3. IPC ACK Loss        | ipc_client.js             | MÉDIA        | MÉDIA (rede instável) | MÉDIO   | MÉDIA      |
+| 4. Pool Init Race      | pool_manager.js           | MÉDIA        | BAIXA (boot rápido)   | MÉDIO   | MÉDIA      |
+| 5. Double Submit       | submission_controller.js  | ✅ PROTEGIDO | -                     | -       | -          |
+| 6. Event Listener Leak | ConnectionOrchestrator.js | ✅ PROTEGIDO | -                     | -       | -          |
+| 7. Kill Timeout        | recovery_system.js        | BAIXA        | MUITO BAIXA           | BAIXO   | BAIXA      |
+| 8. Schema Bypass       | execution_engine.js       | ✅ PROTEGIDO | -                     | -       | -          |
+| 9. Forensics Freeze    | forensics.js              | ✅ PROTEGIDO | -                     | -       | -          |
+| 10. Shutdown Partial   | main.js                   | BAIXA        | BAIXA                 | BAIXO   | BAIXA      |
 
 **Legenda**:
+
 - 🔴 ALTA: Pode causar crash ou corrupção de dados
 - 🟡 MÉDIA: Pode causar comportamento incorreto temporário
 - 🟢 BAIXA: Overhead ou inconsistência menor
@@ -566,18 +593,21 @@ async escalate({ ctx, reason, error, correlationId }) {
 ### Prioridade 1 (IMPLEMENTAR)
 
 **1.1. Lock Manager - Two-Phase Commit**
+
 - Arquivo: `src/infra/locks/lock_manager.js`
 - Mudança: Usar `fs.rename()` para atomicidade
 - Esforço: 2h
 - Impacto: Elimina race condition em concorrência alta
 
 **1.2. IPC Client - ACK Resilience**
+
 - Arquivo: `src/infra/ipc_client.js`
 - Mudança: Try-catch em `sendAck()` com fallback para log
 - Esforço: 30min
 - Impacto: Previne requests pendurados
 
 **1.3. BrowserPool - Init Lock**
+
 - Arquivo: `src/infra/browser_pool/pool_manager.js`
 - Mudança: Promise memoization em `initialize()`
 - Esforço: 15min
@@ -586,12 +616,14 @@ async escalate({ ctx, reason, error, correlationId }) {
 ### Prioridade 2 (CONSIDERAR)
 
 **2.1. Shutdown - Try-Catch Per Phase**
+
 - Arquivo: `src/main.js`
 - Mudança: Loop de fases com isolamento de erros
 - Esforço: 1h
 - Impacto: Garante limpeza parcial mesmo com falhas
 
 **2.2. HandleManager - AbortController**
+
 - Arquivo: `src/driver/modules/handle_manager.js`
 - Mudança: Cancelar cleanup ao timeout
 - Esforço: 45min
@@ -600,6 +632,7 @@ async escalate({ ctx, reason, error, correlationId }) {
 ### Prioridade 3 (MONITORAR)
 
 **3.1. RecoverySystem - Kill Timeout**
+
 - Arquivo: `src/driver/modules/recovery_system.js`
 - Mudança: Promise.race em `killProcess()`
 - Esforço: 20min
@@ -611,13 +644,13 @@ async escalate({ ctx, reason, error, correlationId }) {
 
 ### Cobertura de Error Handling
 
-| Subsistema | Try-Catch | Process.on | Timeouts | Score |
-|-----------|-----------|------------|----------|-------|
-| Kernel | ✅ 100% | ✅ Sim | ✅ Loop isolado | 🟢 A+ |
-| Driver | ✅ 95% | ✅ Sim | ✅ Multi-tier | 🟢 A |
-| Infra | ✅ 90% | ✅ Sim | ⚠️ Parcial | 🟡 B+ |
-| NERV | ✅ 100% | ✅ Sim | ✅ Deadlines | 🟢 A+ |
-| Server | ✅ 100% | ✅ Sim | ✅ Request timeout | 🟢 A |
+| Subsistema | Try-Catch | Process.on | Timeouts           | Score |
+| ---------- | --------- | ---------- | ------------------ | ----- |
+| Kernel     | ✅ 100%   | ✅ Sim     | ✅ Loop isolado    | 🟢 A+ |
+| Driver     | ✅ 95%    | ✅ Sim     | ✅ Multi-tier      | 🟢 A  |
+| Infra      | ✅ 90%    | ✅ Sim     | ⚠️ Parcial         | 🟡 B+ |
+| NERV       | ✅ 100%   | ✅ Sim     | ✅ Deadlines       | 🟢 A+ |
+| Server     | ✅ 100%   | ✅ Sim     | ✅ Request timeout | 🟢 A  |
 
 **Score Geral**: 🟢 **A (94/100)**
 
@@ -640,6 +673,7 @@ async escalate({ ctx, reason, error, correlationId }) {
 ## 🧪 Casos de Teste Sugeridos
 
 ### Test 1: Lock Concorrência Extrema
+
 ```javascript
 // tests/test_lock_stress.js
 // Simula 10 agentes tentando adquirir lock simultaneamente
@@ -647,6 +681,7 @@ async escalate({ ctx, reason, error, correlationId }) {
 ```
 
 ### Test 2: IPC Desconexão Abrupta
+
 ```javascript
 // tests/test_ipc_abrupt_disconnect.js
 // Envia comando e mata socket antes do ACK
@@ -654,6 +689,7 @@ async escalate({ ctx, reason, error, correlationId }) {
 ```
 
 ### Test 3: BrowserPool Double Init
+
 ```javascript
 // tests/test_pool_race_init.js
 // Chama initialize() 3x em paralelo
@@ -661,6 +697,7 @@ async escalate({ ctx, reason, error, correlationId }) {
 ```
 
 ### Test 4: HandleManager Timeout
+
 ```javascript
 // tests/test_handle_cleanup_timeout.js
 // Mock handle.dispose() com delay de 5s
@@ -709,6 +746,7 @@ Para novos PRs, validar:
 O sistema **chatgpt-docker-puppeteer V360** possui **excelente resiliência geral** (94/100), com proteções robustas nos subsistemas críticos:
 
 ✅ **Pontos Fortes**:
+
 - Kernel loop crash-proof
 - Process handlers completos
 - Schema validation rigorosa
@@ -716,11 +754,13 @@ O sistema **chatgpt-docker-puppeteer V360** possui **excelente resiliência gera
 - Shutdown em fases ordenadas
 
 ⚠️ **Pontos de Melhoria**:
+
 - Lock race em concorrência alta (prioridade média)
 - IPC ACK loss em desconexão (prioridade média)
 - BrowserPool init race (prioridade média)
 
 **Próximos Passos**:
+
 1. Implementar recomendações Prioridade 1 (4h estimado)
 2. Criar testes de stress para validar fixes
 3. Monitorar métricas de lock contention em produção

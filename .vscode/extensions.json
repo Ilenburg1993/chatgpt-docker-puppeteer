@@ -2,6 +2,7 @@
   "recommendations": [
     // Core Development
     "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
     "ms-vscode.makefile-tools",
     "EditorConfig.EditorConfig",
 
@@ -21,6 +22,10 @@
     // AI & Productivity
     "github.copilot",
     "github.copilot-chat",
+    "github.copilot-labs",
+    "usernamehm.errorlens",
+    "aaron-bond.better-comments",
+    "streetsidesoftware.code-spell-checker",
 
     // Testing & Quality
     "ms-playwright.playwright",
@@ -35,9 +40,8 @@
     "bierner.markdown-mermaid"
   ],
   "unwantedRecommendations": [
-    // Conflitos com ESLint
+    // Conflitos com configuração atual
     "hookyqr.beautify",
-    "esbenp.prettier-vscode",
 
     // Redundantes
     "ms-vscode.vscode-typescript-next"

@@ -41,14 +41,8 @@ const CONFIG_FILES = {
 };
 
 const REQUIRED_ENV_VARS = {
-    production: [
-        'NODE_ENV',
-        'PORT',
-        'CHROME_WS_ENDPOINT'
-    ],
-    development: [
-        'NODE_ENV'
-    ]
+    production: ['NODE_ENV', 'PORT', 'CHROME_WS_ENDPOINT'],
+    development: ['NODE_ENV']
 };
 
 class ConfigValidator {
@@ -93,7 +87,6 @@ class ConfigValidator {
             }
             this.warnings.push(spec.warning || `Optional file missing: ${filename}`);
             return true;
-
         }
 
         // For .env files, just check existence
@@ -104,7 +97,9 @@ class ConfigValidator {
 
         // Validate JSON files
         const data = this.validateJSON(filepath);
-        if (!data) {return false;}
+        if (!data) {
+            return false;
+        }
 
         // Validate schema if specified
         if (spec.schema) {
@@ -117,7 +112,9 @@ class ConfigValidator {
                 if (Array.isArray(constraint)) {
                     // Enum validation
                     if (!constraint.includes(data[key])) {
-                        this.errors.push(`Invalid value for "${key}" in ${filename}. Expected one of: ${constraint.join(', ')}`);
+                        this.errors.push(
+                            `Invalid value for "${key}" in ${filename}. Expected one of: ${constraint.join(', ')}`
+                        );
                     }
                 } else if (typeof constraint === 'object') {
                     // Type validation
@@ -169,8 +166,10 @@ class ConfigValidator {
 
         // Validate CHROME_WS_ENDPOINT format
         if (process.env.CHROME_WS_ENDPOINT) {
-            if (!process.env.CHROME_WS_ENDPOINT.startsWith('ws://') &&
-          !process.env.CHROME_WS_ENDPOINT.startsWith('wss://')) {
+            if (
+                !process.env.CHROME_WS_ENDPOINT.startsWith('ws://') &&
+                !process.env.CHROME_WS_ENDPOINT.startsWith('wss://')
+            ) {
                 this.errors.push('CHROME_WS_ENDPOINT must start with ws:// or wss://');
             }
         }
@@ -218,7 +217,7 @@ class ConfigValidator {
 
     async run() {
         console.log('\n🔍 Configuration Validation\n');
-        console.log(`${'=' .repeat(60)  }\n`);
+        console.log(`${'='.repeat(60)}\n`);
 
         // Validate config files
         for (const [filename, spec] of Object.entries(CONFIG_FILES)) {
@@ -235,7 +234,7 @@ class ConfigValidator {
         this.validateEntryPoint();
 
         // Report results
-        console.log(`\n${  '='.repeat(60)}`);
+        console.log(`\n${'='.repeat(60)}`);
         console.log('\n📊 Validation Results\n');
 
         if (this.warnings.length > 0) {

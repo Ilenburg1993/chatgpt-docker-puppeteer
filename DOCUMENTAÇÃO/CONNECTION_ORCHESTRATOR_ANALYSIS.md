@@ -11,17 +11,20 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 ### 1. **Dependências em /tmp** ❌ → ✅
 
 **Problema Identificado:**
+
 - Puppeteer criava profiles temporários em `/tmp/puppeteer_dev_chrome_profile-*`
 - Consumia ~6-20MB por execução
 - Nunca eram limpos automaticamente
 - Acumulavam ao longo do tempo (detectados 3 profiles órfãos)
 
 **Causa Raiz:**
+
 - Puppeteer usa `/tmp` para user-data-dir quando não especificado
 - Processo interrompido não limpa o profile
 - Sem garbage collection automático
 
 **Soluções Implementadas:**
+
 1. ✅ Cache persistente em `~/.cache/puppeteer` (não /tmp)
 2. ✅ Método `ConnectionOrchestrator.cleanupTempProfiles()` para limpeza manual
 3. ✅ Hook automático no `shutdown()` de `src/main.js` (fase 6/6)
@@ -29,6 +32,7 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 5. ✅ Arquivo `.puppeteerrc.cjs` para configuração permanente
 
 **Resultado:**
+
 - Cache: 536MB em `~/.cache/puppeteer` (persistente, reutilizado)
 - Profiles temporários: 0 após execução
 - Limpeza automática no shutdown: ✅
@@ -38,6 +42,7 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 ### 2. **Suporte a Múltiplos Métodos de Conexão** ❌ → ✅
 
 **Problema Identificado:**
+
 - Suportava apenas `launcher` e `connect` (parcial)
 - Sem fallback entre métodos
 - Não funcionava com Chrome externo (Docker → Windows)
@@ -48,61 +53,74 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 #### **5 Modos Completos:**
 
 1. **launcher** (Padrão - Recomendado)
-   ```javascript
-   { mode: 'launcher' }
-   ```
-   - Puppeteer inicia Chrome automaticamente
-   - Zero configuração externa
-   - Funciona em qualquer ambiente
+
+    ```javascript
+    {
+        mode: 'launcher';
+    }
+    ```
+
+    - Puppeteer inicia Chrome automaticamente
+    - Zero configuração externa
+    - Funciona em qualquer ambiente
 
 2. **connect** (Chrome externo via browserURL)
-   ```javascript
-   {
-     mode: 'connect',
-     hosts: ['127.0.0.1', 'host.docker.internal'],
-     ports: [9222, 9223, 9224]
-   }
-   ```
-   - Conecta via `http://host:port`
-   - Testa múltiplos hosts/portas
-   - Logs detalhados de falhas
+
+    ```javascript
+    {
+      mode: 'connect',
+      hosts: ['127.0.0.1', 'host.docker.internal'],
+      ports: [9222, 9223, 9224]
+    }
+    ```
+
+    - Conecta via `http://host:port`
+    - Testa múltiplos hosts/portas
+    - Logs detalhados de falhas
 
 3. **wsEndpoint** (Chrome externo via WebSocket)
-   ```javascript
-   {
-     mode: 'wsEndpoint',
-     hosts: ['localhost', 'host.docker.internal'],
-     ports: [9222]
-   }
-   ```
-   - Mais estável que browserURL
-   - Fetch de `/json/version` primeiro
-   - Conecta via WebSocket Debugger URL
+
+    ```javascript
+    {
+      mode: 'wsEndpoint',
+      hosts: ['localhost', 'host.docker.internal'],
+      ports: [9222]
+    }
+    ```
+
+    - Mais estável que browserURL
+    - Fetch de `/json/version` primeiro
+    - Conecta via WebSocket Debugger URL
 
 4. **executablePath** (Chrome customizado)
-   ```javascript
-   {
-     mode: 'executablePath',
-     executablePath: '/usr/bin/google-chrome-stable'
-   }
-   ```
-   - Usa Chrome instalado no sistema
-   - Validação de path (fs.existsSync)
-   - Suporta extensões customizadas
+
+    ```javascript
+    {
+      mode: 'executablePath',
+      executablePath: '/usr/bin/google-chrome-stable'
+    }
+    ```
+
+    - Usa Chrome instalado no sistema
+    - Validação de path (fs.existsSync)
+    - Suporta extensões customizadas
 
 5. **auto** (Fallback inteligente)
-   ```javascript
-   {
-     mode: 'auto',
-     autoFallback: true
-   }
-   ```
-   - Tenta todos os modos em ordem de prioridade
-   - Ordem: launcher → wsEndpoint → connect → executablePath
-   - Logs de cada tentativa
-   - Retry com backoff exponencial
+
+    ```javascript
+    {
+      mode: 'auto',
+      autoFallback: true
+    }
+    ```
+
+    - Tenta todos os modos em ordem de prioridade
+    - Ordem: launcher → wsEndpoint → connect → executablePath
+    - Logs de cada tentativa
+    - Retry com backoff exponencial
 
 **Melhorias de Configuração:**
+
 - Múltiplos hosts: `['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1']`
 - Múltiplas portas: `[9222, 9223, 9224]`
 - Timeout configurável: `connectionTimeout: 30000`
@@ -114,19 +132,21 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 ### 3. **Argumentos e Configurações** ❌ → ✅
 
 **Problema Identificado:**
+
 - Argumentos do Chrome hardcoded
 - Sem suporte a profile persistente
 - Sem configuração de headless mode
 
 **Soluções Implementadas:**
+
 ```javascript
 {
   // Headless mode
   headless: 'new', // 'new' | true | false
-  
+
   // Profile persistente
   userDataDir: '/workspace/chrome-profile',
-  
+
   // Argumentos customizáveis
   args: [
     '--no-sandbox',
@@ -134,7 +154,7 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
     '--window-size=1920,1080',
     '--user-agent=...'
   ],
-  
+
   // Cache directory
   cacheDir: '/home/node/.cache/puppeteer'
 }
@@ -145,11 +165,13 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 ### 4. **Estado e Diagnóstico** ❌ → ✅
 
 **Problema Identificado:**
+
 - `getStatus()` retornava informações limitadas
 - Sem rastreamento de tentativas falhadas
 - Difícil debugar falhas de conexão
 
 **Soluções Implementadas:**
+
 ```javascript
 const status = orch.getStatus();
 // {
@@ -164,6 +186,7 @@ const status = orch.getStatus();
 ```
 
 **Métodos Estáticos Novos:**
+
 - `ConnectionOrchestrator.getCacheInfo()` - Info do cache
 - `ConnectionOrchestrator.cleanupTempProfiles()` - Limpeza
 
@@ -172,11 +195,13 @@ const status = orch.getStatus();
 ### 5. **Integração com BrowserPoolManager** ❌ → ✅
 
 **Problema Identificado:**
+
 - BrowserPoolManager usava `puppeteer-core` diretamente
 - Não aproveitava ConnectionOrchestrator
 - Duplicação de lógica de conexão
 
 **Solução Implementada:**
+
 ```javascript
 // BrowserPoolManager agora usa ConnectionOrchestrator
 const pool = new BrowserPoolManager({
@@ -196,32 +221,33 @@ const pool = new BrowserPoolManager({
 ### Testes Executados (100% Passou):
 
 1. ✅ **test_connection_orchestrator.js**
-   - 6 testes (launcher, auto, cache, cleanup, reuso, args)
-   - Todos passaram
+    - 6 testes (launcher, auto, cache, cleanup, reuso, args)
+    - Todos passaram
 
 2. ✅ **test_browser_pool.js**
-   - Pool de 2 instâncias
-   - Alocação, navegação, liberação, shutdown
-   - Passou
+    - Pool de 2 instâncias
+    - Alocação, navegação, liberação, shutdown
+    - Passou
 
 3. ✅ **test_boot_sequence.js**
-   - 6 fases (Config, Identity, NERV, BrowserPool, Integração, Shutdown)
-   - Passou
+    - 6 fases (Config, Identity, NERV, BrowserPool, Integração, Shutdown)
+    - Passou
 
 4. ✅ **test_integration_complete.js**
-   - Integração completa (pool + navegação + limpeza)
-   - Passou
+    - Integração completa (pool + navegação + limpeza)
+    - Passou
 
 5. ✅ **puppeteer_maintenance.js**
-   - Cache: 536MB em ~/.cache/puppeteer
-   - Profiles temporários: 0
-   - Passou
+    - Cache: 536MB em ~/.cache/puppeteer
+    - Profiles temporários: 0
+    - Passou
 
 ---
 
 ## 🎯 Compatibilidade Universal
 
 ### Ambientes Testados:
+
 - ✅ Docker (Debian 11)
 - ✅ Dev Container (VS Code)
 - ✅ Node.js 20.19.2
@@ -229,41 +255,43 @@ const pool = new BrowserPoolManager({
 
 ### Casos de Uso Validados:
 
-| Caso de Uso | Modo | Status |
-|-------------|------|--------|
-| Desenvolvimento local | launcher | ✅ |
-| Docker → Chrome Windows | wsEndpoint | ✅ (documentado) |
-| Chrome customizado | executablePath | ✅ |
-| Profile persistente | launcher + userDataDir | ✅ |
-| Pool de instâncias | launcher (múltiplos) | ✅ |
-| Fallback automático | auto | ✅ |
+| Caso de Uso             | Modo                   | Status           |
+| ----------------------- | ---------------------- | ---------------- |
+| Desenvolvimento local   | launcher               | ✅               |
+| Docker → Chrome Windows | wsEndpoint             | ✅ (documentado) |
+| Chrome customizado      | executablePath         | ✅               |
+| Profile persistente     | launcher + userDataDir | ✅               |
+| Pool de instâncias      | launcher (múltiplos)   | ✅               |
+| Fallback automático     | auto                   | ✅               |
 
 ---
 
 ## 📁 Arquivos Criados/Modificados
 
 ### Modificados:
+
 1. ✅ `src/infra/ConnectionOrchestrator.js` (210 linhas → 380 linhas)
-   - 5 modos de conexão
-   - Fallback automático
-   - Cache persistente
-   - Limpeza de temporários
+    - 5 modos de conexão
+    - Fallback automático
+    - Cache persistente
+    - Limpeza de temporários
 
 2. ✅ `src/infra/browser_pool/pool_manager.js`
-   - Import de puppeteer (não puppeteer-core)
-   - Usa ConnectionOrchestrator internamente
+    - Import de puppeteer (não puppeteer-core)
+    - Usa ConnectionOrchestrator internamente
 
 3. ✅ `src/main.js`
-   - Fase 6/6 de shutdown: limpeza de profiles
-   - Import de ConnectionOrchestrator
+    - Fase 6/6 de shutdown: limpeza de profiles
+    - Import de ConnectionOrchestrator
 
 4. ✅ `config.json`
-   - Adicionado `BROWSER_MODE: "launcher"`
+    - Adicionado `BROWSER_MODE: "launcher"`
 
 5. ✅ `package.json`
-   - Scripts: `maintenance`, `maintenance:clean-cache`
+    - Scripts: `maintenance`, `maintenance:clean-cache`
 
 ### Criados:
+
 1. ✅ `.puppeteerrc.cjs` - Configuração de cache persistente
 2. ✅ `tests/test_connection_orchestrator.js` - 6 testes completos
 3. ✅ `tests/test_browser_pool.js` - Teste de pool
@@ -277,27 +305,31 @@ const pool = new BrowserPoolManager({
 ## 🚀 Como Usar
 
 ### Modo Padrão (Recomendado):
+
 ```javascript
 const orch = new ConnectionOrchestrator({ mode: 'launcher' });
 const browser = await orch.connect();
 ```
 
 ### Modo Auto (Fallback):
+
 ```javascript
 const orch = new ConnectionOrchestrator({ mode: 'auto' });
 const browser = await orch.connect();
 ```
 
 ### Chrome Externo (Docker → Windows):
+
 ```javascript
 const orch = new ConnectionOrchestrator({
-  mode: 'wsEndpoint',
-  hosts: ['host.docker.internal'],
-  ports: [9222]
+    mode: 'wsEndpoint',
+    hosts: ['host.docker.internal'],
+    ports: [9222]
 });
 ```
 
 ### Manutenção Periódica:
+
 ```bash
 npm run maintenance              # Verifica cache e limpa /tmp
 npm run maintenance:clean-cache  # Remove cache completo
@@ -318,10 +350,12 @@ npm run maintenance:clean-cache  # Remove cache completo
 ## 🔒 Segurança
 
 ### ⚠️ NUNCA use em produção:
+
 - `--disable-web-security`
 - `--remote-debugging-address=0.0.0.0` (sem firewall)
 
 ### ✅ Recomendado:
+
 - `--no-sandbox` (apenas em containers Docker)
 - `--disable-dev-shm-usage` (baixa memória)
 - `headless: 'new'` (modo headless novo)

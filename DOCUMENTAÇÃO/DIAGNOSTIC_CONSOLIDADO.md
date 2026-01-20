@@ -15,6 +15,7 @@
 Não é integração - é **MIGRAÇÃO**. O código novo (4,500 LOC) deve substituir o legacy (696 LOC). Estratégia detalhada na seção ["ESTRATÉGIA DE MIGRAÇÃO"](#-estratégia-de-migração-legacy--novo).
 
 **Descoberta crítica**:
+
 - **execution_engine.js** (401 LOC): 9 responsabilidades em 1 classe, 69 condicionais
 - **KERNEL** (2,900 LOC): Modular, testável, ~30% funcionalidade faltando
 - **ipc_client.js** (295 LOC): Socket.io hardcoded, singleton, telemetria básica
@@ -73,6 +74,7 @@ Distribuição por Camada:
 ### Complexidade
 
 **Top 15 Arquivos por Complexidade Ciclomática**:
+
 ```
 1. execution_engine.js (legacy)      69 condicionais  🔴 ALTA
 2. ConnectionOrchestrator.js         67 condicionais  🔴 ALTA
@@ -96,6 +98,7 @@ Distribuição por Camada:
 ### Tamanho de Arquivos
 
 **Top 20 Maiores Arquivos** (LOC):
+
 ```
 1. kernel_loop.js (kernel)             408 LOC  🔴 MUITO GRANDE
 2. execution_engine.js (legacy)        401 LOC  🔴 MUITO GRANDE
@@ -195,6 +198,7 @@ console.log/error diretos:    26 encontrados ⚠️  (devem usar logger)
 ```
 
 **Problemas**:
+
 1. **2 Camadas de Aplicação** (kernel + core) - conflito
 2. **NERV isolado** - deveria ser camada de transporte
 3. **Driver em infra** - deveria estar mais próximo do domínio
@@ -243,6 +247,7 @@ Driver (driver/)
 ```
 
 **Score de Integração por Componente**:
+
 ```
 ExecutionEngine (legacy):  ████████░░ 85%  ✅ Bem integrado
 Driver:                    ███████░░░ 70%  ✅ Funcional
@@ -309,6 +314,7 @@ NERV:                      ░░░░░░░░░░ 0%   ❌ Código morto
 #### **execution_engine.js → KERNEL**
 
 **O que o legacy FAZ (401 LOC)**:
+
 ```javascript
 // src/core/execution_engine.js (resumo estrutural)
 
@@ -318,11 +324,11 @@ class ExecutionEngine {
   async stop() {}                     // Para motor
   pause() {}                          // Pausa execução
   resume() {}                         // Retoma execução
-  
+
   // LOOP PRINCIPAL
   async _runLoop() {}                 // While infinito com sleep
   async _executeCycle() {}            // Ciclo unitário de trabalho
-  
+
   // PIPELINE DE TAREFA
   async _executeTaskPipeline() {
     // 1. Resolução de contexto
@@ -333,19 +339,19 @@ class ExecutionEngine {
     // 6. Persistência
     // 7. Telemetria
   }
-  
+
   // IPC (ACOPLADO)
   ipc.emitEvent(IPCEvent.TASK_STARTED, ...)
   ipc.emitEvent(IPCEvent.TASK_PROGRESS, ...)
   ipc.emitEvent(IPCEvent.TASK_COMPLETED, ...)
   ipc.emitEvent(IPCEvent.TASK_FAILED, ...)
-  
+
   // BACKOFF
   _calculateBackoff() {}              // Exponencial com jitter
-  
+
   // PERSISTÊNCIA
   async _smartSave() {}               // Throttled save
-  
+
   // REMEDIAÇÃO
   async abortTask() {}                // Comando remoto
   async rebootInfrastructure() {}     // Reboot browser
@@ -361,61 +367,66 @@ class ExecutionEngine {
 ```
 
 **O que o KERNEL DEVE fazer (2,900 LOC distribuídos)**:
+
 ```javascript
 // src/kernel/ (estrutura modular)
 
 // kernel.js - Compositor
 function createKernel({ nerv, telemetry, policy, loop }) {
-  // Compõe subsistemas
-  return {
-    start, stop, pause, resume,
-    getStatus, getMetrics
-  }
+    // Compõe subsistemas
+    return {
+        start,
+        stop,
+        pause,
+        resume,
+        getStatus,
+        getMetrics
+    };
 }
 
 // kernel_loop/kernel_loop.js - Loop isolado
 class KernelLoop {
-  async run(scheduler) {}             // Loop controlado
-  pause() {}
-  resume() {}
-  // SEM lógica de negócio
+    async run(scheduler) {} // Loop controlado
+    pause() {}
+    resume() {}
+    // SEM lógica de negócio
 }
 
 // execution_engine/execution_engine.js - Pipeline puro
 class ExecutionEngine {
-  async executeTask(task, context) {
-    // Pipeline limpo
-    // Emite via NERV (injetado)
-  }
-  // SEM IPC hardcoded
+    async executeTask(task, context) {
+        // Pipeline limpo
+        // Emite via NERV (injetado)
+    }
+    // SEM IPC hardcoded
 }
 
 // task_runtime/task_runtime.js - Gerencia tarefas
 class TaskRuntime {
-  async loadTask() {}
-  async saveTask() {}
-  async lockTask() {}
+    async loadTask() {}
+    async saveTask() {}
+    async lockTask() {}
 }
 
 // policy_engine/policy_engine.js - Políticas
 class PolicyEngine {
-  shouldBackoff() {}
-  calculateDelay() {}
-  enforceLimit() {}
+    shouldBackoff() {}
+    calculateDelay() {}
+    enforceLimit() {}
 }
 
 // observation_store/observation_store.js - Telemetria
 class ObservationStore {
-  record(event, data) {}
-  query(filters) {}
+    record(event, data) {}
+    query(filters) {}
 }
 
 // nerv_bridge/kernel_nerv_bridge.js - Adaptador IPC
 class KernelNERVBridge {
-  emitTaskStarted(taskId) {
-    nerv.emit('TASK_STARTED', { taskId })
-  }
-  // Desacopla Kernel do transporte
+    emitTaskStarted(taskId) {
+        nerv.emit('TASK_STARTED', { taskId });
+    }
+    // Desacopla Kernel do transporte
 }
 
 // GANHOS:
@@ -427,6 +438,7 @@ class KernelNERVBridge {
 ```
 
 **Gap de Funcionalidade** (o que KERNEL ainda NÃO tem):
+
 ```diff
 IMPLEMENTADO no KERNEL:
 + ✅ Estrutura modular completa
@@ -458,6 +470,7 @@ ESTIMATIVA: ~30% de funcionalidade faltando
 #### **ipc_client.js → NERV**
 
 **O que o legacy FAZ (295 LOC)**:
+
 ```javascript
 // src/infra/ipc_client.js
 
@@ -465,28 +478,28 @@ class IPCClient {
   // CONEXÃO
   async connect(port) {}              // Socket.io connect
   _discoverPort() {}                  // Lê estado.json
-  
+
   // HANDSHAKE V2
   _performHandshake() {}              // Identidade + versão
   // Eventos: authorized, rejected
-  
+
   // MENSAGENS
   emitEvent(event, data, corrId) {}   // Fire & forget
   sendCommand(cmd, data, corrId) {}   // Request/response
   _handleIncoming(envelope) {}        // Router
-  
+
   // BUFFERING
   this.outbox = new IPCBuffer(2000)   // Offline queue
   _flushOutbox() {}                   // Replay após reconexão
-  
+
   // HANDLERS
   on(event, handler) {}               // Event subscription
   off(event, handler) {}              // Unsubscribe
-  
+
   // ESTADO
   isConnected() {}
   this.state = IPCConnState.*
-  
+
   // TELEMETRIA (BÁSICA)
   log('INFO', '[IPC] Mensagem')
 }
@@ -501,6 +514,7 @@ class IPCClient {
 ```
 
 **O que o NERV FAZ (1,600 LOC distribuídos)**:
+
 ```javascript
 // src/nerv/ (arquitetura plugável)
 
@@ -514,7 +528,7 @@ function createNERV(config) {
   const emission = createEmission(...)
   const reception = createReception(...)
   const health = createHealth(...)
-  
+
   return { emit, send, on, off, getHealth, getMetrics }
 }
 
@@ -577,6 +591,7 @@ class IPCTelemetry {
 ```
 
 **Gap de Funcionalidade** (o que NERV ainda NÃO tem):
+
 ```diff
 IMPLEMENTADO no NERV:
 + ✅ Arquitetura completa (7 subsistemas)
@@ -604,6 +619,7 @@ ESTIMATIVA: ~15% de funcionalidade faltando
 ### Dependências Inversas (quem usa legacy)
 
 **Quem usa `execution_engine.js`**:
+
 ```bash
 $ grep -r "execution_engine\|ExecutionEngine" src/ --include="*.js"
 
@@ -615,6 +631,7 @@ index.js:85               const engine = new ExecutionEngine({ ... });
 ```
 
 **Quem usa `ipc_client.js`**:
+
 ```bash
 $ grep -r "ipc_client\|require.*ipc" src/ --include="*.js"
 
@@ -640,61 +657,82 @@ src/driver/modules/telemetry_bridge.js:11  const ipc = require('../../infra/ipc_
 // 1. Criar Socket.io Adapter para NERV
 // src/nerv/transport/adapters/socketio_adapter.js
 class SocketIOAdapter {
-  constructor(config) {
-    this.client = socketIOClient(config.url, config.options)
-  }
-  
-  async connect() { /* Socket.io specific */ }
-  send(envelope) { this.client.emit('message', envelope) }
-  onReceive(handler) { this.client.on('message', handler) }
-  disconnect() { this.client.disconnect() }
+    constructor(config) {
+        this.client = socketIOClient(config.url, config.options);
+    }
+
+    async connect() {
+        /* Socket.io specific */
+    }
+    send(envelope) {
+        this.client.emit('message', envelope);
+    }
+    onReceive(handler) {
+        this.client.on('message', handler);
+    }
+    disconnect() {
+        this.client.disconnect();
+    }
 }
 
 // 2. Implementar Handshake V2 no NERV
 // src/nerv/handshake/handshake_v2.js
 class HandshakeV2 {
-  async perform(transport, identity) {
-    // Reimplementa lógica de ipc_client._performHandshake()
-  }
+    async perform(transport, identity) {
+        // Reimplementa lógica de ipc_client._performHandshake()
+    }
 }
 
 // 3. Criar Wrapper de Compatibilidade
 // src/infra/ipc_client_v3.js (drop-in replacement)
 const nerv = createNERV({
-  transport: { adapter: 'socketio', url: '...' },
-  handshake: 'v2'
-})
+    transport: { adapter: 'socketio', url: '...' },
+    handshake: 'v2'
+});
 
 // INTERFACE COMPATÍVEL com ipc_client.js
 module.exports = {
-  async connect(port) { await nerv.connect() },
-  emitEvent(event, data, corrId) { nerv.emit(event, data, { correlationId: corrId }) },
-  sendCommand(cmd, data, corrId) { return nerv.send(cmd, data, { correlationId: corrId }) },
-  on(event, handler) { nerv.on(event, handler) },
-  off(event, handler) { nerv.off(event, handler) },
-  isConnected() { return nerv.getHealth().connected }
-}
+    async connect(port) {
+        await nerv.connect();
+    },
+    emitEvent(event, data, corrId) {
+        nerv.emit(event, data, { correlationId: corrId });
+    },
+    sendCommand(cmd, data, corrId) {
+        return nerv.send(cmd, data, { correlationId: corrId });
+    },
+    on(event, handler) {
+        nerv.on(event, handler);
+    },
+    off(event, handler) {
+        nerv.off(event, handler);
+    },
+    isConnected() {
+        return nerv.getHealth().connected;
+    }
+};
 
 // 4. Feature Flag Migration
 // src/core/config.js
-USE_NERV_IPC: process.env.NERV_ENABLED === 'true' || false
-
-// 5. Substituir import em 5 arquivos
-- src/core/execution_engine.js
-- src/core/forensics.js
-- src/core/infra_failure_policy.js
-- src/server/engine/socket.js
-- src/driver/modules/telemetry_bridge.js
+USE_NERV_IPC: process.env.NERV_ENABLED === 'true' ||
+    false -
+        // 5. Substituir import em 5 arquivos
+        src / core / execution_engine.js -
+        src / core / forensics.js -
+        src / core / infra_failure_policy.js -
+        src / server / engine / socket.js -
+        src / driver / modules / telemetry_bridge.js;
 
 // Trocar:
 const ipc = require('../infra/ipc_client');
 // Por:
-const ipc = CONFIG.USE_NERV_IPC 
-  ? require('../infra/ipc_client_v3')  // NERV
-  : require('../infra/ipc_client');    // Legacy
+const ipc = CONFIG.USE_NERV_IPC
+    ? require('../infra/ipc_client_v3') // NERV
+    : require('../infra/ipc_client'); // Legacy
 ```
 
 **Critérios de Aceite**:
+
 - [ ] Socket.io adapter implementado e testado
 - [ ] Handshake V2 funcional no NERV
 - [ ] Wrapper de compatibilidade 100% compatível
@@ -721,7 +759,7 @@ class DriverAdapter {
   constructor(driverLifecycleManager) {
     this.dlm = driverLifecycleManager
   }
-  
+
   async execute(task, signal) {
     const driver = await this.dlm.acquire()
     // Pipeline usando driver legacy
@@ -753,7 +791,7 @@ class ForensicsAdapter {
 // 2. Atualizar ExecutionEngine do Kernel
 // src/kernel/execution_engine/execution_engine.js
 class ExecutionEngine {
-  constructor({ 
+  constructor({
     driverAdapter,      // NOVO
     contextAdapter,     // NOVO
     validatorAdapter,   // NOVO
@@ -763,7 +801,7 @@ class ExecutionEngine {
   }) {
     // Injeção de dependências com adapters
   }
-  
+
   async executeTask(task, context) {
     // Usa adapters internamente
     const resolvedPrompt = await this.contextAdapter.resolve(...)
@@ -779,13 +817,13 @@ function createProductionKernel(nerv) {
   const driverAdapter = new DriverAdapter(
     require('../driver/DriverLifecycleManager')
   )
-  
+
   const contextAdapter = new ContextAdapter(
     require('../core/context/context_core')
   )
-  
+
   // ... outros adapters
-  
+
   return createKernel({
     nerv,
     adapters: {
@@ -809,10 +847,10 @@ if (CONFIG.USE_KERNEL) {
   // NOVO: Usa Kernel
   const nerv = createNERV({ ... })
   await nerv.connect()
-  
+
   const kernel = createProductionKernel(nerv)
   await kernel.start()
-  
+
 } else {
   // LEGACY: Usa ExecutionEngine
   const ExecutionEngine = require('./src/core/execution_engine');
@@ -822,6 +860,7 @@ if (CONFIG.USE_KERNEL) {
 ```
 
 **Critérios de Aceite**:
+
 - [ ] 4 adapters implementados (driver, context, validator, forensics)
 - [ ] ExecutionEngine do Kernel usa adapters
 - [ ] Kernel factory com adapters funcionando
@@ -844,26 +883,27 @@ if (CONFIG.USE_KERNEL) {
 ```javascript
 // src/server/engine/socket_v3.js (substitui socket.js)
 function initSocketEngine(io, nerv) {
-  // Conecta servidor ao NERV em vez de ipc_client
-  
-  nerv.on('TASK_STARTED', (data) => {
-    io.emit('task_started', data)
-  })
-  
-  nerv.on('TASK_COMPLETED', (data) => {
-    io.emit('task_completed', data)
-  })
-  
-  io.on('connection', (clientSocket) => {
-    clientSocket.on('ENGINE_PAUSE', () => {
-      nerv.send('KERNEL_PAUSE', {})
-    })
-    // etc
-  })
+    // Conecta servidor ao NERV em vez de ipc_client
+
+    nerv.on('TASK_STARTED', data => {
+        io.emit('task_started', data);
+    });
+
+    nerv.on('TASK_COMPLETED', data => {
+        io.emit('task_completed', data);
+    });
+
+    io.on('connection', clientSocket => {
+        clientSocket.on('ENGINE_PAUSE', () => {
+            nerv.send('KERNEL_PAUSE', {});
+        });
+        // etc
+    });
 }
 ```
 
 **Critérios de Aceite**:
+
 - [ ] Server emite via NERV
 - [ ] Dashboard recebe eventos do Kernel via NERV
 - [ ] Comandos do dashboard funcionam (pause, resume, abort)
@@ -901,6 +941,7 @@ rm src/infra/ipc/buffer.js            # ~100 LOC removidas
 ```
 
 **Resultado Final**:
+
 - ❌ **-796 LOC** de código legacy removido
 - ✅ **+4,500 LOC** de código novo ativado
 - ✅ **0 duplicação funcional**
@@ -944,6 +985,7 @@ rm src/infra/ipc/buffer.js            # ~100 LOC removidas
 > **CORREÇÃO**: Não é "integração", é **MIGRAÇÃO**. KERNEL e NERV devem **substituir** legacy.
 
 **Evidência Quantitativa**:
+
 ```bash
 # Ninguém instancia Kernel
 $ grep -r "createKernel\|new Kernel" index.js src/server/ src/core/
@@ -959,6 +1001,7 @@ $ grep "require.*kernel\|require.*nerv" index.js
 ```
 
 **Impacto**:
+
 - **4,500 LOC** (~25% do código) **completamente inutilizado**
 - **Semanas de desenvolvimento** sem ROI
 - **2 arquiteturas paralelas** causando confusão
@@ -974,6 +1017,7 @@ $ grep "require.*kernel\|require.*nerv" index.js
 ### 2. DEPENDÊNCIA CIRCULAR 🔴 ALTA PRIORIDADE
 
 **Ciclo Detectado**:
+
 ```
 core/config.js  (385 imports totais)
     ↓ importa
@@ -985,12 +1029,14 @@ core/config.js  ← CIRCULAR!
 ```
 
 **Impacto**:
+
 - **Ordem de inicialização** crítica e frágil
 - **Testes unitários** impossíveis sem mocks complexos
 - **Refactoring arriscado** - uma mudança quebra tudo
 - **Race conditions** potenciais em hot-reload
 
 **Análise de Acoplamento**:
+
 ```
 config.js é usado por:       42 arquivos (31% do código)
 io.js é usado por:           38 arquivos (28% do código)
@@ -1007,6 +1053,7 @@ Risco: MUITO ALTO - Módulos centrais em ciclo
 ### 3. COBERTURA DE TESTES CRÍTICA ❌ MÁXIMA PRIORIDADE
 
 **Evidência**:
+
 ```bash
 # Testes existentes
 $ find tests/ -name "*.js" | wc -l
@@ -1021,6 +1068,7 @@ $ echo "scale=2; 15 / 137 * 100" | bc
 ```
 
 **Detalhamento**:
+
 ```
 Componentes SEM testes:
 ├─ kernel/ (2,900 LOC)           0% ❌
@@ -1035,6 +1083,7 @@ Coverage real:                   4.9% ❌
 ```
 
 **Impacto**:
+
 - **Regressões invisíveis** - bugs só descobertos em produção
 - **Refactoring perigoso** - sem safety net
 - **Confiança zero** em deploys
@@ -1045,9 +1094,10 @@ Coverage real:                   4.9% ❌
 
 ---
 
-### 4. CÓDIGO MORTO E DUPLICAÇÃO ⚠️  MÉDIA PRIORIDADE
+### 4. CÓDIGO MORTO E DUPLICAÇÃO ⚠️ MÉDIA PRIORIDADE
 
 **Código Morto Identificado**:
+
 ```
 1. kernel/ inteiro                     2,900 LOC  ❌ Não usado
 2. nerv/ inteiro                       1,600 LOC  ❌ Não usado
@@ -1060,6 +1110,7 @@ Total de Código Morto:                ~5,000 LOC (27%)
 ```
 
 **Duplicação Semântica** (não detectada por JSCPD mas existe):
+
 ```
 IPC Systems:
 ├─ ipc_client.js (legacy)              294 LOC
@@ -1078,6 +1129,7 @@ Socket Systems:
 ```
 
 **Impacto**:
+
 - **Confusão** para novos desenvolvedores
 - **Manutenção duplicada** de bugs
 - **Decisões ambíguas** - qual código usar?
@@ -1088,9 +1140,10 @@ Socket Systems:
 
 ---
 
-### 5. COMPLEXIDADE EXCESSIVA ⚠️  MÉDIA PRIORIDADE
+### 5. COMPLEXIDADE EXCESSIVA ⚠️ MÉDIA PRIORIDADE
 
 **Arquivos com Complexidade Crítica** (>60 condicionais):
+
 ```
 1. execution_engine.js (legacy)        69 condicionais
    → Monolito de 401 LOC
@@ -1115,6 +1168,7 @@ Socket Systems:
 ```
 
 **Análise de Responsabilidades**:
+
 ```
 execution_engine.js faz:
 ├─ Task polling              ✓
@@ -1130,6 +1184,7 @@ execution_engine.js faz:
 ```
 
 **Impacto**:
+
 - **Difícil de testar** - muitas ramificações
 - **Difícil de entender** - fluxo não linear
 - **Difícil de modificar** - mudanças arriscadas
@@ -1140,11 +1195,12 @@ execution_engine.js faz:
 
 ---
 
-### 6. OBSERVABILIDADE INSUFICIENTE ⚠️  MÉDIA PRIORIDADE
+### 6. OBSERVABILIDADE INSUFICIENTE ⚠️ MÉDIA PRIORIDADE
 
 **console.log diretos**: 26 ocorrências encontradas
 
 **Problemas**:
+
 ```javascript
 // RUIM (26 casos no código):
 console.log(`Tarefa iniciada: ${taskId}`);
@@ -1156,6 +1212,7 @@ logger.error('critical_failure', { error }, correlationId);
 ```
 
 **Telemetria Existente**:
+
 ```
 ✅ adaptive.js                Métricas de latência
 ✅ kernel_telemetry.js        Telemetria do Kernel (não usado)
@@ -1167,6 +1224,7 @@ logger.error('critical_failure', { error }, correlationId);
 ```
 
 **Gaps de Observabilidade**:
+
 1. **Sem métricas exportáveis** (Prometheus/Grafana)
 2. **Logs não estruturados** em muitos lugares (console.log)
 3. **Sem tracing distribuído** (sem correlation ID consistente)
@@ -1174,6 +1232,7 @@ logger.error('critical_failure', { error }, correlationId);
 5. **Telemetria do Kernel/NERV** não utilizada
 
 **Impacto**:
+
 - **Debugging difícil** em produção
 - **Sem visibilidade** de performance
 - **Alerting impossível** (sem métricas)
@@ -1184,11 +1243,12 @@ logger.error('critical_failure', { error }, correlationId);
 
 ---
 
-### 7. PERFORMANCE SUBÓTIMA ⚠️  MÉDIA-BAIXA PRIORIDADE
+### 7. PERFORMANCE SUBÓTIMA ⚠️ MÉDIA-BAIXA PRIORIDADE
 
 **Gargalos Identificados**:
 
 #### 7.1 File I/O Excessivo
+
 ```
 Queue Poll Loop:
 ├─ fs.readdir('fila/')              → 10ms (disco SSD)
@@ -1201,20 +1261,22 @@ Throughput máximo: ~6-20 tasks/segundo
 ```
 
 **Evidência no Código**:
+
 ```javascript
 // src/infra/queue/task_loader.js
 async function loadAllTasks() {
-  const files = await fs.readdir('fila/');  // I/O
-  for (const file of files) {
-    const stat = await fs.stat(file);       // I/O x N
-    const content = await fs.readFile(file); // I/O x N
-    tasks.push(JSON.parse(content));        // CPU
-  }
+    const files = await fs.readdir('fila/'); // I/O
+    for (const file of files) {
+        const stat = await fs.stat(file); // I/O x N
+        const content = await fs.readFile(file); // I/O x N
+        tasks.push(JSON.parse(content)); // CPU
+    }
 }
 // Chamado a cada 5s (CONFIG.POLL_INTERVAL)
 ```
 
 #### 7.2 Browser Por Task
+
 ```javascript
 // src/driver/DriverLifecycleManager.js
 async executeTask(task) {
@@ -1227,17 +1289,20 @@ Overhead: 7-15 segundos por task
 ```
 
 #### 7.3 Validação Síncrona
+
 ```javascript
 // src/logic/validation/validation_core.js
 const content = fs.readFileSync(responsePath); // Blocking!
-for (let line of content.split('\n')) {        // Blocking!
-  if (forbiddenTerms.some(t => line.includes(t))) {
-    // Regex checks
-  }
+for (let line of content.split('\n')) {
+    // Blocking!
+    if (forbiddenTerms.some(t => line.includes(t))) {
+        // Regex checks
+    }
 }
 ```
 
 **Benchmarks Estimados**:
+
 ```
 Latência Atual (por task):
 ├─ File I/O (queue poll):    ~50ms
@@ -1253,6 +1318,7 @@ Throughput: ~1.5 tasks/minuto (single-threaded)
 ```
 
 **Otimizações Possíveis**:
+
 ```
 Browser Pooling:           -7s    (mantém conexões)
 Redis Queue:               -40ms  (memória vs disco)
@@ -1273,29 +1339,33 @@ Throughput com Pool(5):    ~9 tasks/min (+500%)
 **Vulnerabilidades Identificadas**:
 
 #### 8.1 npm audit
+
 ```bash
 $ npm audit
 → 6 vulnerabilities (1 low, 5 high)
 ```
 
 **Detalhamento**:
+
 ```
 Dependências com vulnerabilidades conhecidas
 (não especificadas - requer npm audit detalhado)
 ```
 
 #### 8.2 WebSocket Sem Autenticação
+
 ```javascript
 // server/engine/socket.js
-io.on('connection', (socket) => {
-  // SEM verificação de token/auth
-  socket.on('ENGINE_PAUSE', () => engine.pause());
+io.on('connection', socket => {
+    // SEM verificação de token/auth
+    socket.on('ENGINE_PAUSE', () => engine.pause());
 });
 ```
 
 **Risco**: Qualquer cliente pode pausar/parar o engine!
 
 #### 8.3 File-based Queue Sem Encryption
+
 ```javascript
 // infra/storage/task_store.js
 fs.writeFileSync('fila/task.json', JSON.stringify(task));
@@ -1305,18 +1375,21 @@ fs.writeFileSync('fila/task.json', JSON.stringify(task));
 **Risco**: Dados sensíveis expostos
 
 #### 8.4 CORS Permissivo (assumido)
+
 ```javascript
 // server/main.js - CORS não configurado explicitamente
 // Provável default: permissivo
 ```
 
 #### 8.5 Input Sanitization
+
 ```javascript
 // ✅ BOM: Zod schemas validam estrutura
 // ⚠️  INCOMPLETO: Não sanitiza content de prompts
 ```
 
 **Score de Segurança**:
+
 ```
 Input Validation:           ████████░░ 8/10  ✅
 Authentication:             ██░░░░░░░░ 2/10  ❌
@@ -1330,6 +1403,7 @@ SCORE GERAL:                ███░░░░░░░ 3.4/10  ❌
 ```
 
 **Recomendações**:
+
 1. JWT/API Keys no WebSocket
 2. Encryption at rest (prompts/respostas sensíveis)
 3. Rate limiting no Dashboard
@@ -1358,6 +1432,7 @@ eslint                   ✅ Linting (já estava)
 ### 🔧 Ferramentas Adicionais Recomendadas
 
 #### Para Testing (CRÍTICO)
+
 ```bash
 npm install --save-dev \
   jest \                      # Framework de testes
@@ -1373,6 +1448,7 @@ npm install --save-dev \
 **Prioridade**: MÁXIMA (Semana 1)
 
 #### Para Observabilidade (ALTA)
+
 ```bash
 npm install \
   pino \                      # Structured logging
@@ -1386,6 +1462,7 @@ npm install \
 **Prioridade**: ALTA (Semana 1)
 
 #### Para Performance (MÉDIA)
+
 ```bash
 npm install \
   generic-pool \              # Connection pooling
@@ -1398,6 +1475,7 @@ npm install \
 **Prioridade**: MÉDIA (Semana 2-3)
 
 #### Para Segurança (MÉDIA-ALTA)
+
 ```bash
 npm install \
   helmet \                    # Security headers
@@ -1411,6 +1489,7 @@ npm install \
 **Prioridade**: MÉDIA-ALTA (Fase 4)
 
 #### Para Developer Experience (BAIXA)
+
 ```bash
 npm install --save-dev \
   husky \                     # Git hooks
@@ -1514,12 +1593,13 @@ Recomendação: Priorizar quadrante superior esquerdo
 ### Analogia
 
 **O projeto é como uma casa de luxo**:
+
 - ✅ **Fundações excelentes** (arquitetura, código limpo)
 - ✅ **Materiais de primeira** (padrões, organização)
-- ⚠️  **Cômodos bem decorados mas desconectados** (componentes isolados)
+- ⚠️ **Cômodos bem decorados mas desconectados** (componentes isolados)
 - ❌ **Extensão nova sem portas** (Kernel/NERV não conectados)
 - ❌ **Sem sistema de alarme** (testes ausentes)
-- ⚠️  **Encanamento exposto** (console.log, observabilidade básica)
+- ⚠️ **Encanamento exposto** (console.log, observabilidade básica)
 
 **Com 4-8 semanas de trabalho focado, vira uma mansão produção-ready.** 🏰
 
@@ -1538,21 +1618,25 @@ Recomendação: Priorizar quadrante superior esquerdo
 ### Próximas 4 Semanas (CRÍTICO)
 
 **Semana 1: NERV Integration**
+
 - Migrar ipc_client → NERV
 - Primeiros 20 testes unitários
 - Pino + correlation IDs
 
 **Semana 2: KERNEL Integration**
+
 - Migrar execution_engine → Kernel
 - Browser pooling básico
 - 40% test coverage
 
 **Semana 3: DRIVER-KERNEL Integration**
+
 - Driver emite via NERV
 - Commands via Kernel
 - 60% test coverage
 
 **Semana 4: SERVER-NERV Integration**
+
 - Dashboard usa NERV
 - Prometheus metrics
 - Cleanup código morto
@@ -1560,6 +1644,7 @@ Recomendação: Priorizar quadrante superior esquerdo
 ### Próximos 2 Meses (IMPORTANTE)
 
 **Mês 2 (Semanas 5-8): Qualidade**
+
 - 80% test coverage
 - Refactor top 5 complexidade
 - Security hardening
@@ -1699,11 +1784,13 @@ VEREDICTO: NÃO FAZER! Risco > Benefício
 #### **Tarefa 1: Resolver Dependência Circular** (1 dia) 🔴
 
 **Problema**:
+
 ```
 core/config.js → infra/io.js → infra/queue/task_loader.js → core/config.js
 ```
 
 **Solução**:
+
 ```javascript
 // 1. Extrair parte de config.js que io.js precisa
 // src/core/config/io_config.js
@@ -1772,11 +1859,11 @@ const createEnvelopes = require('../../src/nerv/envelopes/envelopes');
 
 describe('NERV Envelopes', () => {
   let envelopes;
-  
+
   beforeEach(() => {
     envelopes = createEnvelopes();
   });
-  
+
   test('pack() cria envelope válido', () => {
     const envelope = envelopes.pack('TEST_EVENT', { foo: 'bar' }, {});
     expect(envelope.type).toBe('TEST_EVENT');
@@ -1808,6 +1895,7 @@ git push -u origin feat/kernel-nerv-migration
 ### Checkpoint: Fim da Semana 1
 
 **Validação**:
+
 - [ ] Dependência circular resolvida (`npm run analyze:deps` limpo)
 - [ ] Jest instalado e configurado
 - [ ] Pelo menos 5 testes unitários passando
@@ -1883,6 +1971,7 @@ git push -u origin feat/kernel-nerv-migration
 #### **Recomendação**: 🟢 **GO com Opção A (Migração Conservadora)**
 
 **Justificativa**:
+
 1. ✅ **KERNEL e NERV estão 85-95% prontos** - só faltam adapters
 2. ✅ **Código legacy bem documentado** - fácil de replicar
 3. ✅ **Feature flags permitem rollback** - risco controlado
@@ -1890,6 +1979,7 @@ git push -u origin feat/kernel-nerv-migration
 5. ✅ **Projeto inviável sem isso** - bloqueio para v1.0
 
 **Condições para GO**:
+
 - ✅ Aprovação stakeholder (4 semanas dedicadas)
 - ✅ Staging environment disponível
 - ✅ Monitoring/alerting configurado
@@ -1905,6 +1995,7 @@ git push -u origin feat/kernel-nerv-migration
 ### Fase 1: Diagnóstico ✅ COMPLETO
 
 Este documento consolida:
+
 - ✅ Métricas quantitativas completas
 - ✅ Análise arquitetural profunda
 - ✅ **Estratégia de migração detalhada** (NOVO)
@@ -1919,6 +2010,7 @@ Este documento consolida:
 **Documento a criar**: `ACTION_PLAN.md`
 
 Conteúdo:
+
 1. **Roadmap detalhado** (semana a semana)
 2. **Tarefas granulares** (com checkboxes)
 3. **Ordem de execução** (dependências)

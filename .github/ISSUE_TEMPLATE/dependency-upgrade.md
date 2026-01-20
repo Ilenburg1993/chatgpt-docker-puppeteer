@@ -2,13 +2,14 @@
 name: Dependency Upgrade PR Checklist
 about: Use this template when preparing PRs that upgrade dependencies
 title: 'chore(deps): upgrade <package> — compatibility validation'
-labels: ['dependency','security']
+labels: ['dependency', 'security']
 assignees: []
 ---
 
 Use this checklist for any PR that upgrades runtime or infra dependencies (especially `puppeteer`, `puppeteer-extra`, `pm2`, `express`). Upgrades that touch browser automation or process managers require careful validation.
 
 Checklist
+
 - [ ] Branch name: `chore/deps-upgrade/<package>-<version>`
 - [ ] Document motivation and changelog links in PR description
 - [ ] Run `npm audit --json` and attach output to PR (`analysis/verification_commands/npm_audit_current.json`)
@@ -21,5 +22,6 @@ Checklist
 - [ ] When merged: update `CHANGELOG.md` and tag release if applicable
 
 Notes
+
 - Avoid mass automatic upgrades: prefer small, isolated PRs per package.
 - For packages that include native/binary components (Chromium), test across CI images and local environments.

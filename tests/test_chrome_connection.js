@@ -21,7 +21,7 @@ async function testChromeConnection() {
     console.log('');
 
     try {
-    // 1. Verificar se URL está acessível
+        // 1. Verificar se URL está acessível
         console.log('1. Verificando URL do Chrome...');
         console.log(`   URL: ${CHROME_URL}`);
 
@@ -124,7 +124,6 @@ async function testChromeConnection() {
         console.log('🚀 Sistema pronto para automação!');
 
         process.exit(0);
-
     } catch (error) {
         console.error('');
         console.error('╔══════════════════════════════════════════════════════════════╗');

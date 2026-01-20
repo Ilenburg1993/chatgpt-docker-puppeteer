@@ -50,14 +50,15 @@ const { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, ROO
         } else {
             throw new Error('Timeout: Agente não acordou após RUN.');
         }
-
     } catch (e) {
         console.error('FAIL:', e.message);
         process.exit(1);
     } finally {
         stopAgent(agent.proc);
         // Restaura para RUN para não travar uso futuro
-        try { fs.writeFileSync(CONTROL, JSON.stringify({ estado: 'RUN' }, null, 2)); } catch(_e) {
+        try {
+            fs.writeFileSync(CONTROL, JSON.stringify({ estado: 'RUN' }, null, 2));
+        } catch (_e) {
             // Ignore cleanup errors
         }
     }

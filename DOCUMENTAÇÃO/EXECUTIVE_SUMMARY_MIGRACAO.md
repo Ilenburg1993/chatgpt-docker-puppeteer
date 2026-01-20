@@ -12,6 +12,7 @@
 ### O Problema
 
 Temos **2 arquiteturas paralelas**:
+
 - **Legacy** (696 LOC): `execution_engine.js` + `ipc_client.js` - **EM PRODUÇÃO** ✅
 - **Nova** (4,500 LOC): `kernel/` + `nerv/` - **CÓDIGO MORTO** ❌ (0% uso)
 
@@ -20,6 +21,7 @@ Temos **2 arquiteturas paralelas**:
 ### A Descoberta
 
 Após diagnóstico profundo, identificamos que:
+
 1. **KERNEL** deve **SUBSTITUIR** `execution_engine.js` (não integrar)
 2. **NERV** deve **SUBSTITUIR** `ipc_client.js` (não integrar)
 
@@ -31,24 +33,24 @@ Após diagnóstico profundo, identificamos que:
 
 ### execution_engine.js vs KERNEL
 
-| Aspecto | Legacy (401 LOC) | KERNEL (2,900 LOC) |
-|---------|------------------|---------------------|
-| **Responsabilidades** | 9 em 1 classe ❌ | 1-2 por classe ✅ |
-| **Complexidade** | 69 condicionais 🔴 | <40 por arquivo 🟢 |
-| **Testabilidade** | Difícil (singleton) ❌ | Fácil (DI) ✅ |
-| **IPC** | Hardcoded ❌ | Injetado ✅ |
-| **Funcionalidade** | 100% ✅ | ~70% ⚠️ |
+| Aspecto               | Legacy (401 LOC)       | KERNEL (2,900 LOC) |
+| --------------------- | ---------------------- | ------------------ |
+| **Responsabilidades** | 9 em 1 classe ❌       | 1-2 por classe ✅  |
+| **Complexidade**      | 69 condicionais 🔴     | <40 por arquivo 🟢 |
+| **Testabilidade**     | Difícil (singleton) ❌ | Fácil (DI) ✅      |
+| **IPC**               | Hardcoded ❌           | Injetado ✅        |
+| **Funcionalidade**    | 100% ✅                | ~70% ⚠️            |
 
 **Gap**: KERNEL falta ~30% (adapters para driver, context, validator, forensics)
 
 ### ipc_client.js vs NERV
 
-| Aspecto | Legacy (295 LOC) | NERV (1,600 LOC) |
-|---------|------------------|-------------------|
-| **Transport** | Socket.io hardcoded ❌ | Plugável ✅ |
-| **Telemetria** | console.log ❌ | Prometheus ✅ |
-| **Correlation** | Apenas passa ID ⚠️ | Store completo ✅ |
-| **Funcionalidade** | 100% ✅ | ~85% ⚠️ |
+| Aspecto            | Legacy (295 LOC)       | NERV (1,600 LOC)  |
+| ------------------ | ---------------------- | ----------------- |
+| **Transport**      | Socket.io hardcoded ❌ | Plugável ✅       |
+| **Telemetria**     | console.log ❌         | Prometheus ✅     |
+| **Correlation**    | Apenas passa ID ⚠️     | Store completo ✅ |
+| **Funcionalidade** | 100% ✅                | ~85% ⚠️           |
 
 **Gap**: NERV falta ~15% (Socket.io adapter concreto, Handshake V2)
 
@@ -88,6 +90,7 @@ Semana 5: Consolidação
 ```
 
 **Vantagens**:
+
 - ✅ Rollback fácil (feature flag → false)
 - ✅ Risco distribuído (5 checkpoints)
 - ✅ Validação incremental
@@ -112,20 +115,24 @@ Implementar tudo + substituir de uma vez = Alto risco, sem rollback.
 ### Retorno
 
 **Qualidade**:
+
 - Test coverage: 5% → 60%+ (**↑1100%**)
 - Complexidade: 69 → <40 (**↓42%**)
 - Código morto: -5,000 LOC (**↓100%**)
 
 **Performance**:
+
 - Latência/task: 38s → 31s (**↓19%**)
 - Throughput: 1.5 → 9 task/min (**↑500%**)
 - Browser connect: 5-10s → <1s (**↓90%**)
 
 **Manutenibilidade**:
+
 - Responsabilidades/classe: 9 → 1-2 (**↓78%**)
 - Arquiteturas: 2 → 1 (**↓50%**)
 
 **Observabilidade**:
+
 - Métricas Prometheus: 0 → 50+ (NEW)
 - Correlation tracking: Parcial → Total
 
@@ -136,13 +143,13 @@ Implementar tudo + substituir de uma vez = Alto risco, sem rollback.
 
 ## ⚠️ RISCOS E MITIGAÇÕES
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| Regressões invisíveis | ALTA | ALTO | Feature flags + Staging + Rollback |
-| Funcionalidade faltante | MÉDIA | ALTO | Adapters para código legacy |
-| Performance degradation | BAIXA | MÉDIO | Benchmarks + Monitoring |
-| Time sobrecarregado | MÉDIA | MÉDIO | Plano 5 semanas incremental |
-| Breaking changes dashboard | BAIXA | ALTO | Wrapper compatibilidade |
+| Risco                      | Probabilidade | Impacto | Mitigação                          |
+| -------------------------- | ------------- | ------- | ---------------------------------- |
+| Regressões invisíveis      | ALTA          | ALTO    | Feature flags + Staging + Rollback |
+| Funcionalidade faltante    | MÉDIA         | ALTO    | Adapters para código legacy        |
+| Performance degradation    | BAIXA         | MÉDIO   | Benchmarks + Monitoring            |
+| Time sobrecarregado        | MÉDIA         | MÉDIO   | Plano 5 semanas incremental        |
+| Breaking changes dashboard | BAIXA         | ALTO    | Wrapper compatibilidade            |
 
 ---
 
@@ -151,6 +158,7 @@ Implementar tudo + substituir de uma vez = Alto risco, sem rollback.
 ### Recomendação: 🟢 **GO com Opção A**
 
 **Por quê?**
+
 1. ✅ KERNEL e NERV estão 85-95% prontos (só faltam adapters)
 2. ✅ Código legacy bem documentado (fácil de replicar)
 3. ✅ Feature flags permitem rollback (risco controlado)
@@ -189,6 +197,7 @@ Implementar tudo + substituir de uma vez = Alto risco, sem rollback.
 ### Critérios de Sucesso (KPIs)
 
 Ao final da migração (Semana 5):
+
 - [ ] Test coverage ≥60%
 - [ ] 0 dependências circulares
 - [ ] Complexidade média <40 condicionais
@@ -203,6 +212,7 @@ Ao final da migração (Semana 5):
 ## 📄 DOCUMENTAÇÃO COMPLETA
 
 Este é um resumo executivo. Para análise completa:
+
 - **Diagnóstico Profundo**: [DIAGNOSTIC_CONSOLIDADO.md](./DIAGNOSTIC_CONSOLIDADO.md)
 - **Estratégia de Migração**: Seção "ESTRATÉGIA DE MIGRAÇÃO: LEGACY → NOVO" no diagnóstico
 - **Recomendações Detalhadas**: Seção "RECOMENDAÇÕES DE ENCAMINHAMENTO" no diagnóstico
@@ -215,9 +225,9 @@ Este é um resumo executivo. Para análise completa:
 **Data**: 19 de Janeiro de 2026  
 **Status**: Aguardando aprovação GO/NO-GO
 
-**Aprovação Stakeholder**: ________________________  
-**Data Aprovação**: ___________  
-**Decisão**: [ ] GO  [ ] NO-GO  [ ] ADIAR
+**Aprovação Stakeholder**: \***\*\*\*\*\***\_\_\_\_\***\*\*\*\*\***  
+**Data Aprovação**: \***\*\_\_\_\*\***  
+**Decisão**: [ ] GO [ ] NO-GO [ ] ADIAR
 
 ---
 

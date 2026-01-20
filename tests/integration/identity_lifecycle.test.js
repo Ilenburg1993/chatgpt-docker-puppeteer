@@ -27,7 +27,9 @@ async function runIdentityTest() {
         const dna1 = identityManager.robotId;
         const instance1 = identityManager.instanceId;
 
-        if (!dna1 || dna1.length < 30) {throw new Error('Falha ao gerar DNA no nascimento.');}
+        if (!dna1 || dna1.length < 30) {
+            throw new Error('Falha ao gerar DNA no nascimento.');
+        }
         console.log(`✅ [PASS] Nascimento: Novo DNA gerado -> ${dna1}`);
 
         // --- PASSO 2: SIMULAR REBOOT (RE-INICIALIZAÇÃO) ---
@@ -58,7 +60,6 @@ async function runIdentityTest() {
         console.log(`\n--------------------------------------------------`);
         console.log(`ESTADO: IDENTIDADE SOBERANA CONSOLIDADA`);
         console.log(`--------------------------------------------------\n`);
-
     } catch (err) {
         console.error(`\n❌ [FAIL] Colapso na Identidade: ${err.message}`);
         process.exit(1);

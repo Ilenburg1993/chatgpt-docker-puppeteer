@@ -8,16 +8,16 @@
 
 ## 📊 Resumo Executivo
 
-| Categoria | Status | Nível | Ações |
-|-----------|--------|-------|-------|
-| Node.js/NPM | ⚠️ Bom com melhorias | MÉDIO | Atualizar 6 deps principais |
-| JavaScript | ✅ Excelente | - | jsconfig.json otimizado |
-| PM2 | ⚠️ Bom com melhorias | BAIXO | Ajustes menores |
-| Docker | ⚠️ Bom com issue crítico | **CRÍTICO** | CMD aponta para arquivo inexistente |
-| Aplicação | ✅ Bom | BAIXO | Validações menores |
-| Dev Tools | ⚠️ Bom com gaps | MÉDIO | Adicionar ferramentas faltando |
-| Testes | ✅ Bom | BAIXO | Considerar coverage |
-| CI/CD | ⚠️ Básico | MÉDIO | Expandir workflows |
+| Categoria   | Status                   | Nível       | Ações                               |
+| ----------- | ------------------------ | ----------- | ----------------------------------- |
+| Node.js/NPM | ⚠️ Bom com melhorias     | MÉDIO       | Atualizar 6 deps principais         |
+| JavaScript  | ✅ Excelente             | -           | jsconfig.json otimizado             |
+| PM2         | ⚠️ Bom com melhorias     | BAIXO       | Ajustes menores                     |
+| Docker      | ⚠️ Bom com issue crítico | **CRÍTICO** | CMD aponta para arquivo inexistente |
+| Aplicação   | ✅ Bom                   | BAIXO       | Validações menores                  |
+| Dev Tools   | ⚠️ Bom com gaps          | MÉDIO       | Adicionar ferramentas faltando      |
+| Testes      | ✅ Bom                   | BAIXO       | Considerar coverage                 |
+| CI/CD       | ⚠️ Básico                | MÉDIO       | Expandir workflows                  |
 
 **Prioridade Imediata:** 🔴 Corrigir Dockerfile CMD (CRÍTICO)
 
@@ -28,6 +28,7 @@
 ### ✅ Pontos Positivos
 
 **package.json - Estrutura Excelente**
+
 - ✅ Scripts bem organizados (32 scripts úteis)
 - ✅ Engines definidos: Node >=20.0.0, NPM >=10.0.0
 - ✅ Volta.js configurado (pinning: Node 20.19.2, NPM 10.8.2)
@@ -37,20 +38,22 @@
 - ✅ Metadados completos (author, license, funding)
 
 **Scripts - Cobertura Completa**
+
 ```json
 {
-  "setup": "bash scripts/setup.sh",
-  "doctor": "bash scripts/doctor.sh",
-  "dev": "nodemon --ignore fila/ --ignore logs/ --ignore respostas/",
-  "daemon:*": "PM2 lifecycle completo",
-  "queue:*": "Gestão de fila completa",
-  "lint:*": "ESLint configurado",
-  "test:*": "Suite de testes",
-  "clean:*": "Limpeza granular"
+    "setup": "bash scripts/setup.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "dev": "nodemon --ignore fila/ --ignore logs/ --ignore respostas/",
+    "daemon:*": "PM2 lifecycle completo",
+    "queue:*": "Gestão de fila completa",
+    "lint:*": "ESLint configurado",
+    "test:*": "Suite de testes",
+    "clean:*": "Limpeza granular"
 }
 ```
 
 **Dependências - Lean & Focused**
+
 - ✅ Total: 14 deps produção + 12 dev (26 total) → **LEAN** ✅
 - ✅ node_modules: 298MB (razoável para projeto Puppeteer)
 - ✅ Sem dependências duplicadas
@@ -62,16 +65,17 @@
 
 6 dependências principais com major updates disponíveis:
 
-| Pacote | Atual | Latest | Tipo | Impacto |
-|--------|-------|--------|------|---------|
-| **puppeteer** | 21.11.0 | 24.35.0 | MAJOR | Alto - novas features + fixes |
-| **pm2** | 5.4.3 | 6.0.14 | MAJOR | Médio - melhorias estabilidade |
-| **express** | 4.22.1 | 5.2.1 | MAJOR | Alto - **breaking changes** |
-| **zod** | 3.25.76 | 4.3.5 | MAJOR | Baixo - validações funcionais |
-| **uuid** | 11.1.0 | 13.0.0 | MAJOR | Baixo - geração de IDs funcional |
-| **cross-env** | 7.0.3 | 10.1.0 | MAJOR | Baixo - dev dependency |
+| Pacote        | Atual   | Latest  | Tipo  | Impacto                          |
+| ------------- | ------- | ------- | ----- | -------------------------------- |
+| **puppeteer** | 21.11.0 | 24.35.0 | MAJOR | Alto - novas features + fixes    |
+| **pm2**       | 5.4.3   | 6.0.14  | MAJOR | Médio - melhorias estabilidade   |
+| **express**   | 4.22.1  | 5.2.1   | MAJOR | Alto - **breaking changes**      |
+| **zod**       | 3.25.76 | 4.3.5   | MAJOR | Baixo - validações funcionais    |
+| **uuid**      | 11.1.0  | 13.0.0  | MAJOR | Baixo - geração de IDs funcional |
+| **cross-env** | 7.0.3   | 10.1.0  | MAJOR | Baixo - dev dependency           |
 
 **Recomendações:**
+
 1. 🟡 **Puppeteer 21→24** - Testar em DEV primeiro (pode afetar drivers)
 2. 🟡 **PM2 5→6** - Revisar breaking changes (daemon mode)
 3. 🔴 **Express 4→5** - **ATENÇÃO**: Major rewrite, testar extensivamente
@@ -84,29 +88,30 @@
 ```json
 // Adicionar ao package.json
 {
-  "scripts": {
-    // Verificação de segurança
-    "audit:deps": "npm audit --production",
-    "audit:fix": "npm audit fix",
+    "scripts": {
+        // Verificação de segurança
+        "audit:deps": "npm audit --production",
+        "audit:fix": "npm audit fix",
 
-    // Bundle analysis
-    "analyze:size": "du -sh node_modules && npm ls --depth=0 | wc -l",
+        // Bundle analysis
+        "analyze:size": "du -sh node_modules && npm ls --depth=0 | wc -l",
 
-    // Pre-commit hook (se usar husky)
-    "pre-commit": "npm run lint:src && npm test",
+        // Pre-commit hook (se usar husky)
+        "pre-commit": "npm run lint:src && npm test",
 
-    // Coverage de testes
-    "test:coverage": "c8 npm test",
+        // Coverage de testes
+        "test:coverage": "c8 npm test",
 
-    // Validação completa
-    "validate:all": "npm run lint && npm test && npm run validate"
-  }
+        // Validação completa
+        "validate:all": "npm run lint && npm test && npm run validate"
+    }
 }
 ```
 
 **PRIORIDADE BAIXA - .npmrc Configuration**
 
 Criar `.npmrc` para otimizar instalações:
+
 ```ini
 # .npmrc
 # Performance
@@ -130,10 +135,11 @@ cache-min=86400
 ### ✅ jsconfig.json - Configuração Moderna
 
 **Análise:**
+
 - ✅ Target ES2024 (features modernas)
 - ✅ `checkJs: true` - Type checking em JavaScript
 - ✅ Modo estrito máximo (`strict`, `noImplicitAny`, etc.)
-- ✅ Escopo bem definido (src, scripts, *.js)
+- ✅ Escopo bem definido (src, scripts, \*.js)
 - ✅ Exclusões corretas (node_modules, dist)
 
 **Nenhuma ação necessária** - Configuração já está otimizada ✅
@@ -141,6 +147,7 @@ cache-min=86400
 ### 💡 Consideração Futura
 
 **Migração para TypeScript (Opcional)**
+
 - jsconfig.json já está preparado (strict mode máximo)
 - Esquemas Zod facilitam migração gradual
 - **NÃO recomendado agora** (estabilizar código primeiro)
@@ -152,6 +159,7 @@ cache-min=86400
 ### ✅ ecosystem.config.js - Configuração Sólida
 
 **Positivos:**
+
 - ✅ 2 processos: `agente-gpt` (index.js) + `dashboard-web` (src/server/main.js)
 - ✅ `--expose-gc` para controle manual de memória
 - ✅ `max_memory_restart: '1G'` (proteção contra leaks)
@@ -231,6 +239,7 @@ module.exports = {
 ```
 
 **Benefícios:**
+
 - ✅ Proteção contra crash loops
 - ✅ Graceful shutdown (kill_timeout)
 - ✅ Restart semanal automático (higiene)
@@ -244,12 +253,14 @@ module.exports = {
 ### 🔴 **ISSUE CRÍTICO - Dockerfile CMD Incorreto**
 
 **Problema:**
+
 ```dockerfile
 # Dockerfile linha 81
 CMD ["node", "src/main.js"]  # ❌ ARQUIVO NÃO EXISTE
 ```
 
 **Análise:**
+
 ```bash
 $ ls src/main.js
 ls: cannot access 'src/main.js': No such file found
@@ -260,11 +271,13 @@ src/server/main.js ✅ EXISTS (entry point do dashboard)
 ```
 
 **Impacto:**
+
 - 🔴 **CRÍTICO**: Container falha ao iniciar
 - 🔴 `docker-compose up` resulta em crash loop
 - 🔴 Healthcheck sempre falha
 
 **Solução:**
+
 ```dockerfile
 # Corrigir Dockerfile linha 81
 # OPÇÃO 1: Usar index.js (agente principal)
@@ -281,6 +294,7 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 ### ✅ Pontos Positivos - Docker
 
 **Dockerfile - Multi-stage Otimizado**
+
 - ✅ Node 20 Alpine (40% menor que Debian)
 - ✅ Multi-stage build (deps separadas)
 - ✅ Non-root user (segurança)
@@ -290,6 +304,7 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 - ✅ Comentários detalhados
 
 **docker-compose.yml - Bem Estruturado**
+
 - ✅ Version 3.8 (moderna)
 - ✅ Health checks configurados
 - ✅ Resource limits (CPU 2, RAM 2GB)
@@ -327,47 +342,49 @@ LABEL org.opencontainers.image.title="Chatgpt Docker Puppeteer" \
 ```yaml
 # ⭐ NOVO: Secrets management
 secrets:
-  chrome_ws_endpoint:
-    file: ./secrets/chrome_ws.txt
+    chrome_ws_endpoint:
+        file: ./secrets/chrome_ws.txt
 
 services:
-  agent:
-    # ⭐ NOVO: Build cache
-    build:
-      context: .
-      dockerfile: Dockerfile
-      cache_from:
-        - chatgpt-agent:latest
-      args:
-        NODE_VERSION: 20
+    agent:
+        # ⭐ NOVO: Build cache
+        build:
+            context: .
+            dockerfile: Dockerfile
+            cache_from:
+                - chatgpt-agent:latest
+            args:
+                NODE_VERSION: 20
 
-    # ⭐ NOVO: Usar secrets
-    secrets:
-      - chrome_ws_endpoint
+        # ⭐ NOVO: Usar secrets
+        secrets:
+            - chrome_ws_endpoint
 
-    # ⭐ NOVO: Depends_on com healthcheck
-    depends_on:
-      chrome-remote:
-        condition: service_healthy
+        # ⭐ NOVO: Depends_on com healthcheck
+        depends_on:
+            chrome-remote:
+                condition: service_healthy
 
-    # ⭐ NOVO: Tmpfs para /tmp (performance)
-    tmpfs:
-      - /tmp
-      - /app/tmp
+        # ⭐ NOVO: Tmpfs para /tmp (performance)
+        tmpfs:
+            - /tmp
+            - /app/tmp
 
-    # ⭐ NOVO: Capabilities drop (segurança)
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE # Se precisar porta <1024
+        # ⭐ NOVO: Capabilities drop (segurança)
+        cap_drop:
+            - ALL
+        cap_add:
+            - NET_BIND_SERVICE # Se precisar porta <1024
 
-    # ⭐ NOVO: Read-only root filesystem
-    # read_only: true # Só se /app não precisar writes
+
+        # ⭐ NOVO: Read-only root filesystem
+        # read_only: true # Só se /app não precisar writes
 ```
 
 **PRIORIDADE BAIXA - .dockerignore**
 
 Verificar se existe `.dockerignore` otimizado:
+
 ```ignore
 # .dockerignore
 node_modules
@@ -396,6 +413,7 @@ docker-compose*
 ### ✅ config.json - Bem Estruturado
 
 **Positivos:**
+
 - ✅ Comentários inline (JSON-C style)
 - ✅ Parâmetros organizados por categoria
 - ✅ Valores sensatos (TASK_TIMEOUT 30min, MAX_CONTINUATIONS 25)
@@ -419,7 +437,7 @@ const ConfigSchema = z.object({
     CYCLE_DELAY: z.number().positive(),
     TASK_TIMEOUT_MS: z.number().min(60000).max(3600000),
     allowedDomains: z.array(z.string().url()),
-    adaptive_mode: z.enum(['auto', 'manual', 'off']),
+    adaptive_mode: z.enum(['auto', 'manual', 'off'])
     // ... demais campos
 });
 
@@ -434,7 +452,7 @@ const config = ConfigSchema.parse(require('../../config.json'));
 const config = {
     ...require('../../config.json'),
     CYCLE_DELAY: process.env.CYCLE_DELAY || config.CYCLE_DELAY,
-    TASK_TIMEOUT_MS: process.env.TASK_TIMEOUT_MS || config.TASK_TIMEOUT_MS,
+    TASK_TIMEOUT_MS: process.env.TASK_TIMEOUT_MS || config.TASK_TIMEOUT_MS
 };
 ```
 
@@ -445,6 +463,7 @@ const config = {
 ### ✅ .vscode/settings.json - Excelente
 
 **Positivos:**
+
 - ✅ ESLint configurado e integrado
 - ✅ Auto-fix ao salvar
 - ✅ Formatters por tipo de arquivo
@@ -457,78 +476,78 @@ const config = {
 **PRIORIDADE MÉDIA - VS Code Extensions**
 
 Criar `.vscode/extensions.json`:
+
 ```json
 {
-  "recommendations": [
-    "dbaeumer.vscode-eslint",
-    "ms-azuretools.vscode-docker",
-    "github.copilot",
-    "github.copilot-chat",
-    "christian-kohler.npm-intellisense",
-    "pflannery.vscode-versionlens",
-    "EditorConfig.EditorConfig",
-    "ms-vscode.makefile-tools",
-    "eamodio.gitlens",
-    "ms-playwright.playwright",
-    "redhat.vscode-yaml"
-  ],
-  "unwantedRecommendations": [
-    "hookyqr.beautify",
-    "esbenp.prettier-vscode"
-  ]
+    "recommendations": [
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker",
+        "github.copilot",
+        "github.copilot-chat",
+        "christian-kohler.npm-intellisense",
+        "pflannery.vscode-versionlens",
+        "EditorConfig.EditorConfig",
+        "ms-vscode.makefile-tools",
+        "eamodio.gitlens",
+        "ms-playwright.playwright",
+        "redhat.vscode-yaml"
+    ],
+    "unwantedRecommendations": ["hookyqr.beautify", "esbenp.prettier-vscode"]
 }
 ```
 
 **PRIORIDADE MÉDIA - Debugger Configuration**
 
 Criar `.vscode/launch.json`:
+
 ```json
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Agente",
-      "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/index.js",
-      "env": {
-        "NODE_ENV": "development"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Dashboard",
-      "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/src/server/main.js",
-      "env": {
-        "NODE_ENV": "development",
-        "PORT": "3008"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Testes",
-      "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/scripts/run-tests.js"
-    },
-    {
-      "type": "node",
-      "request": "attach",
-      "name": "Attach to PM2",
-      "port": 9229,
-      "restart": true
-    }
-  ]
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Agente",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}/index.js",
+            "env": {
+                "NODE_ENV": "development"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Dashboard",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}/src/server/main.js",
+            "env": {
+                "NODE_ENV": "development",
+                "PORT": "3008"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Testes",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}/scripts/run-tests.js"
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach to PM2",
+            "port": 9229,
+            "restart": true
+        }
+    ]
 }
 ```
 
 **PRIORIDADE BAIXA - EditorConfig**
 
 Criar `.editorconfig` para consistência:
+
 ```ini
 # .editorconfig
 root = true
@@ -554,15 +573,16 @@ indent_style = tab
 **PRIORIDADE BAIXA - Prettier (OPCIONAL)**
 
 Se quiser formatter automático (complementa ESLint):
+
 ```json
 // .prettierrc
 {
-  "semi": true,
-  "singleQuote": true,
-  "tabWidth": 4,
-  "trailingComma": "none",
-  "printWidth": 100,
-  "arrowParens": "avoid"
+    "semi": true,
+    "singleQuote": true,
+    "tabWidth": 4,
+    "trailingComma": "none",
+    "printWidth": 100,
+    "arrowParens": "avoid"
 }
 ```
 
@@ -575,6 +595,7 @@ Se quiser formatter automático (complementa ESLint):
 ### ✅ Estrutura de Testes
 
 **Diretórios:**
+
 ```
 tests/
 ├── helpers.js              ✅ Utilities compartilhadas
@@ -586,6 +607,7 @@ tests/
 ```
 
 **Scripts de Teste:**
+
 - ✅ `npm test` - Runner principal
 - ✅ `npm run test:health` - Health endpoint
 - ✅ `npm run test:config` - Config validation
@@ -593,6 +615,7 @@ tests/
 - ✅ `npm run test:integration` - E2E tests
 
 **Status:**
+
 - ✅ 38/38 testes passando
 - ✅ Cobertura de P1-P5 (unit)
 - ✅ Integration tests (driver, NERV, kernel)
@@ -604,19 +627,20 @@ tests/
 ```json
 // package.json
 {
-  "scripts": {
-    "test:coverage": "c8 --reporter=html --reporter=text npm test",
-    "test:coverage:ci": "c8 --reporter=lcov npm test"
-  },
-  "devDependencies": {
-    "c8": "^10.1.3"  // Adicionar
-  }
+    "scripts": {
+        "test:coverage": "c8 --reporter=html --reporter=text npm test",
+        "test:coverage:ci": "c8 --reporter=lcov npm test"
+    },
+    "devDependencies": {
+        "c8": "^10.1.3" // Adicionar
+    }
 }
 ```
 
 **PRIORIDADE BAIXA - Test Configuration**
 
 Criar `tests/config.js`:
+
 ```javascript
 // tests/config.js
 module.exports = {
@@ -633,6 +657,7 @@ module.exports = {
 **PRIORIDADE BAIXA - Mocking Library**
 
 Considerar adicionar para tests mais isolados:
+
 ```bash
 npm install --save-dev sinon
 ```
@@ -644,12 +669,14 @@ npm install --save-dev sinon
 ### ✅ GitHub Actions - Configurado
 
 **Workflows Existentes:**
+
 - ✅ `.github/workflows/ci.yml` - Basic tests
 - ✅ `.github/workflows/secret-scan*.yml` - Security scans
 - ✅ `.github/workflows/git-secrets-scan.yml`
 - ✅ `.github/workflows/pre-commit.yml`
 
 **Positivos:**
+
 - ✅ Matrix testing (Ubuntu + Windows)
 - ✅ Node 20 setup
 - ✅ Continue-on-error (pre-v1.0)
@@ -663,119 +690,121 @@ npm install --save-dev sinon
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'npm'
+            - run: npm ci
+            - run: npm run lint
 
-  test:
-    needs: lint
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22]  # Testar múltiplas versões
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-      - run: npm ci
-      - run: npm test
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20'
-        with:
-          files: ./coverage/lcov.info
+    test:
+        needs: lint
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest]
+                node-version: [20, 22] # Testar múltiplas versões
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'npm'
+            - run: npm ci
+            - run: npm test
+            - name: Upload coverage
+              uses: codecov/codecov-action@v4
+              if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20'
+              with:
+                  files: ./coverage/lcov.info
 
-  docker:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Docker image
-        run: docker build -t chatgpt-agent:test .
-      - name: Test Docker image
-        run: |
-          docker run --rm chatgpt-agent:test node --version
-          docker run --rm chatgpt-agent:test npm --version
+    docker:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Build Docker image
+              run: docker build -t chatgpt-agent:test .
+            - name: Test Docker image
+              run: |
+                  docker run --rm chatgpt-agent:test node --version
+                  docker run --rm chatgpt-agent:test npm --version
 ```
 
 **PRIORIDADE BAIXA - Dependabot**
 
 Criar `.github/dependabot.yml`:
+
 ```yaml
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "Ilenburg1993"
-    labels:
-      - "dependencies"
-      - "automated"
+    - package-ecosystem: 'npm'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
+      open-pull-requests-limit: 10
+      reviewers:
+          - 'Ilenburg1993'
+      labels:
+          - 'dependencies'
+          - 'automated'
 
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    - package-ecosystem: 'docker'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    - package-ecosystem: 'github-actions'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
 ```
 
 **PRIORIDADE BAIXA - Release Automation**
 
 Criar `.github/workflows/release.yml`:
+
 ```yaml
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+    push:
+        tags:
+            - 'v*'
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - run: npm test
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: true  # v1.0.0 ainda unstable
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  registry-url: 'https://registry.npmjs.org'
+            - run: npm ci
+            - run: npm test
+            - run: npm publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+            - name: Create GitHub Release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ github.ref }}
+                  release_name: Release ${{ github.ref }}
+                  draft: false
+                  prerelease: true # v1.0.0 ainda unstable
 ```
 
 ---
@@ -785,6 +814,7 @@ jobs:
 ### ✅ .gitignore - Bem Configurado
 
 **Positivos:**
+
 - ✅ node_modules ignorado
 - ✅ Dados sensíveis protegidos (fila/, respostas/, profile/)
 - ✅ .env files ignorados
@@ -801,20 +831,22 @@ jobs:
 // src/server/app.js - Adicionar helmet
 const helmet = require('helmet');
 
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"], // Socket.io requires
-            styleSrc: ["'self'", "'unsafe-inline'"]
+app.use(
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"], // Socket.io requires
+                styleSrc: ["'self'", "'unsafe-inline'"]
+            }
+        },
+        hsts: {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true
         }
-    },
-    hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    }
-}));
+    })
+);
 ```
 
 **PRIORIDADE BAIXA - Rate Limiting**
@@ -839,68 +871,68 @@ app.use('/api/', limiter);
 ### 🔴 CRÍTICO - Fazer IMEDIATAMENTE
 
 1. **Corrigir Dockerfile CMD**
-   ```dockerfile
-   # Linha 81: Trocar
-   CMD ["node", "src/main.js"]
-   # Por
-   CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
-   ```
-   **Impacto:** Container funcional
-   **Esforço:** 2 minutos
-   **Teste:** `docker build -t test . && docker run test`
+    ```dockerfile
+    # Linha 81: Trocar
+    CMD ["node", "src/main.js"]
+    # Por
+    CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
+    ```
+    **Impacto:** Container funcional
+    **Esforço:** 2 minutos
+    **Teste:** `docker build -t test . && docker run test`
 
 ---
 
 ### 🟡 ALTA PRIORIDADE - Próximas 1-2 Semanas
 
 2. **Atualizar Puppeteer 21→24**
-   - Ler CHANGELOG: https://github.com/puppeteer/puppeteer/releases
-   - Testar em DEV: `npm install puppeteer@24.35.0`
-   - Validar drivers (ChatGPT, Gemini)
-   - Rodar test suite completa
-   - Commit se passar
+    - Ler CHANGELOG: https://github.com/puppeteer/puppeteer/releases
+    - Testar em DEV: `npm install puppeteer@24.35.0`
+    - Validar drivers (ChatGPT, Gemini)
+    - Rodar test suite completa
+    - Commit se passar
 
 3. **Criar .vscode/extensions.json**
-   - Lista recomendações de extensões
-   - Melhora DX para contribuidores
+    - Lista recomendações de extensões
+    - Melhora DX para contribuidores
 
 4. **Criar .vscode/launch.json**
-   - Debug configs para agente, dashboard, testes
-   - Attach to PM2 config
+    - Debug configs para agente, dashboard, testes
+    - Attach to PM2 config
 
 ---
 
 ### 🟢 MÉDIA PRIORIDADE - Próximo Mês
 
 5. **Atualizar PM2 5→6**
-   - Ler breaking changes
-   - Testar daemon mode
-   - Validar logs e monitoramento
+    - Ler breaking changes
+    - Testar daemon mode
+    - Validar logs e monitoramento
 
 6. **Expandir CI/CD**
-   - Adicionar lint job separado
-   - Matrix testing (Node 20, 22)
-   - Docker build test
-   - Coverage upload (codecov)
+    - Adicionar lint job separado
+    - Matrix testing (Node 20, 22)
+    - Docker build test
+    - Coverage upload (codecov)
 
 7. **Adicionar Coverage Reporting**
-   - Instalar c8
-   - Configurar npm script
-   - Integrar com CI
+    - Instalar c8
+    - Configurar npm script
+    - Integrar com CI
 
 8. **Otimizar PM2 Config**
-   - Adicionar max_restarts, min_uptime
-   - Cron restart semanal
-   - Environment variables consolidadas
+    - Adicionar max_restarts, min_uptime
+    - Cron restart semanal
+    - Environment variables consolidadas
 
 ---
 
 ### 🔵 BAIXA PRIORIDADE - Quando Tempo Disponível
 
 9. **Atualizar Express 4→5** (⚠️ Breaking changes)
-   - Ler migration guide
-   - Testar extensivamente
-   - Última prioridade (maior risco)
+    - Ler migration guide
+    - Testar extensivamente
+    - Última prioridade (maior risco)
 
 10. **Criar .npmrc**
     - engine-strict, save-exact
@@ -927,25 +959,25 @@ app.use('/api/', limiter);
 
 ### Código
 
-| Métrica | Valor | Status |
-|---------|-------|--------|
-| Dependências | 26 total (14 prod + 12 dev) | ✅ Lean |
-| node_modules | 298MB | ✅ Razoável |
-| Testes | 38/38 passing | ✅ Excelente |
-| ESLint errors | 116 quality improvements | ⚠️ Em progresso |
-| Audit level | 700 (Singularity) | ✅ High quality |
+| Métrica       | Valor                       | Status          |
+| ------------- | --------------------------- | --------------- |
+| Dependências  | 26 total (14 prod + 12 dev) | ✅ Lean         |
+| node_modules  | 298MB                       | ✅ Razoável     |
+| Testes        | 38/38 passing               | ✅ Excelente    |
+| ESLint errors | 116 quality improvements    | ⚠️ Em progresso |
+| Audit level   | 700 (Singularity)           | ✅ High quality |
 
 ### Configurações
 
-| Área | Score | Status |
-|------|-------|--------|
-| package.json | 95/100 | ✅ Excelente |
-| jsconfig.json | 100/100 | ✅ Perfeito |
-| PM2 | 85/100 | ⚠️ Bom |
-| Docker | 60/100 | 🔴 CMD quebrado |
-| VS Code | 80/100 | ⚠️ Falta launch.json |
-| CI/CD | 70/100 | ⚠️ Básico |
-| Segurança | 90/100 | ✅ Muito bom |
+| Área          | Score   | Status               |
+| ------------- | ------- | -------------------- |
+| package.json  | 95/100  | ✅ Excelente         |
+| jsconfig.json | 100/100 | ✅ Perfeito          |
+| PM2           | 85/100  | ⚠️ Bom               |
+| Docker        | 60/100  | 🔴 CMD quebrado      |
+| VS Code       | 80/100  | ⚠️ Falta launch.json |
+| CI/CD         | 70/100  | ⚠️ Básico            |
+| Segurança     | 90/100  | ✅ Muito bom         |
 
 **Score Geral: 82/100** - ⚠️ BOM COM MELHORIAS
 
@@ -954,17 +986,20 @@ app.use('/api/', limiter);
 ## 📋 Checklist de Implementação
 
 ### Fase 1: Correções Críticas (1 dia)
+
 - [ ] Corrigir Dockerfile CMD → `pm2-runtime start ecosystem.config.js`
 - [ ] Testar build Docker
 - [ ] Testar docker-compose up
 
 ### Fase 2: Dev Tools (2-3 dias)
+
 - [ ] Criar .vscode/extensions.json
 - [ ] Criar .vscode/launch.json
 - [ ] Criar .editorconfig
 - [ ] Testar debug configs
 
 ### Fase 3: Atualizações (1 semana)
+
 - [ ] Atualizar Puppeteer 21→24 (testar extensivamente)
 - [ ] Atualizar PM2 5→6 (validar daemon mode)
 - [ ] Atualizar uuid, cross-env (baixo risco)
@@ -972,18 +1007,21 @@ app.use('/api/', limiter);
 - [ ] Validar prod deployment
 
 ### Fase 4: CI/CD (3-5 dias)
+
 - [ ] Expandir .github/workflows/ci.yml
 - [ ] Adicionar coverage reporting (c8)
 - [ ] Criar .github/dependabot.yml
 - [ ] Testar workflows
 
 ### Fase 5: Otimizações (1 semana)
+
 - [ ] Otimizar ecosystem.config.js (max_restarts, cron)
 - [ ] Criar .npmrc
 - [ ] Adicionar helmet + rate limiting
 - [ ] Validação Zod para config.json
 
 ### Fase 6: Express 5 (2 semanas) - **ÚLTIMA PRIORIDADE**
+
 - [ ] Ler Express 4→5 migration guide
 - [ ] Testar em branch separada
 - [ ] Validar breaking changes

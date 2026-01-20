@@ -10,20 +10,25 @@ const SOURCE_FILE = process.argv[2] || path.join(ROOT, 'prompts.txt');
 // --- HELPERS DE ROBUSTEZ ---
 
 function sanitizePrompt(text) {
-    if (!text || typeof text !== 'string') {return '';}
+    if (!text || typeof text !== 'string') {
+        return '';
+    }
     // Remove caracteres de controle ASCII que podem confundir o Puppeteer
+    // eslint-disable-next-line no-control-regex -- required to strip control chars
     return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
 }
 
 function atomicWrite(filepath, content) {
-    const tmp = `${filepath  }.tmp.${  Date.now()}`;
+    const tmp = `${filepath}.tmp.${Date.now()}`;
     fs.writeFileSync(tmp, content, 'utf-8');
     fs.renameSync(tmp, filepath);
 }
 
 // --- INICIALIZAÇÃO ---
 
-if (!fs.existsSync(QUEUE_DIR)) {fs.mkdirSync(QUEUE_DIR, { recursive: true });}
+if (!fs.existsSync(QUEUE_DIR)) {
+    fs.mkdirSync(QUEUE_DIR, { recursive: true });
+}
 
 if (!fs.existsSync(SOURCE_FILE)) {
     console.log(`[INFO] Fonte não encontrada. Gerando template em: ${SOURCE_FILE}`);
@@ -36,13 +41,19 @@ const existingHashes = new Set();
 console.log('🔍 Indexando fila atual para evitar duplicatas...');
 
 fs.readdirSync(QUEUE_DIR).forEach(f => {
-    if (!f.endsWith('.json')) {return;}
+    if (!f.endsWith('.json')) {
+        return;
+    }
     try {
         const content = fs.readFileSync(path.join(QUEUE_DIR, f), 'utf-8');
         const t = JSON.parse(content);
         const p = t.spec?.payload?.user_message || t.prompt || '';
-        if (p) {existingHashes.add(crypto.createHash('md5').update(p).digest('hex'));}
-    } catch(e) {}
+        if (p) {
+            existingHashes.add(crypto.createHash('md5').update(p).digest('hex'));
+        }
+    } catch (_e) {
+        // Ignore invalid task files during dedup scan
+    }
 });
 
 // 2. Leitura com Verificação de Encoding
@@ -84,9 +95,11 @@ lines.forEach((line, idx) => {
             taskData.prio = parseInt(json.prio || json.priority) || 5;
             taskData.model = json.model || 'gpt-5';
             taskData.target = json.target || 'chatgpt';
-            if (Array.isArray(json.tags)) {taskData.tags.push(...json.tags);}
+            if (Array.isArray(json.tags)) {
+                taskData.tags.push(...json.tags);
+            }
         } catch (e) {
-            console.error(`   [!] Linha ${idx+1}: JSON inválido. Pulando.`);
+            console.error(`   [!] Linha ${idx + 1}: JSON inválido. Pulando.`);
             errors++;
             return;
         }
@@ -107,7 +120,7 @@ lines.forEach((line, idx) => {
     }
 
     // Criação do Objeto V3
-    const id = `TASK-BULK-${Date.now()}-${String(idx).padStart(3,'0')}`;
+    const id = `TASK-BULK-${Date.now()}-${String(idx).padStart(3, '0')}`;
     const task = {
         meta: {
             id: id,
@@ -134,7 +147,9 @@ lines.forEach((line, idx) => {
         atomicWrite(path.join(QUEUE_DIR, `${id}.json`), JSON.stringify(task, null, 2));
         existingHashes.add(hash);
         imported++;
-        if (imported % 10 === 0) {process.stdout.write('.');}
+        if (imported % 10 === 0) {
+            process.stdout.write('.');
+        }
     } catch (e) {
         errors++;
     }
@@ -144,4 +159,6 @@ console.log(`\n\n✅ RELATÓRIO FINAL:`);
 console.log(`   - Importadas:  ${imported}`);
 console.log(`   - Duplicadas:  ${skipped}`);
 console.log(`   - Erros:       ${errors}`);
-if (imported > 0) {console.log(`\n[DICA] O Agente processará estas tarefas na ordem de prioridade.`);}
+if (imported > 0) {
+    console.log(`\n[DICA] O Agente processará estas tarefas na ordem de prioridade.`);
+}

@@ -135,14 +135,7 @@ try {
 
     const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
 
-    const requiredPatterns = [
-        '.env',
-        'logs/',
-        'fila/',
-        'respostas/',
-        'profile/',
-        'node_modules/'
-    ];
+    const requiredPatterns = ['.env', 'logs/', 'fila/', 'respostas/', 'profile/', 'node_modules/'];
 
     const missing = [];
     for (const pattern of requiredPatterns) {
@@ -163,7 +156,7 @@ try {
 }
 
 // Summary
-console.log(`\n${  '='.repeat(50)}`);
+console.log(`\n${'='.repeat(50)}`);
 if (errors === 0) {
     console.log('✓ PASS: All configuration validations passed\n');
     process.exit(0);

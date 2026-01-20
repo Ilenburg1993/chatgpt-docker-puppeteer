@@ -47,14 +47,17 @@ Sistema composto por **7 subsistemas principais** com **NERV** como canal univer
 ## 1️⃣ NERV - Neural Event Relay Vector (IPC 2.0)
 
 ### Localização
+
 - `src/nerv/nerv.js` (compositor estrutural)
 - `src/shared/nerv/constants.js` (protocolo)
 - `src/shared/nerv/envelope.js` (envelopes)
 
 ### Responsabilidade
+
 **Canal universal de comunicação pub/sub** entre todos os subsistemas.
 
 ### Arquitetura Interna
+
 ```
 NERV
 ├── Protocol Layer
@@ -92,6 +95,7 @@ NERV
 ### Protocol Specification (NERV IPC 2.0)
 
 #### MessageType (Ontológico - Fechado)
+
 ```javascript
 {
   COMMAND: 'COMMAND',  // Intenção de ação futura
@@ -101,6 +105,7 @@ NERV
 ```
 
 #### ActionCode (Referencial - Extensível)
+
 ```javascript
 {
   // Task / Execution
@@ -128,6 +133,7 @@ NERV
 ```
 
 #### ActorRole (Identidade)
+
 ```javascript
 {
   KERNEL: 'KERNEL',      // Orquestrador de tarefas
@@ -141,29 +147,30 @@ NERV
 ### Modos de Operação (ONDA 2.6)
 
 1. **Local Mode** (default)
-   - Transport: EventEmitter puro (in-process)
-   - Uso: Single process, sem comunicação remota
+    - Transport: EventEmitter puro (in-process)
+    - Uso: Single process, sem comunicação remota
 
 2. **Hybrid Mode**
-   - Transport: EventEmitter + Socket.io adapter
-   - Uso: Multi-process com dashboard remoto
-   - Socket.io adapter: `src/infra/transport/socket_io_adapter.js`
+    - Transport: EventEmitter + Socket.io adapter
+    - Uso: Multi-process com dashboard remoto
+    - Socket.io adapter: `src/infra/transport/socket_io_adapter.js`
 
 ### APIs Públicas
 
 ```javascript
 // Emissão de mensagem
-nerv.emit(envelope)
-nerv.send(envelope)  // Alias para emit
+nerv.emit(envelope);
+nerv.send(envelope); // Alias para emit
 
 // Recepção de mensagem
-nerv.onReceive(filter, handler)
+nerv.onReceive(filter, handler);
 
 // Shutdown
-nerv.shutdown()
+nerv.shutdown();
 ```
 
 ### Características
+
 - ✅ Pub/Sub pattern
 - ✅ Buffering (inbound/outbound FIFO)
 - ✅ Backpressure control
@@ -178,6 +185,7 @@ nerv.shutdown()
 ## 2️⃣ KERNEL - Núcleo Soberano de Decisão
 
 ### Localização
+
 - `src/kernel/kernel.js` (compositor)
 - `src/kernel/kernel_loop/` (loop de execução)
 - `src/kernel/task_runtime/` (vida lógica das tarefas)
@@ -186,9 +194,11 @@ nerv.shutdown()
 - `src/kernel/observation_store/` (registro factual de eventos)
 
 ### Responsabilidade
+
 **Orquestração de ciclo de vida de tarefas** com integração NERV.
 
 ### Arquitetura Interna
+
 ```
 KERNEL
 ├── Telemetry (KernelTelemetry)
@@ -214,6 +224,7 @@ KERNEL
 ```
 
 ### Estados de Tarefas
+
 ```
 PENDING → RUNNING → DONE
              ↓
@@ -223,18 +234,20 @@ PENDING → RUNNING → DONE
 ```
 
 ### APIs Públicas
+
 ```javascript
 // Inicialização
-kernel.initialize()
+kernel.initialize();
 
 // Shutdown
-kernel.shutdown()
+kernel.shutdown();
 
 // Referência NERV (somente leitura)
-kernel.nerv
+kernel.nerv;
 ```
 
 ### Características
+
 - ✅ Polling adaptativo (backoff exponencial)
 - ✅ Classificação de falhas (task vs infra)
 - ✅ Retry logic adaptativo
@@ -248,6 +261,7 @@ kernel.nerv
 ## 3️⃣ DRIVER - Sistema de Automação de Browser
 
 ### Localização
+
 - `src/driver/factory.js` (factory pattern)
 - `src/driver/lifecycle/DriverLifecycleManager.js` (orquestrador)
 - `src/driver/nerv_adapter/driver_nerv_adapter.js` (adapter NERV)
@@ -255,9 +269,11 @@ kernel.nerv
 - `src/driver/GeminiDriver.js` (driver concreto)
 
 ### Responsabilidade
+
 **Execução de tarefas específicas por target** (ChatGPT, Gemini) via Puppeteer.
 
 ### Arquitetura Interna
+
 ```
 DRIVER
 ├── Factory (DriverFactory)
@@ -288,6 +304,7 @@ DRIVER
 ```
 
 ### Fluxo de Telemetria
+
 ```
 Driver (EventEmitter)
     ↓ events: state_change, progress
@@ -299,6 +316,7 @@ KERNEL/SERVER (subscribers)
 ```
 
 ### Fluxo de Comandos
+
 ```
 KERNEL (comando)
     ↓ DRIVER_EXECUTE via NERV
@@ -310,20 +328,22 @@ Driver Concreto (Puppeteer)
 ```
 
 ### APIs Públicas
+
 ```javascript
 // Factory
-DriverFactory.create(target, config)
+DriverFactory.create(target, config);
 
 // Lifecycle Manager
-driver.execute({ task, browserPage, config }, correlationId)
-driver.abort(taskId)
+driver.execute({ task, browserPage, config }, correlationId);
+driver.abort(taskId);
 
 // Events
-driver.on('state_change', handler)
-driver.on('progress', handler)
+driver.on('state_change', handler);
+driver.on('progress', handler);
 ```
 
 ### Características
+
 - ✅ Zero imports de KERNEL ou SERVER
 - ✅ Comunicação 100% via NERV (DriverNERVAdapter)
 - ✅ Sovereign interruption (AbortController)
@@ -338,6 +358,7 @@ driver.on('progress', handler)
 ## 4️⃣ INFRA - Infraestrutura e I/O
 
 ### Localização
+
 - `src/infra/io.js` (unified facade)
 - `src/infra/locks/lock_manager.js` (exclusão mútua)
 - `src/infra/storage/` (task, response, DNA)
@@ -346,9 +367,11 @@ driver.on('progress', handler)
 - `src/infra/browser_pool/pool_manager.js` (pool de browsers)
 
 ### Responsabilidade
+
 **Camada de persistência, queue, locks e gerenciamento de recursos**.
 
 ### Arquitetura Interna
+
 ```
 INFRA
 ├── IO (Unified Facade) - src/infra/io.js
@@ -455,27 +478,29 @@ INFRA
 ### DNA System (dynamic_rules.json)
 
 **Estrutura:**
+
 ```json
 {
-  "_meta": {
-    "version": 1,
-    "last_updated": "ISO-8601",
-    "updated_by": "system|SADI_V19|...",
-    "evolution_count": 0
-  },
-  "targets": {
-    "chatgpt.com": {
-      "selectors": { "input": "...", "send": "..." }
+    "_meta": {
+        "version": 1,
+        "last_updated": "ISO-8601",
+        "updated_by": "system|SADI_V19|...",
+        "evolution_count": 0
+    },
+    "targets": {
+        "chatgpt.com": {
+            "selectors": { "input": "...", "send": "..." }
+        }
+    },
+    "global_selectors": {
+        "input_box": ["textarea", "div[contenteditable='true']"],
+        "send_button": ["button[type='submit']"]
     }
-  },
-  "global_selectors": {
-    "input_box": ["textarea", "div[contenteditable='true']"],
-    "send_button": ["button[type='submit']"]
-  }
 }
 ```
 
 ### Características
+
 - ✅ **Queue baseada em arquivos JSON** (fila/)
 - ✅ **Lock PID-based** (exclusão mútua entre processos)
 - ✅ **Cache reativo** (invalidação automática em saveTask/deleteTask)
@@ -490,6 +515,7 @@ INFRA
 ## 5️⃣ SERVER - Dashboard e API
 
 ### Localização
+
 - `src/server/main.js` (bootstrapper)
 - `src/server/engine/` (HTTP server, Socket.io)
 - `src/server/api/` (REST controllers)
@@ -498,9 +524,11 @@ INFRA
 - `src/server/realtime/` (PM2 bridge, log tail, hardware telemetry)
 
 ### Responsabilidade
+
 **Dashboard web, API REST e comunicação real-time** via Socket.io.
 
 ### Arquitetura Interna
+
 ```
 SERVER
 ├── Bootstrapper (main.js)
@@ -548,12 +576,14 @@ SERVER
 ### REST API Endpoints
 
 #### Health & Diagnostics
+
 ```
 GET  /api/health
 GET  /api/system/health
 ```
 
 #### Tasks
+
 ```
 GET    /api/tasks
 POST   /api/tasks
@@ -562,12 +592,14 @@ DELETE /api/tasks/:id
 ```
 
 #### Agents
+
 ```
 GET  /api/agents
 POST /api/agents/restart
 ```
 
 #### DNA
+
 ```
 GET  /api/dna
 POST /api/dna
@@ -576,6 +608,7 @@ POST /api/dna
 ### Socket.io Events
 
 **Emitidos pelo servidor:**
+
 - `status_update` - Status de task
 - `task_complete` - Task concluída
 - `agent_health` - Saúde do sistema
@@ -583,10 +616,12 @@ POST /api/dna
 - `hardware_metrics` - Métricas de CPU/RAM
 
 **Recebidos do cliente:**
+
 - `subscribe_task` - Inscrever em task
 - `unsubscribe_task` - Desinscrever de task
 
 ### Fluxo de Broadcast via NERV
+
 ```
 Subsistema (KERNEL/DRIVER)
     ↓ evento via NERV
@@ -598,6 +633,7 @@ Clientes conectados (Dashboard)
 ```
 
 ### Características
+
 - ✅ Express 4.x
 - ✅ Socket.io 4.x para real-time
 - ✅ Port hunting (fallback de portas)
@@ -614,13 +650,16 @@ Clientes conectados (Dashboard)
 ## 6️⃣ CONFIG - Configuração Reativa
 
 ### Localização
+
 - `src/core/config.js` (gestor reativo)
 - `config.json` (arquivo de configuração)
 
 ### Responsabilidade
+
 **Centralizar e prover acesso reativo** aos parâmetros do sistema.
 
 ### Schema (Zod)
+
 ```javascript
 {
   // Infraestrutura Base
@@ -658,6 +697,7 @@ Clientes conectados (Dashboard)
 ### ConfigurationManager (Singleton)
 
 **Métodos:**
+
 ```javascript
 // Reload (hot-reload)
 config.reload(correlationId)
@@ -670,6 +710,7 @@ config.on('updated', ({ new, old, ts }) => {})
 ```
 
 ### Características
+
 - ✅ Hot-reload (sem restart)
 - ✅ Validação Zod
 - ✅ Valores padrão (fallback)
@@ -683,15 +724,18 @@ config.on('updated', ({ new, old, ts }) => {})
 ## 7️⃣ SCHEMAS - Validação de Dados
 
 ### Localização
+
 - `src/core/schemas/schema_core.js` (núcleo)
 - `src/core/schemas.js` (shim de compatibilidade)
 
 ### Responsabilidade
+
 **Validação de contratos de dados** via Zod.
 
 ### Schemas Principais
 
 #### TaskSchema
+
 ```javascript
 {
   id: string,
@@ -712,6 +756,7 @@ config.on('updated', ({ new, old, ts }) => {})
 ```
 
 #### DnaSchema
+
 ```javascript
 {
   _meta: {
@@ -726,15 +771,17 @@ config.on('updated', ({ new, old, ts }) => {})
 ```
 
 ### APIs Públicas
+
 ```javascript
 // Validação de task
-schemas.parseTask(rawTask)
+schemas.parseTask(rawTask);
 
 // Validação de DNA
-schemas.DnaSchema.parse(rawDna)
+schemas.DnaSchema.parse(rawDna);
 ```
 
 ### Características
+
 - ✅ Validação estrita via Zod
 - ✅ Schemas reutilizáveis
 - ✅ Type safety (via Zod inference)
@@ -794,6 +841,7 @@ KERNEL  SERVER  OBSERVER
 ### Princípio: Zero-Coupling via NERV
 
 **Comunicação PERMITIDA:**
+
 ```
 KERNEL  ←→ NERV ←→ DRIVER
 KERNEL  ←→ NERV ←→ SERVER
@@ -804,6 +852,7 @@ SERVER  ←→ INFRA (via io.js facade)
 ```
 
 **Comunicação PROIBIDA (violaria zero-coupling):**
+
 ```
 KERNEL  ⃠  DRIVER (direto)
 KERNEL  ⃠  SERVER (direto)
@@ -811,6 +860,7 @@ DRIVER  ⃠  SERVER (direto)
 ```
 
 ### Validação (Testes)
+
 - ✅ 0 imports de KERNEL em DRIVER
 - ✅ 0 imports de SERVER em DRIVER
 - ✅ 0 imports de DRIVER em KERNEL (exceto via factory)
@@ -821,25 +871,30 @@ DRIVER  ⃠  SERVER (direto)
 ## 🔍 Gaps Identificados (Para Documentação)
 
 ### 1. BrowserPool - Comportamento Não Documentado
+
 - ⚠️ Pool mantém múltiplas conexões ou reutiliza 1?
 - ⚠️ Estratégias de alocação (round-robin funcionando?)
 - ⚠️ Health check interval configurável ou fixo?
 - ⚠️ Auto-restart implementado?
 
 ### 2. Queue System - Concorrência
+
 - ⚠️ Sistema processa 1 task por vez ou múltiplas simultâneas?
 - ⚠️ Lock PID impede paralelismo ou apenas duplicação?
 
 ### 3. NERV - Persistência
+
 - ✅ **CONFIRMADO**: Mensagens são efêmeras (in-memory)
 - ❌ **NÃO HÁ** persistência de mensagens para auditoria
 
 ### 4. Dashboard - Features Completas
+
 - ⚠️ Edição de tasks via UI?
 - ⚠️ Visualização de respostas completa?
 - ⚠️ Configuração via UI?
 
 ### 5. DNA - Propósito Completo
+
 - ✅ Seletores CSS por target
 - ⚠️ Histórico de evolução (apenas metadados)
 - ❌ Learning/adaptação automática (não implementado)
@@ -851,46 +906,48 @@ DRIVER  ⃠  SERVER (direto)
 ### Documentar com Ênfase:
 
 1. **NERV como canal universal** (IPC 2.0)
-   - Protocol specification completa
-   - Modos de operação (local/hybrid)
-   - Buffering e backpressure
+    - Protocol specification completa
+    - Modos de operação (local/hybrid)
+    - Buffering e backpressure
 
 2. **Zero-coupling principle**
-   - Validado com testes
-   - Diagramas de fluxo
-   - Comunicação permitida vs proibida
+    - Validado com testes
+    - Diagramas de fluxo
+    - Comunicação permitida vs proibida
 
 3. **INFRA como camada de persistência**
-   - io.js como unified facade
-   - Lock manager (two-phase commit)
-   - Queue cache reativo
-   - DNA hot-reload
+    - io.js como unified facade
+    - Lock manager (two-phase commit)
+    - Queue cache reativo
+    - DNA hot-reload
 
 4. **Driver extensibility**
-   - Factory pattern
-   - NERV adapter
-   - Sovereign interruption (AbortController)
+    - Factory pattern
+    - NERV adapter
+    - Sovereign interruption (AbortController)
 
 5. **CONFIG hot-reload**
-   - Reactive configuration
-   - Zod validation
-   - EventEmitter pattern
+    - Reactive configuration
+    - Zod validation
+    - EventEmitter pattern
 
 6. **BrowserPool** (pendente validação)
-   - Estrutura básica documentada
-   - Comportamento detalhado TBD (Fase 1)
+    - Estrutura básica documentada
+    - Comportamento detalhado TBD (Fase 1)
 
 ---
 
 ## 🚨 Avisos para Documentação
 
 ### Marcar como "Em Validação" (Fase 1):
+
 - BrowserPool: Estratégias de alocação e health checks
 - Queue: Concorrência e paralelismo
 - Dashboard: Features completas de UI
 - DNA: Aprendizado automático (não implementado)
 
 ### Marcar como "Confirmado e Testado":
+
 - NERV: Protocol, pub/sub, zero-coupling
 - KERNEL: Integração NERV, estados de task
 - DRIVER: NERV adapter, sovereign interruption

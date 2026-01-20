@@ -12,6 +12,7 @@ Before running the Docker container, start Chrome with remote debugging enabled:
 ```
 
 **Important:**
+
 - Chrome must be running BEFORE starting the container
 - Port 9222 must be accessible from Docker
 - User data directory ensures isolated browser profile
@@ -27,6 +28,7 @@ You should see Chrome DevTools metadata.
 ## Quick Start
 
 ### Production Mode
+
 ```bash
 # 1. Start Chrome (in separate terminal)
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
@@ -40,6 +42,7 @@ http://localhost:3008
 ```
 
 ### Development Mode
+
 ```bash
 # 1. Start Chrome
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
@@ -77,6 +80,7 @@ http://localhost:3008
 ```
 
 **Benefits:**
+
 - ✅ Chrome UI visible (not headless)
 - ✅ Use Chrome extensions
 - ✅ Persistent profiles
@@ -91,14 +95,14 @@ Configure in `docker-compose.yml`:
 
 ```yaml
 environment:
-  # Chrome WebSocket endpoint
-  - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
-  
-  # Timezone
-  - TZ=America/Sao_Paulo
-  
-  # Node environment
-  - NODE_ENV=production
+    # Chrome WebSocket endpoint
+    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+
+    # Timezone
+    - TZ=America/Sao_Paulo
+
+    # Node environment
+    - NODE_ENV=production
 ```
 
 ---
@@ -110,6 +114,7 @@ environment:
 **Problem:** `Error: connect ECONNREFUSED`
 
 **Solutions:**
+
 1. Verify Chrome is running with `--remote-debugging-port=9222`
 2. Check: http://localhost:9222/json/version
 3. Windows Firewall may block connection
@@ -118,14 +123,16 @@ environment:
 ### host.docker.internal not working
 
 **On Linux:** Add to docker-compose.yml:
+
 ```yaml
 extra_hosts:
-  - "host.docker.internal:host-gateway"
+    - 'host.docker.internal:host-gateway'
 ```
 
 ### Port 9222 already in use
 
 **Solution:** Kill existing Chrome instances:
+
 ```powershell
 taskkill /F /IM chrome.exe
 ```
@@ -135,15 +142,17 @@ taskkill /F /IM chrome.exe
 ## Advanced Configuration
 
 ### Custom Chrome Path
+
 Edit your code to use environment variable:
+
 ```javascript
 const browser = await puppeteer.connect({
-  browserWSEndpoint: process.env.CHROME_WS_ENDPOINT || 
-                     'ws://host.docker.internal:9222'
+    browserWSEndpoint: process.env.CHROME_WS_ENDPOINT || 'ws://host.docker.internal:9222'
 });
 ```
 
 ### Multiple Chrome Profiles
+
 ```bash
 # Profile 1 (port 9222)
 chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\profile1"
@@ -153,7 +162,9 @@ chrome.exe --remote-debugging-port=9223 --user-data-dir="C:\profile2"
 ```
 
 ### Windows Startup Script
+
 Create `start-chrome.bat`:
+
 ```batch
 @echo off
 start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
@@ -165,6 +176,7 @@ echo Chrome started with remote debugging on port 9222
 ## Security Notes
 
 ⚠️ **Remote debugging exposes Chrome control:**
+
 - Only use on trusted networks
 - Firewall port 9222 from external access
 - Use different profile from personal browsing

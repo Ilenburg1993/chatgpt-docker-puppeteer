@@ -23,7 +23,9 @@ const { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondit
         const pages = await browser.pages();
         const page = pages.find(p => p.url().includes('chatgpt.com'));
 
-        if (!page) {throw new Error('Aba ChatGPT não encontrada.');}
+        if (!page) {
+            throw new Error('Aba ChatGPT não encontrada.');
+        }
 
         // Espera o agente começar a processar
         await sleep(8000);
@@ -35,7 +37,9 @@ const { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondit
             window.__wd_last_change = Date.now() - 300000; // 5 minutos atrás
 
             // Garante que o observer existe para não ser recriado imediatamente
-            if (!window.__wd_obs) {window.__wd_obs = true;}
+            if (!window.__wd_obs) {
+                window.__wd_obs = true;
+            }
         });
 
         console.log('> Aguardando reação do Triage...');
@@ -52,7 +56,6 @@ const { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondit
         }
 
         browser.disconnect();
-
     } catch (e) {
         console.error('FAIL:', e.message);
         console.error('Logs:', readLatestGlobalLogTail(30));

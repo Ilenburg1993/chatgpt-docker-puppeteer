@@ -29,7 +29,10 @@ const { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunL
 
         if (recovered) {
             const t = readTask(TASK_ID);
-            if ((t.erro || '').includes('Zombie') || (t.state.history && JSON.stringify(t.state.history).includes('Zombie'))) {
+            if (
+                (t.erro || '').includes('Zombie') ||
+                (t.state.history && JSON.stringify(t.state.history).includes('Zombie'))
+            ) {
                 console.log('PASS: Zumbi V3 eliminado.');
             } else {
                 console.log(`PASS: Recuperado (Erro: ${t.erro})`);
@@ -37,7 +40,6 @@ const { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunL
         } else {
             throw new Error('Timeout: Zumbi sobreviveu.');
         }
-
     } catch (e) {
         console.error('FAIL:', e.message);
         process.exit(1);

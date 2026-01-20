@@ -10,13 +10,20 @@ const RUN_LOCK = path.join(ROOT, 'RUNNING.lock');
 const LOG_FILE_CURRENT = path.join(LOG_DIR, 'agente_current.log');
 const TMP_DIR = path.join(__dirname, 'tmp');
 
-if (!fs.existsSync(TMP_DIR)) {fs.mkdirSync(TMP_DIR, { recursive: true });}
+if (!fs.existsSync(TMP_DIR)) {
+    fs.mkdirSync(TMP_DIR, { recursive: true });
+}
 
-const sleep = (ms) => new Promise(r => { setTimeout(r, ms); });
+const sleep = ms =>
+    new Promise(r => {
+        setTimeout(r, ms);
+    });
 
 function ensureDirs() {
     [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach(d => {
-        if (!fs.existsSync(d)) {fs.mkdirSync(d, { recursive: true });}
+        if (!fs.existsSync(d)) {
+            fs.mkdirSync(d, { recursive: true });
+        }
     });
 }
 
@@ -63,13 +70,23 @@ function writeTask(options) {
 function readTask(id) {
     try {
         const fp = path.join(QUEUE_DIR, `${id}.json`);
-        if (!fs.existsSync(fp)) {return null;}
+        if (!fs.existsSync(fp)) {
+            return null;
+        }
         return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-    } catch (e) { return null; }
+    } catch (e) {
+        return null;
+    }
 }
 
 function removeRunLock() {
-    try { if (fs.existsSync(RUN_LOCK)) {fs.unlinkSync(RUN_LOCK);} } catch (e) {}
+    try {
+        if (fs.existsSync(RUN_LOCK)) {
+            fs.unlinkSync(RUN_LOCK);
+        }
+    } catch (e) {
+        /* Ignore lock file removal errors */
+    }
 }
 
 function cleanTmp() {
@@ -77,15 +94,21 @@ function cleanTmp() {
         if (fs.existsSync(TMP_DIR)) {
             fs.readdirSync(TMP_DIR).forEach(f => fs.unlinkSync(path.join(TMP_DIR, f)));
         }
-    } catch (e) {}
+    } catch (e) {
+        /* Ignore temp cleanup errors */
+    }
 }
 
 function readLatestGlobalLogTail(lines = 50) {
     try {
-        if (!fs.existsSync(LOG_FILE_CURRENT)) {return '<log not created yet>';}
+        if (!fs.existsSync(LOG_FILE_CURRENT)) {
+            return '<log not created yet>';
+        }
         const content = fs.readFileSync(LOG_FILE_CURRENT, 'utf-8').trim().split('\n');
         return content.slice(-lines).join('\n');
-    } catch (e) { return `<error reading log: ${e.message}>`; }
+    } catch (e) {
+        return `<error reading log: ${e.message}>`;
+    }
 }
 
 function startAgent(timeoutMs = 15000) {
@@ -108,7 +131,7 @@ function startAgent(timeoutMs = 15000) {
             reject(new Error(`Timeout (${timeoutMs}ms) aguardando agente.`));
         }, timeoutMs);
 
-        const checkOutput = (data) => {
+        const checkOutput = data => {
             const text = data.toString();
             // Accept multiple engine startup variants (e.g. Engine V32.0 Iniciada)
             if (/Engine V\d+\.\d+\s+Iniciad/i.test(text) || text.includes('Agente Iniciado')) {
@@ -133,25 +156,49 @@ function startAgent(timeoutMs = 15000) {
 }
 
 function stopAgent(proc) {
-    if (!proc || proc.killed) {return;}
+    if (!proc || proc.killed) {
+        return;
+    }
     try {
         proc.kill('SIGTERM');
-        setTimeout(() => { try { proc.kill('SIGKILL'); } catch(e){} }, 2000);
-    } catch (e) {}
+        setTimeout(() => {
+            try {
+                proc.kill('SIGKILL');
+            } catch (e) {
+                /* Ignore force kill errors */
+            }
+        }, 2000);
+    } catch (e) {
+        /* Ignore process termination errors */
+    }
 }
 
 async function waitForCondition(fn, timeout = 10000, interval = 500) {
     const end = Date.now() + timeout;
     while (Date.now() < end) {
-        try { if (await fn()) {return true;} } catch(e) {}
+        try {
+            if (await fn()) {
+                return true;
+            }
+        } catch (e) {
+            /* Retry on condition check errors */
+        }
         await sleep(interval);
     }
     return false;
 }
 
 module.exports = {
-    writeTask, readTask, removeRunLock, cleanTmp,
-    startAgent, stopAgent, waitForCondition,
-    readLatestGlobalLogTail, sleep, ensureDirs,
-    ROOT, QUEUE_DIR
+    writeTask,
+    readTask,
+    removeRunLock,
+    cleanTmp,
+    startAgent,
+    stopAgent,
+    waitForCondition,
+    readLatestGlobalLogTail,
+    sleep,
+    ensureDirs,
+    ROOT,
+    QUEUE_DIR
 };

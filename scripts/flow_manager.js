@@ -17,13 +17,17 @@ function sanitize(name) {
 }
 
 function atomicWrite(filepath, content) {
-    const tmp = `${filepath  }.tmp.${  Date.now()}`;
+    const tmp = `${filepath}.tmp.${Date.now()}`;
     fs.writeFileSync(tmp, content, 'utf-8');
     fs.renameSync(tmp, filepath);
 }
 
 // Garante infraestrutura
-[BLUEPRINTS_DIR, QUEUE_DIR].forEach(d => { if (!fs.existsSync(d)) {fs.mkdirSync(d, { recursive: true });} });
+[BLUEPRINTS_DIR, QUEUE_DIR].forEach(d => {
+    if (!fs.existsSync(d)) {
+        fs.mkdirSync(d, { recursive: true });
+    }
+});
 
 // --- ARGUMENTOS ---
 
@@ -50,7 +54,9 @@ Exemplo:
 // --- PARSER DE AGENDAMENTO ---
 
 function parseSchedule(input) {
-    if (!input) {return null;}
+    if (!input) {
+        return null;
+    }
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
         const val = parseInt(match[1]);
@@ -83,7 +89,9 @@ try {
     const defaults = doc.defaults || {};
 
     console.log(`\n📘 PROJETO: ${doc.project} (ID: ${projectPrefix})`);
-    if (executeAfterDate) {console.log(`   ⏱️ AGENDAMENTO: ${new Date(executeAfterDate).toLocaleString()}`);}
+    if (executeAfterDate) {
+        console.log(`   ⏱️ AGENDAMENTO: ${new Date(executeAfterDate).toLocaleString()}`);
+    }
     console.log(`   🛠️ MODO: ${isDryRun ? 'SIMULAÇÃO (DRY-RUN)' : 'EXECUÇÃO'}`);
 
     // 1. Mapeamento de IDs
@@ -91,7 +99,9 @@ try {
     const idMap = {}; // ID Curto -> ID Real do Sistema
 
     doc.tasks.forEach(t => {
-        if (!t.id) {throw new Error("Uma das tarefas não possui o campo 'id' obrigatório.");}
+        if (!t.id) {
+            throw new Error("Uma das tarefas não possui o campo 'id' obrigatório.");
+        }
         const realId = `${projectPrefix}-${sanitize(t.id)}`;
         idMap[t.id] = realId;
         tasks.push({ ...t, realId });
@@ -102,7 +112,9 @@ try {
     tasks.forEach(t => {
         const deps = t.depends_on || [];
         deps.forEach(d => {
-            if (!idMap[d]) {throw new Error(`Dependência quebrada: '${t.id}' refere-se a '${d}', que não existe.`);}
+            if (!idMap[d]) {
+                throw new Error(`Dependência quebrada: '${t.id}' refere-se a '${d}', que não existe.`);
+            }
         });
         adj[t.id] = deps;
     });
@@ -112,10 +124,14 @@ try {
     function hasCycle(v) {
         visited.add(v);
         stack.add(v);
-        for (const neighbor of (adj[v] || [])) {
+        for (const neighbor of adj[v] || []) {
             if (!visited.has(neighbor)) {
-                if (hasCycle(neighbor)) {return true;}
-            } else if (stack.has(neighbor)) {return true;}
+                if (hasCycle(neighbor)) {
+                    return true;
+                }
+            } else if (stack.has(neighbor)) {
+                return true;
+            }
         }
         stack.delete(v);
         return false;
@@ -123,7 +139,9 @@ try {
 
     for (const t of tasks) {
         if (!visited.has(t.id)) {
-            if (hasCycle(t.id)) {throw new Error(`ERRO: Ciclo de dependência detectado na tarefa '${t.id}'.`);}
+            if (hasCycle(t.id)) {
+                throw new Error(`ERRO: Ciclo de dependência detectado na tarefa '${t.id}'.`);
+            }
         }
     }
 
@@ -138,7 +156,9 @@ try {
 
         // Suporte a {{REF:LAST}}
         if (t.prompt.includes('{{REF:LAST}}') && previousTaskId) {
-            if (!realDeps.includes(previousTaskId)) {realDeps.push(previousTaskId);}
+            if (!realDeps.includes(previousTaskId)) {
+                realDeps.push(previousTaskId);
+            }
         }
 
         // Resolução de Referências no Prompt
@@ -165,7 +185,7 @@ try {
                     user_message: finalPrompt
                 },
                 config: {
-                    reset_context: t.reset_context !== undefined ? t.reset_context : (defaults.reset_context || false)
+                    reset_context: t.reset_context !== undefined ? t.reset_context : defaults.reset_context || false
                 }
             },
             policy: {
@@ -190,7 +210,9 @@ try {
                     return;
                 }
                 action = 'UPDATE';
-            } catch (e) { action = 'REPAIR'; }
+            } catch (e) {
+                action = 'REPAIR';
+            }
         }
 
         if (!isDryRun) {
@@ -206,7 +228,6 @@ try {
 
     console.log(`\n✅ SUCESSO: Fluxo processado.`);
     console.log(`   Criadas: ${created} | Atualizadas: ${updated} | Puladas: ${skipped}\n`);
-
 } catch (e) {
     console.error(`\n❌ ERRO FATAL: ${e.message}`);
     process.exit(1);

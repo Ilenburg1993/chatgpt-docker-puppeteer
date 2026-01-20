@@ -41,6 +41,7 @@ Vocês criaram **componentes de qualidade excepcional** mas que **não conversam
 ```
 
 **Problema**: Você tem **2 arquiteturas paralelas**:
+
 1. **Arquitetura Legacy** (`index.js` + `execution_engine.js`)
 2. **Arquitetura Nova** (`kernel/` + `nerv/`)
 
@@ -53,6 +54,7 @@ E **NENHUMA delas conversa com a outra!** 🔥
 ### 1. 🧠 KERNEL (`src/kernel/`)
 
 #### ✅ O Que Existe
+
 ```javascript
 // src/kernel/kernel.js - Fábrica bem projetada
 function createKernel({
@@ -64,6 +66,7 @@ function createKernel({
 ```
 
 **Componentes Internos**:
+
 - ✅ `KernelLoop` - Loop de execução próprio
 - ✅ `TaskRuntime` - Gestão de tarefas
 - ✅ `ObservationStore` - Armazena eventos
@@ -75,12 +78,14 @@ function createKernel({
 #### ❌ O Que Falta
 
 **1. Ninguém chama `createKernel()`!**
+
 ```bash
 $ grep -r "createKernel" *.js index.js
 # RESULTADO: 0 matches fora de kernel.js
 ```
 
 **2. Não está integrado com `index.js`**
+
 ```javascript
 // index.js atual usa:
 const ExecutionEngine = require('./src/core/execution_engine'); // ← LEGACY
@@ -90,18 +95,21 @@ const { createKernel } = require('./src/kernel/kernel'); // ← NOVO
 ```
 
 **3. Driver não conhece Kernel**
+
 ```bash
 $ grep -r "kernel" src/driver/
 # RESULTADO: 0 matches
 ```
 
 **4. Server não conhece Kernel**
+
 ```bash
 $ grep -r "kernel" src/server/
 # RESULTADO: 0 matches
 ```
 
 #### 📊 Score de Integração: **5% ❌**
+
 - ✅ Código existe
 - ✅ Bem arquitetado
 - ❌ Não é instanciado
@@ -113,22 +121,24 @@ $ grep -r "kernel" src/server/
 ### 2. 🌐 NERV (`src/nerv/`)
 
 #### ✅ O Que Existe
+
 ```javascript
 // src/nerv/nerv.js - Compositor estrutural
 function createNERV(config) {
-  // Componentes internos
-  const telemetry = createTelemetry();
-  const envelopes = createEnvelopes();
-  const correlation = createCorrelation();
-  const buffers = createBuffers();
-  const transport = createTransport();
-  const emission = createEmission();
-  const reception = createReception();
-  const health = createHealth();
+    // Componentes internos
+    const telemetry = createTelemetry();
+    const envelopes = createEnvelopes();
+    const correlation = createCorrelation();
+    const buffers = createBuffers();
+    const transport = createTransport();
+    const emission = createEmission();
+    const reception = createReception();
+    const health = createHealth();
 }
 ```
 
 **Componentes Internos**:
+
 - ✅ `envelopes/` - Validação de mensagens
 - ✅ `correlation/` - Tracking de mensagens
 - ✅ `telemetry/` - Métricas IPC
@@ -141,12 +151,14 @@ function createNERV(config) {
 #### ❌ O Que Falta
 
 **1. Ninguém chama `createNERV()`!**
+
 ```bash
 $ grep -r "createNERV" *.js index.js
 # RESULTADO: 0 matches fora de nerv.js
 ```
 
 **2. Coexiste com IPC antigo (`ipc_client.js`)**
+
 ```javascript
 // index.js usa IPC LEGACY:
 const ipc = require('./src/infra/ipc_client'); // ← V600 antigo
@@ -156,15 +168,17 @@ const { createNERV } = require('./src/nerv/nerv'); // ← NOVO
 ```
 
 **3. Server usa WebSocket próprio, não NERV**
+
 ```javascript
 // src/server/engine/socket.js
 const socketio = require('socket.io'); // ← Socket.io direto
 
 // Deveria usar:
-const nerv = createNERV({ transport: { adapter: socketio }});
+const nerv = createNERV({ transport: { adapter: socketio } });
 ```
 
 #### 📊 Score de Integração: **0% ❌**
+
 - ✅ Código existe
 - ✅ Arquitetura limpa
 - ❌ Não é instanciado
@@ -177,24 +191,26 @@ const nerv = createNERV({ transport: { adapter: socketio }});
 ### 3. 🚗 DRIVER (`src/driver/`)
 
 #### ✅ O Que Existe
+
 ```javascript
 // src/driver/factory.js
 const factory = {
-  create(targetName) {
-    // Retorna driver específico
-  }
+    create(targetName) {
+        // Retorna driver específico
+    }
 };
 
 // src/driver/DriverLifecycleManager.js
 class DriverLifecycleManager {
-  async executeTask(task) {
-    const driver = factory.create(task.target);
-    await driver.execute();
-  }
+    async executeTask(task) {
+        const driver = factory.create(task.target);
+        await driver.execute();
+    }
 }
 ```
 
 **Uso Atual**:
+
 ```javascript
 // ✅ Usado em execution_engine.js (LEGACY)
 const DriverLifecycleManager = require('../driver/DriverLifecycleManager');
@@ -206,10 +222,11 @@ const driverFactory = require('../../driver/factory');
 #### ❌ O Que Falta
 
 **1. Driver não emite eventos via NERV**
+
 ```javascript
 // Deveria:
-driver.on('response:chunk', (chunk) => {
-  nerv.emit('TASK_PROGRESS', { chunk });
+driver.on('response:chunk', chunk => {
+    nerv.emit('TASK_PROGRESS', { chunk });
 });
 
 // Faz:
@@ -217,10 +234,11 @@ driver.on('response:chunk', (chunk) => {
 ```
 
 **2. Driver não recebe comandos via Kernel**
+
 ```javascript
 // Deveria:
-kernel.on('TASK_ABORT', (taskId) => {
-  driver.abort(taskId);
+kernel.on('TASK_ABORT', taskId => {
+    driver.abort(taskId);
 });
 
 // Faz:
@@ -228,6 +246,7 @@ kernel.on('TASK_ABORT', (taskId) => {
 ```
 
 **3. Driver não reporta telemetria ao Kernel**
+
 ```javascript
 // Deveria:
 driver.recordMetric('latency', 1500);
@@ -238,6 +257,7 @@ kernelTelemetry.record('driver_latency', 1500);
 ```
 
 #### 📊 Score de Integração: **30% ⚠️**
+
 - ✅ Funciona standalone
 - ✅ Usado pelo engine legacy
 - ⚠️ Adapter no Kernel existe mas não é usado
@@ -249,23 +269,25 @@ kernelTelemetry.record('driver_latency', 1500);
 ### 4. 🖥️ SERVER (`src/server/`)
 
 #### ✅ O Que Existe
+
 ```javascript
 // src/server/main.js
 async function bootstrap() {
-  // Inicia Express + Socket.io
-  // Watchers
-  // PM2 bridge
-  // Supervisor/Reconciler
+    // Inicia Express + Socket.io
+    // Watchers
+    // PM2 bridge
+    // Supervisor/Reconciler
 }
 
 // src/server/engine/socket.js
 function init(httpServer) {
-  io = socketio(httpServer);
-  // Setup de eventos WebSocket
+    io = socketio(httpServer);
+    // Setup de eventos WebSocket
 }
 ```
 
 **Componentes**:
+
 - ✅ Dashboard web (Express)
 - ✅ WebSocket para real-time (Socket.io direto)
 - ✅ Watchers (filesystem, logs)
@@ -275,12 +297,14 @@ function init(httpServer) {
 #### ❌ O Que Falta
 
 **1. Server não conhece Kernel**
+
 ```bash
 $ grep -r "kernel" src/server/
 # RESULTADO: 0 matches
 ```
 
 **2. Server usa Socket.io direto, não NERV**
+
 ```javascript
 // src/server/engine/socket.js
 io.emit('task:progress', data); // ← Direto
@@ -290,6 +314,7 @@ nerv.emit('TASK_PROGRESS', data); // ← Via NERV
 ```
 
 **3. Server não pode controlar Kernel**
+
 ```javascript
 // Atual: Server controla execution_engine.js diretamente
 ipc.on(IPCCommand.ENGINE_PAUSE, () => engine.pause());
@@ -300,6 +325,7 @@ kernel.on('ENGINE_PAUSE', () => kernelLoop.pause());
 ```
 
 **4. Nenhuma orquestração central**
+
 ```
 index.js → ExecutionEngine (legacy)
 server.js → Socket.io próprio
@@ -308,6 +334,7 @@ nerv/ → Isolado
 ```
 
 #### 📊 Score de Integração: **0% ❌**
+
 - ✅ Funciona standalone
 - ✅ Dashboard funcional
 - ❌ Não usa Kernel
@@ -420,6 +447,7 @@ PROBLEMA:
 ### Gap 1: **KERNEL não está integrado** 🔴 CRÍTICO
 
 **Evidências**:
+
 ```bash
 # Ninguém instancia o Kernel
 $ grep -r "createKernel" index.js src/
@@ -431,6 +459,7 @@ $ grep "ExecutionEngine" index.js
 ```
 
 **Impacto**:
+
 - 18k LOC de código Kernel **inutilizado**
 - Investimento em arquitetura nova **sem ROI**
 - Dívida técnica aumentando (2 engines paralelos)
@@ -443,6 +472,7 @@ $ grep "ExecutionEngine" index.js
 ### Gap 2: **NERV não está integrado** 🔴 CRÍTICO
 
 **Evidências**:
+
 ```bash
 # Ninguém instancia NERV
 $ grep -r "createNERV" index.js src/
@@ -454,6 +484,7 @@ $ grep "ipc_client" index.js
 ```
 
 **Impacto**:
+
 - IPC antigo (V600) continua em produção
 - NERV novo não substitui nada
 - 2 sistemas IPC paralelos (confusão)
@@ -466,6 +497,7 @@ $ grep "ipc_client" index.js
 ### Gap 3: **KERNEL-DRIVER não conversam** 🟡 ALTO
 
 **Evidências**:
+
 ```javascript
 // Driver não emite via NERV
 // Driver não recebe comandos do Kernel
@@ -475,6 +507,7 @@ $ grep "ipc_client" index.js
 ```
 
 **Impacto**:
+
 - Driver não pode ser controlado pelo Kernel
 - Sem telemetria centralizada
 - Abort/Pause não funcionam via Kernel
@@ -487,12 +520,14 @@ $ grep "ipc_client" index.js
 ### Gap 4: **SERVER-KERNEL não conversam** 🟡 ALTO
 
 **Evidências**:
+
 ```bash
 $ grep -r "kernel" src/server/
 # → 0 matches
 ```
 
 **Impacto**:
+
 - Dashboard não pode controlar Kernel
 - Kernel não pode notificar Dashboard
 - Comunicação ad-hoc via IPC antigo
@@ -505,6 +540,7 @@ $ grep -r "kernel" src/server/
 ### Gap 5: **SERVER-NERV não conversam** 🟡 ALTO
 
 **Evidências**:
+
 ```javascript
 // src/server/engine/socket.js usa Socket.io direto
 io.emit('task:progress', data);
@@ -513,6 +549,7 @@ io.emit('task:progress', data);
 ```
 
 **Impacto**:
+
 - Socket.io duplicado (NERV tem transport)
 - Sem benefícios do NERV (correlation, buffers, health)
 - Arquitetura inconsistente
@@ -524,15 +561,16 @@ io.emit('task:progress', data);
 
 ## 📊 Matriz de Integração
 
-| Componente | KERNEL | NERV | DRIVER | SERVER | INFRA |
-|-----------|--------|------|--------|--------|-------|
-| **KERNEL** | - | ⚠️ Ponte existe | ❌ Não integrado | ❌ Isolado | ⚠️ Via legacy |
-| **NERV** | ⚠️ Recebido mas não usado | - | ❌ Não emite/recebe | ❌ Não substitui Socket.io | ❌ Não usado |
-| **DRIVER** | ❌ Não reporta | ❌ Não usa | - | ❌ Direto via legacy | ✅ Funciona |
-| **SERVER** | ❌ Não conhece | ❌ Não usa | ❌ Via IPC antigo | - | ✅ Funciona |
-| **INFRA** | ⚠️ Via legacy | ❌ Não integrado | ✅ Usado | ✅ Usado | - |
+| Componente | KERNEL                    | NERV             | DRIVER              | SERVER                     | INFRA         |
+| ---------- | ------------------------- | ---------------- | ------------------- | -------------------------- | ------------- |
+| **KERNEL** | -                         | ⚠️ Ponte existe  | ❌ Não integrado    | ❌ Isolado                 | ⚠️ Via legacy |
+| **NERV**   | ⚠️ Recebido mas não usado | -                | ❌ Não emite/recebe | ❌ Não substitui Socket.io | ❌ Não usado  |
+| **DRIVER** | ❌ Não reporta            | ❌ Não usa       | -                   | ❌ Direto via legacy       | ✅ Funciona   |
+| **SERVER** | ❌ Não conhece            | ❌ Não usa       | ❌ Via IPC antigo   | -                          | ✅ Funciona   |
+| **INFRA**  | ⚠️ Via legacy             | ❌ Não integrado | ✅ Usado            | ✅ Usado                   | -             |
 
 **Legenda**:
+
 - ✅ Integrado e funcional
 - ⚠️ Integração parcial/indireta
 - ❌ Não integrado / Isolado
@@ -552,13 +590,14 @@ const ipc = require('./src/infra/ipc_client');
 // DEPOIS:
 const { createNERV } = require('./src/nerv/nerv');
 const nerv = createNERV({
-  transport: {
-    adapter: require('./src/infra/ipc/websocket_adapter')
-  }
+    transport: {
+        adapter: require('./src/infra/ipc/websocket_adapter')
+    }
 });
 ```
 
 **Tarefas**:
+
 1. Criar `websocket_adapter.js` para NERV
 2. Migrar eventos IPC para NERV envelopes
 3. Testar compatibilidade com Server
@@ -587,6 +626,7 @@ const kernel = createKernel({
 ```
 
 **Tarefas**:
+
 1. Adaptar `createKernel()` para receber deps do index.js
 2. Migrar lógica de `execution_engine.js` para `kernel/execution_engine/`
 3. Conectar KernelLoop ao polling de queue
@@ -605,30 +645,31 @@ const kernel = createKernel({
 ```javascript
 // Em DriverLifecycleManager:
 class DriverLifecycleManager {
-  constructor({ nerv, telemetry }) {
-    this.nerv = nerv;
-    this.telemetry = telemetry;
-  }
+    constructor({ nerv, telemetry }) {
+        this.nerv = nerv;
+        this.telemetry = telemetry;
+    }
 
-  async executeTask(task) {
-    // Emite eventos via NERV
-    this.nerv.emit('TASK_STARTED', { taskId: task.id });
-    
-    // Driver executa
-    const result = await driver.execute(task);
-    
-    // Emite progresso
-    driver.on('chunk', (chunk) => {
-      this.nerv.emit('TASK_PROGRESS', { taskId, chunk });
-    });
-    
-    // Telemetria ao Kernel
-    this.telemetry.record('driver_latency', latency);
-  }
+    async executeTask(task) {
+        // Emite eventos via NERV
+        this.nerv.emit('TASK_STARTED', { taskId: task.id });
+
+        // Driver executa
+        const result = await driver.execute(task);
+
+        // Emite progresso
+        driver.on('chunk', chunk => {
+            this.nerv.emit('TASK_PROGRESS', { taskId, chunk });
+        });
+
+        // Telemetria ao Kernel
+        this.telemetry.record('driver_latency', latency);
+    }
 }
 ```
 
 **Tarefas**:
+
 1. Injetar NERV no Driver
 2. Emitir eventos estruturados
 3. Receber comandos (ABORT, PAUSE)
@@ -654,6 +695,7 @@ nerv.emit('TASK_PROGRESS', data);
 ```
 
 **Tarefas**:
+
 1. Server recebe instância do NERV
 2. Substituir `io.emit()` por `nerv.emit()`
 3. Adaptar listeners do client
@@ -673,7 +715,7 @@ Semana 1: NERV Migration
 ├─ Dia 3: Migrar eventos IPC
 └─ Dia 4-5: Testes + Deprecar ipc_client
 
-Semana 2: KERNEL Migration  
+Semana 2: KERNEL Migration
 ├─ Dia 1-2: Adaptar createKernel()
 ├─ Dia 3-4: Migrar execution_engine lógica
 └─ Dia 5: Testes + Deprecar engine antigo
@@ -694,21 +736,25 @@ Semana 4: SERVER-NERV Integration
 ## 🚨 Riscos da Não-Integração
 
 ### Risco 1: **Código Morto** (Sunk Cost)
+
 - 18k+ LOC de KERNEL/NERV **não usados**
 - Investimento de semanas **sem retorno**
 - Dívida técnica crescente
 
 ### Risco 2: **Confusão Arquitetural**
+
 - 2 engines paralelos (legacy vs novo)
 - 2 sistemas IPC (ipc_client vs NERV)
 - Desenvolvedores não sabem qual usar
 
 ### Risco 3: **Manutenção Duplicada**
+
 - Bugs precisam ser fixados em 2 lugares
 - Features implementadas 2x
 - Testes duplicados
 
 ### Risco 4: **Impossibilidade de Evolução**
+
 - Não pode adicionar features ao Kernel (não é usado)
 - Não pode deprecar legacy (ainda em produção)
 - **Bloqueio total de roadmap**
@@ -718,6 +764,7 @@ Semana 4: SERVER-NERV Integration
 ## ✅ Benefícios Pós-Integração
 
 ### 1. **Arquitetura Unificada**
+
 ```
 ✅ 1 sistema de execução (Kernel)
 ✅ 1 sistema IPC (NERV)
@@ -726,6 +773,7 @@ Semana 4: SERVER-NERV Integration
 ```
 
 ### 2. **Observabilidade Real**
+
 ```
 ✅ Telemetria centralizada no Kernel
 ✅ Correlation IDs em todo fluxo
@@ -734,6 +782,7 @@ Semana 4: SERVER-NERV Integration
 ```
 
 ### 3. **Controle Granular**
+
 ```
 ✅ Pause/Resume via Kernel
 ✅ Abort individual de tasks
@@ -742,6 +791,7 @@ Semana 4: SERVER-NERV Integration
 ```
 
 ### 4. **Escalabilidade**
+
 ```
 ✅ NERV permite múltiplos agentes
 ✅ Kernel gerencia pool de drivers
@@ -754,18 +804,21 @@ Semana 4: SERVER-NERV Integration
 ## 🎯 Recomendações Finais
 
 ### Imediato (Esta Semana)
+
 1. **PARAR novas features** até integração
 2. **Criar branch `integration/kernel-nerv`**
 3. **Começar Semana 1** (NERV migration)
 4. **Documentar migração** (ADR)
 
 ### Próximas 4 Semanas
+
 1. **Executar plano de integração** (foco total)
 2. **Code freeze** em features novas
 3. **Testes contínuos** após cada etapa
 4. **Documentação atualizada** continuamente
 
 ### Pós-Integração
+
 1. **Deprecar código legacy**
 2. **Atualizar diagramas** (ARCHITECTURE_DIAGRAMS.md)
 3. **Celebrar** 🎉 (arquitetura unificada!)
@@ -778,6 +831,7 @@ Semana 4: SERVER-NERV Integration
 ### Diagnóstico: **FRAGMENTAÇÃO CRÍTICA**
 
 Vocês construíram **componentes excelentes** mas **não os conectaram**. É como construir um carro de Fórmula 1 com:
+
 - ✅ Motor V12 potente (Kernel)
 - ✅ Sistema elétrico sofisticado (NERV)
 - ✅ Rodas de qualidade (Driver)

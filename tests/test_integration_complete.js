@@ -30,11 +30,7 @@ console.log('🔬 Teste de Integração Completo\n');
         chromium: {
             mode: 'launcher',
             headless: 'new',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         }
     });
 
@@ -63,7 +59,10 @@ console.log('🔬 Teste de Integração Completo\n');
     console.log('FASE 5: Estatísticas do Pool');
     console.log('  Instâncias:', pool.pool.length);
     console.log('  Alocações:', pool.stats.totalAllocations);
-    console.log('  Páginas ativas:', pool.pool.reduce((sum, p) => sum + p.stats.activeTasks, 0));
+    console.log(
+        '  Páginas ativas:',
+        pool.pool.reduce((sum, p) => sum + p.stats.activeTasks, 0)
+    );
     console.log();
 
     // FASE 6: Liberação
@@ -90,7 +89,7 @@ console.log('🔬 Teste de Integração Completo\n');
     // FASE 9: Validar estado final
     console.log('FASE 9: Validação Final');
     console.log('  Pool encerrado:', !pool.initialized ? '✅' : '❌');
-    console.log('  Nenhum profile temporário:', cleanedAfter === 0 ? '✅' : `⚠️  ${  cleanedAfter}`);
+    console.log('  Nenhum profile temporário:', cleanedAfter === 0 ? '✅' : `⚠️  ${cleanedAfter}`);
     console.log('  Cache persistente OK:', cacheInfo.chrome ? '✅' : '❌');
     console.log();
 

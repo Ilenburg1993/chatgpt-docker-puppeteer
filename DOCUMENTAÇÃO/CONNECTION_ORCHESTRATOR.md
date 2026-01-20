@@ -7,6 +7,7 @@ O `ConnectionOrchestrator` é um gerenciador universal de conexões Puppeteer co
 ## Modos de Operação
 
 ### 1. **launcher** (Recomendado - Padrão)
+
 Puppeteer inicia Chrome/Chromium automaticamente.
 
 ```javascript
@@ -15,70 +16,79 @@ const browser = await orch.connect();
 ```
 
 **Vantagens:**
+
 - ✅ Zero configuração externa
 - ✅ Funciona em qualquer ambiente
 - ✅ Isolamento completo
 - ✅ Cache persistente em ~/.cache/puppeteer
 
 ### 2. **connect**
+
 Conecta a Chrome externo via `browserURL` (http://host:port).
 
 ```javascript
-const orch = new ConnectionOrchestrator({ 
-  mode: 'connect',
-  hosts: ['127.0.0.1', 'host.docker.internal'],
-  ports: [9222, 9223]
+const orch = new ConnectionOrchestrator({
+    mode: 'connect',
+    hosts: ['127.0.0.1', 'host.docker.internal'],
+    ports: [9222, 9223]
 });
 const browser = await orch.connect();
 ```
 
 **Requisitos:**
+
 - Chrome executando com `--remote-debugging-port=9222`
 
 ### 3. **wsEndpoint**
+
 Conecta a Chrome externo via WebSocket Debugger URL.
 
 ```javascript
-const orch = new ConnectionOrchestrator({ 
-  mode: 'wsEndpoint',
-  hosts: ['localhost'],
-  ports: [9222]
+const orch = new ConnectionOrchestrator({
+    mode: 'wsEndpoint',
+    hosts: ['localhost'],
+    ports: [9222]
 });
 const browser = await orch.connect();
 ```
 
 **Vantagens sobre connect:**
+
 - Mais estável
 - Menos propenso a timeouts
 
 ### 4. **executablePath**
+
 Usa Chrome customizado (não Chromium do Puppeteer).
 
 ```javascript
-const orch = new ConnectionOrchestrator({ 
-  mode: 'executablePath',
-  executablePath: '/usr/bin/google-chrome-stable'
+const orch = new ConnectionOrchestrator({
+    mode: 'executablePath',
+    executablePath: '/usr/bin/google-chrome-stable'
 });
 const browser = await orch.connect();
 ```
 
 **Use quando:**
+
 - Precisa de Chrome específico
 - Extensões customizadas
 - Profile persistente
 
 ### 5. **auto** (Fallback Inteligente)
+
 Tenta todos os modos em ordem de prioridade.
 
 ```javascript
-const orch = new ConnectionOrchestrator({ 
-  mode: 'auto',
-  autoFallback: true
+const orch = new ConnectionOrchestrator({
+    mode: 'auto',
+    autoFallback: true
 });
 const browser = await orch.connect();
 ```
 
 **Ordem de fallback:**
+
 1. launcher (mais confiável)
 2. wsEndpoint
 3. connect
@@ -92,7 +102,7 @@ Por padrão, Chromium é salvo em `~/.cache/puppeteer` (não /tmp).
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  cacheDir: '/home/node/.cache/puppeteer' // Persistente
+    cacheDir: '/home/node/.cache/puppeteer' // Persistente
 });
 ```
 
@@ -100,12 +110,12 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  args: [
-    '--no-sandbox',
-    '--disable-gpu',
-    '--window-size=1920,1080',
-    '--disable-web-security' // Apenas para dev
-  ]
+    args: [
+        '--no-sandbox',
+        '--disable-gpu',
+        '--window-size=1920,1080',
+        '--disable-web-security' // Apenas para dev
+    ]
 });
 ```
 
@@ -113,7 +123,7 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  userDataDir: '/workspace/profile' // Salva cookies, localStorage, etc
+    userDataDir: '/workspace/profile' // Salva cookies, localStorage, etc
 });
 ```
 
@@ -121,16 +131,17 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  connectionTimeout: 30000,        // 30s para conectar
-  maxConnectionAttempts: 5,        // Máximo de tentativas
-  retryDelayMs: 3000,             // Delay inicial entre tentativas
-  maxRetryDelayMs: 15000          // Delay máximo (backoff exponencial)
+    connectionTimeout: 30000, // 30s para conectar
+    maxConnectionAttempts: 5, // Máximo de tentativas
+    retryDelayMs: 3000, // Delay inicial entre tentativas
+    maxRetryDelayMs: 15000 // Delay máximo (backoff exponencial)
 });
 ```
 
 ## API Pública
 
 ### `async connect()`
+
 Conecta/inicia browser e retorna instância.
 
 ```javascript
@@ -138,6 +149,7 @@ const browser = await orch.connect();
 ```
 
 ### `async acquireContext()`
+
 Conecta browser E encontra página alvo (para modo connect/wsEndpoint).
 
 ```javascript
@@ -145,6 +157,7 @@ const { browser, page } = await orch.acquireContext();
 ```
 
 ### `getStatus()`
+
 Obtém estado atual da conexão.
 
 ```javascript
@@ -161,6 +174,7 @@ const status = orch.getStatus();
 ```
 
 ### `static getCacheInfo()`
+
 Informações sobre cache do Puppeteer.
 
 ```javascript
@@ -174,6 +188,7 @@ const info = ConnectionOrchestrator.getCacheInfo();
 ```
 
 ### `static async cleanupTempProfiles()`
+
 Limpa profiles temporários de /tmp.
 
 ```javascript
@@ -204,6 +219,7 @@ console.log(`${cleaned} profiles removidos`);
 **Problema:** Puppeteer cria profiles em /tmp que não são limpos.
 
 **Solução:**
+
 ```javascript
 // Executar periodicamente ou no shutdown
 await ConnectionOrchestrator.cleanupTempProfiles();
@@ -216,6 +232,7 @@ await ConnectionOrchestrator.cleanupTempProfiles();
 **Causa comum:** Chrome bound a 127.0.0.1 (localhost only).
 
 **Solução:**
+
 ```bash
 # Windows/Mac/Linux
 chrome --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0
@@ -226,9 +243,10 @@ chrome --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0
 **Problema:** Chromium baixado a cada execução.
 
 **Solução:** Verificar se `.puppeteerrc.cjs` existe:
+
 ```javascript
 module.exports = {
-  cacheDirectory: path.join(os.homedir(), '.cache', 'puppeteer')
+    cacheDirectory: path.join(os.homedir(), '.cache', 'puppeteer')
 };
 ```
 
@@ -238,9 +256,9 @@ module.exports = {
 // Cada ConnectionOrchestrator cria UMA instância
 // Para pool, criar múltiplos orchestrators:
 const browsers = await Promise.all([
-  new ConnectionOrchestrator().connect(),
-  new ConnectionOrchestrator().connect(),
-  new ConnectionOrchestrator().connect()
+    new ConnectionOrchestrator().connect(),
+    new ConnectionOrchestrator().connect(),
+    new ConnectionOrchestrator().connect()
 ]);
 ```
 
@@ -250,9 +268,9 @@ const browsers = await Promise.all([
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  mode: 'wsEndpoint',
-  hosts: ['host.docker.internal'],
-  ports: [9222]
+    mode: 'wsEndpoint',
+    hosts: ['host.docker.internal'],
+    ports: [9222]
 });
 ```
 
@@ -260,8 +278,8 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  mode: 'launcher',
-  userDataDir: '/workspace/chrome-profile'
+    mode: 'launcher',
+    userDataDir: '/workspace/chrome-profile'
 });
 ```
 
@@ -269,12 +287,8 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-  mode: 'launcher',
-  args: [
-    '--disable-blink-features=AutomationControlled',
-    '--disable-background-networking',
-    '--disable-default-apps'
-  ]
+    mode: 'launcher',
+    args: ['--disable-blink-features=AutomationControlled', '--disable-background-networking', '--disable-default-apps']
 });
 ```
 
@@ -294,11 +308,11 @@ O `BrowserPoolManager` usa `ConnectionOrchestrator` internamente:
 
 ```javascript
 const pool = new BrowserPoolManager({
-  poolSize: 3,
-  chromium: {
-    mode: 'launcher',
-    headless: 'new'
-  }
+    poolSize: 3,
+    chromium: {
+        mode: 'launcher',
+        headless: 'new'
+    }
 });
 
 await pool.initialize();
@@ -314,16 +328,19 @@ await pool.initialize();
 ## Segurança
 
 ⚠️ **NUNCA use em produção:**
+
 - `--disable-web-security`
 - `--remote-debugging-address=0.0.0.0` (sem firewall)
 
 ✅ **Recomendado:**
+
 - `--no-sandbox` (apenas em containers Docker)
 - `--disable-dev-shm-usage` (para ambientes com pouca memória)
 
 ## Changelog
 
 ### v2.0 (Enhanced - Universal Connection Manager)
+
 - ✅ Suporte a 5 modos de conexão
 - ✅ Fallback automático
 - ✅ Cache persistente configurável
@@ -334,6 +351,7 @@ await pool.initialize();
 - ✅ Profile persistente opcional
 
 ### v1.0 (Legacy)
+
 - Apenas launcher e connect
 - Cache em /tmp (não persistente)
 - Sem fallback automático

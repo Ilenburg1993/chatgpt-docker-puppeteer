@@ -30,13 +30,13 @@ function log(type, message) {
 }
 
 function header(text) {
-    console.log(`\n${  colors.cyan  }=== ${  text  } ===${  colors.reset}`);
+    console.log(`\n${colors.cyan}=== ${text} ===${colors.reset}`);
 }
 
 function summary(text) {
-    console.log(`\n${  colors.blue  }╔══════════════════════════════════════════════════════════════╗`);
-    console.log(`║${  text.padEnd(62)  }║`);
-    console.log(`╚══════════════════════════════════════════════════════════════╝${  colors.reset}`);
+    console.log(`\n${colors.blue}╔══════════════════════════════════════════════════════════════╗`);
+    console.log(`║${text.padEnd(62)}║`);
+    console.log(`╚══════════════════════════════════════════════════════════════╝${colors.reset}`);
 }
 
 // ============================================================================
@@ -44,8 +44,8 @@ function summary(text) {
 // ============================================================================
 function createMockSystem(delayMs) {
     return {
-        killProcess: (pid) => {
-            return new Promise((resolve) => {
+        killProcess: pid => {
+            return new Promise(resolve => {
                 setTimeout(() => {
                     resolve();
                 }, delayMs);
@@ -324,14 +324,14 @@ async function runAllTests() {
     const passedTests = Object.values(results).filter(r => r).length;
 
     console.log('');
-    console.log(`${colors.cyan  }📊 Score: ${  passedTests  }/${  totalTests  } testes passaram${  colors.reset}`);
+    console.log(`${colors.cyan}📊 Score: ${passedTests}/${totalTests} testes passaram${colors.reset}`);
 
     if (passedTests === totalTests) {
         console.log('');
-        console.log(`${colors.green  }🎉 TODAS AS CORREÇÕES P3 VALIDADAS COM SUCESSO!${  colors.reset}`);
+        console.log(`${colors.green}🎉 TODAS AS CORREÇÕES P3 VALIDADAS COM SUCESSO!${colors.reset}`);
     } else {
         console.log('');
-        console.log(`${colors.red  }⚠️  Alguns testes falharam. Revise as correções.${  colors.reset}`);
+        console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
     }
 
     console.log('');
@@ -339,7 +339,7 @@ async function runAllTests() {
 
 // Executa
 runAllTests().catch(err => {
-    console.error(`${colors.red  }❌ Erro fatal nos testes:`, err.message + colors.reset);
+    console.error(`${colors.red}❌ Erro fatal nos testes:`, err.message + colors.reset);
     console.error(err.stack);
     process.exit(1);
 });

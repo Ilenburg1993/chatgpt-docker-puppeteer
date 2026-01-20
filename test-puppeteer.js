@@ -5,8 +5,7 @@ const puppeteer = require('puppeteer');
         console.log('[TEST] Iniciando teste isolado do Puppeteer');
 
         // Endpoint obtido do curl (com Host: localhost)
-        const wsEndpoint =
-      'ws://host.docker.internal:9223/devtools/browser/d5a443e3-2e26-4463-a462-141ef57b9d90';
+        const wsEndpoint = 'ws://host.docker.internal:9223/devtools/browser/d5a443e3-2e26-4463-a462-141ef57b9d90';
 
         console.log('[TEST] Conectando via WebSocket direto...');
         const browser = await puppeteer.connect({

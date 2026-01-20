@@ -8,9 +8,11 @@
 ## 🎯 Visão e Objetivos
 
 ### Visão de Longo Prazo
+
 Criar o **framework de referência open-source** para automação autônoma de LLMs via browser automation, com arquitetura extensível, observabilidade completa e deployment simplificado.
 
 ### Objetivos Estratégicos
+
 1. **Estabilidade**: Sistema production-ready com ≥99.5% uptime
 2. **Extensibilidade**: Suporte a novos targets via plugins
 3. **Observabilidade**: Telemetria e debugging profundos
@@ -24,6 +26,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### ✅ O Que Já Temos (Implementado)
 
 #### Core Engine
+
 - [x] Loop principal com polling adaptativo
 - [x] Sistema de queue baseado em arquivos JSON
 - [x] Lock distribuído com validação de PID
@@ -34,6 +37,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [x] Forensics automáticos em crashes
 
 #### Driver System
+
 - [x] Factory pattern para múltiplos targets
 - [x] BaseDriver com template method
 - [x] ChatGPTDriver completo
@@ -44,6 +48,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [x] Stabilizer para esperas adaptativas
 
 #### Infrastructure
+
 - [x] Gestão de locks com detecção de orphans
 - [x] Cache reativo com file watchers
 - [x] Atomic writes para persistência
@@ -53,6 +58,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [x] Logging estruturado com níveis
 
 #### Monitoring & Control
+
 - [x] Dashboard web com Socket.io
 - [x] Real-time updates de progresso
 - [x] Visualização de fila
@@ -60,6 +66,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [x] PM2 ecosystem para daemon mode
 
 #### DevOps
+
 - [x] CI/CD com GitHub Actions
 - [x] Docker setup (desenvolvimento)
 - [x] Suite de testes automatizados
@@ -73,6 +80,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### 🔥 Fase 1: Consolidação (Semanas 1-3) - **EM ANDAMENTO**
 
 #### 1.1 Arquitetura Visual ✨ **AGORA**
+
 - [ ] Diagramas Mermaid para todos os fluxos
 - [ ] Documentação C4 model (Context, Container, Component)
 - [ ] Dependency graph automatizado
@@ -82,16 +90,17 @@ Criar o **framework de referência open-source** para automação autônoma de L
 **Entregável**: `DOCUMENTAÇÃO/ARCHITECTURE_DIAGRAMS.md` completo
 
 #### 1.2 Refactoring Estrutural
+
 - [ ] Migrar para ES Modules (type: "module")
 - [ ] Reorganizar `src/` seguindo DDD rigoroso
-  ```
-  src/
-  ├── core/           # Domain logic
-  ├── application/    # Use cases
-  ├── infrastructure/ # Technical concerns
-  ├── interfaces/     # API, CLI, Dashboard
-  └── shared/         # Cross-cutting
-  ```
+    ```
+    src/
+    ├── core/           # Domain logic
+    ├── application/    # Use cases
+    ├── infrastructure/ # Technical concerns
+    ├── interfaces/     # API, CLI, Dashboard
+    └── shared/         # Cross-cutting
+    ```
 - [ ] Centralizar configurações em `src/core/config/`
 - [ ] Unificar schemas em `src/core/schemas/`
 - [ ] Extrair constantes para `src/shared/constants/`
@@ -99,6 +108,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 **Entregável**: Branch `refactor/ddd-structure`
 
 #### 1.3 Testing Infrastructure
+
 - [ ] Coverage target: ≥80%
 - [ ] Unit tests para domain logic
 - [ ] Integration tests para drivers
@@ -109,6 +119,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 **Entregável**: `npm test` com coverage report
 
 #### 1.4 Observability Enhancement
+
 - [ ] Structured logging com pino/winston
 - [ ] Distributed tracing (correlationId por task)
 - [ ] Metrics export (Prometheus format)
@@ -122,6 +133,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### 🎨 Fase 2: UX e Extensibilidade (Semanas 4-6)
 
 #### 2.1 Dashboard 2.0
+
 - [ ] Interface redesenhada (Tailwind CSS)
 - [ ] Gráficos de performance (Chart.js)
 - [ ] Live logs viewer
@@ -130,6 +142,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Theme switcher (dark/light)
 
 #### 2.2 Plugin System
+
 - [ ] Plugin API documentada
 - [ ] Lifecycle hooks (onLoad, onExecute, onComplete)
 - [ ] Plugin marketplace local
@@ -137,6 +150,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] CLI para scaffold plugins: `npm run plugin:create`
 
 #### 2.3 CLI Enhancement
+
 - [ ] Commander.js CLI moderno
 - [ ] `gpt-agent start|stop|status|logs`
 - [ ] Interactive task creation wizard
@@ -148,6 +162,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### ⚡ Fase 3: Performance e Escalabilidade (Semanas 7-9)
 
 #### 3.1 Queue System Upgrade
+
 - [ ] Suporte a Redis (opcional)
 - [ ] Priority queues
 - [ ] Scheduled tasks (cron-like)
@@ -155,6 +170,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Dead letter queue
 
 #### 3.2 Driver Optimization
+
 - [ ] Browser pool management
 - [ ] Persistent browser sessions
 - [ ] Parallel execution (multi-instance)
@@ -162,6 +178,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Lazy loading de drivers
 
 #### 3.3 Network Resilience
+
 - [ ] Retry com circuit breaker
 - [ ] Timeout configurável por target
 - [ ] Fallback strategies
@@ -172,6 +189,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### 🔒 Fase 4: Security e Compliance (Semanas 10-11)
 
 #### 4.1 Security Hardening
+
 - [ ] Secrets management (dotenv-vault)
 - [ ] Input sanitization reforçada
 - [ ] Rate limiting no dashboard
@@ -179,6 +197,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Audit logs de ações sensíveis
 
 #### 4.2 Privacy
+
 - [ ] Encryption at rest para respostas sensíveis
 - [ ] PII detection e masking
 - [ ] Retention policies configuráveis
@@ -189,6 +208,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### 🌍 Fase 5: Ecosystem e Community (Semanas 12-14)
 
 #### 5.1 Integrações
+
 - [ ] Webhook notifications
 - [ ] Slack/Discord bot
 - [ ] GitHub Actions integration
@@ -196,6 +216,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] API clients (Python, Go, Rust)
 
 #### 5.2 Multi-Target Support
+
 - [ ] Google Gemini driver (estável)
 - [ ] Claude (Anthropic) driver
 - [ ] Perplexity driver
@@ -203,6 +224,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Driver registry centralizado
 
 #### 5.3 Documentation
+
 - [ ] API reference interativo (Swagger)
 - [ ] Video tutorials
 - [ ] Migration guides
@@ -214,6 +236,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ### 🎓 Fase 6: Versão 1.0 Release (Semana 15-16)
 
 #### 6.1 Release Engineering
+
 - [ ] Semantic versioning estrito
 - [ ] Changelog automatizado
 - [ ] Release notes detalhadas
@@ -221,6 +244,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Stability guarantees documentation
 
 #### 6.2 Marketing & Outreach
+
 - [ ] Website/landing page
 - [ ] Blog post de lançamento
 - [ ] HackerNews/Reddit posts
@@ -228,6 +252,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Package publicado no npm registry
 
 #### 6.3 Support Infrastructure
+
 - [ ] GitHub Discussions habilitado
 - [ ] Issue templates refinados
 - [ ] Community guidelines
@@ -239,6 +264,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ## 🔮 Post-v1.0: Roadmap Futuro
 
 ### v1.x Features
+
 - [ ] GraphQL API
 - [ ] AI-powered retry strategies (MLOps)
 - [ ] Visual workflow builder (no-code)
@@ -246,6 +272,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - [ ] Cloud-hosted SaaS version
 
 ### v2.0 Vision
+
 - [ ] Microservices architecture
 - [ ] Kubernetes deployment
 - [ ] Distributed queue (Kafka)
@@ -257,6 +284,7 @@ Criar o **framework de referência open-source** para automação autônoma de L
 ## 📈 Métricas de Sucesso
 
 ### Técnicas
+
 - **Uptime**: ≥99.5% em produção
 - **Latência**: p95 <5s por task
 - **Throughput**: ≥100 tasks/hora por instância
@@ -264,12 +292,14 @@ Criar o **framework de referência open-source** para automação autônoma de L
 - **Test Coverage**: ≥80%
 
 ### Negócio
+
 - **GitHub Stars**: 1,000+ até v1.0
 - **Contributors**: 10+ ativos
 - **npm Downloads**: 1,000+/semana após v1.0
 - **Issues Resolved**: ≥90% em <7 dias
 
 ### Community
+
 - **Documentation**: 100% endpoints documentados
 - **Support**: <24h response time em issues
 - **Tutorials**: 5+ community-created guides
@@ -292,32 +322,32 @@ Criar o **framework de referência open-source** para automação autônoma de L
 gantt
     title Roadmap Timeline - v1.0
     dateFormat  YYYY-MM-DD
-    
+
     section Fase 1: Consolidação
     Arquitetura Visual       :done,    a1, 2026-01-19, 5d
     Refactoring DDD          :active,  a2, 2026-01-24, 10d
     Testing Infrastructure   :         a3, 2026-01-28, 7d
     Observability            :         a4, 2026-02-01, 7d
-    
+
     section Fase 2: UX
     Dashboard 2.0            :         b1, 2026-02-08, 10d
     Plugin System            :         b2, 2026-02-12, 12d
     CLI Enhancement          :         b3, 2026-02-18, 7d
-    
+
     section Fase 3: Performance
     Queue Upgrade            :         c1, 2026-02-25, 10d
     Driver Optimization      :         c2, 2026-03-01, 12d
     Network Resilience       :         c3, 2026-03-07, 7d
-    
+
     section Fase 4: Security
     Security Hardening       :         d1, 2026-03-14, 10d
     Privacy & Compliance     :         d2, 2026-03-18, 7d
-    
+
     section Fase 5: Ecosystem
     Integrações              :         e1, 2026-03-25, 14d
     Multi-Target Support     :         e2, 2026-03-28, 14d
     Documentation            :         e3, 2026-04-04, 10d
-    
+
     section Fase 6: Release
     Release Engineering      :crit,    f1, 2026-04-14, 7d
     v1.0 Launch             :milestone, f2, 2026-04-21, 1d

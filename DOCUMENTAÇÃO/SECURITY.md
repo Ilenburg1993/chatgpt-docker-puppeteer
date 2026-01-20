@@ -13,6 +13,7 @@ This document outlines security best practices for chatgpt-docker-puppeteer deve
 **Risk**: Tasks in `fila/` may contain sensitive prompts or context.
 
 **Mitigation**:
+
 - ✅ `fila/` excluded in `.gitignore`
 - ✅ Backup scripts should encrypt queue data
 - ✅ Use environment-specific queues for production
@@ -22,6 +23,7 @@ This document outlines security best practices for chatgpt-docker-puppeteer deve
 **Risk**: Responses in `respostas/` may contain sensitive information.
 
 **Mitigation**:
+
 - ✅ `respostas/` excluded in `.gitignore`
 - ✅ Implement data retention policies
 - ✅ Sanitize responses before logging
@@ -31,6 +33,7 @@ This document outlines security best practices for chatgpt-docker-puppeteer deve
 **Risk**: `profile/` directory contains browser sessions and cookies.
 
 **Mitigation**:
+
 - ✅ `profile/` excluded in `.gitignore`
 - ✅ Use isolated profiles per environment
 - ✅ Clear profile data after testing
@@ -41,6 +44,7 @@ This document outlines security best practices for chatgpt-docker-puppeteer deve
 **Risk**: Logs may contain personal information or API keys.
 
 **Mitigation**:
+
 - ✅ `logs/` excluded in `.gitignore`
 - ✅ Implement log rotation (PM2 handles this)
 - ✅ Sanitize sensitive data before logging
@@ -53,11 +57,13 @@ This document outlines security best practices for chatgpt-docker-puppeteer deve
 ### 1. Environment Variables
 
 **Never commit:**
+
 - `.env` files
 - Hardcoded API keys
 - Credentials or tokens
 
 **Best Practice**:
+
 ```bash
 # Use .env.example as template
 cp .env.example .env
@@ -68,11 +74,13 @@ cp .env.example .env
 ### 2. Config File Validation
 
 **Implemented**:
+
 - ✅ Zod schema validation for `config.json`
 - ✅ Type checking at runtime
 - ✅ Default values for missing fields
 
 **Test**:
+
 ```bash
 npm run test:config
 ```
@@ -83,14 +91,12 @@ npm run test:config
 
 ```json
 {
-  "allowedDomains": [
-    "chatgpt.com",
-    "gemini.google.com"
-  ]
+    "allowedDomains": ["chatgpt.com", "gemini.google.com"]
 }
 ```
 
 **Adding new domains**:
+
 1. Update `config.json`
 2. Test with validation script
 3. Reload config: `CONFIG.reload('domain-update')`
@@ -104,16 +110,19 @@ npm run test:config
 **Risk**: Port 9222 exposes Chrome DevTools Protocol.
 
 **Mitigation**:
+
 - ⚠️ Bind to `localhost` only (not `0.0.0.0`)
 - ⚠️ Use firewall to block external access
 - ✅ Docker: Use `host.docker.internal` (not exposed publicly)
 
 **Windows**:
+
 ```powershell
 chrome.exe --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1
 ```
 
 **Linux**:
+
 ```bash
 google-chrome --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1
 ```
@@ -123,12 +132,14 @@ google-chrome --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1
 **Risk**: Dashboard on port 3008 accessible to network.
 
 **Production Mitigation**:
+
 - ✅ Use Nginx reverse proxy with authentication
 - ✅ Enable HTTPS with valid certificate
 - ✅ Implement rate limiting
 - ✅ Set `CORS_ORIGIN` to specific domain
 
 **Example Nginx config**:
+
 ```nginx
 location / {
     proxy_pass http://localhost:3008;
@@ -142,12 +153,14 @@ location / {
 **Current Status**: ⚠️ No authentication (development)
 
 **Production TODO**:
+
 - [ ] Implement API key authentication
 - [ ] Add JWT token support
 - [ ] Rate limiting per API key
 - [ ] Audit logging of API calls
 
 **Enable**:
+
 ```bash
 # .env
 API_KEY=your-secret-key-here
@@ -161,11 +174,13 @@ ENABLE_AUTH=true
 ### 1. Dependency Scanning
 
 **Automated**:
+
 - ✅ Dependabot enabled (npm, Docker, Actions)
 - ✅ Weekly scans for vulnerabilities
 - ✅ Automated PRs for security updates
 
 **Manual**:
+
 ```bash
 # Audit dependencies
 npm audit
@@ -180,11 +195,13 @@ npm outdated
 ### 2. Secret Scanning
 
 **Automated**:
+
 - ✅ `.secrets.baseline` for detect-secrets
 - ✅ GitHub Actions secret scan workflow
 - ✅ Pre-commit hooks (optional)
 
 **Manual**:
+
 ```bash
 # Scan for secrets
 detect-secrets scan > .secrets.baseline
@@ -196,11 +213,13 @@ detect-secrets audit .secrets.baseline
 ### 3. Input Validation
 
 **Implemented**:
+
 - ✅ Zod schemas for task validation
 - ✅ Config validation with defaults
 - ✅ Sanitization of prompts (control characters removed)
 
 **Test**:
+
 ```bash
 npm run test:schema
 ```
@@ -212,12 +231,14 @@ npm run test:schema
 ### 1. Container Security
 
 **Best Practices**:
+
 - ✅ Use non-root user in Dockerfile (`USER node`)
 - ✅ Minimal base image (Node 20 slim)
 - ✅ No secrets in image layers
 - ✅ Multi-stage builds to reduce attack surface
 
 **Scan image**:
+
 ```bash
 docker scan chatgpt-docker-puppeteer
 ```
@@ -225,6 +246,7 @@ docker scan chatgpt-docker-puppeteer
 ### 2. PM2 Configuration
 
 **Security settings**:
+
 ```javascript
 // ecosystem.config.js
 {
@@ -238,6 +260,7 @@ docker scan chatgpt-docker-puppeteer
 ### 3. File Permissions
 
 **Recommended**:
+
 ```bash
 # Configuration files (read-only for application)
 chmod 640 config.json dynamic_rules.json .env
@@ -259,6 +282,7 @@ chmod 750 fila/
 ### 1. Compromised Credentials
 
 **Actions**:
+
 1. Rotate all API keys immediately
 2. Review audit logs for suspicious activity
 3. Change `.env` variables
@@ -268,6 +292,7 @@ chmod 750 fila/
 ### 2. Unauthorized Access
 
 **Actions**:
+
 1. Check access logs: `tail -f logs/audit.log`
 2. Review PM2 logs: `pm2 logs`
 3. Check for suspicious tasks in `fila/`
@@ -277,11 +302,13 @@ chmod 750 fila/
 ### 3. Malicious Task Injection
 
 **Detection**:
+
 - Monitor for abnormal task patterns
 - Check `fila/corrupted/` for invalid tasks
 - Review audit logs for task creation
 
 **Prevention**:
+
 - Validate task sources
 - Implement task approval workflow
 - Use API authentication
@@ -291,6 +318,7 @@ chmod 750 fila/
 ## Security Checklist
 
 ### Development
+
 - [ ] Never commit `.env` files
 - [ ] Use `.env.example` for templates
 - [ ] Clear browser profiles after testing
@@ -298,6 +326,7 @@ chmod 750 fila/
 - [ ] Run security tests before commit
 
 ### Deployment
+
 - [ ] Use strong API keys (if enabled)
 - [ ] Enable HTTPS for dashboard
 - [ ] Set up firewall rules
@@ -310,6 +339,7 @@ chmod 750 fila/
 - [ ] Implement backup strategy
 
 ### Maintenance
+
 - [ ] Review audit logs weekly
 - [ ] Update dependencies monthly
 - [ ] Rotate secrets quarterly
@@ -324,12 +354,14 @@ chmod 750 fila/
 **Do NOT open public GitHub issues for security vulnerabilities.**
 
 **Instead**:
+
 1. Email: [security contact - TBD]
 2. Provide detailed description
 3. Include reproduction steps
 4. Allow 90 days for fix before disclosure
 
 **We will**:
+
 - Acknowledge within 48 hours
 - Provide fixes in next release
 - Credit you in CHANGELOG (if desired)
@@ -341,6 +373,7 @@ chmod 750 fila/
 ### GDPR Considerations
 
 If processing personal data:
+
 - ✅ Implement data retention policies
 - ✅ Provide data export functionality
 - ✅ Enable data deletion (clear `fila/` and `respostas/`)
@@ -350,6 +383,7 @@ If processing personal data:
 ### Audit Trail
 
 Enabled:
+
 - ✅ Task creation logged with timestamp
 - ✅ Task execution logged with result
 - ✅ IPC commands audited in `logs/audit.log`
@@ -369,6 +403,7 @@ Enabled:
 ## Updates
 
 This document should be reviewed and updated:
+
 - After security incidents
 - When adding new features
 - During security audits

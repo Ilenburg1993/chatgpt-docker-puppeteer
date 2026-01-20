@@ -1,6 +1,6 @@
 # chatgpt-docker-puppeteer
 
-[![Tests](https://img.shields.io/badge/tests-38%2F38%20(em%20consolida%C3%A7%C3%A3o)-yellow)](tests/)
+[![Tests](<https://img.shields.io/badge/tests-38%2F38%20(em%20consolida%C3%A7%C3%A3o)-yellow>)](tests/)
 ![Node.js Version](https://img.shields.io/badge/node-%E2%89%A520.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
@@ -44,6 +44,7 @@ npm run dev
 ## 📋 O Que é Este Projeto?
 
 Sistema de **agente autônomo** que:
+
 - Controla chatbots LLM (ChatGPT, Gemini) através de automação de browser
 - Processa tarefas de uma fila baseada em arquivos JSON (`fila/`)
 - Salva respostas de IA em `respostas/`
@@ -69,6 +70,7 @@ Sistema de **agente autônomo** que:
 ```
 
 **Princípios:**
+
 - **Zero-coupling**: Comunicação apenas via NERV (pub/sub)
 - **Sovereign interruption**: AbortController para interrupção autônoma
 - **Schema validation**: Zod para validação de dados
@@ -91,6 +93,7 @@ Sistema de **agente autônomo** que:
 ## ✨ Features Principais
 
 ### Core
+
 - ✅ **Automação de Browser**: Controle via Puppeteer
 - ✅ **Chrome Remote Debugging**: Conexão com Chrome existente
 - ✅ **Sistema de Fila**: Queue baseada em arquivos JSON com lock PID
@@ -99,6 +102,7 @@ Sistema de **agente autônomo** que:
 - ✅ **Validação de Qualidade**: Regras configuráveis de validação
 
 ### Arquitetura
+
 - ✅ **NERV (IPC 2.0)**: Canal universal de comunicação pub/sub
 - ✅ **Zero-coupling**: Desacoplamento completo entre módulos
 - ✅ **Retry Adaptativo**: Backoff exponencial com classificação de falhas
@@ -107,6 +111,7 @@ Sistema de **agente autônomo** que:
 - ✅ **Schema Validation**: Zod para contratos de dados
 
 ### Operacional
+
 - ✅ **Docker Ready**: Imagens multi-stage (~150MB)
 - ✅ **Health Checks**: Endpoints de saúde do sistema
 - ✅ **Telemetria**: Logs estruturados e métricas
@@ -211,20 +216,20 @@ pm2 logs agente-gpt
 
 ### Principais Arquivos
 
-| Arquivo | Propósito | Hot-reload |
-|---------|-----------|------------|
-| `config.json` | Configuração principal do sistema | ✅ Sim |
-| `dynamic_rules.json` | Seletores CSS e regras por target | ✅ Sim |
-| `.env` | Variáveis de ambiente | ❌ Requer restart |
+| Arquivo              | Propósito                         | Hot-reload        |
+| -------------------- | --------------------------------- | ----------------- |
+| `config.json`        | Configuração principal do sistema | ✅ Sim            |
+| `dynamic_rules.json` | Seletores CSS e regras por target | ✅ Sim            |
+| `.env`               | Variáveis de ambiente             | ❌ Requer restart |
 
 ### Exemplo de Task
 
 ```json
 {
-  "id": "task-001",
-  "target": "chatgpt",
-  "prompt": "Explique computação quântica de forma simples",
-  "state": "PENDING"
+    "id": "task-001",
+    "target": "chatgpt",
+    "prompt": "Explique computação quântica de forma simples",
+    "state": "PENDING"
 }
 ```
 
@@ -259,6 +264,7 @@ Respostas salvas em `respostas/{taskId}.txt`
 ## 🤝 Contribuindo
 
 Contribuições são bem-vindas! Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para:
+
 - Setup de desenvolvimento
 - Padrões de código
 - Formato de commits

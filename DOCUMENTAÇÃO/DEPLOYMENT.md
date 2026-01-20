@@ -20,6 +20,7 @@ This guide covers deploying chatgpt-docker-puppeteer in various environments.
 ### 1. Native Deployment (Windows/Linux/macOS)
 
 **Advantages:**
+
 - Direct access to system Chrome
 - Simpler debugging
 - Lower resource overhead
@@ -27,17 +28,20 @@ This guide covers deploying chatgpt-docker-puppeteer in various environments.
 **Steps:**
 
 1. **Install Dependencies**
+
 ```bash
 npm install --production
 ```
 
 2. **Configure Environment**
+
 ```bash
 cp .env.example .env
 # Edit .env with your settings
 ```
 
 3. **Start Chrome**
+
 ```bash
 # Windows
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
@@ -47,6 +51,7 @@ google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation-
 ```
 
 4. **Run with PM2**
+
 ```bash
 npm install -g pm2
 npm run daemon:start
@@ -63,6 +68,7 @@ pm2 logs chatgpt-agent
 ### 2. Docker Deployment (Recommended)
 
 **Advantages:**
+
 - Isolated environment
 - Easy scaling
 - Consistent across systems
@@ -70,18 +76,21 @@ pm2 logs chatgpt-agent
 **Steps:**
 
 1. **Start Chrome on Host**
+
 ```bash
 # See DOCKER_SETUP.md for OS-specific commands
 chrome --remote-debugging-port=9222
 ```
 
 2. **Configure Environment**
+
 ```bash
 # docker-compose.yml already configured for host.docker.internal
 # No changes needed for standard setup
 ```
 
 3. **Build and Run**
+
 ```bash
 make build
 make start
@@ -91,6 +100,7 @@ docker-compose up -d
 ```
 
 4. **Verify Health**
+
 ```bash
 make health
 # or
@@ -104,6 +114,7 @@ curl http://localhost:3008/api/health
 **For VPS/dedicated servers:**
 
 #### Setup Script
+
 ```bash
 #!/bin/bash
 # deploy.sh
@@ -174,6 +185,7 @@ echo "Status: pm2 status"
 ```
 
 Make executable and run:
+
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
@@ -239,6 +251,7 @@ server {
 ```
 
 Enable and restart:
+
 ```bash
 sudo ln -s /etc/nginx/sites-available/chatgpt-agent /etc/nginx/sites-enabled/
 sudo nginx -t
@@ -279,6 +292,7 @@ pm2 link <secret> <public>
 ### 2. Prometheus + Grafana
 
 **Install Prometheus:**
+
 ```bash
 # Add Prometheus repository
 sudo apt install prometheus
@@ -294,6 +308,7 @@ sudo systemctl restart prometheus
 ```
 
 **Install Grafana:**
+
 ```bash
 sudo apt install grafana
 sudo systemctl enable grafana-server
@@ -337,6 +352,7 @@ echo "✅ Backup completed: $DATE"
 ```
 
 Setup cron job:
+
 ```bash
 crontab -e
 # Add: 0 2 * * * /path/to/backup.sh
@@ -349,19 +365,23 @@ crontab -e
 ### Horizontal Scaling
 
 **Option 1: Multiple PM2 Instances**
+
 ```javascript
 // ecosystem.config.js
 module.exports = {
-  apps: [{
-    name: 'chatgpt-agent',
-    script: './index.js',
-    instances: 4,  // Number of instances
-    exec_mode: 'cluster'
-  }]
+    apps: [
+        {
+            name: 'chatgpt-agent',
+            script: './index.js',
+            instances: 4, // Number of instances
+            exec_mode: 'cluster'
+        }
+    ]
 };
 ```
 
 **Option 2: Multiple Servers**
+
 ```
 ┌──────────────┐     ┌──────────────┐
 │   Agent 1    │     │   Agent 2    │
@@ -410,6 +430,7 @@ WantedBy=timers.target
 ```
 
 Enable:
+
 ```bash
 sudo systemctl enable chatgpt-agent-health.timer
 sudo systemctl start chatgpt-agent-health.timer
@@ -420,6 +441,7 @@ sudo systemctl start chatgpt-agent-health.timer
 ## Troubleshooting
 
 ### Container Won't Start
+
 ```bash
 # Check logs
 docker logs chatgpt-docker-puppeteer-agent-1
@@ -429,6 +451,7 @@ docker exec -it chatgpt-docker-puppeteer-agent-1 curl http://host.docker.interna
 ```
 
 ### High Memory Usage
+
 ```bash
 # Check memory
 docker stats
@@ -440,6 +463,7 @@ docker-compose up -d
 ```
 
 ### Queue Not Processing
+
 ```bash
 # Check queue status
 npm run queue:status

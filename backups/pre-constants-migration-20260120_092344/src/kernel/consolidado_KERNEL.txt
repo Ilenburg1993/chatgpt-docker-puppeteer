@@ -1,0 +1,2930 @@
+
+
+---
+
+/* ==========================================================================
+   src/kernel/execution_engine/execution_engine.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: execution_engine/
+   Arquivo: execution_engine.js
+   
+   Papel:
+   - Avaliar o estado completo do Kernel em cada ciclo
+   - Produzir PROPOSTAS de decisão (não as aplica)
+   - Consultar PolicyEngine para avaliação normativa
+   - Interpretar observações semanticamente
+   
+   IMPORTANTE:
+   - NÃO aplica decisões (isso é papel do KernelLoop)
+   - NÃO controla tempo (é chamado pelo KernelLoop)
+   - NÃO comunica via IPC (usa TaskRuntime/ObservationStore)
+   - NÃO muta estado diretamente
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Tipos de Proposta de Decisão
+=========================== */
+
+const DecisionKind = Object.freeze({
+  // Controle de tarefas
+  PROPOSE_ACTIVATE_TASK: 'PROPOSE_ACTIVATE_TASK',
+  PROPOSE_SUSPEND_TASK: 'PROPOSE_SUSPEND_TASK',
+  PROPOSE_TERMINATE_TASK: 'PROPOSE_TERMINATE_TASK',
+  
+  // Emissão de comandos
+  PROPOSE_EMIT_COMMAND: 'PROPOSE_EMIT_COMMAND',
+  PROPOSE_EMIT_EVENT: 'PROPOSE_EMIT_EVENT',
+  
+  // Gestão de observações
+  PROPOSE_RECONCILE_OBSERVATIONS: 'PROPOSE_RECONCILE_OBSERVATIONS'
+});
+
+/* ===========================
+   Fábrica do ExecutionEngine
+=========================== */
+
+class ExecutionEngine {
+  /**
+   * @param {Object} params
+   * @param {Object} params.taskRuntime
+   * Gerenciador de vida das tarefas.
+   * 
+   * @param {Object} params.observationStore
+   * Registro de EVENTs recebidos.
+   * 
+   * @param {Object} params.policyEngine
+   * Motor normativo consultivo.
+   * 
+   * @param {Object} params.telemetry
+   * Canal de telemetria.
+   */
+  constructor({
+    taskRuntime,
+    observationStore,
+    policyEngine,
+    telemetry
+  }) {
+    if (!taskRuntime) {
+      throw new Error('ExecutionEngine requer taskRuntime');
+    }
+
+    if (!observationStore) {
+      throw new Error('ExecutionEngine requer observationStore');
+    }
+
+    if (!policyEngine) {
+      throw new Error('ExecutionEngine requer policyEngine');
+    }
+
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+      throw new Error('ExecutionEngine requer telemetria válida');
+    }
+
+    this.taskRuntime = taskRuntime;
+    this.observationStore = observationStore;
+    this.policyEngine = policyEngine;
+    this.telemetry = telemetry;
+  }
+
+  /* ===========================
+     AVALIAÇÃO SEMÂNTICA (PONTO ÚNICO)
+  =========================== */
+
+  /**
+   * Avalia o estado completo do Kernel e produz propostas de decisão.
+   * 
+   * Chamado exclusivamente pelo KernelLoop a cada ciclo.
+   * 
+   * @param {Object} context
+   * @param {number} context.tickId
+   * Identificador do ciclo lógico.
+   * 
+   * @param {number} context.at
+   * Timestamp do ciclo.
+   * 
+   * @returns {Array<Object>}
+   * Lista de propostas de decisão.
+   */
+  evaluate({ tickId, at }) {
+    this.telemetry.info('execution_engine_evaluation_start', {
+      tickId,
+      at
+    });
+
+    const proposals = [];
+
+    // Obtém todas as tarefas existentes
+    const tasks = this.taskRuntime.listTasks();
+
+    // Avalia cada tarefa individualmente
+    for (const task of tasks) {
+      const taskProposals = this._evaluateTask(task, { tickId, at });
+      
+      if (Array.isArray(taskProposals)) {
+        proposals.push(...taskProposals);
+      }
+    }
+
+    this.telemetry.info('execution_engine_evaluation_complete', {
+      tickId,
+      proposalsCount: proposals.length,
+      at: Date.now()
+    });
+
+    return proposals;
+  }
+
+  /* ===========================
+     AVALIAÇÃO DE TAREFA INDIVIDUAL
+  =========================== */
+
+  /**
+   * Avalia uma tarefa específica.
+   * 
+   * @param {Object} task
+   * Snapshot imutável da tarefa.
+   * 
+   * @param {Object} context
+   * Contexto do ciclo.
+   * 
+   * @returns {Array<Object>}
+   * Propostas geradas para esta tarefa.
+   */
+  _evaluateTask(task, { tickId, at }) {
+    const proposals = [];
+
+    // 1. Recupera observações correlacionadas
+    const observations = task.metadata?.correlationId
+      ? this.observationStore.getByCorrelation(task.metadata.correlationId)
+      : [];
+
+    // 2. Avaliação normativa via PolicyEngine
+    const policyAssessment = this.policyEngine.assess({
+      task,
+      observations,
+      at
+    });
+
+    // 3. Interpretação semântica
+    const semanticDecisions = this._interpretObservations({
+      task,
+      observations,
+      at
+    });
+
+    // 4. Combinação de avaliação normativa + semântica
+    const proposal = this._synthesizeProposal({
+      task,
+      observations,
+      policyAssessment,
+      semanticDecisions,
+      at
+    });
+
+    if (proposal) {
+      this.telemetry.info('execution_engine_proposal_created', {
+        taskId: task.taskId,
+        kind: proposal.kind,
+        tickId,
+        at: Date.now()
+      });
+
+      proposals.push(proposal);
+    }
+
+    return proposals;
+  }
+
+  /* ===========================
+     INTERPRETAÇÃO SEMÂNTICA DE OBSERVAÇÕES
+  =========================== */
+
+  /**
+   * Interpreta semanticamente as observações de uma tarefa.
+   * 
+   * @param {Object} params
+   * @param {Object} params.task
+   * @param {Array} params.observations
+   * @param {number} params.at
+   * 
+   * @returns {Object}
+   * Resultado da interpretação semântica.
+   */
+  _interpretObservations({ task, observations, at }) {
+    const result = {
+      hasCompletionSignal: false,
+      hasErrorSignal: false,
+      hasProgressSignal: false,
+      lastObservationAt: null
+    };
+
+    if (observations.length === 0) {
+      return result;
+    }
+
+    // Ordena observações por timestamp de ingestão
+    const sorted = [...observations].sort((a, b) => 
+      a.ingestedAt - b.ingestedAt
+    );
+
+    result.lastObservationAt = sorted[sorted.length - 1].ingestedAt;
+
+    // Interpreta payloads (exemplo simplificado)
+    for (const obs of sorted) {
+      const payload = obs.payload;
+
+      // Sinal de conclusão
+      if (payload?.status === 'completed' || payload?.done === true) {
+        result.hasCompletionSignal = true;
+      }
+
+      // Sinal de erro
+      if (payload?.status === 'error' || payload?.error) {
+        result.hasErrorSignal = true;
+      }
+
+      // Sinal de progresso
+      if (payload?.progress !== undefined) {
+        result.hasProgressSignal = true;
+      }
+    }
+
+    this.telemetry.info('execution_engine_observations_interpreted', {
+      taskId: task.taskId,
+      observationsCount: observations.length,
+      hasCompletionSignal: result.hasCompletionSignal,
+      hasErrorSignal: result.hasErrorSignal,
+      at
+    });
+
+    return result;
+  }
+
+  /* ===========================
+     SÍNTESE DE PROPOSTA
+  =========================== */
+
+  /**
+   * Sintetiza uma proposta de decisão a partir de:
+   * - Avaliação normativa (PolicyEngine)
+   * - Interpretação semântica (observações)
+   * - Estado atual da tarefa
+   * 
+   * @param {Object} params
+   * @returns {Object|null}
+   * Proposta de decisão ou null se nenhuma ação necessária.
+   */
+  _synthesizeProposal({
+    task,
+    observations,
+    policyAssessment,
+    semanticDecisions,
+    at
+  }) {
+    // Regra 1: Suspender tarefa se avaliação normativa crítica
+    if (
+      policyAssessment?.level === 'CRITICAL' &&
+      task.state === 'ACTIVE'
+    ) {
+      return {
+        kind: DecisionKind.PROPOSE_SUSPEND_TASK,
+        taskId: task.taskId,
+        reason: 'Avaliação normativa crítica',
+        policyLevel: policyAssessment.level,
+        alerts: policyAssessment.alerts,
+        at
+      };
+    }
+
+    // Regra 2: Terminar tarefa se sinal de conclusão
+    if (
+      semanticDecisions.hasCompletionSignal &&
+      task.state === 'ACTIVE'
+    ) {
+      return {
+        kind: DecisionKind.PROPOSE_TERMINATE_TASK,
+        taskId: task.taskId,
+        reason: 'Sinal de conclusão recebido',
+        at
+      };
+    }
+
+    // Regra 3: Suspender tarefa se sinal de erro
+    if (
+      semanticDecisions.hasErrorSignal &&
+      task.state === 'ACTIVE'
+    ) {
+      return {
+        kind: DecisionKind.PROPOSE_SUSPEND_TASK,
+        taskId: task.taskId,
+        reason: 'Sinal de erro detectado',
+        at
+      };
+    }
+
+    // Regra 4: Ativar tarefa criada sem observações após tempo mínimo
+    if (
+      task.state === 'CREATED' &&
+      at - task.createdAt > 100 // 100ms após criação
+    ) {
+      return {
+        kind: DecisionKind.PROPOSE_ACTIVATE_TASK,
+        taskId: task.taskId,
+        reason: 'Tempo mínimo de inicialização atingido',
+        at
+      };
+    }
+
+    // Sem proposta
+    return null;
+  }
+}
+
+module.exports = {
+  ExecutionEngine,
+  DecisionKind
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/kernel.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Arquivo: kernel.js
+   
+   Papel:
+   - Compor todos os subsistemas do Kernel de forma explícita
+   - Integrar o NERV como camada de comunicação IPC
+   - Expor interface mínima e controlada
+   - Estabelecer a topologia canônica do sistema
+   
+   IMPORTANTE:
+   - NÃO executa lógica de negócio aqui
+   - NÃO decide (delega ao ExecutionEngine)
+   - NÃO controla tempo diretamente (delega ao KernelLoop)
+   - NÃO interpreta EVENTs (delega ao ObservationStore)
+   - Apenas COMPÕE e CONECTA subsistemas
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const { KernelLoop } = require('./kernel_loop/kernel_loop');
+const { TaskRuntime } = require('./task_runtime/task_runtime');
+const { ObservationStore } = require('./observation_store/observation_store');
+const { PolicyEngine } = require('./policy_engine/policy_engine');
+const { ExecutionEngine } = require('./execution_engine/execution_engine');
+const { KernelTelemetry } = require('./telemetry/kernel_telemetry');
+const { KernelNERVBridge } = require('./nerv_bridge/kernel_nerv_bridge');
+
+/* ===========================
+   Fábrica do Kernel
+=========================== */
+
+/**
+ * Cria e compõe o Kernel de forma explícita e determinística.
+ * 
+ * @param {Object} config
+ * Configurações estruturais:
+ * 
+ * @param {Object} config.nerv
+ * Instância do NERV já configurada e conectada.
+ * 
+ * @param {Object} [config.telemetry]
+ * Opções da telemetria do Kernel.
+ * 
+ * @param {Object} [config.policy]
+ * Limites e políticas normativas.
+ * 
+ * @param {Object} [config.loop]
+ * Opções do kernel_loop (intervalo, scheduler).
+ * 
+ * @returns {Object} Interface pública do Kernel
+ */
+function createKernel({
+  nerv,
+  telemetry: telemetryOptions = {},
+  policy: policyLimits = {},
+  loop: loopOptions = {}
+} = {}) {
+  
+  if (!nerv) {
+    throw new Error('Kernel requer instância do NERV configurada');
+  }
+
+  /* =========================================================
+     1. TELEMETRIA — Base observacional transversal
+  ========================================================= */
+
+  const telemetry = new KernelTelemetry({
+    source: 'kernel',
+    retention: 1000,
+    ...telemetryOptions
+  });
+
+  telemetry.info('kernel_initializing', {
+    at: Date.now()
+  });
+
+  /* =========================================================
+     2. TASK RUNTIME — Vida lógica das tarefas
+  ========================================================= */
+
+  const taskRuntime = new TaskRuntime({
+    telemetry
+  });
+
+  /* =========================================================
+     3. OBSERVATION STORE — Registro factual de EVENTs
+  ========================================================= */
+
+  const observationStore = new ObservationStore({
+    telemetry
+  });
+
+  /* =========================================================
+     4. POLICY ENGINE — Normatividade consultiva
+  ========================================================= */
+
+  const policyEngine = new PolicyEngine({
+    telemetry,
+    limits: {
+      maxObservationsPerTask: 1000,
+      maxTaskAgeMs: 300000, // 5 minutos
+      maxStalledCycles: 10,
+      ...policyLimits
+    }
+  });
+
+  /* =========================================================
+     5. EXECUTION ENGINE — Motor semântico de decisão
+  ========================================================= */
+
+  const executionEngine = new ExecutionEngine({
+    taskRuntime,
+    observationStore,
+    policyEngine,
+    telemetry
+  });
+
+  /* =========================================================
+     6. NERV BRIDGE — Ponte de integração KERNEL↔NERV
+  ========================================================= */
+
+  const nervBridge = new KernelNERVBridge({
+    nerv,
+    taskRuntime,
+    observationStore,
+    telemetry
+  });
+
+  /* =========================================================
+     7. KERNEL LOOP — Tempo soberano e ciclo executivo
+  ========================================================= */
+
+  const kernelLoop = new KernelLoop({
+    executionEngine,
+    nervBridge,
+    telemetry,
+    baseIntervalMs: 50,
+    ...loopOptions
+  });
+
+  telemetry.info('kernel_composed', {
+    subsystems: [
+      'KernelTelemetry',
+      'TaskRuntime',
+      'ObservationStore',
+      'PolicyEngine',
+      'ExecutionEngine',
+      'KernelNERVBridge',
+      'KernelLoop'
+    ],
+    at: Date.now()
+  });
+
+  /* =========================================================
+     INTERFACE PÚBLICA DO KERNEL
+  ========================================================= */
+
+  const kernelInterface = Object.freeze({
+    
+    /**
+     * Inicia o ciclo executivo do Kernel.
+     */
+    start() {
+      telemetry.info('kernel_start_requested', { at: Date.now() });
+      
+      // Inicia ponte NERV (registra handlers)
+      nervBridge.start();
+      
+      // Inicia ciclo lógico
+      kernelLoop.start();
+      
+      telemetry.info('kernel_started', { at: Date.now() });
+    },
+
+    /**
+     * Para o ciclo executivo do Kernel.
+     */
+    stop() {
+      telemetry.info('kernel_stop_requested', { at: Date.now() });
+      
+      // Para ciclo lógico
+      kernelLoop.stop();
+      
+      // Para ponte NERV
+      nervBridge.stop();
+      
+      telemetry.info('kernel_stopped', { at: Date.now() });
+    },
+
+    /**
+     * Retorna status técnico completo do Kernel.
+     */
+    getStatus() {
+      return Object.freeze({
+        loop: kernelLoop.getStatus(),
+        tasks: taskRuntime.getStats(),
+        observations: observationStore.getStats(),
+        nerv: nervBridge.getStatus(),
+        telemetry: telemetry.getStats()
+      });
+    },
+
+    /**
+     * Acesso à telemetria (somente leitura).
+     */
+    telemetry,
+
+    /**
+     * Cria uma nova tarefa no Kernel.
+     * Retorna snapshot imutável da tarefa criada.
+     */
+    createTask({ taskId, metadata = {} }) {
+      return taskRuntime.createTask({ taskId, metadata });
+    },
+
+    /**
+     * Retorna snapshot de uma tarefa específica.
+     */
+    getTask(taskId) {
+      return taskRuntime.getTask(taskId);
+    },
+
+    /**
+     * Lista todas as tarefas existentes.
+     */
+    listTasks() {
+      return taskRuntime.listTasks();
+    }
+  });
+
+  telemetry.info('kernel_ready', {
+    at: Date.now()
+  });
+
+  return kernelInterface;
+}
+
+module.exports = {
+  createKernel
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/kernel_loop/kernel_loop.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: kernel_loop/
+   Arquivo: kernel_loop.js
+   
+   Papel:
+   - Manter o tempo soberano do Kernel
+   - Executar ciclos lógicos periódicos
+   - Chamar o ExecutionEngine para avaliação
+   - Aplicar decisões produzidas pelo ExecutionEngine
+   - Drenar buffers do NERV
+   
+   IMPORTANTE:
+   - É o ÚNICO controlador de tempo do Kernel
+   - NÃO decide semanticamente (delega ao ExecutionEngine)
+   - NÃO interpreta EVENTs (delega ao ObservationStore via NERVBridge)
+   - Executa decisões, mas não as produz
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Estados técnicos do KernelLoop
+=========================== */
+
+const KernelLoopState = Object.freeze({
+  INACTIVE: 'INACTIVE',
+  ACTIVE: 'ACTIVE',
+  DEGRADED: 'DEGRADED',
+  STOPPING: 'STOPPING'
+});
+
+/* ===========================
+   Fábrica do KernelLoop
+=========================== */
+
+class KernelLoop {
+  /**
+   * @param {Object} params
+   * @param {Object} params.executionEngine
+   * Motor semântico que avalia e produz decisões.
+   * 
+   * @param {Object} params.nervBridge
+   * Ponte de integração com NERV (para drenagem de buffers).
+   * 
+   * @param {Object} params.telemetry
+   * Canal de telemetria do Kernel.
+   * 
+   * @param {Object} [params.scheduler]
+   * Scheduler técnico (padrão: global).
+   * 
+   * @param {number} [params.baseIntervalMs]
+   * Intervalo base entre ciclos (padrão: 50ms).
+   */
+  constructor({
+    executionEngine,
+    nervBridge,
+    telemetry,
+    scheduler = global,
+    baseIntervalMs = 50
+  }) {
+    if (!executionEngine || typeof executionEngine.evaluate !== 'function') {
+      throw new Error('KernelLoop requer executionEngine.evaluate()');
+    }
+
+    if (!nervBridge) {
+      throw new Error('KernelLoop requer nervBridge');
+    }
+
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+      throw new Error('KernelLoop requer telemetria válida');
+    }
+
+    this.executionEngine = executionEngine;
+    this.nervBridge = nervBridge;
+    this.telemetry = telemetry;
+    this.scheduler = scheduler;
+    this.baseIntervalMs = baseIntervalMs;
+
+    this.state = KernelLoopState.INACTIVE;
+    this._timer = null;
+    this._tickCounter = 0;
+    this._lastTickAt = null;
+    this._running = false;
+  }
+
+  /* ===========================
+     LIFECYCLE
+  =========================== */
+
+  /**
+   * Inicia o ciclo executivo do Kernel.
+   */
+  start() {
+    if (this.state === KernelLoopState.ACTIVE) {
+      this.telemetry.warning('kernel_loop_already_active', {
+        at: Date.now()
+      });
+      return;
+    }
+
+    this.state = KernelLoopState.ACTIVE;
+    this._running = true;
+
+    this.telemetry.info('kernel_loop_started', {
+      at: Date.now()
+    });
+
+    this._scheduleNextTick();
+  }
+
+  /**
+   * Para o ciclo executivo do Kernel.
+   */
+  stop() {
+    if (this.state === KernelLoopState.INACTIVE) {
+      this.telemetry.warning('kernel_loop_already_inactive', {
+        at: Date.now()
+      });
+      return;
+    }
+
+    this.state = KernelLoopState.STOPPING;
+    this._running = false;
+
+    if (this._timer) {
+      this.scheduler.clearTimeout(this._timer);
+      this._timer = null;
+    }
+
+    this.telemetry.info('kernel_loop_stopped', {
+      ticks: this._tickCounter,
+      at: Date.now()
+    });
+
+    this.state = KernelLoopState.INACTIVE;
+  }
+
+  /**
+   * Verifica se o loop está executando.
+   */
+  isRunning() {
+    return this._running;
+  }
+
+  /* ===========================
+     CICLO LÓGICO (STEP)
+  =========================== */
+
+  /**
+   * Executa um único ciclo lógico do Kernel.
+   * 
+   * Sequência canônica:
+   * 1. Drenagem de buffers do NERV (inbound)
+   * 2. Avaliação semântica (ExecutionEngine)
+   * 3. Aplicação de decisões
+   * 4. Drenagem de buffers do NERV (outbound)
+   */
+  step() {
+    if (!this._running) return;
+
+    const tickId = ++this._tickCounter;
+    const startedAt = Date.now();
+    this._lastTickAt = startedAt;
+
+    this.telemetry.info('kernel_loop_tick_start', {
+      tickId,
+      state: this.state,
+      at: startedAt
+    });
+
+    try {
+      // 1. Drenagem de buffer inbound (EVENTs recebidos)
+      this._drainInbound();
+
+      // 2. Avaliação semântica (produz propostas de decisão)
+      const proposals = this.executionEngine.evaluate({
+        tickId,
+        at: startedAt
+      });
+
+      // 3. Aplicação de decisões
+      this._applyDecisions(proposals, { tickId, at: startedAt });
+
+      // 4. Drenagem de buffer outbound (COMMANDs/EVENTs a enviar)
+      this._drainOutbound();
+
+    } catch (error) {
+      this.state = KernelLoopState.DEGRADED;
+
+      this.telemetry.critical('kernel_loop_tick_error', {
+        tickId,
+        error: error.message || String(error),
+        stack: error.stack,
+        at: Date.now()
+      });
+    } finally {
+      const endedAt = Date.now();
+      const durationMs = endedAt - startedAt;
+
+      this.telemetry.info('kernel_loop_tick_end', {
+        tickId,
+        durationMs,
+        at: endedAt
+      });
+    }
+  }
+
+  /* ===========================
+     DRENAGEM DE BUFFERS NERV
+  =========================== */
+
+  /**
+   * Drena buffer inbound do NERV.
+   * EVENTs recebidos são processados pela NERVBridge.
+   */
+  _drainInbound() {
+    if (!this.nervBridge.nerv || !this.nervBridge.nerv.buffers) {
+      return;
+    }
+
+    const buffers = this.nervBridge.nerv.buffers;
+    let drained = 0;
+
+    // Drena até 100 mensagens por ciclo (limite técnico)
+    while (drained < 100) {
+      const envelope = buffers.dequeueInbound();
+      if (!envelope) break;
+
+      // Processa via receive do NERV (que chama handlers registrados)
+      this.nervBridge.nerv.receive(envelope);
+      drained++;
+    }
+
+    if (drained > 0) {
+      this.telemetry.info('kernel_loop_inbound_drained', {
+        count: drained,
+        at: Date.now()
+      });
+    }
+  }
+
+  /**
+   * Drena buffer outbound do NERV.
+   * Envia mensagens pendentes via transporte físico.
+   */
+  _drainOutbound() {
+    if (!this.nervBridge.nerv || !this.nervBridge.nerv.buffers) {
+      return;
+    }
+
+    const buffers = this.nervBridge.nerv.buffers;
+    const transport = this.nervBridge.nerv.transport;
+
+    if (!transport) return;
+
+    let drained = 0;
+
+    // Drena até 100 mensagens por ciclo
+    while (drained < 100) {
+      const envelope = buffers.dequeueOutbound();
+      if (!envelope) break;
+
+      // Serializa e envia via transporte
+      try {
+        const serialized = JSON.stringify(envelope);
+        const buffer = Buffer.from(serialized, 'utf8');
+        transport.send(buffer);
+        drained++;
+      } catch (error) {
+        this.telemetry.critical('kernel_loop_outbound_send_failed', {
+          error: error.message,
+          at: Date.now()
+        });
+      }
+    }
+
+    if (drained > 0) {
+      this.telemetry.info('kernel_loop_outbound_drained', {
+        count: drained,
+        at: Date.now()
+      });
+    }
+  }
+
+  /* ===========================
+     APLICAÇÃO DE DECISÕES
+  =========================== */
+
+  /**
+   * Aplica decisões produzidas pelo ExecutionEngine.
+   * 
+   * @param {Array<Object>} proposals
+   * Lista de propostas de decisão.
+   * 
+   * @param {Object} context
+   * Contexto do ciclo atual.
+   */
+  _applyDecisions(proposals, context) {
+    if (!Array.isArray(proposals) || proposals.length === 0) {
+      return;
+    }
+
+    this.telemetry.info('kernel_loop_applying_decisions', {
+      count: proposals.length,
+      tickId: context.tickId,
+      at: context.at
+    });
+
+    for (const proposal of proposals) {
+      try {
+        this._applyDecision(proposal, context);
+      } catch (error) {
+        this.telemetry.critical('kernel_loop_decision_application_failed', {
+          proposal,
+          error: error.message,
+          at: Date.now()
+        });
+      }
+    }
+  }
+
+  /**
+   * Aplica uma única decisão.
+   */
+  _applyDecision(proposal, context) {
+    const { kind, taskId, reason } = proposal;
+
+    this.telemetry.info('kernel_loop_decision_applied', {
+      kind,
+      taskId,
+      reason,
+      tickId: context.tickId,
+      at: context.at
+    });
+
+    // Exemplo de decisão implementada
+    switch (kind) {
+      case 'PROPOSE_SUSPEND_TASK':
+        // Aqui seria implementada a suspensão da tarefa
+        // Por ora, apenas registramos a intenção
+        this.telemetry.warning('kernel_loop_task_suspension_proposed', {
+          taskId,
+          reason,
+          at: context.at
+        });
+        break;
+
+      default:
+        this.telemetry.warning('kernel_loop_unknown_decision_kind', {
+          kind,
+          at: context.at
+        });
+    }
+  }
+
+  /* ===========================
+     AGENDAMENTO (SCHEDULING)
+  =========================== */
+
+  /**
+   * Agenda próximo ciclo lógico.
+   */
+  _scheduleNextTick() {
+    if (!this._running) return;
+
+    const delay = this._computeDelay();
+
+    this._timer = this.scheduler.setTimeout(() => {
+      this.step();
+      this._scheduleNextTick();
+    }, delay);
+  }
+
+  /**
+   * Calcula delay até próximo ciclo.
+   * Pode ser adaptativo com base no estado.
+   */
+  _computeDelay() {
+    if (this.state === KernelLoopState.DEGRADED) {
+      return this.baseIntervalMs * 2;
+    }
+
+    return this.baseIntervalMs;
+  }
+
+  /* ===========================
+     OBSERVABILIDADE
+  =========================== */
+
+  /**
+   * Retorna status técnico do loop.
+   */
+  getStatus() {
+    return Object.freeze({
+      state: this.state,
+      ticks: this._tickCounter,
+      lastTickAt: this._lastTickAt,
+      running: this._running,
+      baseIntervalMs: this.baseIntervalMs
+    });
+  }
+}
+
+module.exports = {
+  KernelLoop,
+  KernelLoopState
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/nerv_bridge/kernel_nerv_bridge.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: nerv_bridge/
+   Arquivo: kernel_nerv_bridge.js
+   
+   Papel:
+   - Integrar o Kernel ao NERV como camada de comunicação IPC
+   - Receber EVENTs do mundo e encaminhá-los ao ObservationStore
+   - Emitir COMMANDs do Kernel via NERV
+   - Traduzir entre semântica do Kernel e estrutura do NERV
+   
+   IMPORTANTE:
+   - NÃO decide nada
+   - NÃO interpreta payload dos envelopes
+   - NÃO valida verdade semântica
+   - NÃO fecha causalidade
+   - Atua apenas como ponte estrutural
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const { v4: uuidv4 } = require('uuid');
+
+/* ===========================
+   Utilitários internos
+=========================== */
+
+/**
+ * Valida envelope recebido do NERV.
+ */
+function isValidEnvelope(envelope) {
+  return (
+    envelope &&
+    envelope.header &&
+    envelope.ids &&
+    envelope.kind &&
+    envelope.payload
+  );
+}
+
+/**
+ * Extrai dados estruturais do envelope de forma segura.
+ */
+function extractEnvelopeData(envelope) {
+  return {
+    msgId: envelope.ids?.msg_id ?? null,
+    correlationId: envelope.ids?.correlation_id ?? null,
+    source: envelope.header?.source ?? 'unknown',
+    timestamp: envelope.header?.timestamp ?? Date.now(),
+    kind: envelope.kind,
+    payload: envelope.payload
+  };
+}
+
+/* ===========================
+   Fábrica da Ponte KERNEL↔NERV
+=========================== */
+
+/**
+ * Cria a ponte de integração entre Kernel e NERV.
+ * 
+ * @param {Object} deps
+ * @param {Object} deps.nerv
+ * Instância do NERV já configurada.
+ * 
+ * @param {Object} deps.taskRuntime
+ * Instância do TaskRuntime.
+ * 
+ * @param {Object} deps.observationStore
+ * Instância do ObservationStore.
+ * 
+ * @param {Object} deps.telemetry
+ * Canal de telemetria do Kernel.
+ */
+class KernelNERVBridge {
+  constructor({
+    nerv,
+    taskRuntime,
+    observationStore,
+    telemetry
+  }) {
+    if (!nerv) {
+      throw new Error('KernelNERVBridge requer instância do NERV');
+    }
+
+    if (!taskRuntime) {
+      throw new Error('KernelNERVBridge requer TaskRuntime');
+    }
+
+    if (!observationStore) {
+      throw new Error('KernelNERVBridge requer ObservationStore');
+    }
+
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+      throw new Error('KernelNERVBridge requer telemetria válida');
+    }
+
+    this.nerv = nerv;
+    this.taskRuntime = taskRuntime;
+    this.observationStore = observationStore;
+    this.telemetry = telemetry;
+
+    this.started = false;
+    this.unsubscribe = null;
+  }
+
+  /* ===========================
+     LIFECYCLE
+  =========================== */
+
+  /**
+   * Inicia a ponte, registrando handlers no NERV.
+   */
+  start() {
+    if (this.started) {
+      this.telemetry.warning('nerv_bridge_already_started');
+      return;
+    }
+
+    this.telemetry.info('nerv_bridge_starting', {
+      at: Date.now()
+    });
+
+    // Registra handler de recepção de envelopes
+    this.unsubscribe = this.nerv.onReceive((envelope) => {
+      this._handleInboundEnvelope(envelope);
+    });
+
+    this.started = true;
+
+    this.telemetry.info('nerv_bridge_started', {
+      at: Date.now()
+    });
+  }
+
+  /**
+   * Para a ponte, desregistrando handlers.
+   */
+  stop() {
+    if (!this.started) {
+      this.telemetry.warning('nerv_bridge_already_stopped');
+      return;
+    }
+
+    this.telemetry.info('nerv_bridge_stopping', {
+      at: Date.now()
+    });
+
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+
+    this.started = false;
+
+    this.telemetry.info('nerv_bridge_stopped', {
+      at: Date.now()
+    });
+  }
+
+  /* ===========================
+     RECEPÇÃO DE ENVELOPES (INBOUND)
+  =========================== */
+
+  /**
+   * Processa envelope recebido do NERV.
+   * 
+   * IMPORTANTE:
+   * - Apenas EVENTs são processados (fatos do mundo)
+   * - ACKs são ignorados (confirmações físicas)
+   * - COMMANDs recebidos são anomalia (Kernel não recebe comandos)
+   */
+  _handleInboundEnvelope(envelope) {
+    if (!isValidEnvelope(envelope)) {
+      this.telemetry.warning('nerv_bridge_invalid_envelope', {
+        at: Date.now()
+      });
+      return;
+    }
+
+    const data = extractEnvelopeData(envelope);
+
+    this.telemetry.info('nerv_bridge_envelope_received', {
+      kind: data.kind,
+      msgId: data.msgId,
+      correlationId: data.correlationId,
+      at: Date.now()
+    });
+
+    // Apenas EVENTs são fatos do mundo
+    if (data.kind === 'EVENT') {
+      this._processEvent(envelope, data);
+      return;
+    }
+
+    // ACKs são confirmações físicas (ignoradas semanticamente)
+    if (data.kind === 'ACK') {
+      this.telemetry.info('nerv_bridge_ack_received', {
+        msgId: data.msgId,
+        at: Date.now()
+      });
+      return;
+    }
+
+    // COMMANDs recebidos são anomalia
+    if (data.kind === 'COMMAND') {
+      this.telemetry.warning('nerv_bridge_unexpected_command', {
+        msgId: data.msgId,
+        source: data.source,
+        at: Date.now()
+      });
+      return;
+    }
+
+    // Tipo desconhecido
+    this.telemetry.warning('nerv_bridge_unknown_envelope_kind', {
+      kind: data.kind,
+      at: Date.now()
+    });
+  }
+
+  /**
+   * Processa EVENT recebido, encaminhando ao ObservationStore.
+   */
+  _processEvent(envelope, data) {
+    try {
+      // Delega ingestão ao ObservationStore
+      this.observationStore.ingestEvent(envelope);
+
+      this.telemetry.info('nerv_bridge_event_ingested', {
+        msgId: data.msgId,
+        correlationId: data.correlationId,
+        at: Date.now()
+      });
+    } catch (error) {
+      this.telemetry.critical('nerv_bridge_event_ingestion_failed', {
+        msgId: data.msgId,
+        error: error.message,
+        at: Date.now()
+      });
+    }
+  }
+
+  /* ===========================
+     EMISSÃO DE ENVELOPES (OUTBOUND)
+  =========================== */
+
+  /**
+   * Emite um COMMAND via NERV.
+   * 
+   * @param {Object} params
+   * @param {string} params.target
+   * Destinatário do comando (ex.: 'driver', 'server').
+   * 
+   * @param {string} params.correlationId
+   * ID de correlação (vincula a uma tarefa).
+   * 
+   * @param {Object} params.payload
+   * Payload opaco do comando.
+   */
+  emitCommand({ target, correlationId, payload }) {
+    if (!this.started) {
+      throw new Error('KernelNERVBridge não iniciada');
+    }
+
+    const msgId = uuidv4();
+
+    const envelope = {
+      header: {
+        version: 1,
+        timestamp: Date.now(),
+        source: 'kernel',
+        target
+      },
+      ids: {
+        msg_id: msgId,
+        correlation_id: correlationId
+      },
+      kind: 'COMMAND',
+      payload
+    };
+
+    try {
+      this.nerv.emitCommand(envelope);
+
+      this.telemetry.info('nerv_bridge_command_emitted', {
+        msgId,
+        correlationId,
+        target,
+        at: Date.now()
+      });
+    } catch (error) {
+      this.telemetry.critical('nerv_bridge_command_emission_failed', {
+        msgId,
+        correlationId,
+        error: error.message,
+        at: Date.now()
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Emite um EVENT via NERV.
+   * 
+   * @param {Object} params
+   * @param {string} [params.target]
+   * Destinatário opcional (broadcast se ausente).
+   * 
+   * @param {string} params.correlationId
+   * ID de correlação.
+   * 
+   * @param {Object} params.payload
+   * Payload opaco do evento.
+   */
+  emitEvent({ target = null, correlationId, payload }) {
+    if (!this.started) {
+      throw new Error('KernelNERVBridge não iniciada');
+    }
+
+    const msgId = uuidv4();
+
+    const envelope = {
+      header: {
+        version: 1,
+        timestamp: Date.now(),
+        source: 'kernel',
+        ...(target && { target })
+      },
+      ids: {
+        msg_id: msgId,
+        correlation_id: correlationId
+      },
+      kind: 'EVENT',
+      payload
+    };
+
+    try {
+      this.nerv.emitEvent(envelope);
+
+      this.telemetry.info('nerv_bridge_event_emitted', {
+        msgId,
+        correlationId,
+        target: target ?? 'broadcast',
+        at: Date.now()
+      });
+    } catch (error) {
+      this.telemetry.critical('nerv_bridge_event_emission_failed', {
+        msgId,
+        correlationId,
+        error: error.message,
+        at: Date.now()
+      });
+
+      throw error;
+    }
+  }
+
+  /* ===========================
+     OBSERVABILIDADE
+  =========================== */
+
+  /**
+   * Retorna status técnico da ponte.
+   */
+  getStatus() {
+    return Object.freeze({
+      started: this.started,
+      nerv: this.nerv ? 'connected' : 'disconnected'
+    });
+  }
+}
+
+module.exports = {
+  KernelNERVBridge
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/observation_store/observation_store.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: observation_store/
+   Arquivo: observation_store.js
+   
+   Papel:
+   - Registrar EVENTs como fatos históricos imutáveis
+   - Preservar atraso, duplicação e contradição
+   - Indexar observações por correlation_id
+   - Fornecer leitura imutável para o ExecutionEngine
+   
+   IMPORTANTE:
+   - NÃO decide
+   - NÃO interpreta EVENTs semanticamente
+   - NÃO valida veracidade
+   - NÃO encerra tarefas
+   - NÃO comunica via IPC
+   - NÃO espera EVENTs
+   
+   Princípios:
+   - Neutralidade absoluta
+   - Imutabilidade semântica
+   - Causalidade aberta
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const EventEmitter = require('events');
+
+/* ===========================
+   Estrutura de Registro de Observação
+=========================== */
+
+/**
+ * Cria registro imutável de uma observação.
+ * 
+ * @param {Object} params
+ * @returns {Object}
+ */
+function createObservationRecord({
+  msgId,
+  correlationId,
+  source,
+  payload,
+  originalTimestamp
+}) {
+  return Object.freeze({
+    msgId,
+    correlationId,
+    source,
+    payload: Object.freeze(payload),
+    originalTimestamp: originalTimestamp ?? null,
+    ingestedAt: Date.now()
+  });
+}
+
+/* ===========================
+   Fábrica do ObservationStore
+=========================== */
+
+class ObservationStore extends EventEmitter {
+  /**
+   * @param {Object} params
+   * @param {Object} params.telemetry
+   * Canal de telemetria do Kernel.
+   * 
+   * @param {number} [params.maxObservationsPerCorrelation]
+   * Limite técnico opcional (default: sem limite).
+   */
+  constructor({
+    telemetry,
+    maxObservationsPerCorrelation = null
+  }) {
+    super();
+
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+      throw new Error('ObservationStore requer telemetria válida');
+    }
+
+    this.telemetry = telemetry;
+    this.maxObservationsPerCorrelation = maxObservationsPerCorrelation;
+
+    /**
+     * Armazenamento primário:
+     * correlation_id -> lista de observações (ordem de chegada)
+     */
+    this.byCorrelation = new Map();
+
+    /**
+     * Índice auxiliar para detecção de duplicação:
+     * msg_id -> true
+     */
+    this.seenMsgIds = new Set();
+
+    /**
+     * Índice temporal:
+     * Array de [timestamp, correlationId] para queries temporais
+     */
+    this.temporalIndex = [];
+  }
+
+  /* ===========================
+     INGESTÃO DE EVENTs
+  =========================== */
+
+  /**
+   * Ingere um EVENT como fato observado.
+   * 
+   * @param {Object} eventEnvelope
+   * Envelope IPC do tipo EVENT.
+   * 
+   * Regras:
+   * - EVENT nunca é rejeitado por atraso
+   * - EVENT nunca é rejeitado por duplicação
+   * - EVENT nunca é interpretado
+   * 
+   * @returns {Object}
+   * Registro criado.
+   */
+  ingestEvent(eventEnvelope) {
+    if (!eventEnvelope || typeof eventEnvelope !== 'object') {
+      throw new Error('ingestEvent requer envelope válido');
+    }
+
+    const { ids, header, payload } = eventEnvelope;
+
+    if (!ids || !ids.msg_id || !ids.correlation_id) {
+      throw new Error('EVENT inválido: ids ausentes');
+    }
+
+    const msgId = ids.msg_id;
+    const correlationId = ids.correlation_id;
+    const source = header?.source ?? 'unknown';
+    const originalTimestamp = header?.timestamp ?? null;
+
+    const isDuplicate = this.seenMsgIds.has(msgId);
+
+    const record = createObservationRecord({
+      msgId,
+      correlationId,
+      source,
+      payload,
+      originalTimestamp
+    });
+
+    // Inicializa lista de observações se necessário
+    if (!this.byCorrelation.has(correlationId)) {
+      this.byCorrelation.set(correlationId, []);
+    }
+
+    const observations = this.byCorrelation.get(correlationId);
+
+    // Verifica limite técnico (se configurado)
+    if (
+      this.maxObservationsPerCorrelation !== null &&
+      observations.length >= this.maxObservationsPerCorrelation
+    ) {
+      this.telemetry.warning('observation_store_limit_exceeded', {
+        correlationId,
+        limit: this.maxObservationsPerCorrelation,
+        at: Date.now()
+      });
+
+      // Remove observação mais antiga (FIFO técnico)
+      const discarded = observations.shift();
+
+      this.telemetry.info('observation_store_observation_discarded', {
+        correlationId,
+        discardedMsgId: discarded.msgId,
+        at: Date.now()
+      });
+    }
+
+    // Adiciona observação
+    observations.push(record);
+    this.seenMsgIds.add(msgId);
+
+    // Atualiza índice temporal
+    this.temporalIndex.push([record.ingestedAt, correlationId]);
+
+    // Limpa índice temporal se muito grande (mantém últimas 10000 entradas)
+    if (this.temporalIndex.length > 10000) {
+      this.temporalIndex = this.temporalIndex.slice(-10000);
+    }
+
+    // Telemetria de ingestão
+    this.telemetry.info('observation_store_event_ingested', {
+      msgId,
+      correlationId,
+      source,
+      duplicate: isDuplicate,
+      at: record.ingestedAt
+    });
+
+    if (isDuplicate) {
+      this.telemetry.warning('observation_store_duplicate_detected', {
+        msgId,
+        correlationId,
+        at: record.ingestedAt
+      });
+    }
+
+    // Emite evento para observadores
+    this.emit('observation_ingested', {
+      record,
+      isDuplicate
+    });
+
+    return record;
+  }
+
+  /* ===========================
+     CONSULTAS (SOMENTE LEITURA)
+  =========================== */
+
+  /**
+   * Retorna todas as observações de uma correlação.
+   * 
+   * @param {string} correlationId
+   * @returns {Array<Object>}
+   * Lista imutável de observações.
+   */
+  getByCorrelation(correlationId) {
+    const list = this.byCorrelation.get(correlationId);
+    if (!list) return Object.freeze([]);
+
+    return Object.freeze([...list]);
+  }
+
+  /**
+   * Retorna observações em intervalo temporal.
+   * 
+   * @param {Object} params
+   * @param {number} params.startAt
+   * @param {number} params.endAt
+   * @returns {Array<Object>}
+   */
+  getByTimeRange({ startAt, endAt }) {
+    const results = [];
+
+    for (const [timestamp, correlationId] of this.temporalIndex) {
+      if (timestamp >= startAt && timestamp <= endAt) {
+        const observations = this.getByCorrelation(correlationId);
+        results.push(...observations.filter(
+          obs => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt
+        ));
+      }
+    }
+
+    return Object.freeze(results);
+  }
+
+  /**
+   * Retorna última observação de uma correlação.
+   * 
+   * @param {string} correlationId
+   * @returns {Object|null}
+   */
+  getLastObservation(correlationId) {
+    const list = this.byCorrelation.get(correlationId);
+    if (!list || list.length === 0) return null;
+
+    return list[list.length - 1];
+  }
+
+  /**
+   * Verifica se correlação existe.
+   * 
+   * @param {string} correlationId
+   * @returns {boolean}
+   */
+  hasCorrelation(correlationId) {
+    return this.byCorrelation.has(correlationId);
+  }
+
+  /**
+   * Retorna contagem de observações por correlação.
+   * 
+   * @param {string} correlationId
+   * @returns {number}
+   */
+  countObservations(correlationId) {
+    const list = this.byCorrelation.get(correlationId);
+    return list ? list.length : 0;
+  }
+
+  /**
+   * Lista todas as observações (uso em auditoria).
+   * 
+   * @returns {Array<Object>}
+   */
+  listAll() {
+    const all = [];
+    for (const list of this.byCorrelation.values()) {
+      all.push(...list);
+    }
+    return Object.freeze(all);
+  }
+
+  /**
+   * Lista todas as correlation_ids ativas.
+   * 
+   * @returns {Array<string>}
+   */
+  listCorrelations() {
+    return Array.from(this.byCorrelation.keys());
+  }
+
+  /**
+   * Retorna estatísticas técnicas.
+   * 
+   * @returns {Object}
+   */
+  getStats() {
+    let totalObservations = 0;
+    let maxObservationsInCorrelation = 0;
+
+    for (const list of this.byCorrelation.values()) {
+      totalObservations += list.length;
+      maxObservationsInCorrelation = Math.max(
+        maxObservationsInCorrelation,
+        list.length
+      );
+    }
+
+    return Object.freeze({
+      correlations: this.byCorrelation.size,
+      observations: totalObservations,
+      uniqueMsgIds: this.seenMsgIds.size,
+      maxObservationsInCorrelation,
+      temporalIndexSize: this.temporalIndex.length
+    });
+  }
+
+  /* ===========================
+     LIMPEZA TÉCNICA (OPCIONAL)
+  =========================== */
+
+  /**
+   * Remove correlação completa (uso técnico/diagnóstico).
+   * 
+   * @param {string} correlationId
+   */
+  purgeCorrelation(correlationId) {
+    const existed = this.byCorrelation.has(correlationId);
+
+    if (existed) {
+      this.byCorrelation.delete(correlationId);
+
+      this.telemetry.info('observation_store_correlation_purged', {
+        correlationId,
+        at: Date.now()
+      });
+    }
+  }
+
+  /**
+   * Limpa observações antigas por critério temporal.
+   * 
+   * @param {Object} params
+   * @param {number} params.olderThan
+   * Timestamp limite.
+   */
+  purgeOlderThan({ olderThan }) {
+    let purgedCount = 0;
+
+    for (const [correlationId, observations] of this.byCorrelation.entries()) {
+      const filtered = observations.filter(
+        obs => obs.ingestedAt >= olderThan
+      );
+
+      purgedCount += observations.length - filtered.length;
+
+      if (filtered.length === 0) {
+        this.byCorrelation.delete(correlationId);
+      } else if (filtered.length < observations.length) {
+        this.byCorrelation.set(correlationId, filtered);
+      }
+    }
+
+    this.telemetry.info('observation_store_purged_old', {
+      purgedCount,
+      olderThan,
+      at: Date.now()
+    });
+  }
+}
+
+module.exports = {
+  ObservationStore
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/policy_engine/policy_engine.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: policy_engine/
+   Arquivo: policy_engine.js
+   
+   Papel:
+   - Avaliar riscos, limites e condições internas
+   - Emitir alertas normativos consultivos
+   - Aconselhar o ExecutionEngine (não decide)
+   - Aplicar políticas configuráveis
+   
+   IMPORTANTE:
+   - NÃO decide
+   - NÃO executa ações
+   - NÃO controla tempo
+   - NÃO interpreta EVENTs
+   - NÃO comunica via IPC
+   
+   Toda saída é:
+   - Consultiva
+   - Sem efeito colateral
+   - Semanticamente neutra
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+/* ===========================
+   Níveis Normativos
+=========================== */
+
+const PolicyLevel = Object.freeze({
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL'
+});
+
+/* ===========================
+   Tipos de Alerta Normativo
+=========================== */
+
+const PolicyAlertType = Object.freeze({
+  BUDGET_PRESSURE: 'BUDGET_PRESSURE',
+  OBSERVATION_INCONSISTENCY: 'OBSERVATION_INCONSISTENCY',
+  OBSERVATION_VOLUME: 'OBSERVATION_VOLUME',
+  TASK_STAGNATION: 'TASK_STAGNATION',
+  TASK_AGE_EXCEEDED: 'TASK_AGE_EXCEEDED',
+  CONFIGURATION_RISK: 'CONFIGURATION_RISK',
+  OBSERVATION_GAP: 'OBSERVATION_GAP',
+  DUPLICATE_OBSERVATIONS: 'DUPLICATE_OBSERVATIONS'
+});
+
+/* ===========================
+   Fábrica do PolicyEngine
+=========================== */
+
+class PolicyEngine {
+  /**
+   * @param {Object} params
+   * @param {Object} params.telemetry
+   * Canal de telemetria do Kernel.
+   * 
+   * @param {Object} [params.limits]
+   * Limites técnicos/configuracionais.
+   */
+  constructor({ telemetry, limits = {} }) {
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+      throw new Error('PolicyEngine requer telemetria válida');
+    }
+
+    this.telemetry = telemetry;
+
+    /**
+     * Limites normativos configuráveis.
+     */
+    this.limits = {
+      maxObservationsPerTask: limits.maxObservationsPerTask ?? 1000,
+      maxTaskAgeMs: limits.maxTaskAgeMs ?? 300000, // 5 minutos
+      maxStalledCycles: limits.maxStalledCycles ?? 10,
+      maxObservationGapMs: limits.maxObservationGapMs ?? 30000, // 30 segundos
+      maxDuplicateRatio: limits.maxDuplicateRatio ?? 0.3, // 30%
+      ...limits
+    };
+  }
+
+  /* ===========================
+     AVALIAÇÃO NORMATIVA (PONTO ÚNICO)
+  =========================== */
+
+  /**
+   * Avalia normativamente uma tarefa no contexto atual.
+   * 
+   * @param {Object} params
+   * @param {Object} params.task
+   * Snapshot imutável da tarefa.
+   * 
+   * @param {Array} params.observations
+   * Lista de observações correlacionadas.
+   * 
+   * @param {number} params.at
+   * Timestamp do ciclo lógico.
+   * 
+   * @returns {Object}
+   * Avaliação normativa consultiva.
+   */
+  assess({ task, observations, at }) {
+    const alerts = [];
+
+    // 1. Avaliação de volume de observações
+    this._assessObservationVolume(task, observations, alerts);
+
+    // 2. Avaliação de idade da tarefa
+    this._assessTaskAge(task, at, alerts);
+
+    // 3. Avaliação de gaps de observação
+    this._assessObservationGaps(task, observations, at, alerts);
+
+    // 4. Avaliação de duplicação
+    this._assessDuplication(observations, alerts);
+
+    // 5. Avaliação de risco configuracional
+    this._assessConfigurationRisk(task, observations, alerts);
+
+    // 6. Avaliação de estagnação
+    this._assessStagnation(task, observations, at, alerts);
+
+    // Calcula nível normativo
+    const level = this._computeLevel(alerts);
+
+    const assessment = Object.freeze({
+      level,
+      alerts: Object.freeze(alerts),
+      at
+    });
+
+    // Telemetria normativa
+    this.telemetry.info('policy_engine_assessment_complete', {
+      taskId: task.taskId,
+      level,
+      alertsCount: alerts.length,
+      at
+    });
+
+    return assessment;
+  }
+
+  /* ===========================
+     AVALIAÇÕES ESPECÍFICAS
+  =========================== */
+
+  /**
+   * Avalia pressão por volume de observações.
+   */
+  _assessObservationVolume(task, observations, alerts) {
+    if (observations.length > this.limits.maxObservationsPerTask) {
+      alerts.push(Object.freeze({
+        type: PolicyAlertType.OBSERVATION_VOLUME,
+        message: 'Volume elevado de observações para a tarefa',
+        value: observations.length,
+        limit: this.limits.maxObservationsPerTask,
+        severity: 'HIGH'
+      }));
+    }
+  }
+
+  /**
+   * Avalia idade lógica da tarefa.
+   */
+  _assessTaskAge(task, at, alerts) {
+    if (this.limits.maxTaskAgeMs !== null) {
+      const ageMs = at - task.createdAt;
+
+      if (ageMs > this.limits.maxTaskAgeMs) {
+        alerts.push(Object.freeze({
+          type: PolicyAlertType.TASK_AGE_EXCEEDED,
+          message: 'Tarefa com idade lógica elevada',
+          value: ageMs,
+          limit: this.limits.maxTaskAgeMs,
+          severity: 'CRITICAL'
+        }));
+      }
+    }
+  }
+
+  /**
+   * Avalia gaps temporais entre observações.
+   */
+  _assessObservationGaps(task, observations, at, alerts) {
+    if (observations.length === 0) return;
+
+    // Ordena por timestamp de ingestão
+    const sorted = [...observations].sort((a, b) => 
+      a.ingestedAt - b.ingestedAt
+    );
+
+    const lastObs = sorted[sorted.length - 1];
+    const gapMs = at - lastObs.ingestedAt;
+
+    if (
+      this.limits.maxObservationGapMs !== null &&
+      gapMs > this.limits.maxObservationGapMs &&
+      task.state === 'ACTIVE'
+    ) {
+      alerts.push(Object.freeze({
+        type: PolicyAlertType.OBSERVATION_GAP,
+        message: 'Gap temporal excessivo desde última observação',
+        value: gapMs,
+        limit: this.limits.maxObservationGapMs,
+        severity: 'MEDIUM'
+      }));
+    }
+  }
+
+  /**
+   * Avalia taxa de duplicação de observações.
+   */
+  _assessDuplication(observations, alerts) {
+    if (observations.length === 0) return;
+
+    const msgIds = new Set();
+    let duplicates = 0;
+
+    for (const obs of observations) {
+      if (msgIds.has(obs.msgId)) {
+        duplicates++;
+      } else {
+        msgIds.add(obs.msgId);
+      }
+    }
+
+    const duplicateRatio = duplicates / observations.length;
+
+    if (
+      this.limits.maxDuplicateRatio !== null &&
+      duplicateRatio > this.limits.maxDuplicateRatio
+    ) {
+      alerts.push(Object.freeze({
+        type: PolicyAlertType.DUPLICATE_OBSERVATIONS,
+        message: 'Taxa elevada de observações duplicadas',
+        value: duplicateRatio,
+        limit: this.limits.maxDuplicateRatio,
+        severity: 'MEDIUM'
+      }));
+    }
+  }
+
+  /**
+   * Avalia risco configuracional.
+   */
+  _assessConfigurationRisk(task, observations, alerts) {
+    // Tarefa suspensa com observações acumuladas
+    if (task.state === 'SUSPENDED' && observations.length > 0) {
+      alerts.push(Object.freeze({
+        type: PolicyAlertType.CONFIGURATION_RISK,
+        message: 'Tarefa suspensa com observações acumuladas',
+        value: observations.length,
+        severity: 'LOW'
+      }));
+    }
+
+    // Tarefa criada há muito tempo sem ativação
+    const ageMs = Date.now() - task.createdAt;
+    if (task.state === 'CREATED' && ageMs > 60000) { // 1 minuto
+      alerts.push(Object.freeze({
+        type: PolicyAlertType.CONFIGURATION_RISK,
+        message: 'Tarefa criada mas não ativada após tempo limite',
+        value: ageMs,
+        severity: 'MEDIUM'
+      }));
+    }
+  }
+
+  /**
+   * Avalia estagnação lógica.
+   */
+  _assessStagnation(task, observations, at, alerts) {
+    // Tarefa ativa sem progresso recente
+    if (task.state === 'ACTIVE' && observations.length > 0) {
+      const sorted = [...observations].sort((a, b) => 
+        a.ingestedAt - b.ingestedAt
+      );
+
+      const lastObs = sorted[sorted.length - 1];
+      const stalledMs = at - lastObs.ingestedAt;
+
+      if (stalledMs > 120000) { // 2 minutos sem progresso
+        alerts.push(Object.freeze({
+          type: PolicyAlertType.TASK_STAGNATION,
+          message: 'Tarefa ativa sem progresso recente',
+          value: stalledMs,
+          severity: 'HIGH'
+        }));
+      }
+    }
+  }
+
+  /* ===========================
+     CÁLCULO DO NÍVEL NORMATIVO
+  =========================== */
+
+  /**
+   * Calcula nível normativo a partir dos alertas.
+   * 
+   * @param {Array<Object>} alerts
+   * @returns {string}
+   */
+  _computeLevel(alerts) {
+    if (alerts.length === 0) {
+      return PolicyLevel.LOW;
+    }
+
+    const severities = alerts.map(a => a.severity);
+
+    // Se há algum CRITICAL, nível é CRITICAL
+    if (severities.includes('CRITICAL')) {
+      return PolicyLevel.CRITICAL;
+    }
+
+    // Se há algum HIGH, nível é HIGH
+    if (severities.includes('HIGH')) {
+      return PolicyLevel.HIGH;
+    }
+
+    // Se há mais de 3 MEDIUM, nível é HIGH
+    const mediumCount = severities.filter(s => s === 'MEDIUM').length;
+    if (mediumCount >= 3) {
+      return PolicyLevel.HIGH;
+    }
+
+    // Se há algum MEDIUM, nível é MEDIUM
+    if (severities.includes('MEDIUM')) {
+      return PolicyLevel.MEDIUM;
+    }
+
+    // Caso contrário, LOW
+    return PolicyLevel.LOW;
+  }
+
+  /* ===========================
+     CONFIGURAÇÃO DINÂMICA
+  =========================== */
+
+  /**
+   * Atualiza limites normativos em tempo de execução.
+   * 
+   * @param {Object} newLimits
+   */
+  updateLimits(newLimits) {
+    Object.assign(this.limits, newLimits);
+
+    this.telemetry.info('policy_engine_limits_updated', {
+      limits: this.limits,
+      at: Date.now()
+    });
+  }
+
+  /**
+   * Retorna limites atuais.
+   * 
+   * @returns {Object}
+   */
+  getLimits() {
+    return Object.freeze({ ...this.limits });
+  }
+}
+
+module.exports = {
+  PolicyEngine,
+  PolicyLevel,
+  PolicyAlertType
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/task_runtime/task_runtime.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: task_runtime/
+   Arquivo: task_runtime.js
+   
+   Papel:
+   - Manter a existência lógica contínua das tarefas
+   - Registrar transições de estado por decisão explícita
+   - Preservar histórico interno imutável
+   - Fornecer snapshots thread-safe
+   
+   IMPORTANTE:
+   - NÃO decide (apenas registra decisões)
+   - NÃO executa (apenas mantém estado lógico)
+   - NÃO observa EVENTs (isso é papel do ObservationStore)
+   - NÃO interpreta silêncio ou timeout
+   - NÃO comunica via IPC
+   
+   Toda mutação ocorre SOMENTE por ordem explícita do ExecutionEngine.
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const EventEmitter = require('events');
+
+/* ===========================
+   Estados lógicos de tarefa
+=========================== */
+
+const TaskState = Object.freeze({
+  CREATED: 'CREATED',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  TERMINATED: 'TERMINATED'
+});
+
+/* ===========================
+   Transições permitidas
+=========================== */
+
+const ALLOWED_TRANSITIONS = Object.freeze({
+  [TaskState.CREATED]: [TaskState.ACTIVE, TaskState.TERMINATED],
+  [TaskState.ACTIVE]: [TaskState.SUSPENDED, TaskState.TERMINATED],
+  [TaskState.SUSPENDED]: [TaskState.ACTIVE, TaskState.TERMINATED],
+  [TaskState.TERMINATED]: []
+});
+
+/* ===========================
+   Fábrica do TaskRuntime
+=========================== */
+
+class TaskRuntime extends EventEmitter {
+  /**
+   * @param {Object} params
+   * @param {Object} params.telemetry
+   * Canal de telemetria do Kernel.
+   */
+  constructor({ telemetry }) {
+    super();
+
+    if (!telemetry || typeof telemetry.emit !== 'function') {
+      throw new Error('TaskRuntime requer telemetria válida');
+    }
+
+    this.telemetry = telemetry;
+
+    /**
+     * Armazenamento interno de tarefas.
+     * taskId -> estrutura da tarefa
+     */
+    this.tasks = new Map();
+  }
+
+  /* ===========================
+     CRIAÇÃO DE TAREFA
+  =========================== */
+
+  /**
+   * Cria uma nova tarefa lógica.
+   * 
+   * @param {Object} params
+   * @param {string} params.taskId
+   * Identificador único da tarefa.
+   * 
+   * @param {Object} [params.metadata]
+   * Metadados iniciais (livre, não interpretado pelo TaskRuntime).
+   * 
+   * @returns {Object}
+   * Snapshot imutável da tarefa criada.
+   */
+  createTask({ taskId, metadata = {} }) {
+    if (!taskId || typeof taskId !== 'string') {
+      throw new Error('createTask requer taskId válido');
+    }
+
+    if (this.tasks.has(taskId)) {
+      throw new Error(`Tarefa ${taskId} já existe`);
+    }
+
+    const now = Date.now();
+
+    const task = {
+      taskId,
+      state: TaskState.CREATED,
+      createdAt: now,
+      updatedAt: now,
+
+      /**
+       * Histórico interno da tarefa.
+       * Lista de eventos técnicos (não semânticos).
+       */
+      history: [],
+
+      /**
+       * Metadados livres.
+       * Definidos externamente, nunca interpretados aqui.
+       */
+      metadata: { ...metadata }
+    };
+
+    this.tasks.set(taskId, task);
+
+    this._recordHistory(task, {
+      type: 'TASK_CREATED',
+      at: now
+    });
+
+    this.telemetry.info('task_runtime_task_created', {
+      taskId,
+      state: task.state,
+      at: now
+    });
+
+    // Emite evento para observadores externos
+    this.emit('task_created', this._snapshot(task));
+
+    return this._snapshot(task);
+  }
+
+  /* ===========================
+     TRANSIÇÕES DE ESTADO
+  =========================== */
+
+  /**
+   * Aplica transição de estado explícita.
+   * 
+   * @param {Object} params
+   * @param {string} params.taskId
+   * @param {string} params.newState
+   * Estado alvo.
+   * 
+   * @param {string} params.reason
+   * Descrição da decisão que motivou a transição.
+   * 
+   * @returns {Object}
+   * Snapshot atualizado da tarefa.
+   */
+  applyStateTransition({ taskId, newState, reason }) {
+    const task = this._getTaskOrThrow(taskId);
+
+    if (!Object.values(TaskState).includes(newState)) {
+      throw new Error(`Estado inválido: ${newState}`);
+    }
+
+    if (task.state === TaskState.TERMINATED) {
+      throw new Error(
+        `Tarefa ${taskId} já está TERMINATED e não pode mudar de estado`
+      );
+    }
+
+    if (!this._isTransitionAllowed(task.state, newState)) {
+      throw new Error(
+        `Transição não permitida: ${task.state} → ${newState}`
+      );
+    }
+
+    const now = Date.now();
+    const previousState = task.state;
+
+    task.state = newState;
+    task.updatedAt = now;
+
+    this._recordHistory(task, {
+      type: 'STATE_TRANSITION',
+      from: previousState,
+      to: newState,
+      reason,
+      at: now
+    });
+
+    this.telemetry.info('task_runtime_state_changed', {
+      taskId,
+      from: previousState,
+      to: newState,
+      reason,
+      at: now
+    });
+
+    // Emite evento para observadores
+    this.emit('task_state_changed', {
+      taskId,
+      from: previousState,
+      to: newState,
+      reason,
+      snapshot: this._snapshot(task)
+    });
+
+    return this._snapshot(task);
+  }
+
+  /* ===========================
+     REGISTROS HISTÓRICOS
+  =========================== */
+
+  /**
+   * Registra referência histórica a uma intenção (COMMAND emitido).
+   * NÃO cria expectativa semântica.
+   * 
+   * @param {Object} params
+   * @param {string} params.taskId
+   * @param {Object} params.intent
+   * Descrição da intenção registrada.
+   */
+  recordIntentReference({ taskId, intent }) {
+    const task = this._getTaskOrThrow(taskId);
+
+    this._recordHistory(task, {
+      type: 'INTENT_REFERENCED',
+      intent,
+      at: Date.now()
+    });
+
+    this.telemetry.info('task_runtime_intent_referenced', {
+      taskId,
+      intent: intent?.kind ?? 'unknown'
+    });
+  }
+
+  /**
+   * Registra referência histórica a uma observação (EVENT considerado).
+   * NÃO interpreta o EVENT.
+   * 
+   * @param {Object} params
+   * @param {string} params.taskId
+   * @param {Object} params.observation
+   * Referência à observação.
+   */
+  recordObservationReference({ taskId, observation }) {
+    const task = this._getTaskOrThrow(taskId);
+
+    this._recordHistory(task, {
+      type: 'OBSERVATION_REFERENCED',
+      observation: observation?.msgId ?? 'unknown',
+      at: Date.now()
+    });
+
+    this.telemetry.info('task_runtime_observation_referenced', {
+      taskId,
+      observationId: observation?.msgId ?? 'unknown'
+    });
+  }
+
+  /**
+   * Atualiza metadados de uma tarefa.
+   * 
+   * @param {Object} params
+   * @param {string} params.taskId
+   * @param {Object} params.metadata
+   * Novos metadados (merge com existentes).
+   */
+  updateMetadata({ taskId, metadata }) {
+    const task = this._getTaskOrThrow(taskId);
+
+    Object.assign(task.metadata, metadata);
+    task.updatedAt = Date.now();
+
+    this._recordHistory(task, {
+      type: 'METADATA_UPDATED',
+      at: task.updatedAt
+    });
+
+    this.telemetry.info('task_runtime_metadata_updated', {
+      taskId,
+      at: task.updatedAt
+    });
+  }
+
+  /* ===========================
+     CONSULTAS (SOMENTE LEITURA)
+  =========================== */
+
+  /**
+   * Retorna snapshot imutável de uma tarefa.
+   * 
+   * @param {string} taskId
+   * @returns {Object|null}
+   */
+  getTask(taskId) {
+    const task = this.tasks.get(taskId);
+    if (!task) return null;
+    return this._snapshot(task);
+  }
+
+  /**
+   * Lista todas as tarefas existentes.
+   * 
+   * @returns {Array<Object>}
+   */
+  listTasks() {
+    return Array.from(this.tasks.values()).map(t => this._snapshot(t));
+  }
+
+  /**
+   * Filtra tarefas por estado.
+   * 
+   * @param {string} state
+   * @returns {Array<Object>}
+   */
+  listTasksByState(state) {
+    return this.listTasks().filter(t => t.state === state);
+  }
+
+  /**
+   * Retorna estatísticas técnicas.
+   * 
+   * @returns {Object}
+   */
+  getStats() {
+    const byState = {};
+    
+    for (const state of Object.values(TaskState)) {
+      byState[state] = 0;
+    }
+
+    for (const task of this.tasks.values()) {
+      byState[task.state]++;
+    }
+
+    return Object.freeze({
+      total: this.tasks.size,
+      byState
+    });
+  }
+
+  /* ===========================
+     FUNÇÕES INTERNAS
+  =========================== */
+
+  /**
+   * Recupera tarefa ou lança erro.
+   */
+  _getTaskOrThrow(taskId) {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Tarefa ${taskId} não encontrada`);
+    }
+    return task;
+  }
+
+  /**
+   * Verifica se transição é permitida.
+   */
+  _isTransitionAllowed(from, to) {
+    return ALLOWED_TRANSITIONS[from]?.includes(to) ?? false;
+  }
+
+  /**
+   * Registra entrada no histórico interno.
+   */
+  _recordHistory(task, entry) {
+    task.history.push(Object.freeze(entry));
+  }
+
+  /**
+   * Produz snapshot imutável da tarefa.
+   * Protege contra mutação externa.
+   */
+  _snapshot(task) {
+    return Object.freeze({
+      taskId: task.taskId,
+      state: task.state,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      metadata: Object.freeze({ ...task.metadata }),
+      history: Object.freeze([...task.history])
+    });
+  }
+}
+
+module.exports = {
+  TaskRuntime,
+  TaskState
+};
+
+---
+
+/* ==========================================================================
+   src/kernel/telemetry/kernel_telemetry.js
+   Subsistema: KERNEL — Núcleo Soberano de Decisão
+   Módulo: telemetry/
+   Arquivo: kernel_telemetry.js
+   
+   Papel:
+   - Tornar observável o estado interno do Kernel
+   - Registrar eventos estruturais
+   - Garantir não-silêncio epistemológico
+   - Alimentar dashboards e auditorias
+   
+   IMPORTANTE:
+   - NÃO decide
+   - NÃO executa ações
+   - NÃO interpreta o mundo
+   - NÃO fecha causalidade
+   - NÃO corrige estados
+   
+   A telemetria é:
+   - Transversal
+   - Estrutural
+   - Obrigatória
+   - Passiva
+   
+   Linguagem: JavaScript (Node.js)
+========================================================================== */
+
+const EventEmitter = require('events');
+
+/* ===========================
+   Severidades Canônicas
+=========================== */
+
+const TelemetrySeverity = Object.freeze({
+  INFO: 'INFO',
+  WARNING: 'WARNING',
+  CRITICAL: 'CRITICAL'
+});
+
+/* ===========================
+   Fábrica da Telemetria do Kernel
+=========================== */
+
+class KernelTelemetry extends EventEmitter {
+  /**
+   * @param {Object} config
+   * @param {string} [config.source]
+   * Identificador da origem dos eventos (ex.: 'kernel', 'task_runtime').
+   * 
+   * @param {number|null} [config.retention]
+   * Política de retenção em memória (null = sem retenção interna).
+   * 
+   * @param {boolean} [config.enabled]
+   * Habilita/desabilita telemetria (default: true).
+   */
+  constructor({
+    source = 'kernel',
+    retention = null,
+    enabled = true
+  } = {}) {
+    super();
+
+    this.source = source;
+    this.retention = retention;
+    this.enabled = enabled;
+
+    /**
+     * Buffer interno para auditoria/retenção.
+     */
+    this.buffer = [];
+
+    /**
+     * Contadores e gauges técnicos.
+     */
+    this.counters = Object.create(null);
+    this.gauges = Object.create(null);
+    this.timestamps = Object.create(null);
+
+    if (this.retention !== null && typeof this.retention !== 'number') {
+      throw new Error('retention deve ser número ou null');
+    }
+  }
+
+  /* ===========================
+     EMISSÃO DE EVENTOS
+  =========================== */
+
+  /**
+   * Emite evento de telemetria estruturado.
+   * 
+   * @param {string} type
+   * Tipo canônico do evento (ex.: 'task_created').
+   * 
+   * @param {Object} [payload]
+   * Dados observáveis.
+   * 
+   * @param {string} [severity]
+   * Severidade (INFO, WARNING, CRITICAL).
+   * 
+   * @returns {Object}
+   * Evento criado.
+   */
+  emitEvent(type, payload = {}, severity = TelemetrySeverity.INFO) {
+    if (!this.enabled) return null;
+
+    if (!type) {
+      throw new Error('Evento de telemetria requer um tipo');
+    }
+
+    const event = Object.freeze({
+      type,
+      at: Date.now(),
+      source: this.source,
+      severity,
+      payload: Object.freeze(payload)
+    });
+
+    // Atualiza métricas internas
+    this._incrementCounter(`event:${type}`);
+    this._mark(`last:${type}`);
+
+    // Retenção interna (se configurada)
+    if (this.retention !== null) {
+      this.buffer.push(event);
+
+      if (this.buffer.length > this.retention) {
+        const discarded = this.buffer.shift();
+        super.emit('telemetry_discarded', {
+          discardedAt: Date.now(),
+          discardedEventType: discarded.type
+        });
+      }
+    }
+
+    // Emissão padrão via EventEmitter
+    super.emit('telemetry_event', event);
+
+    return event;
+  }
+
+  /* ===========================
+     MÉTODOS DE CONVENIÊNCIA
+  =========================== */
+
+  /**
+   * Emite evento informativo.
+   */
+  info(type, payload = {}) {
+    return this.emitEvent(type, payload, TelemetrySeverity.INFO);
+  }
+
+  /**
+   * Emite alerta.
+   */
+  warning(type, payload = {}) {
+    return this.emitEvent(type, payload, TelemetrySeverity.WARNING);
+  }
+
+  /**
+   * Emite evento crítico.
+   */
+  critical(type, payload = {}) {
+    return this.emitEvent(type, payload, TelemetrySeverity.CRITICAL);
+  }
+
+  /**
+   * Emite evento genérico (compatibilidade com NERV).
+   */
+  emit(type, payload = {}) {
+    // Se for chamado via EventEmitter.emit, repassa
+    if (arguments.length > 2) {
+      return super.emit(...arguments);
+    }
+
+    // Caso contrário, emite como telemetria
+    return this.emitEvent(type, payload, TelemetrySeverity.INFO);
+  }
+
+  /* ===========================
+     MÉTRICAS INTERNAS
+  =========================== */
+
+  /**
+   * Incrementa contador técnico.
+   */
+  _incrementCounter(name, value = 1) {
+    this.counters[name] = (this.counters[name] || 0) + value;
+  }
+
+  /**
+   * Define gauge técnico.
+   */
+  _setGauge(name, value) {
+    this.gauges[name] = value;
+  }
+
+  /**
+   * Registra timestamp técnico.
+   */
+  _mark(name) {
+    this.timestamps[name] = Date.now();
+  }
+
+  /* ===========================
+     CONSULTAS (SOMENTE LEITURA)
+  =========================== */
+
+  /**
+   * Retorna snapshot do buffer interno.
+   */
+  getBufferSnapshot() {
+    return Object.freeze([...this.buffer]);
+  }
+
+  /**
+   * Retorna estatísticas técnicas.
+   */
+  getStats() {
+    return Object.freeze({
+      source: this.source,
+      enabled: this.enabled,
+      retainedEvents: this.buffer.length,
+      retentionLimit: this.retention,
+      counters: Object.freeze({ ...this.counters }),
+      gauges: Object.freeze({ ...this.gauges }),
+      timestamps: Object.freeze({ ...this.timestamps })
+    });
+  }
+
+  /**
+   * Retorna eventos por tipo.
+   */
+  getEventsByType(type) {
+    return Object.freeze(
+      this.buffer.filter(e => e.type === type)
+    );
+  }
+
+  /**
+   * Retorna eventos por severidade.
+   */
+  getEventsBySeverity(severity) {
+    return Object.freeze(
+      this.buffer.filter(e => e.severity === severity)
+    );
+  }
+
+  /**
+   * Retorna eventos em intervalo temporal.
+   */
+  getEventsByTimeRange({ startAt, endAt }) {
+    return Object.freeze(
+      this.buffer.filter(e => e.at >= startAt && e.at <= endAt)
+    );
+  }
+
+  /* ===========================
+     CONTROLE DE LIFECYCLE
+  =========================== */
+
+  /**
+   * Habilita telemetria.
+   */
+  enable() {
+    this.enabled = true;
+    this.info('telemetry_enabled', { at: Date.now() });
+  }
+
+  /**
+   * Desabilita telemetria.
+   */
+  disable() {
+    this.enabled = false;
+  }
+
+  /**
+   * Limpa buffer interno.
+   */
+  clearBuffer() {
+    const count = this.buffer.length;
+    this.buffer = [];
+
+    this.info('telemetry_buffer_cleared', {
+      clearedCount: count,
+      at: Date.now()
+    });
+  }
+
+  /**
+   * Reseta métricas internas (uso em testes).
+   */
+  resetMetrics() {
+    this.counters = Object.create(null);
+    this.gauges = Object.create(null);
+    this.timestamps = Object.create(null);
+
+    this.info('telemetry_metrics_reset', {
+      at: Date.now()
+    });
+  }
+
+  /* ===========================
+     SUBSCRIÇÂO DE OBSERVADORES
+  =========================== */
+
+  /**
+   * Registra observador de telemetria.
+   * 
+   * @param {Function} handler
+   * Função chamada para cada evento.
+   * 
+   * @returns {Function}
+   * Função de unsubscribe.
+   */
+  onEvent(handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('onEvent requer função');
+    }
+
+    this.on('telemetry_event', handler);
+
+    return () => {
+      this.removeListener('telemetry_event', handler);
+    };
+  }
+
+  /**
+   * Registra observador para tipo específico.
+   */
+  onEventType(type, handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('onEventType requer função');
+    }
+
+    const wrappedHandler = (event) => {
+      if (event.type === type) {
+        handler(event);
+      }
+    };
+
+    this.on('telemetry_event', wrappedHandler);
+
+    return () => {
+      this.removeListener('telemetry_event', wrappedHandler);
+    };
+  }
+
+  /**
+   * Registra observador para severidade específica.
+   */
+  onEventSeverity(severity, handler) {
+    if (typeof handler !== 'function') {
+      throw new Error('onEventSeverity requer função');
+    }
+
+    const wrappedHandler = (event) => {
+      if (event.severity === severity) {
+        handler(event);
+      }
+    };
+
+    this.on('telemetry_event', wrappedHandler);
+
+    return () => {
+      this.removeListener('telemetry_event', wrappedHandler);
+    };
+  }
+}
+
+module.exports = {
+  KernelTelemetry,
+  TelemetrySeverity
+};

@@ -3,6 +3,7 @@
 ## Overview
 
 This project uses two main configuration files:
+
 - `config.json` - Main application parameters (validated with Zod schema)
 - `dynamic_rules.json` - Target-specific selectors and behavior overrides (hot-reloadable)
 
@@ -14,11 +15,11 @@ This project uses two main configuration files:
 
 ```json
 {
-  "DEBUG_PORT": "http://localhost:9222",
-  "IDLE_SLEEP": 3000,
-  "CYCLE_DELAY": 2000,
-  "TASK_TIMEOUT_MS": 1800000,
-  "allowedDomains": ["chatgpt.com", "gemini.google.com"]
+    "DEBUG_PORT": "http://localhost:9222",
+    "IDLE_SLEEP": 3000,
+    "CYCLE_DELAY": 2000,
+    "TASK_TIMEOUT_MS": 1800000,
+    "allowedDomains": ["chatgpt.com", "gemini.google.com"]
 }
 ```
 
@@ -28,63 +29,68 @@ All parameters are validated using Zod schema in [src/core/config.js](../src/cor
 
 ```javascript
 const ConfigSchema = z.object({
-  DEBUG_PORT: z.string().url().default('http://localhost:9222'),
-  IDLE_SLEEP: z.number().min(500).default(3000),
-  CYCLE_DELAY: z.number().min(0).default(2000),
-  // ... more fields
+    DEBUG_PORT: z.string().url().default('http://localhost:9222'),
+    IDLE_SLEEP: z.number().min(500).default(3000),
+    CYCLE_DELAY: z.number().min(0).default(2000)
+    // ... more fields
 });
 ```
 
 ### Key Parameters
 
 #### Infrastructure
+
 - **DEBUG_PORT**: Chrome remote debugging URL
-  - Type: `string (URL)`
-  - Default: `http://localhost:9222`
-  - Example: `http://host.docker.internal:9222`
+    - Type: `string (URL)`
+    - Default: `http://localhost:9222`
+    - Example: `http://host.docker.internal:9222`
 
 #### Engine Rhythm
+
 - **CYCLE_DELAY**: Delay between task processing cycles (ms)
-  - Type: `number`
-  - Default: `2000`
-  - Range: `≥0`
+    - Type: `number`
+    - Default: `2000`
+    - Range: `≥0`
 
 - **IDLE_SLEEP**: Sleep time when queue is empty (ms)
-  - Type: `number`
-  - Default: `3000`
-  - Range: `≥500`
+    - Type: `number`
+    - Default: `3000`
+    - Range: `≥500`
 
 - **PAUSED_SLEEP**: Sleep time when engine is paused (ms)
-  - Type: `number`
-  - Default: `2000`
-  - Range: `≥1000`
+    - Type: `number`
+    - Default: `2000`
+    - Range: `≥1000`
 
 #### Timeouts
+
 - **TASK_TIMEOUT_MS**: Maximum execution time per task
-  - Type: `number`
-  - Default: `1800000` (30 minutes)
+    - Type: `number`
+    - Default: `1800000` (30 minutes)
 
 - **PROGRESS_TIMEOUT_MS**: Timeout for response progress detection
-  - Type: `number`
-  - Default: `90000` (90 seconds)
+    - Type: `number`
+    - Default: `90000` (90 seconds)
 
 - **HEARTBEAT_TIMEOUT_MS**: IPC heartbeat timeout
-  - Type: `number`
-  - Default: `15000` (15 seconds)
+    - Type: `number`
+    - Default: `15000` (15 seconds)
 
 #### Execution Limits
+
 - **MAX_CONTINUATIONS**: Maximum response continuation iterations
-  - Type: `number`
-  - Default: `25`
+    - Type: `number`
+    - Default: `25`
 
 - **MAX_OUT_BYTES**: Maximum response size in bytes
-  - Type: `number`
-  - Default: `10485760` (10MB)
+    - Type: `number`
+    - Default: `10485760` (10MB)
 
 #### Security
+
 - **allowedDomains**: Whitelist of allowed target domains
-  - Type: `string[]`
-  - Default: `["chatgpt.com", "claude.ai", "gemini.google.com", "openai.com"]`
+    - Type: `string[]`
+    - Default: `["chatgpt.com", "claude.ai", "gemini.google.com", "openai.com"]`
 
 ### Hot Reload
 
@@ -116,31 +122,32 @@ If validation fails, the system maintains the previous valid configuration:
 
 ```json
 {
-  "_meta": {
-    "version": 5,
-    "last_updated": "2026-01-18T12:06:03.846Z",
-    "updated_by": "SADI_SYSTEM",
-    "evolution_count": 2
-  },
-  "targets": {
-    "chatgpt.com": {
-      "selectors": {
-        "input_box": ["#prompt-textarea", "div[contenteditable='true']"],
+    "_meta": {
+        "version": 5,
+        "last_updated": "2026-01-18T12:06:03.846Z",
+        "updated_by": "SADI_SYSTEM",
+        "evolution_count": 2
+    },
+    "targets": {
+        "chatgpt.com": {
+            "selectors": {
+                "input_box": ["#prompt-textarea", "div[contenteditable='true']"],
+                "send_button": ["button[type='submit']"]
+            },
+            "behavior_overrides": {}
+        }
+    },
+    "global_selectors": {
+        "input_box": ["textarea", "[role='textbox']"],
         "send_button": ["button[type='submit']"]
-      },
-      "behavior_overrides": {}
     }
-  },
-  "global_selectors": {
-    "input_box": ["textarea", "[role='textbox']"],
-    "send_button": ["button[type='submit']"]
-  }
 }
 ```
 
 ### Purpose
 
 Target-specific automation rules that can be updated without restarting the agent:
+
 - **CSS selectors** for input boxes, buttons, etc.
 - **Behavior overrides** for special handling
 - **Evolution tracking** via metadata
@@ -158,17 +165,17 @@ Each target domain can have custom selectors:
 
 ```json
 {
-  "targets": {
-    "chatgpt.com": {
-      "selectors": {
-        "input_box": [
-          "#prompt-textarea",           // Try first
-          "div[contenteditable='true']", // Fallback
-          "textarea"                     // Last resort
-        ]
-      }
+    "targets": {
+        "chatgpt.com": {
+            "selectors": {
+                "input_box": [
+                    "#prompt-textarea", // Try first
+                    "div[contenteditable='true']", // Fallback
+                    "textarea" // Last resort
+                ]
+            }
+        }
     }
-  }
 }
 ```
 
@@ -180,14 +187,9 @@ Used when no target-specific selector is found:
 
 ```json
 {
-  "global_selectors": {
-    "input_box": [
-      "textarea",
-      "div[contenteditable='true']",
-      "[role='textbox']",
-      "input[type='text']"
-    ]
-  }
+    "global_selectors": {
+        "input_box": ["textarea", "div[contenteditable='true']", "[role='textbox']", "input[type='text']"]
+    }
 }
 ```
 
@@ -197,15 +199,15 @@ Custom behavior for specific targets:
 
 ```json
 {
-  "targets": {
-    "chatgpt.com": {
-      "behavior_overrides": {
-        "typing_speed": "slow",
-        "wait_after_submit": 3000,
-        "disable_ghost_cursor": false
-      }
+    "targets": {
+        "chatgpt.com": {
+            "behavior_overrides": {
+                "typing_speed": "slow",
+                "wait_after_submit": 3000,
+                "disable_ghost_cursor": false
+            }
+        }
     }
-  }
 }
 ```
 
@@ -220,6 +222,7 @@ Changes to `dynamic_rules.json` are detected automatically via file watcher. No 
 ### 1. Sensitive Data
 
 **Never commit:**
+
 - `.env` files (credentials)
 - `fila/` directory (tasks may contain sensitive prompts)
 - `respostas/` directory (AI responses may contain sensitive data)
@@ -234,7 +237,7 @@ Only domains in `allowedDomains` are permitted:
 
 ```json
 {
-  "allowedDomains": ["chatgpt.com", "gemini.google.com"]
+    "allowedDomains": ["chatgpt.com", "gemini.google.com"]
 }
 ```
 
@@ -243,6 +246,7 @@ Only domains in `allowedDomains` are permitted:
 ### 3. Timeout Limits
 
 Enforce reasonable timeouts to prevent resource exhaustion:
+
 - Task timeout: 30 minutes default
 - Progress timeout: 90 seconds
 - Heartbeat timeout: 15 seconds
@@ -250,6 +254,7 @@ Enforce reasonable timeouts to prevent resource exhaustion:
 ### 4. Size Limits
 
 Prevent memory issues:
+
 - Max response size: 10MB (`MAX_OUT_BYTES`)
 - Max continuations: 25 iterations
 
@@ -300,6 +305,7 @@ TASK_TIMEOUT=60000
 **Symptom**: Config values not applied
 
 **Solutions**:
+
 1. Check JSON syntax: `node -e "require('./config.json')"`
 2. Review logs for validation errors
 3. Verify file permissions: `ls -la config.json`
@@ -310,6 +316,7 @@ TASK_TIMEOUT=60000
 **Symptom**: Selector changes not reflected
 
 **Solutions**:
+
 1. Check file watcher is running
 2. Verify JSON syntax in `dynamic_rules.json`
 3. Check logs for parsing errors
@@ -323,7 +330,7 @@ TASK_TIMEOUT=60000
 
 ```json
 {
-  "allowedDomains": ["chatgpt.com", "new-domain.com"]
+    "allowedDomains": ["chatgpt.com", "new-domain.com"]
 }
 ```
 

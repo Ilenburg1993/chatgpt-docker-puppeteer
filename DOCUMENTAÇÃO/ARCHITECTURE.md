@@ -56,9 +56,11 @@
 ## Core Components
 
 ### 1. Execution Engine (`src/core/execution_engine.js`)
+
 **Responsibility:** Main task processing loop
 
 **Key Features:**
+
 - Adaptive backoff strategy
 - Incremental response collection
 - Quality validation
@@ -66,22 +68,25 @@
 - Memory management (GC triggers)
 
 **Flow:**
+
 ```javascript
 while (true) {
-  task = queue.getNext();
-  driver = factory.getDriver(task.target);
-  result = await driver.execute(task);
-  validator.validate(result);
-  queue.markComplete(task);
+    task = queue.getNext();
+    driver = factory.getDriver(task.target);
+    result = await driver.execute(task);
+    validator.validate(result);
+    queue.markComplete(task);
 }
 ```
 
 ---
 
 ### 2. Driver System (`src/driver/`)
+
 **Responsibility:** Target-specific automation
 
 **Architecture:**
+
 ```
 BaseDriver (abstract)
    ├── TargetDriver (template)
@@ -94,6 +99,7 @@ BaseDriver (abstract)
 ```
 
 **Key Modules:**
+
 - **Analyzer**: DOM element detection
 - **InputResolver**: Text input handling
 - **SubmissionController**: Form submission logic
@@ -105,9 +111,11 @@ BaseDriver (abstract)
 ---
 
 ### 3. NERV System (`src/nerv/`)
+
 **Responsibility:** Inter-Process Communication
 
 **Components:**
+
 ```
 Transport Layer
    ├── Connection (WebSocket)
@@ -130,6 +138,7 @@ Correlation Layer
 ```
 
 **Protocol:**
+
 - WebSocket-based
 - Envelope format with schemas
 - Acknowledgment system
@@ -138,15 +147,18 @@ Correlation Layer
 ---
 
 ### 4. Queue System (`src/infra/queue/`)
+
 **Responsibility:** Task persistence and scheduling
 
 **Components:**
+
 - **TaskStore**: JSON file-based persistence
 - **Cache**: Reactive in-memory cache
 - **Scheduler**: Priority-based scheduling
 - **QueryEngine**: Task queries and filters
 
 **File Structure:**
+
 ```
 fila/
 ├── task-001.json        # Pending task
@@ -155,6 +167,7 @@ fila/
 ```
 
 **Locking:**
+
 - PID-based locks
 - Orphan detection (process liveness check)
 - Atomic operations
@@ -162,9 +175,11 @@ fila/
 ---
 
 ### 5. Kernel System (`src/kernel/`)
+
 **Responsibility:** Task lifecycle management
 
 **Components:**
+
 - **KernelLoop**: Main execution loop
 - **TaskExecutor**: Task execution wrapper
 - **ObservationStore**: State tracking
@@ -172,6 +187,7 @@ fila/
 - **StatePersistence**: State snapshots
 
 **States:**
+
 ```
 PENDING → RUNNING → DONE
              ↓
@@ -183,9 +199,11 @@ PENDING → RUNNING → DONE
 ---
 
 ### 6. Infrastructure (`src/infra/`)
+
 **Responsibility:** Core services
 
 **Modules:**
+
 - **LockManager**: Process synchronization
 - **ProcessGuard**: PID validation
 - **AtomicWrite**: Safe file writes
@@ -199,6 +217,7 @@ PENDING → RUNNING → DONE
 ## Data Flow
 
 ### Task Creation
+
 ```
 1. User/API → POST /api/tasks
 2. Schema Validation (Zod)
@@ -208,6 +227,7 @@ PENDING → RUNNING → DONE
 ```
 
 ### Task Processing
+
 ```
 1. Engine polls queue
 2. Acquire lock (PID-based)
@@ -222,6 +242,7 @@ PENDING → RUNNING → DONE
 ```
 
 ### Error Handling
+
 ```
 1. Exception caught
 2. Classify failure (task vs infra)
@@ -237,36 +258,43 @@ PENDING → RUNNING → DONE
 ## Design Patterns
 
 ### 1. Factory Pattern
+
 ```javascript
 // src/driver/factory.js
 const driver = DriverFactory.create(targetName);
 ```
 
 ### 2. Observer Pattern
+
 ```javascript
 // WebSocket events
 socket.on('task:progress', handler);
 ```
 
 ### 3. Strategy Pattern
+
 ```javascript
 // Validation rules
 const validator = new Validator(task.validation);
 ```
 
 ### 4. Template Method
+
 ```javascript
 // BaseDriver defines flow
 class TargetDriver extends BaseDriver {
-  async execute() { /* implementation */ }
+    async execute() {
+        /* implementation */
+    }
 }
 ```
 
 ### 5. Circuit Breaker
+
 ```javascript
 // Infra failure handling
 if (consecutiveFailures > threshold) {
-  cooldown(exponentialBackoff);
+    cooldown(exponentialBackoff);
 }
 ```
 
@@ -275,6 +303,7 @@ if (consecutiveFailures > threshold) {
 ## Scalability
 
 ### Horizontal Scaling
+
 ```
 ┌─────────┐   ┌─────────┐   ┌─────────┐
 │ Agent 1 │   │ Agent 2 │   │ Agent 3 │
@@ -289,11 +318,13 @@ if (consecutiveFailures > threshold) {
 ```
 
 **Implementation:**
+
 - Replace file-based queue with Redis/RabbitMQ
 - Shared lock manager (Redis locks)
 - Distributed state (database)
 
 ### Vertical Scaling
+
 - Increase PM2 instances
 - Adjust resource limits
 - Optimize memory (GC tuning)
@@ -303,21 +334,25 @@ if (consecutiveFailures > threshold) {
 ## Security
 
 ### 1. Browser Isolation
+
 - Separate Chrome profile per agent
 - No personal data in automation profile
 - Remote debugging on localhost only
 
 ### 2. File System
+
 - Locked file operations
 - PID validation
 - Atomic writes
 
 ### 3. Network
+
 - Dashboard on localhost (production: reverse proxy)
 - No external API exposure
 - Rate limiting on endpoints
 
 ### 4. Secrets
+
 - Environment variables only
 - No hardcoded credentials
 - .env in .gitignore
@@ -327,12 +362,14 @@ if (consecutiveFailures > threshold) {
 ## Performance
 
 ### Bottlenecks
+
 1. **Chrome startup**: ~2-3s (reuse connections)
 2. **Page load**: Variable (wait strategies)
 3. **File I/O**: Minimize with caching
 4. **JSON parsing**: Use streams for large files
 
 ### Optimizations
+
 - Connection pooling (Puppeteer)
 - Reactive cache (invalidate on change)
 - Incremental response collection
@@ -344,6 +381,7 @@ if (consecutiveFailures > threshold) {
 ## Monitoring
 
 ### Metrics
+
 - Task throughput (tasks/hour)
 - Success rate (%)
 - Average execution time (ms)
@@ -351,6 +389,7 @@ if (consecutiveFailures > threshold) {
 - Failure reasons
 
 ### Logging
+
 ```
 [2026-01-19T12:00:00.000Z] INFO [task-001] >>> Processando tarefa
 [2026-01-19T12:00:02.500Z] DEBUG [task-001] [LIFECYCLE] Adquirindo driver
@@ -359,6 +398,7 @@ if (consecutiveFailures > threshold) {
 ```
 
 ### Health Checks
+
 - Chrome connection status
 - Queue size thresholds
 - Memory usage
@@ -369,12 +409,14 @@ if (consecutiveFailures > threshold) {
 ## Deployment
 
 ### Development
+
 ```bash
 npm run dev
 # nodemon with hot reload
 ```
 
 ### Production (PM2)
+
 ```bash
 npm run daemon:start
 # ecosystem.config.js
@@ -385,6 +427,7 @@ npm run daemon:start
 ```
 
 ### Docker
+
 ```bash
 docker-compose up
 # See DOCKER_SETUP.md
@@ -395,6 +438,7 @@ docker-compose up
 ## Extension Points
 
 ### Adding New LLM Targets
+
 1. Create driver: `src/driver/targets/NewLLMDriver.js`
 2. Extend TargetDriver
 3. Implement automation logic
@@ -402,11 +446,13 @@ docker-compose up
 5. Add tests
 
 ### Custom Validation
+
 1. Define rules in `dynamic_rules.json`
 2. Extend `src/logic/validator.js`
 3. Hot-reload supported
 
 ### Custom Protocols
+
 1. Implement in `src/nerv/`
 2. Define schema
 3. Add emission/reception handlers

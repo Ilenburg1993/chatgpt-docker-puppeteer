@@ -18,6 +18,7 @@ package.json              → Scripts npm
 ## 🚀 Comandos Disponíveis
 
 ### Lint Básico
+
 ```bash
 npm run lint              # Verifica todo o projeto
 npm run lint:src          # Verifica apenas src/
@@ -25,16 +26,19 @@ npm run lint:tests        # Verifica apenas tests/
 ```
 
 ### Auto-Fix
+
 ```bash
 npm run lint:fix          # Corrige problemas automaticamente
 ```
 
 ### Relatórios
+
 ```bash
 npm run lint:report       # Gera relatório em logs/eslint-report.txt
 ```
 
 ### VS Code (Auto-fix ao salvar)
+
 - ESLint roda automaticamente ao digitar
 - Auto-fix ao salvar arquivo (Ctrl+S / Cmd+S)
 - Indicadores inline de erros/warnings
@@ -46,33 +50,39 @@ npm run lint:report       # Gera relatório em logs/eslint-report.txt
 ### 🔴 Erros Críticos (Bloqueiam PR)
 
 **Segurança**:
+
 - `no-eval`: Proíbe eval()
 - `no-implied-eval`: Proíbe setTimeout/setInterval com strings
 - `no-new-func`: Proíbe new Function()
 
 **Qualidade de Código**:
+
 - `eqeqeq`: Força === ao invés de ==
 - `no-undef`: Variáveis não definidas
 - `curly`: Força chaves em if/else/for/while
 
 **Async/Await**:
+
 - `no-async-promise-executor`: Evita async em Promise constructor
 - `prefer-promise-reject-errors`: Reject com Error objects
 
 ### ⚠️ Warnings (Recomendações)
 
 **Variáveis**:
+
 - `no-unused-vars`: Variáveis não usadas (exceto prefixo `_`)
 - `no-shadow`: Redeclaração de variáveis
 - `prefer-const`: Usa const quando possível
 
 **Complexidade**:
+
 - `complexity`: Máx 15 caminhos por função
 - `max-depth`: Máx 4 níveis de aninhamento
 - `max-params`: Máx 5 parâmetros
 - `max-lines-per-function`: Máx 150 linhas
 
 **Estilo**:
+
 - `semi`: Força ponto-e-vírgula
 - `quotes`: Aspas simples (exceto em templates)
 - `indent`: 4 espaços
@@ -85,6 +95,7 @@ npm run lint:report       # Gera relatório em logs/eslint-report.txt
 ### Domain-Driven Design
 
 **Complexidade Controlada**:
+
 ```javascript
 // ✅ BOM: Função focada
 async function processTask(task) {
@@ -108,6 +119,7 @@ async function processTask(task) {
 ### Zero-Coupling via NERV
 
 **Importações**:
+
 ```javascript
 // ✅ BOM: Usa NERV para comunicação
 const nerv = require('../nerv/nerv');
@@ -120,6 +132,7 @@ const kernel = require('../kernel/kernel'); // Viola zero-coupling
 ### Audit Levels
 
 **Comentários Estruturados**:
+
 ```javascript
 /* ==========================================================================
    src/module/file.js
@@ -134,18 +147,19 @@ ESLint preserva esses headers (regra `spaced-comment`).
 
 ## 🔧 Exceções e Overrides
 
-### Testes (tests/*)
+### Testes (tests/\*)
 
 Regras relaxadas:
+
 - `no-console`: OFF (logs em testes permitidos)
 - `max-lines-per-function`: OFF
 - `complexity`: 20 (ao invés de 15)
 
-### Scripts (scripts/*)
+### Scripts (scripts/\*)
 
 Mesmas exceções dos testes.
 
-### Config Files (*.config.js)
+### Config Files (\*.config.js)
 
 Source type: `module` (ESM ao invés de CommonJS)
 
@@ -153,12 +167,12 @@ Source type: `module` (ESM ao invés de CommonJS)
 
 ## 📊 Plugins Instalados
 
-| Plugin | Uso | Files |
-|--------|-----|-------|
-| `@eslint/js` | JavaScript base | `**/*.js` |
-| `@eslint/json` | JSON validation | `**/*.json`, `**/*.jsonc` |
-| `@eslint/markdown` | Markdown linting | `**/*.md` |
-| `@eslint/css` | CSS validation | `**/*.css` |
+| Plugin             | Uso              | Files                     |
+| ------------------ | ---------------- | ------------------------- |
+| `@eslint/js`       | JavaScript base  | `**/*.js`                 |
+| `@eslint/json`     | JSON validation  | `**/*.json`, `**/*.jsonc` |
+| `@eslint/markdown` | Markdown linting | `**/*.md`                 |
+| `@eslint/css`      | CSS validation   | `**/*.css`                |
 
 ---
 
@@ -166,15 +180,15 @@ Source type: `module` (ESM ao invés de CommonJS)
 
 ```javascript
 ignores: [
-  "**/node_modules/**",
-  "**/logs/**",
-  "**/fila/**",          // Arquivos de fila
-  "**/respostas/**",     // Outputs de tarefas
-  "**/profile/**",       // Perfis Chromium
-  "**/tmp/**",
-  "**/*.min.js",
-  "public/js/libs/**"
-]
+    '**/node_modules/**',
+    '**/logs/**',
+    '**/fila/**', // Arquivos de fila
+    '**/respostas/**', // Outputs de tarefas
+    '**/profile/**', // Perfis Chromium
+    '**/tmp/**',
+    '**/*.min.js',
+    'public/js/libs/**'
+];
 ```
 
 ---
@@ -204,6 +218,7 @@ npm run lint:fix
 ### Configuração customizada
 
 Editar [eslint.config.mjs](../eslint.config.mjs):
+
 ```javascript
 rules: {
   "no-console": "off",  // Exemplo: permitir console.log
@@ -223,6 +238,7 @@ rules: {
 ## 🎓 Boas Práticas
 
 ### 1. Use const por padrão
+
 ```javascript
 // ✅ BOM
 const config = require('./config');
@@ -231,7 +247,8 @@ const config = require('./config');
 let config = require('./config');
 ```
 
-### 2. Prefixe variáveis não usadas com _
+### 2. Prefixe variáveis não usadas com \_
+
 ```javascript
 // ✅ BOM
 app.use((req, res, _next) => {
@@ -245,6 +262,7 @@ app.use((req, res, next) => {
 ```
 
 ### 3. Use === ao invés de ==
+
 ```javascript
 // ✅ BOM
 if (value === null) { ... }
@@ -254,6 +272,7 @@ if (value == null) { ... }
 ```
 
 ### 4. Sempre use async/await corretamente
+
 ```javascript
 // ✅ BOM
 async function loadData() {
@@ -268,6 +287,7 @@ async function loadData() {
 ```
 
 ### 5. Limite complexidade
+
 ```javascript
 // ✅ BOM: Extrair lógica complexa
 function validateTask(task) {

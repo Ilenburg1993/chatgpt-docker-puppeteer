@@ -1,14 +1,26 @@
 # AI Coding Agent Instructions for chatgpt-docker-puppeteer
 
 ## Architecture Overview
-This is a domain-driven autonomous agent using Puppeteer for browser automation with AI chatbots (ChatGPT, Gemini). Core components:
-- **Engine** (`index.js`): Main task processing loop with adaptive backoff, incremental response collection, and quality validation
-- **Queue System** (`src/infra/io.js`): JSON-based task persistence in `fila/` with reactive caching and PID-based locking
-- **Drivers** (`src/driver/`): Factory-pattern for target-specific automation (e.g., `ChatGPTDriver.js`)
-- **Dashboard** (`server.js`): Express + Socket.io for real-time monitoring and control
-- **Schemas** (`src/core/schemas.js`): Zod-validated data contracts for tasks, DNA/rules, and telemetry
+
+This is a domain-driven autonomous agent using Puppeteer for browser automation with AI chatbots (ChatGPT, Gemini). **NERV-centric architecture** with event-driven decoupling.
+
+### Core Components (13 modules)
+
+- **NERV** (`src/nerv/`): Central event bus for IPC - ALL components communicate through NERV (zero direct coupling)
+    - Buffers, correlation, emission, reception, transport, telemetry, health checks
+- **Kernel** (`src/kernel/`): Task execution engine with policy decisions, runtime lifecycle, state management
+    - execution_engine, kernel_loop, nerv_bridge, task_runtime, policy_engine, observation_store
+- **Driver** (`src/driver/`): Target-specific automation (ChatGPT, Gemini) via factory pattern
+    - DriverNERVAdapter connects drivers to NERV (no direct KERNEL/SERVER access)
+- **Infra** (`src/infra/`): Browser pool, locks, queue, storage (tasks/responses/DNA)
+    - ConnectionOrchestrator: multi-mode browser connection (launcher/external/auto)
+    - Two-phase commit locks with PID validation
+- **Server** (`src/server/`): Dashboard + API (Express + Socket.io) via ServerNERVAdapter
+- **Core** (`src/core/`): Config, schemas (Zod), logger, identity (DNA), context management
 
 ## Key Patterns
+
+- **NERV-First Communication**: All cross-component communication via NERV events (e.g., `DRIVER_EXECUTE`, `TASK_STATE_CHANGE`)
 - **Audit Levels**: Code annotated with audit levels (e.g., `Audit Level: 32`) indicating reliability tiers
 - **Scoped Locking**: Use `io.acquireLock(taskId, target)` with PID validation to prevent zombie processes
 - **Incremental Collection**: Responses gathered in chunks with anti-loop heuristics (hash comparison, punctuation detection)
@@ -16,16 +28,28 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Reactive State**: File watchers invalidate caches instantly (e.g., queue changes trigger re-scan)
 - **Sanitization**: Remove control characters from prompts to prevent browser protocol breaks
 - **Backoff Strategy**: Exponential jitter for failures (task/infra separate counters)
+- **Optimistic Locking**: Kernel uses expectedState for race detection in concurrent task updates (P5.1 fix)
+- **Cache Invalidation**: ALWAYS call `markDirty()` BEFORE write operations in io.js (P5.2 known bug - needs fix)
 
 ## Developer Workflows
+
 - **Local Dev**: `npm run dev` (nodemon, ignores data dirs)
 - **Production**: `npm run daemon:start` (PM2 with memory limits, auto-restart)
 - **Queue Ops**: `npm run queue:status -- --watch` for live monitoring; `npm run queue:add` for task creation
-- **Testing**: `npm run test:linux` (bash script); use `tests/helpers.js` for agent lifecycle in tests
+- **Testing**: `npm test` runs all tests (⚠️ known issue: bash syntax error in run_all_tests.sh - use individual tests)
+    - Test files in `tests/` (14 functional tests maintained, 11 obsolete deleted Jan 2026)
+    - Use `tests/helpers.js` for agent lifecycle mocking
+    - Run individual tests: `node tests/test_<name>.js`
+    - Key test suites: config_validation, driver_nerv_integration, p1-p5_fixes, boot_sequence, browser_pool
+- **Code Quality**:
+    - ESLint v9 (flat config) runs on type (`eslint.run: onType`) with auto-fix on save
+    - Prettier formats on save (single quotes, 4 spaces, 120 char lines)
+    - `npm run lint` / `npm run format` for manual checks
 - **Diagnostics**: `npm run diagnose` for crash analysis; forensics dumps in `logs/crash_reports/`
 - **Cleanup**: `npm run clean` removes logs/tmp/queue; `npm run reset:hard` for full reset
 
 ## Conventions
+
 - **Logging**: `logger.log('INFO', msg, taskId?)` with structured telemetry
 - **Error Handling**: Classify failures with `classifyAndSaveFailure(task, type, msg)` and history tracking
 - **Configuration**: Hot-reload from `config.json`/`dynamic_rules.json` with defaults in `src/core/config.js`
@@ -34,6 +58,7 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Browser Profiles**: Isolated in `profile/` with stealth plugins and user-agent rotation
 
 ## Integration Points
+
 - **PM2**: Ecosystem config for dual processes (agent + dashboard); logs in `logs/`
 - **Socket.io**: Real-time events for task updates, status broadcasts
 - **Puppeteer Extras**: Stealth plugin + ghost-cursor for human-like interaction
@@ -41,15 +66,35 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Docker**: Slim Node 20 image with Chromium deps; volume mount for data persistence
 
 ## Quality Validation
+
 - **Semantic Checks**: Post-response validation against `task.spec.validation` (min length, forbidden terms)
 - **Schema Enforcement**: All data through Zod parsers; corrupted tasks moved to `fila/corrupted/`
 - **Forensics**: Automatic crash dumps with page screenshots on failures
 - **Health Monitoring**: Heartbeat checks for infra stability; consecutive failure counters trigger cooldowns
 
 ## Common Pitfalls
+
 - Avoid direct file writes; use `io.saveTask()` for atomic persistence
 - Check `isLockOwnerAlive()` before breaking orphaned locks
 - Handle `Target closed` errors as infra failures, not task errors
 - Use absolute paths for file operations (e.g., `path.join(ROOT, 'fila')`)
-- Test with `test-puppeteer.js` for browser connectivity before full runs</content>
-<parameter name="filePath">/workspaces/chatgpt-docker-puppeteer/.github/copilot-instructions.md
+- Test with `test-puppeteer.js` for browser connectivity before full runs
+- **Never import STATES from ConnectionOrchestrator** without using it (triggers ESLint no-unused-vars)
+- **P5.2 Bug**: markDirty() must be called BEFORE saveTask/deleteTask in io.js (cache invalidation order)
+- **Browser Pool**: Always use launcher mode in tests unless external Chrome is confirmed available
+
+## Known Issues (as of Jan 2026)
+
+1. **P5.2 Cache Invalidation**: `src/infra/io.js` - markDirty() called after writes (should be before)
+2. **npm test broken**: `scripts/run_all_tests.sh` line 3 has bash syntax issue (`set -euo pipefail`)
+3. **Integration tests**: 82% (9/11) were obsolete due to IPC refactoring - already cleaned up
+4. **Test dependencies**: 4 tests (lock, control_pause, running_recovery, stall_mitigation) require full agent running
+
+## Testing Strategy
+
+- **Unit Tests**: Mock components, no I/O (e.g., test_config_validation, test_driver_nerv_integration)
+- **Integration Tests**: `tests/integration/` contains only identity_lifecycle (others deleted)
+- **Regression Tests**: P1-P5 fixes validated (23 assertions covering locks, shutdown, timeouts, observers)
+- **E2E Tests**: test_ariadne_thread, test_boot_sequence, test_integration_complete
+- **Coverage**: 78% after cleanup (14/19 tests pass, 5 need refactoring)</content>
+  <parameter name="filePath">/workspaces/chatgpt-docker-puppeteer/.github/copilot-instructions.md

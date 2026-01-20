@@ -1,23 +1,57 @@
 {
-  /* Forçar uso do TypeScript do workspace */
   "typescript.tsdk": "node_modules/typescript/lib",
-
-  /* Dev Container */
   "dev.containers.gpuAvailability": "none",
-
-  /* Git */
   "git.enableSmartCommit": true,
   "git.ignoreLimitWarning": true,
   "git.autofetch": true,
-
-  /* ===== ESLINT CONFIG ===== */
+  "cSpell.enabled": false,
+  "cSpell.language": "en,pt-BR",
+  "cSpell.enabledLanguageIds": [
+    "markdown",
+    "plaintext",
+    "jsonc",
+    "javascript",
+    "javascriptreact",
+    "json",
+    "typescript"
+  ],
+  "cSpell.enableFiletypes": [
+    "markdown",
+    "plaintext",
+    "jsonc",
+    "javascript",
+    "javascriptreact"
+  ],
+  "cSpell.words": [
+    "Ambiente",
+    "análise",
+    "arquitetura",
+    "auditoria",
+    "chatgpt",
+    "configuração",
+    "execução",
+    "fila",
+    "graphviz",
+    "Ilenburg",
+    "importar",
+    "integração",
+    "limpa",
+    "limpo",
+    "nerv",
+    "NERV",
+    "pipefail",
+    "puppeteer",
+    "respostas",
+    "tarefa",
+    "validação",
+    "visualizar"
+  ],
   "eslint.enable": true,
   "eslint.validate": [
     "javascript",
     "javascriptreact",
-    "json",
-    "jsonc",
-    "markdown"
+    "typescript",
+    "typescriptreact"
   ],
   "eslint.options": {
     "overrideConfigFile": "eslint.config.mjs"
@@ -25,21 +59,20 @@
   "eslint.run": "onType",
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
-
-  /* ===== EDITOR CONFIG ===== */
-  "editor.formatOnSave": false,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
-  "editor.defaultFormatter": "dbaeumer.vscode-eslint",
   "editor.tabSize": 4,
   "editor.insertSpaces": true,
-  "editor.rulers": [100, 120],
+  "editor.rulers": [
+    100,
+    120
+  ],
   "editor.wordWrap": "on",
   "editor.bracketPairColorization.enabled": true,
   "editor.guides.bracketPairs": "active",
-
-  /* ===== FILES CONFIG ===== */
   "files.eol": "\n",
   "files.encoding": "utf8",
   "files.trimTrailingWhitespace": true,
@@ -58,8 +91,6 @@
     "**/fila/**": true,
     "**/respostas/**": true
   },
-
-  /* ===== SEARCH CONFIG ===== */
   "search.exclude": {
     "**/node_modules/**": true,
     "**/dist/**": true,
@@ -71,27 +102,32 @@
     "**/respostas/**": true,
     "**/profile/**": true
   },
-
-  /* ===== JAVASCRIPT CONFIG ===== */
-  "javascript.validate.enable": true,
+  "javascript.validate.enable": false,
   "javascript.format.enable": false,
   "javascript.suggest.completeFunctionCalls": true,
   "javascript.updateImportsOnFileMove.enabled": "always",
   "javascript.preferences.quoteStyle": "single",
   "javascript.preferences.importModuleSpecifier": "shortest",
-
-  /* ===== JSON CONFIG ===== */
+  "js/ts.implicitProjectConfig.checkJs": false,
+  "js/ts.implicitProjectConfig.strictNullChecks": false,
+  "js/ts.implicitProjectConfig.strictFunctionTypes": false,
   "json.format.enable": true,
   "json.validate.enable": true,
-
-  /* TypeScript / JavaScript Language Server */
+  "typescript.validate.enable": false,
   "typescript.tsserver.useSeparateSyntaxServer": false,
   "typescript.disableAutomaticTypeAcquisition": false,
   "typescript.preferences.importModuleSpecifier": "relative",
-
-  /* ===== FORMATTERS POR TIPO ===== */
   "[javascript]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
@@ -100,22 +136,32 @@
     "editor.defaultFormatter": "vscode.json-language-features"
   },
   "[markdown]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.defaultFormatter": "vscode.markdown-language-features",
     "editor.wordWrap": "on"
   },
-
-  /* Copilot */
   "github.copilot.enable": {
     "*": true,
-    "javascript": true
+    "javascript": true,
+    "markdown": true,
+    "plaintext": false
   },
   "github.copilot.inlineSuggest.enable": true,
+  "github.copilot.editor.enableAutoCompletions": true,
   "github.copilot.nextEditSuggestions.enabled": true,
   "github.copilot.advanced": {
     "length": 500
   },
-
-  /* Makefile */
+  "editor.inlineSuggest.enabled": true,
+  "editor.suggestSelection": "first",
+  "editor.acceptSuggestionOnEnter": "smart",
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": true,
+    "strings": true
+  },
+  "javascript.suggest.autoImports": true,
+  "npm.enableScriptExplorer": true,
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.enableMultiLinePasteWarning": false,
   "makefile.configureOnOpen": true
 }
-

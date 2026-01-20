@@ -1,55 +1,50 @@
 {
-  "_comment": "Configuração Mestra - Agente Universal V7.0 (Singularity Edition)",
+    "_comment": "Configuração Mestra - Agente Universal V7.0 (Singularity Edition)",
 
-  "// --- INFRAESTRUTURA ---": "",
-  "BROWSER_MODE": "launcher",
-  "DEBUG_PORT": "http://localhost:9222",
-  "IDLE_SLEEP": 3000,
+    "// --- INFRAESTRUTURA ---": "",
+    "BROWSER_MODE": "launcher",
+    "DEBUG_PORT": "http://localhost:9222",
+    "IDLE_SLEEP": 3000,
 
-  "// --- RITMO DO MOTOR (ENGINE RHYTHM) ---": "",
-  "CYCLE_DELAY": 2000,
-  "PAUSED_SLEEP": 2000,
-  "UNKNOWN_ENV_SLEEP": 3000,
-  "MIN_ENV_CONFIDENCE": 1,
+    "// --- RITMO DO MOTOR (ENGINE RHYTHM) ---": "",
+    "CYCLE_DELAY": 2000,
+    "PAUSED_SLEEP": 2000,
+    "UNKNOWN_ENV_SLEEP": 3000,
+    "MIN_ENV_CONFIDENCE": 1,
 
-  "// --- COMPORTAMENTO DO MODELO ---": "",
-  "DEFAULT_MODEL_ID": "gpt-5",
-  "adaptive_mode": "auto",
+    "// --- COMPORTAMENTO DO MODELO ---": "",
+    "DEFAULT_MODEL_ID": "gpt-5",
+    "adaptive_mode": "auto",
 
-  "// --- TIMEOUTS & PACIÊNCIA ---": "",
-  "STABILITY_INTERVAL": 2000,
-  "PROGRESS_TIMEOUT_MS": 90000,
-  "HEARTBEAT_TIMEOUT_MS": 15000,
-  "ECHO_CONFIRM_TIMEOUT_MS": 5000,
-  "CONTEXT_RESOLUTION_TIMEOUT": 30000,
-  
-  "// --- LIMITES DE EXECUÇÃO ---": "",
-  "TASK_TIMEOUT_MS": 1800000,
-  "RUNNING_RECOVERY_MS": 2400000,
-  "MAX_CONTINUATIONS": 25,
-  "MAX_OUT_BYTES": 10485760,
-  
-  "// --- DIGITAÇÃO HUMANA ---": "",
-  "CHUNK_SIZE": 150,
-  "ECHO_RETRIES": 5,
-  "ADAPTIVE_DELAY_BASE": 40,
-  "ADAPTIVE_DELAY_MAX": 250,
-  
-  "// --- POLÍTICAS DE SEGURANÇA ---": "",
-  "allow_dom_assist": true,
-  "multi_tab_policy": "AUTO_CLOSE",
-  "USER_INACTIVITY_THRESHOLD_MS": 5000,
-  "USER_ABORT_ACTION": "PAUSE",
+    "// --- TIMEOUTS & PACIÊNCIA ---": "",
+    "STABILITY_INTERVAL": 2000,
+    "PROGRESS_TIMEOUT_MS": 90000,
+    "HEARTBEAT_TIMEOUT_MS": 15000,
+    "ECHO_CONFIRM_TIMEOUT_MS": 5000,
+    "CONTEXT_RESOLUTION_TIMEOUT": 30000,
 
-  "// --- GOVERNANÇA DE DOMÍNIO ---": "",
-  "allowedDomains": [
-    "chatgpt.com", 
-    "claude.ai", 
-    "gemini.google.com", 
-    "openai.com"
-  ],
+    "// --- LIMITES DE EXECUÇÃO ---": "",
+    "TASK_TIMEOUT_MS": 1800000,
+    "RUNNING_RECOVERY_MS": 2400000,
+    "MAX_CONTINUATIONS": 25,
+    "MAX_OUT_BYTES": 10485760,
 
-  "// --- TUNING DO ADAPTATIVO ---": "",
-  "ADAPTIVE_ALPHA": 0.15,
-  "ADAPTIVE_COOLDOWN_MS": 5000
+    "// --- DIGITAÇÃO HUMANA ---": "",
+    "CHUNK_SIZE": 150,
+    "ECHO_RETRIES": 5,
+    "ADAPTIVE_DELAY_BASE": 40,
+    "ADAPTIVE_DELAY_MAX": 250,
+
+    "// --- POLÍTICAS DE SEGURANÇA ---": "",
+    "allow_dom_assist": true,
+    "multi_tab_policy": "AUTO_CLOSE",
+    "USER_INACTIVITY_THRESHOLD_MS": 5000,
+    "USER_ABORT_ACTION": "PAUSE",
+
+    "// --- GOVERNANÇA DE DOMÍNIO ---": "",
+    "allowedDomains": ["chatgpt.com", "claude.ai", "gemini.google.com", "openai.com"],
+
+    "// --- TUNING DO ADAPTATIVO ---": "",
+    "ADAPTIVE_ALPHA": 0.15,
+    "ADAPTIVE_COOLDOWN_MS": 5000
 }

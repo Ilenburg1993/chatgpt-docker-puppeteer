@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+*.min.js
+
+# Logs and runtime data
+logs/
+*.log
+crash_reports/
+
+# Queue and responses (generated data)
+fila/
+respostas/
+
+# Browser profiles
+profile/
+
+# Temporary files
+tmp/
+.tmp.*
+*.tmp
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Docker
+.dockerignore
+
+# Git
+.git/
+.gitignore
+
+# VS Code
+.vscode/
+
+# Documentation artifacts
+DOCUMENTAÇÃO/**/*.generated.*
+
+# Analysis outputs
+analysis/backups/
+analysis/ci-local/
+
+# Public assets
+public/
+
+# Config files that should preserve formatting
+ecosystem.config.js
+docker-compose*.yml

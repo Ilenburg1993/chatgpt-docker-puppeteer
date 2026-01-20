@@ -64,7 +64,6 @@ async function testLockTwoPhaseCommit() {
 
         console.log('✅ TEST 1 PASSOU: Two-Phase Commit funcionando corretamente\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 1 FALHOU:', error.message);
 
@@ -93,10 +92,7 @@ async function testLockConcurrency() {
 
         const promises = [];
         for (let i = 0; i < numAttempts; i++) {
-            promises.push(
-                acquireLock(`task-${i}`, target)
-                    .then(result => ({ taskId: `task-${i}`, acquired: result }))
-            );
+            promises.push(acquireLock(`task-${i}`, target).then(result => ({ taskId: `task-${i}`, acquired: result })));
         }
 
         const results = await Promise.all(promises);
@@ -109,9 +105,11 @@ async function testLockConcurrency() {
 
         if (successCount !== 1) {
             console.error(`❌ RACE CONDITION DETECTADA: ${successCount} locks adquiridos (esperado: 1)`);
-            results.filter(r => r.acquired).forEach(r => {
-                console.error(`   - ${r.taskId} conseguiu lock`);
-            });
+            results
+                .filter(r => r.acquired)
+                .forEach(r => {
+                    console.error(`   - ${r.taskId} conseguiu lock`);
+                });
             return false;
         }
 
@@ -122,7 +120,6 @@ async function testLockConcurrency() {
 
         console.log('✅ TEST 2 PASSOU: Concorrência tratada corretamente\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 2 FALHOU:', error.message);
 
@@ -156,11 +153,7 @@ async function testLockNoTempOrphans() {
         console.log('> Verificando arquivos .tmp órfãos...');
 
         const files = await fs.readdir(LOCK_DIR);
-        const tempFiles = files.filter(f =>
-            f.includes('RUNNING_') &&
-            f.includes('.tmp') &&
-            f.includes(target)
-        );
+        const tempFiles = files.filter(f => f.includes('RUNNING_') && f.includes('.tmp') && f.includes(target));
 
         if (tempFiles.length > 0) {
             console.error(`❌ Encontrados ${tempFiles.length} arquivos .tmp órfãos:`);
@@ -171,7 +164,6 @@ async function testLockNoTempOrphans() {
         console.log('✅ Nenhum arquivo .tmp órfão encontrado');
         console.log('✅ TEST 3 PASSOU: Cleanup de temp files funcionando\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 3 FALHOU:', error.message);
         return false;
@@ -195,7 +187,9 @@ async function testBrowserPoolMemoization() {
             }
 
             async initialize() {
-                if (this.initialized) {return;}
+                if (this.initialized) {
+                    return;
+                }
 
                 if (this._initPromise) {
                     console.log('  > Inicialização já em andamento, retornando promise existente');
@@ -216,7 +210,9 @@ async function testBrowserPoolMemoization() {
                 this.initCount++;
 
                 // Simula tempo de inicialização
-                await new Promise(resolve => { setTimeout(resolve, 100));
+                await new Promise(resolve => {
+                    setTimeout(resolve, 100);
+                });
 
                 this.initialized = true;
                 console.log('  > Inicialização concluída');
@@ -227,11 +223,7 @@ async function testBrowserPoolMemoization() {
 
         console.log('> Chamando initialize() 3 vezes em paralelo...');
 
-        await Promise.all([
-            pool.initialize(),
-            pool.initialize(),
-            pool.initialize()
-        ]);
+        await Promise.all([pool.initialize(), pool.initialize(), pool.initialize()]);
 
         console.log(`> Contador de inicializações reais: ${pool.initCount}`);
 
@@ -253,7 +245,6 @@ async function testBrowserPoolMemoization() {
         console.log('✅ Retornou imediatamente (já inicializado)');
         console.log('✅ TEST 4 PASSOU: Promise Memoization implementado corretamente\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 4 FALHOU:', error.message);
         return false;
@@ -274,9 +265,18 @@ async function testIntegrationValidation() {
         const poolManagerPath = path.join(ROOT, 'src/infra/browser_pool/pool_manager.js');
         const patchPath = path.join(ROOT, 'src/infra/ipc_client_v800_patch.js');
 
-        const lockManagerExists = await fs.access(lockManagerPath).then(() => true).catch(() => false);
-        const poolManagerExists = await fs.access(poolManagerPath).then(() => true).catch(() => false);
-        const patchExists = await fs.access(patchPath).then(() => true).catch(() => false);
+        const lockManagerExists = await fs
+            .access(lockManagerPath)
+            .then(() => true)
+            .catch(() => false);
+        const poolManagerExists = await fs
+            .access(poolManagerPath)
+            .then(() => true)
+            .catch(() => false);
+        const patchExists = await fs
+            .access(patchPath)
+            .then(() => true)
+            .catch(() => false);
 
         console.log(`  - lock_manager.js: ${lockManagerExists ? '✅' : '❌'}`);
         console.log(`  - pool_manager.js: ${poolManagerExists ? '✅' : '❌'}`);
@@ -318,7 +318,6 @@ async function testIntegrationValidation() {
 
         console.log('✅ TEST 5 PASSOU: Todos os arquivos validados\n');
         return true;
-
     } catch (error) {
         console.error('❌ TEST 5 FALHOU:', error.message);
         return false;

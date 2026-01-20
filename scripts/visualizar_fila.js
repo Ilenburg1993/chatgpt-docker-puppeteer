@@ -12,20 +12,20 @@ const HTML_OUT = path.join(PUBLIC_DIR, 'graph.html');
 const MODE_HTML = process.argv.includes('--html');
 
 // --- HELPERS DE DADOS (V3) ---
-const getStatus = (t) => t.state?.status || t.status || 'UNKNOWN';
-const getId = (t) => t.meta?.id || t.id || '???';
-const getDeps = (t) => t.policy?.dependencies || t.dependsOn || [];
-const getPrompt = (t) => t.spec?.payload?.user_message || t.prompt || '';
-const getPrio = (t) => t.meta?.priority ?? t.prioridade ?? 5;
-const getAttempts = (t) => t.state?.attempts || 0;
-const getProject = (t) => (t.meta?.tags && t.meta.tags.length > 0) ? t.meta.tags[0] : 'Sem Projeto';
+const getStatus = t => t.state?.status || t.status || 'UNKNOWN';
+const getId = t => t.meta?.id || t.id || '???';
+const getDeps = t => t.policy?.dependencies || t.dependsOn || [];
+const getPrompt = t => t.spec?.payload?.user_message || t.prompt || '';
+const getPrio = t => t.meta?.priority ?? t.prioridade ?? 5;
+const getAttempts = t => t.state?.attempts || 0;
+const getProject = t => (t.meta?.tags && t.meta.tags.length > 0 ? t.meta.tags[0] : 'Sem Projeto');
 
 // Cores Semânticas
 const COLORS = {
     PENDING: '#8b949e', // Cinza
     RUNNING: '#d29922', // Amarelo/Ouro
-    DONE: '#238636',    // Verde
-    FAILED: '#f85149',  // Vermelho
+    DONE: '#238636', // Verde
+    FAILED: '#f85149', // Vermelho
     SKIPPED: '#30363d', // Cinza Escuro
     SCHEDULED: '#58a6ff' // Azul
 };
@@ -36,7 +36,9 @@ if (!fs.existsSync(QUEUE_DIR)) {
     console.error("❌ Erro: Pasta 'fila' não encontrada.");
     process.exit(1);
 }
-if (MODE_HTML && !fs.existsSync(PUBLIC_DIR)) {fs.mkdirSync(PUBLIC_DIR, { recursive: true });}
+if (MODE_HTML && !fs.existsSync(PUBLIC_DIR)) {
+    fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+}
 
 const files = fs.readdirSync(QUEUE_DIR).filter(f => f.endsWith('.json'));
 const tasks = [];
@@ -45,7 +47,9 @@ files.forEach(f => {
     try {
         const content = fs.readFileSync(path.join(QUEUE_DIR, f), 'utf-8');
         tasks.push(JSON.parse(content));
-    } catch(e) { /* arquivo em escrita */ }
+    } catch (e) {
+        /* arquivo em escrita */
+    }
 });
 
 // --- MODO HTML (Vis.js) ---
@@ -57,7 +61,9 @@ if (MODE_HTML) {
         const prio = getPrio(t);
 
         let label = `${getId(t)}\n[${status}]`;
-        if (attempts > 0) {label += `\nRetry: ${attempts}`;}
+        if (attempts > 0) {
+            label += `\nRetry: ${attempts}`;
+        }
 
         return {
             id: getId(t),
@@ -147,7 +153,6 @@ if (MODE_HTML) {
     fs.writeFileSync(HTML_OUT, htmlContent);
     console.log(`\n✅ Grafo gerado: public/graph.html`);
     console.log(`   Acesse: http://localhost:3000/graph.html`);
-
 } else {
     // --- MODO DOT (Padrão para CLI) ---
     console.log('digraph Fila {');

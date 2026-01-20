@@ -12,6 +12,7 @@
 ## 🎯 O QUE FOI REALIZADO
 
 ### ✨ Documentação Visual Completa
+
 ```
 ✅ ARCHITECTURE_DIAGRAMS.md  - 11 diagramas Mermaid
 ✅ ROADMAP.md               - 6 fases até v1.0 (Gantt)
@@ -20,6 +21,7 @@
 ```
 
 ### 🛠️ Ferramentas Instaladas
+
 ```bash
 ✅ mermaid           # Diagramas como código
 ✅ graphviz-cli      # Grafos (SVG/PNG)
@@ -27,12 +29,14 @@
 ```
 
 ### 🎨 Scripts Criados
+
 ```bash
 ✅ scripts/setup.sh   # Setup automatizado
 ✅ scripts/doctor.sh  # Diagnóstico completo
 ```
 
 ### 📦 Novos Comandos NPM
+
 ```bash
 npm run setup                # One-command setup
 npm run doctor               # Diagnóstico do sistema
@@ -47,29 +51,34 @@ npm run analyze:deps:graph   # Gerar grafo visual
 ### ⚠️ Issues Detectados
 
 1. **Dependência Circular** (ALTA PRIORIDADE)
-   ```
-   core/config.js → infra/io.js → infra/queue/task_loader.js
-   ```
-   **Ação**: Refatorar para injeção de dependência
+
+    ```
+    core/config.js → infra/io.js → infra/queue/task_loader.js
+    ```
+
+    **Ação**: Refatorar para injeção de dependência
 
 2. **2 Locks Órfãos na Fila** (MÉDIA PRIORIDADE)
-   ```
-   TASK-GUI-1768290824104.json.tmp.4016 (PID morto)
-   test-lock-001.json.tmp.19100 (PID morto)
-   ```
-   **Ação**: `rm fila/*.tmp.*` + script de cleanup
+
+    ```
+    TASK-GUI-1768290824104.json.tmp.4016 (PID morto)
+    test-lock-001.json.tmp.19100 (PID morto)
+    ```
+
+    **Ação**: `rm fila/*.tmp.*` + script de cleanup
 
 3. **Chrome Não Configurado** (OPERACIONAL)
-   ```
-   Chrome não detectado na porta 9222
-   ```
-   **Ação**: Ver comando no output do `npm run doctor`
+    ```
+    Chrome não detectado na porta 9222
+    ```
+    **Ação**: Ver comando no output do `npm run doctor`
 
 ---
 
 ## 🚀 PRÓXIMOS PASSOS (ESTA SEMANA)
 
 ### Dia 1-2: Testing Infrastructure
+
 ```bash
 npm install --save-dev jest c8 supertest @faker-js/faker
 mkdir -p tests/{unit,integration,e2e,fixtures}
@@ -77,6 +86,7 @@ mkdir -p tests/{unit,integration,e2e,fixtures}
 ```
 
 ### Dia 3-4: Observability
+
 ```bash
 npm install pino pino-pretty prom-client
 # - Logs estruturados JSON
@@ -85,6 +95,7 @@ npm install pino pino-pretty prom-client
 ```
 
 ### Dia 5-7: Fixes Críticos
+
 - [ ] Resolver dependência circular
 - [ ] Script para limpar locks órfãos
 - [ ] Top 5 error messages melhorados
@@ -93,20 +104,21 @@ npm install pino pino-pretty prom-client
 
 ## 📊 ESTADO ATUAL
 
-| Componente | Status | Próximo Passo |
-|-----------|--------|---------------|
-| **Docs** | ✅ 100% | Manter atualizada |
-| **Tooling** | ✅ 100% | Usar ativamente |
-| **Engine** | ✅ 80% | Validação refinada |
-| **Tests** | ❌ <30% | **URGENTE** |
-| **Observability** | ⚠️ 30% | Prometheus (Semana 1) |
-| **Extensibility** | ❌ 0% | Plugin API (Semana 2) |
+| Componente        | Status  | Próximo Passo         |
+| ----------------- | ------- | --------------------- |
+| **Docs**          | ✅ 100% | Manter atualizada     |
+| **Tooling**       | ✅ 100% | Usar ativamente       |
+| **Engine**        | ✅ 80%  | Validação refinada    |
+| **Tests**         | ❌ <30% | **URGENTE**           |
+| **Observability** | ⚠️ 30%  | Prometheus (Semana 1) |
+| **Extensibility** | ❌ 0%   | Plugin API (Semana 2) |
 
 ---
 
 ## 🎓 COMO USAR
 
 ### 1. Visualizar Arquitetura
+
 ```bash
 # No VS Code
 code --install-extension bierner.markdown-mermaid
@@ -121,6 +133,7 @@ code DOCUMENTAÇÃO/ARCHITECTURE_DIAGRAMS.md
 ```
 
 ### 2. Diagnosticar Sistema
+
 ```bash
 npm run doctor
 
@@ -136,6 +149,7 @@ npm run doctor
 ```
 
 ### 3. Analisar Dependências
+
 ```bash
 # Circular dependencies
 npm run analyze:deps
@@ -147,6 +161,7 @@ npm run analyze:deps:graph     # Gera deps-graph.svg
 ```
 
 ### 4. Setup Inicial
+
 ```bash
 npm run setup
 # Faz tudo automaticamente:
@@ -161,42 +176,47 @@ npm run setup
 ## 📖 DOCUMENTAÇÃO CRIADA
 
 ### 🏗️ Arquitetura
+
 - **[ARCHITECTURE_DIAGRAMS.md](DOCUMENTAÇÃO/ARCHITECTURE_DIAGRAMS.md)**
-  - C4 Context & Container
-  - Sequence Diagrams
-  - Class Diagrams
-  - State Machines
-  - Deployment Architecture
-  - 11 diagramas no total
+    - C4 Context & Container
+    - Sequence Diagrams
+    - Class Diagrams
+    - State Machines
+    - Deployment Architecture
+    - 11 diagramas no total
 
 ### 🗺️ Planejamento
+
 - **[ROADMAP.md](DOCUMENTAÇÃO/ROADMAP.md)**
-  - 6 Fases até v1.0
-  - Timeline: Jan-Abr 2026
-  - Gantt chart visual
-  - Métricas de sucesso
-  - Post-v1.0 vision
+    - 6 Fases até v1.0
+    - Timeline: Jan-Abr 2026
+    - Gantt chart visual
+    - Métricas de sucesso
+    - Post-v1.0 vision
 
 ### 🔍 Análise
+
 - **[GAP_ANALYSIS.md](DOCUMENTAÇÃO/GAP_ANALYSIS.md)**
-  - 6 categorias auditadas
-  - Issues priorizados
-  - Plano de 2 semanas
-  - Riscos e mitigações
-  - Checklist de validação
+    - 6 categorias auditadas
+    - Issues priorizados
+    - Plano de 2 semanas
+    - Riscos e mitigações
+    - Checklist de validação
 
 ### 📋 Resumo
+
 - **[SUMMARY.md](DOCUMENTAÇÃO/SUMMARY.md)**
-  - Overview executivo
-  - Descobertas críticas
-  - Próximos passos
-  - FAQs
+    - Overview executivo
+    - Descobertas críticas
+    - Próximos passos
+    - FAQs
 
 ---
 
 ## 🎯 MÉTRICAS DE PROGRESSO
 
 ### Baseline (Agora → Target Semana 2 → v1.0)
+
 ```
 Test Coverage:     0% → 40% → 80%
 Circular Deps:     1 → 0 → 0
@@ -206,13 +226,16 @@ Docs Pages:        11 → 15 → 20+
 ```
 
 ### Checkpoints
+
 **Checkpoint 1** (Fim Semana 1):
+
 - [ ] Tests rodando no CI
 - [ ] Coverage ≥40%
 - [ ] Logs estruturados
 - [ ] Metrics endpoint
 
 **Checkpoint 2** (Fim Semana 2):
+
 - [ ] Plugin system funcional
 - [ ] Browser pooling
 - [ ] CLI moderno
@@ -223,6 +246,7 @@ Docs Pages:        11 → 15 → 20+
 ## 🔗 LINKS RÁPIDOS
 
 ### Comandos Essenciais
+
 ```bash
 npm run setup           # Setup inicial
 npm run doctor          # Diagnóstico
@@ -235,6 +259,7 @@ npm run daemon:logs     # Ver logs
 ```
 
 ### Documentação
+
 - [Architecture Diagrams](DOCUMENTAÇÃO/ARCHITECTURE_DIAGRAMS.md)
 - [Roadmap](DOCUMENTAÇÃO/ROADMAP.md)
 - [Gap Analysis](DOCUMENTAÇÃO/GAP_ANALYSIS.md)
@@ -243,6 +268,7 @@ npm run daemon:logs     # Ver logs
 - [API Reference](DOCUMENTAÇÃO/API.md)
 
 ### Ferramentas Externas
+
 - [Mermaid Live Editor](https://mermaid.live/)
 - [C4 Model](https://c4model.com/)
 - [Jest Docs](https://jestjs.io/)
@@ -253,6 +279,7 @@ npm run daemon:logs     # Ver logs
 ## ✅ AÇÕES IMEDIATAS
 
 ### 1. Commit das Mudanças
+
 ```bash
 git add DOCUMENTAÇÃO/ scripts/ package.json package-lock.json
 git commit -m "feat: add architecture diagrams, roadmap, and diagnostic tools
@@ -269,11 +296,13 @@ git commit -m "feat: add architecture diagrams, roadmap, and diagnostic tools
 ```
 
 ### 2. Limpar Locks Órfãos (Temporário)
+
 ```bash
 rm fila/*.tmp.*
 ```
 
 ### 3. Iniciar Chrome (Se Necessário)
+
 ```bash
 # Linux
 google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-automation-profile"
@@ -283,6 +312,7 @@ google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-automat
 ```
 
 ### 4. Validar Setup
+
 ```bash
 npm run doctor
 ```
@@ -306,7 +336,7 @@ Na próxima sessão, vamos focar em:
 ✅ **Ferramentas instaladas** - Mermaid, Madge, Graphviz  
 ✅ **Scripts criados** - setup.sh, doctor.sh  
 ✅ **Issues identificados** - 1 circular dep, 2 orphan locks  
-✅ **Roadmap definido** - 6 fases até v1.0 (Abril 2026)  
+✅ **Roadmap definido** - 6 fases até v1.0 (Abril 2026)
 
 **Status**: Fase 1 (Consolidação) - 20% completa  
 **Próximo Milestone**: Checkpoint 1 (26 Jan 2026)  

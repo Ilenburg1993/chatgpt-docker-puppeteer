@@ -10,7 +10,9 @@
 ### 1. ✨ Documentação Visual Completa (CONCLUÍDO)
 
 #### 📐 [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md)
+
 Diagramas Mermaid abrangentes criados:
+
 - **C4 Context Diagram**: Visão de sistema externo
 - **C4 Container Diagram**: Arquitetura de containers
 - **Sequence Diagram**: Fluxo completo de processamento
@@ -26,14 +28,18 @@ Diagramas Mermaid abrangentes criados:
 **Impacto**: Onboarding de novos desenvolvedores reduzido de horas para minutos.
 
 #### 🗺️ [ROADMAP.md](ROADMAP.md)
+
 Planejamento estratégico completo:
+
 - **6 Fases até v1.0** com timeline Gantt visual
 - **Métricas de sucesso** técnicas e de negócio
 - **Post-v1.0 vision** (v1.x e v2.0)
 - **Timeline**: ~3 meses até release v1.0 (Abril 2026)
 
 #### 🔍 [GAP_ANALYSIS.md](GAP_ANALYSIS.md)
+
 Análise crítica detalhada:
+
 - **6 categorias auditadas**: Arquitetura, Testing, Observability, Extensibility, Performance, DX
 - **Plano de 2 semanas** com checkpoints diários
 - **Riscos identificados** com mitigações
@@ -44,6 +50,7 @@ Análise crítica detalhada:
 ### 2. 🛠️ Ferramentas Instaladas
 
 #### Diagramação
+
 ```bash
 ✅ mermaid              # Diagramas como código
 ✅ graphviz-cli         # Grafos de dependências
@@ -51,12 +58,14 @@ Análise crítica detalhada:
 ```
 
 #### Scripts Criados
+
 ```bash
 ✅ scripts/setup.sh     # Setup automatizado completo
 ✅ scripts/doctor.sh    # Diagnóstico profundo do sistema
 ```
 
 #### Novos Comandos NPM
+
 ```bash
 npm run setup           # One-command setup
 npm run doctor          # Diagnóstico completo
@@ -71,23 +80,28 @@ npm run analyze:deps:graph # Gerar grafo visual (SVG)
 ### ⚠️ Issues Críticos Detectados
 
 #### 1. **Dependência Circular** (Detectado pelo madge)
+
 ```
 core/config.js → infra/io.js → infra/queue/task_loader.js
 ```
+
 **Impacto**: Dificulta refactoring, pode causar race conditions  
 **Prioridade**: ALTA  
 **Solução**: Refatorar para injeção de dependência ou event-driven
 
 #### 2. **Locks Órfãos na Fila**
+
 ```
 TASK-GUI-1768290824104.json.tmp.4016.1768291472697 (PID morto)
 test-lock-001.json.tmp.19100.1768200422288 (PID morto)
 ```
+
 **Impacto**: Tarefas travadas indefinidamente  
 **Prioridade**: MÉDIA  
 **Solução**: Script de cleanup automático ou TTL nos locks
 
 #### 3. **Chrome Não Configurado**
+
 **Impacto**: Sistema não pode processar tarefas  
 **Prioridade**: OPERACIONAL  
 **Solução**: Documentado no doctor com comandos exatos
@@ -96,16 +110,16 @@ test-lock-001.json.tmp.19100.1768200422288 (PID morto)
 
 ## 📊 Estado Atual do Sistema
 
-| Componente | Status | Cobertura | Prioridade |
-|-----------|--------|-----------|-----------|
-| **Engine** | ✅ Funcional | ~80% features | Refinar validação |
-| **Drivers** | ✅ ChatGPT OK | Gemini parcial | Adicionar Claude |
-| **Queue** | ⚠️ 2 orphans | File-based | Migrar Redis (Fase 3) |
-| **Dashboard** | ✅ Funcional | UI básica | Redesign (Fase 2) |
-| **Tests** | ❌ Insuficiente | <30% estimado | **URGENTE** |
-| **Docs** | ✅ Completa | 100% | Manter atualizada |
-| **Observability** | ⚠️ Básica | Logs simples | Prometheus (Semana 1) |
-| **Extensibility** | ❌ Ausente | N/A | Plugin API (Semana 2) |
+| Componente        | Status          | Cobertura      | Prioridade            |
+| ----------------- | --------------- | -------------- | --------------------- |
+| **Engine**        | ✅ Funcional    | ~80% features  | Refinar validação     |
+| **Drivers**       | ✅ ChatGPT OK   | Gemini parcial | Adicionar Claude      |
+| **Queue**         | ⚠️ 2 orphans    | File-based     | Migrar Redis (Fase 3) |
+| **Dashboard**     | ✅ Funcional    | UI básica      | Redesign (Fase 2)     |
+| **Tests**         | ❌ Insuficiente | <30% estimado  | **URGENTE**           |
+| **Docs**          | ✅ Completa     | 100%           | Manter atualizada     |
+| **Observability** | ⚠️ Básica       | Logs simples   | Prometheus (Semana 1) |
+| **Extensibility** | ❌ Ausente      | N/A            | Plugin API (Semana 2) |
 
 ---
 
@@ -114,6 +128,7 @@ test-lock-001.json.tmp.19100.1768200422288 (PID morto)
 ### 🔥 Esta Semana (Dias 1-7)
 
 #### Segunda/Terça: Testing Infrastructure
+
 ```bash
 # Instalar ferramentas
 npm install --save-dev jest c8 supertest @faker-js/faker
@@ -128,6 +143,7 @@ npm run test:coverage
 **Deliverable**: CI rodando testes com coverage report
 
 #### Quarta/Quinta: Observability
+
 ```bash
 # Instalar Pino + Prometheus
 npm install pino pino-pretty prom-client
@@ -141,6 +157,7 @@ npm install pino pino-pretty prom-client
 **Deliverable**: Dashboard Grafana opcional com métricas
 
 #### Sexta: Fixes Críticos
+
 - [ ] Resolver dependência circular (config → io → task_loader)
 - [ ] Script para limpar locks órfãos
 - [ ] Melhorar error messages (top 5)
@@ -150,18 +167,21 @@ npm install pino pino-pretty prom-client
 ### 📅 Próxima Semana (Dias 8-14)
 
 #### Plugin System Design
+
 - [ ] Definir interfaces `Plugin`, `PluginContext`
 - [ ] Implementar `PluginLoader`
 - [ ] Criar plugin exemplo (Gemini driver)
 - [ ] CLI scaffold: `npm run plugin:create`
 
 #### Performance Baseline
+
 - [ ] Browser pooling (generic-pool)
 - [ ] Benchmarks de throughput
 - [ ] Memory profiling
 - [ ] Documentar resultados
 
 #### Developer Experience
+
 - [ ] CLI com Commander.js
 - [ ] Improved error messages
 - [ ] `npm run setup` refinado
@@ -173,6 +193,7 @@ npm install pino pino-pretty prom-client
 ### 1. Visualizar Arquitetura
 
 #### No VS Code (Recomendado)
+
 ```bash
 # Instalar extensão
 code --install-extension bierner.markdown-mermaid
@@ -183,9 +204,11 @@ code DOCUMENTAÇÃO/ARCHITECTURE_DIAGRAMS.md
 ```
 
 #### No GitHub
+
 Apenas abra `ARCHITECTURE_DIAGRAMS.md` - renderização automática!
 
 #### Gerar PNGs/SVGs
+
 ```bash
 # Online (sem instalação)
 # Copie o código Mermaid e cole em: https://mermaid.live/
@@ -244,6 +267,7 @@ npm run setup
 ## 📋 Checklist de Validação da Fase 1
 
 ### Arquitetura ✅ (CONCLUÍDO)
+
 - [x] Diagramas Mermaid criados (11 tipos)
 - [x] Roadmap detalhado com Gantt
 - [x] Gap analysis completo
@@ -251,6 +275,7 @@ npm run setup
 - [ ] Dependências circulares resolvidas (esta semana)
 
 ### Testing ⏳ (EM ANDAMENTO)
+
 - [ ] Jest + c8 configurados
 - [ ] Estrutura tests/ organizada
 - [ ] 50+ unit tests
@@ -260,6 +285,7 @@ npm run setup
 - [ ] CI verde consistente
 
 ### Observability ⏳ (EM ANDAMENTO)
+
 - [ ] Pino logs estruturados
 - [ ] Correlation IDs
 - [ ] Prometheus metrics
@@ -267,12 +293,14 @@ npm run setup
 - [ ] Health check avançado
 
 ### Tooling ✅ (CONCLUÍDO)
+
 - [x] Mermaid instalado
 - [x] Madge para análise
 - [x] Scripts doctor/setup
 - [x] Comandos NPM atualizados
 
 ### Documentation ✅ (CONCLUÍDO)
+
 - [x] ARCHITECTURE_DIAGRAMS.md
 - [x] ROADMAP.md
 - [x] GAP_ANALYSIS.md
@@ -283,6 +311,7 @@ npm run setup
 ## 🎯 Métricas de Progresso
 
 ### Baseline (Agora)
+
 ```
 Test Coverage:     ~0% → Target: 40% (Semana 1) → 80% (v1.0)
 Circular Deps:     1 detectada → Target: 0 (Semana 1)
@@ -292,7 +321,9 @@ Docs Pages:        11 → Target: 15 (Semana 2) → 20+ (v1.0)
 ```
 
 ### Tracking Diário
+
 Use o GitHub Projects ou Trello:
+
 ```
 TODO:
 - [ ] Fix circular dependency
@@ -315,6 +346,7 @@ DONE:
 ## 🔗 Links Rápidos
 
 ### Documentação
+
 - 📐 [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md)
 - 🗺️ [Roadmap](ROADMAP.md)
 - 🔍 [Gap Analysis](GAP_ANALYSIS.md)
@@ -323,12 +355,14 @@ DONE:
 - 📖 [API Reference](API.md)
 
 ### Ferramentas
+
 - [Mermaid Live Editor](https://mermaid.live/)
 - [C4 Model Guide](https://c4model.com/)
 - [Jest Documentation](https://jestjs.io/)
 - [Prometheus Best Practices](https://prometheus.io/docs/practices/)
 
 ### Scripts
+
 ```bash
 npm run setup          # Setup inicial
 npm run doctor         # Diagnóstico
@@ -343,21 +377,24 @@ npm run queue:status   # Status da fila
 ## 💡 Recomendações Finais
 
 ### Imediato (Hoje/Amanhã)
+
 1. **Limpar locks órfãos**: `rm fila/*.tmp.*` (manual por ora)
 2. **Iniciar Chrome**: Seguir comando do `npm run doctor`
 3. **Commit das mudanças**:
-   ```bash
-   git add DOCUMENTAÇÃO/ scripts/ package.json
-   git commit -m "feat: add architecture diagrams, roadmap, and diagnostic tools"
-   ```
+    ```bash
+    git add DOCUMENTAÇÃO/ scripts/ package.json
+    git commit -m "feat: add architecture diagrams, roadmap, and diagnostic tools"
+    ```
 
 ### Esta Semana
+
 1. **Resolver dependência circular** (core/config → infra/io)
 2. **Setup testing infrastructure** (Jest, c8, supertest)
 3. **Implementar logs estruturados** (Pino)
 4. **Criar primeiros 20 testes**
 
 ### Próxima Semana
+
 1. **Design Plugin API**
 2. **Browser pooling**
 3. **CLI moderno**
@@ -368,22 +405,29 @@ npm run queue:status   # Status da fila
 ## ❓ FAQ
 
 ### Q: Por onde começar?
+
 **A**: Execute `npm run doctor` para ver o estado atual, depois `npm run setup` para garantir que tudo está configurado.
 
 ### Q: Como contribuir com o roadmap?
+
 **A**: Abra issues no GitHub com label `enhancement`, vote com 👍 em features desejadas, ou submeta PRs seguindo o [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ### Q: O sistema está pronto para produção?
+
 **A**: Não ainda. Estamos em Pre-v1.0. Use em ambientes controlados. Production-ready estimado para Abril 2026.
 
 ### Q: Como visualizar os diagramas?
-**A**: 
+
+**A**:
+
 1. No GitHub: Abra `ARCHITECTURE_DIAGRAMS.md` diretamente
 2. No VS Code: Instale extensão Mermaid e abra com preview
 3. Online: Copie código para https://mermaid.live/
 
 ### Q: E se o doctor reportar problemas?
+
 **A**: Siga as ações recomendadas no output. Problemas comuns:
+
 - Chrome não rodando → Inicie com `--remote-debugging-port=9222`
 - Locks órfãos → Delete arquivos `.tmp.*` na fila
 - Dependências faltando → Execute `npm install`
@@ -392,9 +436,10 @@ npm run queue:status   # Status da fila
 
 ## 🎊 Conclusão
 
-**Status**: Fase 1 (Consolidação) iniciada com sucesso! 
+**Status**: Fase 1 (Consolidação) iniciada com sucesso!
 
 **Progresso**: ~20% da Fase 1 completa
+
 - ✅ Arquitetura visual documentada
 - ✅ Roadmap detalhado criado
 - ✅ Ferramentas de diagnóstico instaladas
@@ -403,6 +448,7 @@ npm run queue:status   # Status da fila
 - ⏳ Observability (próximo)
 
 **Próximo Milestone**: Checkpoint 1 (Fim Semana 1)
+
 - [ ] Tests rodando no CI
 - [ ] Coverage report visível
 - [ ] Logs estruturados

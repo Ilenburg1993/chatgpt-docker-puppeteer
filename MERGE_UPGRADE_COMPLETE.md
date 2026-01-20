@@ -10,62 +10,62 @@ Merge bem-sucedido de todos os upgrades de dependências e otimizações de conf
 
 ## Dependências Atualizadas
 
-| Dependência | Versão Anterior | Nova Versão | Status |
-|------------|----------------|-------------|---------|
-| **Puppeteer** | 21.11.0 | 24.35.0 | ✅ Validado |
-| **PM2** | 5.4.3 | 6.0.14 | ✅ Validado |
-| **Zod** | 3.25.76 | 4.3.5 | ✅ Validado |
-| **uuid** | 11.1.0 | 13.0.0 | ✅ Validado |
-| **cross-env** | 7.0.3 | 10.1.0 | ✅ Validado |
+| Dependência   | Versão Anterior | Nova Versão | Status      |
+| ------------- | --------------- | ----------- | ----------- |
+| **Puppeteer** | 21.11.0         | 24.35.0     | ✅ Validado |
+| **PM2**       | 5.4.3           | 6.0.14      | ✅ Validado |
+| **Zod**       | 3.25.76         | 4.3.5       | ✅ Validado |
+| **uuid**      | 11.1.0          | 13.0.0      | ✅ Validado |
+| **cross-env** | 7.0.3           | 10.1.0      | ✅ Validado |
 
 ## Arquivos de Configuração Criados/Otimizados
 
 ### Novos Arquivos
 
 1. **[.vscode/extensions.json](.vscode/extensions.json)**
-   - 20 extensões recomendadas para o projeto
-   - 3 extensões indesejadas bloqueadas (Prettier, Beautify)
-   - Facilita onboarding de novos desenvolvedores
+    - 20 extensões recomendadas para o projeto
+    - 3 extensões indesejadas bloqueadas (Prettier, Beautify)
+    - Facilita onboarding de novos desenvolvedores
 
 2. **[.vscode/launch.json](.vscode/launch.json)**
-   - 8 configurações de debug:
-     * Debug Agente (index.js)
-     * Debug Dashboard (src/server/main.js)
-     * Debug Current Test File
-     * Debug All Tests
-     * Debug P1 Tests
-     * Debug Driver Integration
-     * Attach to PM2 Process (port 9229)
-     * Attach to Docker Container (remote debug)
+    - 8 configurações de debug:
+        - Debug Agente (index.js)
+        - Debug Dashboard (src/server/main.js)
+        - Debug Current Test File
+        - Debug All Tests
+        - Debug P1 Tests
+        - Debug Driver Integration
+        - Attach to PM2 Process (port 9229)
+        - Attach to Docker Container (remote debug)
 
 3. **[.editorconfig](.editorconfig)**
-   - Consistência cross-editor (VS Code, IntelliJ, Vim, etc.)
-   - Regras específicas por tipo de arquivo
-   - Indentação: 4 espaços (default), 2 espaços (JSON/YAML), tabs (Makefile)
+    - Consistência cross-editor (VS Code, IntelliJ, Vim, etc.)
+    - Regras específicas por tipo de arquivo
+    - Indentação: 4 espaços (default), 2 espaços (JSON/YAML), tabs (Makefile)
 
 4. **[.npmrc](.npmrc)**
-   - `engine-strict=true` - força Node.js correto
-   - `save-exact=true` - sem ^ ou ~ em package.json
-   - `audit-level=moderate` - segurança
-   - `prefer-offline=true` - performance
-   - `cache-min=86400` - cache de 24h
+    - `engine-strict=true` - força Node.js correto
+    - `save-exact=true` - sem ^ ou ~ em package.json
+    - `audit-level=moderate` - segurança
+    - `prefer-offline=true` - performance
+    - `cache-min=86400` - cache de 24h
 
 ### Arquivos Atualizados
 
 5. **[.vscode/settings.json](.vscode/settings.json)**
-   - Adicionadas associações de arquivo (ecosystem.config.js, Dockerfile)
-   - Exclusões otimizadas (fila/, respostas/, profile/)
-   - Melhor integração com ferramentas do projeto
+    - Adicionadas associações de arquivo (ecosystem.config.js, Dockerfile)
+    - Exclusões otimizadas (fila/, respostas/, profile/)
+    - Melhor integração com ferramentas do projeto
 
 6. **[jsconfig.json](jsconfig.json)**
-   - Adicionados path mappings para imports limpos:
-     * `@core/*` → `src/core/*`
-     * `@driver/*` → `src/driver/*`
-     * `@infra/*` → `src/infra/*`
-     * `@kernel/*` → `src/kernel/*`
-     * `@logic/*` → `src/logic/*`
-     * `@server/*` → `src/server/*`
-   - Inclui `tests/**/*` no escopo do projeto
+    - Adicionados path mappings para imports limpos:
+        - `@core/*` → `src/core/*`
+        - `@driver/*` → `src/driver/*`
+        - `@infra/*` → `src/infra/*`
+        - `@kernel/*` → `src/kernel/*`
+        - `@logic/*` → `src/logic/*`
+        - `@server/*` → `src/server/*`
+    - Inclui `tests/**/*` no escopo do projeto
 
 ## Estratégia de Merge
 
@@ -127,16 +127,19 @@ main (731cea2) ✅ MERGED
 ## Benefícios da Atualização
 
 ### Segurança
+
 - ✅ Dependências atualizadas para versões mais seguras
 - ✅ Vulnerabilidades conhecidas corrigidas
 - ✅ Suporte continuado dos pacotes
 
 ### Performance
+
 - ✅ Puppeteer 24: Melhorias de performance e estabilidade
 - ✅ PM2 6: Otimizações de gerenciamento de processos
 - ✅ Zod 4: Parser mais eficiente
 
 ### Developer Experience
+
 - ✅ Debug configs prontos para uso
 - ✅ Extensões recomendadas automaticamente
 - ✅ Consistência cross-editor garantida
@@ -144,6 +147,7 @@ main (731cea2) ✅ MERGED
 - ✅ NPM otimizado para velocidade e segurança
 
 ### Manutenibilidade
+
 - ✅ Código alinhado com versões modernas
 - ✅ APIs futuras disponíveis
 - ✅ Melhor tipagem e validação
@@ -152,29 +156,33 @@ main (731cea2) ✅ MERGED
 ## Próximos Passos Recomendados
 
 ### Imediato
+
 1. **Teste Completo**: Rodar suite de testes completa em ambiente de staging
 2. **Validação PM2**: Confirmar daemon mode em produção
 3. **Monitoramento**: Observar métricas após deploy
 
 ### Curto Prazo
+
 1. **ESLint Improvements**: Corrigir 116 warnings restantes
-   - `no-promise-executor-return`: 69 ocorrências
-   - `no-empty`: 33 ocorrências
-   - `no-return-await`: 9 ocorrências
+    - `no-promise-executor-return`: 69 ocorrências
+    - `no-empty`: 33 ocorrências
+    - `no-return-await`: 9 ocorrências
 
 2. **Cleanup de Branches**: Remover branches de upgrade já mergeadas
-   ```bash
-   git branch -d upgrade/puppeteer-24
-   git branch -d upgrade/pm2-6
-   git branch -d upgrade/low-risk-deps
-   ```
+
+    ```bash
+    git branch -d upgrade/puppeteer-24
+    git branch -d upgrade/pm2-6
+    git branch -d upgrade/low-risk-deps
+    ```
 
 3. **Documentação**: Atualizar README.md com:
-   - Novas versões de dependências
-   - Requisitos de Node.js (20.x+)
-   - Path aliases disponíveis
+    - Novas versões de dependências
+    - Requisitos de Node.js (20.x+)
+    - Path aliases disponíveis
 
 ### Médio Prazo
+
 1. **Express 5 Upgrade**: Considerar quando estabilizar (atualmente risco alto)
 2. **TypeScript Migration**: Avaliar benefícios com jsconfig atual
 3. **CI/CD Enhancement**: Integrar validação de configs

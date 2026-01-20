@@ -14,7 +14,7 @@ const TEMPLATE_DIR = path.join(ROOT, 'templates');
 // --- HELPERS DE INFRAESTRUTURA ---
 
 function atomicWrite(filepath, content) {
-    const tmp = `${filepath  }.tmp.${  crypto.randomBytes(4).toString('hex')}`;
+    const tmp = `${filepath}.tmp.${crypto.randomBytes(4).toString('hex')}`;
     fs.writeFileSync(tmp, content, 'utf-8');
     fs.renameSync(tmp, filepath);
 }
@@ -26,7 +26,11 @@ function generateUniqueId(prefix = 'TASK-CLI') {
 }
 
 // Garante infra
-[QUEUE_DIR, TEMPLATE_DIR].forEach(d => { if (!fs.existsSync(d)) {fs.mkdirSync(d, { recursive: true });} });
+[QUEUE_DIR, TEMPLATE_DIR].forEach(d => {
+    if (!fs.existsSync(d)) {
+        fs.mkdirSync(d, { recursive: true });
+    }
+});
 
 // --- CONFIGURAÇÃO DE MODELOS ---
 const VALID_TARGETS = ['chatgpt', 'gemini', 'claude', 'perplexity'];
@@ -48,22 +52,37 @@ function parseArgs(args) {
 
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
-        if (arg === '--prio') {options.prio = parseInt(args[++i], 10) || 5;}
-        else if (arg === '--model') {options.model = args[++i];}
-        else if (arg === '--target') {options.target = args[++i];}
-        else if (arg === '--system') {options.system = args[++i];}
-        else if (arg === '--template') {options.template = args[++i];}
-        else if (arg === '--after') {options.after = args[++i];}
-        else if (arg === '--tags') {options.tags = (args[++i] || '').split(',').map(t => t.trim()).filter(t => t);}
-        else if (arg.startsWith('--')) { /* ignora flags desconhecidas */ }
-        else {options.prompt.push(arg);}
+        if (arg === '--prio') {
+            options.prio = parseInt(args[++i], 10) || 5;
+        } else if (arg === '--model') {
+            options.model = args[++i];
+        } else if (arg === '--target') {
+            options.target = args[++i];
+        } else if (arg === '--system') {
+            options.system = args[++i];
+        } else if (arg === '--template') {
+            options.template = args[++i];
+        } else if (arg === '--after') {
+            options.after = args[++i];
+        } else if (arg === '--tags') {
+            options.tags = (args[++i] || '')
+                .split(',')
+                .map(t => t.trim())
+                .filter(t => t);
+        } else if (arg.startsWith('--')) {
+            /* ignora flags desconhecidas */
+        } else {
+            options.prompt.push(arg);
+        }
     }
     return options;
 }
 
 // --- HELPER DE AGENDAMENTO ---
 function parseSchedule(input) {
-    if (!input) {return null;}
+    if (!input) {
+        return null;
+    }
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
         const val = parseInt(match[1]);
@@ -113,7 +132,9 @@ function createTask(opts, promptText) {
         console.log(`\n✅ TAREFA CRIADA: ${id}`);
         console.log(`   🎯 Alvo:    ${task.spec.target} (${task.spec.model})`);
         console.log(`   ⚖️  Prio:    ${task.meta.priority}`);
-        if (executeAfter) {console.log(`   ⏱️  Agenda:  ${new Date(executeAfter).toLocaleString()}`);}
+        if (executeAfter) {
+            console.log(`   ⏱️  Agenda:  ${new Date(executeAfter).toLocaleString()}`);
+        }
         console.log(`   📝 Prompt:  "${promptText.slice(0, 50)}..."`);
     } catch (e) {
         console.error(`\n❌ ERRO AO CRIAR TAREFA: ${e.message}`);
@@ -123,33 +144,44 @@ function createTask(opts, promptText) {
 // --- MODO INTERATIVO (WIZARD) ---
 async function runInteractive() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const ask = (q) => new Promise(r => rl.question(q, r));
+    const ask = q =>
+        new Promise(r => {
+            rl.question(q, r);
+        });
 
     console.log('\n✨ WIZARD DE TAREFA UNIVERSAL (V3)\n');
 
     const prompt = await ask('1. Prompt do Usuário (Instrução): ');
-    if (!prompt) { console.log('Cancelado.'); process.exit(0); }
+    if (!prompt) {
+        console.log('Cancelado.');
+        process.exit(0);
+    }
 
     const system = await ask('2. System Prompt / Persona (Opcional): ');
 
     console.log(`   Disponíveis: [${VALID_TARGETS.join(', ')}]`);
-    const target = await ask('3. Alvo (chatgpt): ') || 'chatgpt';
+    const target = (await ask('3. Alvo (chatgpt): ')) || 'chatgpt';
 
-    const model = await ask(`4. Modelo (${target === 'chatgpt' ? 'gpt-5' : 'auto'}): `) || (target === 'chatgpt' ? 'gpt-5' : 'default');
+    const model =
+        (await ask(`4. Modelo (${target === 'chatgpt' ? 'gpt-5' : 'auto'}): `)) ||
+        (target === 'chatgpt' ? 'gpt-5' : 'default');
 
     const prioInput = await ask('5. Prioridade (1-100, Default 5): ');
     const prio = parseInt(prioInput, 10) || 5;
 
     const after = await ask('6. Agendar para (ex: 10m, 1h ou data ISO): ');
 
-    createTask({
-        prio,
-        model,
-        target,
-        system,
-        after,
-        tags: []
-    }, prompt);
+    createTask(
+        {
+            prio,
+            model,
+            target,
+            system,
+            after,
+            tags: []
+        },
+        prompt
+    );
 
     rl.close();
 }
@@ -163,7 +195,10 @@ if (opts.interactive) {
     let promptText = opts.prompt.join(' ').trim();
 
     if (opts.template) {
-        const tplPath = path.join(TEMPLATE_DIR, opts.template.endsWith('.txt') ? opts.template : `${opts.template}.txt`);
+        const tplPath = path.join(
+            TEMPLATE_DIR,
+            opts.template.endsWith('.txt') ? opts.template : `${opts.template}.txt`
+        );
         if (fs.existsSync(tplPath)) {
             const tplContent = fs.readFileSync(tplPath, 'utf-8');
             promptText = tplContent.replace(/{{INPUT}}/gi, promptText);

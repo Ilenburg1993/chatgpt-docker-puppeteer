@@ -58,7 +58,9 @@ runTest('TEST 1: Driver - Zero importação direta do KERNEL', () => {
 
     for (const file of driverFiles) {
         const filePath = path.join(process.cwd(), file);
-        if (!fs.existsSync(filePath)) {continue;}
+        if (!fs.existsSync(filePath)) {
+            continue;
+        }
 
         const content = fs.readFileSync(filePath, 'utf8');
 
@@ -85,7 +87,9 @@ runTest('TEST 2: Driver - Zero importação direta do SERVER', () => {
 
     for (const file of driverFiles) {
         const filePath = path.join(process.cwd(), file);
-        if (!fs.existsSync(filePath)) {continue;}
+        if (!fs.existsSync(filePath)) {
+            continue;
+        }
 
         const content = fs.readFileSync(filePath, 'utf8');
 
@@ -104,14 +108,13 @@ runTest('TEST 2: Driver - Zero importação direta do SERVER', () => {
 runTest('TEST 3: Driver - Zero acesso direto ao filesystem', () => {
     console.log('> Verificando acesso ao filesystem...');
 
-    const driverFiles = [
-        'src/driver/DriverLifecycleManager.js',
-        'src/driver/nerv_adapter/driver_nerv_adapter.js'
-    ];
+    const driverFiles = ['src/driver/DriverLifecycleManager.js', 'src/driver/nerv_adapter/driver_nerv_adapter.js'];
 
     for (const file of driverFiles) {
         const filePath = path.join(process.cwd(), file);
-        if (!fs.existsSync(filePath)) {continue;}
+        if (!fs.existsSync(filePath)) {
+            continue;
+        }
 
         const content = fs.readFileSync(filePath, 'utf8');
 
@@ -127,7 +130,7 @@ runTest('TEST 3: Driver - Zero acesso direto ao filesystem', () => {
 
             // Verifica operações de filesystem
             if (line.match(/fs\.(read|write|append|unlink|mkdir|rmdir)/i)) {
-                throw new Error(`${file}:${i+1} acessa filesystem diretamente: ${line}`);
+                throw new Error(`${file}:${i + 1} acessa filesystem diretamente: ${line}`);
             }
         }
 
@@ -168,13 +171,19 @@ runTest('TEST 4: DriverNERVAdapter - Comunicação 100% via NERV', () => {
         const line = lines[i].trim();
 
         // Ignora comentários e logs normais
-        if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {continue;}
-        if (line.includes('log(')) {continue;}
+        if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
+            continue;
+        }
+        if (line.includes('log(')) {
+            continue;
+        }
 
         // Verifica emissões não autorizadas
         if (line.match(/\.emit\(/i) && !line.includes('nerv.emit') && !line.includes('driver.emit')) {
             // Pode ter EventEmitter interno para drivers, mas não para comunicação externa
-            if (line.includes('EventEmitter')) {continue;}
+            if (line.includes('EventEmitter')) {
+                continue;
+            }
         }
     }
     console.log('  ✓ Sem emissões diretas fora do NERV');
@@ -324,7 +333,9 @@ console.log(`
 
 📊 Score: ${testsPassed}/8 testes passaram
 
-${testsPassed === 8 ? `
+${
+    testsPassed === 8
+        ? `
 🎉 DRIVER COMPLETAMENTE INTEGRADO VIA NERV!
 
 Princípios validados:
@@ -335,12 +346,14 @@ Princípios validados:
   ✓ Soberania de interrupção (AbortController)
 
 ✨ Arquitetura limpa e desacoplada!
-` : `
+`
+        : `
 ⚠️  ALGUNS TESTES FALHARAM (${testsFailed}/8)
 
 Revise os logs acima para identificar violações
 dos princípios NERV.
-`}
+`
+}
 `);
 
 process.exit(testsPassed === 8 ? 0 : 1);

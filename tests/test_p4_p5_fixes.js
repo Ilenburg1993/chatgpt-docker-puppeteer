@@ -33,13 +33,13 @@ function log(type, message) {
 }
 
 function header(text) {
-    console.log(`\n${  colors.cyan  }=== ${  text  } ===${  colors.reset}`);
+    console.log(`\n${colors.cyan}=== ${text} ===${colors.reset}`);
 }
 
 function summary(text) {
-    console.log(`\n${  colors.blue  }╔══════════════════════════════════════════════════════════════╗`);
-    console.log(`║${  text.padEnd(62)  }║`);
-    console.log(`╚══════════════════════════════════════════════════════════════╝${  colors.reset}`);
+    console.log(`\n${colors.blue}╔══════════════════════════════════════════════════════════════╗`);
+    console.log(`║${text.padEnd(62)}║`);
+    console.log(`╚══════════════════════════════════════════════════════════════╝${colors.reset}`);
 }
 
 // ============================================================================
@@ -266,7 +266,7 @@ async function test6_ConcurrentSignals() {
     let _shutdownInProgress = false;
     let shutdownCalls = 0;
 
-    const gracefulShutdown = async (signal) => {
+    const gracefulShutdown = async signal => {
         if (_shutdownInProgress) {
             log('INFO', `${signal} ignorado (guard funcionou)`);
             return false;
@@ -276,7 +276,9 @@ async function test6_ConcurrentSignals() {
         shutdownCalls++;
 
         // Simula shutdown delay
-        await new Promise(r => { setTimeout(r, 100); });
+        await new Promise(r => {
+            setTimeout(r, 100);
+        });
         return true;
     };
 
@@ -352,7 +354,7 @@ async function test7_OptimisticLock() {
 
     // Cenário 2: Simula race (state muda entre check e write)
     log('INFO', 'Cenário 2: Race condition - state muda antes do write');
-    task.state = 'COMPLETED';  // Reset
+    task.state = 'COMPLETED'; // Reset
     const expectedState = task.state;
 
     // Simula outro processo mudando o state
@@ -364,9 +366,9 @@ async function test7_OptimisticLock() {
         return false;
     } catch (e) {
         if (e.message.includes('[RACE]')) {
-            log('SUCCESS', `Race detectada corretamente: ${  e.message}`);
+            log('SUCCESS', `Race detectada corretamente: ${e.message}`);
         } else {
-            log('FAIL', `Erro errado: ${  e.message}`);
+            log('FAIL', `Erro errado: ${e.message}`);
             return false;
         }
     }
@@ -406,21 +408,21 @@ async function runAllTests() {
     const passedTests = Object.values(results).filter(r => r).length;
 
     console.log('');
-    console.log(`${colors.cyan  }📊 Score: ${  passedTests  }/${  totalTests  } testes passaram${  colors.reset}`);
+    console.log(`${colors.cyan}📊 Score: ${passedTests}/${totalTests} testes passaram${colors.reset}`);
 
     if (passedTests === totalTests) {
         console.log('');
-        console.log(`${colors.green  }🎉 TODAS AS CORREÇÕES P4+P5 VALIDADAS COM SUCESSO!${  colors.reset}`);
+        console.log(`${colors.green}🎉 TODAS AS CORREÇÕES P4+P5 VALIDADAS COM SUCESSO!${colors.reset}`);
         console.log('');
-        console.log(`${colors.cyan  }📈 Progresso Total:${  colors.reset}`);
+        console.log(`${colors.cyan}📈 Progresso Total:${colors.reset}`);
         console.log('  • P1+P2+P3: 15/15 testes (100%)');
-        console.log(`  • P4+P5: ${  passedTests  }/${  totalTests  } testes (100%)`);
+        console.log(`  • P4+P5: ${passedTests}/${totalTests} testes (100%)`);
         console.log('  • TOTAL: 22/22 testes críticos validados');
         console.log('');
-        console.log(`${colors.green  }✨ Resiliência do Sistema: 99.8/100${  colors.reset}`);
+        console.log(`${colors.green}✨ Resiliência do Sistema: 99.8/100${colors.reset}`);
     } else {
         console.log('');
-        console.log(`${colors.red  }⚠️  Alguns testes falharam. Revise as correções.${  colors.reset}`);
+        console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
     }
 
     console.log('');
@@ -428,7 +430,7 @@ async function runAllTests() {
 
 // Executa
 runAllTests().catch(err => {
-    console.error(`${colors.red  }❌ Erro fatal nos testes:`, err.message + colors.reset);
+    console.error(`${colors.red}❌ Erro fatal nos testes:`, err.message + colors.reset);
     console.error(err.stack);
     process.exit(1);
 });
