@@ -11,7 +11,7 @@ const { z } = require('zod');
 const EventEmitter = require('events');
 const { log } = require('./logger');
 const PATHS = require('../infra/fs/paths');
-const io = require('../infra/io');
+const { safeReadJSON } = require('../infra/fs/safe_read');
 
 /**
  * 1. SCHEMA MESTRE (O Contrato Paramétrico)
@@ -67,8 +67,8 @@ class ConfigurationManager extends EventEmitter {
         try {
             log('DEBUG', '[CONFIG] Sincronizando definições com o disco...', correlationId);
 
-            // Leitura segura e assíncrona via Fachada de IO
-            const userConfig = (await io.safeReadJSON(PATHS.CONFIG)) || {};
+            // Leitura segura e assíncrona
+            const userConfig = (await safeReadJSON(PATHS.CONFIG)) || {};
 
             // Validação de Integridade via Zod
             const result = ConfigSchema.safeParse(userConfig);
