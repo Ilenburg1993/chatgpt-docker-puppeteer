@@ -91,6 +91,13 @@ pids/
 # Coverage reports
 coverage/
 .nyc_output/
+.c8/
+*.lcov
+lcov.info
+
+# Test artifacts
+tests/tmp/
+tests/**/*.log
 
 # Security scan outputs
 .secrets.baseline
