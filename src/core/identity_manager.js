@@ -19,8 +19,8 @@ const { ActorRole, PROTOCOL_VERSION } = require('../shared/nerv/constants');
 
 class IdentityManager {
     constructor() {
-        this.robotId = null;               // DNA persistente (Identidade do Robô)
-        this.instanceId = uuidv4();        // Vida efêmera (Identidade do Processo)
+        this.robotId = null; // DNA persistente (Identidade do Robô)
+        this.instanceId = uuidv4(); // Vida efêmera (Identidade do Processo)
         this.capabilities = [
             'BROWSER_CONTROL',
             'SADI_V19',
@@ -56,7 +56,6 @@ class IdentityManager {
 
                 log('WARN', `[IDENTITY] Novo DNA gerado (Nascimento): ${this.robotId}`);
             }
-
         } catch (err) {
             log('FATAL', `[IDENTITY] Falha crítica ao inicializar identidade: ${err.message}`);
             throw err;

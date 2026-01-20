@@ -9,6 +9,11 @@
 ========================================================================== */
 
 const fs = require('fs');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const path = require('path');
 
 // Caminho padrão para recuperação de estado (Legado compatível)
@@ -20,7 +25,7 @@ class TaskStore {
         this.activeTask = null; // null ou Objeto de Tarefa
         this.failureCount = 0;
         this.lastError = null;
-        this.status = 'IDLE';   // IDLE, RUNNING, PAUSED, FAILED
+        this.status = STATUS_VALUES.IDLE; // IDLE, RUNNING, PAUSED, FAILED
     }
 
     /**
@@ -37,7 +42,7 @@ class TaskStore {
                 // Validação mínima para evitar carregar lixo
                 if (state && state.meta && state.meta.id) {
                     this.activeTask = state;
-                    this.status = state.state ? state.state.status : 'IDLE';
+                    this.status = state.state ? state.state.status : STATUS_VALUES.IDLE;
                     console.log(`[KERNEL MEMORY] Memória recuperada: Tarefa ${state.meta.id} em estado ${this.status}`);
                 }
             }
@@ -57,7 +62,7 @@ class TaskStore {
             ...taskPayload,
             // Garante estrutura de estado interna se não vier do payload
             state: taskPayload.state || {
-                status: 'PENDING',
+                status: STATUS_VALUES.PENDING,
                 progress: 0,
                 step: 0,
                 history: []
@@ -66,7 +71,7 @@ class TaskStore {
 
         this.failureCount = 0;
         this.lastError = null;
-        this.status = 'RUNNING'; // Assume intenção de rodar
+        this.status = STATUS_VALUES.RUNNING; // Assume intenção de rodar
 
         console.log(`[KERNEL MEMORY] Nova tarefa estagiada: ${this.activeTask.meta.id}`);
     }
@@ -85,7 +90,9 @@ class TaskStore {
             this.activeTask.state.retry_count = this.failureCount;
         }
 
-        console.log(`[KERNEL MEMORY] Falha registrada #${this.failureCount}: ${errorPayload.msg || 'Erro desconhecido'}`);
+        console.log(
+            `[KERNEL MEMORY] Falha registrada #${this.failureCount}: ${errorPayload.msg || 'Erro desconhecido'}`
+        );
     }
 
     /**
@@ -102,7 +109,7 @@ class TaskStore {
     clearActive() {
         this.activeTask = null;
         this.failureCount = 0;
-        this.status = 'IDLE';
+        this.status = STATUS_VALUES.IDLE;
     }
 
     /**

@@ -24,16 +24,20 @@ const { sleep, cleanText } = require('../fs/fs_utils');
  * @returns {Promise<string|null>} Conteúdo limpo ou null se não localizado.
  */
 async function loadResponse(taskId, signal = null) {
-    const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')  }.txt`;
+    const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
     const filepath = path.join(PATHS.RESPONSE, filename);
 
-    if (!fss.existsSync(filepath)) {return null;}
+    if (!fss.existsSync(filepath)) {
+        return null;
+    }
 
     let attempts = 0;
     while (attempts < 5) {
         try {
             // 1. Check de Aborto Precoce (Soberania do Kernel)
-            if (signal?.aborted) {throw new Error('OPERATION_ABORTED');}
+            if (signal?.aborted) {
+                throw new Error('OPERATION_ABORTED');
+            }
 
             // 2. Validação de Tamanho (Proteção contra Out-of-Memory)
             const stats = await fs.stat(filepath);
@@ -49,7 +53,6 @@ async function loadResponse(taskId, signal = null) {
 
             // 4. Sanitização Universal (Remoção de caracteres de controle)
             return cleanText(content);
-
         } catch (err) {
             // Tratamento de interrupção externa
             if (err.name === 'AbortError' || err.message === 'OPERATION_ABORTED') {
@@ -75,14 +78,14 @@ async function loadResponse(taskId, signal = null) {
  * @param {string} taskId - ID da tarefa cujo resultado deve ser removido.
  */
 async function deleteResponse(taskId) {
-    const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')  }.txt`;
+    const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
     const filepath = path.join(PATHS.RESPONSE, filename);
 
     try {
         if (fss.existsSync(filepath)) {
             await fs.unlink(filepath);
         }
-    } catch (e) {
+    } catch (_e) {
         // Falha no delete não deve interromper o fluxo principal (Best-effort)
     }
 }

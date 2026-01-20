@@ -36,7 +36,9 @@ let isShuttingDown = false;
  * @param {string} signal - O sinal de interrupção (ex: SIGINT, SIGTERM).
  */
 async function gracefulShutdown(signal) {
-    if (isShuttingDown) {return;}
+    if (isShuttingDown) {
+        return;
+    }
     isShuttingDown = true;
 
     log('WARN', `[LIFECYCLE] Sinal ${signal} detectado. Iniciando Protocolo de Encerramento...`);
@@ -51,15 +53,25 @@ async function gracefulShutdown(signal) {
         // 1. DESATIVAÇÃO DOS OBSERVADORES (WATCHERS)
         // Corta a entrada de novos eventos do sistema de arquivos.
         log('DEBUG', '[LIFECYCLE] Finalizando observadores de disco...');
-        if (fsWatcher && typeof fsWatcher.stop === 'function') {fsWatcher.stop();}
-        if (logWatcher && typeof logWatcher.stop === 'function') {logWatcher.stop();}
+        if (fsWatcher && typeof fsWatcher.stop === 'function') {
+            fsWatcher.stop();
+        }
+        if (logWatcher && typeof logWatcher.stop === 'function') {
+            logWatcher.stop();
+        }
 
         // 2. DESATIVAÇÃO DOS MOTORES DE TELEMETRIA E STREAMING
         // Interrompe o fluxo de dados de hardware e barramentos externos.
         log('DEBUG', '[LIFECYCLE] Encerrando barramentos de dados vivos...');
-        if (hardwareTelemetry && typeof hardwareTelemetry.stop === 'function') {hardwareTelemetry.stop();}
-        if (logTail && typeof logTail.stop === 'function') {logTail.stop();}
-        if (pm2Bridge && typeof pm2Bridge.stop === 'function') {pm2Bridge.stop();}
+        if (hardwareTelemetry && typeof hardwareTelemetry.stop === 'function') {
+            hardwareTelemetry.stop();
+        }
+        if (logTail && typeof logTail.stop === 'function') {
+            logTail.stop();
+        }
+        if (pm2Bridge && typeof pm2Bridge.stop === 'function') {
+            pm2Bridge.stop();
+        }
 
         // 3. DESATIVAÇÃO DO HUB DE EVENTOS (SOCKET.IO)
         // [V600] Desconecta agentes e limpa o Registry de forma assíncrona.
@@ -90,7 +102,6 @@ async function gracefulShutdown(signal) {
 
         // Encerramento do processo com código de sucesso.
         process.exit(0);
-
     } catch (e) {
         log('ERROR', `[LIFECYCLE] Colapso durante a sequência de encerramento: ${e.message}`);
         process.exit(1);
@@ -107,12 +118,12 @@ function listenToSignals() {
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
     // Captura de falhas catastróficas para evitar encerramento "sujo" da infraestrutura
-    process.on('uncaughtException', (err) => {
+    process.on('uncaughtException', err => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
         gracefulShutdown('UNCAUGHT_EXCEPTION');
     });
 
-    process.on('unhandledRejection', (reason) => {
+    process.on('unhandledRejection', reason => {
         log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
         gracefulShutdown('UNHANDLED_REJECTION');
     });

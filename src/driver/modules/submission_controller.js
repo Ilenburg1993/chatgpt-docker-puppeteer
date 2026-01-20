@@ -12,8 +12,8 @@ const { log } = require('../../core/logger');
 
 class SubmissionController {
     /**
-   * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
-   */
+     * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
+     */
     constructor(driver) {
         this.driver = driver;
         this.submissionLock = null;
@@ -21,12 +21,12 @@ class SubmissionController {
     }
 
     /**
-   * Executa a submissão da mensagem com monitoramento sensorial.
-   *
-   * @param {object} ctx - Contexto de execução (Page ou Frame).
-   * @param {string} selector - Seletor do campo de entrada.
-   * @param {string} taskId - ID da tarefa ativa.
-   */
+     * Executa a submissão da mensagem com monitoramento sensorial.
+     *
+     * @param {object} ctx - Contexto de execução (Page ou Frame).
+     * @param {string} selector - Seletor do campo de entrada.
+     * @param {string} taskId - ID da tarefa ativa.
+     */
     async submit(ctx, selector, taskId) {
         const correlationId = this.driver.correlationId;
 
@@ -43,7 +43,9 @@ class SubmissionController {
             this.driver._emitVital('PROGRESS_UPDATE', { step: 'SUBMISSION_START', taskId });
 
             // Pequena pausa biomecânica pré-press
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => {
+                setTimeout(r, 300);
+            });
 
             // 2. ACIONAMENTO FÍSICO (Enter Key)
             this.driver._emitVital('PROGRESS_UPDATE', { step: 'SENDING_ENTER_KEY' });
@@ -52,19 +54,19 @@ class SubmissionController {
             // 3. CÁLCULO DE ESPERA ADAPTATIVA
             let debounceDelay = 400;
             try {
-                const timeoutData = await adaptive.getAdjustedTimeout(
-                    this.driver.currentDomain,
-                    0,
-                    'ECHO'
-                );
+                const timeoutData = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'ECHO');
                 // Usamos 10% do timeout de eco como janela de limpeza
                 debounceDelay = Math.min(Math.floor(timeoutData.timeout / 10), 600);
-            } catch (e) { /* Fallback para 400ms */ }
+            } catch (_e) {
+                /* Fallback para 400ms */
+            }
 
-            await new Promise(r => setTimeout(r, debounceDelay));
+            await new Promise(r => {
+                setTimeout(r, debounceDelay);
+            });
 
             // 4. VERIFICAÇÃO DE ESVAZIAMENTO (Confirmação de Recebimento pela IA)
-            const wasCleared = await ctx.evaluate((s) => {
+            const wasCleared = await ctx.evaluate(s => {
                 const el = document.querySelector(s);
                 const content = el?.value || el?.innerText || '';
                 return content.trim().length === 0;
@@ -83,23 +85,24 @@ class SubmissionController {
                     evidence: { selector, delay: debounceDelay }
                 });
 
-                await ctx.evaluate((sel) => {
+                await ctx.evaluate(sel => {
                     const el = document.querySelector(sel);
-                    if (!el) {return;}
+                    if (!el) {
+                        return;
+                    }
                     const evParams = { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 };
 
                     // Dispara a sequência completa de eventos de teclado via DOM
-                    ['keydown', 'keypress', 'keyup'].forEach(t =>
-                        el.dispatchEvent(new KeyboardEvent(t, evParams))
-                    );
+                    ['keydown', 'keypress', 'keyup'].forEach(t => el.dispatchEvent(new KeyboardEvent(t, evParams)));
                 }, selector);
 
                 this.driver._emitVital('PROGRESS_UPDATE', { step: 'SUBMISSION_SYNTHETIC_SENT' });
             }
 
             // Estabilização pós-envio
-            await new Promise(r => setTimeout(r, 500));
-
+            await new Promise(r => {
+                setTimeout(r, 500);
+            });
         } catch (err) {
             log('ERROR', `[SUBMISSION] Falha no processo de envio: ${err.message}`, correlationId);
             throw err;
@@ -109,15 +112,15 @@ class SubmissionController {
     }
 
     /**
-   * Força a liberação do lock de submissão.
-   */
+     * Força a liberação do lock de submissão.
+     */
     clearLock() {
         this.submissionLock = null;
     }
 
     /**
-   * Verifica se o controlador está em período de cooldown.
-   */
+     * Verifica se o controlador está em período de cooldown.
+     */
     isLocked() {
         return !!(this.submissionLock && Date.now() - this.submissionLock < this.LOCK_DURATION);
     }

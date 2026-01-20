@@ -52,10 +52,10 @@ const ALLOWED_TRANSITIONS = Object.freeze({
 
 class TaskRuntime extends EventEmitter {
     /**
-   * @param {Object} params
-   * @param {Object} params.telemetry
-   * Canal de telemetria do Kernel.
-   */
+     * @param {Object} params
+     * @param {Object} params.telemetry
+     * Canal de telemetria do Kernel.
+     */
     constructor({ telemetry }) {
         super();
 
@@ -66,9 +66,9 @@ class TaskRuntime extends EventEmitter {
         this.telemetry = telemetry;
 
         /**
-     * Armazenamento interno de tarefas.
-     * taskId -> estrutura da tarefa
-     */
+         * Armazenamento interno de tarefas.
+         * taskId -> estrutura da tarefa
+         */
         this.tasks = new Map();
     }
 
@@ -77,18 +77,18 @@ class TaskRuntime extends EventEmitter {
   =========================== */
 
     /**
-   * Cria uma nova tarefa lógica.
-   *
-   * @param {Object} params
-   * @param {string} params.taskId
-   * Identificador único da tarefa.
-   *
-   * @param {Object} [params.metadata]
-   * Metadados iniciais (livre, não interpretado pelo TaskRuntime).
-   *
-   * @returns {Object}
-   * Snapshot imutável da tarefa criada.
-   */
+     * Cria uma nova tarefa lógica.
+     *
+     * @param {Object} params
+     * @param {string} params.taskId
+     * Identificador único da tarefa.
+     *
+     * @param {Object} [params.metadata]
+     * Metadados iniciais (livre, não interpretado pelo TaskRuntime).
+     *
+     * @returns {Object}
+     * Snapshot imutável da tarefa criada.
+     */
     createTask({ taskId, metadata = {} }) {
         if (!taskId || typeof taskId !== 'string') {
             throw new Error('createTask requer taskId válido');
@@ -107,15 +107,15 @@ class TaskRuntime extends EventEmitter {
             updatedAt: now,
 
             /**
-       * Histórico interno da tarefa.
-       * Lista de eventos técnicos (não semânticos).
-       */
+             * Histórico interno da tarefa.
+             * Lista de eventos técnicos (não semânticos).
+             */
             history: [],
 
             /**
-       * Metadados livres.
-       * Definidos externamente, nunca interpretados aqui.
-       */
+             * Metadados livres.
+             * Definidos externamente, nunca interpretados aqui.
+             */
             metadata: { ...metadata }
         };
 
@@ -143,19 +143,19 @@ class TaskRuntime extends EventEmitter {
   =========================== */
 
     /**
-   * Aplica transição de estado explícita.
-   *
-   * @param {Object} params
-   * @param {string} params.taskId
-   * @param {string} params.newState
-   * Estado alvo.
-   *
-   * @param {string} params.reason
-   * Descrição da decisão que motivou a transição.
-   *
-   * @returns {Object}
-   * Snapshot atualizado da tarefa.
-   */
+     * Aplica transição de estado explícita.
+     *
+     * @param {Object} params
+     * @param {string} params.taskId
+     * @param {string} params.newState
+     * Estado alvo.
+     *
+     * @param {string} params.reason
+     * Descrição da decisão que motivou a transição.
+     *
+     * @returns {Object}
+     * Snapshot atualizado da tarefa.
+     */
     applyStateTransition({ taskId, newState, reason }) {
         const task = this._getTaskOrThrow(taskId);
 
@@ -167,22 +167,16 @@ class TaskRuntime extends EventEmitter {
         }
 
         if (expectedState === TaskState.TERMINATED) {
-            throw new Error(
-                `Tarefa ${taskId} já está TERMINATED e não pode mudar de estado`
-            );
+            throw new Error(`Tarefa ${taskId} já está TERMINATED e não pode mudar de estado`);
         }
 
         if (!this._isTransitionAllowed(expectedState, newState)) {
-            throw new Error(
-                `Transição não permitida: ${expectedState} → ${newState}`
-            );
+            throw new Error(`Transição não permitida: ${expectedState} → ${newState}`);
         }
 
         // [P5.1 FIX] Verifica se state mudou durante validação (race detection)
         if (task.state !== expectedState) {
-            throw new Error(
-                `[RACE] State changed during transition (expected ${expectedState}, found ${task.state})`
-            );
+            throw new Error(`[RACE] State changed during transition (expected ${expectedState}, found ${task.state})`);
         }
 
         const now = Date.now();
@@ -223,14 +217,14 @@ class TaskRuntime extends EventEmitter {
   =========================== */
 
     /**
-   * Registra referência histórica a uma intenção (COMMAND emitido).
-   * NÃO cria expectativa semântica.
-   *
-   * @param {Object} params
-   * @param {string} params.taskId
-   * @param {Object} params.intent
-   * Descrição da intenção registrada.
-   */
+     * Registra referência histórica a uma intenção (COMMAND emitido).
+     * NÃO cria expectativa semântica.
+     *
+     * @param {Object} params
+     * @param {string} params.taskId
+     * @param {Object} params.intent
+     * Descrição da intenção registrada.
+     */
     recordIntentReference({ taskId, intent }) {
         const task = this._getTaskOrThrow(taskId);
 
@@ -247,14 +241,14 @@ class TaskRuntime extends EventEmitter {
     }
 
     /**
-   * Registra referência histórica a uma observação (EVENT considerado).
-   * NÃO interpreta o EVENT.
-   *
-   * @param {Object} params
-   * @param {string} params.taskId
-   * @param {Object} params.observation
-   * Referência à observação.
-   */
+     * Registra referência histórica a uma observação (EVENT considerado).
+     * NÃO interpreta o EVENT.
+     *
+     * @param {Object} params
+     * @param {string} params.taskId
+     * @param {Object} params.observation
+     * Referência à observação.
+     */
     recordObservationReference({ taskId, observation }) {
         const task = this._getTaskOrThrow(taskId);
 
@@ -271,13 +265,13 @@ class TaskRuntime extends EventEmitter {
     }
 
     /**
-   * Atualiza metadados de uma tarefa.
-   *
-   * @param {Object} params
-   * @param {string} params.taskId
-   * @param {Object} params.metadata
-   * Novos metadados (merge com existentes).
-   */
+     * Atualiza metadados de uma tarefa.
+     *
+     * @param {Object} params
+     * @param {string} params.taskId
+     * @param {Object} params.metadata
+     * Novos metadados (merge com existentes).
+     */
     updateMetadata({ taskId, metadata }) {
         const task = this._getTaskOrThrow(taskId);
 
@@ -300,41 +294,43 @@ class TaskRuntime extends EventEmitter {
   =========================== */
 
     /**
-   * Retorna snapshot imutável de uma tarefa.
-   *
-   * @param {string} taskId
-   * @returns {Object|null}
-   */
+     * Retorna snapshot imutável de uma tarefa.
+     *
+     * @param {string} taskId
+     * @returns {Object|null}
+     */
     getTask(taskId) {
         const task = this.tasks.get(taskId);
-        if (!task) {return null;}
+        if (!task) {
+            return null;
+        }
         return this._snapshot(task);
     }
 
     /**
-   * Lista todas as tarefas existentes.
-   *
-   * @returns {Array<Object>}
-   */
+     * Lista todas as tarefas existentes.
+     *
+     * @returns {Array<Object>}
+     */
     listTasks() {
         return Array.from(this.tasks.values()).map(t => this._snapshot(t));
     }
 
     /**
-   * Filtra tarefas por estado.
-   *
-   * @param {string} state
-   * @returns {Array<Object>}
-   */
+     * Filtra tarefas por estado.
+     *
+     * @param {string} state
+     * @returns {Array<Object>}
+     */
     listTasksByState(state) {
         return this.listTasks().filter(t => t.state === state);
     }
 
     /**
-   * Retorna estatísticas técnicas.
-   *
-   * @returns {Object}
-   */
+     * Retorna estatísticas técnicas.
+     *
+     * @returns {Object}
+     */
     getStats() {
         const byState = {};
 
@@ -357,8 +353,8 @@ class TaskRuntime extends EventEmitter {
   =========================== */
 
     /**
-   * Recupera tarefa ou lança erro.
-   */
+     * Recupera tarefa ou lança erro.
+     */
     _getTaskOrThrow(taskId) {
         const task = this.tasks.get(taskId);
         if (!task) {
@@ -368,23 +364,23 @@ class TaskRuntime extends EventEmitter {
     }
 
     /**
-   * Verifica se transição é permitida.
-   */
+     * Verifica se transição é permitida.
+     */
     _isTransitionAllowed(from, to) {
         return ALLOWED_TRANSITIONS[from]?.includes(to) ?? false;
     }
 
     /**
-   * Registra entrada no histórico interno.
-   */
+     * Registra entrada no histórico interno.
+     */
     _recordHistory(task, entry) {
         task.history.push(Object.freeze(entry));
     }
 
     /**
-   * Produz snapshot imutável da tarefa.
-   * Protege contra mutação externa.
-   */
+     * Produz snapshot imutável da tarefa.
+     * Protege contra mutação externa.
+     */
     _snapshot(task) {
         return Object.freeze({
             taskId: task.taskId,

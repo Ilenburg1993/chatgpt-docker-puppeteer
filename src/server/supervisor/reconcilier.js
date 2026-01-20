@@ -20,7 +20,7 @@ class SupervisorReconciler {
 
         // Limiares de tolerância operacional (NASA Standard)
         this.HEARTBEAT_THRESHOLD_MS = 30000; // 30s sem sinal = Agente Zumbi
-        this.STALL_THRESHOLD_MS = 300000;    // 5min na mesma etapa = Stall Lógico
+        this.STALL_THRESHOLD_MS = 300000; // 5min na mesma etapa = Stall Lógico
     }
 
     /**
@@ -28,7 +28,9 @@ class SupervisorReconciler {
      * Garante que o sistema entre em modo de monitoramento contínuo.
      */
     start() {
-        if (this.checkInterval) {return;}
+        if (this.checkInterval) {
+            return;
+        }
 
         log('INFO', '[RECONCILER] Iniciando vigilância e loop de reconciliação soberana.');
 
@@ -44,7 +46,9 @@ class SupervisorReconciler {
      * Implementa proteção contra duplicidade de listeners em reinicializações.
      */
     _attachSensoryListeners() {
-        if (this.isListening) {return;}
+        if (this.isListening) {
+            return;
+        }
 
         const io = socketHub.getIO();
         if (!io) {
@@ -57,8 +61,8 @@ class SupervisorReconciler {
          * Intercepta eventos de diagnóstico (STALL_DETECTED) no milissegundo
          * em que são emitidos pelo robô, permitindo reação instantânea do Supervisor.
          */
-        io.on('connection', (socket) => {
-            socket.on('message', (envelope) => {
+        io.on('connection', socket => {
+            socket.on('message', envelope => {
                 if (envelope.kind === MessageType.EVENT && envelope.actionCode === 'STALL_DETECTED') {
                     this._handleStallSignal(socket.robot_id, envelope);
                 }
@@ -84,7 +88,10 @@ class SupervisorReconciler {
             // 1. DETECÇÃO DE AGENTE ZUMBI
             // Se o robô parou de enviar batimentos cardíacos ou telemetria.
             if (idleTime > this.HEARTBEAT_THRESHOLD_MS) {
-                log('WARN', `[RECONCILER] Drift detectado: Agente ${robot_id} está silencioso há ${Math.round(idleTime/1000)}s.`);
+                log(
+                    'WARN',
+                    `[RECONCILER] Drift detectado: Agente ${robot_id} está silencioso há ${Math.round(idleTime / 1000)}s.`
+                );
                 this._attemptEmergencyPing(robot_id);
                 return;
             }
@@ -130,10 +137,14 @@ class SupervisorReconciler {
      * @param {string} robotId - ID do robô alvo.
      */
     _attemptEmergencyPing(robotId) {
-        socketHub.sendCommand(ActionCode.ENGINE_RESUME, {
-            reason: 'RECONCILER_HEARTBEAT_RECOVERY',
-            correlation_id: `sys-rec-${Date.now()}`
-        }, robotId);
+        socketHub.sendCommand(
+            ActionCode.ENGINE_RESUME,
+            {
+                reason: 'RECONCILER_HEARTBEAT_RECOVERY',
+                correlation_id: `sys-rec-${Date.now()}`
+            },
+            robotId
+        );
     }
 
     /**

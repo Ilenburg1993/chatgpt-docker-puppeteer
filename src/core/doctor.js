@@ -6,6 +6,11 @@
 ========================================================================== */
 
 const fs = require('fs');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('./constants/tasks.js');
+
 const fsp = require('fs').promises;
 const path = require('path');
 const os = require('os');
@@ -40,11 +45,11 @@ async function probeChromeConnection() {
         }
 
         // Tenta buscar informações detalhadas do Chrome
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
             const client = httpEndpoint.startsWith('https') ? https : http;
-            const req = client.get(versionUrl, (res) => {
+            const req = client.get(versionUrl, res => {
                 let data = '';
-                res.on('data', chunk => data += chunk);
+                res.on('data', chunk => (data += chunk));
                 res.on('end', () => {
                     try {
                         const info = JSON.parse(data);
@@ -67,7 +72,7 @@ async function probeChromeConnection() {
                     }
                 });
             });
-            req.on('error', (err) => {
+            req.on('error', err => {
                 resolve({
                     connected: false,
                     endpoint: httpEndpoint,
@@ -98,10 +103,14 @@ async function probeChromeConnection() {
 // --- GESTÃO DE TENDÊNCIAS (PERSISTÊNCIA DE BASELINE) ---
 async function getTrends() {
     try {
-        if (!fs.existsSync(TREND_FILE)) {return { ram: [], cpu: [], io: [] };}
+        if (!fs.existsSync(TREND_FILE)) {
+            return { ram: [], cpu: [], io: [] };
+        }
         const data = await fsp.readFile(TREND_FILE, 'utf-8');
         return JSON.parse(data);
-    } catch { return { ram: [], cpu: [], io: [] }; }
+    } catch {
+        return { ram: [], cpu: [], io: [] };
+    }
 }
 
 async function saveTrends(trends) {
@@ -114,7 +123,9 @@ async function saveTrends(trends) {
             ts: new Date().toISOString()
         };
         await fsp.writeFile(TREND_FILE, JSON.stringify(simplified, null, 2));
-    } catch (e) { /* Fail-safe */ }
+    } catch (_e) {
+        /* Fail-safe */
+    }
 }
 
 /* ==========================================================================
@@ -131,8 +142,8 @@ function getHardwareMetrics() {
     const totalMem = os.totalmem();
     return {
         cpu_load: os.loadavg()[0].toFixed(2),
-        ram_usage_pct: ((1 - (freeMem / totalMem)) * 100).toFixed(1),
-        ram_free_gb: `${(freeMem / 1024 / 1024 / 1024).toFixed(2)  }GB`,
+        ram_usage_pct: ((1 - freeMem / totalMem) * 100).toFixed(1),
+        ram_free_gb: `${(freeMem / 1024 / 1024 / 1024).toFixed(2)}GB`,
         ts: Date.now()
     };
 }
@@ -141,14 +152,17 @@ function getHardwareMetrics() {
  * Triangulação de Rede via Handshake HTTP.
  */
 async function probeConnectivity(url) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const t0 = Date.now();
         const client = url.startsWith('https') ? https : http;
-        const req = client.request(url, { method: 'HEAD', timeout: 5000 }, (res) => {
+        const req = client.request(url, { method: 'HEAD', timeout: 5000 }, res => {
             resolve({ ok: res.statusCode < 400, status: res.statusCode, ms: Date.now() - t0 });
         });
         req.on('error', () => resolve({ ok: false, status: 'OFFLINE', ms: Date.now() - t0 }));
-        req.on('timeout', () => { req.destroy(); resolve({ ok: false, status: 'TIMEOUT', ms: 5000 }); });
+        req.on('timeout', () => {
+            req.destroy();
+            resolve({ ok: false, status: 'TIMEOUT', ms: 5000 });
+        });
         req.end();
     });
 }
@@ -168,9 +182,11 @@ async function checkStorageSLA() {
         await fsp.unlink(testFile);
         ioLatency = Date.now() - t0;
         writeOk = true;
-    } catch (e) { writeOk = false; }
+    } catch (_e) {
+        writeOk = false;
+    }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const cmd = process.platform === 'win32' ? 'dir' : 'df -h .';
         exec(cmd, (err, stdout) => {
             resolve({
@@ -187,12 +203,16 @@ async function checkStorageSLA() {
  */
 async function validateDNASanity() {
     const rulesPath = path.join(ROOT, 'dynamic_rules.json');
-    if (!fs.existsSync(rulesPath)) {return { ok: false, msg: 'DNA_MISSING' };}
+    if (!fs.existsSync(rulesPath)) {
+        return { ok: false, msg: 'DNA_MISSING' };
+    }
     try {
         const dna = JSON.parse(await fsp.readFile(rulesPath, 'utf-8'));
         const hasSelectors = dna.selectors && Object.keys(dna.selectors).length > 0;
         return { ok: hasSelectors, version: dna._meta?.version || 0 };
-    } catch { return { ok: false, msg: 'DNA_CORRUPTED' }; }
+    } catch {
+        return { ok: false, msg: 'DNA_CORRUPTED' };
+    }
 }
 
 /* ==========================================================================
@@ -204,12 +224,15 @@ async function runFullCheck() {
     const trends = await getTrends();
     const io = require('../infra/io'); // Carrega dinamicamente para evitar ciclos
 
-    const targets = ['https://www.google.com', ... (CONFIG.allowedDomains || []).map(d => `https://${d}`)];
+    const targets = ['https://www.google.com', ...(CONFIG.allowedDomains || []).map(d => `https://${d}`)];
     const [networkResults, storage, dna, lag, chrome] = await Promise.all([
         Promise.all(targets.map(url => probeConnectivity(url))),
         checkStorageSLA(),
         validateDNASanity(),
-        new Promise(r => { const s = Date.now(); setImmediate(() => r(Date.now() - s)); }),
+        new Promise(r => {
+            const s = Date.now();
+            setImmediate(() => r(Date.now() - s));
+        }),
         probeChromeConnection()
     ]);
 
@@ -218,11 +241,13 @@ async function runFullCheck() {
     try {
         const tasks = await io.loadAllTasks();
         queueStats = {
-            pending: tasks.filter(t => t.status === 'PENDING').length,
-            running: tasks.filter(t => t.status === 'RUNNING').length,
+            pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
+            running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length,
             total: tasks.length
         };
-    } catch { /* Fail-safe */ }
+    } catch {
+        /* Fail-safe */
+    }
 
     const metrics = getHardwareMetrics();
 
@@ -265,8 +290,8 @@ async function runFullCheck() {
             duration_ms: Date.now() - t0
         },
         health: {
-            score: Math.max(0, 100 - (issues.length * 20)),
-            status: issues.length === 0 ? 'HEALTHY' : (issues.length > 2 ? 'CRITICAL' : 'DEGRADED')
+            score: Math.max(0, 100 - issues.length * 20),
+            status: issues.length === 0 ? STATUS_VALUES.HEALTHY : issues.length > 2 ? 'CRITICAL' : 'DEGRADED'
         },
         telemetry: {
             network: targets.map((url, i) => ({ url, ...networkResults[i] })),

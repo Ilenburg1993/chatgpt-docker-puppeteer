@@ -68,7 +68,6 @@ class DriverLifecycleManager {
             this.driver.on('progress', this._handleProgress);
 
             return this.driver;
-
         } catch (e) {
             log('ERROR', `[LIFECYCLE] Falha catastrófica na ignição do driver: ${e.message}`, this.correlationId);
             throw e;
@@ -112,7 +111,9 @@ class DriverLifecycleManager {
      */
     async _handleStateChange(data) {
         // Validação de Token de Segurança
-        if (this.task.meta.id !== this.taskId) {return;}
+        if (this.task.meta.id !== this.taskId) {
+            return;
+        }
 
         this.task.state.status = data.to;
         this.task.state.history.push({
@@ -128,7 +129,9 @@ class DriverLifecycleManager {
      * Atualiza a estimativa de progresso da tarefa no objeto persistente.
      */
     async _handleProgress(data) {
-        if (this.task.meta.id !== this.taskId) {return;}
+        if (this.task.meta.id !== this.taskId) {
+            return;
+        }
 
         // Estimativa baseada no volume de dados processados (Bytes/Chars)
         const estimated = Math.min(99, Math.round((data.length / 5000) * 100));

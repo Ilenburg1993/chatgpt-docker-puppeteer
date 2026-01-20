@@ -37,29 +37,23 @@ const KernelLoopState = Object.freeze({
 
 class KernelLoop {
     /**
-   * @param {Object} params
-   * @param {Object} params.executionEngine
-   * Motor semântico que avalia e produz decisões.
-   *
-   * @param {Object} params.nervBridge
-   * Ponte de integração com NERV (para drenagem de buffers).
-   *
-   * @param {Object} params.telemetry
-   * Canal de telemetria do Kernel.
-   *
-   * @param {Object} [params.scheduler]
-   * Scheduler técnico (padrão: global).
-   *
-   * @param {number} [params.baseIntervalMs]
-   * Intervalo base entre ciclos (padrão: 50ms).
-   */
-    constructor({
-        executionEngine,
-        nervBridge,
-        telemetry,
-        scheduler = global,
-        baseIntervalMs = 50
-    }) {
+     * @param {Object} params
+     * @param {Object} params.executionEngine
+     * Motor semântico que avalia e produz decisões.
+     *
+     * @param {Object} params.nervBridge
+     * Ponte de integração com NERV (para drenagem de buffers).
+     *
+     * @param {Object} params.telemetry
+     * Canal de telemetria do Kernel.
+     *
+     * @param {Object} [params.scheduler]
+     * Scheduler técnico (padrão: global).
+     *
+     * @param {number} [params.baseIntervalMs]
+     * Intervalo base entre ciclos (padrão: 50ms).
+     */
+    constructor({ executionEngine, nervBridge, telemetry, scheduler = global, baseIntervalMs = 50 }) {
         if (!executionEngine || typeof executionEngine.evaluate !== 'function') {
             throw new Error('KernelLoop requer executionEngine.evaluate()');
         }
@@ -90,8 +84,8 @@ class KernelLoop {
   =========================== */
 
     /**
-   * Inicia o ciclo executivo do Kernel.
-   */
+     * Inicia o ciclo executivo do Kernel.
+     */
     start() {
         if (this.state === KernelLoopState.ACTIVE) {
             this.telemetry.warning('kernel_loop_already_active', {
@@ -111,8 +105,8 @@ class KernelLoop {
     }
 
     /**
-   * Para o ciclo executivo do Kernel.
-   */
+     * Para o ciclo executivo do Kernel.
+     */
     stop() {
         if (this.state === KernelLoopState.INACTIVE) {
             this.telemetry.warning('kernel_loop_already_inactive', {
@@ -138,8 +132,8 @@ class KernelLoop {
     }
 
     /**
-   * Verifica se o loop está executando.
-   */
+     * Verifica se o loop está executando.
+     */
     isRunning() {
         return this._running;
     }
@@ -149,16 +143,18 @@ class KernelLoop {
   =========================== */
 
     /**
-   * Executa um único ciclo lógico do Kernel.
-   *
-   * Sequência canônica:
-   * 1. Drenagem de buffers do NERV (inbound)
-   * 2. Avaliação semântica (ExecutionEngine)
-   * 3. Aplicação de decisões
-   * 4. Drenagem de buffers do NERV (outbound)
-   */
+     * Executa um único ciclo lógico do Kernel.
+     *
+     * Sequência canônica:
+     * 1. Drenagem de buffers do NERV (inbound)
+     * 2. Avaliação semântica (ExecutionEngine)
+     * 3. Aplicação de decisões
+     * 4. Drenagem de buffers do NERV (outbound)
+     */
     step() {
-        if (!this._running) {return;}
+        if (!this._running) {
+            return;
+        }
 
         const tickId = ++this._tickCounter;
         const startedAt = Date.now();
@@ -185,7 +181,6 @@ class KernelLoop {
 
             // 4. Drenagem de buffer outbound (COMMANDs/EVENTs a enviar)
             this._drainOutbound();
-
         } catch (error) {
             this.state = KernelLoopState.DEGRADED;
 
@@ -212,9 +207,9 @@ class KernelLoop {
   =========================== */
 
     /**
-   * Drena buffer inbound do NERV.
-   * EVENTs recebidos são processados pela NERVBridge.
-   */
+     * Drena buffer inbound do NERV.
+     * EVENTs recebidos são processados pela NERVBridge.
+     */
     _drainInbound() {
         if (!this.nervBridge.nerv || !this.nervBridge.nerv.buffers) {
             return;
@@ -226,7 +221,9 @@ class KernelLoop {
         // Drena até 100 mensagens por ciclo (limite técnico)
         while (drained < 100) {
             const envelope = buffers.dequeueInbound();
-            if (!envelope) {break;}
+            if (!envelope) {
+                break;
+            }
 
             // Processa via receive do NERV (que chama handlers registrados)
             this.nervBridge.nerv.receive(envelope);
@@ -242,9 +239,9 @@ class KernelLoop {
     }
 
     /**
-   * Drena buffer outbound do NERV.
-   * Envia mensagens pendentes via transporte físico.
-   */
+     * Drena buffer outbound do NERV.
+     * Envia mensagens pendentes via transporte físico.
+     */
     _drainOutbound() {
         if (!this.nervBridge.nerv || !this.nervBridge.nerv.buffers) {
             return;
@@ -253,14 +250,18 @@ class KernelLoop {
         const buffers = this.nervBridge.nerv.buffers;
         const transport = this.nervBridge.nerv.transport;
 
-        if (!transport) {return;}
+        if (!transport) {
+            return;
+        }
 
         let drained = 0;
 
         // Drena até 100 mensagens por ciclo
         while (drained < 100) {
             const envelope = buffers.dequeueOutbound();
-            if (!envelope) {break;}
+            if (!envelope) {
+                break;
+            }
 
             // Serializa e envia via transporte
             try {
@@ -289,14 +290,14 @@ class KernelLoop {
   =========================== */
 
     /**
-   * Aplica decisões produzidas pelo ExecutionEngine.
-   *
-   * @param {Array<Object>} proposals
-   * Lista de propostas de decisão.
-   *
-   * @param {Object} context
-   * Contexto do ciclo atual.
-   */
+     * Aplica decisões produzidas pelo ExecutionEngine.
+     *
+     * @param {Array<Object>} proposals
+     * Lista de propostas de decisão.
+     *
+     * @param {Object} context
+     * Contexto do ciclo atual.
+     */
     _applyDecisions(proposals, context) {
         if (!Array.isArray(proposals) || proposals.length === 0) {
             return;
@@ -322,8 +323,8 @@ class KernelLoop {
     }
 
     /**
-   * Aplica uma única decisão.
-   */
+     * Aplica uma única decisão.
+     */
     _applyDecision(proposal, context) {
         const { kind, taskId, reason } = proposal;
 
@@ -360,10 +361,12 @@ class KernelLoop {
   =========================== */
 
     /**
-   * Agenda próximo ciclo lógico.
-   */
+     * Agenda próximo ciclo lógico.
+     */
     _scheduleNextTick() {
-        if (!this._running) {return;}
+        if (!this._running) {
+            return;
+        }
 
         const delay = this._computeDelay();
 
@@ -374,9 +377,9 @@ class KernelLoop {
     }
 
     /**
-   * Calcula delay até próximo ciclo.
-   * Pode ser adaptativo com base no estado.
-   */
+     * Calcula delay até próximo ciclo.
+     * Pode ser adaptativo com base no estado.
+     */
     _computeDelay() {
         if (this.state === KernelLoopState.DEGRADED) {
             return this.baseIntervalMs * 2;
@@ -390,8 +393,8 @@ class KernelLoop {
   =========================== */
 
     /**
-   * Retorna status técnico do loop.
-   */
+     * Retorna status técnico do loop.
+     */
     getStatus() {
         return Object.freeze({
             state: this.state,

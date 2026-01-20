@@ -13,20 +13,21 @@ const { log } = require('../../core/logger');
 
 class RecoverySystem {
     /**
-   * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
-   */
+     * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
+     */
     constructor(driver) {
         this.driver = driver;
     }
 
     /**
-   * Aplica um nível de recuperação baseado no número de tentativas falhas.
-   * Narra a manobra para o barramento IPC 2.0.
-   *
-   * @param {Error} recoveryErr - O erro original capturado.
-   * @param {number} attempt - O índice da tentativa atual (0-3).
-   * @param {string} taskId - ID da tarefa ativa.
-   */
+     * Aplica um nível de recuperação baseado no número de tentativas falhas.
+     * Narra a manobra para o barramento IPC 2.0.
+     *
+     * @param {Error} recoveryErr - O erro original capturado.
+     * @param {number} attempt - O índice da tentativa atual (0-3).
+     * @param {string} taskId - ID da tarefa ativa.
+     */
+    // eslint-disable-next-line complexity -- Recovery tier logic requires complex branching
     async applyTier(recoveryErr, attempt, taskId) {
         const msg = String(recoveryErr?.message || '').toUpperCase();
         const correlationId = this.driver.correlationId;
@@ -51,7 +52,9 @@ class RecoverySystem {
                 this.driver.inputResolver.clearCache();
 
                 // Backoff progressivo baseado no número da tentativa
-                await new Promise(r => setTimeout(r, 1200 + attempt * 800));
+                await new Promise(r => {
+                    setTimeout(r, 1200 + attempt * 800);
+                });
                 this.driver._assertPageAlive();
                 break;
 
@@ -63,7 +66,11 @@ class RecoverySystem {
                         await this.driver.page.bringToFront();
                         // Clique biomecânico "cego" no topo para forçar o foco da janela
                         await this.driver.page.mouse.click(1, 1).catch(() => {});
-                        await this.driver.page.evaluate(() => { window.focus(); }).catch(() => {});
+                        await this.driver.page
+                            .evaluate(() => {
+                                window.focus();
+                            })
+                            .catch(() => {});
                     }
                 } catch (focusErr) {
                     log('DEBUG', `[RECOVERY] Falha ao forçar foco: ${focusErr.message}`, correlationId);
@@ -93,7 +100,6 @@ class RecoverySystem {
                 // Tier 3: Manobra Nuclear (Surgical Process Kill)
                 // Aplicada em casos de congelamento de browser ou desconexão fatal.
                 if (msg.includes('TIMEOUT') || msg.includes('CLOSED') || msg.includes('DETACHED') || attempt >= 3) {
-
                     this.driver._emitVital('TRIAGE_ALERT', {
                         type: 'TERMINAL_INFRA_FAILURE',
                         severity: 'CRITICAL',
@@ -112,13 +118,17 @@ class RecoverySystem {
                         try {
                             await Promise.race([
                                 system.killProcess(pid),
-                                new Promise((_, reject) =>
-                                    setTimeout(() => reject(new Error('KILL_TIMEOUT')), KILL_TIMEOUT_MS)
-                                )
+                                new Promise((_, reject) => {
+                                    setTimeout(() => reject(new Error('KILL_TIMEOUT')), KILL_TIMEOUT_MS);
+                                })
                             ]);
                         } catch (killErr) {
                             if (killErr.message === 'KILL_TIMEOUT') {
-                                log('WARN', `[RECOVERY] Kill timeout após ${KILL_TIMEOUT_MS}ms, processo pode estar zombie`, correlationId);
+                                log(
+                                    'WARN',
+                                    `[RECOVERY] Kill timeout após ${KILL_TIMEOUT_MS}ms, processo pode estar zombie`,
+                                    correlationId
+                                );
                             } else {
                                 log('ERROR', `[RECOVERY] Falha no kill: ${killErr.message}`, correlationId);
                             }

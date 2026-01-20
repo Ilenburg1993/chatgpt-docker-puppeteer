@@ -17,11 +17,56 @@ const AGENTE_NAME = 'agente-gpt';
  * Evita o aninhamento de callbacks e facilita o tratamento de erros.
  */
 const pm2p = {
-    connect: () => new Promise((res, rej) => pm2.connect(err => err ? rej(err) : res())),
-    describe: (name) => new Promise((res, rej) => pm2.describe(name, (err, list) => err ? rej(err) : res(list))),
-    start: (opts) => new Promise((res, rej) => pm2.start(opts, err => err ? rej(err) : res())),
-    stop: (name) => new Promise((res, rej) => pm2.stop(name, err => err ? rej(err) : res())),
-    restart: (name) => new Promise((res, rej) => pm2.restart(name, err => err ? rej(err) : res())),
+    connect: () =>
+        new Promise((res, rej) => {
+            pm2.connect(err => {
+                if (err) {
+                    rej(err);
+                } else {
+                    res();
+                }
+            });
+        }),
+    describe: name =>
+        new Promise((res, rej) => {
+            pm2.describe(name, (err, list) => {
+                if (err) {
+                    rej(err);
+                } else {
+                    res(list);
+                }
+            });
+        }),
+    start: opts =>
+        new Promise((res, rej) => {
+            pm2.start(opts, err => {
+                if (err) {
+                    rej(err);
+                } else {
+                    res();
+                }
+            });
+        }),
+    stop: name =>
+        new Promise((res, rej) => {
+            pm2.stop(name, err => {
+                if (err) {
+                    rej(err);
+                } else {
+                    res();
+                }
+            });
+        }),
+    restart: name =>
+        new Promise((res, rej) => {
+            pm2.restart(name, err => {
+                if (err) {
+                    rej(err);
+                } else {
+                    res();
+                }
+            });
+        }),
     disconnect: () => pm2.disconnect()
 };
 
@@ -46,7 +91,7 @@ async function getAgentStatus() {
         return {
             agent: app.pm2_env.status, // 'online', 'stopped', 'errored', etc.
             memory: app.monit.memory || 0,
-            uptime: (app.pm2_env.status === 'online') ? (Date.now() - app.pm2_env.pm_uptime) : 0,
+            uptime: app.pm2_env.status === 'online' ? Date.now() - app.pm2_env.pm_uptime : 0,
             pid: app.pid
         };
     } catch (e) {
@@ -65,7 +110,7 @@ async function controlAgent(action) {
         log('INFO', `[SYSTEM] Comando recebido: ${action}`);
 
         switch (action) {
-            case 'start':
+            case 'start': {
                 const statusInfo = await getAgentStatus();
                 // Se já existe no PM2 (mesmo parado ou com erro), usamos restart para reviver
                 if (statusInfo.agent !== 'stopped' && statusInfo.agent !== 'not_found') {
@@ -84,6 +129,7 @@ async function controlAgent(action) {
                     });
                 }
                 break;
+            }
 
             case 'stop':
                 await pm2p.stop(AGENTE_NAME);
@@ -94,9 +140,11 @@ async function controlAgent(action) {
                 break;
 
             case 'kill_daemon':
-                return new Promise((res) => {
-                    exec('npx pm2 kill', (err) => {
-                        if (err) {log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);}
+                return new Promise(res => {
+                    exec('npx pm2 kill', err => {
+                        if (err) {
+                            log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);
+                        }
                         res({ success: !err });
                     });
                 });
@@ -119,15 +167,16 @@ async function controlAgent(action) {
  * Mata um processo específico e sua árvore de filhos com SIGKILL.
  */
 function killProcess(pid) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         if (!pid) {
             log('WARN', 'Tentativa de matar processo sem PID.');
-            return resolve();
+            resolve();
+            return;
         }
 
         log('FATAL', `Executando Kill Switch no PID ${pid}...`);
 
-        treeKill(pid, 'SIGKILL', (err) => {
+        treeKill(pid, 'SIGKILL', err => {
             if (err) {
                 log('ERROR', `Falha ao matar PID ${pid}: ${err.message}`);
                 killChromeGlobal();
@@ -143,15 +192,16 @@ function killProcess(pid) {
  * Mata TODOS os processos do Chrome (Fallback Nuclear).
  */
 function killChromeGlobal() {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         log('WARN', 'Executando Kill Global no Chrome (Fallback)...');
-        const cmd = process.platform === 'win32'
-            ? 'taskkill /F /IM chrome.exe /T'
-            : 'pkill -9 chrome';
+        const cmd = process.platform === 'win32' ? 'taskkill /F /IM chrome.exe /T' : 'pkill -9 chrome';
 
-        exec(cmd, (err) => {
-            if (err) {log('WARN', `Falha no Kill Global: ${err.message}`);}
-            else {log('INFO', 'Todos os Chromes encerrados.');}
+        exec(cmd, err => {
+            if (err) {
+                log('WARN', `Falha no Kill Global: ${err.message}`);
+            } else {
+                log('INFO', 'Todos os Chromes encerrados.');
+            }
             resolve();
         });
     });

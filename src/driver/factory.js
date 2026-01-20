@@ -60,11 +60,19 @@ try {
 /**
  * Obtém ou cria a instância do driver com injeção de sinal e sincronia de config.
  *
- * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt').
- * @param {object} page - Instância ativa da página do Puppeteer.
- * @param {object} config - Configuração da tarefa (clonada para imutabilidade).
- * @param {AbortSignal} signal - Sinal soberano de cancelamento da tarefa.
- * @returns {object} Instância de TargetDriver pronta para execução.
+ * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt', 'gemini')
+ * @param {import('puppeteer').Page} page - Instância ativa da página do Puppeteer
+ * @param {Object} config - Configuração da tarefa (clonada para imutabilidade)
+ * @param {string} config.target - Target específico (chatgpt, gemini, etc)
+ * @param {number} [config.timeout] - Timeout em milissegundos
+ * @param {AbortSignal} signal - Sinal soberano de cancelamento da tarefa
+ *
+ * @returns {TargetDriver} Instância de TargetDriver pronta para execução
+ * @throws {Error} Se a página estiver fechada ou o target não existir
+ *
+ * @example
+ * const driver = getDriver('chatgpt', page, { timeout: 30000 }, abortSignal);
+ * const response = await driver.execute(task);
  */
 function getDriver(targetName, page, config, signal) {
     const key = (targetName || DEFAULT_TARGET).toLowerCase();
@@ -130,7 +138,6 @@ function getDriver(targetName, page, config, signal) {
         log('INFO', `[FACTORY] Novo Driver '${instance.name}' acoplado com sucesso.`);
 
         return instance;
-
     } catch (e) {
         log('ERROR', `[FACTORY] Erro na ativação do driver '${key}': ${e.message}`);
         throw e;

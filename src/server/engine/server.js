@@ -25,7 +25,7 @@ let httpServer = null;
  * @returns {Promise<object>} Objeto contendo a instância e a porta final alocada.
  */
 function start(port) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         // Criação do servidor acoplando a lógica de processamento do Express
         httpServer = http.createServer(app);
 
@@ -44,7 +44,7 @@ function start(port) {
          * Se a porta estiver em uso, o motor aplica uma estratégia recursiva
          * de escalonamento até encontrar um slot livre no SO.
          */
-        httpServer.on('error', (e) => {
+        httpServer.on('error', e => {
             if (e.code === 'EADDRINUSE') {
                 log('WARN', `[ENGINE] Porta ${port} ocupada. Escalando para ${port + 1}...`);
 
@@ -68,7 +68,7 @@ function start(port) {
  * Garante a liberação imediata do descritor de arquivo e da porta no SO.
  */
 async function stop() {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         if (httpServer && httpServer.listening) {
             httpServer.close(() => {
                 log('INFO', '[ENGINE] Fundação HTTP encerrada e porta liberada.');

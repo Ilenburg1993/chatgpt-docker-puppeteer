@@ -51,7 +51,7 @@ function init(httpServer) {
         pingInterval: 5000
     });
 
-    ioInstance.on('connection', (socket) => {
+    ioInstance.on('connection', socket => {
         // 1. FILTRO DE INFRAESTRUTURA (Token de Acesso)
         const token = socket.handshake.auth?.token;
         const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
@@ -65,7 +65,7 @@ function init(httpServer) {
             log('DEBUG', `[HUB] Terminal Dashboard conectado: ${socket.id}`);
         }
 
-        socket.on('disconnect', (reason) => {
+        socket.on('disconnect', reason => {
             if (socket.robot_id) {
                 agentRegistry.delete(socket.robot_id);
                 log('WARN', `[HUB] Maestro ${socket.robot_id} desconectado. Causa: ${reason}`);
@@ -96,7 +96,7 @@ function _setupMaestroProtocol(socket) {
     }, 5000);
 
     // 1. CERIMÔNIA DE APRESENTAÇÃO (Handshake V2)
-    socket.on('handshake:present', (data) => {
+    socket.on('handshake:present', data => {
         try {
             // Validação Nativa (Shared Kernel) - Audit 410
             const identity = validateRobotIdentity(data.identity);
@@ -133,7 +133,6 @@ function _setupMaestroProtocol(socket) {
 
             // Notifica Dashboards sobre o novo agente pronto para missões
             ioInstance.to('dashboards').emit('hub:agent_online', identity);
-
         } catch (err) {
             log('ERROR', `[HUB] Handshake rejeitado para ${socket.id}: ${err.message}`);
             socket.emit('handshake:rejected', { reason: err.message });
@@ -142,8 +141,10 @@ function _setupMaestroProtocol(socket) {
     });
 
     // 2. RECEPTOR DE MENSAGENS ESTRUTURADAS (Envelope V2)
-    socket.on('message', (rawEnvelope) => {
-        if (!socket.authorized) {return;}
+    socket.on('message', rawEnvelope => {
+        if (!socket.authorized) {
+            return;
+        }
 
         try {
             // Validação Nativa de Integridade de Envelope
@@ -160,7 +161,6 @@ function _setupMaestroProtocol(socket) {
             if (agentRegistry.has(socket.robot_id)) {
                 agentRegistry.get(socket.robot_id).last_seen = Date.now();
             }
-
         } catch (err) {
             log('ERROR', `[HUB] Envelope malformado de ${socket.robot_id}: ${err.message}`);
         }
@@ -180,7 +180,9 @@ function _setupMaestroProtocol(socket) {
  * @returns {string} O msg_id gerado para rastreamento de ACK.
  */
 function sendCommand(command, payload, robotId = null) {
-    if (!ioInstance) {return null;}
+    if (!ioInstance) {
+        return null;
+    }
 
     const msgId = uuidv4();
     const correlationId = payload.correlation_id || uuidv4();
@@ -221,7 +223,7 @@ async function stop() {
             s.disconnect(true);
         }
 
-        await new Promise((resolve) => {
+        await new Promise(resolve => {
             ioInstance.close(() => {
                 ioInstance = null;
                 resolve();
@@ -237,7 +239,9 @@ async function stop() {
  * Notify: Broadcast global informativo para todos os conectados.
  */
 function notify(event, data) {
-    if (!ioInstance) {return false;}
+    if (!ioInstance) {
+        return false;
+    }
     ioInstance.emit(event, data);
     return true;
 }

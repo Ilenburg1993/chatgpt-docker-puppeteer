@@ -21,10 +21,10 @@ const SubmissionController = require('../modules/submission_controller');
 
 class BaseDriver extends TargetDriver {
     /**
-   * @param {object} page - Instância ativa do Puppeteer.
-   * @param {object} config - Configuração da tarefa (clonada).
-   * @param {AbortSignal} signal - Sinal soberano de interrupção.
-   */
+     * @param {object} page - Instância ativa do Puppeteer.
+     * @param {object} config - Configuração da tarefa (clonada).
+     * @param {AbortSignal} signal - Sinal soberano de interrupção.
+     */
     constructor(page, config, signal) {
         super(page, config, signal);
         this.name = 'BaseUniversalDriver';
@@ -41,13 +41,15 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-   * Injeta o rastro de causalidade para todos os sinais emitidos por este driver.
-   * @param {string} id - UUID de correlação da transação.
-   */
+     * Injeta o rastro de causalidade para todos os sinais emitidos por este driver.
+     * @param {string} id - UUID de correlação da transação.
+     */
     setCorrelationId(id) {
         this.correlationId = id;
         // Propaga o ID para o resolvedor de input (vital para logs de DNA)
-        if (this.inputResolver) {this.inputResolver.driver = this;}
+        if (this.inputResolver) {
+            this.inputResolver.driver = this;
+        }
         log('DEBUG', `[DRIVER] Contexto de rastro sincronizado: ${id}`, id);
     }
 
@@ -56,12 +58,12 @@ class BaseDriver extends TargetDriver {
   ====================================================================== */
 
     /**
-   * Emite um sinal vital capturado pela TelemetryBridge.
-   * Mantém o Driver agnóstico ao transporte (IPC/Socket).
-   *
-   * @param {string} type - Categoria (SADI_PERCEPTION, HUMAN_PULSE, etc).
-   * @param {object} payload - Dados técnicos da ação/percepção.
-   */
+     * Emite um sinal vital capturado pela TelemetryBridge.
+     * Mantém o Driver agnóstico ao transporte (IPC/Socket).
+     *
+     * @param {string} type - Categoria (SADI_PERCEPTION, HUMAN_PULSE, etc).
+     * @param {object} payload - Dados técnicos da ação/percepção.
+     */
     _emitVital(type, payload) {
         this.emit('driver:vital', {
             type,
@@ -76,15 +78,21 @@ class BaseDriver extends TargetDriver {
   ====================================================================== */
 
     _assertPageAlive() {
-        if (!this.page || this.page.isClosed()) {throw new Error('TARGET_CLOSED');}
+        if (!this.page || this.page.isClosed()) {
+            throw new Error('TARGET_CLOSED');
+        }
     }
 
     _updateDomain() {
         try {
             const url = this.page.url();
-            if (!url || url === 'about:blank' || !url.startsWith('http')) {return 'initialization';}
+            if (!url || url === 'about:blank' || !url.startsWith('http')) {
+                return 'initialization';
+            }
             return new URL(url).hostname.replace(/^www\./, '');
-        } catch (e) { return 'unknown_context'; }
+        } catch (_e) {
+            return 'unknown_context';
+        }
     }
 
     /* ======================================================================
@@ -92,12 +100,14 @@ class BaseDriver extends TargetDriver {
   ====================================================================== */
 
     /**
-   * Executa o envio do prompt com narração sensorial em tempo real.
-   * Segue o fluxo: Estabilização -> Percepção -> Navegação -> Biomecânica -> Envio.
-   */
+     * Executa o envio do prompt com narração sensorial em tempo real.
+     * Segue o fluxo: Estabilização -> Percepção -> Navegação -> Biomecânica -> Envio.
+     */
     async sendPrompt(text, taskId, signal) {
-    // 1. Check de Aborto Precoce (Nível Kernel)
-        if (signal?.aborted) {throw new Error('OPERATION_ABORTED');}
+        // 1. Check de Aborto Precoce (Nível Kernel)
+        if (signal?.aborted) {
+            throw new Error('OPERATION_ABORTED');
+        }
 
         // 2. Aguarda Ociosidade (Telemetria integrada no Biomechanics)
         await this.biomechanics.waitIfBusy(taskId);
@@ -108,12 +118,16 @@ class BaseDriver extends TargetDriver {
         while (attempts < 4) {
             try {
                 // Check de interrupção entre tentativas
-                if (signal?.aborted) {throw new Error('OPERATION_ABORTED');}
+                if (signal?.aborted) {
+                    throw new Error('OPERATION_ABORTED');
+                }
 
                 await this.handles.clearAll();
                 this._assertPageAlive();
 
-                if (attempts > 0) {await this.page.bringToFront().catch(() => {});}
+                if (attempts > 0) {
+                    await this.page.bringToFront().catch(() => {});
+                }
 
                 // 3. RESOLUÇÃO DE INTERFACE (Governada por DNA V4 Gold)
                 // O InputResolver V700 emite SADI_PERCEPTION internamente
@@ -138,9 +152,10 @@ class BaseDriver extends TargetDriver {
 
                 this.setState(TargetDriver.STATES.IDLE);
                 return;
-
             } catch (err) {
-                if (err.message === 'OPERATION_ABORTED') {throw err;}
+                if (err.message === 'OPERATION_ABORTED') {
+                    throw err;
+                }
 
                 // 8. DIAGNÓSTICO DE FALHA (Instrumentação de Triage)
                 this._emitVital('TRIAGE_ALERT', {
@@ -155,12 +170,13 @@ class BaseDriver extends TargetDriver {
                     ts: Date.now()
                 });
 
-                if (errorHistory.length > 10) {errorHistory.shift();}
+                if (errorHistory.length > 10) {
+                    errorHistory.shift();
+                }
 
                 // 9. RECUPERAÇÃO ESCALONADA (Tiers 0-3)
                 await this.recovery.applyTier(err, attempts, taskId);
                 attempts++;
-
             } finally {
                 await this.handles.clearAll();
                 await this.biomechanics.releaseModifiers();
@@ -173,11 +189,19 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-   * Cleanup profundo da instância e invalidação de caches de subsistemas.
-   */
+     * Cleanup profundo da instância e invalidação de caches de subsistemas.
+     */
     async destroy() {
-        try { await this.handles.clearAll(); } catch (e) {}
-        try { await this.biomechanics.releaseModifiers(); } catch (e) {}
+        try {
+            await this.handles.clearAll();
+        } catch (_e) {
+            /* Ignore cleanup errors */
+        }
+        try {
+            await this.biomechanics.releaseModifiers();
+        } catch (_e) {
+            /* Ignore release errors */
+        }
 
         // Invalidação de estados de subsistemas
         this.inputResolver.clearCache();

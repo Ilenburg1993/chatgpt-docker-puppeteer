@@ -1,3 +1,4 @@
+
 /* ==========================================================================
    src/infra/transport/socket_io_adapter.js
    Audit Level: 590 — Physical Transport Layer (Socket.io Implementation)
@@ -21,8 +22,11 @@ function createSocketAdapter(config) {
     // Bus de eventos para comunicar mudanças de estado ao NERV Core
     const events = new EventEmitter();
 
+    // Flag de shutdown para evitar erros durante desligamento
+    let _shuttingDown = false;
+
     // Adiciona handler de erro padrão para evitar crashes
-    events.on('error', (errorData) => {
+    events.on('error', errorData => {
         // Log silencioso - erros de conexão são esperados durante shutdown
         if (!_shuttingDown) {
             // Apenas emite no log interno, não propaga
@@ -38,9 +42,6 @@ function createSocketAdapter(config) {
 
     // Handler injetado pelo NERV para receber dados
     let inboundHandler = null;
-
-    // Flag de shutdown para evitar erros durante desligamento
-    let _shuttingDown = false;
 
     /**
      * Inicia a conexão física.
@@ -75,13 +76,13 @@ function createSocketAdapter(config) {
         });
 
         // 2. Desconexão
-        socket.on('disconnect', (reason) => {
+        socket.on('disconnect', reason => {
             events.emit('disconnect');
             events.emit('log', { level: 'WARN', msg: `[TRANSPORT] Desconectado: ${reason}` });
         });
 
         // 3. Erros de Conexão (silenciado durante shutdown)
-        socket.on('connect_error', (err) => {
+        socket.on('connect_error', err => {
             // Ignora erros de conexão se já estamos desligando
             if (_shuttingDown) {return;}
 
@@ -93,7 +94,7 @@ function createSocketAdapter(config) {
 
         // 4. Recebimento de Dados (Payload do NERV)
         // O servidor envia eventos no canal 'message'
-        socket.on('message', (rawFrame) => {
+        socket.on('message', rawFrame => {
             if (inboundHandler) {
                 try {
                     inboundHandler(rawFrame);
@@ -110,12 +111,14 @@ function createSocketAdapter(config) {
     /**
      * Encerra a conexão física.
      */
-    function stop() {        _shuttingDown = true;        if (socket) {
-        socket.removeAllListeners();
-        socket.disconnect();
-        socket = null;
-        events.emit('disconnect');
-    }
+    function stop() {
+        _shuttingDown = true;
+        if (socket) {
+            socket.removeAllListeners();
+            socket.disconnect();
+            socket = null;
+            events.emit('disconnect');
+        }
     }
 
     /**

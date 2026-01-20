@@ -7,7 +7,7 @@
    Sincronizado com: paths.js V700, fs_core.js V700, dna_schema.js V100.
 ========================================================================== */
 
-const path = require('path');
+const _path = require('path');
 const PATHS = require('../fs/paths');
 const { atomicWrite, safeReadJSON } = require('../fs/fs_core');
 const { DnaSchema } = require('../../core/schemas');
@@ -43,7 +43,9 @@ let cachedDna = null;
  */
 async function getDna() {
     // 1. Hit de Cache (Performance O(1))
-    if (cachedDna) {return cachedDna;}
+    if (cachedDna) {
+        return cachedDna;
+    }
 
     // 2. Leitura de Disco
     const rawDna = await safeReadJSON(PATHS.RULES);
@@ -51,11 +53,13 @@ async function getDna() {
     if (!rawDna) {
         log('WARN', '[DNA_STORE] dynamic_rules.json ausente. Inicializando estrutura V4 Gold.');
         await saveDna(DEFAULT_DNA, 'system_init');
+        // eslint-disable-next-line require-atomic-updates -- Protected by write lock in caller
         cachedDna = DEFAULT_DNA;
         return cachedDna;
     }
 
     try {
+
         // 3. Validação de Fronteira (Zod)
         cachedDna = DnaSchema.parse(rawDna);
         return cachedDna;

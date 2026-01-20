@@ -10,6 +10,11 @@
 ========================================================================== */
 
 const tasksController = require('./controllers/tasks');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const systemController = require('./controllers/system');
 const dnaController = require('./controllers/dna');
 const { notFound, errorHandler } = require('../middleware/error_handler');
@@ -46,10 +51,12 @@ function applyRoutes(app) {
             try {
                 const tasks = await io.loadAllTasks();
                 queueStats = {
-                    pending: tasks.filter(t => t.status === 'PENDING').length,
-                    running: tasks.filter(t => t.status === 'RUNNING').length
+                    pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
+                    running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length
                 };
-            } catch { /* Fail-safe */ }
+            } catch {
+                /* Fail-safe */
+            }
 
             const status = chrome.connected ? 'ok' : 'degraded';
             const httpCode = chrome.connected ? 200 : 503;
@@ -90,7 +97,7 @@ function applyRoutes(app) {
      * Responsável pelo ciclo de vida das intenções de execução e download de .txt.
      */
     app.use('/api/tasks', tasksController);
-    app.use('/api/queue', tasksController);   // Alias para operações bulk de fila
+    app.use('/api/queue', tasksController); // Alias para operações bulk de fila
     app.use('/api/results', tasksController); // Alias para recuperação de respostas
 
     /**

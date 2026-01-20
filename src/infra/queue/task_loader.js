@@ -8,6 +8,11 @@
 ========================================================================== */
 
 const cache = require('./cache');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const { getNextEligible } = require('./scheduler');
 const { saveTask } = require('../storage/task_store');
 const CONFIG = require('../../core/config');
@@ -20,17 +25,22 @@ const { log } = require('../../core/logger');
  * @param {string|null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
  * @returns {Promise<object|null>}
  */
+// eslint-disable-next-line complexity -- Task loading with corruption handling requires branching
 async function loadNextTask(targetFilter = null) {
     // 1. Aquisição de Snapshot Estável (RAM)
     const allTasks = await cache.getQueue();
     const now = Date.now();
 
-    if (!allTasks || allTasks.length === 0) {return null;}
+    if (!allTasks || allTasks.length === 0) {
+        return null;
+    }
 
     // [OPTIMIZATION] Indexação O(N) para resolução rápida de dependências
     const taskMap = new Map();
     for (const t of allTasks) {
-        if (t?.meta?.id) {taskMap.set(t.meta.id, t);}
+        if (t?.meta?.id) {
+            taskMap.set(t.meta.id, t);
+        }
     }
 
     let queueWasMutated = false;
@@ -41,15 +51,15 @@ async function loadNextTask(targetFilter = null) {
         let isModified = false;
 
         // A. Auto-Cura de Zumbis (Tarefas presas em RUNNING por crash do sistema)
-        if (task.state.status === 'RUNNING' && task.state.started_at) {
+        if (task.state.status === STATUS_VALUES.RUNNING && task.state.started_at) {
             const startedAt = Date.parse(task.state.started_at);
             const recoveryThreshold = CONFIG.RUNNING_RECOVERY_MS || 600000; // Default 10min
 
-            if (!isNaN(startedAt) && (now - startedAt > recoveryThreshold)) {
+            if (!isNaN(startedAt) && now - startedAt > recoveryThreshold) {
                 // Clone-on-Write: Isolamento para não sujar o cache prematuramente
                 task = JSON.parse(JSON.stringify(originalTask));
 
-                task.state.status = 'FAILED';
+                task.state.status = STATUS_VALUES.FAILED;
                 task.state.last_error = 'RECOVERY_TRIGGERED: Timeout de execução (Zumbi)';
                 task.state.completed_at = new Date().toISOString();
                 task.state.history.push({
@@ -64,16 +74,18 @@ async function loadNextTask(targetFilter = null) {
         }
 
         // B. Anulação em Cascata (Se o pai falhou/foi pulado, o filho é SKIPPED)
-        if (task.state.status === 'PENDING' && task.policy.dependencies?.length > 0) {
+        if (task.state.status === STATUS_VALUES.PENDING && task.policy.dependencies?.length > 0) {
             const hasFailedParent = task.policy.dependencies.some(depId => {
                 const parent = taskMap.get(depId);
-                return parent && (parent.state.status === 'FAILED' || parent.state.status === 'SKIPPED');
+                return parent && (parent.state.status === STATUS_VALUES.FAILED || parent.state.status === STATUS_VALUES.SKIPPED);
             });
 
             if (hasFailedParent) {
-                if (!isModified) {task = JSON.parse(JSON.stringify(originalTask));}
+                if (!isModified) {
+                    task = JSON.parse(JSON.stringify(originalTask));
+                }
 
-                task.state.status = 'SKIPPED';
+                task.state.status = STATUS_VALUES.SKIPPED;
                 task.state.last_error = 'CASCADE_FAILURE: Dependência falhou ou foi anulada.';
                 task.state.completed_at = new Date().toISOString();
 
@@ -110,9 +122,11 @@ async function loadNextTask(targetFilter = null) {
  */
 async function bulkRetryFailed() {
     const allTasks = await cache.getQueue();
-    const failedTasks = allTasks.filter(t => t?.state?.status === 'FAILED');
+    const failedTasks = allTasks.filter(t => t?.state?.status === STATUS_VALUES.FAILED);
 
-    if (failedTasks.length === 0) {return 0;}
+    if (failedTasks.length === 0) {
+        return 0;
+    }
 
     log('INFO', `[LOADER] Iniciando Bulk Retry para ${failedTasks.length} tarefas.`);
 
@@ -121,7 +135,7 @@ async function bulkRetryFailed() {
         try {
             const task = JSON.parse(JSON.stringify(originalTask));
 
-            task.state.status = 'PENDING';
+            task.state.status = STATUS_VALUES.PENDING;
             task.state.last_error = null;
             task.state.history.push({
                 ts: new Date().toISOString(),
@@ -136,7 +150,9 @@ async function bulkRetryFailed() {
         }
     }
 
-    if (count > 0) {cache.markDirty();}
+    if (count > 0) {
+        cache.markDirty();
+    }
     return count;
 }
 

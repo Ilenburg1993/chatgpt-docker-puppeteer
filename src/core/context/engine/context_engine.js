@@ -25,14 +25,20 @@ async function applyTransform(content, transform, targetTask) {
     const type = (transform || 'RAW').toUpperCase();
 
     switch (type) {
-        case 'SUMMARY': return smartTruncate(content, 2000);
-        case 'JSON':    return extractJsonByStack(content);
-        case 'CODE':    return extractCodeBlocks(content);
+        case 'SUMMARY':
+            return smartTruncate(content, 2000);
+        case 'JSON':
+            return extractJsonByStack(content);
+        case 'CODE':
+            return extractCodeBlocks(content);
         case 'STATUS':
         case 'ERROR':
-        case 'METRICS': return extractTaskMetadata(targetTask, type);
-        case 'RAW':     return identity(content);
-        default:        return identity(content);
+        case 'METRICS':
+            return extractTaskMetadata(targetTask, type);
+        case 'RAW':
+            return identity(content);
+        default:
+            return identity(content);
     }
 }
 
@@ -44,26 +50,35 @@ async function applyTransform(content, transform, targetTask) {
  * @param {number} depth - Nível atual de recursão.
  * @param {BudgetManager} budget - Gestor de volume de injeção.
  */
+// eslint-disable-next-line complexity -- Context resolution orchestrator inherently complex
 async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {
     // 1. GUARDRAILS: Validação de segurança e aborto
-    if (signal?.aborted) {throw new Error('CONTEXT_RESOLUTION_ABORTED');}
+    if (signal?.aborted) {
+        throw new Error('CONTEXT_RESOLUTION_ABORTED');
+    }
     assertSafetyDepth(depth);
 
-    if (!text || !text.includes('{{REF:')) {return text;}
+    if (!text || !text.includes('{{REF:')) {
+        return text;
+    }
 
     // Inicializa o gestor de orçamento no nível 0 da recursão
     const currentBudget = budget || new BudgetManager();
 
     // 2. PARSING: Identifica todas as intenções de referência
     const refs = parseReferences(text);
-    if (refs.length === 0) {return text;}
+    if (refs.length === 0) {
+        return text;
+    }
 
     let resolvedText = text;
     const projectId = currentTask?.meta?.project_id || 'default';
 
     for (const ref of refs) {
         // Check de aborto em cada iteração do loop para resposta imediata
-        if (signal?.aborted) {throw new Error('CONTEXT_RESOLUTION_ABORTED');}
+        if (signal?.aborted) {
+            throw new Error('CONTEXT_RESOLUTION_ABORTED');
+        }
 
         try {
             // [FIX 3.4] Check de Orçamento Preventivo:
@@ -118,13 +133,12 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
             if (!currentBudget.allocate(injectedContent.length)) {
                 log('WARN', `Orçamento de contexto excedido para ${ref.criteria}. Aplicando truncamento.`);
                 const remaining = currentBudget.getRemaining();
-                injectedContent = `${injectedContent.slice(0, Math.max(0, remaining))  }... [TRUNCATED]`;
+                injectedContent = `${injectedContent.slice(0, Math.max(0, remaining))}... [TRUNCATED]`;
                 currentBudget.allocate(injectedContent.length);
             }
 
             // Substituição atômica no texto (Literal Replacement)
             resolvedText = resolvedText.split(ref.fullMatch).join(injectedContent);
-
         } catch (err) {
             log('ERROR', `Falha ao resolver referência ${ref.fullMatch}: ${err.message}`);
             resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO_CONTEXTO]`);
@@ -132,7 +146,7 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
     }
 
     // 7. RECURSÃO: Resolve tags que possam ter vindo de dentro das referências injetadas
-    return await resolveContext(resolvedText, currentTask, signal, depth + 1, currentBudget);
+    return resolveContext(resolvedText, currentTask, signal, depth + 1, currentBudget);
 }
 
 module.exports = { resolveContext };

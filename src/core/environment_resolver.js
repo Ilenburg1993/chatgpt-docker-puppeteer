@@ -76,7 +76,6 @@ class EnvironmentResolver {
 
             // 5. CASO DE BAIXA CONFIANÇA (Ambiente Desconhecido)
             return this._reject('TARGET_NOT_SUPPORTED', 0.2, { hostname });
-
         } catch (e) {
             // Falha no parsing da URL ou erro de acesso à página
             return this._reject('PERCEPTION_CRASH', 0, { error: e.message });

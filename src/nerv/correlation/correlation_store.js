@@ -59,16 +59,15 @@ function createCorrelationStore({ telemetry, limits = {} }) {
 
     const store = emptyMap();
 
-    const MAX_ENTRIES =
-    typeof limits.maxEntries === 'number' ? limits.maxEntries : null;
+    const MAX_ENTRIES = typeof limits.maxEntries === 'number' ? limits.maxEntries : null;
 
     /* ===========================
      Operações internas
   =========================== */
 
     /**
-   * Cria uma nova correlação, se ainda não existir.
-   */
+     * Cria uma nova correlação, se ainda não existir.
+     */
     function ensureCorrelation(correlationId) {
         if (!store[correlationId]) {
             store[correlationId] = [];
@@ -80,9 +79,9 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     }
 
     /**
-   * Cria um registro técnico mínimo a partir de um envelope.
-   * Payload permanece opaco (não armazenado integralmente).
-   */
+     * Cria um registro técnico mínimo a partir de um envelope.
+     * Payload permanece opaco (não armazenado integralmente).
+     */
     function createRecord(envelope) {
         return Object.freeze({
             timestamp: now(),
@@ -96,11 +95,11 @@ function createCorrelationStore({ telemetry, limits = {} }) {
   =========================== */
 
     /**
-   * Registra um envelope em sua correlação.
-   *
-   * @param {string} correlationId
-   * @param {Object} envelope
-   */
+     * Registra um envelope em sua correlação.
+     *
+     * @param {string} correlationId
+     * @param {Object} envelope
+     */
     function append(correlationId, envelope) {
         if (typeof correlationId !== 'string') {
             return;
@@ -127,11 +126,11 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     }
 
     /**
-   * Retorna cópia do histórico de uma correlação.
-   *
-   * @param {string} correlationId
-   * @returns {Array}
-   */
+     * Retorna cópia do histórico de uma correlação.
+     *
+     * @param {string} correlationId
+     * @returns {Array}
+     */
     function get(correlationId) {
         if (!store[correlationId]) {
             return [];
@@ -141,21 +140,21 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     }
 
     /**
-   * Verifica se uma correlação existe.
-   *
-   * @param {string} correlationId
-   * @returns {boolean}
-   */
+     * Verifica se uma correlação existe.
+     *
+     * @param {string} correlationId
+     * @returns {boolean}
+     */
     function has(correlationId) {
         return Boolean(store[correlationId]);
     }
 
     /**
-   * Retorna o tamanho do histórico de uma correlação.
-   *
-   * @param {string} correlationId
-   * @returns {number}
-   */
+     * Retorna o tamanho do histórico de uma correlação.
+     *
+     * @param {string} correlationId
+     * @returns {number}
+     */
     function size(correlationId) {
         if (!store[correlationId]) {
             return 0;
@@ -165,11 +164,11 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     }
 
     /**
-   * Lista todos os correlation_ids existentes.
-   * Uso exclusivo para auditoria/diagnóstico.
-   *
-   * @returns {Array<string>}
-   */
+     * Lista todos os correlation_ids existentes.
+     * Uso exclusivo para auditoria/diagnóstico.
+     *
+     * @returns {Array<string>}
+     */
     function list() {
         return Object.keys(store);
     }

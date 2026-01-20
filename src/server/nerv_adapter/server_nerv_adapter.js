@@ -27,8 +27,12 @@ class ServerNERVAdapter {
      * @param {Object} config - Configuração do sistema
      */
     constructor(nerv, socketHub, config) {
-        if (!nerv) {throw new Error('[ServerNERVAdapter] NERV instance required');}
-        if (!socketHub) {throw new Error('[ServerNERVAdapter] SocketHub required');}
+        if (!nerv) {
+            throw new Error('[ServerNERVAdapter] NERV instance required');
+        }
+        if (!socketHub) {
+            throw new Error('[ServerNERVAdapter] SocketHub required');
+        }
 
         this.nerv = nerv;
         this.socketHub = socketHub;
@@ -52,9 +56,11 @@ class ServerNERVAdapter {
      * Configura listeners para eventos NERV que devem ser broadcast ao dashboard.
      */
     _setupNERVListeners() {
-        this.nerv.onReceive((envelope) => {
+        this.nerv.onReceive(envelope => {
             // Filtra apenas EVENTS (COMMANDS são internos, não vão para dashboard)
-            if (envelope.messageType !== MessageType.EVENT) {return;}
+            if (envelope.messageType !== MessageType.EVENT) {
+                return;
+            }
 
             // Broadcast evento para clientes Socket.io conectados
             this._broadcastEvent(envelope).catch(err => {
@@ -71,28 +77,31 @@ class ServerNERVAdapter {
      */
     _setupSocketListeners() {
         // Listener para comandos do dashboard (ex: pausar engine, cancelar task)
-        this.socketHub.on('dashboard:command', (data) => {
+        this.socketHub.on('dashboard:command', data => {
             this._handleDashboardCommand(data).catch(err => {
                 log('ERROR', `[ServerNERVAdapter] Erro ao processar comando dashboard: ${err.message}`);
             });
         });
 
         // Listener para requisições de status/health
-        this.socketHub.on('dashboard:status_request', (data) => {
+        this.socketHub.on('dashboard:status_request', data => {
             this._handleStatusRequest(data).catch(err => {
                 log('ERROR', `[ServerNERVAdapter] Erro ao processar requisição de status: ${err.message}`);
             });
         });
 
         // Listener para conexões/desconexões de clientes
-        this.socketHub.on('client:connected', (clientId) => {
+        this.socketHub.on('client:connected', clientId => {
             this.stats.clientsConnected++;
             log('INFO', `[ServerNERVAdapter] Cliente conectado: ${clientId} (total: ${this.stats.clientsConnected})`);
         });
 
-        this.socketHub.on('client:disconnected', (clientId) => {
+        this.socketHub.on('client:disconnected', clientId => {
             this.stats.clientsConnected = Math.max(0, this.stats.clientsConnected - 1);
-            log('INFO', `[ServerNERVAdapter] Cliente desconectado: ${clientId} (total: ${this.stats.clientsConnected})`);
+            log(
+                'INFO',
+                `[ServerNERVAdapter] Cliente desconectado: ${clientId} (total: ${this.stats.clientsConnected})`
+            );
         });
 
         log('DEBUG', '[ServerNERVAdapter] Listeners Socket.io configurados');
@@ -205,10 +214,7 @@ class ServerNERVAdapter {
         const { actionCode, payload, correlationId, timestamp } = envelope;
 
         // Filtro de privacidade: alguns eventos são apenas para observação interna
-        const PRIVATE_EVENTS = [
-            ActionCode.KERNEL_INTERNAL_ERROR,
-            ActionCode.SECURITY_VIOLATION
-        ];
+        const PRIVATE_EVENTS = [ActionCode.KERNEL_INTERNAL_ERROR, ActionCode.SECURITY_VIOLATION];
 
         if (PRIVATE_EVENTS.includes(actionCode)) {
             log('DEBUG', `[ServerNERVAdapter] Evento privado não broadcast: ${actionCode}`, correlationId);
@@ -289,7 +295,9 @@ class ServerNERVAdapter {
         }
 
         // Aguarda 2 segundos para clientes receberem a notificação
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => {
+            setTimeout(resolve, 2000);
+        });
 
         log('INFO', '[ServerNERVAdapter] Shutdown concluído');
     }

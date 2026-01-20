@@ -14,8 +14,8 @@ const { log } = require('../../core/logger');
 
 class InputResolver {
     /**
-   * @param {object} driver - Instância do BaseDriver.
-   */
+     * @param {object} driver - Instância do BaseDriver.
+     */
     constructor(driver) {
         this.driver = driver;
         this.cachedProtocol = null;
@@ -23,24 +23,21 @@ class InputResolver {
     }
 
     /**
-   * Resolve o protocolo de entrada (seletor + contexto) com hierarquia de autoridade.
-   * Fluxo: Cache -> DNA (Rules) -> Heurística (SADI Scan).
-   */
+     * Resolve o protocolo de entrada (seletor + contexto) com hierarquia de autoridade.
+     * Fluxo: Cache -> DNA (Rules) -> Heurística (SADI Scan).
+     */
     async resolve() {
         this.driver._assertPageAlive();
         const domain = this.driver.currentDomain;
-        const correlationId = this.driver.correlationId;
+        const _correlationId = this.driver.correlationId;
 
         // Ritmo de validade ditado pela governança central
         const ttl = CONFIG.all.INPUT_CACHE_TTL || 60000;
 
         try {
             // 1. VALIDAÇÃO DE CACHE (Performance O(1))
-            if (this.cachedProtocol && (Date.now() - this.cacheTimestamp < ttl)) {
-                const ok = await analyzer.validateCandidateInteractivity(
-                    this.driver.page,
-                    this.cachedProtocol
-                );
+            if (this.cachedProtocol && Date.now() - this.cacheTimestamp < ttl) {
+                const ok = await analyzer.validateCandidateInteractivity(this.driver.page, this.cachedProtocol);
 
                 if (ok) {
                     this.driver._emitVital('SADI_PERCEPTION', {
@@ -87,7 +84,6 @@ class InputResolver {
                 evidence: { domain, url: this.driver.page.url() }
             });
             throw new Error(`INPUT_NOT_FOUND: Falha ao localizar interface em ${domain}`);
-
         } finally {
             // Higiene de handles: evita vazamento de referências do Puppeteer
             await this.driver.handles.clearAll();
@@ -95,27 +91,27 @@ class InputResolver {
     }
 
     /**
-   * Testa uma lista de seletores ou protocolos conhecidos para ganho de performance.
-   * Suporta polimorfismo: aceita Array de strings ou objetos de protocolo SADI.
-   */
+     * Testa uma lista de seletores ou protocolos conhecidos para ganho de performance.
+     * Suporta polimorfismo: aceita Array de strings ou objetos de protocolo SADI.
+     */
     async _tryKnownSelectors(inputRules) {
         const candidates = Array.isArray(inputRules) ? inputRules : [inputRules];
 
         for (const item of candidates) {
             // Normaliza para o formato de protocolo estruturado
-            const protocol = typeof item === 'string'
-                ? { selector: item, context: 'root' }
-                : item;
+            const protocol = typeof item === 'string' ? { selector: item, context: 'root' } : item;
 
             const ok = await analyzer.validateCandidateInteractivity(this.driver.page, protocol);
-            if (ok) {return protocol;}
+            if (ok) {
+                return protocol;
+            }
         }
         return null;
     }
 
     /**
-   * Consolida a descoberta, resolve o botão de envio e atualiza o cache em RAM.
-   */
+     * Consolida a descoberta, resolve o botão de envio e atualiza o cache em RAM.
+     */
     async _finalizeDiscovery(protocol, source, dnaRules, confidence = 1.0) {
         const domain = this.driver.currentDomain;
 
@@ -144,19 +140,19 @@ class InputResolver {
     }
 
     /**
-   * Invalida o conhecimento atual. Chamado pelo Driver em manobras de recuperação.
-   */
+     * Invalida o conhecimento atual. Chamado pelo Driver em manobras de recuperação.
+     */
     clearCache() {
         this.cachedProtocol = null;
         this.cacheTimestamp = 0;
     }
 
     /**
-   * Verifica se o cache ainda é confiável conforme a política de ritmo.
-   */
+     * Verifica se o cache ainda é confiável conforme a política de ritmo.
+     */
     isCached() {
         const ttl = CONFIG.all.INPUT_CACHE_TTL || 60000;
-        return !!(this.cachedProtocol && (Date.now() - this.cacheTimestamp < ttl));
+        return !!(this.cachedProtocol && Date.now() - this.cacheTimestamp < ttl);
     }
 }
 

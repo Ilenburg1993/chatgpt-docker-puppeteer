@@ -1,3 +1,7 @@
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 /* ==========================================================================
    src/infra/queue/scheduler.js
    Audit Level: 700 — Pure Selection Engine (Singularity Edition)
@@ -36,12 +40,17 @@ function getNextEligible(allTasks, targetFilter = null) {
     }
 
     // 3. FILTRAGEM DE ELEGIBILIDADE
+    // eslint-disable-next-line complexity -- Task scheduling requires complex priority logic
     const eligible = allTasks.filter(t => {
         // Validação de Integridade Mínima (Schema V4 Guard)
-        if (!t?.state || !t?.meta || !t?.policy) {return false;}
+        if (!t?.state || !t?.meta || !t?.policy) {
+            return false;
+        }
 
         // A. Check de Estado: Apenas tarefas pendentes entram no motor
-        if (t.state.status !== 'PENDING') {return false;}
+        if (t.state.status !== STATUS_VALUES.PENDING) {
+            return false;
+        }
 
         // B. Time-lock (Agendamento): Verifica se a hora de execução já chegou
         if (t.policy.execute_after && new Date(t.policy.execute_after) > now) {
@@ -55,16 +64,22 @@ function getNextEligible(allTasks, targetFilter = null) {
                 const parent = taskMap.get(depId);
 
                 // Se o pai não existe no snapshot, assumimos que ainda não foi criado
-                if (!parent) {return false;}
+                if (!parent) {
+                    return false;
+                }
 
                 const pStatus = parent.state.status;
 
                 // Bloqueio Estrito: Se o pai falhou ou foi pulado, o filho fica travado
                 // (O Loader eventualmente marcará este filho como SKIPPED)
-                if (pStatus === 'FAILED' || pStatus === 'SKIPPED') {return false;}
+                if (pStatus === STATUS_VALUES.FAILED || pStatus === STATUS_VALUES.SKIPPED) {
+                    return false;
+                }
 
                 // Só libera se o pai estiver concluído com sucesso
-                if (pStatus !== 'DONE') {return false;}
+                if (pStatus !== STATUS_VALUES.DONE) {
+                    return false;
+                }
             }
         }
 
@@ -83,11 +98,17 @@ function getNextEligible(allTasks, targetFilter = null) {
         const pA = a.meta.priority || 0;
         const pB = b.meta.priority || 0;
 
-        if (pB !== pA) {return pB - pA;}
+        if (pB !== pA) {
+            return pB - pA;
+        }
 
         // Comparação léxica de strings ISO-8601 (Alta performance)
-        if (a.meta.created_at < b.meta.created_at) {return -1;}
-        if (a.meta.created_at > b.meta.created_at) {return 1;}
+        if (a.meta.created_at < b.meta.created_at) {
+            return -1;
+        }
+        if (a.meta.created_at > b.meta.created_at) {
+            return 1;
+        }
         return 0;
     });
 }

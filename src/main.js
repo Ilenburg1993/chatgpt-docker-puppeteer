@@ -19,6 +19,15 @@
 // @ts-nocheck - Suprime warnings TypeScript para propriedades dinâmicas e tipos implícitos
 
 const { log } = require('./core/logger');
+
+const {
+    CONNECTION_MODES: CONNECTION_MODES
+} = require('./core/constants/browser.js');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('./core/constants/tasks.js');
+
 const CONFIG = require('./core/config');
 const identityManager = require('./core/identity_manager');
 
@@ -39,6 +48,18 @@ const ServerNERVAdapter = require('./server/nerv_adapter/server_nerv_adapter');
 /**
  * Sequência de inicialização do sistema.
  * Ordem crítica: NERV → BrowserPool → KERNEL → Adapters → Server
+ *
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Se qualquer subsistema falhar na inicialização
+ *
+ * @description
+ * Fase 1: Configuração e Identidade
+ * Fase 2: NERV (Event Bus)
+ * Fase 3: Browser Pool Manager
+ * Fase 4: KERNEL (Núcleo de decisão)
+ * Fase 5: Adapters (Driver + Server)
+ * Fase 6: Server Web
  */
 async function boot() {
     log('INFO', '🚀 Maestro Singularity Edition - Iniciando boot sequence...');
@@ -68,10 +89,10 @@ async function boot() {
         log('INFO', '[BOOT] Fase 2/6: Inicializando NERV (canal de transporte)');
 
         const nerv = await createNERV({
-            mode: 'hybrid', // local EventEmitter + Socket.io adapter
+            mode: CONNECTION_MODES.HYBRID, // local EventEmitter + Socket.io adapter
             correlation: true, // Event sourcing
             bufferSize: process.env.NERV_BUFFER_SIZE || CONFIG.NERV_BUFFER_SIZE || 1000,
-            telemetry: process.env.NERV_TELEMETRY !== 'false' && (CONFIG.NERV_TELEMETRY !== false)
+            telemetry: process.env.NERV_TELEMETRY !== 'false' && CONFIG.NERV_TELEMETRY !== false
         });
 
         log('INFO', '[BOOT] ✅ NERV online (híbrido: local + remoto)');
@@ -92,13 +113,16 @@ async function boot() {
 
         await browserPool.initialize();
         const poolHealth = await browserPool.getHealth();
-        log('INFO', `[BOOT] ✅ Browser Pool online (${poolHealth.healthy}/${poolHealth.poolSize} instâncias saudáveis)`);
+        log(
+            'INFO',
+            `[BOOT] ✅ Browser Pool online (${poolHealth.healthy}/${poolHealth.poolSize} instâncias saudáveis)`
+        );
 
         // ===== FASE 4: KERNEL (DECISOR SOBERANO) =====
         log('INFO', '[BOOT] Fase 4/6: Inicializando KERNEL');
 
         const kernel = await createKernel({
-            nerv,  // Passa NERV diretamente
+            nerv, // Passa NERV diretamente
             telemetry: {
                 source: 'kernel',
                 retention: 1000
@@ -132,9 +156,12 @@ async function boot() {
         // Inicia o servidor HTTP
         const serverPort = process.env.PORT || CONFIG.SERVER_PORT || 3008;
         await new Promise((resolve, reject) => {
-            httpServer.listen(serverPort, (err) => {
-                if (err) {reject(err);}
-                else {resolve();}
+            httpServer.listen(serverPort, err => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve();
+                }
             });
         });
 
@@ -155,7 +182,6 @@ async function boot() {
             bootDuration,
             identity
         };
-
     } catch (error) {
         log('FATAL', `[BOOT] Falha catastrófica durante boot: ${error.message}`);
         log('ERROR', `[BOOT] Stack trace: ${error.stack}`);
@@ -272,19 +298,18 @@ async function shutdown(context) {
             const phaseDuration = Date.now() - phaseStartTime;
             phases.push({
                 name: phase.name,
-                status: 'SUCCESS',
+                status: STATUS_VALUES.SUCCESS,
                 duration: phaseDuration
             });
 
             log('DEBUG', `[SHUTDOWN] ${phase.name} concluído em ${phaseDuration}ms`);
-
         } catch (error) {
             const phaseDuration = Date.now() - phaseStartTime;
             failedPhases++;
 
             phases.push({
                 name: phase.name,
-                status: 'FAILED',
+                status: STATUS_VALUES.FAILED,
                 duration: phaseDuration,
                 error: error.message
             });
@@ -296,18 +321,23 @@ async function shutdown(context) {
 
     // Sumário do shutdown
     const shutdownDuration = Date.now() - shutdownStartTime;
-    const successCount = phases.filter(p => p.status === 'SUCCESS').length;
+    const successCount = phases.filter(p => p.status === STATUS_VALUES.SUCCESS).length;
 
     if (failedPhases === 0) {
         log('INFO', `[SHUTDOWN] ✅ Shutdown gracioso concluído: ${successCount}/6 fases OK em ${shutdownDuration}ms`);
         process.exit(0);
     } else {
-        log('WARN', `[SHUTDOWN] ⚠️  Shutdown parcial: ${successCount}/6 fases OK, ${failedPhases} falhas em ${shutdownDuration}ms`);
+        log(
+            'WARN',
+            `[SHUTDOWN] ⚠️  Shutdown parcial: ${successCount}/6 fases OK, ${failedPhases} falhas em ${shutdownDuration}ms`
+        );
 
         // Log detalhado das falhas
-        phases.filter(p => p.status === 'FAILED').forEach(p => {
-            log('ERROR', `   ❌ ${p.name}: ${p.error}`);
-        });
+        phases
+            .filter(p => p.status === STATUS_VALUES.FAILED)
+            .forEach(p => {
+                log('ERROR', `   ❌ ${p.name}: ${p.error}`);
+            });
 
         // Exit code 1 = shutdown com falhas (mas tentou limpar tudo)
         process.exit(1);
@@ -326,7 +356,7 @@ let _shutdownInProgress = false;
  */
 function setupSignalHandlers(context) {
     // [P4.3 FIX] Handler unificado com guard contra shutdown concorrente
-    const gracefulShutdown = async (signal) => {
+    const gracefulShutdown = async signal => {
         if (_shutdownInProgress) {
             log('WARN', `[SIGNAL] ${signal} ignorado - shutdown já em andamento`);
             return;
@@ -361,7 +391,7 @@ function setupSignalHandlers(context) {
     });
 
     // Uncaught Exception: Crash com forensics
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', error => {
         log('FATAL', `[CRASH] Uncaught Exception: ${error.message}`);
         log('ERROR', `[CRASH] Stack: ${error.stack}`);
 
@@ -405,7 +435,6 @@ async function main() {
 
         // Sistema rodando - aguarda sinais
         log('INFO', '[MAIN] Sistema operacional. Pressione Ctrl+C para shutdown gracioso.');
-
     } catch (error) {
         log('FATAL', `[MAIN] Erro fatal não tratado: ${error.message}`);
         process.exit(1);

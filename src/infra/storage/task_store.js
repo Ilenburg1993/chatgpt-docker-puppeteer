@@ -8,6 +8,11 @@
 ========================================================================== */
 
 const fs = require('fs');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const fsp = fs.promises;
 const path = require('path');
 
@@ -42,7 +47,7 @@ async function saveTask(task) {
  */
 async function loadTask(id) {
     const filepath = path.join(PATHS.QUEUE, `${id}.json`);
-    return await safeReadJSON(filepath);
+    return safeReadJSON(filepath);
 }
 
 /**
@@ -67,7 +72,7 @@ async function deleteTask(id) {
 function listTaskFiles() {
     try {
         return fs.readdirSync(PATHS.QUEUE).filter(f => f.endsWith('.json'));
-    } catch (e) {
+    } catch (_e) {
         return [];
     }
 }
@@ -89,14 +94,14 @@ async function clearQueue() {
             const task = await safeReadJSON(filepath);
 
             // Proteção de Soberania: Nunca apagar o que o robô está operando agora
-            if (task && task.state && task.state.status === 'RUNNING') {
+            if (task && task.state && task.state.status === STATUS_VALUES.RUNNING) {
                 preserved++;
                 continue;
             }
 
             await fsp.unlink(filepath);
             deleted++;
-        } catch (e) {
+        } catch (_e) {
             // Em caso de erro de leitura ou exclusão de um arquivo específico, incrementa preservados
             preserved++;
         }

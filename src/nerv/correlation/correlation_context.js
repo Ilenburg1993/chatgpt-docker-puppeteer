@@ -66,11 +66,11 @@ function createCorrelationContext({ store, telemetry }) {
   =========================== */
 
     /**
-   * Retorna o histórico completo de uma correlação.
-   *
-   * @param {string} correlationId
-   * @returns {Array<Object>}
-   */
+     * Retorna o histórico completo de uma correlação.
+     *
+     * @param {string} correlationId
+     * @returns {Array<Object>}
+     */
     function getHistory(correlationId) {
         if (!isNonEmptyString(correlationId)) {
             return [];
@@ -87,11 +87,11 @@ function createCorrelationContext({ store, telemetry }) {
     }
 
     /**
-   * Verifica se uma correlação existe.
-   *
-   * @param {string} correlationId
-   * @returns {boolean}
-   */
+     * Verifica se uma correlação existe.
+     *
+     * @param {string} correlationId
+     * @returns {boolean}
+     */
     function exists(correlationId) {
         if (!isNonEmptyString(correlationId)) {
             return false;
@@ -101,11 +101,11 @@ function createCorrelationContext({ store, telemetry }) {
     }
 
     /**
-   * Retorna o tamanho do histórico de uma correlação.
-   *
-   * @param {string} correlationId
-   * @returns {number}
-   */
+     * Retorna o tamanho do histórico de uma correlação.
+     *
+     * @param {string} correlationId
+     * @returns {number}
+     */
     function size(correlationId) {
         if (!isNonEmptyString(correlationId)) {
             return 0;
@@ -115,11 +115,11 @@ function createCorrelationContext({ store, telemetry }) {
     }
 
     /**
-   * Retorna lista de todas as correlações existentes.
-   * Uso exclusivo para auditoria/diagnóstico.
-   *
-   * @returns {Array<string>}
-   */
+     * Retorna lista de todas as correlações existentes.
+     * Uso exclusivo para auditoria/diagnóstico.
+     *
+     * @returns {Array<string>}
+     */
     function list() {
         const ids = store.list();
 

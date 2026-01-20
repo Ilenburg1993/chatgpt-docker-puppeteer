@@ -17,7 +17,9 @@
  */
 function evaluateLine(line, forbiddenTerms) {
     // 1. Guardrail de entrada: Evita processamento em linhas vazias ou sem regras
-    if (!line || !forbiddenTerms || forbiddenTerms.length === 0) {return null;}
+    if (!line || !forbiddenTerms || forbiddenTerms.length === 0) {
+        return null;
+    }
 
     // 2. Normalização única por linha (Otimização de Memória)
     const normalizedLine = line.toLowerCase();
@@ -46,9 +48,8 @@ function compileForbiddenList(systemTerms = [], userTerms = []) {
 
     // 3. Filtragem e Normalização (Hardening V68)
     return combined
-        .filter(t =>
-            typeof t === 'string' &&
-            t.trim().length > 2 // [FIX] Impede falsos-positivos com conectores curtos
+        .filter(
+            t => typeof t === 'string' && t.trim().length > 2 // [FIX] Impede falsos-positivos com conectores curtos
         )
         .map(t => t.trim().toLowerCase());
 }

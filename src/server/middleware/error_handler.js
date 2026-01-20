@@ -28,7 +28,7 @@ function notFound(req, res, next) {
  * @param {object} res - Response Express.
  * @param {function} next - Próximo middleware.
  */
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
     // 1. Determinação do Status Code
     // Se o status já foi definido (ex: 404), mantém. Caso contrário, assume falha interna (500).
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;

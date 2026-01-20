@@ -28,7 +28,9 @@ let reconnectTimer = null;
  * Implementa lógica de auto-recuperação e reconexão resiliente.
  */
 function init() {
-    if (isBusActive) {return;}
+    if (isBusActive) {
+        return;
+    }
 
     // Limpeza de timers de reconexão pendentes
     if (reconnectTimer) {
@@ -39,7 +41,7 @@ function init() {
     log('INFO', '[PM2_BRIDGE] Conectando ao barramento de eventos do PM2...');
 
     // Conecta ao daemon do PM2 usando a interface bruta da Infraestrutura
-    pm2Raw.connect((err) => {
+    pm2Raw.connect(err => {
         if (err) {
             log('ERROR', `[PM2_BRIDGE] Falha ao conectar ao daemon: ${err.message}`);
             // Tenta reconectar em 5 segundos (Backoff Passivo)
@@ -62,12 +64,12 @@ function init() {
              * Escuta eventos globais de todos os processos gerenciados pelo PM2.
              * Filtra cirurgicamente apenas os eventos do Agente Soberano.
              */
-            bus.on('process:event', (data) => {
+            bus.on('process:event', data => {
                 const processName = data.process ? data.process.name : null;
 
                 if (processName === AGENTE_NAME) {
                     const payload = {
-                        event: data.event,      // 'start', 'stop', 'restart', 'exit', 'online'
+                        event: data.event, // 'start', 'stop', 'restart', 'exit', 'online'
                         status: data.process.status,
                         ts: Date.now()
                     };
@@ -89,12 +91,16 @@ function init() {
  * Garante que a ponte se recupere caso o daemon do PM2 seja reiniciado.
  */
 function _startHealthCheck() {
-    if (healthCheckInterval) {clearInterval(healthCheckInterval);}
+    if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+    }
 
     healthCheckInterval = setInterval(() => {
-        if (!isBusActive) {return;}
+        if (!isBusActive) {
+            return;
+        }
 
-        pm2Raw.list((err) => {
+        pm2Raw.list(err => {
             if (err) {
                 log('WARN', '[PM2_BRIDGE] Link com daemon PM2 perdido. Reiniciando ponte...');
                 isBusActive = false;

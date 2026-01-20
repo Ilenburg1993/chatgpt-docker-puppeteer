@@ -16,7 +16,7 @@ const { log, audit } = require('../../core/logger');
  * @param {z.ZodSchema} schema - O Schema Zod (ex: TaskSchema) para validação.
  * @returns {Function} Middleware Express (req, res, next).
  */
-const schemaGuard = (schema) => (req, res, next) => {
+const schemaGuard = schema => (req, res, next) => {
     const requestId = req.id || 'no-id';
 
     // 1. Verificação de Existência

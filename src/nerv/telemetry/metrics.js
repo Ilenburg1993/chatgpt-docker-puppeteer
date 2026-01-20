@@ -81,9 +81,15 @@ function createMetrics() {
     }
 
     function reset() {
-        for (const k in counters) {delete counters[k];}
-        for (const k in gauges) {delete gauges[k];}
-        for (const k in timestamps) {delete timestamps[k];}
+        for (const k in counters) {
+            delete counters[k];
+        }
+        for (const k in gauges) {
+            delete gauges[k];
+        }
+        for (const k in timestamps) {
+            delete timestamps[k];
+        }
     }
 
     /* ===========================

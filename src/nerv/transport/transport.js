@@ -67,7 +67,7 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
 
             // Recebe chunks brutos do meio físico
             onReceive(handler) {
-                adapter.onReceive((chunk) => {
+                adapter.onReceive(chunk => {
                     unpacker.push(chunk, handler);
                 });
             }
@@ -92,16 +92,16 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
   ========================================================= */
 
     /**
-   * Inicializa o transporte físico.
-   */
+     * Inicializa o transporte físico.
+     */
     function start() {
         telemetry.emit('nerv:transport:starting');
         connection.start();
     }
 
     /**
-   * Encerra o transporte físico.
-   */
+     * Encerra o transporte físico.
+     */
     function stop() {
         telemetry.emit('nerv:transport:stopping');
 
@@ -113,20 +113,20 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     }
 
     /**
-   * Envia frame opaco pelo meio físico.
-   *
-   * @param {Buffer|Uint8Array} frame
-   */
+     * Envia frame opaco pelo meio físico.
+     *
+     * @param {Buffer|Uint8Array} frame
+     */
     function send(frame) {
         const packed = framing.pack(frame);
         connection.send(packed);
     }
 
     /**
-   * Registra handler para frames recebidos.
-   *
-   * @param {Function} handler
-   */
+     * Registra handler para frames recebidos.
+     *
+     * @param {Function} handler
+     */
     function onReceive(handler) {
         connection.onReceive(handler);
     }

@@ -9,7 +9,12 @@
 ========================================================================== */
 
 const fs = require('fs');
-const path = require('path');
+
+const {
+    CONNECTION_MODES: CONNECTION_MODES
+} = require('../core/constants/browser.js');
+
+const _path = require('path');
 
 // 1. Motores Centrais (Engine)
 const server = require('./engine/server');
@@ -51,7 +56,7 @@ function persistServerState(port) {
         server_started_at: new Date().toISOString(),
         server_version: 'V750',
         protocol: PROTOCOL_VERSION || '2.0.0',
-        mode: 'singularity'
+        mode: CONNECTION_MODES.SINGULARITY
     };
 
     try {
@@ -120,7 +125,6 @@ async function bootstrap() {
         log('INFO', `[BOOT] Mission Control Prime V750 totalmente operacional na porta ${instance.port}`);
 
         return instance;
-
     } catch (e) {
         log('FATAL', `[BOOT] Falha catastrófica na ignição do servidor: ${e.message}`);
         // Em caso de falha no boot, encerramos o processo para evitar estado inconsistente

@@ -45,7 +45,7 @@ const AdaptiveStateSchema = z.object({
 -------------------------------------------------------------------------- */
 const STATE_FILE = path.join(LOG_DIR, 'adaptive_state.json');
 
-const createEmptyStats = (avg) => ({
+const createEmptyStats = avg => ({
     avg,
     var: Math.pow(avg / 2, 2),
     count: 0
@@ -75,7 +75,7 @@ async function init() {
             const rawContent = await fs.readFile(STATE_FILE, 'utf-8');
             try {
                 state = AdaptiveStateSchema.parse(JSON.parse(rawContent));
-            } catch (parseErr) {
+            } catch (_parseErr) {
                 // [FIX] Preservação forense de dados corrompidos
                 const bak = `${STATE_FILE}.bak.${Date.now()}`;
                 await fs.writeFile(bak, rawContent);
@@ -110,6 +110,7 @@ async function persist() {
     } catch (e) {
         log('ERROR', `[ADAPTIVE] Falha de escrita: ${e.message}`);
     } finally {
+    // eslint-disable-next-line require-atomic-updates -- Single-threaded execution, no race condition
         persistLock = false;
         if (pendingPersist) {
             pendingPersist = false;
@@ -122,7 +123,9 @@ async function persist() {
    MOTOR ESTATÍSTICO
 -------------------------------------------------------------------------- */
 function updateStats(stats, value, label) {
-    if (!Number.isFinite(value) || value < 0) {return;}
+    if (!Number.isFinite(value) || value < 0) {
+        return;
+    }
 
     const std = Math.sqrt(Math.max(0, stats.var));
     if (stats.count > 10 && value > stats.avg + 6 * std) {
@@ -130,7 +133,7 @@ function updateStats(stats, value, label) {
         return;
     }
 
-    const alpha = stats.count < 20 ? 0.4 : (CONFIG.ADAPTIVE_ALPHA || 0.15);
+    const alpha = stats.count < 20 ? 0.4 : CONFIG.ADAPTIVE_ALPHA || 0.15;
     const diff = value - stats.avg;
 
     stats.avg = Math.round(stats.avg + alpha * diff);
@@ -142,8 +145,12 @@ function updateStats(stats, value, label) {
    API PÚBLICA
 -------------------------------------------------------------------------- */
 async function recordMetric(type, ms, target = 'generic') {
-    if (!isReady) {await readyPromise;}
-    if (!Number.isFinite(ms) || ms < 0) {return;}
+    if (!isReady) {
+        await readyPromise;
+    }
+    if (!Number.isFinite(ms) || ms < 0) {
+        return;
+    }
 
     const key = target.toLowerCase();
     if (!state.targets[key]) {
@@ -156,24 +163,38 @@ async function recordMetric(type, ms, target = 'generic') {
     }
 
     switch (type) {
-        case 'ttft': updateStats(state.targets[key].ttft, ms, 'TTFT'); break;
-        case 'gap': updateStats(state.targets[key].stream, ms, 'STREAM'); break;
-        case 'echo': updateStats(state.targets[key].echo, ms, 'ECHO'); break;
-        case 'heartbeat': updateStats(state.infra, ms, 'INFRA'); break;
+        case 'ttft':
+            updateStats(state.targets[key].ttft, ms, 'TTFT');
+            break;
+        case 'gap':
+            updateStats(state.targets[key].stream, ms, 'STREAM');
+            break;
+        case 'echo':
+            updateStats(state.targets[key].echo, ms, 'ECHO');
+            break;
+        case 'heartbeat':
+            updateStats(state.infra, ms, 'INFRA');
+            break;
     }
 
     state.last_adjustment_at = Date.now(); // [FIX] Atualização de contrato
 
-    if (Math.random() < 0.05) {persist();}
+    if (Math.random() < 0.05) {
+        persist();
+    }
 }
 
 async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 'STREAM') {
-    if (!isReady) {await readyPromise;}
+    if (!isReady) {
+        await readyPromise;
+    }
 
     const profile = state.targets[target.toLowerCase()];
-    const stats = (!profile)
+    const stats = !profile
         ? createEmptyStats(phase === 'STREAM' ? SEED_STREAM : SEED_TTFT) // [FIX] Fallback consistente
-        : (phase === 'INITIAL' || phase === 'TTFT' ? profile.ttft : profile.stream);
+        : phase === 'INITIAL' || phase === 'TTFT'
+            ? profile.ttft
+            : profile.stream;
 
     const avg = Math.max(1, stats.avg);
     const std = Math.sqrt(Math.max(0, stats.var));
@@ -199,7 +220,9 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
 }
 
 async function getStabilityMetrics(target = 'generic') {
-    if (!isReady) {await readyPromise;}
+    if (!isReady) {
+        await readyPromise;
+    }
 
     const profile = state.targets[target.toLowerCase()];
     if (!profile || profile.stream.count === 0) {

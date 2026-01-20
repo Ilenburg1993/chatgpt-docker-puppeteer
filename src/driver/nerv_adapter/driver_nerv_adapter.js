@@ -18,6 +18,11 @@
 ========================================================================== */
 
 const DriverLifecycleManager = require('../DriverLifecycleManager');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const { log } = require('../../core/logger');
 const { ActionCode, MessageType, ActorRole } = require('../../shared/nerv/constants');
 
@@ -28,8 +33,12 @@ class DriverNERVAdapter {
      * @param {Object} config - Configuração do sistema
      */
     constructor(nerv, browserPool, config) {
-        if (!nerv) {throw new Error('[DriverNERVAdapter] NERV instance required');}
-        if (!browserPool) {throw new Error('[DriverNERVAdapter] BrowserPool required');}
+        if (!nerv) {
+            throw new Error('[DriverNERVAdapter] NERV instance required');
+        }
+        if (!browserPool) {
+            throw new Error('[DriverNERVAdapter] BrowserPool required');
+        }
 
         this.nerv = nerv;
         this.browserPool = browserPool;
@@ -58,20 +67,28 @@ class DriverNERVAdapter {
      */
     _setupListeners() {
         // Escuta comandos do tipo DRIVER_* vindos do KERNEL
-        this.nerv.onReceive((envelope) => {
+        this.nerv.onReceive(envelope => {
             // Filtra apenas mensagens para o domínio DRIVER
-            if (envelope.messageType !== MessageType.COMMAND) {return;}
-            if (!envelope.actionCode.startsWith('DRIVER_')) {return;}
+            if (envelope.messageType !== MessageType.COMMAND) {
+                return;
+            }
+            if (!envelope.actionCode.startsWith('DRIVER_')) {
+                return;
+            }
 
             this._handleDriverCommand(envelope).catch(err => {
                 log('ERROR', `[DriverNERVAdapter] Erro ao processar comando: ${err.message}`, envelope.correlationId);
 
                 // Emite evento de falha
-                this._emitEvent(ActionCode.DRIVER_ERROR, {
-                    error: err.message,
-                    taskId: envelope.payload?.taskId,
-                    originalCommand: envelope.actionCode
-                }, envelope.correlationId);
+                this._emitEvent(
+                    ActionCode.DRIVER_ERROR,
+                    {
+                        error: err.message,
+                        taskId: envelope.payload?.taskId,
+                        originalCommand: envelope.actionCode
+                    },
+                    envelope.correlationId
+                );
             });
         });
 
@@ -143,38 +160,48 @@ class DriverNERVAdapter {
             this._attachDriverTelemetry(driver, taskId, correlationId);
 
             // 6. Emite evento de início
-            this._emitEvent(ActionCode.DRIVER_TASK_STARTED, {
-                taskId,
-                target: task.spec.target,
-                driverType: driver.constructor.name
-            }, correlationId);
+            this._emitEvent(
+                ActionCode.DRIVER_TASK_STARTED,
+                {
+                    taskId,
+                    target: task.spec.target,
+                    driverType: driver.constructor.name
+                },
+                correlationId
+            );
 
             // 7. Executa a tarefa (método execute do driver)
             const result = await driver.execute(task.spec.prompt);
 
             // 8. Emite evento de conclusão
-            this._emitEvent(ActionCode.DRIVER_TASK_COMPLETED, {
-                taskId,
-                result: {
-                    status: 'SUCCESS',
-                    outputLength: result?.length || 0,
-                    duration: Date.now() - task.meta.created_at
-                }
-            }, correlationId);
+            this._emitEvent(
+                ActionCode.DRIVER_TASK_COMPLETED,
+                {
+                    taskId,
+                    result: {
+                        status: STATUS_VALUES.SUCCESS,
+                        outputLength: result?.length || 0,
+                        duration: Date.now() - task.meta.created_at
+                    }
+                },
+                correlationId
+            );
 
             this.stats.tasksExecuted++;
-
         } catch (error) {
             log('ERROR', `[DriverNERVAdapter] Falha na execução: ${error.message}`, correlationId);
 
-            this._emitEvent(ActionCode.DRIVER_TASK_FAILED, {
-                taskId,
-                error: error.message,
-                errorType: error.constructor.name
-            }, correlationId);
+            this._emitEvent(
+                ActionCode.DRIVER_TASK_FAILED,
+                {
+                    taskId,
+                    error: error.message,
+                    errorType: error.constructor.name
+                },
+                correlationId
+            );
 
             this.stats.driversCrashed++;
-
         } finally {
             // 9. Libera recursos
             if (lifecycleManager) {
@@ -206,10 +233,14 @@ class DriverNERVAdapter {
         await lifecycleManager.release();
         this.activeDrivers.delete(taskId);
 
-        this._emitEvent(ActionCode.DRIVER_TASK_ABORTED, {
-            taskId,
-            reason: 'USER_REQUESTED'
-        }, correlationId);
+        this._emitEvent(
+            ActionCode.DRIVER_TASK_ABORTED,
+            {
+                taskId,
+                reason: 'USER_REQUESTED'
+            },
+            correlationId
+        );
 
         this.stats.tasksAborted++;
     }
@@ -219,7 +250,7 @@ class DriverNERVAdapter {
      */
     async _performHealthCheck(payload, correlationId) {
         const health = {
-            adapter: 'HEALTHY',
+            adapter: STATUS_VALUES.HEALTHY,
             activeDrivers: this.activeDrivers.size,
             stats: { ...this.stats },
             browserPoolHealth: await this.browserPool.getHealth()
@@ -236,35 +267,47 @@ class DriverNERVAdapter {
      */
     _attachDriverTelemetry(driver, taskId, correlationId) {
         // Listener para mudanças de estado
-        driver.on('state_change', (data) => {
-            this._emitEvent(ActionCode.DRIVER_STATE_OBSERVED, {
-                taskId,
-                stateTransition: data,
-                timestamp: new Date().toISOString()
-            }, correlationId);
+        driver.on('state_change', data => {
+            this._emitEvent(
+                ActionCode.DRIVER_STATE_OBSERVED,
+                {
+                    taskId,
+                    stateTransition: data,
+                    timestamp: new Date().toISOString()
+                },
+                correlationId
+            );
         });
 
         // Listener para progresso
-        driver.on('progress', (data) => {
-            this._emitEvent(ActionCode.DRIVER_VITAL, {
-                taskId,
-                vitalType: 'PROGRESS',
-                data,
-                timestamp: new Date().toISOString()
-            }, correlationId);
+        driver.on('progress', data => {
+            this._emitEvent(
+                ActionCode.DRIVER_VITAL,
+                {
+                    taskId,
+                    vitalType: 'PROGRESS',
+                    data,
+                    timestamp: new Date().toISOString()
+                },
+                correlationId
+            );
 
             this.stats.vitalsEmitted++;
         });
 
         // Listener para anomalias (se disponível)
         if (typeof driver.on === 'function') {
-            driver.on('anomaly', (data) => {
-                this._emitEvent(ActionCode.DRIVER_ANOMALY, {
-                    taskId,
-                    anomalyType: data.type,
-                    severity: data.severity,
-                    details: data.message
-                }, correlationId);
+            driver.on('anomaly', data => {
+                this._emitEvent(
+                    ActionCode.DRIVER_ANOMALY,
+                    {
+                        taskId,
+                        anomalyType: data.type,
+                        severity: data.severity,
+                        details: data.message
+                    },
+                    correlationId
+                );
             });
         }
     }

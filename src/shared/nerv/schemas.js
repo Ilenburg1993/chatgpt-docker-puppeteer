@@ -11,12 +11,7 @@
    - Guardas de imutabilidade e consistência
 ========================================================================== */
 
-const {
-    PROTOCOL_VERSION,
-    MessageType,
-    ActionCode,
-    ActorRole
-} = require('./constants');
+const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('./constants');
 
 /* --------------------------------------------------------------------------
  * INTERNAL GUARDS
@@ -27,11 +22,7 @@ function violation(message) {
 }
 
 function isPlainObject(obj) {
-    return (
-        typeof obj === 'object' &&
-    obj !== null &&
-    !Array.isArray(obj)
-    );
+    return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
 function isUUID(value) {
@@ -131,16 +122,7 @@ function validateOntology(envelope) {
  * NEGATIVE VALIDATION (PROHIBITIONS)
  * ------------------------------------------------------------------------ */
 
-const FORBIDDEN_FIELDS = [
-    'status',
-    'result',
-    'success',
-    'error',
-    'response',
-    'return_value',
-    'exception',
-    'completed'
-];
+const FORBIDDEN_FIELDS = ['status', 'result', 'success', 'error', 'response', 'return_value', 'exception', 'completed'];
 
 function validateProhibitions(envelope) {
     const serialized = JSON.stringify(envelope);

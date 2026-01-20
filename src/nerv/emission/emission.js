@@ -44,12 +44,7 @@ const createEmitAck = require('./emit_ack');
  * @param {Object} deps.telemetry
  * Interface de telemetria do NERV.
  */
-function createEmission({
-    envelopes,
-    buffers,
-    correlation,
-    telemetry
-}) {
+function createEmission({ envelopes, buffers, correlation, telemetry }) {
     if (!envelopes || !buffers || !correlation || !telemetry) {
         throw new Error('emission requer dependências completas');
     }

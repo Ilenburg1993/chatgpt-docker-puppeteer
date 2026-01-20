@@ -7,6 +7,11 @@
 ========================================================================== */
 
 const { z } = require('zod');
+
+const {
+    CONNECTION_MODES: CONNECTION_MODES
+} = require('../constants/browser.js');
+
 const {
     ID_SCHEMA,
     TIMESTAMP_SCHEMA,
@@ -22,7 +27,7 @@ const {
 const MetaSchema = z.object({
     id: ID_SCHEMA,
     project_id: ID_SCHEMA.default('default'),
-    parent_id: ID_SCHEMA.optional(),      // Para árvores de tarefas
+    parent_id: ID_SCHEMA.optional(), // Para árvores de tarefas
     correlation_id: ID_SCHEMA.optional(), // Para agrupamento de fluxos
     version: z.string().default('4.0'),
     created_at: TIMESTAMP_SCHEMA,
@@ -36,34 +41,40 @@ const MetaSchema = z.object({
  */
 const SpecSchema = z.object({
     target: z.string().min(1), // Ex: 'chatgpt', 'gemini'
-    model: z.string().default('auto'),
+    model: z.string().default(CONNECTION_MODES.AUTO),
 
     payload: z.object({
         system_message: CLEAN_STRING_SCHEMA.default(''),
         user_message: CLEAN_STRING_SCHEMA, // Sanitização automática via shared_types
-        context: z.string().optional()     // Buffer para injeções manuais
+        context: z.string().optional() // Buffer para injeções manuais
     }),
 
-    parameters: z.object({
-        temperature: z.number().min(0).max(2).default(0.7),
-        max_tokens: z.number().optional(),
-        top_p: z.number().optional(),
-        stop_sequences: z.array(z.string()).default([])
-    }).default({}),
+    parameters: z
+        .object({
+            temperature: z.number().min(0).max(2).default(0.7),
+            max_tokens: z.number().optional(),
+            top_p: z.number().optional(),
+            stop_sequences: z.array(z.string()).default([])
+        })
+        .default({}),
 
     // Regras de validação específicas para esta tarefa
-    validation: z.object({
-        min_length: z.number().default(10),
-        required_format: z.enum(['text', 'json', 'markdown', 'code']).default('text'),
-        required_pattern: z.string().optional(), // Regex para o Validator
-        forbidden_terms: z.array(z.string()).default([])
-    }).default({}),
+    validation: z
+        .object({
+            min_length: z.number().default(10),
+            required_format: z.enum(['text', 'json', 'markdown', 'code']).default('text'),
+            required_pattern: z.string().optional(), // Regex para o Validator
+            forbidden_terms: z.array(z.string()).default([])
+        })
+        .default({}),
 
-    config: z.object({
-        reset_context: z.boolean().default(false),
-        require_history: z.boolean().default(true),
-        output_format: z.enum(['markdown', 'json', 'raw']).default('markdown')
-    }).default({})
+    config: z
+        .object({
+            reset_context: z.boolean().default(false),
+            require_history: z.boolean().default(true),
+            output_format: z.enum(['markdown', 'json', 'raw']).default('markdown')
+        })
+        .default({})
 });
 
 /**
@@ -71,7 +82,7 @@ const SpecSchema = z.object({
  */
 const PolicySchema = z.object({
     max_attempts: z.number().int().min(1).default(3),
-    timeout_ms: z.union([z.number(), z.literal('auto')]).default('auto'),
+    timeout_ms: z.union([z.number(), z.literal(CONNECTION_MODES.AUTO)]).default(CONNECTION_MODES.AUTO),
     dependencies: z.array(ID_SCHEMA).default([]),
     execute_after: TIMESTAMP_SCHEMA.nullable().default(null),
     priority_weight: z.number().default(1.0)
@@ -89,19 +100,25 @@ const StateSchema = z.object({
     completed_at: TIMESTAMP_SCHEMA.nullable().default(null),
     last_error: z.string().nullable().default(null),
 
-    metrics: z.object({
-        duration_ms: z.number().default(0),
-        token_estimate: z.number().default(0),
-        event_loop_lag_ms: z.number().default(0)
-    }).default({}),
+    metrics: z
+        .object({
+            duration_ms: z.number().default(0),
+            token_estimate: z.number().default(0),
+            event_loop_lag_ms: z.number().default(0)
+        })
+        .default({}),
 
     // Log de eventos da tarefa (Audit Trail)
-    history: z.array(z.object({
-        ts: TIMESTAMP_SCHEMA,
-        event: z.string(),
-        msg: z.string().optional(),
-        evidence: z.any().optional() // Para metadados do Triage
-    })).default([])
+    history: z
+        .array(
+            z.object({
+                ts: TIMESTAMP_SCHEMA,
+                event: z.string(),
+                msg: z.string().optional(),
+                evidence: z.any().optional() // Para metadados do Triage
+            })
+        )
+        .default([])
 });
 
 /**
@@ -117,13 +134,15 @@ const ResultSchema = z.object({
 /**
  * TASK_SCHEMA: O Contrato Mestre V4 Gold.
  */
-const TaskSchema = z.object({
-    meta: MetaSchema,
-    spec: SpecSchema,
-    policy: PolicySchema,
-    state: StateSchema,
-    result: ResultSchema
-}).passthrough();
+const TaskSchema = z
+    .object({
+        meta: MetaSchema,
+        spec: SpecSchema,
+        policy: PolicySchema,
+        state: StateSchema,
+        result: ResultSchema
+    })
+    .passthrough();
 
 module.exports = {
     TaskSchema,

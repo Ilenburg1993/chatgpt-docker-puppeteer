@@ -30,7 +30,7 @@ function safeCall(fn) {
     try {
         fn();
     } catch (_) {
-    // falha física não deve propagar
+        // falha física não deve propagar
     }
 }
 
@@ -63,12 +63,7 @@ function now() {
  * - interval (ms)
  * - maxAttempts (null = infinito)
  */
-function createReconnect({
-    telemetry,
-    start,
-    stop,
-    policy = {}
-}) {
+function createReconnect({ telemetry, start, stop, policy = {} }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
         throw new Error('reconnect requer telemetry válida');
     }
@@ -78,8 +73,7 @@ function createReconnect({
     }
 
     const interval = typeof policy.interval === 'number' ? policy.interval : 1000;
-    const maxAttempts =
-    typeof policy.maxAttempts === 'number' ? policy.maxAttempts : null;
+    const maxAttempts = typeof policy.maxAttempts === 'number' ? policy.maxAttempts : null;
 
     let attempts = 0;
     let active = false;
@@ -90,7 +84,9 @@ function createReconnect({
   =========================== */
 
     function schedule() {
-        if (timer) {return;}
+        if (timer) {
+            return;
+        }
 
         timer = setTimeout(() => {
             timer = null;
@@ -99,7 +95,9 @@ function createReconnect({
     }
 
     function tryReconnect() {
-        if (!active) {return;}
+        if (!active) {
+            return;
+        }
 
         if (maxAttempts !== null && attempts >= maxAttempts) {
             telemetry.emit('nerv:transport:reconnect:exhausted', {
@@ -126,7 +124,9 @@ function createReconnect({
   =========================== */
 
     function startReconnecting() {
-        if (active) {return;}
+        if (active) {
+            return;
+        }
 
         active = true;
         attempts = 0;
@@ -136,7 +136,9 @@ function createReconnect({
     }
 
     function stopReconnecting() {
-        if (!active) {return;}
+        if (!active) {
+            return;
+        }
 
         active = false;
 

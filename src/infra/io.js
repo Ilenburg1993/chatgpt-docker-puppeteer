@@ -24,6 +24,20 @@ const queueCache = require('./queue/cache');
 const taskLoader = require('./queue/task_loader');
 const queryEngine = require('./queue/query_engine');
 
+/**
+ * @module io
+ * @description Facade unificada para operações de I/O, armazenamento e gerenciamento de fila.
+ * Consolidação de todos os subsistemas de infraestrutura em uma interface única.
+ *
+ * @property {string} ROOT - Diretório raiz do projeto
+ * @property {string} QUEUE_DIR - Diretório da fila de tarefas
+ * @property {string} RESPONSE_DIR - Diretório de respostas
+ *
+ * @example
+ * const io = require('./infra/io');
+ * const task = await io.loadTask('task-123');
+ * await io.saveResponse('task-123', 'Response text');
+ */
 module.exports = {
     /* ==========================================================================
        1. CAMADA FÍSICA E HIGIENE (SISTEMA OPERACIONAL)
@@ -40,20 +54,25 @@ module.exports = {
      * Varre simultaneamente os diretórios de Fila, Respostas e Storage.
      * @returns {Promise<number>} Total de arquivos removidos.
      */
-    cleanupOrphans: async () => {
+
+    async cleanupOrphans() {
         let totalCleaned = 0;
         const targetDirs = [PATHS.QUEUE, PATHS.RESPONSE, path.dirname(PATHS.IDENTITY)];
 
         for (const dir of targetDirs) {
             try {
+
                 const files = await fs.readdir(dir);
                 const tmpFiles = files.filter(f => f.includes('.tmp'));
 
                 for (const file of tmpFiles) {
+
                     await fs.unlink(path.join(dir, file)).catch(() => {});
                     totalCleaned++;
                 }
-            } catch (e) { /* Falha em diretório específico não interrompe a higiene */ }
+            } catch (_e) {
+                /* Falha em diretório específico não interrompe a higiene */
+            }
         }
         return totalCleaned;
     },
@@ -66,8 +85,8 @@ module.exports = {
      * Salva uma tarefa e invalida o cache em RAM da fila imediatamente.
      * [P5.2 FIX] Invalida ANTES do write para garantir consistency mesmo em crash.
      */
-    saveTask: async (task) => {
-        queueCache.markDirty();  // Invalida primeiro (defensivo)
+    async saveTask(task) {
+        queueCache.markDirty(); // Invalida primeiro (defensivo)
         const result = await taskStore.saveTask(task);
         return result;
     },
@@ -76,8 +95,8 @@ module.exports = {
      * Remove uma tarefa e invalida o cache em RAM da fila.
      * [P5.2 FIX] Invalida ANTES do delete para garantir consistency.
      */
-    deleteTask: async (id) => {
-        queueCache.markDirty();  // Invalida primeiro (defensivo)
+    async deleteTask(id) {
+        queueCache.markDirty(); // Invalida primeiro (defensivo)
         await taskStore.deleteTask(id);
     },
 
@@ -128,15 +147,12 @@ module.exports = {
     /**
      * Recupera a Identidade Soberana do robô de forma assíncrona.
      */
-    getIdentity: async () => await fsCore.safeReadJSON(PATHS.IDENTITY),
+    getIdentity: async () => fsCore.safeReadJSON(PATHS.IDENTITY),
 
     /**
      * Persiste a Identidade Soberana de forma atômica.
      */
-    saveIdentity: async (data) => await fsCore.atomicWrite(
-        PATHS.IDENTITY,
-        JSON.stringify(data, null, 2)
-    ),
+    saveIdentity: async data => fsCore.atomicWrite(PATHS.IDENTITY, JSON.stringify(data, null, 2)),
 
     acquireLock: lockManager.acquireLock,
     releaseLock: lockManager.releaseLock,

@@ -43,25 +43,20 @@ const DecisionKind = Object.freeze({
 
 class ExecutionEngine {
     /**
-   * @param {Object} params
-   * @param {Object} params.taskRuntime
-   * Gerenciador de vida das tarefas.
-   *
-   * @param {Object} params.observationStore
-   * Registro de EVENTs recebidos.
-   *
-   * @param {Object} params.policyEngine
-   * Motor normativo consultivo.
-   *
-   * @param {Object} params.telemetry
-   * Canal de telemetria.
-   */
-    constructor({
-        taskRuntime,
-        observationStore,
-        policyEngine,
-        telemetry
-    }) {
+     * @param {Object} params
+     * @param {Object} params.taskRuntime
+     * Gerenciador de vida das tarefas.
+     *
+     * @param {Object} params.observationStore
+     * Registro de EVENTs recebidos.
+     *
+     * @param {Object} params.policyEngine
+     * Motor normativo consultivo.
+     *
+     * @param {Object} params.telemetry
+     * Canal de telemetria.
+     */
+    constructor({ taskRuntime, observationStore, policyEngine, telemetry }) {
         if (!taskRuntime) {
             throw new Error('ExecutionEngine requer taskRuntime');
         }
@@ -89,20 +84,20 @@ class ExecutionEngine {
   =========================== */
 
     /**
-   * Avalia o estado completo do Kernel e produz propostas de decisão.
-   *
-   * Chamado exclusivamente pelo KernelLoop a cada ciclo.
-   *
-   * @param {Object} context
-   * @param {number} context.tickId
-   * Identificador do ciclo lógico.
-   *
-   * @param {number} context.at
-   * Timestamp do ciclo.
-   *
-   * @returns {Array<Object>}
-   * Lista de propostas de decisão.
-   */
+     * Avalia o estado completo do Kernel e produz propostas de decisão.
+     *
+     * Chamado exclusivamente pelo KernelLoop a cada ciclo.
+     *
+     * @param {Object} context
+     * @param {number} context.tickId
+     * Identificador do ciclo lógico.
+     *
+     * @param {number} context.at
+     * Timestamp do ciclo.
+     *
+     * @returns {Array<Object>}
+     * Lista de propostas de decisão.
+     */
     evaluate({ tickId, at }) {
         this.telemetry.info('execution_engine_evaluation_start', {
             tickId,
@@ -137,17 +132,17 @@ class ExecutionEngine {
   =========================== */
 
     /**
-   * Avalia uma tarefa específica.
-   *
-   * @param {Object} task
-   * Snapshot imutável da tarefa.
-   *
-   * @param {Object} context
-   * Contexto do ciclo.
-   *
-   * @returns {Array<Object>}
-   * Propostas geradas para esta tarefa.
-   */
+     * Avalia uma tarefa específica.
+     *
+     * @param {Object} task
+     * Snapshot imutável da tarefa.
+     *
+     * @param {Object} context
+     * Contexto do ciclo.
+     *
+     * @returns {Array<Object>}
+     * Propostas geradas para esta tarefa.
+     */
     _evaluateTask(task, { tickId, at }) {
         const proposals = [];
 
@@ -198,16 +193,16 @@ class ExecutionEngine {
   =========================== */
 
     /**
-   * Interpreta semanticamente as observações de uma tarefa.
-   *
-   * @param {Object} params
-   * @param {Object} params.task
-   * @param {Array} params.observations
-   * @param {number} params.at
-   *
-   * @returns {Object}
-   * Resultado da interpretação semântica.
-   */
+     * Interpreta semanticamente as observações de uma tarefa.
+     *
+     * @param {Object} params
+     * @param {Object} params.task
+     * @param {Array} params.observations
+     * @param {number} params.at
+     *
+     * @returns {Object}
+     * Resultado da interpretação semântica.
+     */
     _interpretObservations({ task, observations, at }) {
         const result = {
             hasCompletionSignal: false,
@@ -221,9 +216,7 @@ class ExecutionEngine {
         }
 
         // Ordena observações por timestamp de ingestão
-        const sorted = [...observations].sort((a, b) =>
-            a.ingestedAt - b.ingestedAt
-        );
+        const sorted = [...observations].sort((a, b) => a.ingestedAt - b.ingestedAt);
 
         result.lastObservationAt = sorted[sorted.length - 1].ingestedAt;
 
@@ -263,27 +256,18 @@ class ExecutionEngine {
   =========================== */
 
     /**
-   * Sintetiza uma proposta de decisão a partir de:
-   * - Avaliação normativa (PolicyEngine)
-   * - Interpretação semântica (observações)
-   * - Estado atual da tarefa
-   *
-   * @param {Object} params
-   * @returns {Object|null}
-   * Proposta de decisão ou null se nenhuma ação necessária.
-   */
-    _synthesizeProposal({
-        task,
-        observations,
-        policyAssessment,
-        semanticDecisions,
-        at
-    }) {
-    // Regra 1: Suspender tarefa se avaliação normativa crítica
-        if (
-            policyAssessment?.level === 'CRITICAL' &&
-      task.state === 'ACTIVE'
-        ) {
+     * Sintetiza uma proposta de decisão a partir de:
+     * - Avaliação normativa (PolicyEngine)
+     * - Interpretação semântica (observações)
+     * - Estado atual da tarefa
+     *
+     * @param {Object} params
+     * @returns {Object|null}
+     * Proposta de decisão ou null se nenhuma ação necessária.
+     */
+    _synthesizeProposal({ task, observations, policyAssessment, semanticDecisions, at }) {
+        // Regra 1: Suspender tarefa se avaliação normativa crítica
+        if (policyAssessment?.level === 'CRITICAL' && task.state === 'ACTIVE') {
             return {
                 kind: DecisionKind.PROPOSE_SUSPEND_TASK,
                 taskId: task.taskId,
@@ -295,10 +279,7 @@ class ExecutionEngine {
         }
 
         // Regra 2: Terminar tarefa se sinal de conclusão
-        if (
-            semanticDecisions.hasCompletionSignal &&
-      task.state === 'ACTIVE'
-        ) {
+        if (semanticDecisions.hasCompletionSignal && task.state === 'ACTIVE') {
             return {
                 kind: DecisionKind.PROPOSE_TERMINATE_TASK,
                 taskId: task.taskId,
@@ -308,10 +289,7 @@ class ExecutionEngine {
         }
 
         // Regra 3: Suspender tarefa se sinal de erro
-        if (
-            semanticDecisions.hasErrorSignal &&
-      task.state === 'ACTIVE'
-        ) {
+        if (semanticDecisions.hasErrorSignal && task.state === 'ACTIVE') {
             return {
                 kind: DecisionKind.PROPOSE_SUSPEND_TASK,
                 taskId: task.taskId,
@@ -323,7 +301,7 @@ class ExecutionEngine {
         // Regra 4: Ativar tarefa criada sem observações após tempo mínimo
         if (
             task.state === 'CREATED' &&
-      at - task.createdAt > 100 // 100ms após criação
+            at - task.createdAt > 100 // 100ms após criação
         ) {
             return {
                 kind: DecisionKind.PROPOSE_ACTIVATE_TASK,

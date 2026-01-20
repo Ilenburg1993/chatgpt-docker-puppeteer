@@ -40,12 +40,7 @@
  * @param {Object} deps.telemetry
  * Interface de telemetria do NERV.
  */
-function createEmitCommand({
-    envelopes,
-    buffers,
-    correlation,
-    telemetry
-}) {
+function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
     if (!envelopes || !buffers || !correlation || !telemetry) {
         throw new Error('emit_command requer dependências completas');
     }
@@ -55,11 +50,11 @@ function createEmitCommand({
   =========================== */
 
     /**
-   * Emite um envelope COMMAND.
-   *
-   * @param {Object} envelope
-   * Envelope estruturalmente válido.
-   */
+     * Emite um envelope COMMAND.
+     *
+     * @param {Object} envelope
+     * Envelope estruturalmente válido.
+     */
     function emitCommand(envelope) {
         telemetry.emit('nerv:emission:attempt', {
             kind: 'COMMAND'
@@ -84,10 +79,7 @@ function createEmitCommand({
 
         // 3. Registro histórico de correlação
         if (normalized.ids && normalized.ids.correlation_id) {
-            correlation.append(
-                normalized.ids.correlation_id,
-                normalized
-            );
+            correlation.append(normalized.ids.correlation_id, normalized);
         }
 
         // 4. Enfileiramento outbound

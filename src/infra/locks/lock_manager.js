@@ -70,7 +70,6 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
             // Sucesso: remove temp file (agora temos 2 hard links para mesmo inode)
             await fs.unlink(tempLockFile).catch(() => {});
             return true;
-
         } catch (linkErr) {
             // Link falhou: lock já existe (outro processo venceu)
             await fs.unlink(tempLockFile).catch(() => {});
@@ -88,13 +87,17 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
 
         // Caso A: Lock inexistente ou ilegível (Race na deleção)
         if (!currentLock) {
-            if (attempt >= MAX_ORPHAN_RECOVERY_ATTEMPTS) {return false;}
+            if (attempt >= MAX_ORPHAN_RECOVERY_ATTEMPTS) {
+                return false;
+            }
             return acquireLock(taskId, target, attempt + 1);
         }
 
         // Caso B: Lock Órfão (Processo dono morreu)
         if (!isProcessAlive(currentLock.pid)) {
-            if (attempt >= MAX_ORPHAN_RECOVERY_ATTEMPTS) {return false;}
+            if (attempt >= MAX_ORPHAN_RECOVERY_ATTEMPTS) {
+                return false;
+            }
 
             try {
                 // [ANTI-RACE] Revalida PID antes de deletar
@@ -111,8 +114,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
 
         // Caso C: Lock válido (processo ativo)
         return false;
-
-    } catch (err) {
+    } catch (_err) {
         // Falha na fase 1: cleanup e abort
         await fs.unlink(tempLockFile).catch(() => {});
         return false;
@@ -133,7 +135,9 @@ async function releaseLock(target = 'global', taskId = null) {
     const lockFile = getLockPath(target);
 
     const currentLock = await safeReadJSON(lockFile);
-    if (!currentLock) {return;}
+    if (!currentLock) {
+        return;
+    }
 
     try {
         // Só remove se for o dono (taskId bate) ou se for uma ordem mestre (taskId null)

@@ -28,43 +28,53 @@ const SelectorProtocolSchema = z.object({
 /**
  * DomainRulesSchema: Conjunto de regras específicas para um domínio (ex: chatgpt.com).
  */
-const DomainRulesSchema = z.object({
-    // Mapeamento de intenção (ex: input_box) para protocolo ou seletor legado
-    selectors: z.record(
-        z.union([
-            z.array(z.string()),        // Legado: Lista de seletores em string
-            SelectorProtocolSchema      // Moderno: Protocolo estruturado SADI V10+
-        ])
-    ).default({}),
+const DomainRulesSchema = z
+    .object({
+        // Mapeamento de intenção (ex: input_box) para protocolo ou seletor legado
+        selectors: z
+            .record(
+                z.union([
+                    z.array(z.string()), // Legado: Lista de seletores em string
+                    SelectorProtocolSchema // Moderno: Protocolo estruturado SADI V10+
+                ])
+            )
+            .default({}),
 
-    // Sobrescritas de comportamento aprendidas ou manuais
-    behavior_overrides: z.object({
-        idle_sleep_ms: z.number().optional(),
-        stability_threshold: z.number().optional(),
-        typing_speed_factor: z.number().optional()
-    }).default({})
-}).passthrough(); // Permite evolução genética para novas propriedades de IA
+        // Sobrescritas de comportamento aprendidas ou manuais
+        behavior_overrides: z
+            .object({
+                idle_sleep_ms: z.number().optional(),
+                stability_threshold: z.number().optional(),
+                typing_speed_factor: z.number().optional()
+            })
+            .default({})
+    })
+    .passthrough(); // Permite evolução genética para novas propriedades de IA
 
 /**
  * DNA_SCHEMA: O contrato mestre do arquivo dynamic_rules.json.
  */
-const DnaSchema = z.object({
-    _meta: z.object({
-        version: z.number().default(1),
-        last_updated: TIMESTAMP_SCHEMA,
-        updated_by: z.string().default('system_init'),
-        evolution_count: z.number().nonnegative().default(0)
-    }).default({}),
+const DnaSchema = z
+    .object({
+        _meta: z
+            .object({
+                version: z.number().default(1),
+                last_updated: TIMESTAMP_SCHEMA,
+                updated_by: z.string().default('system_init'),
+                evolution_count: z.number().nonnegative().default(0)
+            })
+            .default({}),
 
-    // Mapeamento de Domínio -> Regras (ex: { "chatgpt.com": { ... } })
-    targets: z.record(DomainRulesSchema).default({}),
+        // Mapeamento de Domínio -> Regras (ex: { "chatgpt.com": { ... } })
+        targets: z.record(DomainRulesSchema).default({}),
 
-    // Regras globais de fallback (Padrões universais de chat)
-    global_selectors: z.record(z.array(z.string())).default({
-        input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
-        send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
+        // Regras globais de fallback (Padrões universais de chat)
+        global_selectors: z.record(z.array(z.string())).default({
+            input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
+            send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
+        })
     })
-}).passthrough();
+    .passthrough();
 
 module.exports = {
     DnaSchema,

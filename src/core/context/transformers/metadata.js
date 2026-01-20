@@ -8,7 +8,9 @@
  * Extrai propriedades específicas do estado da tarefa.
  */
 function extractTaskMetadata(task, transformType) {
-    if (!task || !task.state) {return 'UNKNOWN';}
+    if (!task || !task.state) {
+        return 'UNKNOWN';
+    }
 
     switch (transformType.toUpperCase()) {
         case 'STATUS':

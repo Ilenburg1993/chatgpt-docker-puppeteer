@@ -30,8 +30,8 @@ const PROTOCOL_VERSION = '2.0.0';
  */
 const MessageType = Object.freeze({
     COMMAND: 'COMMAND', // Intenção declarada de ação futura
-    EVENT: 'EVENT',     // Observação registrada de algo ocorrido
-    ACK: 'ACK'          // Confirmação técnica de transporte
+    EVENT: 'EVENT', // Observação registrada de algo ocorrido
+    ACK: 'ACK' // Confirmação técnica de transporte
 });
 
 /**

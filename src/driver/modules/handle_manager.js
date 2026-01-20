@@ -14,16 +14,18 @@ class HandleManager {
     }
 
     register(handle) {
-        if (handle) {this.activeHandles.push(handle);}
+        if (handle) {
+            this.activeHandles.push(handle);
+        }
         return handle;
     }
 
     /**
-   * Limpa todos os handles com timeout de 3s.
-   *
-   * [V800] Usa AbortController para cancelar cleanup em timeout,
-   * evitando promises órfãs rodando indefinidamente em background.
-   */
+     * Limpa todos os handles com timeout de 3s.
+     *
+     * [V800] Usa AbortController para cancelar cleanup em timeout,
+     * evitando promises órfãs rodando indefinidamente em background.
+     */
     async clearAll() {
         const CLEANUP_TIMEOUT_MS = 3000;
 
@@ -62,8 +64,7 @@ class HandleManager {
             // Sucesso: todos handles limpos
             clearTimeout(timeoutId);
             log('DEBUG', `[HANDLES] ${cleanedCount} handles limpos com sucesso`);
-
-        } catch (abortErr) {
+        } catch (_abortErr) {
             // Timeout atingido: cleanup interrompido
             clearTimeout(timeoutId);
 

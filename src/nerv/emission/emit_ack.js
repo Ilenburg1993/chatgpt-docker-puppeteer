@@ -39,12 +39,7 @@
  * @param {Object} deps.telemetry
  * Interface de telemetria do NERV.
  */
-function createEmitAck({
-    envelopes,
-    buffers,
-    correlation,
-    telemetry
-}) {
+function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
     if (!envelopes || !buffers || !correlation || !telemetry) {
         throw new Error('emit_ack requer dependências completas');
     }
@@ -54,11 +49,11 @@ function createEmitAck({
   =========================== */
 
     /**
-   * Emite um envelope ACK técnico.
-   *
-   * @param {Object} envelope
-   * Envelope estruturalmente válido do tipo ACK.
-   */
+     * Emite um envelope ACK técnico.
+     *
+     * @param {Object} envelope
+     * Envelope estruturalmente válido do tipo ACK.
+     */
     function emitAck(envelope) {
         telemetry.emit('nerv:emission:attempt', {
             kind: 'ACK'
@@ -83,10 +78,7 @@ function createEmitAck({
 
         // 3. Registro histórico (ACK também é fato)
         if (normalized.ids && normalized.ids.correlation_id) {
-            correlation.append(
-                normalized.ids.correlation_id,
-                normalized
-            );
+            correlation.append(normalized.ids.correlation_id, normalized);
         }
 
         // 4. Enfileiramento outbound

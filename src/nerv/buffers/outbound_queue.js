@@ -57,8 +57,8 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
   =========================== */
 
     /**
-   * Verifica se a fila atingiu limite técnico.
-   */
+     * Verifica se a fila atingiu limite técnico.
+     */
     function isFull() {
         return typeof maxSize === 'number' && queue.length >= maxSize;
     }
@@ -68,12 +68,12 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
   =========================== */
 
     /**
-   * Enfileira item na fila outbound.
-   *
-   * @param {*} item
-   * Item opaco (frame, bytes ou estrutura técnica)
-   * @returns {boolean} true se aceito, false se recusado por pressão
-   */
+     * Enfileira item na fila outbound.
+     *
+     * @param {*} item
+     * Item opaco (frame, bytes ou estrutura técnica)
+     * @returns {boolean} true se aceito, false se recusado por pressão
+     */
     function enqueue(item) {
         if (isFull()) {
             telemetry.emit('nerv:buffer:outbound:pressure', {
@@ -93,10 +93,10 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
     }
 
     /**
-   * Remove e retorna o próximo item da fila.
-   *
-   * @returns {*} item ou null se vazio
-   */
+     * Remove e retorna o próximo item da fila.
+     *
+     * @returns {*} item ou null se vazio
+     */
     function dequeue() {
         if (queue.length === 0) {
             return null;
@@ -112,22 +112,22 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
     }
 
     /**
-   * Retorna o tamanho atual da fila.
-   */
+     * Retorna o tamanho atual da fila.
+     */
     function size() {
         return queue.length;
     }
 
     /**
-   * Indica se a fila está vazia.
-   */
+     * Indica se a fila está vazia.
+     */
     function isEmpty() {
         return queue.length === 0;
     }
 
     /**
-   * Limpa a fila (uso técnico/diagnóstico).
-   */
+     * Limpa a fila (uso técnico/diagnóstico).
+     */
     function clear() {
         queue.length = 0;
 

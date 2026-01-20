@@ -30,13 +30,7 @@ const { v4: uuidv4 } = require('uuid');
  * Valida envelope recebido do NERV.
  */
 function isValidEnvelope(envelope) {
-    return (
-        envelope &&
-    envelope.header &&
-    envelope.ids &&
-    envelope.kind &&
-    envelope.payload
-    );
+    return envelope && envelope.header && envelope.ids && envelope.kind && envelope.payload;
 }
 
 /**
@@ -74,12 +68,7 @@ function extractEnvelopeData(envelope) {
  * Canal de telemetria do Kernel.
  */
 class KernelNERVBridge {
-    constructor({
-        nerv,
-        taskRuntime,
-        observationStore,
-        telemetry
-    }) {
+    constructor({ nerv, taskRuntime, observationStore, telemetry }) {
         if (!nerv) {
             throw new Error('KernelNERVBridge requer instância do NERV');
         }
@@ -110,8 +99,8 @@ class KernelNERVBridge {
   =========================== */
 
     /**
-   * Inicia a ponte, registrando handlers no NERV.
-   */
+     * Inicia a ponte, registrando handlers no NERV.
+     */
     start() {
         if (this.started) {
             this.telemetry.warning('nerv_bridge_already_started');
@@ -123,7 +112,7 @@ class KernelNERVBridge {
         });
 
         // Registra handler de recepção de envelopes
-        this.unsubscribe = this.nerv.onReceive((envelope) => {
+        this.unsubscribe = this.nerv.onReceive(envelope => {
             this._handleInboundEnvelope(envelope);
         });
 
@@ -135,8 +124,8 @@ class KernelNERVBridge {
     }
 
     /**
-   * Para a ponte, desregistrando handlers.
-   */
+     * Para a ponte, desregistrando handlers.
+     */
     stop() {
         if (!this.started) {
             this.telemetry.warning('nerv_bridge_already_stopped');
@@ -164,13 +153,13 @@ class KernelNERVBridge {
   =========================== */
 
     /**
-   * Processa envelope recebido do NERV.
-   *
-   * IMPORTANTE:
-   * - Apenas EVENTs são processados (fatos do mundo)
-   * - ACKs são ignorados (confirmações físicas)
-   * - COMMANDs recebidos são anomalia (Kernel não recebe comandos)
-   */
+     * Processa envelope recebido do NERV.
+     *
+     * IMPORTANTE:
+     * - Apenas EVENTs são processados (fatos do mundo)
+     * - ACKs são ignorados (confirmações físicas)
+     * - COMMANDs recebidos são anomalia (Kernel não recebe comandos)
+     */
     _handleInboundEnvelope(envelope) {
         if (!isValidEnvelope(envelope)) {
             this.telemetry.warning('nerv_bridge_invalid_envelope', {
@@ -221,8 +210,8 @@ class KernelNERVBridge {
     }
 
     /**
-   * Processa EVENT recebido, encaminhando ao ObservationStore.
-   */
+     * Processa EVENT recebido, encaminhando ao ObservationStore.
+     */
     _processEvent(envelope, data) {
         try {
             // Delega ingestão ao ObservationStore
@@ -247,18 +236,18 @@ class KernelNERVBridge {
   =========================== */
 
     /**
-   * Emite um COMMAND via NERV.
-   *
-   * @param {Object} params
-   * @param {string} params.target
-   * Destinatário do comando (ex.: 'driver', 'server').
-   *
-   * @param {string} params.correlationId
-   * ID de correlação (vincula a uma tarefa).
-   *
-   * @param {Object} params.payload
-   * Payload opaco do comando.
-   */
+     * Emite um COMMAND via NERV.
+     *
+     * @param {Object} params
+     * @param {string} params.target
+     * Destinatário do comando (ex.: 'driver', 'server').
+     *
+     * @param {string} params.correlationId
+     * ID de correlação (vincula a uma tarefa).
+     *
+     * @param {Object} params.payload
+     * Payload opaco do comando.
+     */
     emitCommand({ target, correlationId, payload }) {
         if (!this.started) {
             throw new Error('KernelNERVBridge não iniciada');
@@ -303,18 +292,18 @@ class KernelNERVBridge {
     }
 
     /**
-   * Emite um EVENT via NERV.
-   *
-   * @param {Object} params
-   * @param {string} [params.target]
-   * Destinatário opcional (broadcast se ausente).
-   *
-   * @param {string} params.correlationId
-   * ID de correlação.
-   *
-   * @param {Object} params.payload
-   * Payload opaco do evento.
-   */
+     * Emite um EVENT via NERV.
+     *
+     * @param {Object} params
+     * @param {string} [params.target]
+     * Destinatário opcional (broadcast se ausente).
+     *
+     * @param {string} params.correlationId
+     * ID de correlação.
+     *
+     * @param {Object} params.payload
+     * Payload opaco do evento.
+     */
     emitEvent({ target = null, correlationId, payload }) {
         if (!this.started) {
             throw new Error('KernelNERVBridge não iniciada');
@@ -363,8 +352,8 @@ class KernelNERVBridge {
   =========================== */
 
     /**
-   * Retorna status técnico da ponte.
-   */
+     * Retorna status técnico da ponte.
+     */
     getStatus() {
         return Object.freeze({
             started: this.started,

@@ -8,10 +8,11 @@
      - Garantir que o robô não viole limites de segurança (Retries, Timeouts).
 ========================================================================== */
 
+const { ActionCode, MessageType } = require('../../shared/nerv/constants');
+
 const {
-    ActionCode,
-    MessageType
-} = require('../../shared/nerv/constants');
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
 
 class PolicyEngine {
     constructor(config) {
@@ -35,13 +36,17 @@ class PolicyEngine {
         // 1. Avaliação de Observações (Reação a Estímulos Externos)
         for (const obs of observations) {
             const reaction = this._reactToObservation(obs, state);
-            if (reaction) {proposals.push(reaction);}
+            if (reaction) {
+                proposals.push(reaction);
+            }
         }
 
         // 2. Avaliação de Estado (Regras de Negócio Contínuas)
         // Ex: Se estou falhando muito, desista.
         const stateProposals = this._evaluateStateHealth(state);
-        if (stateProposals) {proposals.push(...stateProposals);}
+        if (stateProposals) {
+            proposals.push(...stateProposals);
+        }
 
         return proposals;
     }
@@ -64,7 +69,6 @@ class PolicyEngine {
                 action: 'EMIT_EVENT',
                 payload: this._createRejectionEnvelope(obs, 'BUSY')
             };
-
         }
 
         // LEI 2: Se o sistema reporta alta pressão -> Pausa técnica.
@@ -81,8 +85,7 @@ class PolicyEngine {
 
         // LEI 3: Limite de Tentativas (Retry Policy)
         // Se a tarefa atual falhou mais que o permitido -> Aborte.
-        if (state.status === 'RUNNING' && state.failures > 0) {
-
+        if (state.status === STATUS_VALUES.RUNNING && state.failures > 0) {
             if (state.failures > this.MAX_RETRIES) {
                 console.error(`[POLICY] Limite de falhas excedido (${state.failures}/${this.MAX_RETRIES}). Abortando.`);
 
@@ -94,7 +97,6 @@ class PolicyEngine {
                     action: 'EMIT_EVENT',
                     payload: this._createTaskFailedEnvelope(state.task, 'MAX_RETRIES_EXCEEDED')
                 });
-
             } else {
                 // Se ainda tem tentativas, o Driver (via TaskEffector) deve tentar se recuperar sozinho.
                 // O Kernel apenas observa, a menos que queiramos forçar um reinício explícito.

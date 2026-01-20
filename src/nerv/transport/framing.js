@@ -73,12 +73,12 @@ function createUnpacker() {
     let buffer = Buffer.alloc(0);
 
     /**
-   * Processa chunk recebido do meio físico.
-   *
-   * @param {Buffer|Uint8Array} chunk
-   * @param {Function} onFrame
-   * Callback chamado para cada frame completo reconstruído.
-   */
+     * Processa chunk recebido do meio físico.
+     *
+     * @param {Buffer|Uint8Array} chunk
+     * @param {Function} onFrame
+     * Callback chamado para cada frame completo reconstruído.
+     */
     function push(chunk, onFrame) {
         if (!Buffer.isBuffer(chunk)) {
             chunk = Buffer.from(chunk);

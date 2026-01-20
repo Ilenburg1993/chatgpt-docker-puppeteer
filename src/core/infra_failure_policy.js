@@ -11,7 +11,7 @@ const system = require('../infra/system');
 // TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter
 // const ipc = require('../infra/ipc_client');
 const { log, audit } = require('./logger');
-const { ActionCode } = require('../shared/nerv/constants');
+const { ActionCode: _ActionCode } = require('../shared/nerv/constants');
 
 class InfraFailurePolicy {
     /**
@@ -24,7 +24,7 @@ class InfraFailurePolicy {
      * @param {Error} params.error - Objeto de erro original para evidência.
      * @param {string} params.correlationId - Rastro de causalidade da tarefa.
      */
-    async escalate({ ctx, reason, error, correlationId }) {
+    async escalate({ ctx, reason, error: _error, correlationId }) {
         const traceId = correlationId || 'sys-infra-escalation';
 
         log('WARN', `[POLICY] Avaliando escalada de infraestrutura: ${reason}`, traceId);
@@ -97,7 +97,7 @@ class InfraFailurePolicy {
                 const proc = ctx.browser.process();
                 return proc ? proc.pid : null;
             }
-        } catch (e) {
+        } catch (_e) {
             return null;
         }
         return null;

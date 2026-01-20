@@ -1,3 +1,7 @@
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 /* ==========================================================================
    src/nerv/buffers/backpressure.js
    Audit Level: 550 — Neural Pressure Sensor
@@ -12,7 +16,7 @@
  * Limites de Segurança (Hardcoded por segurança constitucional)
  */
 const THRESHOLDS = {
-    WARNING: 50,  // Avisa quando houver 50 mensagens na fila
+    WARNING: 50, // Avisa quando houver 50 mensagens na fila
     CRITICAL: 200 // Grita/Bloqueia quando houver 200 mensagens
 };
 
@@ -24,7 +28,7 @@ const THRESHOLDS = {
 function createBackpressure({ telemetry }) {
     // Estado interno volátil
     let currentSize = 0;
-    let status = 'HEALTHY'; // HEALTHY | WARNING | CRITICAL
+    let status = STATUS_VALUES.HEALTHY; // HEALTHY | WARNING | CRITICAL
 
     /**
      * Avalia o novo tamanho da fila e emite eventos se houver transição de estado.
@@ -33,7 +37,7 @@ function createBackpressure({ telemetry }) {
      */
     function update(size) {
         currentSize = size;
-        let newStatus = 'HEALTHY';
+        let newStatus = STATUS_VALUES.HEALTHY;
 
         if (size >= THRESHOLDS.CRITICAL) {
             newStatus = 'CRITICAL';

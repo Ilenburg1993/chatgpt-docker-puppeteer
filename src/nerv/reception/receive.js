@@ -56,11 +56,7 @@ function safeCall(handler, envelope, telemetry) {
  * @param {Object} deps.telemetry
  * Interface de telemetria do NERV.
  */
-function createReception({
-    envelopes,
-    correlation,
-    telemetry
-}) {
+function createReception({ envelopes, correlation, telemetry }) {
     if (!envelopes || !correlation || !telemetry) {
         throw new Error('reception requer dependências completas');
     }
@@ -72,11 +68,11 @@ function createReception({
   =========================== */
 
     /**
-   * Recebe um frame inbound já desserializado
-   * (objeto bruto ou buffer convertido).
-   *
-   * @param {*} raw
-   */
+     * Recebe um frame inbound já desserializado
+     * (objeto bruto ou buffer convertido).
+     *
+     * @param {*} raw
+     */
     function receive(raw) {
         telemetry.emit('nerv:reception:frame_received');
 
@@ -84,10 +80,7 @@ function createReception({
 
         try {
             // 1. Desserialização técnica (se necessário)
-            envelope =
-        typeof raw === 'string'
-            ? JSON.parse(raw)
-            : raw;
+            envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
         } catch (error) {
             telemetry.emit('nerv:reception:deserialization_failed', {
                 message: error.message
@@ -112,10 +105,7 @@ function createReception({
 
         // 4. Registro histórico de correlação
         if (normalized.ids && normalized.ids.correlation_id) {
-            correlation.append(
-                normalized.ids.correlation_id,
-                normalized
-            );
+            correlation.append(normalized.ids.correlation_id, normalized);
         }
 
         telemetry.emit('nerv:reception:accepted', {
@@ -129,10 +119,10 @@ function createReception({
     }
 
     /**
-   * Registra handler de recepção.
-   *
-   * @param {Function} handler
-   */
+     * Registra handler de recepção.
+     *
+     * @param {Function} handler
+     */
     function onReceive(handler) {
         if (typeof handler !== 'function') {
             throw new Error('handler de recepção deve ser função');

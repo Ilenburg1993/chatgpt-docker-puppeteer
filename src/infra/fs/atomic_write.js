@@ -38,7 +38,9 @@ async function atomicWrite(filepath, content) {
             }
         }
     } catch (err) {
-        if (fss.existsSync(tmpPath)) {await fs.unlink(tmpPath).catch(() => {});}
+        if (fss.existsSync(tmpPath)) {
+            await fs.unlink(tmpPath).catch(() => {});
+        }
         throw err;
     }
 }

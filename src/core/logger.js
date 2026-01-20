@@ -17,12 +17,14 @@ const METRICS_FILE = path.join(LOG_DIR, 'metrics.log');
 const AUDIT_FILE = path.join(LOG_DIR, 'audit.log');
 
 // --- POLÍTICAS DE RETENÇÃO ---
-const MAX_LOG_SIZE = 5 * 1024 * 1024;    // 5MB para logs comuns
-const MAX_AUDIT_SIZE = 2 * 1024 * 1024;  // 2MB para auditoria (conforme requisito server.js)
-const MAX_ARCHIVES = 5;                  // Mantém 5 arquivos de histórico por tipo
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB para logs comuns
+const MAX_AUDIT_SIZE = 2 * 1024 * 1024; // 2MB para auditoria (conforme requisito server.js)
+const MAX_ARCHIVES = 5; // Mantém 5 arquivos de histórico por tipo
 
 // Garante a existência do diretório de logs
-if (!fs.existsSync(LOG_DIR)) {fs.mkdirSync(LOG_DIR, { recursive: true });}
+if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+}
 
 /* ==========================================================================
    SISTEMA DE GESTÃO DE ARQUIVOS (ROTAÇÃO E LIMPEZA)
@@ -33,7 +35,8 @@ if (!fs.existsSync(LOG_DIR)) {fs.mkdirSync(LOG_DIR, { recursive: true });}
  */
 function cleanOldFiles(prefix) {
     try {
-        const files = fs.readdirSync(LOG_DIR)
+        const files = fs
+            .readdirSync(LOG_DIR)
             .filter(f => f.startsWith(prefix) && (f.endsWith('.log') || f.endsWith('.bak') || f.endsWith('.json')))
             .map(f => ({ name: f, time: fs.statSync(path.join(LOG_DIR, f)).mtime.getTime() }))
             .sort((a, b) => b.time - a.time);
@@ -44,8 +47,6 @@ function cleanOldFiles(prefix) {
                     fs.unlinkSync(path.join(LOG_DIR, f.name));
                 } catch (_e) {
                     // Ignore cleanup errors
-                }
-                    // Ignora erros ao deletar arquivos antigos
                 }
             });
         }
@@ -59,7 +60,9 @@ function cleanOldFiles(prefix) {
  */
 function rotateFile(filePath, prefix, maxSize) {
     try {
-        if (!fs.existsSync(filePath)) {return;}
+        if (!fs.existsSync(filePath)) {
+            return;
+        }
         const stats = fs.statSync(filePath);
 
         if (stats.size > maxSize) {
@@ -87,8 +90,15 @@ function log(level, msg, taskId = '-') {
 
     const ts = new Date().toISOString();
     let content = msg;
-    if (msg instanceof Error) {content = `${msg.message}\n${msg.stack}`;}
-    else if (typeof msg === 'object') {try { content = JSON.stringify(msg); } catch (_) { /* Use String fallback */ content = String(msg); }}
+    if (msg instanceof Error) {
+        content = `${msg.message}\n${msg.stack}`;
+    } else if (typeof msg === 'object') {
+        try {
+            content = JSON.stringify(msg);
+        } catch (_) {
+            /* Use String fallback */ content = String(msg);
+        }
+    }
 
     const line = `[${ts}] ${level.padEnd(5)} [${taskId}] ${content}`;
     console.log(line);
@@ -96,8 +106,6 @@ function log(level, msg, taskId = '-') {
         fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
     } catch (_e) {
         // Silent failure - console.log already logged
-    }
-        // Falha silenciosa - console.log já registrou
     }
 }
 
@@ -113,7 +121,7 @@ function audit(action, details) {
 
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
-    } catch (e) {
+    } catch (_e) {
         // Fallback para console em caso de falha crítica de I/O na auditoria
         console.error(`[CRITICAL_AUDIT_FAIL] ${entry}`);
     }
@@ -126,10 +134,15 @@ function metric(name, payload) {
     rotateFile(METRICS_FILE, 'metrics_', MAX_LOG_SIZE);
 
     try {
-        const entry = JSON.stringify(Object.assign({
-            ts: new Date().toISOString(),
-            metric: name
-        }, payload || {}));
+        const entry = JSON.stringify(
+            Object.assign(
+                {
+                    ts: new Date().toISOString(),
+                    metric: name
+                },
+                payload || {}
+            )
+        );
         fs.appendFileSync(METRICS_FILE, `${entry}\\n`, 'utf-8');
     } catch (_e) {
         // Silent failure - metrics are non-critical

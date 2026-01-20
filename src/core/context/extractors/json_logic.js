@@ -11,14 +11,18 @@
  * @returns {string} Objeto JSON serializado ou "{}" se não encontrado.
  */
 function extractJsonByStack(content) {
-    if (!content || typeof content !== 'string') {return '{}';}
+    if (!content || typeof content !== 'string') {
+        return '{}';
+    }
 
     let depth = 0;
     let start = -1;
 
     for (let i = 0; i < content.length; i++) {
         if (content[i] === '{') {
-            if (depth === 0) {start = i;}
+            if (depth === 0) {
+                start = i;
+            }
             depth++;
         } else if (content[i] === '}') {
             depth--;

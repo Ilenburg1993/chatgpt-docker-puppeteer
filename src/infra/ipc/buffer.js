@@ -41,7 +41,9 @@ class IPCBuffer {
      * @returns {Array} Lista de envelopes em ordem cronológica.
      */
     flush() {
-        if (this.queue.length === 0) {return [];}
+        if (this.queue.length === 0) {
+            return [];
+        }
 
         const pending = [...this.queue];
         this.queue = [];

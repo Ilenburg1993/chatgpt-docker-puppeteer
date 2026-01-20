@@ -49,7 +49,7 @@ function init() {
          * fs.watch: Monitoramento de baixo nível via Kernel do SO.
          * Detecta mudanças de conteúdo (change) e de referência física (rename).
          */
-        logWatcher = fs.watch(LOG_FILE, (event) => {
+        logWatcher = fs.watch(LOG_FILE, event => {
             if (event === 'rename') {
                 /**
                  * ROTAÇÃO DETECTADA:
@@ -68,9 +68,8 @@ function init() {
         });
 
         internalLog('INFO', '[LOG_TAIL] Streaming de telemetria textual ativo.');
-
-    } catch (e) {
-        internalLog('ERROR', `[LOG_TAIL] Falha catastrófica no watcher: ${e.message}`);
+    } catch (_e) {
+        internalLog('ERROR', `[LOG_TAIL] Falha catastrófica no watcher: ${_e.message}`);
         retryTimeout = setTimeout(init, 10000);
     }
 }
@@ -99,20 +98,21 @@ async function _streamLastChunk() {
             highWaterMark: bufferSize
         });
 
-        stream.on('data', (chunk) => {
+        stream.on('data', chunk => {
             // Transmite o fragmento para o barramento soberano
             notify('log_stream', chunk.toString());
         });
 
-        const release = () => { logReadActive = false; };
+        const release = () => {
+            logReadActive = false;
+        };
 
         stream.on('end', release);
         stream.on('close', release);
-        stream.on('error', (err) => {
+        stream.on('error', err => {
             internalLog('ERROR', `[LOG_TAIL] Erro no stream de leitura: ${err.message}`);
             release();
         });
-
     } catch (e) {
         logReadActive = false;
     }
@@ -123,7 +123,11 @@ async function _streamLastChunk() {
  */
 function _clearInternalResources() {
     if (logWatcher) {
-        try { logWatcher.close(); } catch (e) {}
+        try {
+            logWatcher.close();
+        } catch (e) {
+            /* Ignore watcher close errors */
+        }
         logWatcher = null;
     }
     if (retryTimeout) {

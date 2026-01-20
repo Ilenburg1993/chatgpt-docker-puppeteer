@@ -8,6 +8,11 @@
 ========================================================================== */
 
 const { ActionCode } = require('../../shared/nerv/constants');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const { log } = require('../../../core/logger');
 
 /**
@@ -15,22 +20,21 @@ const { log } = require('../../../core/logger');
  * Define a manobra tática para cada patologia detectada na interface.
  */
 const RemediationPolicy = Object.freeze({
-
     // --- 1. COLAPSOS DE INFRAESTRUTURA FÍSICA ---
 
-    'BROWSER_FROZEN': {
+    BROWSER_FROZEN: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
         retryTask: true
     },
 
-    'TERMINAL_INFRA_FAILURE': {
+    TERMINAL_INFRA_FAILURE: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'CRITICAL',
         retryTask: true
     },
 
-    'DIAGNOSTIC_CRASH': {
+    DIAGNOSTIC_CRASH: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
         retryTask: true
@@ -38,19 +42,19 @@ const RemediationPolicy = Object.freeze({
 
     // --- 2. BARREIRAS DE SEGURANÇA E ACESSO ---
 
-    'CAPTCHA_CHALLENGE': {
+    CAPTCHA_CHALLENGE: {
         action: ActionCode.ENGINE_PAUSE,
         severity: 'CRITICAL',
         notifyUser: true // Exige intervenção humana imediata no Dashboard
     },
 
-    'INFRA_BARRIER_DETECTED': {
+    INFRA_BARRIER_DETECTED: {
         action: ActionCode.BROWSER_REBOOT, // Tenta contornar via reset de sessão
         severity: 'HIGH',
         retryTask: true
     },
 
-    'LOGIN_REQUIRED': {
+    LOGIN_REQUIRED: {
         action: ActionCode.ENGINE_STOP,
         severity: 'HIGH',
         notifyUser: true
@@ -58,13 +62,13 @@ const RemediationPolicy = Object.freeze({
 
     // --- 3. LIMITES E ERROS SEMÂNTICOS ---
 
-    'LIMIT_REACHED': {
+    LIMIT_REACHED: {
         action: ActionCode.ENGINE_PAUSE,
         severity: 'MEDIUM',
         cooldown_ms: 3600000 // 1 hora de repouso para reset de cota
     },
 
-    'GENERIC_ERROR_TEXT': {
+    GENERIC_ERROR_TEXT: {
         action: ActionCode.TASK_RETRY,
         severity: 'MEDIUM',
         maxRetries: 1
@@ -72,25 +76,25 @@ const RemediationPolicy = Object.freeze({
 
     // --- 4. ANOMALIAS DE LÓGICA E INTERFACE ---
 
-    'LOGICAL_LOOP': {
+    LOGICAL_LOOP: {
         action: ActionCode.CACHE_CLEAR,
         severity: 'MEDIUM',
         retryTask: true
     },
 
-    'INPUT_NOT_FOUND': {
+    INPUT_NOT_FOUND: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
         retryTask: true
     },
 
-    'FINISHED_ABRUPTLY': {
+    FINISHED_ABRUPTLY: {
         action: ActionCode.TASK_RETRY,
         severity: 'LOW',
         maxRetries: 2
     },
 
-    'VISUAL_ERROR_DETECTED': {
+    VISUAL_ERROR_DETECTED: {
         action: ActionCode.TASK_RETRY,
         severity: 'MEDIUM',
         maxRetries: 1
@@ -105,7 +109,7 @@ class RemediationEngine {
      * @returns {object|null} Prescrição técnica ou null se não houver ação necessária.
      */
     evaluate(diagnosis) {
-        if (!diagnosis || !diagnosis.type || diagnosis.type === 'HEALTHY') {
+        if (!diagnosis || !diagnosis.type || diagnosis.type === STATUS_VALUES.HEALTHY) {
             return null;
         }
 

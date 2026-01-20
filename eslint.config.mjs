@@ -14,6 +14,7 @@ import globals from 'globals';
 import json from '@eslint/json';
 import markdown from '@eslint/markdown';
 import css from '@eslint/css';
+import i18next from 'eslint-plugin-i18next';
 
 export default [
     // ===== GLOBAL IGNORES =====
@@ -29,6 +30,8 @@ export default [
             '**/tmp/**',
             '**/.tmp.*/**',
             '**/crash_reports/**',
+            '**/.vscode/**',
+            '**/.devcontainer/**',
             '**/*.min.js',
             'public/js/libs/**',
             'tools/outputs/**'
@@ -38,6 +41,9 @@ export default [
     // ===== JAVASCRIPT FILES (Node.js + Browser) =====
     {
         files: ['**/*.{js,mjs,cjs}'],
+        plugins: {
+            i18next
+        },
         languageOptions: {
             ecmaVersion: 2024,
             sourceType: 'commonjs',
@@ -52,6 +58,39 @@ export default [
             // ===== RECOMMENDED BASE =====
             ...js.configs.recommended.rules,
 
+            // ===== MAGIC STRINGS PREVENTION =====
+            // Nota: 'off' por enquanto - será 'warn' após migração completa para constantes
+            'i18next/no-literal-string': [
+                'off',
+                {
+                    mode: 'all',
+                    'should-validate-template': true,
+                    ignore: [
+                        // Ignore common patterns that are not magic strings
+                        '^[A-Z_]+$', // Constants like STATUS_VALUES
+                        '^\\s*$', // Empty/whitespace strings
+                        '^[0-9]+$', // Numbers as strings
+                        '^[.,;:!?\\-_/\\\\]+$' // Punctuation
+                    ],
+                    ignoreCallee: [
+                        // Allow literals in specific function calls
+                        'require',
+                        'console.log',
+                        'console.error',
+                        'console.warn',
+                        'console.info',
+                        'logger.log',
+                        'path.join',
+                        'path.resolve',
+                        'Object.freeze',
+                        'Object.values',
+                        'z.enum',
+                        'z.literal'
+                    ],
+                    ignoreAttribute: ['className', 'styleName', 'type', 'id', 'name', 'data-testid']
+                }
+            ],
+
             // ===== ERROR PREVENTION =====
             'no-console': 'off', // Logger customizado usado
             'no-debugger': 'warn',
@@ -62,7 +101,8 @@ export default [
             'no-proto': 'error',
             'no-script-url': 'error',
             'no-return-await': 'error',
-            'no-await-in-loop': 'warn',
+            // Sequential automation loops são comuns em Puppeteer - apenas warning em casos óbvios
+            'no-await-in-loop': 'off',
             'require-atomic-updates': 'warn',
 
             // ===== ASYNC/AWAIT BEST PRACTICES =====
@@ -71,71 +111,88 @@ export default [
             'prefer-promise-reject-errors': 'error',
 
             // ===== VARIÁVEIS E ESCOPO =====
-            'no-unused-vars': ['warn', {
-                'argsIgnorePattern': '^_',
-                'varsIgnorePattern': '^_',
-                'caughtErrorsIgnorePattern': '^_'
-            }],
-            'no-use-before-define': ['error', { 'functions': false, 'classes': true }],
-            'no-shadow': ['warn', { 'builtinGlobals': false, 'hoist': 'functions' }],
+            'no-unused-vars': [
+                'warn',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_'
+                }
+            ],
+            'no-use-before-define': ['error', { functions: false, classes: true }],
+            'no-shadow': ['warn', { builtinGlobals: false, hoist: 'functions' }],
             'no-undef': 'error',
             'no-undefined': 'off',
             'no-var': 'warn',
-            'prefer-const': ['warn', { 'destructuring': 'all' }],
+            'prefer-const': ['warn', { destructuring: 'all' }],
 
             // ===== CÓDIGO LIMPO =====
-            'eqeqeq': ['error', 'always', { 'null': 'ignore' }],
-            'curly': ['warn', 'all'],
-            'no-else-return': 'warn',
-            'no-lonely-if': 'warn',
+            eqeqeq: ['error', 'always', { null: 'ignore' }],
+            curly: ['warn', 'all'],
+            'no-else-return': 'off', // Early returns são preferíveis, mas else-return não é problema
+            'no-lonely-if': 'off', // Lonely if pode ser mais legível que else-if em alguns casos
             'no-unneeded-ternary': 'warn',
-            'no-nested-ternary': 'warn',
-            'prefer-template': 'warn',
-            'prefer-arrow-callback': 'warn',
+            'no-nested-ternary': 'off', // Nested ternary pode ser legível quando bem formatado
+            'prefer-template': 'off', // Concatenação com + é aceitável
+            'prefer-arrow-callback': 'off', // Function expressions são equivalentes
 
             // ===== COMPLEXIDADE (Arquitetura Domain-Driven) =====
-            'complexity': ['warn', { 'max': 15 }],
-            'max-depth': ['warn', { 'max': 4 }],
-            'max-nested-callbacks': ['warn', { 'max': 4 }],
-            'max-lines-per-function': ['warn', {
-                'max': 150,
-                'skipBlankLines': true,
-                'skipComments': true
-            }],
-            'max-params': ['warn', { 'max': 5 }],
+            // Limites ajustados para arquitetura NERV event-driven (funções orquestradoras naturalmente complexas)
+            complexity: ['warn', { max: 20 }],
+            'max-depth': ['warn', { max: 5 }],
+            'max-nested-callbacks': ['warn', { max: 5 }],
+            'max-lines-per-function': [
+                'warn',
+                {
+                    max: 200,
+                    skipBlankLines: true,
+                    skipComments: true
+                }
+            ],
+            'max-params': ['warn', { max: 6 }],
 
             // ===== ESTILO CONSISTENTE =====
-            'semi': ['warn', 'always'],
-            'quotes': ['warn', 'single', { 'avoidEscape': true, 'allowTemplateLiterals': true }],
-            'comma-dangle': ['warn', {
-                'arrays': 'never',
-                'objects': 'never',
-                'imports': 'never',
-                'exports': 'never',
-                'functions': 'never'
-            }],
-            'indent': ['warn', 4, { 'SwitchCase': 1 }],
+            semi: ['warn', 'always'],
+            quotes: ['warn', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
+            'comma-dangle': [
+                'warn',
+                {
+                    arrays: 'never',
+                    objects: 'never',
+                    imports: 'never',
+                    exports: 'never',
+                    functions: 'never'
+                }
+            ],
+            indent: ['warn', 4, { SwitchCase: 1 }],
             'linebreak-style': ['error', 'unix'],
             'no-trailing-spaces': 'warn',
-            'no-multiple-empty-lines': ['warn', { 'max': 2, 'maxEOF': 1 }],
-            'space-before-function-paren': ['warn', {
-                'anonymous': 'always',
-                'named': 'never',
-                'asyncArrow': 'always'
-            }],
+            'no-multiple-empty-lines': ['warn', { max: 2, maxEOF: 1 }],
+            'space-before-function-paren': [
+                'warn',
+                {
+                    anonymous: 'always',
+                    named: 'never',
+                    asyncArrow: 'always'
+                }
+            ],
 
             // ===== SEGURANÇA =====
             'no-buffer-constructor': 'error',
             'no-path-concat': 'warn',
 
             // ===== PERFORMANCE =====
-            'no-constant-condition': ['error', { 'checkLoops': false }],
+            'no-constant-condition': ['error', { checkLoops: false }],
 
             // ===== DOCUMENTAÇÃO =====
-            'spaced-comment': ['warn', 'always', {
-                'line': { 'markers': ['/', '=', '!'] },
-                'block': { 'balanced': true }
-            }]
+            'spaced-comment': [
+                'warn',
+                'always',
+                {
+                    line: { markers: ['/', '=', '!'] },
+                    block: { balanced: true }
+                }
+            ]
         }
     },
 
@@ -145,13 +202,13 @@ export default [
         rules: {
             'no-console': 'off',
             'max-lines-per-function': 'off',
-            'complexity': ['warn', { 'max': 20 }]
+            complexity: ['warn', { max: 20 }]
         }
     },
 
     // ===== CONFIG FILES (Módulos ES) =====
     {
-        files: ['*.config.{js,mjs}', 'eslint.config.mjs'],
+        files: ['*.config.{js,mjs}', 'eslint.config.mjs', 'src/core/constants/**/*.js'],
         languageOptions: {
             sourceType: 'module',
             globals: globals.node

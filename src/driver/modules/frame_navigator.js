@@ -11,19 +11,19 @@ const { log } = require('../../core/logger');
 
 class FrameNavigator {
     /**
-   * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
-   */
+     * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
+     */
     constructor(driver) {
         this.driver = driver;
     }
 
     /**
-   * Resolve o contexto de execução e calcula o deslocamento (offset) visual.
-   * Narra a trajetória através dos frames para o Mission Control.
-   *
-   * @param {object} protocol - Protocolo SADI contendo o framePath.
-   * @returns {object} Contexto contendo { ctx, offsetX, offsetY, frameStack }.
-   */
+     * Resolve o contexto de execução e calcula o deslocamento (offset) visual.
+     * Narra a trajetória através dos frames para o Mission Control.
+     *
+     * @param {object} protocol - Protocolo SADI contendo o framePath.
+     * @returns {object} Contexto contendo { ctx, offsetX, offsetY, frameStack }.
+     */
     async getExecutionContext(protocol) {
         const result = {
             ctx: this.driver.page,
@@ -64,10 +64,12 @@ class FrameNavigator {
                 const targetSig = part.toLowerCase();
 
                 // Localiza o frame no nível atual
-                const frameJSHandle = await currentLevel.evaluateHandle((sig) => {
+                const frameJSHandle = await currentLevel.evaluateHandle(sig => {
                     const frames = Array.from(document.querySelectorAll('iframe'));
                     return frames.find(f => {
-                        if (f.tagName.toLowerCase() !== 'iframe') {return false;}
+                        if (f.tagName.toLowerCase() !== 'iframe') {
+                            return false;
+                        }
                         const id = f.id ? `#${f.id}` : '';
                         const name = f.name ? `[name="${f.name}"]` : '';
                         const currentSig = `${f.tagName}${id}${name}`.toLowerCase();
@@ -88,6 +90,7 @@ class FrameNavigator {
 
                             // Acumula o deslocamento físico (Bounding Box)
                             const box = await element.boundingBox();
+                            // eslint-disable-next-line max-depth -- Recursive frame navigation requires deep nesting
                             if (box) {
                                 result.offsetX += box.x;
                                 result.offsetY += box.y;
@@ -103,7 +106,6 @@ class FrameNavigator {
                                 frame: targetSig,
                                 depth: result.frameStack.length
                             });
-
                         } else {
                             log('WARN', `[FRAME_NAV] Falha ao acessar conteúdo do frame: ${targetSig}`, correlationId);
                             await element.dispose().catch(() => {});
@@ -116,7 +118,9 @@ class FrameNavigator {
                 } finally {
                     try {
                         await frameJSHandle.dispose();
-                    } catch (dispErr) {}
+                    } catch (_dispErr) {
+                        // Ignore disposal errors
+                    }
                 }
             }
         } catch (lineageErr) {

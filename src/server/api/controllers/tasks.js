@@ -63,7 +63,7 @@ router.post('/', async (req, res) => {
         log('WARN', `[API_TASKS] Ingestão rejeitada: ${e.message}`, req.id);
         res.status(400).json({
             success: false,
-            error: `Dados da tarefa inválidos: ${  e.message}`,
+            error: `Dados da tarefa inválidos: ${e.message}`,
             request_id: req.id
         });
     }
@@ -201,7 +201,7 @@ const downloadResult = async (req, res) => {
         const stream = fs.createReadStream(filePath);
         stream.pipe(res);
 
-        stream.on('error', (err) => {
+        stream.on('error', err => {
             log('ERROR', `[API_TASKS] Erro no stream do arquivo ${safeId}: ${err.message}`, requestId);
             if (!res.headersSent) {
                 res.status(500).json({
@@ -211,7 +211,6 @@ const downloadResult = async (req, res) => {
                 });
             }
         });
-
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha crítica no download: ${e.message}`, requestId);
         res.status(500).json({
@@ -227,7 +226,9 @@ router.get('/results/:id', downloadResult);
 
 // Mapeamento para /api/results/:id (Suporte a rotas legadas do Dashboard)
 router.get('/:id', (req, res, next) => {
-    if (['retry-failed', 'clear'].includes(req.params.id)) {return next();}
+    if (['retry-failed', 'clear'].includes(req.params.id)) {
+        return next();
+    }
     downloadResult(req, res);
 });
 

@@ -76,7 +76,6 @@ function _pushMetrics() {
         // Broadcast global para todos os terminais conectados (Dashboards)
         // O método notify do socket.js V600 garante a entrega atômica.
         notify('sys_metrics', payload);
-
     } catch (e) {
         // Falhas na telemetria de hardware são não-críticas e não devem parar o servidor
         log('ERROR', `[TELEMETRY_HW] Erro no ciclo de amostragem: ${e.message}`);

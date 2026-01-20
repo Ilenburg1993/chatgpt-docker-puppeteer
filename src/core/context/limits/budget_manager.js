@@ -18,14 +18,16 @@ class BudgetManager {
      * @returns {boolean}
      */
     hasBudget(length) {
-        return (this.consumed + length) <= this.limit;
+        return this.consumed + length <= this.limit;
     }
 
     /**
      * Registra o consumo e retorna true se permitido, false se estourou.
      */
     allocate(length) {
-        if (!this.hasBudget(length)) {return false;}
+        if (!this.hasBudget(length)) {
+            return false;
+        }
         this.consumed += length;
         return true;
     }

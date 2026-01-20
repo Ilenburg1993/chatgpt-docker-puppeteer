@@ -194,14 +194,18 @@ router.get('/locks', async (req, res) => {
         const files = await fs.readdir(ROOT);
         const lockFiles = files.filter(f => f.startsWith('RUNNING_') && f.endsWith('.lock'));
 
-        const locks = await Promise.all(lockFiles.map(async f => {
-            const content = await io.safeReadJSON(path.join(ROOT, f));
-            if (!content) {return null;}
-            return {
-                target: f.replace('RUNNING_', '').replace('.lock', ''),
-                ...content
-            };
-        }));
+        const locks = await Promise.all(
+            lockFiles.map(async f => {
+                const content = await io.safeReadJSON(path.join(ROOT, f));
+                if (!content) {
+                    return null;
+                }
+                return {
+                    target: f.replace('RUNNING_', '').replace('.lock', ''),
+                    ...content
+                };
+            })
+        );
 
         res.json({
             success: true,

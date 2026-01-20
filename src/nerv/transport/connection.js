@@ -32,7 +32,7 @@ function safeCall(handler, payload) {
     try {
         handler(payload);
     } catch (_) {
-    // transporte nunca falha semanticamente
+        // transporte nunca falha semanticamente
     }
 }
 
@@ -73,7 +73,7 @@ function createConnection({ telemetry, adapter }) {
   =========================== */
 
     if (typeof adapter.onReceive === 'function') {
-        adapter.onReceive((frame) => {
+        adapter.onReceive(frame => {
             telemetry.emit('nerv:transport:receive', {
                 size: frame ? frame.length || null : null
             });
@@ -85,7 +85,7 @@ function createConnection({ telemetry, adapter }) {
     }
 
     if (typeof adapter.onError === 'function') {
-        adapter.onError((error) => {
+        adapter.onError(error => {
             telemetry.emit('nerv:transport:error', {
                 message: error ? error.message : 'erro físico'
             });
@@ -97,10 +97,12 @@ function createConnection({ telemetry, adapter }) {
   =========================== */
 
     /**
-   * Inicializa a conexão física.
-   */
+     * Inicializa a conexão física.
+     */
     function start() {
-        if (started) {return;}
+        if (started) {
+            return;
+        }
 
         started = true;
         telemetry.emit('nerv:transport:start');
@@ -113,10 +115,12 @@ function createConnection({ telemetry, adapter }) {
     }
 
     /**
-   * Encerra a conexão física.
-   */
+     * Encerra a conexão física.
+     */
     function stop() {
-        if (!started) {return;}
+        if (!started) {
+            return;
+        }
 
         started = false;
         telemetry.emit('nerv:transport:stop');
@@ -129,10 +133,10 @@ function createConnection({ telemetry, adapter }) {
     }
 
     /**
-   * Envia frame opaco pelo meio físico.
-   *
-   * @param {*} frame
-   */
+     * Envia frame opaco pelo meio físico.
+     *
+     * @param {*} frame
+     */
     function send(frame) {
         telemetry.emit('nerv:transport:send', {
             size: frame ? frame.length || null : null
@@ -144,10 +148,10 @@ function createConnection({ telemetry, adapter }) {
     }
 
     /**
-   * Registra handler de recepção de frames.
-   *
-   * @param {Function} handler
-   */
+     * Registra handler de recepção de frames.
+     *
+     * @param {Function} handler
+     */
     function onReceive(handler) {
         if (typeof handler !== 'function') {
             throw new Error('onReceive requer função');

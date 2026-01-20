@@ -39,7 +39,7 @@ function safeCall(handler, payload) {
     try {
         handler(payload);
     } catch (_) {
-    // Falha silenciosa: telemetria nunca interfere
+        // Falha silenciosa: telemetria nunca interfere
     }
 }
 
@@ -74,22 +74,22 @@ function createIPCTelemetry(config = {}) {
   =========================== */
 
     /**
-   * Incrementa contador técnico.
-   */
+     * Incrementa contador técnico.
+     */
     function incCounter(name, value = 1) {
         metrics.counters[name] = (metrics.counters[name] || 0) + value;
     }
 
     /**
-   * Atualiza gauge técnico.
-   */
+     * Atualiza gauge técnico.
+     */
     function setGauge(name, value) {
         metrics.gauges[name] = value;
     }
 
     /**
-   * Registra timestamp técnico.
-   */
+     * Registra timestamp técnico.
+     */
     function mark(name) {
         metrics.timestamps[name] = now();
     }
@@ -99,16 +99,18 @@ function createIPCTelemetry(config = {}) {
   =========================== */
 
     /**
-   * Emite um evento técnico de telemetria.
-   *
-   * @param {string} type
-   * Nome do evento técnico (ex.: nerv:envelope:sent)
-   *
-   * @param {Object} [meta]
-   * Metadados técnicos opcionais (nunca semânticos)
-   */
+     * Emite um evento técnico de telemetria.
+     *
+     * @param {string} type
+     * Nome do evento técnico (ex.: nerv:envelope:sent)
+     *
+     * @param {Object} [meta]
+     * Metadados técnicos opcionais (nunca semânticos)
+     */
     function emit(type, meta = null) {
-        if (!enabled) {return;}
+        if (!enabled) {
+            return;
+        }
 
         const event = {
             timestamp: now(),
@@ -127,10 +129,10 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-   * Subscrição passiva a eventos de telemetria.
-   *
-   * @param {Function} handler
-   */
+     * Subscrição passiva a eventos de telemetria.
+     *
+     * @param {Function} handler
+     */
     function on(handler) {
         if (typeof handler !== 'function') {
             throw new Error('telemetry.on requer função');
@@ -145,9 +147,9 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-   * Retorna snapshot das métricas atuais.
-   * Leitura pura, sem efeitos colaterais.
-   */
+     * Retorna snapshot das métricas atuais.
+     * Leitura pura, sem efeitos colaterais.
+     */
     function stats() {
         return {
             counters: { ...metrics.counters },
@@ -157,9 +159,9 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-   * Reseta métricas internas.
-   * Uso permitido apenas para testes.
-   */
+     * Reseta métricas internas.
+     * Uso permitido apenas para testes.
+     */
     function reset() {
         metrics.counters = Object.create(null);
         metrics.gauges = Object.create(null);

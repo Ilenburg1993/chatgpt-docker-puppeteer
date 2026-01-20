@@ -47,6 +47,7 @@ const ISSUE_TYPES = Object.freeze({
 });
 
 const DEFAULTS = {
+
     // Modo de operação: 'launcher' | 'connect' | 'wsEndpoint' | 'executablePath' | 'auto'
     mode: 'launcher',
 
@@ -132,7 +133,9 @@ class ConnectionOrchestrator {
     }
 
     setState(next, meta = {}) {
-        if (this.state === next) {return;} // Evita spam de estado igual
+        if (this.state === next) {
+            return;
+        } // Evita spam de estado igual
         this.state = next;
         this._pushStateHistory(next, meta);
         log('INFO', `[ORCH] State: ${next}`, meta);
@@ -140,7 +143,9 @@ class ConnectionOrchestrator {
 
     _pushStateHistory(state, meta) {
         this.stateHistory.push({ state, meta, ts: new Date().toISOString() });
-        if (this.stateHistory.length > this.config.stateHistorySize) {this.stateHistory.shift();}
+        if (this.stateHistory.length > this.config.stateHistorySize) {
+            this.stateHistory.shift();
+        }
     }
 
     classifyIssue(kind, type, message) {
@@ -186,9 +191,9 @@ class ConnectionOrchestrator {
     // --- MÉTODOS DE CONEXÃO (Todos os tipos suportados) ---
 
     /**
-   * LAUNCHER: Puppeteer inicia Chrome automaticamente
-   * Mais confiável, funciona em qualquer ambiente
-   */
+     * LAUNCHER: Puppeteer inicia Chrome automaticamente
+     * Mais confiável, funciona em qualquer ambiente
+     */
     async tryLauncher() {
         const launchOptions = {
             headless: this.config.headless,
@@ -211,13 +216,13 @@ class ConnectionOrchestrator {
         // Usa puppeteer (bundle) ou puppeteer-core (sem bundle)
         const lib = this.config.executablePath ? puppeteerCore : puppeteer;
 
-        return await lib.launch(launchOptions);
+        return lib.launch(launchOptions);
     }
 
     /**
-   * BROWSER_URL: Conecta via http://host:port
-   * Para Chrome externo com --remote-debugging-port
-   */
+     * BROWSER_URL: Conecta via http://host:port
+     * Para Chrome externo com --remote-debugging-port
+     */
     async tryConnectBrowserURL() {
         const errors = [];
 
@@ -242,9 +247,9 @@ class ConnectionOrchestrator {
     }
 
     /**
-   * WS_ENDPOINT: Conecta via WebSocket Debugger URL
-   * Para Chrome externo, mais estável que browserURL
-   */
+     * WS_ENDPOINT: Conecta via WebSocket Debugger URL
+     * Para Chrome externo, mais estável que browserURL
+     */
     async tryConnectWSEndpoint() {
         const errors = [];
 
@@ -274,7 +279,6 @@ class ConnectionOrchestrator {
                         });
                     }
                     errors.push(`${host}:${port} - No WS URL in response`);
-
                 } catch (e) {
                     errors.push(`${host}:${port} - ${e.message}`);
                 }
@@ -285,9 +289,9 @@ class ConnectionOrchestrator {
     }
 
     /**
-   * EXECUTABLE_PATH: Inicia Chrome customizado
-   * Para usar Chrome instalado (não Chromium do Puppeteer)
-   */
+     * EXECUTABLE_PATH: Inicia Chrome customizado
+     * Para usar Chrome instalado (não Chromium do Puppeteer)
+     */
     async tryExecutablePath() {
         if (!this.config.executablePath) {
             throw new Error('executablePath não configurado');
@@ -297,7 +301,7 @@ class ConnectionOrchestrator {
             throw new Error(`Chrome não encontrado: ${this.config.executablePath}`);
         }
 
-        return await this.tryLauncher(); // Usa launcher com executablePath
+        return this.tryLauncher(); // Usa launcher com executablePath
     }
 
     async ensureBrowser() {
@@ -323,7 +327,9 @@ class ConnectionOrchestrator {
 
         for (const currentMode of modesToTry) {
             // Evita tentar o mesmo modo múltiplas vezes
-            if (this.attemptedModes.includes(currentMode) && mode !== 'auto') {continue;}
+            if (this.attemptedModes.includes(currentMode) && mode !== 'auto') {
+                continue;
+            }
 
             try {
                 this.setState(STATES.CONNECTING_BROWSER, { mode: currentMode });
@@ -361,7 +367,6 @@ class ConnectionOrchestrator {
                     log('INFO', `[ORCH] Browser conectado com sucesso em modo: ${currentMode}`);
                     return this.browser;
                 }
-
             } catch (error) {
                 lastError = error;
                 this.attemptedModes.push(currentMode);
@@ -379,7 +384,11 @@ class ConnectionOrchestrator {
 
         // Se chegou aqui, todos os modos falharam
         this.retryCount++;
-        this.classifyIssue(ISSUE_KIND.EVENT, ISSUE_TYPES.BROWSER_NOT_STARTED, lastError?.message || 'Todos os modos falharam');
+        this.classifyIssue(
+            ISSUE_KIND.EVENT,
+            ISSUE_TYPES.BROWSER_NOT_STARTED,
+            lastError?.message || 'Todos os modos falharam'
+        );
         this.setState(STATES.RETRY_BROWSER, { retry: this.retryCount, attemptedModes: this.attemptedModes });
 
         // Retry com backoff exponencial
@@ -390,7 +399,9 @@ class ConnectionOrchestrator {
             );
 
             log('WARN', `[ORCH] Retry ${this.retryCount}/${this.config.maxConnectionAttempts} em ${delay}ms`);
-            await new Promise(r => setTimeout(r, delay));
+            await new Promise(r => {
+                setTimeout(r, delay);
+            });
 
             // Reseta modos tentados para permitir nova rodada
             this.attemptedModes = [];
@@ -406,7 +417,9 @@ class ConnectionOrchestrator {
             const url = p.url();
             return url && url !== 'about:blank' && this.config.allowedDomains.some(d => url.includes(d));
         });
-        if (!candidates.length) {return null;}
+        if (!candidates.length) {
+            return null;
+        }
         return this.config.pageSelectionPolicy === 'MOST_RECENT' ? candidates[candidates.length - 1] : candidates[0];
     }
 
@@ -434,14 +447,17 @@ class ConnectionOrchestrator {
                 }
 
                 this.classifyIssue(ISSUE_KIND.EVENT, ISSUE_TYPES.PAGE_NOT_FOUND, 'Aguardando aba alvo...');
-                await new Promise(r => setTimeout(r, this.config.pageScanIntervalMs));
-
+                await new Promise(r => {
+                    setTimeout(r, this.config.pageScanIntervalMs);
+                });
             } catch (e) {
                 if (e.message.includes('Browser lost')) {
                     // Joga erro para cima para reiniciar o ciclo do browser
                     throw e;
                 }
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => {
+                    setTimeout(r, 1000);
+                });
             }
         }
     }
@@ -449,7 +465,9 @@ class ConnectionOrchestrator {
     async validatePage(page) {
         this.setState(STATES.VALIDATING_PAGE);
         try {
-            if (!page || page.isClosed()) {throw new Error('Page closed');}
+            if (!page || page.isClosed()) {
+                throw new Error('Page closed');
+            }
             await page.bringToFront().catch(() => {});
             this.setState(STATES.PAGE_VALIDATED, { url: page.url() });
             return true;
@@ -463,9 +481,9 @@ class ConnectionOrchestrator {
     // --- API PÚBLICA ---
 
     /**
-   * Conecta/inicia browser e retorna instância.
-   * Usado pelo BrowserPoolManager para obter múltiplas instâncias.
-   */
+     * Conecta/inicia browser e retorna instância.
+     * Usado pelo BrowserPoolManager para obter múltiplas instâncias.
+     */
     async connect() {
         await this.ensureBrowser();
         return this.browser;
@@ -486,7 +504,9 @@ class ConnectionOrchestrator {
                 }
             } catch (e) {
                 log('WARN', `[ORCH] Ciclo de recuperação: ${e.message}`);
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => {
+                    setTimeout(r, 1000);
+                });
             }
         }
     }
@@ -504,9 +524,9 @@ class ConnectionOrchestrator {
     }
 
     /**
-   * Limpa profiles temporários criados pelo Puppeteer em /tmp
-   * Deve ser chamado periodicamente ou no shutdown
-   */
+     * Limpa profiles temporários criados pelo Puppeteer em /tmp
+     * Deve ser chamado periodicamente ou no shutdown
+     */
     static async cleanupTempProfiles() {
         try {
             const tmpDir = '/tmp';
@@ -535,8 +555,8 @@ class ConnectionOrchestrator {
     }
 
     /**
-   * Obtém informações sobre o cache do Puppeteer
-   */
+     * Obtém informações sobre o cache do Puppeteer
+     */
     static getCacheInfo() {
         const cacheDir = path.join(process.env.HOME || '/home/node', '.cache', 'puppeteer');
 

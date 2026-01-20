@@ -31,7 +31,9 @@ function validateJSON(content, signal = null) {
         }
 
         if (content[i] === '{') {
-            if (depth === 0) {start = i;}
+            if (depth === 0) {
+                start = i;
+            }
             depth++;
         } else if (content[i] === '}') {
             depth--;
@@ -63,8 +65,12 @@ function validateJSON(content, signal = null) {
  * @param {AbortSignal} [signal] - Sinal de cancelamento.
  */
 function validateRegex(content, patternStr, signal = null) {
-    if (!patternStr) {return { ok: true, reason: null };}
-    if (signal?.aborted) {return { ok: false, reason: 'VALIDATION_ABORTED' };}
+    if (!patternStr) {
+        return { ok: true, reason: null };
+    }
+    if (signal?.aborted) {
+        return { ok: false, reason: 'VALIDATION_ABORTED' };
+    }
 
     try {
         const regex = new RegExp(patternStr, 'i');
@@ -77,7 +83,7 @@ function validateRegex(content, patternStr, signal = null) {
             };
         }
         return { ok: true, reason: null };
-    } catch (e) {
+    } catch (_e) {
         return { ok: false, reason: 'INVALID_REGEX_RULE: Expressão regular malformada.' };
     }
 }

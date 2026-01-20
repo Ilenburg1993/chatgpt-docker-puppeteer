@@ -36,5 +36,5 @@ module.exports = {
      * parseTask: O ponto de entrada oficial para novas tarefas.
      * Utiliza o motor de cura para garantir compatibilidade e integridade.
      */
-    parseTask: (raw) => healTask(raw)
+    parseTask: raw => healTask(raw)
 };

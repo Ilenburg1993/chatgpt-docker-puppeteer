@@ -62,7 +62,7 @@ function createBuffers({ telemetry, limits = {} }) {
   =========================== */
 
     return Object.freeze({
-    /* Outbound */
+        /* Outbound */
 
         enqueueOutbound(item) {
             const ok = outbound.enqueue(item);

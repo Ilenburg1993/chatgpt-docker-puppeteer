@@ -25,6 +25,7 @@ const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/f
  * @param {AbortSignal} signal - Sinal para interrupção imediata.
  * @returns {Promise<object>} { ok: boolean, reason: string|null }
  */
+// eslint-disable-next-line complexity -- Validation scanning requires comprehensive checks
 async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = null) {
     let fileStream = null;
 
@@ -32,7 +33,9 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         // 1. AUDITORIA FÍSICA (Metadados Assíncronos)
         const stats = await fsp.stat(filePath);
         const physicalCheck = checkPhysicalIntegrity(task, stats);
-        if (!physicalCheck.ok) {return physicalCheck;}
+        if (!physicalCheck.ok) {
+            return physicalCheck;
+        }
 
         // 2. PREPARAÇÃO DA VARREDURA
         const userForbidden = task.spec?.validation?.forbidden_terms || [];
@@ -43,7 +46,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         // [FIX 1.2] Otimização de Memória: Uso de Array Buffer em vez de String Concatenation
         // Isso evita realocações de memória O(N^2) durante o processamento de arquivos grandes.
         const contentBuffer = [];
-        const shouldAccumulate = (stats.size <= MAX_JSON_SIZE);
+        const shouldAccumulate = stats.size <= MAX_JSON_SIZE;
 
         // 3. INICIALIZAÇÃO DO STREAM
         fileStream = fs.createReadStream(filePath, { signal });
@@ -55,7 +58,9 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         // 4. LOOP DE VARREDURA (LINHA A LINHA)
         for await (const line of rl) {
             // Check de aborto manual para garantir interrupção entre linhas
-            if (signal?.aborted) {throw new Error('VALIDATION_ABORTED');}
+            if (signal?.aborted) {
+                throw new Error('VALIDATION_ABORTED');
+            }
 
             // A. Check Semântico (Interrompe no primeiro erro detectado - Fail Fast)
             const violation = evaluateLine(line, forbiddenList);
@@ -87,23 +92,28 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         // Validação JSON (Propaga sinal de aborto para o parser)
         if (formatRequired === 'json') {
             const jsonCheck = validateJSON(fullContent, signal);
-            if (!jsonCheck.ok) {return jsonCheck;}
+            if (!jsonCheck.ok) {
+                return jsonCheck;
+            }
         }
 
         // Validação Markdown
         if (formatRequired === 'markdown' || formatRequired === 'code') {
             const mdCheck = validateMarkdownCode(fullContent);
-            if (!mdCheck.ok) {return mdCheck;}
+            if (!mdCheck.ok) {
+                return mdCheck;
+            }
         }
 
         // Validação de Padrão (Regex - Propaga sinal de aborto)
         if (patternRequired) {
             const regexCheck = validateRegex(fullContent, patternRequired, signal);
-            if (!regexCheck.ok) {return regexCheck;}
+            if (!regexCheck.ok) {
+                return regexCheck;
+            }
         }
 
         return { ok: true, reason: null };
-
     } catch (scanErr) {
         // Tratamento de interrupção via sinal
         if (scanErr.name === 'AbortError' || scanErr.message === 'VALIDATION_ABORTED') {

@@ -44,7 +44,7 @@ function init() {
          * fs.watch: Monitora mudanças no diretório/arquivo via Kernel do SO.
          * No Windows, o evento 'rename' é disparado quando o Logger rotaciona o arquivo.
          */
-        watcher = fs.watch(LOG_FILE, (event) => {
+        watcher = fs.watch(LOG_FILE, event => {
             if (event === 'rename') {
                 /**
                  * ROTAÇÃO DETECTADA:
@@ -57,11 +57,10 @@ function init() {
         });
 
         // Captura falhas no nível do driver de eventos do Sistema Operacional
-        watcher.on('error', (err) => {
+        watcher.on('error', err => {
             log('ERROR', `[LOG_WATCHER] Falha no driver de observação: ${err.message}`);
             _handleRotation();
         });
-
     } catch (e) {
         log('ERROR', `[LOG_WATCHER] Erro ao acessar descritor de arquivo: ${e.message}`);
         _scheduleReconnect(10000); // Backoff de 10s para erros graves de I/O
@@ -83,7 +82,9 @@ function _handleRotation() {
  * @param {number} ms - Tempo de espera em milissegundos.
  */
 function _scheduleReconnect(ms) {
-    if (reconnectTimeout) {clearTimeout(reconnectTimeout);}
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+    }
     reconnectTimeout = setTimeout(() => {
         init();
     }, ms);
@@ -97,7 +98,7 @@ function stop() {
     if (watcher) {
         try {
             watcher.close();
-        } catch (e) {
+        } catch (_e) {
             // Falha ao fechar watcher já inválido é ignorada
         }
         watcher = null;

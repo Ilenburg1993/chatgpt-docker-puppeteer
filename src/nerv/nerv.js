@@ -21,7 +21,12 @@
 
 // Protocolo universal NERV
 const { createEnvelope } = require('../shared/nerv/envelope');
-const { MessageType, ActionCode, ActorRole } = require('../shared/nerv/constants');
+
+const {
+    CONNECTION_MODES: CONNECTION_MODES
+} = require('../core/constants/browser.js');
+
+const { MessageType: _MessageType, ActionCode: _ActionCode, ActorRole: _ActorRole } = require('../shared/nerv/constants');
 
 // Núcleo estrutural
 const createCorrelation = require('./correlation/correlation_store');
@@ -54,17 +59,18 @@ const createHealth = require('./health/health');
  * - health: { thresholds? }
  * - socketUrl: URL do servidor Socket.io (se mode='hybrid')
  */
+// eslint-disable-next-line complexity -- NERV initialization requires complex setup
 async function createNERV(config = {}) {
     /* =========================================================
      0. Modo de operação (ONDA 2.6: Suporte híbrido)
   ========================================================= */
 
-    const mode = config.mode || 'local';
+    const mode = config.mode || CONNECTION_MODES.LOCAL;
     let socketAdapter = null;
     let hybridTransport = null;
 
     // Se modo híbrido, cria adapter Socket.io
-    if (mode === 'hybrid') {
+    if (mode === CONNECTION_MODES.HYBRID) {
         const createSocketAdapter = require('../infra/transport/socket_io_adapter');
 
         socketAdapter = createSocketAdapter({
@@ -87,7 +93,7 @@ async function createNERV(config = {}) {
     });
 
     // Agora que telemetry existe, cria hybrid transport
-    if (mode === 'local' || mode === 'hybrid') {
+    if (mode === CONNECTION_MODES.LOCAL || mode === CONNECTION_MODES.HYBRID) {
         hybridTransport = createHybridTransport({
             mode,
             socketAdapter,
@@ -105,7 +111,7 @@ async function createNERV(config = {}) {
     const envelopes = {
         createEnvelope,
         normalize: createEnvelope, // Alias para compatibilidade
-        validate: (env) => env // Validação já feita no createEnvelope
+        validate: env => env // Validação já feita no createEnvelope
     };
 
     /* =========================================================
@@ -128,11 +134,15 @@ async function createNERV(config = {}) {
   ========================================================= */
 
     // ONDA 2.6: Usa hybridTransport se local/hybrid, ou transport customizado
-    const transport = hybridTransport || (config.transport?.adapter ? createTransport({
-        telemetry,
-        adapter: config.transport.adapter,
-        reconnect: config.transport?.reconnect
-    }) : null);
+    const transport =
+        hybridTransport ||
+        (config.transport?.adapter
+            ? createTransport({
+                telemetry,
+                adapter: config.transport.adapter,
+                reconnect: config.transport?.reconnect
+            })
+            : null);
 
     /* =========================================================
      6. Emissão (ato unilateral)
@@ -170,15 +180,15 @@ async function createNERV(config = {}) {
   ========================================================= */
 
     const publicAPI = {
-    /* Emissão */
-        emit: (envelope) => {
+        /* Emissão */
+        emit: envelope => {
             // ONDA 2.6: Emite via hybrid transport diretamente
             if (hybridTransport) {
                 return hybridTransport.send(envelope);
             }
             return emission.emitEvent(envelope);
         },
-        send: (envelope) => {
+        send: envelope => {
             // Alias para emit - usado pelos testes
             return publicAPI.emit(envelope);
         },
@@ -189,7 +199,7 @@ async function createNERV(config = {}) {
         /* Recepção */
         receive: reception.receive,
         onReceive: hybridTransport ? hybridTransport.onReceive : reception.onReceive,
-        onEvent: hybridTransport ? hybridTransport.onEvent : (reception.onEvent || reception.onReceive),
+        onEvent: hybridTransport ? hybridTransport.onEvent : reception.onEvent || reception.onReceive,
         onCommand: reception.onCommand || reception.onReceive,
         onActor: hybridTransport ? hybridTransport.onActor : reception.onReceive,
 
@@ -210,7 +220,7 @@ async function createNERV(config = {}) {
             if (hybridTransport && hybridTransport.getStatus) {
                 return hybridTransport.getStatus();
             }
-            return { mode: 'local', status: 'active' };
+            return { mode: CONNECTION_MODES.LOCAL, status: 'active' };
         },
 
         /* Shutdown gracioso */

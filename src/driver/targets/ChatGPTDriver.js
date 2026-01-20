@@ -8,6 +8,11 @@
 ========================================================================== */
 
 const BaseDriver = require('../core/BaseDriver');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const triage = require('../modules/triage');
 const adaptive = require('../../logic/adaptive');
 const analyzer = require('../modules/analyzer');
@@ -16,10 +21,10 @@ const { log } = require('../../core/logger');
 
 class ChatGPTDriver extends BaseDriver {
     /**
-   * @param {object} page - Puppeteer Page.
-   * @param {object} config - Task Config.
-   * @param {AbortSignal} signal - Sovereign Abort Signal.
-   */
+     * @param {object} page - Puppeteer Page.
+     * @param {object} config - Task Config.
+     * @param {AbortSignal} signal - Sovereign Abort Signal.
+     */
     constructor(page, config, signal) {
         super(page, config, signal);
         this.name = 'ChatGPT';
@@ -34,23 +39,30 @@ class ChatGPTDriver extends BaseDriver {
     }
 
     /**
-   * Captura o estado atual da conversa (Contagem de turnos).
-   */
+     * Captura o estado atual da conversa (Contagem de turnos).
+     */
     async captureState() {
         try {
-            return await this.page.evaluate(() => {
-                const msgs = document.querySelectorAll('div[data-message-author-role="assistant"], article[data-testid*="conversation-turn"]');
+            return this.page.evaluate(() => {
+                const msgs = document.querySelectorAll(
+                    'div[data-message-author-role="assistant"], article[data-testid*="conversation-turn"]'
+                );
                 return msgs.length;
             });
-        } catch (e) { return 0; }
+        } catch (_e) {
+            return 0;
+        }
     }
 
     /**
-   * Prepara o ambiente para a tarefa (Troca de modelo / Reset).
-   */
+     * Prepara o ambiente para a tarefa (Troca de modelo / Reset).
+     */
     async prepareContext(taskSpec) {
         this.setState('PREPARING');
-        this._emitVital('PROGRESS_UPDATE', { step: 'MODEL_SYNCHRONIZATION', model: taskSpec?.model || this.defaultModel });
+        this._emitVital('PROGRESS_UPDATE', {
+            step: 'MODEL_SYNCHRONIZATION',
+            model: taskSpec?.model || this.defaultModel
+        });
 
         const modelId = taskSpec?.model || this.defaultModel;
         const targetUrl = `https://chatgpt.com/?model=${modelId}`;
@@ -68,12 +80,12 @@ class ChatGPTDriver extends BaseDriver {
             await stabilizer.waitForStability(this);
         }
 
-        this.setState('IDLE');
+        this.setState(STATUS_VALUES.IDLE);
     }
 
     /**
-   * Loop de percepção incremental com filtragem de pensamento (o1/o3).
-   */
+     * Loop de percepção incremental com filtragem de pensamento (o1/o3).
+     */
     async waitForCompletion(startSnapshot, signal) {
         let lastText = '';
         let stableCycles = 0;
@@ -82,15 +94,19 @@ class ChatGPTDriver extends BaseDriver {
 
         // Watchdog de Mutação (Browser-Side) para detecção de Stall
         await this.page.evaluate(() => {
-            if (window.__wd_obs) {window.__wd_obs.disconnect();}
+            if (window.__wd_obs) {
+                window.__wd_obs.disconnect();
+            }
             window.__wd_last_change = Date.now();
-            window.__wd_obs = new MutationObserver(() => window.__wd_last_change = Date.now());
+            window.__wd_obs = new MutationObserver(() => (window.__wd_last_change = Date.now()));
             window.__wd_obs.observe(document.body, { childList: true, subtree: true, characterData: true });
         });
 
         while (true) {
             try {
-                if (signal?.aborted) {throw new Error('OPERATION_ABORTED');}
+                if (signal?.aborted) {
+                    throw new Error('OPERATION_ABORTED');
+                }
                 this._assertPageAlive();
 
                 // 1. Diagnóstico de Bloqueios (Triage)
@@ -110,10 +126,12 @@ class ChatGPTDriver extends BaseDriver {
                     const { ctx } = await this.frameNavigator.getExecutionContext(responseArea.protocol);
 
                     // Extração com Poda de Pensamento (NASA Standard Pruning)
-                    const extractionResult = await ctx.evaluate((proto) => {
+                    const extractionResult = await ctx.evaluate(proto => {
                         const msgs = Array.from(document.querySelectorAll(proto.selector));
                         const targetMsg = msgs[msgs.length - 1];
-                        if (!targetMsg) {return { text: '', pruned: 0 };}
+                        if (!targetMsg) {
+                            return { text: '', pruned: 0 };
+                        }
 
                         const clone = targetMsg.cloneNode(true);
                         // Remove elementos de raciocínio interno (o1/o3) e metadados de UI
@@ -130,7 +148,10 @@ class ChatGPTDriver extends BaseDriver {
 
                     // [V500] Telemetria de Poda: Informa se a IA está em "modo de pensamento"
                     if (extractionResult.pruned > 0) {
-                        this._emitVital('PROGRESS_UPDATE', { step: 'THOUGHT_PRUNING_ACTIVE', count: extractionResult.pruned });
+                        this._emitVital('PROGRESS_UPDATE', {
+                            step: 'THOUGHT_PRUNING_ACTIVE',
+                            count: extractionResult.pruned
+                        });
                     }
                 }
 
@@ -150,14 +171,19 @@ class ChatGPTDriver extends BaseDriver {
                         const txt = (b.innerText || '').toLowerCase();
                         return b.offsetParent !== null && (txt.includes('continue') || txt.includes('regenerate'));
                     });
-                    if (btn) { btn.click(); return true; }
+                    if (btn) {
+                        btn.click();
+                        return true;
+                    }
                     return false;
                 });
 
                 if (didContinue) {
                     this._emitVital('PROGRESS_UPDATE', { step: 'CONTINUING_GENERATION' });
                     log('INFO', `[${this.name}] Acionando botão de continuação.`, this.correlationId);
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => {
+                        setTimeout(r, 2000);
+                    });
                     stableCycles = 0;
                     continue;
                 }
@@ -165,7 +191,7 @@ class ChatGPTDriver extends BaseDriver {
                 // 5. Critério de Conclusão
                 if (stableCycles >= this.stableCyclesTarget && currentText.length > 0) {
                     this._emitVital('PROGRESS_UPDATE', { step: 'GENERATION_COMPLETE' });
-                    this.setState('IDLE');
+                    this.setState(STATUS_VALUES.IDLE);
                     return currentText;
                 }
 
@@ -174,39 +200,50 @@ class ChatGPTDriver extends BaseDriver {
                 const browserNow = await this.page.evaluate(() => Date.now());
                 const adaptiveData = await adaptive.getAdjustedTimeout(this.currentDomain, 0, 'STREAM');
 
-                if ((browserNow - lastChange) > adaptiveData.timeout) {
+                if (browserNow - lastChange > adaptiveData.timeout) {
                     if (responseArea && responseArea.isBusy) {
                         // IA ainda ativa fisicamente, renovamos a paciência
-                        await this.page.evaluate(() => window.__wd_last_change = Date.now());
+                        await this.page.evaluate(() => (window.__wd_last_change = Date.now()));
                         continue;
                     }
-                    this._emitVital('TRIAGE_ALERT', { type: 'STALL_DETECTED', severity: 'MEDIUM', evidence: { timeout: adaptiveData.timeout } });
+                    this._emitVital('TRIAGE_ALERT', {
+                        type: 'STALL_DETECTED',
+                        severity: 'MEDIUM',
+                        evidence: { timeout: adaptiveData.timeout }
+                    });
                     throw new Error(`STALL_DETECTED: Latência excedeu ${adaptiveData.timeout}ms`);
                 }
-
             } catch (loopErr) {
                 if (loopErr.message.includes('context was destroyed')) {
                     log('WARN', '[DRIVER] Re-sincronizando contexto de resposta...', this.correlationId);
-                    await new Promise(r => setTimeout(r, 1500));
-                } else {throw loopErr;}
+                    await new Promise(r => {
+                        setTimeout(r, 1500);
+                    });
+                } else {
+                    throw loopErr;
+                }
             }
 
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => {
+                setTimeout(r, 800);
+            });
         }
     }
 
     /**
-   * Interrompe a geração ativa via SADI.
-   */
+     * Interrompe a geração ativa via SADI.
+     */
     async stopGeneration() {
         log('WARN', `[${this.name}] Interrompendo geração ativa...`, this.correlationId);
-        const stopProtocol = await analyzer.findSendButtonSelector(this.page, { selector: '[aria-label*="Stop"], .stop-button' });
+        const stopProtocol = await analyzer.findSendButtonSelector(this.page, {
+            selector: '[aria-label*="Stop"], .stop-button'
+        });
 
         if (stopProtocol && stopProtocol.protocol) {
             const { ctx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(stopProtocol.protocol);
             const rect = await this.biomechanics.getStableRect(ctx, stopProtocol.protocol.selector);
             if (rect) {
-                await this.page.mouse.click(offsetX + rect.x + (rect.w/2), offsetY + rect.y + (rect.h / 2));
+                await this.page.mouse.click(offsetX + rect.x + rect.w / 2, offsetY + rect.y + rect.h / 2);
                 this._emitVital('PROGRESS_UPDATE', { step: 'GENERATION_STOPPED_MANUALLY' });
             }
         }
@@ -216,10 +253,14 @@ class ChatGPTDriver extends BaseDriver {
         try {
             if (this.page && !this.page.isClosed()) {
                 await this.page.evaluate(() => {
-                    if (window.__wd_obs) {window.__wd_obs.disconnect();}
+                    if (window.__wd_obs) {
+                        window.__wd_obs.disconnect();
+                    }
                 });
             }
-        } catch (e) {}
+        } catch (_e) {
+            // Ignore cleanup errors
+        }
         await super.destroy();
     }
 }

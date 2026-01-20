@@ -34,22 +34,31 @@ const { KernelNERVBridge } = require('./nerv_bridge/kernel_nerv_bridge');
 /**
  * Cria e compõe o Kernel de forma explícita e determinística.
  *
- * @param {Object} config
- * Configurações estruturais:
- *
- * @param {Object} config.nerv
- * Instância do NERV já configurada e conectada.
- *
- * @param {Object} [config.telemetry]
- * Opções da telemetria do Kernel.
- *
- * @param {Object} [config.policy]
- * Limites e políticas normativas.
- *
- * @param {Object} [config.loop]
- * Opções do kernel_loop (intervalo, scheduler).
+ * @param {Object} config - Configurações estruturais do Kernel
+ * @param {Object} config.nerv - Instância do NERV já configurada e conectada (obrigatório)
+ * @param {Object} [config.telemetry] - Opções da telemetria do Kernel
+ * @param {string} [config.telemetry.source='kernel'] - Identificador da fonte de telemetria
+ * @param {number} [config.telemetry.retention=1000] - Número de eventos a reter em memória
+ * @param {Object} [config.policy] - Limites e políticas normativas
+ * @param {number} [config.policy.maxConcurrentTasks] - Número máximo de tarefas concorrentes
+ * @param {number} [config.policy.taskTimeout] - Timeout padrão para tarefas em ms
+ * @param {Object} [config.loop] - Opções do kernel_loop (intervalo, scheduler)
+ * @param {number} [config.loop.interval] - Intervalo do loop em ms
  *
  * @returns {Object} Interface pública do Kernel
+ * @returns {Function} returns.start - Inicia o Kernel
+ * @returns {Function} returns.stop - Para o Kernel graciosamente
+ * @returns {Object} returns.telemetry - Acesso à telemetria
+ *
+ * @throws {Error} Se NERV não for fornecido
+ *
+ * @example
+ * const kernel = createKernel({
+ *   nerv: nervInstance,
+ *   policy: { maxConcurrentTasks: 5 },
+ *   loop: { interval: 1000 }
+ * });
+ * await kernel.start();
  */
 function createKernel({
     nerv,
@@ -57,7 +66,6 @@ function createKernel({
     policy: policyLimits = {},
     loop: loopOptions = {}
 } = {}) {
-
     if (!nerv) {
         throw new Error('Kernel requer instância do NERV configurada');
     }
@@ -67,7 +75,7 @@ function createKernel({
   ========================================================= */
 
     const telemetry = new KernelTelemetry({
-        nerv,  // Passa NERV para telemetria
+        nerv, // Passa NERV para telemetria
         source: 'kernel',
         retention: 1000,
         ...telemetryOptions
@@ -159,10 +167,9 @@ function createKernel({
   ========================================================= */
 
     const kernelInterface = Object.freeze({
-
         /**
-     * Inicia o ciclo executivo do Kernel.
-     */
+         * Inicia o ciclo executivo do Kernel.
+         */
         start() {
             telemetry.info('kernel_start_requested', { at: Date.now() });
 
@@ -176,8 +183,8 @@ function createKernel({
         },
 
         /**
-     * Para o ciclo executivo do Kernel.
-     */
+         * Para o ciclo executivo do Kernel.
+         */
         stop() {
             telemetry.info('kernel_stop_requested', { at: Date.now() });
 
@@ -191,8 +198,8 @@ function createKernel({
         },
 
         /**
-     * Retorna status técnico completo do Kernel.
-     */
+         * Retorna status técnico completo do Kernel.
+         */
         getStatus() {
             return Object.freeze({
                 loop: kernelLoop.getStatus(),
@@ -204,41 +211,41 @@ function createKernel({
         },
 
         /**
-     * Acesso à telemetria (somente leitura).
-     */
+         * Acesso à telemetria (somente leitura).
+         */
         telemetry,
 
         /**
-     * Referência ao NERV (somente leitura).
-     */
+         * Referência ao NERV (somente leitura).
+         */
         nerv,
 
         /**
-     * Cria uma nova tarefa no Kernel.
-     * Retorna snapshot imutável da tarefa criada.
-     */
+         * Cria uma nova tarefa no Kernel.
+         * Retorna snapshot imutável da tarefa criada.
+         */
         createTask({ taskId, metadata = {} }) {
             return taskRuntime.createTask({ taskId, metadata });
         },
 
         /**
-     * Retorna snapshot de uma tarefa específica.
-     */
+         * Retorna snapshot de uma tarefa específica.
+         */
         getTask(taskId) {
             return taskRuntime.getTask(taskId);
         },
 
         /**
-     * Lista todas as tarefas existentes.
-     */
+         * Lista todas as tarefas existentes.
+         */
         listTasks() {
             return taskRuntime.listTasks();
         },
 
         /**
-     * Shutdown gracioso do KERNEL.
-     * Para o loop de execução e limpa recursos.
-     */
+         * Shutdown gracioso do KERNEL.
+         * Para o loop de execução e limpa recursos.
+         */
         async shutdown() {
             telemetry.info('kernel_shutting_down', { at: Date.now() });
 

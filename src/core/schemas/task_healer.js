@@ -17,6 +17,7 @@ const { log } = require('../logger');
  * @param {object} raw - Objeto bruto vindo da fila, API ou scripts.
  * @returns {object} Tarefa validada e curada conforme o Schema V4.
  */
+// eslint-disable-next-line complexity -- Task healing requires complex conditional logic
 function healTask(raw) {
     if (!raw || typeof raw !== 'object') {
         throw new Error('[HEALER] Input inválido: A tarefa deve ser um objeto.');

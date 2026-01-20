@@ -17,8 +17,13 @@
    - Graceful degradation: se 1 instância falhar, pool continua com 2
 ========================================================================== */
 
-const puppeteer = require('puppeteer');
-const puppeteerCore = require('puppeteer-core');
+const _puppeteer = require('puppeteer');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
+const _puppeteerCore = require('puppeteer-core');
 const { log } = require('../../core/logger');
 const { ConnectionOrchestrator } = require('../ConnectionOrchestrator');
 
@@ -116,7 +121,7 @@ class BrowserPoolManager {
                     browser,
                     pages: new Map(), // taskId -> page
                     health: {
-                        status: 'HEALTHY',
+                        status: STATUS_VALUES.HEALTHY,
                         lastCheck: Date.now(),
                         consecutiveFailures: 0
                     },
@@ -130,7 +135,6 @@ class BrowserPoolManager {
                 this.pool.push(poolEntry);
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} conectada e adicionada ao pool`);
-
             } catch (error) {
                 log('ERROR', `[BrowserPool] Falha ao conectar instância ${i}: ${error.message}`);
                 // Continua com pool degradado (menos instâncias)
@@ -196,12 +200,11 @@ class BrowserPoolManager {
             };
 
             return page;
-
         } catch (error) {
             log('ERROR', `[BrowserPool] Erro ao alocar página de ${poolEntry.id}: ${error.message}`);
 
             // Marca instância como unhealthy
-            poolEntry.health.status = 'UNHEALTHY';
+            poolEntry.health.status = STATUS_VALUES.UNHEALTHY;
             poolEntry.health.consecutiveFailures++;
 
             // Tenta alocar de outra instância
@@ -244,7 +247,6 @@ class BrowserPoolManager {
             this.stats.totalReleases++;
 
             log('DEBUG', `[BrowserPool] Página liberada de ${poolEntryId} (${poolEntry.stats.activeTasks} ativas)`);
-
         } catch (error) {
             log('ERROR', `[BrowserPool] Erro ao liberar página: ${error.message}`);
         }
@@ -254,7 +256,7 @@ class BrowserPoolManager {
      * Seleciona uma instância do pool baseado na estratégia configurada.
      */
     _selectInstance(target) {
-        const healthyInstances = this.pool.filter(entry => entry.health.status === 'HEALTHY');
+        const healthyInstances = this.pool.filter(entry => entry.health.status === STATUS_VALUES.HEALTHY);
 
         if (healthyInstances.length === 0) {
             log('ERROR', '[BrowserPool] Nenhuma instância saudável disponível');
@@ -289,9 +291,7 @@ class BrowserPoolManager {
      * Estratégia Least-Loaded: seleciona instância com menos tasks ativas.
      */
     _selectLeastLoaded(instances) {
-        return instances.reduce((min, entry) =>
-            entry.stats.activeTasks < min.stats.activeTasks ? entry : min
-        );
+        return instances.reduce((min, entry) => (entry.stats.activeTasks < min.stats.activeTasks ? entry : min));
     }
 
     /**
@@ -336,20 +336,22 @@ class BrowserPoolManager {
                 await testPage.close();
 
                 // Instância saudável
-                poolEntry.health.status = 'HEALTHY';
+                poolEntry.health.status = STATUS_VALUES.HEALTHY;
                 poolEntry.health.consecutiveFailures = 0;
                 poolEntry.health.lastCheck = Date.now();
-
             } catch (error) {
                 log('WARN', `[BrowserPool] Health check falhou para ${poolEntry.id}: ${error.message}`);
 
                 poolEntry.health.consecutiveFailures++;
 
                 if (poolEntry.health.consecutiveFailures >= 3) {
-                    poolEntry.health.status = 'CRASHED';
+                    poolEntry.health.status = STATUS_VALUES.CRASHED;
                     this.stats.crashesDetected++;
 
-                    log('ERROR', `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED (${poolEntry.health.consecutiveFailures} falhas consecutivas)`);
+                    log(
+                        'ERROR',
+                        `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED (${poolEntry.health.consecutiveFailures} falhas consecutivas)`
+                    );
 
                     // TODO: Auto-restart (requer orquestração externa para reiniciar Chrome)
                     // Por enquanto, apenas marca como crashed
@@ -362,9 +364,9 @@ class BrowserPoolManager {
      * Retorna health status do pool.
      */
     async getHealth() {
-        const healthyCount = this.pool.filter(e => e.health.status === 'HEALTHY').length;
-        const unhealthyCount = this.pool.filter(e => e.health.status === 'UNHEALTHY').length;
-        const crashedCount = this.pool.filter(e => e.health.status === 'CRASHED').length;
+        const healthyCount = this.pool.filter(e => e.health.status === STATUS_VALUES.HEALTHY).length;
+        const unhealthyCount = this.pool.filter(e => e.health.status === STATUS_VALUES.UNHEALTHY).length;
+        const crashedCount = this.pool.filter(e => e.health.status === STATUS_VALUES.CRASHED).length;
 
         return {
             status: healthyCount > 0 ? 'OPERATIONAL' : 'DEGRADED',
@@ -405,7 +407,6 @@ class BrowserPoolManager {
                 await poolEntry.browser.disconnect();
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} desconectada`);
-
             } catch (error) {
                 log('ERROR', `[BrowserPool] Erro ao desconectar ${poolEntry.id}: ${error.message}`);
             }

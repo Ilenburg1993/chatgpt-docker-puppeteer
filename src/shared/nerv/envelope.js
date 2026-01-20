@@ -12,12 +12,7 @@
    - Zero inferência: todos os campos explícitos
 ========================================================================== */
 
-const {
-    PROTOCOL_VERSION,
-    MessageType,
-    ActionCode,
-    ActorRole
-} = require('./constants');
+const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('./constants');
 
 const { v4: uuidv4 } = require('uuid');
 
@@ -48,37 +43,24 @@ function assertUUID(value, field) {
  * Creates an immutable IPC envelope.
  * No defaults hide intent. No field is inferred.
  */
-function createEnvelope({
-    actor,
-    messageType,
-    actionCode,
-    payload = {},
-    correlationId = null,
-    target = null
-}) {
+function createEnvelope({ actor, messageType, actionCode, payload = {}, correlationId = null, target = null }) {
     /* ------------------------------------------------------------------------
-   * LAYER 1 — PROTOCOL
-   * ---------------------------------------------------------------------- */
+     * LAYER 1 — PROTOCOL
+     * ---------------------------------------------------------------------- */
     assert(PROTOCOL_VERSION, 'Protocol version must be explicit');
 
     /* ------------------------------------------------------------------------
-   * LAYER 2 — IDENTITY
-   * ---------------------------------------------------------------------- */
-    assert(
-        Object.values(ActorRole).includes(actor),
-        `Invalid actor role: ${actor}`
-    );
+     * LAYER 2 — IDENTITY
+     * ---------------------------------------------------------------------- */
+    assert(Object.values(ActorRole).includes(actor), `Invalid actor role: ${actor}`);
 
     if (target !== null) {
-        assert(
-            Object.values(ActorRole).includes(target),
-            `Invalid target actor: ${target}`
-        );
+        assert(Object.values(ActorRole).includes(target), `Invalid target actor: ${target}`);
     }
 
     /* ------------------------------------------------------------------------
-   * LAYER 3 — CAUSALITY
-   * ---------------------------------------------------------------------- */
+     * LAYER 3 — CAUSALITY
+     * ---------------------------------------------------------------------- */
     const msgId = uuidv4();
 
     if (correlationId !== null) {
@@ -88,36 +70,27 @@ function createEnvelope({
     const effectiveCorrelationId = correlationId || msgId;
 
     /* ------------------------------------------------------------------------
-   * LAYER 4 — ONTOLOGICAL TYPE
-   * ---------------------------------------------------------------------- */
-    assert(
-        Object.values(MessageType).includes(messageType),
-        `Invalid message type: ${messageType}`
-    );
+     * LAYER 4 — ONTOLOGICAL TYPE
+     * ---------------------------------------------------------------------- */
+    assert(Object.values(MessageType).includes(messageType), `Invalid message type: ${messageType}`);
 
-    assert(
-        Object.values(ActionCode).includes(actionCode),
-        `Invalid action code: ${actionCode}`
-    );
+    assert(Object.values(ActionCode).includes(actionCode), `Invalid action code: ${actionCode}`);
 
     if (messageType === MessageType.ACK) {
-        assert(
-            Object.keys(payload).length === 0,
-            'ACK must not carry semantic payload'
-        );
+        assert(Object.keys(payload).length === 0, 'ACK must not carry semantic payload');
     }
 
     /* ------------------------------------------------------------------------
-   * LAYER 5 — PAYLOAD
-   * ---------------------------------------------------------------------- */
+     * LAYER 5 — PAYLOAD
+     * ---------------------------------------------------------------------- */
     assert(
         typeof payload === 'object' && payload !== null && !Array.isArray(payload),
         'Payload must be a plain object'
     );
 
     /* ------------------------------------------------------------------------
-   * ENVELOPE CONSTRUCTION
-   * ---------------------------------------------------------------------- */
+     * ENVELOPE CONSTRUCTION
+     * ---------------------------------------------------------------------- */
     const envelope = {
         protocol: {
             version: PROTOCOL_VERSION,
@@ -143,8 +116,8 @@ function createEnvelope({
     };
 
     /* ------------------------------------------------------------------------
-   * IMMUTABILITY GUARANTEE
-   * ---------------------------------------------------------------------- */
+     * IMMUTABILITY GUARANTEE
+     * ---------------------------------------------------------------------- */
     return deepFreeze(envelope);
 }
 
@@ -157,11 +130,7 @@ function createEnvelope({
 function deepFreeze(obj) {
     Object.freeze(obj);
     for (const key of Object.keys(obj)) {
-        if (
-            typeof obj[key] === 'object' &&
-      obj[key] !== null &&
-      !Object.isFrozen(obj[key])
-        ) {
+        if (typeof obj[key] === 'object' && obj[key] !== null && !Object.isFrozen(obj[key])) {
             deepFreeze(obj[key]);
         }
     }

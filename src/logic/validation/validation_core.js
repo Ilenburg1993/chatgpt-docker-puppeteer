@@ -25,7 +25,9 @@ async function validateTaskResult(task, filePath, signal = null) {
     try {
         // 1. CHECK DE ABORTO PRECOCE
         // Impede o início da validação se a tarefa já foi cancelada pelo Maestro.
-        if (signal?.aborted) {throw new Error('VALIDATION_ABORTED');}
+        if (signal?.aborted) {
+            throw new Error('VALIDATION_ABORTED');
+        }
 
         log('DEBUG', `[VALIDATOR] Iniciando auditoria de qualidade para tarefa: ${taskId}`);
 
@@ -51,7 +53,6 @@ async function validateTaskResult(task, filePath, signal = null) {
         }
 
         return result;
-
     } catch (valErr) {
         // 6. TRATAMENTO DE INTERRUPÇÃO SILENCIOSA
         if (valErr.message === 'VALIDATION_ABORTED' || valErr.name === 'AbortError') {

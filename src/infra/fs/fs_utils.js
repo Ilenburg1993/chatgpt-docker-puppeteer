@@ -15,6 +15,7 @@ const PATHS = require('./paths');
  * Protege o sistema de arquivos e o Puppeteer contra caracteres de controle
  * que podem causar quebras de protocolo ou falhas de injeção.
  */
+// eslint-disable-next-line no-control-regex -- required to strip control chars
 const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 
 /* ==========================================================================
@@ -26,13 +27,7 @@ const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
  * Utiliza a autoridade de caminhos do paths.js.
  */
 function ensureInfrastructure() {
-    const criticalDirs = [
-        PATHS.QUEUE,
-        PATHS.RESPONSE,
-        PATHS.LOGS,
-        PATHS.CORRUPT,
-        PATHS.REPORTS
-    ];
+    const criticalDirs = [PATHS.QUEUE, PATHS.RESPONSE, PATHS.LOGS, PATHS.CORRUPT, PATHS.REPORTS];
 
     for (const dir of criticalDirs) {
         if (!fs.existsSync(dir)) {
@@ -53,7 +48,9 @@ function ensureInfrastructure() {
  * @returns {string} Nome higienizado e seguro.
  */
 function sanitizeFilename(name) {
-    if (!name || typeof name !== 'string') {return `unknown_${Date.now()}`;}
+    if (!name || typeof name !== 'string') {
+        return `unknown_${Date.now()}`;
+    }
     // Remove qualquer coisa que não seja alfanumérico, ponto, traço ou sublinhado
     return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 64);
 }
@@ -64,7 +61,9 @@ function sanitizeFilename(name) {
  * @returns {string} Texto limpo.
  */
 function cleanText(text) {
-    if (!text || typeof text !== 'string') {return '';}
+    if (!text || typeof text !== 'string') {
+        return '';
+    }
     return text.replace(CONTROL_CHARS_REGEX, '').trim();
 }
 
@@ -72,7 +71,10 @@ function cleanText(text) {
  * Pausa assíncrona baseada em Promises para backoffs e sincronia biomecânica.
  * @param {number} ms - Milissegundos de espera.
  */
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const sleep = ms =>
+    new Promise(r => {
+        setTimeout(r, ms);
+    });
 
 module.exports = {
     // Re-exporta os caminhos para manter compatibilidade com a Fachada de IO

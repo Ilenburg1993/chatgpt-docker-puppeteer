@@ -10,12 +10,16 @@
  * @returns {string} Blocos concatenados.
  */
 function extractCodeBlocks(content) {
-    if (!content) {return '[Nenhum código detectado]';}
+    if (!content) {
+        return '[Nenhum código detectado]';
+    }
 
     const regex = /```[\s\S]*?```/g;
     const matches = content.match(regex);
 
-    if (!matches || matches.length === 0) {return '[Nenhum bloco de código detectado]';}
+    if (!matches || matches.length === 0) {
+        return '[Nenhum bloco de código detectado]';
+    }
 
     return matches.join('\n\n').trim();
 }

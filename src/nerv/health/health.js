@@ -108,7 +108,7 @@ function createHealth({ telemetry, thresholds = {} }) {
     function checkThresholds() {
         if (
             typeof thresholds.maxOutboundBuffer === 'number' &&
-      state.buffers.outbound >= thresholds.maxOutboundBuffer
+            state.buffers.outbound >= thresholds.maxOutboundBuffer
         ) {
             telemetry.emit('nerv:health:anomaly', {
                 type: 'outbound_buffer_pressure',
@@ -117,10 +117,7 @@ function createHealth({ telemetry, thresholds = {} }) {
             });
         }
 
-        if (
-            typeof thresholds.maxInboundBuffer === 'number' &&
-      state.buffers.inbound >= thresholds.maxInboundBuffer
-        ) {
+        if (typeof thresholds.maxInboundBuffer === 'number' && state.buffers.inbound >= thresholds.maxInboundBuffer) {
             telemetry.emit('nerv:health:anomaly', {
                 type: 'inbound_buffer_pressure',
                 value: state.buffers.inbound,
@@ -134,12 +131,12 @@ function createHealth({ telemetry, thresholds = {} }) {
   ========================================================= */
 
     /**
-   * Ingestão genérica de eventos técnicos.
-   * Não interpreta, apenas atualiza estado.
-   *
-   * @param {string} type
-   * @param {Object} data
-   */
+     * Ingestão genérica de eventos técnicos.
+     * Não interpreta, apenas atualiza estado.
+     *
+     * @param {string} type
+     * @param {Object} data
+     */
     function report(type, data = {}) {
         switch (type) {
             case 'transport:connected':
@@ -173,14 +170,8 @@ function createHealth({ telemetry, thresholds = {} }) {
             case 'buffer:update':
                 update({
                     buffers: {
-                        inbound:
-              typeof data.inbound === 'number'
-                  ? data.inbound
-                  : state.buffers.inbound,
-                        outbound:
-              typeof data.outbound === 'number'
-                  ? data.outbound
-                  : state.buffers.outbound
+                        inbound: typeof data.inbound === 'number' ? data.inbound : state.buffers.inbound,
+                        outbound: typeof data.outbound === 'number' ? data.outbound : state.buffers.outbound
                     }
                 });
                 checkThresholds();
@@ -211,16 +202,16 @@ function createHealth({ telemetry, thresholds = {} }) {
     }
 
     /**
-   * Retorna snapshot atual de saúde.
-   */
+     * Retorna snapshot atual de saúde.
+     */
     function getStatus() {
         telemetry.emit('nerv:health:snapshot');
         return clone(state);
     }
 
     /**
-   * Registra handler observacional de mudanças.
-   */
+     * Registra handler observacional de mudanças.
+     */
     function onChange(handler) {
         if (typeof handler !== 'function') {
             throw new Error('onChange requer função');

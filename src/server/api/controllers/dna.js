@@ -29,7 +29,7 @@ const CONFIG_PATH = path.join(ROOT, 'config.json');
  */
 router.get('/', async (req, res) => {
     try {
-        const config = await io.safeReadJSON(CONFIG_PATH) || {};
+        const config = (await io.safeReadJSON(CONFIG_PATH)) || {};
         res.json({
             success: true,
             config,
@@ -95,7 +95,9 @@ router.put('/', async (req, res) => {
 router.get('/dna', async (req, res) => {
     try {
         const dna = await io.getDna();
-        if (!dna) {throw new Error('DNA_NOT_FOUND');}
+        if (!dna) {
+            throw new Error('DNA_NOT_FOUND');
+        }
 
         res.json({
             success: true,
@@ -134,7 +136,7 @@ router.put('/dna', async (req, res) => {
         log('WARN', `[API_DNA] Evolução de DNA rejeitada: ${e.message}`, req.id);
         res.status(400).json({
             success: false,
-            error: `O novo DNA viola o contrato de integridade: ${  e.message}`,
+            error: `O novo DNA viola o contrato de integridade: ${e.message}`,
             request_id: req.id
         });
     }

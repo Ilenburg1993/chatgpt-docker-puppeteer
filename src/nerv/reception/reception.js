@@ -39,11 +39,7 @@ const createReceive = require('./receive');
  * @param {Object} deps.telemetry
  * Interface de telemetria do NERV.
  */
-function createReception({
-    envelopes,
-    correlation,
-    telemetry
-}) {
+function createReception({ envelopes, correlation, telemetry }) {
     if (!envelopes || !correlation || !telemetry) {
         throw new Error('reception requer dependências completas');
     }
@@ -63,15 +59,15 @@ function createReception({
   ========================================================= */
 
     return Object.freeze({
-    /**
-     * Recebe um frame inbound já desserializado.
-     * Ato puramente factual.
-     */
+        /**
+         * Recebe um frame inbound já desserializado.
+         * Ato puramente factual.
+         */
         receive: receiver.receive,
 
         /**
-     * Registra handler para envelopes recebidos.
-     */
+         * Registra handler para envelopes recebidos.
+         */
         onReceive: receiver.onReceive
     });
 }

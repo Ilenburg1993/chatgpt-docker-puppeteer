@@ -1,3 +1,4 @@
+
 /* ==========================================================================
    src/driver/modules/stabilizer.js
    Audit Level: 500 — Instrumented System Stabilizer (IPC 2.0)
@@ -8,6 +9,11 @@
 ========================================================================== */
 
 const { log } = require('../../core/logger');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const adaptive = require('../../logic/adaptive');
 
 /**
@@ -15,8 +21,9 @@ const adaptive = require('../../logic/adaptive');
  */
 async function measureEventLoopLag(page) {
     try {
-        return await page.evaluate(() => {
-            return new Promise((resolve) => {
+        return page.evaluate(() => {
+            // Measure event loop lag
+            return new Promise(resolve => {
                 const channel = new MessageChannel();
                 const t0 = performance.now();
                 channel.port1.onmessage = () => {
@@ -27,7 +34,9 @@ async function measureEventLoopLag(page) {
                 channel.port2.postMessage(null);
             });
         });
-    } catch { return 500; }
+    } catch {
+        return 500;
+    }
 }
 
 /**
@@ -35,9 +44,11 @@ async function measureEventLoopLag(page) {
  */
 async function getPageLoadStatus(page) {
     try {
-        return await page.evaluate(() => {
+        return page.evaluate(() => {
+            // Check for loading indicators
             const checkSpinnersDeep = (root = document) => {
-                const selector = '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
+                const selector =
+                    '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
                 const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
                 let node = walker.currentNode;
 
@@ -46,14 +57,21 @@ async function getPageLoadStatus(page) {
                         if (node.matches(selector)) {
                             if (node.offsetParent !== null) {
                                 const s = window.getComputedStyle(node);
-                                if (s.display !== 'none' && s.visibility !== 'hidden' && parseFloat(s.opacity || '1') > 0.1) {return true;}
+                                if (
+                                    s.display !== 'none' &&
+                                    s.visibility !== 'hidden' &&
+                                    parseFloat(s.opacity || '1') > 0.1
+                                )
+                                {return true;}
                             }
                         }
                         if (node.shadowRoot && checkSpinnersDeep(node.shadowRoot)) {return true;}
                         if (node.tagName === 'IFRAME') {
                             try {
                                 if (node.contentDocument && checkSpinnersDeep(node.contentDocument)) {return true;}
-                            } catch (e) {}
+                            } catch (_e) {
+                                // Ignore cross-origin iframe access errors
+                            }
                         }
                     }
                     node = walker.nextNode();
@@ -68,9 +86,11 @@ async function getPageLoadStatus(page) {
                 const latest = entries.reduce((a, b) => (b.responseEnd > a.responseEnd ? b : a), entries[0]);
                 if (performance.now() - latest.responseEnd < 500) {return 'BUSY_NETWORK';}
             }
-            return 'IDLE';
+            return STATUS_VALUES.IDLE;
         });
-    } catch { return 'UNKNOWN'; }
+    } catch {
+        return 'UNKNOWN';
+    }
 }
 
 /**
@@ -88,13 +108,15 @@ async function waitForStability(driver, timeoutMs = 30000) {
     try {
         const url = page.url();
         if (url && url.startsWith('http')) {domain = new URL(url).hostname.replace('www.', '');}
-    } catch (e) {}
+    } catch (_e) {
+        // Ignore URL parse errors
+    }
 
     // FASE 0: Limpeza de métricas
     await page.evaluate(() => performance.clearResourceTimings()).catch(() => {});
 
     try {
-    // FASE 1: Network Idle
+        // FASE 1: Network Idle
         driver._emitVital('PROGRESS_UPDATE', { step: 'STABILIZING_NETWORK' });
         await page.waitForNetworkIdle({ idleTime: 500, timeout: 5000 }).catch(() => {});
 
@@ -103,8 +125,10 @@ async function waitForStability(driver, timeoutMs = 30000) {
         let iterations = 0;
         while (iterations < 60 && Date.now() < deadline) {
             const status = await getPageLoadStatus(page);
-            if (status === 'IDLE') {break;}
-            await new Promise(r => setTimeout(r, 500));
+            if (status === STATUS_VALUES.IDLE) {break;}
+            await new Promise(r => {
+                setTimeout(r, 500);
+            });
             iterations++;
         }
 
@@ -116,101 +140,154 @@ async function waitForStability(driver, timeoutMs = 30000) {
             const metrics = await adaptive.getSnapshot();
             const targetStats = metrics.targets[domain];
             if (targetStats && targetStats.stream.avg > 1000) {silenceWindow = 1000;}
-        } catch (e) {}
+        } catch (_e) {
+            // Ignore adaptive snapshot errors
+        }
 
         // [P4.1 FIX] Wrapper externo com force cleanup para prevenir observer leaks
         try {
-            await page.evaluate(async (windowMs, taskDomain, maxWaitMs) => {
-                const observers = [];
-                // Registra observers globalmente para cleanup forçado
-                if (!window.__STABILIZER_OBSERVERS) {window.__STABILIZER_OBSERVERS = [];}
+            await page.evaluate(
+                async (windowMs, taskDomain, maxWaitMs) => {
+                    const observers = [];
+                    // Registra observers globalmente para cleanup forçado
+                    if (!window.__STABILIZER_OBSERVERS) {window.__STABILIZER_OBSERVERS = [];}
 
-                try {
-                    return await new Promise((resolve) => {
-                        let lastActivity = Date.now();
-                        const startTime = Date.now();
+                    try {
+                        return new Promise(resolve => {
+                            let lastActivity = Date.now();
+                            const startTime = Date.now();
 
-                        const onMutation = (mutations) => {
-                            const isRelevant = mutations.some(m =>
-                                m.type === 'childList' || m.type === 'characterData' ||
-                        (m.type === 'attributes' && (m.attributeName.startsWith('data-') || ['class', 'aria-busy'].includes(m.attributeName)))
-                            );
-                            if (isRelevant) {lastActivity = Date.now();}
-                        };
+                            const onMutation = mutations => {
+                                const isRelevant = mutations.some(
+                                    m =>
+                                        m.type === 'childList' ||
+                                        m.type === 'characterData' ||
+                                        (m.type === 'attributes' &&
+                                            (m.attributeName.startsWith('data-') ||
+                                                ['class', 'aria-busy'].includes(m.attributeName)))
+                                );
+                                if (isRelevant) {lastActivity = Date.now();}
+                            };
 
-                        const roots = [document];
-                        const queue = [document];
-                        while (queue.length > 0) {
-                            const curr = queue.shift();
-                            const walker = document.createTreeWalker(curr, NodeFilter.SHOW_ELEMENT);
-                            let node = walker.nextNode();
-                            while (node) {
-                                if (node.nodeType === 1) {
-                                    if (node.shadowRoot) { roots.push(node.shadowRoot); queue.push(node.shadowRoot); }
-                                    if (node.tagName === 'IFRAME') {
-                                        try { if (node.contentDocument) { roots.push(node.contentDocument); queue.push(node.contentDocument); } } catch(e) {}
+                            const roots = [document];
+                            const queue = [document];
+                            while (queue.length > 0) {
+                                const curr = queue.shift();
+                                const walker = document.createTreeWalker(curr, NodeFilter.SHOW_ELEMENT);
+                                let node = walker.nextNode();
+                                while (node) {
+                                    if (node.nodeType === 1) {
+                                        if (node.shadowRoot) {
+                                            roots.push(node.shadowRoot);
+                                            queue.push(node.shadowRoot);
+                                        }
+                                        if (node.tagName === 'IFRAME') {
+                                            try {
+                                                if (node.contentDocument) {
+                                                    roots.push(node.contentDocument);
+                                                    queue.push(node.contentDocument);
+                                                }
+                                            } catch (_e) {
+                                                // Ignore cross-origin iframe access errors
+                                            }
+                                        }
                                     }
+                                    node = walker.nextNode();
                                 }
-                                node = walker.nextNode();
                             }
-                        }
 
-                        roots.forEach(r => {
-                            const obs = new MutationObserver(onMutation);
-                            const target = (r instanceof ShadowRoot) ? r : (r.documentElement || r);
-                            try {
-                                obs.observe(target, { childList: true, subtree: true, characterData: true, attributes: true });
-                                observers.push(obs);
-                                window.__STABILIZER_OBSERVERS.push(obs);
-                            } catch(e) {}
+                            roots.forEach(r => {
+                                const obs = new MutationObserver(onMutation);
+                                const target = r instanceof ShadowRoot ? r : r.documentElement || r;
+                                try {
+                                    obs.observe(target, {
+                                        childList: true,
+                                        subtree: true,
+                                        characterData: true,
+                                        attributes: true
+                                    });
+                                    observers.push(obs);
+                                    window.__STABILIZER_OBSERVERS.push(obs);
+                                } catch (_e) {
+                                    // Ignore observer errors
+                                }
+                            });
+
+                            const check = setInterval(() => {
+                                const now = Date.now();
+                                if (!window.__SADI_PULSE) {window.__SADI_PULSE = {};}
+                                const lastPulse = window.__SADI_PULSE[taskDomain] || 0;
+                                const isPulsing = now - lastPulse < 1500;
+
+                                if ((!isPulsing && now - lastActivity > windowMs) || now - startTime > maxWaitMs) {
+                                    clearInterval(check);
+                                    resolve();
+                                }
+                            }, 100);
                         });
-
-                        const check = setInterval(() => {
-                            const now = Date.now();
-                            if (!window.__SADI_PULSE) {window.__SADI_PULSE = {};}
-                            const lastPulse = window.__SADI_PULSE[taskDomain] || 0;
-                            const isPulsing = (now - lastPulse < 1500);
-
-                            if ((!isPulsing && now - lastActivity > windowMs) || (now - startTime > maxWaitMs)) {
-                                clearInterval(check);
-                                resolve();
-                            }
-                        }, 100);
-                    });
-                } finally {
-                    observers.forEach(o => o.disconnect());
-                }
-            }, silenceWindow, domain, Math.max(8000, timeoutMs * 0.3));
+                    } finally {
+                        observers.forEach(o => o.disconnect());
+                    }
+                },
+                silenceWindow,
+                domain,
+                Math.max(8000, timeoutMs * 0.3)
+            );
         } catch (evaluateErr) {
             log('WARN', `[STABILIZER] Evaluate error: ${evaluateErr.message}`, correlationId);
         } finally {
-        // [P4.1 FIX] Force cleanup de observers globais (best-effort)
-            await page.evaluate(() => {
-                if (window.__STABILIZER_OBSERVERS) {
-                    window.__STABILIZER_OBSERVERS.forEach(obs => {
-                        try { obs.disconnect(); } catch(e) {}
-                    });
-                    window.__STABILIZER_OBSERVERS = [];
-                }
-            }).catch(() => {});
+            // [P4.1 FIX] Force cleanup de observers globais (best-effort)
+            await page
+                .evaluate(() => {
+                    if (window.__STABILIZER_OBSERVERS) {
+                        window.__STABILIZER_OBSERVERS.forEach(obs => {
+                            try {
+                                obs.disconnect();
+                            } catch (_e) {
+                                // Ignore observer cleanup errors
+                            }
+                        });
+                        window.__STABILIZER_OBSERVERS = [];
+                    }
+                })
+                .catch(() => {});
         }
 
         // FASE 4: Hydration Guard
         driver._emitVital('PROGRESS_UPDATE', { step: 'HYDRATION_GUARD' });
-        await page.evaluate(async () => {
-            return new Promise((resolve) => {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => { controller.abort(); resolve(); }, 1000);
-                document.addEventListener('mousemove', () => { clearTimeout(timeout); resolve(); }, { once: true, signal: controller.signal });
-                window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
-            });
-        }).catch(() => {});
+        await page
+            .evaluate(async () => {
+                return new Promise(resolve => {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => {
+                        controller.abort();
+                        resolve();
+                    }, 1000);
+                    document.addEventListener(
+                        'mousemove',
+                        () => {
+                            clearTimeout(timeout);
+                            resolve();
+                        },
+                        { once: true, signal: controller.signal }
+                    );
+                    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+                });
+            })
+            .catch(() => {});
 
         // FASE 5: Visual Frame Sync
         driver._emitVital('PROGRESS_UPDATE', { step: 'FRAME_SYNC' });
         await Promise.race([
-            page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))),
-            new Promise(r => setTimeout(r, 2000))
+            page.evaluate(
+                () =>
+                    new Promise(r => {
+                        requestAnimationFrame(() => requestAnimationFrame(r));
+                    })
+            ),
+            new Promise(r => {
+                setTimeout(r, 2000);
+            })
         ]).catch(() => {});
 
         // FASE 6: CPU Lag Check
@@ -221,13 +298,14 @@ async function waitForStability(driver, timeoutMs = 30000) {
             lag = await measureEventLoopLag(page);
             if (lag > 150) {
                 driver._emitVital('TRIAGE_ALERT', { type: 'HIGH_CPU_LAG', severity: 'LOW', evidence: { lag_ms: lag } });
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => {
+                    setTimeout(r, 300);
+                });
             }
         }
 
         driver._emitVital('PROGRESS_UPDATE', { step: 'STABILITY_CONFIRMED' });
         return true;
-
     } catch (e) {
         log('WARN', `Estabilização parcial (${Date.now() - start}ms): ${e.message}`, correlationId);
         return false;

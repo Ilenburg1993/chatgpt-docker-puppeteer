@@ -37,7 +37,9 @@ let signaling = false;
  * Monitora a pasta física definida na Fachada de IO.
  */
 function init() {
-    if (fsWatcher) {return;}
+    if (fsWatcher) {
+        return;
+    }
 
     const queuePath = io.QUEUE_DIR;
 
@@ -74,7 +76,9 @@ function init() {
  * NÃO executa lógica. Apenas sinaliza indícios.
  */
 function _signalChange() {
-    if (signaling) {return;}
+    if (signaling) {
+        return;
+    }
     signaling = true;
 
     try {

@@ -57,13 +57,13 @@ const PolicyAlertType = Object.freeze({
 
 class PolicyEngine {
     /**
-   * @param {Object} params
-   * @param {Object} params.telemetry
-   * Canal de telemetria do Kernel.
-   *
-   * @param {Object} [params.limits]
-   * Limites técnicos/configuracionais.
-   */
+     * @param {Object} params
+     * @param {Object} params.telemetry
+     * Canal de telemetria do Kernel.
+     *
+     * @param {Object} [params.limits]
+     * Limites técnicos/configuracionais.
+     */
     constructor({ telemetry, limits = {} }) {
         if (!telemetry || typeof telemetry.emit !== 'function') {
             throw new Error('PolicyEngine requer telemetria válida');
@@ -72,8 +72,8 @@ class PolicyEngine {
         this.telemetry = telemetry;
 
         /**
-     * Limites normativos configuráveis.
-     */
+         * Limites normativos configuráveis.
+         */
         this.limits = {
             maxObservationsPerTask: limits.maxObservationsPerTask ?? 1000,
             maxTaskAgeMs: limits.maxTaskAgeMs ?? 300000, // 5 minutos
@@ -89,21 +89,21 @@ class PolicyEngine {
   =========================== */
 
     /**
-   * Avalia normativamente uma tarefa no contexto atual.
-   *
-   * @param {Object} params
-   * @param {Object} params.task
-   * Snapshot imutável da tarefa.
-   *
-   * @param {Array} params.observations
-   * Lista de observações correlacionadas.
-   *
-   * @param {number} params.at
-   * Timestamp do ciclo lógico.
-   *
-   * @returns {Object}
-   * Avaliação normativa consultiva.
-   */
+     * Avalia normativamente uma tarefa no contexto atual.
+     *
+     * @param {Object} params
+     * @param {Object} params.task
+     * Snapshot imutável da tarefa.
+     *
+     * @param {Array} params.observations
+     * Lista de observações correlacionadas.
+     *
+     * @param {number} params.at
+     * Timestamp do ciclo lógico.
+     *
+     * @returns {Object}
+     * Avaliação normativa consultiva.
+     */
     assess({ task, observations, at }) {
         const alerts = [];
 
@@ -150,73 +150,81 @@ class PolicyEngine {
   =========================== */
 
     /**
-   * Avalia pressão por volume de observações.
-   */
+     * Avalia pressão por volume de observações.
+     */
     _assessObservationVolume(task, observations, alerts) {
         if (observations.length > this.limits.maxObservationsPerTask) {
-            alerts.push(Object.freeze({
-                type: PolicyAlertType.OBSERVATION_VOLUME,
-                message: 'Volume elevado de observações para a tarefa',
-                value: observations.length,
-                limit: this.limits.maxObservationsPerTask,
-                severity: 'HIGH'
-            }));
+            alerts.push(
+                Object.freeze({
+                    type: PolicyAlertType.OBSERVATION_VOLUME,
+                    message: 'Volume elevado de observações para a tarefa',
+                    value: observations.length,
+                    limit: this.limits.maxObservationsPerTask,
+                    severity: 'HIGH'
+                })
+            );
         }
     }
 
     /**
-   * Avalia idade lógica da tarefa.
-   */
+     * Avalia idade lógica da tarefa.
+     */
     _assessTaskAge(task, at, alerts) {
         if (this.limits.maxTaskAgeMs !== null) {
             const ageMs = at - task.createdAt;
 
             if (ageMs > this.limits.maxTaskAgeMs) {
-                alerts.push(Object.freeze({
-                    type: PolicyAlertType.TASK_AGE_EXCEEDED,
-                    message: 'Tarefa com idade lógica elevada',
-                    value: ageMs,
-                    limit: this.limits.maxTaskAgeMs,
-                    severity: 'CRITICAL'
-                }));
+                alerts.push(
+                    Object.freeze({
+                        type: PolicyAlertType.TASK_AGE_EXCEEDED,
+                        message: 'Tarefa com idade lógica elevada',
+                        value: ageMs,
+                        limit: this.limits.maxTaskAgeMs,
+                        severity: 'CRITICAL'
+                    })
+                );
             }
         }
     }
 
     /**
-   * Avalia gaps temporais entre observações.
-   */
+     * Avalia gaps temporais entre observações.
+     */
     _assessObservationGaps(task, observations, at, alerts) {
-        if (observations.length === 0) {return;}
+        if (observations.length === 0) {
+            return;
+        }
 
         // Ordena por timestamp de ingestão
-        const sorted = [...observations].sort((a, b) =>
-            a.ingestedAt - b.ingestedAt
-        );
+        const sorted = [...observations].sort((a, b) => a.ingestedAt - b.ingestedAt);
 
         const lastObs = sorted[sorted.length - 1];
         const gapMs = at - lastObs.ingestedAt;
 
         if (
             this.limits.maxObservationGapMs !== null &&
-      gapMs > this.limits.maxObservationGapMs &&
-      task.state === 'ACTIVE'
+            gapMs > this.limits.maxObservationGapMs &&
+            task.state === 'ACTIVE'
         ) {
-            alerts.push(Object.freeze({
-                type: PolicyAlertType.OBSERVATION_GAP,
-                message: 'Gap temporal excessivo desde última observação',
-                value: gapMs,
-                limit: this.limits.maxObservationGapMs,
-                severity: 'MEDIUM'
-            }));
+            alerts.push(
+                Object.freeze({
+                    type: PolicyAlertType.OBSERVATION_GAP,
+                    message: 'Gap temporal excessivo desde última observação',
+                    value: gapMs,
+                    limit: this.limits.maxObservationGapMs,
+                    severity: 'MEDIUM'
+                })
+            );
         }
     }
 
     /**
-   * Avalia taxa de duplicação de observações.
-   */
+     * Avalia taxa de duplicação de observações.
+     */
     _assessDuplication(observations, alerts) {
-        if (observations.length === 0) {return;}
+        if (observations.length === 0) {
+            return;
+        }
 
         const msgIds = new Set();
         let duplicates = 0;
@@ -231,66 +239,71 @@ class PolicyEngine {
 
         const duplicateRatio = duplicates / observations.length;
 
-        if (
-            this.limits.maxDuplicateRatio !== null &&
-      duplicateRatio > this.limits.maxDuplicateRatio
-        ) {
-            alerts.push(Object.freeze({
-                type: PolicyAlertType.DUPLICATE_OBSERVATIONS,
-                message: 'Taxa elevada de observações duplicadas',
-                value: duplicateRatio,
-                limit: this.limits.maxDuplicateRatio,
-                severity: 'MEDIUM'
-            }));
+        if (this.limits.maxDuplicateRatio !== null && duplicateRatio > this.limits.maxDuplicateRatio) {
+            alerts.push(
+                Object.freeze({
+                    type: PolicyAlertType.DUPLICATE_OBSERVATIONS,
+                    message: 'Taxa elevada de observações duplicadas',
+                    value: duplicateRatio,
+                    limit: this.limits.maxDuplicateRatio,
+                    severity: 'MEDIUM'
+                })
+            );
         }
     }
 
     /**
-   * Avalia risco configuracional.
-   */
+     * Avalia risco configuracional.
+     */
     _assessConfigurationRisk(task, observations, alerts) {
-    // Tarefa suspensa com observações acumuladas
+        // Tarefa suspensa com observações acumuladas
         if (task.state === 'SUSPENDED' && observations.length > 0) {
-            alerts.push(Object.freeze({
-                type: PolicyAlertType.CONFIGURATION_RISK,
-                message: 'Tarefa suspensa com observações acumuladas',
-                value: observations.length,
-                severity: 'LOW'
-            }));
+            alerts.push(
+                Object.freeze({
+                    type: PolicyAlertType.CONFIGURATION_RISK,
+                    message: 'Tarefa suspensa com observações acumuladas',
+                    value: observations.length,
+                    severity: 'LOW'
+                })
+            );
         }
 
         // Tarefa criada há muito tempo sem ativação
         const ageMs = Date.now() - task.createdAt;
-        if (task.state === 'CREATED' && ageMs > 60000) { // 1 minuto
-            alerts.push(Object.freeze({
-                type: PolicyAlertType.CONFIGURATION_RISK,
-                message: 'Tarefa criada mas não ativada após tempo limite',
-                value: ageMs,
-                severity: 'MEDIUM'
-            }));
+        if (task.state === 'CREATED' && ageMs > 60000) {
+            // 1 minuto
+            alerts.push(
+                Object.freeze({
+                    type: PolicyAlertType.CONFIGURATION_RISK,
+                    message: 'Tarefa criada mas não ativada após tempo limite',
+                    value: ageMs,
+                    severity: 'MEDIUM'
+                })
+            );
         }
     }
 
     /**
-   * Avalia estagnação lógica.
-   */
+     * Avalia estagnação lógica.
+     */
     _assessStagnation(task, observations, at, alerts) {
-    // Tarefa ativa sem progresso recente
+        // Tarefa ativa sem progresso recente
         if (task.state === 'ACTIVE' && observations.length > 0) {
-            const sorted = [...observations].sort((a, b) =>
-                a.ingestedAt - b.ingestedAt
-            );
+            const sorted = [...observations].sort((a, b) => a.ingestedAt - b.ingestedAt);
 
             const lastObs = sorted[sorted.length - 1];
             const stalledMs = at - lastObs.ingestedAt;
 
-            if (stalledMs > 120000) { // 2 minutos sem progresso
-                alerts.push(Object.freeze({
-                    type: PolicyAlertType.TASK_STAGNATION,
-                    message: 'Tarefa ativa sem progresso recente',
-                    value: stalledMs,
-                    severity: 'HIGH'
-                }));
+            if (stalledMs > 120000) {
+                // 2 minutos sem progresso
+                alerts.push(
+                    Object.freeze({
+                        type: PolicyAlertType.TASK_STAGNATION,
+                        message: 'Tarefa ativa sem progresso recente',
+                        value: stalledMs,
+                        severity: 'HIGH'
+                    })
+                );
             }
         }
     }
@@ -300,11 +313,11 @@ class PolicyEngine {
   =========================== */
 
     /**
-   * Calcula nível normativo a partir dos alertas.
-   *
-   * @param {Array<Object>} alerts
-   * @returns {string}
-   */
+     * Calcula nível normativo a partir dos alertas.
+     *
+     * @param {Array<Object>} alerts
+     * @returns {string}
+     */
     _computeLevel(alerts) {
         if (alerts.length === 0) {
             return PolicyLevel.LOW;
@@ -342,10 +355,10 @@ class PolicyEngine {
   =========================== */
 
     /**
-   * Atualiza limites normativos em tempo de execução.
-   *
-   * @param {Object} newLimits
-   */
+     * Atualiza limites normativos em tempo de execução.
+     *
+     * @param {Object} newLimits
+     */
     updateLimits(newLimits) {
         Object.assign(this.limits, newLimits);
 
@@ -356,10 +369,10 @@ class PolicyEngine {
     }
 
     /**
-   * Retorna limites atuais.
-   *
-   * @returns {Object}
-   */
+     * Retorna limites atuais.
+     *
+     * @returns {Object}
+     */
     getLimits() {
         return Object.freeze({ ...this.limits });
     }

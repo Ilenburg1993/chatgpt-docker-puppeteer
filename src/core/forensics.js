@@ -17,7 +17,7 @@ const io = require('../infra/io');
 // TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter
 // const ipc = require('../infra/ipc_client');
 const identityManager = require('./identity_manager');
-const { ActionCode } = require('../shared/nerv/constants');
+const { ActionCode: _ActionCode } = require('../shared/nerv/constants');
 
 /**
  * Tempo limite para capturas visuais (5 segundos).
@@ -68,9 +68,9 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         if (page && !page.isClosed()) {
             await Promise.race([
                 _captureVisualEvidence(page, folder, correlationId),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('BROWSER_CAPTURE_TIMEOUT')), CAPTURE_TIMEOUT_MS)
-                )
+                new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('BROWSER_CAPTURE_TIMEOUT')), CAPTURE_TIMEOUT_MS);
+                })
             ]).catch(err => {
                 log('WARN', `[FORENSICS] Captura visual abortada: ${err.message}`, correlationId);
             });
@@ -89,7 +89,6 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         //     }
         // }, correlationId);
         log('INFO', `[FORENSICS] Dump criado: ${dumpId} - TODO: emitir via NERV`, correlationId);
-
     } catch (e) {
         // Falha na forense é reportada apenas no log local para não interferir na recuperação
         console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
@@ -99,7 +98,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
 /**
  * Captura Screenshot e Snapshot do DOM de forma inteligente.
  */
-async function _captureVisualEvidence(page, folder, correlationId) {
+async function _captureVisualEvidence(page, folder, _correlationId) {
     // A. Screenshot (JPEG comprimido para performance)
     await page.screenshot({
         path: path.join(folder, 'screenshot.jpg'),

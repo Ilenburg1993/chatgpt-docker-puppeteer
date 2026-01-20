@@ -17,23 +17,23 @@ const ROOT = path.normalize(path.join(__dirname, '..', '..', '..'));
  */
 const DIRS = {
     ROOT,
-    QUEUE:    path.join(ROOT, 'fila'),
+    QUEUE: path.join(ROOT, 'fila'),
     RESPONSE: path.join(ROOT, 'respostas'),
-    LOGS:     path.join(ROOT, 'logs'),
-    CORRUPT:  path.join(ROOT, 'fila', 'corrupted'),
-    REPORTS:  path.join(ROOT, 'logs', 'crash_reports')
+    LOGS: path.join(ROOT, 'logs'),
+    CORRUPT: path.join(ROOT, 'fila', 'corrupted'),
+    REPORTS: path.join(ROOT, 'logs', 'crash_reports')
 };
 
 /**
  * ARQUIVOS DE ESTADO E CONFIGURAÇÃO
  */
 const FILES = {
-    CONFIG:   path.join(ROOT, 'config.json'),
-    RULES:    path.join(ROOT, 'dynamic_rules.json'),
-    CONTROL:  path.join(ROOT, 'controle.json'),
-    STATE:    path.join(ROOT, 'estado.json'),
+    CONFIG: path.join(ROOT, 'config.json'),
+    RULES: path.join(ROOT, 'dynamic_rules.json'),
+    CONTROL: path.join(ROOT, 'controle.json'),
+    STATE: path.join(ROOT, 'estado.json'),
     IDENTITY: path.join(ROOT, 'src/infra/storage/robot_identity.json'),
-    VOCAB:    path.join(ROOT, 'vocabulary.json')
+    VOCAB: path.join(ROOT, 'vocabulary.json')
 };
 
 /**
@@ -41,7 +41,7 @@ const FILES = {
  */
 const LIMITS = {
     MAX_JSON_SIZE: 1024 * 1024, // 1MB para proteção de memória
-    MAX_LOG_SIZE:  5 * 1024 * 1024 // 5MB para rotação
+    MAX_LOG_SIZE: 5 * 1024 * 1024 // 5MB para rotação
 };
 
 module.exports = {

@@ -17,7 +17,7 @@ const { log } = require('../../core/logger');
 const PATHS = require('../fs/paths');
 
 // --- CONFIGURAÇÃO DE CADÊNCIA ---
-const CACHE_HEARTBEAT_MS = 5000;    // Varredura forçada a cada 5s
+const CACHE_HEARTBEAT_MS = 5000; // Varredura forçada a cada 5s
 const OBSERVATION_WINDOW_MS = 300; // Janela de estabilização para eventos de disco
 
 // --- ESTADO VOLÁTIL DO CACHE ---
@@ -51,7 +51,7 @@ async function loadTask(filePath) {
     try {
         const raw = await fs.promises.readFile(filePath, 'utf-8');
         return JSON.parse(raw);
-    } catch (err) {
+    } catch (_err) {
         // Falha silenciosa para arquivos em processo de escrita/deleção
         return null;
     }
@@ -91,7 +91,9 @@ async function scanQueue() {
  * Sinais de sensores (Watchers) apenas marcam o cache como sujo e chamam esta função.
  */
 function openObservationWindow() {
-    if (windowTimer) {return;}
+    if (windowTimer) {
+        return;
+    }
 
     windowTimer = setTimeout(async () => {
         windowTimer = null;
@@ -107,7 +109,7 @@ function openObservationWindow() {
  */
 async function getQueue() {
     const now = Date.now();
-    const needsHeartbeat = (now - lastFullScan > CACHE_HEARTBEAT_MS);
+    const needsHeartbeat = now - lastFullScan > CACHE_HEARTBEAT_MS;
 
     if (needsHeartbeat || isCacheDirty) {
         isCacheDirty = true;

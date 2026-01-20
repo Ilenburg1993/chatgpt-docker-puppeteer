@@ -8,6 +8,15 @@
 ========================================================================== */
 
 const human = require('./human');
+
+const {
+    CONNECTION_MODES: CONNECTION_MODES
+} = require('../../core/constants/browser.js');
+
+const {
+    STATUS_VALUES: STATUS_VALUES
+} = require('../../core/constants/tasks.js');
+
 const analyzer = require('./analyzer');
 const stabilizer = require('./stabilizer');
 const adaptive = require('../../logic/adaptive');
@@ -15,8 +24,8 @@ const { log } = require('../../core/logger');
 
 class BiomechanicsEngine {
     /**
-   * @param {object} driver - Instância do BaseDriver (para acesso ao _emitVital).
-   */
+     * @param {object} driver - Instância do BaseDriver (para acesso ao _emitVital).
+     */
     constructor(driver) {
         this.driver = driver;
         this.modifier = null;
@@ -28,7 +37,9 @@ class BiomechanicsEngine {
   ====================================================================== */
 
     async getModifier() {
-        if (this.modifier) {return this.modifier;}
+        if (this.modifier) {
+            return this.modifier;
+        }
         this.driver._assertPageAlive();
 
         try {
@@ -40,11 +51,14 @@ class BiomechanicsEngine {
                 return (navigator.platform || '').toLowerCase();
             });
 
-            if (platform.includes('mac')) {this.modifier = 'Meta';}
-            else if (platform === 'mobile') {this.modifier = null;}
-            else {this.modifier = 'Control';}
-
-        } catch (modErr) {
+            if (platform.includes('mac')) {
+                this.modifier = 'Meta';
+            } else if (platform === 'mobile') {
+                this.modifier = null;
+            } else {
+                this.modifier = 'Control';
+            }
+        } catch (_modErr) {
             this.modifier = 'Control';
         }
 
@@ -59,7 +73,9 @@ class BiomechanicsEngine {
                     await this.driver.page.keyboard.up(mod).catch(() => {});
                 }
             }
-        } catch (releaseErr) {}
+        } catch (_releaseErr) {
+            // Ignore release errors - mouse already moved
+        }
     }
 
     /* ======================================================================
@@ -67,14 +83,10 @@ class BiomechanicsEngine {
   ====================================================================== */
 
     /**
-   * Aguarda a IA ficar ociosa, narrando a espera para o Dashboard.
-   */
+     * Aguarda a IA ficar ociosa, narrando a espera para o Dashboard.
+     */
     async waitIfBusy(taskId) {
-        const { timeout } = await adaptive.getAdjustedTimeout(
-            this.driver.currentDomain,
-            0,
-            'INITIAL'
-        );
+        const { timeout } = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'INITIAL');
 
         const start = Date.now();
         let iterations = 0;
@@ -94,13 +106,15 @@ class BiomechanicsEngine {
             const responseInfo = await analyzer.findResponseArea(this.driver.page).catch(() => null);
             if (!responseInfo || !responseInfo.isBusy) {
                 const loadStatus = await stabilizer.getPageLoadStatus(this.driver.page);
-                if (loadStatus === 'IDLE') {
+                if (loadStatus === STATUS_VALUES.IDLE) {
                     this.driver._emitVital('PROGRESS_UPDATE', { step: 'IA_IDLE_CONFIRMED', taskId });
                     return;
                 }
             }
 
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => {
+                setTimeout(r, 800);
+            });
         }
 
         if (iterations >= 50) {
@@ -116,21 +130,25 @@ class BiomechanicsEngine {
         let lastRect = null;
         for (let i = 0; i < 10; i++) {
             try {
-                const rect = await ctx.evaluate((s) => {
+                const rect = await ctx.evaluate(s => {
                     const el = document.querySelector(s);
-                    if (!el) {return null;}
+                    if (!el) {
+                        return null;
+                    }
                     const r = el.getBoundingClientRect();
                     return { x: r.left, y: r.top, w: r.width, h: r.height };
                 }, selector);
 
-                if (lastRect && rect &&
-            Math.abs(rect.x - lastRect.x) < 0.5 &&
-            Math.abs(rect.y - lastRect.y) < 0.5) {
+                if (lastRect && rect && Math.abs(rect.x - lastRect.x) < 0.5 && Math.abs(rect.y - lastRect.y) < 0.5) {
                     return rect;
                 }
                 lastRect = rect;
-            } catch (rectErr) { return null; }
-            await new Promise(r => setTimeout(r, 60));
+            } catch (_rectErr) {
+                return null;
+            }
+            await new Promise(r => {
+                setTimeout(r, 60);
+            });
         }
         return lastRect;
     }
@@ -139,31 +157,43 @@ class BiomechanicsEngine {
         const mainHeight = await this.driver.page.evaluate(() => window.innerHeight);
         const baseOffset = mainHeight * 0.15;
 
-        await ctx.evaluate((sel, off) => {
-            const el = document.querySelector(sel);
-            if (!el) {return;}
-            el.scrollIntoView({ behavior: 'auto', block: 'center' });
-            const safeOff = Math.min(off, window.innerHeight * 0.3);
-            window.scrollBy(0, -safeOff);
-        }, selector, baseOffset);
+        await ctx.evaluate(
+            (sel, off) => {
+                const el = document.querySelector(sel);
+                if (!el) {
+                    return;
+                }
+                el.scrollIntoView({ behavior: CONNECTION_MODES.AUTO, block: 'center' });
+                const safeOff = Math.min(off, window.innerHeight * 0.3);
+                window.scrollBy(0, -safeOff);
+            },
+            selector,
+            baseOffset
+        );
 
         for (let i = frameStack.length - 1; i >= 0; i--) {
             try {
-                const parent = (i === 0) ? this.driver.page : await frameStack[i-1].contentFrame();
-                if (!parent) {continue;}
-                await frameStack[i].scrollIntoView({ behavior: 'auto', block: 'center' });
-                await parent.evaluate((off) => {
+                const parent = i === 0 ? this.driver.page : await frameStack[i - 1].contentFrame();
+                if (!parent) {
+                    continue;
+                }
+                await frameStack[i].scrollIntoView({ behavior: CONNECTION_MODES.AUTO, block: 'center' });
+                await parent.evaluate(off => {
                     const safeOff = Math.min(off, window.innerHeight * 0.3);
                     window.scrollBy(0, -safeOff);
                 }, baseOffset);
-            } catch (scrollErr) {}
+            } catch (_scrollErr) {
+                // Ignore scroll errors - continue with click
+            }
         }
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => {
+            setTimeout(r, 500);
+        });
     }
 
     /**
-   * Prepara o elemento para interação, reportando o pulso de movimento.
-   */
+     * Prepara o elemento para interação, reportando o pulso de movimento.
+     */
     async prepareElement(execContext, selector) {
         const { ctx, frameStack, offsetX, offsetY } = execContext;
 
@@ -171,17 +201,13 @@ class BiomechanicsEngine {
         await this.omniScroll(ctx, frameStack, selector);
 
         const rect = await this.getStableRect(ctx, selector);
-        if (!rect) {throw new Error('ELEMENT_LOST');}
+        if (!rect) {
+            throw new Error('ELEMENT_LOST');
+        }
 
         // [V500] Realiza o clique humano reportando o pulso de mouse
-        await human.humanClick(
-            this.driver.page,
-            ctx,
-            selector,
-            offsetX,
-            offsetY,
-            this.driver.signal,
-            (pulse) => this.driver._emitVital('HUMAN_PULSE', pulse)
+        await human.humanClick(this.driver.page, ctx, selector, offsetX, offsetY, this.driver.signal, pulse =>
+            this.driver._emitVital('HUMAN_PULSE', pulse)
         );
 
         await ctx.focus(selector);
@@ -198,42 +224,59 @@ class BiomechanicsEngine {
             await this.driver.page.keyboard.press('Backspace');
         }
 
-        await ctx.evaluate((sel) => {
+        await ctx.evaluate(sel => {
             const el = document.querySelector(sel);
             if (el) {
-                if (el.isContentEditable) {el.innerHTML = '';}
-                else {el.value = '';}
+                if (el.isContentEditable) {
+                    el.innerHTML = '';
+                } else {
+                    el.value = '';
+                }
             }
         }, selector);
     }
 
     /**
-   * Digita o texto reportando o progresso e o pulso de cada tecla.
-   */
+     * Digita o texto reportando o progresso e o pulso de cada tecla.
+     */
     async typeText(ctx, selector, text, signal) {
         if (text.length > 2000) {
             // Zen Mode (Injeção Direta)
             this.driver._emitVital('PROGRESS_UPDATE', { step: 'ZEN_MODE_TYPING_START', length: text.length });
 
-            const zenSuccess = await ctx.evaluate((sel, content) => {
-                const el = document.querySelector(sel);
-                if (!el) {return false;}
-                el.focus();
-                const ok = document.execCommand('insertText', false, content);
-                if (!ok) {
-                    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set ||
-                         Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerText')?.set;
-                    if (setter) {setter.call(el, content);}
-                }
-                ['input', 'change'].forEach(ev => el.dispatchEvent(new Event(ev, { bubbles: true })));
-                const finalVal = el.value || el.innerText || '';
-                if (finalVal.trim().length > 0) { el.blur(); el.focus(); return true; }
-                return false;
-            }, selector, text);
+            const zenSuccess = await ctx.evaluate(
+                (sel, content) => {
+                    const el = document.querySelector(sel);
+                    if (!el) {
+                        return false;
+                    }
+                    el.focus();
+                    const ok = document.execCommand('insertText', false, content);
+                    if (!ok) {
+                        const setter =
+                            Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set ||
+                            Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerText')?.set;
+                        if (setter) {
+                            setter.call(el, content);
+                        }
+                    }
+                    ['input', 'change'].forEach(ev => el.dispatchEvent(new Event(ev, { bubbles: true })));
+                    const finalVal = el.value || el.innerText || '';
+                    if (finalVal.trim().length > 0) {
+                        el.blur();
+                        el.focus();
+                        return true;
+                    }
+                    return false;
+                },
+                selector,
+                text
+            );
 
-            if (!zenSuccess) {throw new Error('ZEN_MODE_FAILED');}
+            if (!zenSuccess) {
+                throw new Error('ZEN_MODE_FAILED');
+            }
             this.driver._emitVital('PROGRESS_UPDATE', { step: 'ZEN_MODE_TYPING_COMPLETE' });
-
         } else {
             // Human Mode (Digitação Biomecânica)
             this.driver._emitVital('PROGRESS_UPDATE', { step: 'HUMAN_TYPING_START', length: text.length });
@@ -241,18 +284,12 @@ class BiomechanicsEngine {
             const lag = await stabilizer.measureEventLoopLag(this.driver.page);
 
             // [V500] Passa o callback para reportar cada tecla pressionada
-            await human.humanType(
-                this.driver.page,
-                ctx,
-                selector,
-                text,
-                lag,
-                signal,
-                (pulse) => this.driver._emitVital('HUMAN_PULSE', pulse)
+            await human.humanType(this.driver.page, ctx, selector, text, lag, signal, pulse =>
+                this.driver._emitVital('HUMAN_PULSE', pulse)
             );
 
             // Verificação de Eco (Sanidade)
-            const eco = await ctx.evaluate((s) => {
+            const eco = await ctx.evaluate(s => {
                 const el = document.querySelector(s);
                 const val = el?.value || el?.innerText || '';
                 return Array.from(val.replace(/\s/g, '')).length;
