@@ -1,0 +1,45 @@
+{
+  "recommendations": [
+    // Core Development
+    "dbaeumer.vscode-eslint",
+    "ms-vscode.makefile-tools",
+    "EditorConfig.EditorConfig",
+
+    // Docker & Containers
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+
+    // Git & Version Control
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+
+    // JavaScript/Node.js
+    "christian-kohler.npm-intellisense",
+    "christian-kohler.path-intellisense",
+    "pflannery.vscode-versionlens",
+
+    // AI & Productivity
+    "github.copilot",
+    "github.copilot-chat",
+
+    // Testing & Quality
+    "ms-playwright.playwright",
+    "hbenl.vscode-test-explorer",
+
+    // Data & Config Files
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+
+    // Documentation
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-mermaid"
+  ],
+  "unwantedRecommendations": [
+    // Conflitos com ESLint
+    "hookyqr.beautify",
+    "esbenp.prettier-vscode",
+
+    // Redundantes
+    "ms-vscode.vscode-typescript-next"
+  ]
+}
