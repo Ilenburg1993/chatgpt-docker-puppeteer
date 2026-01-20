@@ -209,6 +209,11 @@ function createKernel({
     telemetry,
 
     /**
+     * Referência ao NERV (somente leitura).
+     */
+    nerv,
+
+    /**
      * Cria uma nova tarefa no Kernel.
      * Retorna snapshot imutável da tarefa criada.
      */
@@ -228,6 +233,20 @@ function createKernel({
      */
     listTasks() {
       return taskRuntime.listTasks();
+    },
+
+    /**
+     * Shutdown gracioso do KERNEL.
+     * Para o loop de execução e limpa recursos.
+     */
+    async shutdown() {
+      telemetry.info('kernel_shutting_down', { at: Date.now() });
+      
+      if (kernelLoop && typeof kernelLoop.stop === 'function') {
+        kernelLoop.stop();
+      }
+      
+      telemetry.info('kernel_shutdown_complete', { at: Date.now() });
     }
   });
 

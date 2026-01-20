@@ -219,12 +219,15 @@ class ServerNERVAdapter {
         const socketEvent = this._translateEventName(actionCode);
         
         // Broadcast para todos os clientes conectados
-        this.socketHub.broadcast(socketEvent, {
-            actionCode,
-            payload,
-            correlationId,
-            timestamp: timestamp || new Date().toISOString()
-        });
+        // Socket.io usa emit() para broadcast global, não broadcast()
+        if (this.socketHub && typeof this.socketHub.emit === 'function') {
+            this.socketHub.emit(socketEvent, {
+                actionCode,
+                payload,
+                correlationId,
+                timestamp: timestamp || new Date().toISOString()
+            });
+        }
         
         this.stats.eventsBroadcasted++;
         
@@ -262,16 +265,28 @@ class ServerNERVAdapter {
     }
 
     /**
+     * Broadcast helper - wrapper para socketHub.emit (broadcast global).
+     * Socket.io usa emit() para broadcast, não broadcast().
+     */
+    _broadcast(event, data) {
+        if (this.socketHub && typeof this.socketHub.emit === 'function') {
+            this.socketHub.emit(event, data);
+        }
+    }
+
+    /**
      * Shutdown gracioso do adapter.
      */
     async shutdown() {
         log('INFO', '[ServerNERVAdapter] Iniciando shutdown');
         
         // Notifica clientes conectados sobre shutdown
-        this.socketHub.broadcast('system:shutdown', {
-            message: 'Sistema entrando em shutdown gracioso',
-            timestamp: new Date().toISOString()
-        });
+        if (this.socketHub && typeof this.socketHub.emit === 'function') {
+            this.socketHub.emit('system:shutdown', {
+                message: 'Sistema entrando em shutdown gracioso',
+                timestamp: new Date().toISOString()
+            });
+        }
         
         // Aguarda 2 segundos para clientes receberem a notificação
         await new Promise(resolve => setTimeout(resolve, 2000));

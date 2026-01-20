@@ -178,6 +178,10 @@ async function createNERV(config = {}) {
       }
       return emission.emitEvent(envelope);
     },
+    send: (envelope) => {
+      // Alias para emit - usado pelos testes
+      return publicAPI.emit(envelope);
+    },
     emitCommand: emission.emitCommand,
     emitEvent: emission.emitEvent,
     emitAck: emission.emitAck,

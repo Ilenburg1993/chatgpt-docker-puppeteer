@@ -3,7 +3,6 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 
 # Runtime data
 *.pid
@@ -23,6 +22,7 @@ tests/tmp/
 .git/
 .github/
 .gitignore
+.gitattributes
 
 # Documentation
 DOCUMENTAÇÃO/
@@ -34,6 +34,7 @@ analysis/
 .env
 .env.local
 .env.*.local
+.env.example
 
 # IDE
 .vscode/
@@ -45,10 +46,13 @@ analysis/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Testing
 tests/
 coverage/
+*.test.js
+*.spec.js
 
 # Build artifacts
 dist/
@@ -74,3 +78,17 @@ build/
 *.pyc
 __pycache__/
 *.py
+
+# Docker files (not needed in image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.pre-commit-config.yaml
+
+# Development tools
+tools/
+Makefile
+jsconfig.json

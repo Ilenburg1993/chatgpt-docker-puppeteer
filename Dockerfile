@@ -1,57 +1,65 @@
 # =============================================================================
-# Multi-stage Dockerfile for chatgpt-docker-puppeteer
+# Optimized Multi-stage Dockerfile for chatgpt-docker-puppeteer
 # Uses remote Chrome via debugging protocol (host.docker.internal:9222)
+# Base: Alpine for 30-40% size reduction vs Debian slim
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Stage 1: Dependencies
+# Stage 1: Dependencies (Build Cache Optimized)
 # -----------------------------------------------------------------------------
-FROM node:20-slim AS deps
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Install production dependencies
+# Cache layer invalidates only when package files change
+COPY package.json package-lock.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production --ignore-scripts
+RUN npm ci --only=production --ignore-scripts && \
+    npm cache clean --force
 
 # -----------------------------------------------------------------------------
-# Stage 2: Production Image
+# Stage 2: Production Image (Alpine-based)
 # -----------------------------------------------------------------------------
-FROM node:20-slim
+FROM node:20-alpine
 
-# Install only essential tools (no Chrome/Chromium - uses remote debugging)
-RUN apt-get update && apt-get install -y \
-    curl \
+# Install runtime dependencies
+# Combined into single layer to reduce image size
+RUN apk add --no-cache \
     ca-certificates \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    curl \
+    dumb-init \
+    && rm -rf /var/cache/apk/*
 
 WORKDIR /app
 
-# Configure to use remote Chrome via debugging protocol
-# Default: host.docker.internal:9222 (Docker Desktop Windows/Mac)
-# Override with CHROME_WS_ENDPOINT environment variable
+# Configure environment for remote Chrome debugging
+# Puppeteer skips Chromium download (connects to remote Chrome)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NODE_ENV=production \
     TZ=UTC \
     CHROME_REMOTE_DEBUGGING_PORT=9222
 
-# Copy dependencies from deps stage
+# Copy dependencies from build stage
+# Placed early for better cache utilization
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy application files
-COPY src/ ./src/
-COPY scripts/ ./scripts/
-COPY public/ ./public/
-COPY index.js ecosystem.config.js ./
+# Copy application files (ordered by change frequency)
+# Config files change less frequently than source code
+COPY package.json ./
+COPY ecosystem.config.js ./
 COPY config.json dynamic_rules.json ./
 
+# Copy application directories
+COPY scripts/ ./scripts/
+COPY public/ ./public/
+COPY src/ ./src/
+
 # Create necessary directories with proper permissions
+# Single RUN command to reduce layers
 RUN mkdir -p fila respostas logs profile && \
-    chown -R node:node /app
+    chown -R node:node /app && \
+    chmod +x scripts/healthcheck.js
 
 # Switch to non-root user for security
 USER node
@@ -62,9 +70,12 @@ VOLUME ["/app/fila", "/app/respostas", "/app/logs", "/app/profile"]
 # Expose dashboard port
 EXPOSE 3008
 
-# Health check
+# Optimized health check using dedicated script
+# Faster startup and better error handling than inline node -e
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3008/api/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))" || exit 1
+    CMD node scripts/healthcheck.js
 
-# Start application
-CMD ["node", "index.js"]
+# Use dumb-init to handle signals properly and reap zombie processes
+# Entry point is src/main.js (not index.js which doesn't exist)
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "src/main.js"]

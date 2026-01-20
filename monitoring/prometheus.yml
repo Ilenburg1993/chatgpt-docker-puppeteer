@@ -1,0 +1,59 @@
+# Sample Prometheus configuration for chatgpt-docker-puppeteer monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'chatgpt-agent'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Scrape configurations
+scrape_configs:
+  # Agent metrics
+  - job_name: 'chatgpt-agent'
+    static_configs:
+      - targets: ['agent:9090']
+        labels:
+          service: 'agent'
+    
+    # Metrics path (if not default /metrics)
+    # metrics_path: '/metrics'
+    
+    # Scrape interval override
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Docker daemon metrics (if exposed)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+        labels:
+          service: 'docker'
+    
+    # Optional: relabel to add instance info
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'docker-host'
+
+  # Node exporter (if deployed for host metrics)
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+# Alert rules (create separate file: alerts.yml)
+# rule_files:
+#   - 'alerts.yml'

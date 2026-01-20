@@ -70,7 +70,7 @@ module.exports = {
       out_file: "./logs/dashboard-out.log",
       
       env: {
-        PORT: 3000,
+        PORT: 3008,
         NODE_ENV: "production",
         // Sinaliza ao lifecycle.js que o processo deve se encerrar via process.exit
         DAEMON_MODE: "true" 

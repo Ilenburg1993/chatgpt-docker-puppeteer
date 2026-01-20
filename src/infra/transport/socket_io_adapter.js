@@ -21,11 +21,26 @@ function createSocketAdapter(config) {
     // Bus de eventos para comunicar mudanças de estado ao NERV Core
     const events = new EventEmitter();
     
+    // Adiciona handler de erro padrão para evitar crashes
+    events.on('error', (errorData) => {
+        // Log silencioso - erros de conexão são esperados durante shutdown
+        if (!_shuttingDown) {
+            // Apenas emite no log interno, não propaga
+            events.emit('log', { 
+                level: 'DEBUG', 
+                msg: `[TRANSPORT] Connection error: ${errorData.msg}` 
+            });
+        }
+    });
+    
     // Instância nativa do socket (inicializada em start)
     let socket = null;
     
     // Handler injetado pelo NERV para receber dados
     let inboundHandler = null;
+    
+    // Flag de shutdown para evitar erros durante desligamento
+    let _shuttingDown = false;
 
     /**
      * Inicia a conexão física.
@@ -65,8 +80,11 @@ function createSocketAdapter(config) {
             events.emit('log', { level: 'WARN', msg: `[TRANSPORT] Desconectado: ${reason}` });
         });
 
-        // 3. Erros de Conexão
+        // 3. Erros de Conexão (silenciado durante shutdown)
         socket.on('connect_error', (err) => {
+            // Ignora erros de conexão se já estamos desligando
+            if (_shuttingDown) return;
+            
             events.emit('error', { 
                 code: 'CONNECTION_ERROR', 
                 msg: err.message 
@@ -92,8 +110,7 @@ function createSocketAdapter(config) {
     /**
      * Encerra a conexão física.
      */
-    function stop() {
-        if (socket) {
+    function stop() {        _shuttingDown = true;        if (socket) {
             socket.removeAllListeners();
             socket.disconnect();
             socket = null;

@@ -70,8 +70,8 @@ async function boot() {
         const nerv = await createNERV({
             mode: 'hybrid', // local EventEmitter + Socket.io adapter
             correlation: true, // Event sourcing
-            bufferSize: CONFIG.NERV_BUFFER_SIZE || 1000,
-            telemetry: CONFIG.NERV_TELEMETRY || true
+            bufferSize: process.env.NERV_BUFFER_SIZE || CONFIG.NERV_BUFFER_SIZE || 1000,
+            telemetry: process.env.NERV_TELEMETRY !== 'false' && (CONFIG.NERV_TELEMETRY !== false)
         });
         
         log('INFO', '[BOOT] ✅ NERV online (híbrido: local + remoto)');
@@ -80,13 +80,13 @@ async function boot() {
         log('INFO', '[BOOT] Fase 3/6: Inicializando Browser Pool');
         
         const browserPool = new BrowserPoolManager({
-            poolSize: CONFIG.BROWSER_POOL_SIZE || 3,
-            allocationStrategy: CONFIG.ALLOCATION_STRATEGY || 'round-robin',
-            healthCheckInterval: CONFIG.HEALTH_CHECK_INTERVAL || 30000,
+            poolSize: process.env.BROWSER_POOL_SIZE || CONFIG.BROWSER_POOL_SIZE || 3,
+            allocationStrategy: process.env.ALLOCATION_STRATEGY || CONFIG.ALLOCATION_STRATEGY || 'round-robin',
+            healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || CONFIG.HEALTH_CHECK_INTERVAL || 30000,
             chromium: {
-                browserURL: CONFIG.BROWSER_URL || 'http://localhost:9222',
-                wsEndpoint: CONFIG.WS_ENDPOINT,
-                executablePath: CONFIG.CHROME_EXECUTABLE_PATH
+                browserURL: process.env.CHROME_WS_ENDPOINT || CONFIG.BROWSER_URL || 'http://localhost:9222',
+                wsEndpoint: process.env.CHROME_WS_ENDPOINT || CONFIG.WS_ENDPOINT,
+                executablePath: process.env.CHROME_EXECUTABLE_PATH || CONFIG.CHROME_EXECUTABLE_PATH
             }
         });
         
@@ -105,7 +105,7 @@ async function boot() {
             },
             policy: {},
             loop: {
-                cycleInterval: CONFIG.KERNEL_CYCLE_INTERVAL || 50 // 50ms = 20 Hz
+                cycleInterval: process.env.KERNEL_CYCLE_INTERVAL || CONFIG.KERNEL_CYCLE_INTERVAL || 50 // 50ms = 20 Hz
             }
         });
         
@@ -130,7 +130,7 @@ async function boot() {
         const serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
         
         // Inicia o servidor HTTP
-        const serverPort = CONFIG.SERVER_PORT || 3333;
+        const serverPort = process.env.PORT || CONFIG.SERVER_PORT || 3008;
         await new Promise((resolve, reject) => {
             httpServer.listen(serverPort, (err) => {
                 if (err) reject(err);
