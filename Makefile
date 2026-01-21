@@ -2,21 +2,44 @@
 # Makefile - ChatGPT Docker Puppeteer (PM2-First Strategy)
 # =============================================================================
 # CROSS-PLATFORM: Windows (cmd.exe/PowerShell) + Linux + macOS support
-# Optimized for Super Launcher v2.0 + PM2 ecosystem
+# Optimized for Super Launcher v3.0 + PM2 ecosystem
 # Docker commands maintained as secondary option
-# Version: 2.3 (21/01/2026) - Definitive Edition
+# Version: 2.4 (21/01/2026) - Hardened Edition
+# Changes: Strict mode, error helpers, DRY PM2, test separation, git protection
 # =============================================================================
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start stop restart reload status health logs logs-app logs-error \
+# =============================================================================
+# Strict Mode (opt-in for CI/debugging)
+# =============================================================================
+
+STRICT ?= false
+
+ifeq ($(STRICT),true)
+.SHELLFLAGS := -eu -o pipefail -c
+endif
+
+# =============================================================================
+# Error Helper (centralized failure messages)
+# =============================================================================
+
+define fail
+	echo "$(RED)❌ $(1)$(NC)"; exit 1
+endef
+
+define confirm
+	read -p "$(YELLOW)⚠ $(1) (y/N): $(NC)" ans && [ "$$ans" = "y" ]
+endef
+
+.PHONY: help start stop restart reload status health health-core logs logs-app logs-error \
         clean clean-logs diagnose backup launcher quick watch dashboard \
-        test test-integration test-health test-all pm2 pm2-start pm2-stop \
+        test test-fast test-integration test-health test-all pm2 pm2-start pm2-stop \
         pm2-restart pm2-reload pm2-logs pm2-monit pm2-gui pm2-flush pm2-list \
         queue queue-watch queue-add dev lint lint-fix docker-build docker-start \
         docker-stop docker-logs docker-shell docker-clean ci-test ci-lint info \
         version check-deps rebuild full-check vscode-info commit-settings \
-        git-changed reload-vscode install-deps update-deps format-code \
+        git-changed reload-vscode install-deps update-deps deps-consistency format-code \
         workspace-clean git-push-safe s st r h l t c b q d i v g
 
 # =============================================================================
@@ -29,6 +52,7 @@ NODE := node
 DC := docker-compose
 CURL := curl
 HEALTH_PORT ?= 2998
+PM2_APPS := agente-gpt dashboard-web
 
 # =============================================================================
 # Colors (ANSI - work in Git Bash, native on Linux/Mac)
@@ -131,8 +155,8 @@ endif
 help:
 	@echo ""
 	@echo "$(CYAN)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(CYAN)║  ChatGPT Docker Puppeteer - PM2-First Makefile v2.3       ║$(NC)"
-	@echo "$(CYAN)║  Cross-Platform: Windows/Linux/macOS (Definitive)         ║$(NC)"
+	@echo "$(CYAN)║  ChatGPT Docker Puppeteer - PM2-First Makefile v2.4       ║$(NC)"
+	@echo "$(CYAN)║  Cross-Platform: Windows/Linux/macOS (Hardened Edition)   ║$(NC)"
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(GREEN)🚀 Quick Start (PM2-First):$(NC)"
@@ -148,7 +172,9 @@ help:
 	@echo ""
 	@echo "$(GREEN)🧪 Testing:$(NC)"
 	@echo "  make test            Run all tests"
+	@echo "  make test-fast       Quick tests (pre-commit)"
 	@echo "  make test-integration   Run FASE 8 tests"
+	@echo "  make deps-consistency   Check lockfile sync"
 	@echo ""
 	@echo "$(GREEN)⚙️  PM2 Commands:$(NC)"
 	@echo "  make pm2         PM2 status"
@@ -172,6 +198,7 @@ help:
 	@echo "$(MAGENTA)⌨️  Shortcuts:$(NC) s=start, h=health, l=logs, t=test, v=vscode, g=git"
 	@echo ""
 	@echo "$(BLUE)💻 Platform: $(DETECTED_OS) | Port: $(HEALTH_PORT)$(NC)"
+	@echo "$(YELLOW)⚡ Strict Mode: STRICT=true (fail-fast for CI)$(NC)"
 	@echo ""
 
 # =============================================================================
@@ -181,13 +208,13 @@ help:
 check-deps:
 	@echo "$(CYAN)🔍 Checking dependencies...$(NC)"
 ifeq ($(DETECTED_OS),Windows)
-	@where node >nul 2>&1 || (echo "$(RED)✗ Node.js not found (install from nodejs.org)$(NC)" && exit 1)
-	@where npm >nul 2>&1 || (echo "$(RED)✗ npm not found$(NC)" && exit 1)
+	@where node >nul 2>&1 || $(call fail,Node.js not found - install from nodejs.org)
+	@where npm >nul 2>&1 || $(call fail,npm not found)
 	@where pm2 >nul 2>&1 || echo "$(YELLOW)⚠ PM2 not installed (npm i -g pm2)$(NC)"
 	@where curl >nul 2>&1 || echo "$(YELLOW)⚠ curl not found (optional)$(NC)"
 else
-	@command -v node >/dev/null 2>&1 || (echo "$(RED)✗ Node.js not found$(NC)" && exit 1)
-	@command -v npm >/dev/null 2>&1 || (echo "$(RED)✗ npm not found$(NC)" && exit 1)
+	@command -v node >/dev/null 2>&1 || $(call fail,Node.js not found)
+	@command -v npm >/dev/null 2>&1 || $(call fail,npm not found)
 	@command -v pm2 >/dev/null 2>&1 || echo "$(YELLOW)⚠ PM2 not installed (npm i -g pm2)$(NC)"
 	@command -v curl >/dev/null 2>&1 || echo "$(YELLOW)⚠ curl not found (optional)$(NC)"
 endif
@@ -243,6 +270,11 @@ health:
 	@echo "$(GREEN)✓ All health checks passed!$(NC)"
 	@echo ""
 
+health-core:
+	@echo "$(GREEN)🏥 Quick Health Check (core only)...$(NC)"
+	@$(CURL) -sf http://localhost:$(HEALTH_PORT)/api/health >/dev/null 2>&1 || $(call fail,Core health endpoint unreachable)
+	@echo "$(GREEN)✓ Core health OK$(NC)"
+
 logs:
 	@echo "$(CYAN)📜 Following PM2 logs...$(NC)"
 	@$(NPM) run daemon:logs
@@ -287,6 +319,11 @@ test:
 	@echo "$(GREEN)🧪 Running all tests...$(NC)"
 	@$(NPM) test
 
+test-fast:
+	@echo "$(GREEN)⚡ Running fast tests (pre-commit)...$(NC)"
+	@$(NODE) tests/integration/test_launcher_integration.js
+	@echo "$(GREEN)✓ Fast tests passed$(NC)"
+
 test-integration:
 	@echo "$(GREEN)🧪 Running integration tests (FASE 8)...$(NC)"
 	@$(NODE) tests/integration/test_launcher_integration.js
@@ -309,15 +346,15 @@ pm2-start:
 
 pm2-stop:
 	@echo "$(YELLOW)⏹️  Stopping PM2 processes...$(NC)"
-	@$(PM2) stop agente-gpt dashboard-web || true
+	@$(PM2) stop $(PM2_APPS) || true
 
 pm2-restart:
 	@echo "$(YELLOW)🔄 Restarting PM2 processes...$(NC)"
-	@$(PM2) restart agente-gpt dashboard-web || true
+	@$(PM2) restart $(PM2_APPS) || true
 
 pm2-reload:
 	@echo "$(YELLOW)♻️  Reloading PM2 (zero-downtime)...$(NC)"
-	@$(PM2) reload agente-gpt dashboard-web || true
+	@$(PM2) reload $(PM2_APPS) || true
 
 pm2-logs:
 	@echo "$(CYAN)📜 PM2 logs...$(NC)"
@@ -463,11 +500,13 @@ info:
 
 version:
 	@echo "$(CYAN)ChatGPT Docker Puppeteer$(NC)"
-	@echo "Super Launcher: v2.0"
+	@echo "Super Launcher: v3.0"
 	@echo "Strategy: PM2-First"
-	@echo "Makefile: v2.3 (Definitive Edition)"
+	@echo "Makefile: v2.4 (Hardened Edition)"
 	@echo "Platform: $(DETECTED_OS)"
 	@echo "Health Port: $(HEALTH_PORT)"
+	@echo "PM2 Apps: $(PM2_APPS)"
+	@echo "Strict Mode: $(STRICT)"
 
 # =============================================================================
 # Dependency Management
@@ -504,6 +543,10 @@ update-deps:
 	@echo "$(YELLOW)⚠ Run 'npm update' to update packages$(NC)"
 	@echo "$(YELLOW)⚠ Run 'npm install <package>@latest' for major updates$(NC)"
 
+deps-consistency:
+	@echo "$(CYAN)🔍 Checking package-lock.json consistency...$(NC)"
+	@$(NPM) ci --dry-run --quiet 2>/dev/null && echo "$(GREEN)✓ Dependencies in sync$(NC)" || $(call fail,package-lock.json out of sync - run npm install)
+
 workspace-clean:
 	@echo "$(RED)🧹 Deep cleaning workspace...$(NC)"
 	@echo ""
@@ -513,7 +556,7 @@ workspace-clean:
 	@echo "  - Clean npm cache"
 	@echo "  - Reinstall dependencies"
 	@echo ""
-	@read -p "Continue? (y/N) " confirm && [ "$$confirm" = "y" ] || exit 1
+	@$(call confirm,This will delete node_modules and clean cache) || exit 1
 	@echo ""
 	@echo "$(CYAN)1. Stopping PM2...$(NC)"
 	@$(MAKE) stop --no-print-directory 2>/dev/null || true
@@ -634,7 +677,12 @@ format-code:
 git-push-safe:
 	@echo "$(GREEN)🛡️ Safe push with checks...$(NC)"
 	@echo ""
-	@echo "$(CYAN)1. Checking for uncommitted changes...$(NC)"
+	@echo "$(CYAN)1. Checking branch protection...$(NC)"
+	@git rev-parse --abbrev-ref HEAD | grep -Ev '^(main|master)$$' >/dev/null 2>&1 || \
+		$(call fail,Direct push to protected branch blocked - use feature branch)
+	@echo "  ✅ Branch OK (not main/master)"
+	@echo ""
+	@echo "$(CYAN)2. Checking for uncommitted changes...$(NC)"
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "$(RED)  ❌ Uncommitted changes found!$(NC)"; \
 		git status --short; \
@@ -642,15 +690,15 @@ git-push-safe:
 	fi
 	@echo "  ✅ No uncommitted changes"
 	@echo ""
-	@echo "$(CYAN)2. Running ESLint...$(NC)"
+	@echo "$(CYAN)3. Running ESLint...$(NC)"
 	@npx eslint . --quiet --max-warnings 0 || (echo "$(RED)  ❌ Lint errors found!$(NC)"; exit 1)
 	@echo "  ✅ Lint passed"
 	@echo ""
-	@echo "$(CYAN)3. Running tests...$(NC)"
-	@$(MAKE) test-integration --no-print-directory || (echo "$(RED)  ❌ Tests failed!$(NC)"; exit 1)
+	@echo "$(CYAN)4. Running tests...$(NC)"
+	@$(MAKE) test-fast --no-print-directory || (echo "$(RED)  ❌ Tests failed!$(NC)"; exit 1)
 	@echo "  ✅ Tests passed"
 	@echo ""
-	@echo "$(CYAN)4. Pushing to origin...$(NC)"
+	@echo "$(CYAN)5. Pushing to origin...$(NC)"
 	@git push
 	@echo ""
 	@echo "$(GREEN)✅ Push successful! All checks passed.$(NC)"
