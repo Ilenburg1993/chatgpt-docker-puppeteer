@@ -1,10 +1,20 @@
 @echo off
 REM ============================================================================
-REM  INSTALL-PM2-GUI - Helper para instalação do pm2-gui
+REM  INSTALL-PM2-GUI v3.0 - Helper para instalação do pm2-gui
+REM  Version: 3.0 (2026-01-21) - Enhanced error handling & install logging
 REM  Interface gráfica Electron para gerenciar processos PM2
 REM ============================================================================
 
 setlocal enabledelayedexpansion
+
+REM Check npm availability
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo [FAIL] npm not found!
+    echo [HINT] Install Node.js from https://nodejs.org/
+    pause
+    exit /b 1
+)
 
 echo ============================================================
 echo  PM2-GUI INSTALLER
@@ -51,30 +61,41 @@ if /i not "%confirm%"=="S" (
 echo.
 echo [INFO] Instalando pm2-gui via npm...
 echo        Isso pode levar alguns minutos...
+echo        Log de instalacao: logs\pm2-gui-install.log
 echo.
 
-call npm install -g pm2-gui
+if not exist logs mkdir logs
+call npm install -g pm2-gui >logs\pm2-gui-install.log 2>&1
 
 if errorlevel 1 (
     echo.
-    echo [ERROR] Falha na instalacao!
+    echo [FAIL] Falha na instalacao!
     echo.
-    echo Tente manualmente:
-    echo   npm install -g pm2-gui
+    echo [TROUBLESHOOTING]
+    echo   1. Verifique o log: logs\pm2-gui-install.log
+    echo   2. Problemas comuns:
+    echo      - Permissoes: tente com direitos de administrador
+    echo      - Rede: verifique conexao com npmjs.com
+    echo      - Cache: execute 'npm cache clean --force'
     echo.
-    goto END
+    echo   3. Instalacao manual:
+    echo      npm install -g pm2-gui
+    echo.
+    pause
+    exit /b 1
 )
 
 echo.
 echo ============================================================
-echo  [SUCCESS] pm2-gui instalado com sucesso!
+echo  [OK] pm2-gui instalado com sucesso!
 echo ============================================================
 echo.
 echo Para usar:
-echo   1. Execute: pm2-gui
-echo   2. Acesse: http://localhost:8088
+   1. Execute: pm2-gui
+   2. Acesse: http://localhost:8088
 echo.
 echo Ou use o LAUNCHER.bat opcao [6]
+echo Log completo: logs\pm2-gui-install.log
 echo.
 
 set /p launch="Deseja abrir pm2-gui agora? (S/N): "

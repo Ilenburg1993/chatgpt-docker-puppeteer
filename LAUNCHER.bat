@@ -1,6 +1,7 @@
 @echo off
 REM ============================================================================
-REM  SUPER LAUNCHER v2.0 - ChatGPT Docker Puppeteer
+REM  SUPER LAUNCHER v3.0 - ChatGPT Docker Puppeteer
+REM  Version: 3.0 (2026-01-21) - Enhanced features & cross-platform parity
 REM  Audit Level: PM2-First Strategy (Opção A)
 REM  Estratégia: Menu interativo + validações + health checks + automações
 REM ============================================================================
@@ -33,7 +34,7 @@ set "COLOR_BOLD=[1m"
 cls
 echo.
 echo %COLOR_CYAN%============================================================%COLOR_RESET%
-echo %COLOR_BOLD%          SUPER LAUNCHER v2.0 - ChatGPT Puppeteer%COLOR_RESET%
+echo %COLOR_BOLD%          SUPER LAUNCHER v3.0 - ChatGPT Puppeteer%COLOR_RESET%
 echo %COLOR_CYAN%============================================================%COLOR_RESET%
 echo.
 echo  %COLOR_GREEN%[1]%COLOR_RESET% Start System          %COLOR_YELLOW%(boot completo com validações)%COLOR_RESET%
@@ -457,7 +458,7 @@ REM ============================================================================
 :EXIT
 cls
 echo.
-echo %COLOR_CYAN%Obrigado por usar o Super Launcher v2.0!%COLOR_RESET%
+echo %COLOR_CYAN%Obrigado por usar o Super Launcher v3.0!%COLOR_RESET%
 echo.
 timeout /t 2 >nul
 exit /b 0

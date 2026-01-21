@@ -1,6 +1,7 @@
 @echo off
 REM ============================================================================
-REM  QUICK-OPS - Operações rápidas via CLI
+REM  QUICK-OPS v3.0 - Operações rápidas via CLI
+REM  Version: 3.0 (2026-01-21) - Enhanced error handling & exit codes
 REM  Uso: quick-ops.bat <comando> [args]
 REM  Comandos: start, stop, restart, status, health, logs, backup
 REM ============================================================================
@@ -30,9 +31,22 @@ goto SHOW_HELP
 :CMD_START
 echo [QUICK-OPS] Iniciando sistema...
 call npm run daemon:start
+if errorlevel 1 (
+    echo [FAIL] Failed to start PM2 processes
+    exit /b 1
+)
+echo [OK] PM2 processes started
+echo [INFO] Aguardando servicos iniciarem (5s)...
 timeout /t 5 >nul
+echo [INFO] Validating health checks...
 call scripts\quick-ops.bat health
-goto END
+if errorlevel 1 (
+    echo [WARN] Services started but health checks failed
+    echo [HINT] Check logs with: npm run logs
+    exit /b 1
+)
+echo [OK] System is healthy and operational
+exit /b 0
 
 :CMD_STOP
 echo [QUICK-OPS] Parando sistema...
@@ -51,8 +65,21 @@ goto END
 
 :CMD_HEALTH
 echo [QUICK-OPS] Health Check:
-curl -s http://localhost:2998/api/health 2>nul | node -e "const s=require('fs').readFileSync(0,'utf8');if(s){const j=JSON.parse(s);console.log('  Status: '+j.status);console.log('  Components: '+Object.keys(j).filter(k=>k!=='status').join(', '));}" 2>nul || echo   [ERROR] Health endpoint not responding
-goto END
+curl -sS --max-time 3 http://localhost:2998/api/health 2>nul >temp_health.json
+if errorlevel 1 (
+    echo   [FAIL] Health endpoint not responding
+    echo   [HINT] Start system with: quick-ops.bat start
+    del temp_health.json 2>nul
+    exit /b 1
+)
+node -e "const s=require('fs').readFileSync('temp_health.json','utf8');if(s){const j=JSON.parse(s);if(j.status==='ok'||j.status==='healthy'||j.status==='online'){console.log('  [OK] Status: '+j.status);const c=Object.keys(j).filter(k=>k!=='status');console.log('  Components: '+c.join(', '));process.exit(0);}else{console.log('  [WARN] Status: '+j.status);process.exit(1);}}else{console.log('  [FAIL] Invalid response');process.exit(1);}" 2>nul
+set HEALTH_EXIT=%errorlevel%
+del temp_health.json 2>nul
+if %HEALTH_EXIT% neq 0 (
+    echo   [HINT] Check PM2 status: npm run pm2
+    exit /b 1
+)
+exit /b 0
 
 :CMD_LOGS
 if "%ARG1%"=="" (
@@ -67,12 +94,35 @@ goto END
 :CMD_BACKUP
 echo [QUICK-OPS] Criando backup...
 set BACKUP_NAME=quickops-%DATE:/=-%_%TIME::=-%_%RANDOM%
+set BACKUP_NAME=%BACKUP_NAME::=-%
 mkdir backups\%BACKUP_NAME% 2>nul
-copy config.json backups\%BACKUP_NAME%\ >nul 2>&1
-copy controle.json backups\%BACKUP_NAME%\ >nul 2>&1
-copy dynamic_rules.json backups\%BACKUP_NAME%\ >nul 2>&1
-echo [SUCCESS] Backup: backups\%BACKUP_NAME%
-goto END
+if errorlevel 1 (
+    echo [FAIL] Failed to create backup directory
+    echo [HINT] Check permissions in backups\ folder
+    exit /b 1
+)
+
+set FILES_BACKED=0
+for %%F in (config.json controle.json dynamic_rules.json ecosystem.config.js) do (
+    if exist %%F (
+        copy %%F backups\%BACKUP_NAME%\ >nul 2>&1
+        if not errorlevel 1 (
+            echo   [OK] %%F
+            set /a FILES_BACKED+=1
+        ) else (
+            echo   [WARN] Failed to backup %%F
+        )
+    )
+)
+
+if %FILES_BACKED% EQU 0 (
+    echo [FAIL] No files were backed up
+    echo [HINT] Check if config files exist in project root
+    exit /b 1
+)
+
+echo [OK] Backup complete: backups\%BACKUP_NAME% ^(%FILES_BACKED% files^)
+exit /b 0
 
 :SHOW_HELP
 echo.
@@ -101,4 +151,5 @@ echo.
 goto END
 
 :END
+REM Generic end point for commands that don't specify exit code
 exit /b 0
