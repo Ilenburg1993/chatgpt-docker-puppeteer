@@ -75,7 +75,8 @@
     // ============================================================
     // Run after container is created (install deps + setup environment)
     // Note: npm ci moved here to ensure node_modules volume is mounted first
-    "postCreateCommand": "npm ci && bash scripts/setup-devcontainer.sh",
+    // Fix permissions first (volumes are created as root)
+    "postCreateCommand": "sudo chown -R node:node /workspaces/chatgpt-docker-puppeteer/node_modules && npm ci && bash scripts/setup-devcontainer.sh",
     // Run every time container starts
     "postStartCommand": "make info && make health || true",
     // Run when attaching to container
