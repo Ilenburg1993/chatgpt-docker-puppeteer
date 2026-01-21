@@ -22,11 +22,7 @@
 // Protocolo universal NERV
 const { createEnvelope } = require('../shared/nerv/envelope');
 
-const {
-    CONNECTION_MODES: CONNECTION_MODES
-} = require('../core/constants/browser.js');
-
-const { MessageType: _MessageType, ActionCode: _ActionCode, ActorRole: _ActorRole } = require('../shared/nerv/constants');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('../core/constants/browser.js');
 
 // Núcleo estrutural
 const createCorrelation = require('./correlation/correlation_store');
@@ -43,143 +39,76 @@ const createReception = require('./reception/reception');
 const createHealth = require('./health/health');
 
 /* ===========================
-   Fábrica do NERV
+   Funções auxiliares de bootstrap
 =========================== */
 
 /**
- * Cria o subsistema NERV.
- *
- * @param {Object} config
- * Configurações estruturais:
- * - mode: 'local' | 'hybrid' (default: 'local')
- *   * local: EventEmitter puro (in-process)
- *   * hybrid: EventEmitter + Socket.io adapter (local + remoto)
- * - transport: { adapter, reconnect? } (se mode='remote' ou adapter customizado)
- * - buffers: { inbound?, outbound? }
- * - health: { thresholds? }
- * - socketUrl: URL do servidor Socket.io (se mode='hybrid')
+ * Bootstrap: Socket.io adapter para modo híbrido
  */
-// eslint-disable-next-line complexity -- NERV initialization requires complex setup
-async function createNERV(config = {}) {
-    /* =========================================================
-     0. Modo de operação (ONDA 2.6: Suporte híbrido)
-  ========================================================= */
+function bootstrapSocketAdapter(config) {
+    const createSocketAdapter = require('../infra/transport/socket_io_adapter');
 
-    const mode = config.mode || CONNECTION_MODES.LOCAL;
-    let socketAdapter = null;
-    let hybridTransport = null;
-
-    // Se modo híbrido, cria adapter Socket.io
-    if (mode === CONNECTION_MODES.HYBRID) {
-        const createSocketAdapter = require('../infra/transport/socket_io_adapter');
-
-        socketAdapter = createSocketAdapter({
-            url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3333',
-            options: config.socketOptions || {}
-        });
-
-        // Log de eventos de conexão (antes de criar telemetria)
-        socketAdapter.events.on('log', ({ level, msg }) => {
-            console.log(`[NERV/${level}] ${msg}`);
-        });
-    }
-
-    /* =========================================================
-     1. Telemetria (base observacional)
-  ========================================================= */
-
-    const telemetry = createTelemetry({
-        namespace: 'nerv'
+    const socketAdapter = createSocketAdapter({
+        url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3333',
+        options: config.socketOptions || {}
     });
 
-    // Agora que telemetry existe, cria hybrid transport
+    // Log de eventos de conexão (antes de criar telemetria)
+    socketAdapter.events.on('log', ({ level, msg }) => {
+        console.log(`[NERV/${level}] ${msg}`);
+    });
+
+    return socketAdapter;
+}
+
+/**
+ * Bootstrap: Hybrid transport (local + Socket.io)
+ */
+function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
     if (mode === CONNECTION_MODES.LOCAL || mode === CONNECTION_MODES.HYBRID) {
-        hybridTransport = createHybridTransport({
+        const hybridTransport = createHybridTransport({
             mode,
             socketAdapter,
             telemetry
         });
 
         hybridTransport.start();
+        return hybridTransport;
     }
+    return null;
+}
 
-    /* =========================================================
-     2. Envelopes (protocolo universal NERV)
-  ========================================================= */
-
-    // Usa protocolo universal diretamente (sem compositor intermediário)
-    const envelopes = {
-        createEnvelope,
-        normalize: createEnvelope, // Alias para compatibilidade
-        validate: env => env // Validação já feita no createEnvelope
-    };
-
-    /* =========================================================
-     3. Correlação (histórico factual)
-  ========================================================= */
-
-    const correlation = createCorrelation({ telemetry });
-
-    /* =========================================================
-     4. Buffers (FIFO técnico)
-  ========================================================= */
-
-    const buffers = createBuffers({
-        telemetry,
-        limits: config.buffers || {}
-    });
-
-    /* =========================================================
-     5. Transporte físico (híbrido ou customizado)
-  ========================================================= */
-
+/**
+ * Bootstrap: Transport físico (híbrido ou customizado)
+ */
+function bootstrapTransport({ hybridTransport, config, telemetry }) {
     // ONDA 2.6: Usa hybridTransport se local/hybrid, ou transport customizado
-    const transport =
+    return (
         hybridTransport ||
         (config.transport?.adapter
             ? createTransport({
-                telemetry,
-                adapter: config.transport.adapter,
-                reconnect: config.transport?.reconnect
-            })
-            : null);
+                  telemetry,
+                  adapter: config.transport.adapter,
+                  reconnect: config.transport?.reconnect
+              })
+            : null)
+    );
+}
 
-    /* =========================================================
-     6. Emissão (ato unilateral)
-  ========================================================= */
-
-    const emission = createEmission({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-        transport // Pode ser null se mode='local'
-    });
-
-    /* =========================================================
-     7. Recepção (fronteira factual)
-  ========================================================= */
-
-    const reception = createReception({
-        envelopes,
-        correlation,
-        telemetry
-    });
-
-    /* =========================================================
-     8. Health (observação de vitalidade)
-  ========================================================= */
-
-    const health = createHealth({
-        telemetry,
-        thresholds: config.health?.thresholds || {}
-    });
-
-    /* =========================================================
-     9. Interface pública do NERV
-  ========================================================= */
-
-    const publicAPI = {
+/**
+ * Constrói a interface pública do NERV
+ */
+function buildPublicAPI({
+    hybridTransport,
+    emission,
+    reception,
+    buffers,
+    transport,
+    health,
+    telemetry,
+    socketAdapter
+}) {
+    return {
         /* Emissão */
         emit: envelope => {
             // ONDA 2.6: Emite via hybrid transport diretamente
@@ -190,7 +119,10 @@ async function createNERV(config = {}) {
         },
         send: envelope => {
             // Alias para emit - usado pelos testes
-            return publicAPI.emit(envelope);
+            if (hybridTransport) {
+                return hybridTransport.send(envelope);
+            }
+            return emission.emitEvent(envelope);
         },
         emitCommand: emission.emitCommand,
         emitEvent: emission.emitEvent,
@@ -236,6 +168,88 @@ async function createNERV(config = {}) {
             }
         }
     };
+}
+
+/* ===========================
+   Fábrica do NERV
+=========================== */
+
+/**
+ * Cria o subsistema NERV.
+ *
+ * @param {Object} config
+ * Configurações estruturais:
+ * - mode: 'local' | 'hybrid' (default: 'local')
+ *   * local: EventEmitter puro (in-process)
+ *   * hybrid: EventEmitter + Socket.io adapter (local + remoto)
+ * - transport: { adapter, reconnect? } (se mode='remote' ou adapter customizado)
+ * - buffers: { inbound?, outbound? }
+ * - health: { thresholds? }
+ * - socketUrl: URL do servidor Socket.io (se mode='hybrid')
+ */
+async function createNERV(config = {}) {
+    /* 0. Modo de operação */
+    const mode = config.mode || CONNECTION_MODES.LOCAL;
+    const socketAdapter = mode === CONNECTION_MODES.HYBRID ? bootstrapSocketAdapter(config) : null;
+
+    /* 1. Telemetria */
+    const telemetry = createTelemetry({ namespace: 'nerv' });
+
+    /* 2. Hybrid transport */
+    const hybridTransport = bootstrapHybridTransport({ mode, socketAdapter, telemetry });
+
+    /* 3. Envelopes */
+    const envelopes = {
+        createEnvelope,
+        normalize: createEnvelope,
+        validate: env => env
+    };
+
+    /* 4. Correlação */
+    const correlation = createCorrelation({ telemetry });
+
+    /* 5. Buffers */
+    const buffers = createBuffers({
+        telemetry,
+        limits: config.buffers || {}
+    });
+
+    /* 6. Transporte físico */
+    const transport = bootstrapTransport({ hybridTransport, config, telemetry });
+
+    /* 7. Emissão */
+    const emission = createEmission({
+        envelopes,
+        buffers,
+        correlation,
+        telemetry,
+        transport
+    });
+
+    /* 8. Recepção */
+    const reception = createReception({
+        envelopes,
+        correlation,
+        telemetry
+    });
+
+    /* 9. Health */
+    const health = createHealth({
+        telemetry,
+        thresholds: config.health?.thresholds || {}
+    });
+
+    /* 10. Interface pública */
+    const publicAPI = buildPublicAPI({
+        hybridTransport,
+        emission,
+        reception,
+        buffers,
+        transport,
+        health,
+        telemetry,
+        socketAdapter
+    });
 
     return Object.freeze(publicAPI);
 }

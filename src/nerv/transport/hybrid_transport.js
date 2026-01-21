@@ -22,9 +22,7 @@
 
 const EventEmitter = require('events');
 
-const {
-    CONNECTION_MODES: CONNECTION_MODES
-} = require('../../core/constants/browser.js');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('../../core/constants/browser.js');
 
 /**
  * Cria transporte híbrido com suporte local + remoto.
@@ -68,7 +66,10 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                             handler(envelope);
                         } catch (err) {
                             telemetry.emit('hybrid_transport_handler_error', {
-                                error: err.message
+                                error: err.message,
+                                correlationId: envelope.causality?.correlation_id,
+                                msgId: envelope.causality?.msg_id,
+                                actionCode: envelope.type?.action_code
                             });
                         }
                     });

@@ -125,13 +125,19 @@ function validateOntology(envelope) {
 const FORBIDDEN_FIELDS = ['status', 'result', 'success', 'error', 'response', 'return_value', 'exception', 'completed'];
 
 function validateProhibitions(envelope) {
-    const serialized = JSON.stringify(envelope);
+    // Recursive walk para detectar campos proibidos (mais eficiente que JSON.stringify)
+    function walk(obj, path = 'envelope') {
+        if (typeof obj !== 'object' || obj === null) return;
 
-    for (const field of FORBIDDEN_FIELDS) {
-        if (serialized.includes(`"${field}"`)) {
-            violation(`Forbidden semantic field detected: ${field}`);
+        for (const key of Object.keys(obj)) {
+            if (FORBIDDEN_FIELDS.includes(key)) {
+                violation(`Forbidden semantic field detected: ${path}.${key}`);
+            }
+            walk(obj[key], `${path}.${key}`);
         }
     }
+
+    walk(envelope);
 }
 
 /* --------------------------------------------------------------------------

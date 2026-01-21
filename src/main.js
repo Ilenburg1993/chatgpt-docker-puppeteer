@@ -35,6 +35,10 @@ const { createKernel } = require('./kernel/kernel');
 const BrowserPoolManager = require('./infra/browser_pool/pool_manager');
 const { ConnectionOrchestrator } = require('./infra/ConnectionOrchestrator');
 
+// Módulos ONDA 2 (requerem NERV injection)
+const forensics = require('./core/forensics');
+const { InfraFailurePolicy } = require('./core/infra_failure_policy');
+
 // Adapters (Pontes NERV)
 const DriverNERVAdapter = require('./driver/nerv_adapter/driver_nerv_adapter');
 const ServerNERVAdapter = require('./server/nerv_adapter/server_nerv_adapter');
@@ -94,6 +98,12 @@ async function boot() {
         });
 
         log('INFO', '[BOOT] ✅ NERV online (híbrido: local + remoto)');
+
+        // Injeta NERV nos módulos ONDA 2
+        forensics.setNERV(nerv);
+        const infraPolicy = new InfraFailurePolicy();
+        infraPolicy.setNERV(nerv);
+        log('DEBUG', '[BOOT] NERV injetado em forensics e infra_failure_policy');
 
         // ===== FASE 3: BROWSER POOL =====
         log('INFO', '[BOOT] Fase 3/6: Inicializando Browser Pool');
@@ -393,8 +403,13 @@ function setupSignalHandlers(context) {
         log('FATAL', `[CRASH] Uncaught Exception: ${error.message}`);
         log('ERROR', `[CRASH] Stack: ${error.stack}`);
 
-        // TODO: Criar crash dump via forensics
-        // await createCrashDump(null, error, 'sys-crash', 'uncaught-exception');
+        // Cria crash dump via forensics (ONDA 2: emite via NERV)
+        try {
+            const forensics = require('./core/forensics');
+            forensics.createCrashDump(null, error, 'sys-crash', 'uncaught-exception');
+        } catch (dumpErr) {
+            log('ERROR', `[CRASH] Falha ao criar dump: ${dumpErr.message}`);
+        }
 
         process.exit(1);
     });

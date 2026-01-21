@@ -19,6 +19,7 @@ const PATHS = require('../fs/paths');
 // --- CONFIGURAÇÃO DE CADÊNCIA ---
 const CACHE_HEARTBEAT_MS = 5000; // Varredura forçada a cada 5s
 const OBSERVATION_WINDOW_MS = 300; // Janela de estabilização para eventos de disco
+const WATCHER_DEBOUNCE_MS = 100; // Debounce para file watcher (P1.2)
 
 // --- ESTADO VOLÁTIL DO CACHE ---
 let globalQueueCache = [];
@@ -26,6 +27,7 @@ let isCacheDirty = true;
 let lastFullScan = 0;
 let currentScanPromise = null;
 let windowTimer = null;
+const watcherDebounceTimer = null; // Timer de debounce para watcher (P1.2)
 
 /**
  * Lista arquivos de tarefa existentes no diretório físico.

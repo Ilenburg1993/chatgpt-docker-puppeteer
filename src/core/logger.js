@@ -149,9 +149,37 @@ function metric(name, payload) {
     }
 }
 
+/* ==========================================================================
+   CONVENIENCE WRAPPERS (DX Improvement)
+========================================================================== */
+
+/**
+ * Wrappers de conveniência para níveis de log mais comuns.
+ * Uso:
+ *   log.debug('Mensagem', taskId)
+ *   log.info('Mensagem', taskId)
+ *   log.warn('Mensagem', taskId)
+ *   log.error('Mensagem', taskId)
+ */
+log.debug = (msg, taskId) => log('DEBUG', msg, taskId);
+log.info = (msg, taskId) => log('INFO', msg, taskId);
+log.warn = (msg, taskId) => log('WARN', msg, taskId);
+log.error = (msg, taskId) => log('ERROR', msg, taskId);
+
 // --- INICIALIZAÇÃO (HYGIENE CHECK) ---
 cleanOldFiles('agente_');
 cleanOldFiles('metrics_');
 cleanOldFiles('audit_');
 
-module.exports = { log, audit, metric, logMetric: metric, LOG_DIR };
+module.exports = {
+    log,
+    audit,
+    metric,
+    logMetric: metric,
+    LOG_DIR,
+    // Export wrappers for convenience
+    debug: log.debug,
+    info: log.info,
+    warn: log.warn,
+    error: log.error
+};

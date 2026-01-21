@@ -56,6 +56,7 @@ function safeCall(handler, payload) {
  */
 function createIPCTelemetry(config = {}) {
     const enabled = config.enabled !== false;
+    const MAX_LISTENERS = config.maxListeners || 100;
 
     /* ===========================
      Estado interno (técnico)
@@ -136,6 +137,10 @@ function createIPCTelemetry(config = {}) {
     function on(handler) {
         if (typeof handler !== 'function') {
             throw new Error('telemetry.on requer função');
+        }
+
+        if (subscribers.size >= MAX_LISTENERS) {
+            throw new Error(`Telemetry max listeners (${MAX_LISTENERS}) exceeded`);
         }
 
         subscribers.add(handler);

@@ -100,11 +100,39 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
             }
 
             try {
+                // P3.3: Recovery lock com UUID para prevenir race entre múltiplas instâncias
+                const recoveryId = `${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 9)}`;
+                const recoveryLockFile = `${lockFile}.recovery.${recoveryId}`;
+
+                // [FASE 1] Cria recovery lock temporário
+                await fs.writeFile(recoveryLockFile, JSON.stringify({ pid: process.pid, recoveryId }));
+
+                // [FASE 2] Aguarda 100ms para dar chance de outros processos detectarem
+                await new Promise(resolve => {
+                    setTimeout(resolve, 100);
+                });
+
+                // [FASE 3] Verifica se somos únicos no recovery
+                const lockDir = require('path').dirname(lockFile);
+                const files = await fs.readdir(lockDir);
+                const recoveryFiles = files.filter(f => f.includes('.recovery.'));
+
+                if (recoveryFiles.length > 1) {
+                    // Outro processo também detectou - aborta para evitar race
+                    await fs.unlink(recoveryLockFile).catch(() => {});
+                    return false;
+                }
+
+                // [FASE 4] Somos únicos - prossegue com recovery
                 // [ANTI-RACE] Revalida PID antes de deletar
                 const recheck = await safeReadJSON(lockFile);
                 if (recheck && recheck.pid === currentLock.pid) {
                     await fs.unlink(lockFile).catch(() => {});
                 }
+
+                // Cleanup recovery lock
+                await fs.unlink(recoveryLockFile).catch(() => {});
+
                 // Tenta adquirir novamente após limpeza
                 return acquireLock(taskId, target, attempt + 1);
             } catch (_) {

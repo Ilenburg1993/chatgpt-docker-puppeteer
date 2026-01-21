@@ -63,7 +63,11 @@ function init() {
         fsWatcher = fs.watch(queuePath, (event, filename) => {
             // Filtra cirurgicamente apenas arquivos de intenção (.json)
             if (filename && filename.endsWith('.json')) {
-                _signalChange();
+                // P1.2: Debounce de 100ms para prevenir múltiplos eventos da mesma mudança
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    _signalChange();
+                }, 100);
             }
         });
     } catch (e) {

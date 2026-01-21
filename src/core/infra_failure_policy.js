@@ -8,10 +8,20 @@
 ========================================================================== */
 
 const system = require('../infra/system');
-// TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter
-// const ipc = require('../infra/ipc_client');
 const { log, audit } = require('./logger');
-const { ActionCode: _ActionCode } = require('../shared/nerv/constants');
+const { ActionCode, MessageType, ActorRole } = require('../shared/nerv/constants');
+const { createEnvelope } = require('../shared/nerv/envelope');
+
+// NERV instance will be injected via setNERV()
+let nervInstance = null;
+
+/**
+ * Injeta instância do NERV para emissão de eventos (ONDA 2).
+ * Deve ser chamado no boot antes de usar infra_failure_policy.
+ */
+function setNERV(nerv) {
+    nervInstance = nerv;
+}
 
 /**
  * Failure Categories: Categorias de falha de infraestrutura
@@ -77,14 +87,29 @@ class InfraFailurePolicy {
      * Executa a manobra física e reporta para a malha sensorial (IPC).
      */
     async _executeManeuver(type, pid, correlationId, ctx, forceKill = false) {
-        // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura
-        // TODO [ONDA 2]: Migrar para NERV.emit()
-        // ipc.emitEvent(ActionCode.STALL_DETECTED, {
-        //     type,
-        //     severity: 'CRITICAL',
-        //     evidence: { pid, action: forceKill ? 'PROCESS_KILL' : 'CLEANUP' }
-        // }, correlationId);
-        log('WARN', `[POLICY] Infraestrutura escalada: ${type} (PID: ${pid}) - TODO: emitir via NERV`, correlationId);
+        // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura via NERV (ONDA 2 - Migrado)
+        if (nervInstance) {
+            const envelope = createEnvelope({
+                actor: ActorRole.INFRA,
+                messageType: MessageType.EVENT,
+                actionCode: ActionCode.INFRA_EMERGENCY,
+                payload: {
+                    type: type,
+                    pid: pid,
+                    action: forceKill ? 'PROCESS_KILL' : 'CLEANUP',
+                    severity: 'CRITICAL'
+                },
+                correlationId: correlationId
+            });
+            nervInstance.emit(envelope);
+            log('WARN', `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`, correlationId);
+        } else {
+            log(
+                'WARN',
+                `[POLICY] Infraestrutura escalada mas NERV não disponível: ${type} (PID: ${pid})`,
+                correlationId
+            );
+        }
 
         // B. Registro em Auditoria Administrativa
         await audit('INFRA_ESCALATION', { type, pid, correlationId });
@@ -115,4 +140,4 @@ class InfraFailurePolicy {
     }
 }
 
-module.exports = InfraFailurePolicy;
+module.exports = { InfraFailurePolicy, setNERV };

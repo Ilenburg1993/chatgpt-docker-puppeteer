@@ -49,8 +49,6 @@ const ActionCode = Object.freeze({
     TASK_RETRY: 'TASK_RETRY',
     TASK_FAILED: 'TASK_FAILED', // Task execution failed
     TASK_REJECTED: 'TASK_REJECTED', // Task rejected by policy
-    TASK_OBSERVED: 'TASK_OBSERVED', // (Planned for future use)
-    TASK_FAILED_OBSERVED: 'TASK_FAILED_OBSERVED', // (Planned for future use)
 
     // ---- PROPOSAL / POLICY ----
     PROPOSE_TASK: 'PROPOSE_TASK', // Policy engine task proposal
@@ -85,20 +83,16 @@ const ActionCode = Object.freeze({
     BROWSER_REBOOT: 'BROWSER_REBOOT',
     CACHE_CLEAR: 'CACHE_CLEAR',
     STALL_DETECTED: 'STALL_DETECTED',
+    INFRA_EMERGENCY: 'INFRA_EMERGENCY', // ONDA 2: Infrastructure emergency escalation
+
+    // ---- FORENSICS ----
+    FORENSICS_DUMP_CREATED: 'FORENSICS_DUMP_CREATED', // ONDA 2: Crash dump evidence ready
 
     // ---- SECURITY ----
     SECURITY_VIOLATION: 'SECURITY_VIOLATION',
 
     // ---- TELEMETRY ----
-    TELEMETRY_DISCARDED: 'TELEMETRY_DISCARDED',
-
-    // ---- TRANSPORT / IPC (technical events - planned) ----
-    TRANSPORT_TIMEOUT: 'TRANSPORT_TIMEOUT', // (Planned for future use)
-    TRANSPORT_RETRYING: 'TRANSPORT_RETRYING', // (Planned for future use)
-    CHANNEL_DEGRADED: 'CHANNEL_DEGRADED', // (Planned for future use)
-
-    // ---- ACK (technical only - planned) ----
-    ACK_RECEIVED: 'ACK_RECEIVED' // (Planned for future use)
+    TELEMETRY_DISCARDED: 'TELEMETRY_DISCARDED'
 });
 
 /**

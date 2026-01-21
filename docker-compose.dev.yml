@@ -1,0 +1,81 @@
+version: '3.8'
+
+# =============================================================================
+# Docker Compose - Development Configuration
+# Hot-reload enabled for rapid development
+# =============================================================================
+
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+
+    container_name: chatgpt-agent-dev
+    restart: unless-stopped
+
+    environment:
+      - NODE_ENV=development
+      - TZ=America/Sao_Paulo
+      # Chrome remote debugging connection
+      # host.docker.internal works on Docker Desktop (Windows/Mac)
+      # For Linux, use: --add-host=host.docker.internal:host-gateway
+      - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+      - LOG_LEVEL=debug
+      # Enable Node.js inspector for debugging
+      - NODE_OPTIONS=--inspect=0.0.0.0:9229
+
+    volumes:
+      # HOT-RELOAD: Source code mounted as read-only
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
+      - ./public:/app/public:ro
+
+      # Config files (hot-reload enabled)
+      - ./config.json:/app/config.json:ro
+      - ./dynamic_rules.json:/app/dynamic_rules.json:ro
+      - ./controle.json:/app/controle.json
+
+      # Data volumes (persistent)
+      - ./fila:/app/fila
+      - ./respostas:/app/respostas
+      - ./logs:/app/logs
+      - ./profile:/app/profile
+
+      # Isolated node_modules (performance)
+      - node_modules_dev:/app/node_modules
+
+    ports:
+      - "3008:3008"    # Dashboard web
+      - "9229:9229"    # Node.js inspector (Chrome DevTools)
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+volumes:
+  # Isolated node_modules for better performance
+  # Prevents host node_modules conflicts and improves I/O on Windows/macOS
+  node_modules_dev:
+    driver: local
+
+# =============================================================================
+# Notes:
+# 1. Source code is mounted read-only (:ro) for security
+# 2. Nodemon (in Dockerfile.dev) watches /app/src for changes
+# 3. Node inspector exposed on port 9229 for Chrome DevTools debugging
+# 4. Use with: docker-compose -f docker-compose.dev.yml up
+# 5. For Linux hosts, add: extra_hosts: ["host.docker.internal:host-gateway"]
+# =============================================================================

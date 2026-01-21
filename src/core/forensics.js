@@ -14,10 +14,20 @@ const { log } = require('./logger');
 // Infraestrutura e Shared Kernel
 const PATHS = require('../infra/fs/paths');
 const io = require('../infra/io');
-// TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter
-// const ipc = require('../infra/ipc_client');
 const identityManager = require('./identity_manager');
-const { ActionCode: _ActionCode } = require('../shared/nerv/constants');
+const { ActionCode, MessageType, ActorRole } = require('../shared/nerv/constants');
+const { createEnvelope } = require('../shared/nerv/envelope');
+
+// NERV instance will be injected via setNERV()
+let nervInstance = null;
+
+/**
+ * Injeta instância do NERV para emissão de eventos (ONDA 2).
+ * Deve ser chamado no boot antes de usar forensics.
+ */
+function setNERV(nerv) {
+    nervInstance = nerv;
+}
 
 /**
  * Tempo limite para capturas visuais (5 segundos).
@@ -76,19 +86,26 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
             });
         }
 
-        // 4. NOTIFICAÇÃO IPC 2.0 (Com Truncamento de Payload)
+        // 4. NOTIFICAÇÃO IPC 2.0 via NERV (ONDA 2 - Migrado)
         // Evita enviar stack traces gigantescas pelo barramento Socket.io
-        // TODO [ONDA 2]: Migrar para NERV.emit()
-        // ipc.emitEvent(ActionCode.STALL_DETECTED, {
-        //     type: 'FORENSIC_DUMP_READY',
-        //     severity: 'CRITICAL',
-        //     evidence: {
-        //         dump_id: dumpId,
-        //         error_summary: error.message.substring(0, 255), // Truncamento de segurança
-        //         path: folder
-        //     }
-        // }, correlationId);
-        log('INFO', `[FORENSICS] Dump criado: ${dumpId} - TODO: emitir via NERV`, correlationId);
+        if (nervInstance) {
+            const envelope = createEnvelope({
+                actor: ActorRole.INFRA,
+                messageType: MessageType.EVENT,
+                actionCode: ActionCode.FORENSICS_DUMP_CREATED,
+                payload: {
+                    dump_id: dumpId,
+                    error_summary: error.message.substring(0, 255), // Truncamento de segurança
+                    path: folder,
+                    severity: 'CRITICAL'
+                },
+                correlationId: correlationId
+            });
+            nervInstance.emit(envelope);
+            log('INFO', `[FORENSICS] Dump criado e notificado via NERV: ${dumpId}`, correlationId);
+        } else {
+            log('WARN', `[FORENSICS] Dump criado mas NERV não disponível: ${dumpId}`, correlationId);
+        }
     } catch (e) {
         // Falha na forense é reportada apenas no log local para não interferir na recuperação
         console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
@@ -119,4 +136,4 @@ async function _captureVisualEvidence(page, folder, _correlationId) {
     await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
 }
 
-module.exports = { createCrashDump };
+module.exports = { createCrashDump, setNERV };

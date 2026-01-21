@@ -25,11 +25,13 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Scoped Locking**: Use `io.acquireLock(taskId, target)` with PID validation to prevent zombie processes
 - **Incremental Collection**: Responses gathered in chunks with anti-loop heuristics (hash comparison, punctuation detection)
 - **Memory Management**: Manual GC (`global.gc()`) and WeakMap caching for browser instances
-- **Reactive State**: File watchers invalidate caches instantly (e.g., queue changes trigger re-scan)
+- **Reactive State**: File watchers invalidate caches instantly with 100ms debounce (e.g., queue changes trigger re-scan)
 - **Sanitization**: Remove control characters from prompts to prevent browser protocol breaks
 - **Backoff Strategy**: Exponential jitter for failures (task/infra separate counters)
 - **Optimistic Locking**: Kernel uses expectedState for race detection in concurrent task updates (P5.1 fix)
-- **Cache Invalidation**: ALWAYS call `markDirty()` BEFORE write operations in io.js (P5.2 known bug - needs fix)
+- **Cache Invalidation**: ✅ markDirty() called BEFORE write operations in io.js (P5.2 fixed 2026-01-21)
+- **Health Checks**: Browser pool detects both crashes AND degradation (>5s response time)
+- **Orphan Recovery**: UUID-based recovery locks prevent race conditions between multiple instances
 
 ## Developer Workflows
 
@@ -75,28 +77,28 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 ## Constants Usage Patterns
 
 - **Always import from** `src/core/constants/`:
-  ```javascript
-  const { STATUS_VALUES, TASK_STATES } = require('../core/constants/tasks');
-  const { CONNECTION_MODES, BROWSER_STATES } = require('../core/constants/browser');
-  // Note: LOG_CATEGORIES is documentation-only, not imported
-  ```
+    ```javascript
+    const { STATUS_VALUES, TASK_STATES } = require('../core/constants/tasks');
+    const { CONNECTION_MODES, BROWSER_STATES } = require('../core/constants/browser');
+    // Note: LOG_CATEGORIES is documentation-only, not imported
+    ```
 - **Never use magic strings** for:
-  - Task status values → Use `STATUS_VALUES.PENDING`, `STATUS_VALUES.RUNNING`, etc.
-  - Connection modes → Use `CONNECTION_MODES.HYBRID`, `CONNECTION_MODES.LAUNCHER`, etc.
-  - Log levels → Use severity levels directly: `log('INFO', msg)`, `log('ERROR', msg)`
-  - **LOG_CATEGORIES**: Documentation reference only; not used as runtime constants
-- **Use *_ARRAY variants** for Zod enum validation:
-  ```javascript
-  const { STATUS_VALUES_ARRAY } = require('../core/constants/tasks');
-  const statusSchema = z.enum(STATUS_VALUES_ARRAY); // ['PENDING', 'RUNNING', ...]
-  ```
+    - Task status values → Use `STATUS_VALUES.PENDING`, `STATUS_VALUES.RUNNING`, etc.
+    - Connection modes → Use `CONNECTION_MODES.HYBRID`, `CONNECTION_MODES.LAUNCHER`, etc.
+    - Log levels → Use severity levels directly: `log('INFO', msg)`, `log('ERROR', msg)`
+    - **LOG_CATEGORIES**: Documentation reference only; not used as runtime constants
+- **Use \*\_ARRAY variants** for Zod enum validation:
+    ```javascript
+    const { STATUS_VALUES_ARRAY } = require('../core/constants/tasks');
+    const statusSchema = z.enum(STATUS_VALUES_ARRAY); // ['PENDING', 'RUNNING', ...]
+    ```
 - **Logging pattern**: Use severity levels + descriptive tags in messages:
-  ```javascript
-  const { log } = require('./core/logger');
-  log('INFO', '[BOOT] System starting...');    // ✓ Correct
-  log('ERROR', '[LIFECYCLE] Task failed');      // ✓ Correct
-  log(LOG_CATEGORIES.BOOT, 'Message');           // ✗ Not used in this codebase
-  ```
+    ```javascript
+    const { log } = require('./core/logger');
+    log('INFO', '[BOOT] System starting...'); // ✓ Correct
+    log('ERROR', '[LIFECYCLE] Task failed'); // ✓ Correct
+    log(LOG_CATEGORIES.BOOT, 'Message'); // ✗ Not used in this codebase
+    ```
 - **Automated migration**: Run `scripts/apply-all-codemods.sh` to transform magic strings
 - **Import paths**: Codemods auto-calculate relative paths using `path.relative()`
 
@@ -108,16 +110,34 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - Use absolute paths for file operations (e.g., `path.join(ROOT, 'fila')`)
 - Test with `test-puppeteer.js` for browser connectivity before full runs
 - **Never import STATES from ConnectionOrchestrator** without using it (triggers ESLint no-unused-vars)
-- **P5.2 Bug**: markDirty() must be called BEFORE saveTask/deleteTask in io.js (cache invalidation order)
 - **Browser Pool**: Always use launcher mode in tests unless external Chrome is confirmed available
 - **Constants First**: Always use typed constants from `src/core/constants/` instead of magic strings
+- **File Watcher**: 100ms debounce prevents multiple events from same file change
 
 ## Known Issues (as of Jan 2026)
 
-1. **P5.2 Cache Invalidation**: `src/infra/io.js` - markDirty() called after writes (should be before)
+1. ~~**P5.2 Cache Invalidation**~~: ✅ CORRIGIDO (2026-01-21) - markDirty() agora é chamado ANTES dos writes
 2. **npm test broken**: `scripts/run_all_tests.sh` line 3 has bash syntax issue (`set -euo pipefail`)
 3. **Integration tests**: 82% (9/11) were obsolete due to IPC refactoring - already cleaned up
 4. **Test dependencies**: 4 tests (lock, control_pause, running_recovery, stall_mitigation) require full agent running
+
+## Recent Corrections (Jan 2026)
+
+### NERV Subsystem (P1+P2+P3 - 13 corrections - ~30 hours)
+
+- ✅ Envelope canonicalization (KernelNERVBridge, DriverNERVAdapter, ServerNERVAdapter)
+- ✅ Identity validation complete
+- ✅ MessageType enum consolidation
+- ✅ ActionCode constants migration
+- ✅ Correlation ID propagation
+- ✅ NERV injection in main.js (forensics + infra_failure_policy)
+
+### INFRA Subsystem (P3 corrections - 3 corrections - ~5 hours)
+
+- ✅ P5.2 Cache Invalidation: markDirty() BEFORE writes (io.js)
+- ✅ File Watcher Debounce: 100ms debounce (fs_watcher.js)
+- ✅ Health Checks: Timing-based degradation detection (pool_manager.js)
+- ✅ Orphan Recovery: UUID-based race-safe recovery (lock_manager.js)
 
 ## Testing Strategy
 

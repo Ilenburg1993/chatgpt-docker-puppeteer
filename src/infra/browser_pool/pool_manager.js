@@ -19,9 +19,7 @@
 
 const _puppeteer = require('puppeteer');
 
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('../../core/constants/tasks.js');
 
 const _puppeteerCore = require('puppeteer-core');
 const { log } = require('../../core/logger');
@@ -318,6 +316,7 @@ class BrowserPoolManager {
 
     /**
      * Realiza health check em todas as instâncias do pool.
+     * P3.2: Detecta tanto crashes quanto degradação de performance
      */
     async _performHealthCheck() {
         this.stats.healthChecks++;
@@ -331,14 +330,36 @@ class BrowserPoolManager {
                     throw new Error('Browser desconectado');
                 }
 
-                // Tenta criar/fechar página de teste (smoke test)
+                // P3.2: Mede timing do smoke test para detectar degradação
+                const startTime = Date.now();
                 const testPage = await poolEntry.browser.newPage();
                 await testPage.close();
+                const duration = Date.now() - startTime;
 
-                // Instância saudável
-                poolEntry.health.status = STATUS_VALUES.HEALTHY;
-                poolEntry.health.consecutiveFailures = 0;
-                poolEntry.health.lastCheck = Date.now();
+                // P3.2: Detecta degradação (resposta > 5s indica problema)
+                if (duration > 5000) {
+                    poolEntry.health.status = 'DEGRADED';
+                    poolEntry.health.consecutiveFailures++;
+                    log(
+                        'WARN',
+                        `[BrowserPool] Instância ${poolEntry.id} DEGRADED (${duration}ms) - ${poolEntry.health.consecutiveFailures}/3 falhas`
+                    );
+
+                    // Auto-restart após 3 degradações consecutivas
+                    if (poolEntry.health.consecutiveFailures >= 3) {
+                        poolEntry.health.status = STATUS_VALUES.CRASHED;
+                        this.stats.crashesDetected++;
+                        log(
+                            'ERROR',
+                            `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED após degradações repetidas`
+                        );
+                    }
+                } else {
+                    // Instância saudável - reseta contador
+                    poolEntry.health.status = STATUS_VALUES.HEALTHY;
+                    poolEntry.health.consecutiveFailures = 0;
+                    poolEntry.health.lastCheck = Date.now();
+                }
             } catch (error) {
                 log('WARN', `[BrowserPool] Health check falhou para ${poolEntry.id}: ${error.message}`);
 

@@ -37,13 +37,16 @@ const createBackpressure = require('./backpressure');
  *
  * @param {Object} [deps.limits]
  * Limites técnicos opcionais:
- * - outbound
- * - inbound
+ * - outbound: Limite de fila outbound
+ * - inbound: Limite de fila inbound
+ * - blockOnPressure: Se true, bloqueia quando buffer cheio (default: false)
  */
 function createBuffers({ telemetry, limits = {} }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
         throw new Error('buffers requer telemetry válida');
     }
+
+    const blockOnPressure = limits.blockOnPressure === true;
 
     const backpressure = createBackpressure({ telemetry });
 
@@ -64,7 +67,7 @@ function createBuffers({ telemetry, limits = {} }) {
     return Object.freeze({
         /* Outbound */
 
-        enqueueOutbound(item) {
+        async enqueueOutbound(item) {
             const ok = outbound.enqueue(item);
             if (!ok) {
                 backpressure.signal({
@@ -72,6 +75,11 @@ function createBuffers({ telemetry, limits = {} }) {
                     size: outbound.size(),
                     limit: limits.outbound ?? null
                 });
+
+                // Blocking option: rejeita se backpressure ativo
+                if (blockOnPressure) {
+                    throw new Error(`Outbound buffer full (${outbound.size()}/${limits.outbound ?? 'unlimited'})`);
+                }
             }
             return ok;
         },
@@ -86,7 +94,7 @@ function createBuffers({ telemetry, limits = {} }) {
 
         /* Inbound */
 
-        enqueueInbound(item) {
+        async enqueueInbound(item) {
             const ok = inbound.enqueue(item);
             if (!ok) {
                 backpressure.signal({
@@ -94,6 +102,11 @@ function createBuffers({ telemetry, limits = {} }) {
                     size: inbound.size(),
                     limit: limits.inbound ?? null
                 });
+
+                // Blocking option: rejeita se backpressure ativo
+                if (blockOnPressure) {
+                    throw new Error(`Inbound buffer full (${inbound.size()}/${limits.inbound ?? 'unlimited'})`);
+                }
             }
             return ok;
         },

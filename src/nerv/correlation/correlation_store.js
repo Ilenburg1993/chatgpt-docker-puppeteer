@@ -60,6 +60,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     const store = emptyMap();
 
     const MAX_ENTRIES = typeof limits.maxEntries === 'number' ? limits.maxEntries : null;
+    const TTL = limits.ttl || 3600000; // 1 hora default
 
     /* ===========================
      Operações internas
@@ -70,13 +71,45 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      */
     function ensureCorrelation(correlationId) {
         if (!store[correlationId]) {
-            store[correlationId] = [];
+            store[correlationId] = {
+                createdAt: now(),
+                entries: []
+            };
 
             telemetry.emit('nerv:correlation:created', {
                 correlation_id: correlationId
             });
         }
     }
+
+    /**
+     * Cleanup periódico de correlações expiradas (TTL)
+     */
+    const cleanupInterval = setInterval(() => {
+        const cutoff = now() - TTL;
+        let expiredCount = 0;
+
+        for (const id in store) {
+            if (store[id].createdAt < cutoff) {
+                delete store[id];
+                expiredCount++;
+                telemetry.emit('nerv:correlation:expired', {
+                    correlation_id: id,
+                    ttl: TTL
+                });
+            }
+        }
+
+        if (expiredCount > 0) {
+            telemetry.emit('nerv:correlation:cleanup', {
+                expired_count: expiredCount,
+                remaining: Object.keys(store).length
+            });
+        }
+    }, 60000); // Check a cada 1 minuto
+
+    // Permite parar o cleanup se necessário
+    cleanupInterval.unref(); // Não bloqueia o processo de encerrar
 
     /**
      * Cria um registro técnico mínimo a partir de um envelope.
@@ -107,7 +140,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
 
         ensureCorrelation(correlationId);
 
-        const records = store[correlationId];
+        const records = store[correlationId].entries;
         records.push(createRecord(envelope));
 
         telemetry.emit('nerv:correlation:append', {
@@ -136,7 +169,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
             return [];
         }
 
-        return store[correlationId].slice();
+        return store[correlationId].entries.slice();
     }
 
     /**
@@ -160,7 +193,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
             return 0;
         }
 
-        return store[correlationId].length;
+        return store[correlationId].entries.length;
     }
 
     /**

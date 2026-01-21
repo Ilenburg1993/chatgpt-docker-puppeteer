@@ -20,6 +20,7 @@ const { safeReadJSON } = require('../infra/fs/safe_read');
 const ConfigSchema = z
     .object({
         // --- Infraestrutura Base ---
+        BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher'),
         DEBUG_PORT: z.string().url().default('http://localhost:9222'),
         IDLE_SLEEP: z.number().min(500).default(3000),
 
@@ -29,20 +30,41 @@ const ConfigSchema = z
         UNKNOWN_ENV_SLEEP: z.number().min(1000).default(3000),
         MIN_ENV_CONFIDENCE: z.number().min(0).max(1).default(1),
 
+        // --- Comportamento do Modelo ---
+        DEFAULT_MODEL_ID: z.string().default('gpt-5'),
+        adaptive_mode: z.enum(['auto', 'manual']).default('auto'),
+
+        // --- Timeouts e Paciência ---
+        STABILITY_INTERVAL: z.number().min(500).default(2000),
+        PROGRESS_TIMEOUT_MS: z.number().default(90000),
+        HEARTBEAT_TIMEOUT_MS: z.number().default(15000),
+        ECHO_CONFIRM_TIMEOUT_MS: z.number().default(5000),
+        CONTEXT_RESOLUTION_TIMEOUT: z.number().default(30000),
+
         // --- Limites de Execução e SLA ---
         TASK_TIMEOUT_MS: z.number().default(1800000),
         RUNNING_RECOVERY_MS: z.number().default(2400000),
         MAX_CONTINUATIONS: z.number().int().default(25),
         MAX_OUT_BYTES: z.number().default(10485760),
 
-        // --- Timeouts de Protocolo e Contexto ---
-        PROGRESS_TIMEOUT_MS: z.number().default(90000),
-        HEARTBEAT_TIMEOUT_MS: z.number().default(15000),
-        ECHO_CONFIRM_TIMEOUT_MS: z.number().default(5000),
-        CONTEXT_RESOLUTION_TIMEOUT: z.number().default(30000),
+        // --- Digitação Humana (Biomechanics) ---
+        CHUNK_SIZE: z.number().int().min(50).max(500).default(150),
+        ECHO_RETRIES: z.number().int().min(1).max(10).default(5),
+        ADAPTIVE_DELAY_BASE: z.number().min(10).max(100).default(40),
+        ADAPTIVE_DELAY_MAX: z.number().min(100).max(1000).default(250),
+
+        // --- Políticas de Segurança ---
+        allow_dom_assist: z.boolean().default(true),
+        multi_tab_policy: z.enum(['AUTO_CLOSE', 'MANUAL', 'IGNORE']).default('AUTO_CLOSE'),
+        USER_INACTIVITY_THRESHOLD_MS: z.number().min(1000).default(5000),
+        USER_ABORT_ACTION: z.enum(['PAUSE', 'FAIL', 'IGNORE']).default('PAUSE'),
 
         // --- Governança de Domínio ---
-        allowedDomains: z.array(z.string()).default(['chatgpt.com', 'claude.ai', 'gemini.google.com', 'openai.com'])
+        allowedDomains: z.array(z.string()).default(['chatgpt.com', 'claude.ai', 'gemini.google.com', 'openai.com']),
+
+        // --- Tuning do Adaptativo ---
+        ADAPTIVE_ALPHA: z.number().min(0).max(1).default(0.15),
+        ADAPTIVE_COOLDOWN_MS: z.number().min(1000).default(5000)
     })
     .passthrough(); // Preserva chaves de comentário "//"
 
@@ -131,6 +153,68 @@ class ConfigurationManager extends EventEmitter {
     }
     get allowedDomains() {
         return this.currentConfig.allowedDomains;
+    }
+
+    // --- Getters Adicionais (Novos Parâmetros) ---
+    get BROWSER_MODE() {
+        return this.currentConfig.BROWSER_MODE;
+    }
+    get DEFAULT_MODEL_ID() {
+        return this.currentConfig.DEFAULT_MODEL_ID;
+    }
+    get adaptive_mode() {
+        return this.currentConfig.adaptive_mode;
+    }
+    get STABILITY_INTERVAL() {
+        return this.currentConfig.STABILITY_INTERVAL;
+    }
+    get PROGRESS_TIMEOUT_MS() {
+        return this.currentConfig.PROGRESS_TIMEOUT_MS;
+    }
+    get HEARTBEAT_TIMEOUT_MS() {
+        return this.currentConfig.HEARTBEAT_TIMEOUT_MS;
+    }
+    get ECHO_CONFIRM_TIMEOUT_MS() {
+        return this.currentConfig.ECHO_CONFIRM_TIMEOUT_MS;
+    }
+    get TASK_TIMEOUT_MS() {
+        return this.currentConfig.TASK_TIMEOUT_MS;
+    }
+    get MAX_CONTINUATIONS() {
+        return this.currentConfig.MAX_CONTINUATIONS;
+    }
+    get MAX_OUT_BYTES() {
+        return this.currentConfig.MAX_OUT_BYTES;
+    }
+    get CHUNK_SIZE() {
+        return this.currentConfig.CHUNK_SIZE;
+    }
+    get ECHO_RETRIES() {
+        return this.currentConfig.ECHO_RETRIES;
+    }
+    get ADAPTIVE_DELAY_BASE() {
+        return this.currentConfig.ADAPTIVE_DELAY_BASE;
+    }
+    get ADAPTIVE_DELAY_MAX() {
+        return this.currentConfig.ADAPTIVE_DELAY_MAX;
+    }
+    get allow_dom_assist() {
+        return this.currentConfig.allow_dom_assist;
+    }
+    get multi_tab_policy() {
+        return this.currentConfig.multi_tab_policy;
+    }
+    get USER_INACTIVITY_THRESHOLD_MS() {
+        return this.currentConfig.USER_INACTIVITY_THRESHOLD_MS;
+    }
+    get USER_ABORT_ACTION() {
+        return this.currentConfig.USER_ABORT_ACTION;
+    }
+    get ADAPTIVE_ALPHA() {
+        return this.currentConfig.ADAPTIVE_ALPHA;
+    }
+    get ADAPTIVE_COOLDOWN_MS() {
+        return this.currentConfig.ADAPTIVE_COOLDOWN_MS;
     }
 }
 

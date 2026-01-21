@@ -1,0 +1,45 @@
+{
+    "_comment": "========================================",
+    "_comment_2": "ATENÇÃO: Este é apenas um EXEMPLO de estrutura",
+    "_comment_3": "A fila real fica na pasta fila/ com arquivos task-{id}.json",
+    "_comment_4": "Este arquivo NÃO é lido pelo sistema",
+    "_comment_5": "========================================",
+    "fila": [
+        {
+            "id": "task-001",
+            "prompt": "Explique em um parágrafo o que é ontologia negativa.",
+            "status": "PENDING",
+            "prioridade": 1,
+            "criadoEm": "2026-01-12T21:00:00Z",
+            "resultado": null,
+            "_schema_notes": "Campos obrigatórios: id, prompt, status",
+            "_status_values": "PENDING | RUNNING | DONE | FAILED",
+            "_optional_fields": "prioridade, target, spec, criadoEm, resultado"
+        },
+        {
+            "id": "task-002",
+            "prompt": "Resuma em 3 parágrafos a teoria da evolução de Darwin.",
+            "status": "PENDING",
+            "prioridade": 2,
+            "target": "chatgpt.com",
+            "spec": {
+                "model": "gpt-4",
+                "validation": {
+                    "min_length": 300,
+                    "max_length": 1000,
+                    "forbidden_terms": [
+                        "copia",
+                        "plágio"
+                    ]
+                }
+            },
+            "criadoEm": "2026-01-12T21:05:00Z",
+            "resultado": null
+        }
+    ],
+    "_usage_instructions": {
+        "como_adicionar_tarefa": "Use `npm run queue:add` ou crie arquivo task-{uuid}.json em fila/",
+        "como_ver_fila": "Use `npm run queue:status` ou acesse dashboard em http://localhost:3008",
+        "schema_completo": "Veja src/core/schemas/task_schema.js para validação Zod completa"
+    }
+}

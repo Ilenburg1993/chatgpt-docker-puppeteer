@@ -12,7 +12,7 @@ const { ActorRole, MessageType, ActionCode } = require('./src/shared/ipc/constan
 const { createEnvelope } = require('./src/shared/ipc/envelope');
 
 // CONFIGURAÇÃO DO TESTE
-const SERVER_URL = 'http://localhost:3000'; // Ajuste a porta se seu server usar outra
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3008';
 const ROBOT_ID = uuidv4(); // Identidade efêmera para o teste
 
 console.log(`\n[DIAGNOSTIC] Iniciando Teste de Pulso do NERV...`);

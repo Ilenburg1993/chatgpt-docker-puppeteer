@@ -21,7 +21,8 @@
 ========================================================================== */
 
 const { v4: uuidv4 } = require('uuid');
-const { ActorRole, MessageType } = require('../../shared/nerv/constants');
+const { ActorRole, MessageType, ActionCode } = require('../../shared/nerv/constants');
+const { createEnvelope } = require('../../shared/nerv/envelope');
 
 /* ===========================
    Utilitários internos
@@ -310,22 +311,20 @@ class KernelNERVBridge {
             throw new Error('KernelNERVBridge não iniciada');
         }
 
-        const msgId = uuidv4();
+        // Extrair actionCode do payload (ou usar genérico)
+        const actionCode = payload.actionCode || ActionCode.KERNEL_TELEMETRY;
 
-        const envelope = {
-            header: {
-                version: 1,
-                timestamp: Date.now(),
-                source: ActorRole.KERNEL.toLowerCase(),
-                ...(target && { target })
-            },
-            ids: {
-                msg_id: msgId,
-                correlation_id: correlationId
-            },
-            kind: MessageType.EVENT,
-            payload
-        };
+        // Criar envelope canônico usando factory
+        const envelope = createEnvelope({
+            actor: ActorRole.KERNEL,
+            target: target ? ActorRole[target.toUpperCase()] : null,
+            messageType: MessageType.EVENT,
+            actionCode: actionCode,
+            payload: payload,
+            correlationId: correlationId
+        });
+
+        const msgId = envelope.causality.msg_id;
 
         try {
             this.nerv.emitEvent(envelope);
