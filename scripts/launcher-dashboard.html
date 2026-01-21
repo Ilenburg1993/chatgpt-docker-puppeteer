@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Launcher Dashboard - ChatGPT Puppeteer</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #1e1e1e 0%, #2d2d30 100%);
+                color: #cccccc;
+                padding: 20px;
+                min-height: 100vh;
+            }
+
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            header {
+                text-align: center;
+                margin-bottom: 30px;
+                padding: 20px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            h1 {
+                color: #4ec9b0;
+                font-size: 2.5em;
+                margin-bottom: 10px;
+                text-shadow: 0 0 10px rgba(78, 201, 176, 0.3);
+            }
+
+            .subtitle {
+                color: #858585;
+                font-size: 0.9em;
+            }
+
+            .last-update {
+                color: #569cd6;
+                font-size: 0.85em;
+                margin-top: 10px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 20px;
+                margin-bottom: 20px;
+            }
+
+            .card {
+                background: rgba(30, 30, 30, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                padding: 20px;
+                transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                border-color: rgba(78, 201, 176, 0.5);
+            }
+
+            .card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .card-title {
+                font-size: 1.2em;
+                font-weight: bold;
+                color: #4ec9b0;
+            }
+
+            .status-badge {
+                padding: 5px 12px;
+                border-radius: 20px;
+                font-size: 0.8em;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .status-healthy {
+                background: rgba(78, 201, 176, 0.2);
+                color: #4ec9b0;
+                border: 1px solid #4ec9b0;
+            }
+
+            .status-unhealthy {
+                background: rgba(244, 71, 71, 0.2);
+                color: #f44747;
+                border: 1px solid #f44747;
+            }
+
+            .status-warning {
+                background: rgba(206, 145, 120, 0.2);
+                color: #ce9178;
+                border: 1px solid #ce9178;
+            }
+
+            .status-loading {
+                background: rgba(86, 156, 214, 0.2);
+                color: #569cd6;
+                border: 1px solid #569cd6;
+            }
+
+            .card-content {
+                color: #cccccc;
+            }
+
+            .info-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }
+
+            .info-label {
+                color: #858585;
+                font-size: 0.9em;
+            }
+
+            .info-value {
+                color: #cccccc;
+                font-weight: 500;
+            }
+
+            .process-list {
+                margin-top: 10px;
+            }
+
+            .process-item {
+                background: rgba(255, 255, 255, 0.03);
+                padding: 8px 12px;
+                margin: 5px 0;
+                border-radius: 5px;
+                font-size: 0.85em;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .process-name {
+                color: #4ec9b0;
+                font-weight: bold;
+            }
+
+            .process-status {
+                padding: 2px 8px;
+                border-radius: 10px;
+                font-size: 0.8em;
+            }
+
+            .status-online {
+                background: rgba(78, 201, 176, 0.3);
+                color: #4ec9b0;
+            }
+
+            .status-stopped {
+                background: rgba(244, 71, 71, 0.3);
+                color: #f44747;
+            }
+
+            .alert {
+                background: rgba(244, 71, 71, 0.1);
+                border: 1px solid #f44747;
+                border-radius: 5px;
+                padding: 10px;
+                margin-top: 10px;
+                font-size: 0.85em;
+                color: #f44747;
+            }
+
+            .loading {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid rgba(255, 255, 255, 0.3);
+                border-top-color: #4ec9b0;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            .footer {
+                text-align: center;
+                padding: 20px;
+                color: #858585;
+                font-size: 0.85em;
+                margin-top: 30px;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .error-message {
+                background: rgba(244, 71, 71, 0.1);
+                border: 1px solid #f44747;
+                border-radius: 5px;
+                padding: 15px;
+                margin: 10px 0;
+                color: #f44747;
+            }
+
+            .disk-bar {
+                width: 100%;
+                height: 20px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                overflow: hidden;
+                margin-top: 10px;
+            }
+
+            .disk-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #4ec9b0 0%, #569cd6 100%);
+                transition: width 0.3s ease;
+            }
+
+            .disk-fill.warning {
+                background: linear-gradient(90deg, #ce9178 0%, #f44747 50%);
+            }
+
+            .disk-fill.critical {
+                background: linear-gradient(90deg, #f44747 0%, #c74040 100%);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>🚀 Launcher Dashboard</h1>
+                <div class="subtitle">ChatGPT Docker Puppeteer - Real-time Monitoring</div>
+                <div class="last-update">Última atualização: <span id="lastUpdate">--:--:--</span></div>
+            </header>
+
+            <div class="grid">
+                <!-- Server Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🖥️ Server</div>
+                        <span class="status-badge status-loading" id="serverStatus">Loading...</span>
+                    </div>
+                    <div class="card-content" id="serverContent">
+                        <div class="loading"></div>
+                        Carregando...
+                    </div>
+                </div>
+
+                <!-- Chrome Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🌐 Chrome Debug</div>
+                        <span class="status-badge status-loading" id="chromeStatus">Loading...</span>
+                    </div>
+                    <div class="card-content" id="chromeContent">
+                        <div class="loading"></div>
+                        Carregando...
+                    </div>
+                </div>
+
+                <!-- PM2 Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">⚙️ PM2 Processes</div>
+                        <span class="status-badge status-loading" id="pm2Status">Loading...</span>
+                    </div>
+                    <div class="card-content" id="pm2Content">
+                        <div class="loading"></div>
+                        Carregando...
+                    </div>
+                </div>
+
+                <!-- Kernel Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🧠 Kernel</div>
+                        <span class="status-badge status-loading" id="kernelStatus">Loading...</span>
+                    </div>
+                    <div class="card-content" id="kernelContent">
+                        <div class="loading"></div>
+                        Carregando...
+                    </div>
+                </div>
+
+                <!-- Disk Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">💾 Disk Usage</div>
+                        <span class="status-badge status-loading" id="diskStatus">Loading...</span>
+                    </div>
+                    <div class="card-content" id="diskContent">
+                        <div class="loading"></div>
+                        Carregando...
+                    </div>
+                </div>
+            </div>
+
+            <footer class="footer">
+                <p>Super Launcher v2.0 - PM2-First Strategy</p>
+                <p>Auto-refresh: 5 segundos | Health Endpoints: /api/health/*</p>
+            </footer>
+        </div>
+
+        <script>
+            const API_BASE = 'http://localhost:2998/api/health';
+            const REFRESH_INTERVAL = 5000; // 5 segundos
+
+            function updateTime() {
+                const now = new Date();
+                document.getElementById('lastUpdate').textContent = now.toLocaleTimeString('pt-BR');
+            }
+
+            function getStatusClass(status) {
+                if (status === 'healthy') return 'status-healthy';
+                if (status === 'warning') return 'status-warning';
+                if (status === 'unhealthy') return 'status-unhealthy';
+                return 'status-loading';
+            }
+
+            async function fetchHealth(endpoint) {
+                try {
+                    const response = await fetch(`${API_BASE}${endpoint}`);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    return { status: 'unhealthy', error: error.message };
+                }
+            }
+
+            async function updateServer() {
+                const data = await fetchHealth('');
+                const statusEl = document.getElementById('serverStatus');
+                const contentEl = document.getElementById('serverContent');
+
+                statusEl.textContent = data.status || 'Error';
+                statusEl.className = 'status-badge ' + getStatusClass(data.status);
+
+                if (data.error) {
+                    contentEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                } else {
+                    contentEl.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">Status:</span>
+                        <span class="info-value">${data.status || 'Unknown'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Timestamp:</span>
+                        <span class="info-value">${data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : 'N/A'}</span>
+                    </div>
+                `;
+                }
+            }
+
+            async function updateChrome() {
+                const data = await fetchHealth('/chrome');
+                const statusEl = document.getElementById('chromeStatus');
+                const contentEl = document.getElementById('chromeContent');
+
+                statusEl.textContent = data.status || 'Error';
+                statusEl.className = 'status-badge ' + getStatusClass(data.status);
+
+                if (data.error) {
+                    contentEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                } else {
+                    contentEl.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">Connected:</span>
+                        <span class="info-value">${data.connected ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Endpoint:</span>
+                        <span class="info-value">${data.endpoint || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Version:</span>
+                        <span class="info-value">${data.version || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Latency:</span>
+                        <span class="info-value">${data.latency_ms || 0} ms</span>
+                    </div>
+                `;
+                }
+            }
+
+            async function updatePM2() {
+                const data = await fetchHealth('/pm2');
+                const statusEl = document.getElementById('pm2Status');
+                const contentEl = document.getElementById('pm2Content');
+
+                statusEl.textContent = data.status || 'Error';
+                statusEl.className = 'status-badge ' + getStatusClass(data.status);
+
+                if (data.error) {
+                    contentEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                } else {
+                    const processes = data.processes || [];
+                    const online = processes.filter(p => p.status === 'online').length;
+
+                    let html = `
+                    <div class="info-row">
+                        <span class="info-label">Total Processes:</span>
+                        <span class="info-value">${processes.length}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Online:</span>
+                        <span class="info-value">${online}</span>
+                    </div>
+                `;
+
+                    if (processes.length > 0) {
+                        html += '<div class="process-list">';
+                        processes.forEach(proc => {
+                            const statusClass = proc.status === 'online' ? 'status-online' : 'status-stopped';
+                            html += `
+                            <div class="process-item">
+                                <span class="process-name">${proc.name}</span>
+                                <span class="process-status ${statusClass}">${proc.status}</span>
+                            </div>
+                        `;
+                        });
+                        html += '</div>';
+                    }
+
+                    contentEl.innerHTML = html;
+                }
+            }
+
+            async function updateKernel() {
+                const data = await fetchHealth('/kernel');
+                const statusEl = document.getElementById('kernelStatus');
+                const contentEl = document.getElementById('kernelContent');
+
+                statusEl.textContent = data.status || 'Error';
+                statusEl.className = 'status-badge ' + getStatusClass(data.status);
+
+                if (data.error) {
+                    contentEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                } else {
+                    contentEl.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">State:</span>
+                        <span class="info-value">${data.state || 'Unknown'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Active:</span>
+                        <span class="info-value">${data.active ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">NERV Bus:</span>
+                        <span class="info-value">${data.nervBus || 'N/A'}</span>
+                    </div>
+                `;
+                }
+            }
+
+            async function updateDisk() {
+                const data = await fetchHealth('/disk');
+                const statusEl = document.getElementById('diskStatus');
+                const contentEl = document.getElementById('diskContent');
+
+                statusEl.textContent = data.status || 'Error';
+                statusEl.className = 'status-badge ' + getStatusClass(data.status);
+
+                if (data.error) {
+                    contentEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                } else {
+                    const usage = data.usage || {};
+                    const totalMB = usage.total?.mb || 0;
+                    const thresholds = data.thresholds || {};
+
+                    let barClass = '';
+                    let percentage = 0;
+                    if (totalMB > thresholds.critical_mb) {
+                        barClass = 'critical';
+                        percentage = 100;
+                    } else if (totalMB > thresholds.warning_mb) {
+                        barClass = 'warning';
+                        percentage = (totalMB / thresholds.critical_mb) * 100;
+                    } else {
+                        percentage = (totalMB / thresholds.warning_mb) * 100;
+                    }
+
+                    let html = `
+                    <div class="info-row">
+                        <span class="info-label">Total:</span>
+                        <span class="info-value">${totalMB} MB</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Logs:</span>
+                        <span class="info-value">${usage.logs?.mb || 0} MB</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Queue:</span>
+                        <span class="info-value">${usage.queue?.mb || 0} MB</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Responses:</span>
+                        <span class="info-value">${usage.responses?.mb || 0} MB</span>
+                    </div>
+                    <div class="disk-bar">
+                        <div class="disk-fill ${barClass}" style="width: ${Math.min(percentage, 100)}%"></div>
+                    </div>
+                `;
+
+                    if (data.alerts && data.alerts.length > 0) {
+                        html += '<div class="alert">' + data.alerts.join('<br>') + '</div>';
+                    }
+
+                    contentEl.innerHTML = html;
+                }
+            }
+
+            async function updateAll() {
+                updateTime();
+                await Promise.all([updateServer(), updateChrome(), updatePM2(), updateKernel(), updateDisk()]);
+            }
+
+            // Atualização inicial
+            updateAll();
+
+            // Auto-refresh
+            setInterval(updateAll, REFRESH_INTERVAL);
+        </script>
+    </body>
+</html>
