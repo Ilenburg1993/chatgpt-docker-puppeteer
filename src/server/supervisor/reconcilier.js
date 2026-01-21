@@ -63,7 +63,7 @@ class SupervisorReconciler {
          */
         io.on('connection', socket => {
             socket.on('message', envelope => {
-                if (envelope.kind === MessageType.EVENT && envelope.actionCode === 'STALL_DETECTED') {
+                if (envelope.kind === MessageType.EVENT && envelope.actionCode === ActionCode.STALL_DETECTED) {
                     this._handleStallSignal(socket.robot_id, envelope);
                 }
             });

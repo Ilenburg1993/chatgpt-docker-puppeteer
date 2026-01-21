@@ -43,23 +43,62 @@ const MessageType = Object.freeze({
  * Nunca redefine o tipo ontológico.
  */
 const ActionCode = Object.freeze({
-    // ---- TASK / EXECUTION (examples) ----
+    // ---- TASK / EXECUTION ----
     TASK_START: 'TASK_START',
     TASK_CANCEL: 'TASK_CANCEL',
-    TASK_OBSERVED: 'TASK_OBSERVED',
-    TASK_FAILED_OBSERVED: 'TASK_FAILED_OBSERVED',
+    TASK_RETRY: 'TASK_RETRY',
+    TASK_FAILED: 'TASK_FAILED', // Task execution failed
+    TASK_REJECTED: 'TASK_REJECTED', // Task rejected by policy
+    TASK_OBSERVED: 'TASK_OBSERVED', // (Planned for future use)
+    TASK_FAILED_OBSERVED: 'TASK_FAILED_OBSERVED', // (Planned for future use)
 
-    // ---- DRIVER / ENVIRONMENT (observational) ----
-    DRIVER_ANOMALY: 'DRIVER_ANOMALY',
+    // ---- PROPOSAL / POLICY ----
+    PROPOSE_TASK: 'PROPOSE_TASK', // Policy engine task proposal
+
+    // ---- ENGINE CONTROL ----
+    ENGINE_PAUSE: 'ENGINE_PAUSE',
+    ENGINE_RESUME: 'ENGINE_RESUME',
+    ENGINE_STOP: 'ENGINE_STOP',
+
+    // ---- DRIVER / TASK EXECUTION ----
+    DRIVER_EXECUTE_TASK: 'DRIVER_EXECUTE_TASK',
+    DRIVER_ABORT: 'DRIVER_ABORT',
+    DRIVER_TASK_STARTED: 'DRIVER_TASK_STARTED',
+    DRIVER_TASK_COMPLETED: 'DRIVER_TASK_COMPLETED',
+    DRIVER_TASK_FAILED: 'DRIVER_TASK_FAILED',
+    DRIVER_TASK_ABORTED: 'DRIVER_TASK_ABORTED',
+
+    // ---- DRIVER / HEALTH & MONITORING ----
+    DRIVER_HEALTH_CHECK: 'DRIVER_HEALTH_CHECK',
+    DRIVER_HEALTH_REPORT: 'DRIVER_HEALTH_REPORT',
     DRIVER_STATE_OBSERVED: 'DRIVER_STATE_OBSERVED',
+    DRIVER_VITAL: 'DRIVER_VITAL',
+    DRIVER_ANOMALY: 'DRIVER_ANOMALY',
+    DRIVER_ERROR: 'DRIVER_ERROR',
 
-    // ---- TRANSPORT / IPC (technical events) ----
-    TRANSPORT_TIMEOUT: 'TRANSPORT_TIMEOUT',
-    TRANSPORT_RETRYING: 'TRANSPORT_RETRYING',
-    CHANNEL_DEGRADED: 'CHANNEL_DEGRADED',
+    // ---- KERNEL / SYSTEM ----
+    KERNEL_HEALTH_CHECK: 'KERNEL_HEALTH_CHECK',
+    KERNEL_TELEMETRY: 'KERNEL_TELEMETRY',
+    KERNEL_INTERNAL_ERROR: 'KERNEL_INTERNAL_ERROR',
 
-    // ---- ACK (technical only) ----
-    ACK_RECEIVED: 'ACK_RECEIVED'
+    // ---- BROWSER / INFRA ----
+    BROWSER_REBOOT: 'BROWSER_REBOOT',
+    CACHE_CLEAR: 'CACHE_CLEAR',
+    STALL_DETECTED: 'STALL_DETECTED',
+
+    // ---- SECURITY ----
+    SECURITY_VIOLATION: 'SECURITY_VIOLATION',
+
+    // ---- TELEMETRY ----
+    TELEMETRY_DISCARDED: 'TELEMETRY_DISCARDED',
+
+    // ---- TRANSPORT / IPC (technical events - planned) ----
+    TRANSPORT_TIMEOUT: 'TRANSPORT_TIMEOUT', // (Planned for future use)
+    TRANSPORT_RETRYING: 'TRANSPORT_RETRYING', // (Planned for future use)
+    CHANNEL_DEGRADED: 'CHANNEL_DEGRADED', // (Planned for future use)
+
+    // ---- ACK (technical only - planned) ----
+    ACK_RECEIVED: 'ACK_RECEIVED' // (Planned for future use)
 });
 
 /**
@@ -73,10 +112,9 @@ const ActorRole = Object.freeze({
     KERNEL: 'KERNEL',
     SERVER: 'SERVER',
     INFRA: 'INFRA',
-    OBSERVER: 'OBSERVER'
-    // Explicitamente ausentes:
-    // - DRIVER
-    // - DASHBOARD
+    OBSERVER: 'OBSERVER',
+    MAESTRO: 'MAESTRO', // Policy Engine (decision maker)
+    DRIVER: 'DRIVER' // Driver adapters (ChatGPT/Gemini)
 });
 
 /**

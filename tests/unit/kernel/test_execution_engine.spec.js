@@ -14,7 +14,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve ter estados definidos', () => {
             assert.ok(STATUS_VALUES.PENDING, 'Estado PENDING deve existir');
             assert.ok(STATUS_VALUES.RUNNING, 'Estado RUNNING deve existir');
-            assert.ok(STATUS_VALUES.DONE, 'Estado DONE deve existir');
+            assert.ok(STATUS_VALUES.SUCCESS, 'Estado SUCCESS deve existir');
             assert.ok(STATUS_VALUES.FAILED, 'Estado FAILED deve existir');
         });
 

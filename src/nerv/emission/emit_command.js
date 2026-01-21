@@ -20,6 +20,8 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
+const { MessageType } = require('../../shared/nerv/constants');
+
 /* ===========================
    Fábrica do emissor de COMMAND
 =========================== */
@@ -57,7 +59,7 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
      */
     function emitCommand(envelope) {
         telemetry.emit('nerv:emission:attempt', {
-            kind: 'COMMAND'
+            kind: MessageType.COMMAND
         });
 
         let normalized;
@@ -70,7 +72,7 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
             envelopes.assertValid(normalized);
         } catch (error) {
             telemetry.emit('nerv:emission:rejected', {
-                kind: 'COMMAND',
+                kind: MessageType.COMMAND,
                 reason: 'estrutura',
                 message: error.message
             });
@@ -87,14 +89,14 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
 
         if (!accepted) {
             telemetry.emit('nerv:emission:enqueue_failed', {
-                kind: 'COMMAND'
+                kind: MessageType.COMMAND
             });
             return;
         }
 
         // 5. Telemetria de sucesso técnico
         telemetry.emit('nerv:emission:success', {
-            kind: 'COMMAND'
+            kind: MessageType.COMMAND
         });
     }
 

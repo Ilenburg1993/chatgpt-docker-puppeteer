@@ -19,6 +19,7 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
+const { ActorRole } = require('../shared/nerv/constants');
 const { KernelLoop } = require('./kernel_loop/kernel_loop');
 const { TaskRuntime } = require('./task_runtime/task_runtime');
 const { ObservationStore } = require('./observation_store/observation_store');
@@ -76,7 +77,7 @@ function createKernel({
 
     const telemetry = new KernelTelemetry({
         nerv, // Passa NERV para telemetria
-        source: 'kernel',
+        source: ActorRole.KERNEL.toLowerCase(),
         retention: 1000,
         ...telemetryOptions
     });

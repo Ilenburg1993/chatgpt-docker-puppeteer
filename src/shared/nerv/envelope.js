@@ -64,7 +64,8 @@ function createEnvelope({ actor, messageType, actionCode, payload = {}, correlat
     const msgId = uuidv4();
 
     if (correlationId !== null) {
-        assertUUID(correlationId, 'correlationId');
+        assert(typeof correlationId === 'string', 'correlationId must be a string');
+        assert(correlationId.length > 0, 'correlationId cannot be empty');
     }
 
     const effectiveCorrelationId = correlationId || msgId;

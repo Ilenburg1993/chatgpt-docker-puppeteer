@@ -69,6 +69,8 @@
         "diagnose": "node scripts/analisar_crash.js",
         "reset:hard": "npm run clean && npm run clean:queue && npm run clean:logs",
         "test": "node --test tests/**/*.spec.js",
+        "test:all": "node scripts/run-all-tests.js",
+        "test:report": "node scripts/run-all-tests.js",
         "test:unit": "node --test 'tests/unit/**/*.spec.js'",
         "test:integration": "node --test 'tests/integration/**/*.spec.js'",
         "test:e2e": "node --test 'tests/e2e/**/*.spec.js'",

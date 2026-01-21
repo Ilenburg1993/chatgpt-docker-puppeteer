@@ -41,7 +41,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
         files.forEach(file => {
             try {
                 fs.unlinkSync(path.join(TEST_LOG_DIR, file));
-            } catch (e) {
+            } catch (_e) {
                 // Ignorar erros de limpeza
             }
         });

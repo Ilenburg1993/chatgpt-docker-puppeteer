@@ -13,6 +13,17 @@ const system = require('../infra/system');
 const { log, audit } = require('./logger');
 const { ActionCode: _ActionCode } = require('../shared/nerv/constants');
 
+/**
+ * Failure Categories: Categorias de falha de infraestrutura
+ * Escopo: Local ao módulo infra_failure_policy
+ */
+const FAILURE_CATEGORIES = {
+    TARGET_CLOSED: 'TARGET_CLOSED',
+    CONNECTION_LOST: 'CONNECTION_LOST',
+    BROWSER_FROZEN: 'BROWSER_FROZEN',
+    INFRA_TIMEOUT: 'INFRA_TIMEOUT'
+};
+
 class InfraFailurePolicy {
     /**
      * Escala uma falha de infraestrutura conforme a severidade técnica.
@@ -34,8 +45,8 @@ class InfraFailurePolicy {
 
         // 2. CATEGORIZAÇÃO E SENTENÇA
         switch (reason) {
-            case 'TARGET_CLOSED':
-            case 'CONNECTION_LOST':
+            case FAILURE_CATEGORIES.TARGET_CLOSED:
+            case FAILURE_CATEGORIES.CONNECTION_LOST:
                 /**
                  * Caso: O canal de comunicação com o Chrome foi cortado.
                  * Ação: Notificar e garantir que não restem processos órfãos.
@@ -43,8 +54,8 @@ class InfraFailurePolicy {
                 await this._executeManeuver('TERMINAL_CONNECTION_FAILURE', pid, traceId, ctx);
                 break;
 
-            case 'BROWSER_FROZEN':
-            case 'INFRA_TIMEOUT':
+            case FAILURE_CATEGORIES.BROWSER_FROZEN:
+            case FAILURE_CATEGORIES.INFRA_TIMEOUT:
                 /**
                  * Caso: O navegador parou de responder ao protocolo DevTools (HUNG).
                  * Ação: Executar Kill cirúrgico para permitir o restart pelo Engine.

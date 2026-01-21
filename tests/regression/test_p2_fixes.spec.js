@@ -337,7 +337,7 @@ async function testCodeValidation() {
         console.log('> Verificando arquivos modificados...');
 
         // Valida src/main.js
-        const mainPath = path.join(__dirname, '../src/main.js');
+        const mainPath = path.join(__dirname, '../../src/main.js');
         const mainCode = await fs.readFile(mainPath, 'utf-8');
 
         if (!mainCode.includes('shutdownPhases')) {
@@ -358,7 +358,7 @@ async function testCodeValidation() {
         console.log('✅ main.js contém shutdown com isolamento de erros');
 
         // Valida handle_manager.js
-        const handlePath = path.join(__dirname, '../src/driver/modules/handle_manager.js');
+        const handlePath = path.join(__dirname, '../../src/driver/modules/handle_manager.js');
         const handleCode = await fs.readFile(handlePath, 'utf-8');
 
         if (!handleCode.includes('AbortController')) {

@@ -32,6 +32,12 @@ const KernelLoopState = Object.freeze({
 });
 
 /* ===========================
+   Tipos de Decisão (importado de ExecutionEngine)
+=========================== */
+
+const { DecisionKind } = require('../execution_engine/execution_engine');
+
+/* ===========================
    Fábrica do KernelLoop
 =========================== */
 
@@ -338,7 +344,7 @@ class KernelLoop {
 
         // Exemplo de decisão implementada
         switch (kind) {
-            case 'PROPOSE_SUSPEND_TASK':
+            case DecisionKind.PROPOSE_SUSPEND_TASK:
                 // Aqui seria implementada a suspensão da tarefa
                 // Por ora, apenas registramos a intenção
                 this.telemetry.warning('kernel_loop_task_suspension_proposed', {

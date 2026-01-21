@@ -1,244 +1,381 @@
 /**
- * Testes Unitários: Schemas
- * @module tests/unit/core/test_schemas.spec.js
- * @description Valida schemas Zod para tarefas, DNA e configurações
- * @audit-level 100
+ * @file tests/unit/core/test_schemas.spec.js
+ * Testes unitários para validação de schemas Zod (Task V4 + DNA)
+ * FASE 3 - Cobertura de Core/Schemas
  */
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-
 const schemas = require('../../../src/core/schemas');
-const { criarLoggerSilencioso } = require('../../mocks/mock_logger');
+const { STATUS_VALUES } = require('../../../src/core/constants/tasks');
 
-// Usar logger silencioso para não poluir output dos testes
-global.logger = criarLoggerSilencioso();
-
-describe('Schemas - Validação de Dados com Zod', () => {
-    describe('1. TaskSchema - Validação de Tarefas', () => {
+describe('Task Schema Validation', () => {
+    describe('Validação de tarefas válidas', () => {
         it('deve validar tarefa válida completa', () => {
             const tarefaValida = {
-                id: 'task-001',
-                target: 'gemini',
-                prompt: 'Qual é a capital da França?',
-                status: 'PENDING',
-                priority: 5,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                meta: {
+                    id: 'task-001',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'api',
+                    tags: ['unit-test']
+                },
+                spec: {
+                    target: 'gemini',
+                    payload: {
+                        user_message: 'Qual é a capital da França?'
+                    }
+                },
+                state: {
+                    status: STATUS_VALUES.PENDING,
+                    attempts: 0
+                }
             };
 
-            const resultado = schemas.TaskSchema.safeParse(tarefaValida);
+            const resultado = schemas.parseTask(tarefaValida);
 
-            assert.ok(resultado.success, 'Tarefa válida deve passar na validação');
-            assert.strictEqual(resultado.data.id, 'task-001');
-        });
-
-        it('deve rejeitar tarefa sem campo obrigatório (target)', () => {
-            const tarefaInvalida = {
-                id: 'task-002',
-                prompt: 'Teste sem target',
-                status: 'PENDING'
-            };
-
-            const resultado = schemas.TaskSchema.safeParse(tarefaInvalida);
-
-            assert.strictEqual(resultado.success, false, 'Deve falhar sem target');
-            assert.ok(resultado.error, 'Deve ter erro de validação');
-        });
-
-        it('deve rejeitar tarefa com target inválido', () => {
-            const tarefaInvalida = {
-                id: 'task-003',
-                target: 'invalid-target',
-                prompt: 'Teste com target inválido',
-                status: 'PENDING'
-            };
-
-            const resultado = schemas.TaskSchema.safeParse(tarefaInvalida);
-
-            // Target deve ser 'chatgpt' ou 'gemini'
-            assert.strictEqual(resultado.success, false, 'Target inválido deve falhar');
-        });
-
-        it('deve rejeitar tarefa com status inválido', () => {
-            const tarefaInvalida = {
-                id: 'task-004',
-                target: 'gemini',
-                prompt: 'Teste',
-                status: 'INVALID_STATUS'
-            };
-
-            const resultado = schemas.TaskSchema.safeParse(tarefaInvalida);
-
-            assert.strictEqual(resultado.success, false, 'Status inválido deve falhar');
+            assert.ok(resultado, 'Tarefa válida deve passar na validação');
+            assert.strictEqual(resultado.meta.id, 'task-001');
+            assert.strictEqual(resultado.spec.target, 'gemini');
+            assert.strictEqual(resultado.state.status, STATUS_VALUES.PENDING);
         });
 
         it('deve aceitar tarefa mínima com campos obrigatórios', () => {
             const tarefaMinima = {
-                target: 'chatgpt',
-                prompt: 'Pergunta simples'
+                meta: {
+                    id: 'task-min',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'manual'
+                },
+                spec: {
+                    target: 'chatgpt',
+                    payload: {
+                        user_message: 'Teste mínimo'
+                    }
+                },
+                state: {
+                    status: STATUS_VALUES.PENDING,
+                    attempts: 0
+                }
             };
 
-            // parseTask cura a tarefa adicionando campos faltantes
             const resultado = schemas.parseTask(tarefaMinima);
 
-            assert.ok(resultado, 'Tarefa mínima deve ser curada');
-            assert.ok(resultado.id, 'Deve ter ID gerado');
-            assert.strictEqual(resultado.target, 'chatgpt');
+            assert.ok(resultado, 'Tarefa mínima deve ser válida');
+            assert.strictEqual(resultado.spec.target, 'chatgpt');
+            assert.strictEqual(resultado.spec.payload.user_message, 'Teste mínimo');
         });
-    });
 
-    describe('2. parseTask - Motor de Cura', () => {
-        it('deve adicionar ID se não fornecido', () => {
-            const tarefa = {
-                target: 'gemini',
-                prompt: 'Teste'
+        it('deve migrar ID do root para meta.id (healer)', () => {
+            // O healer migra raw.id -> meta.id, não gera automaticamente
+            const tarefaLegacyId = {
+                id: 'legacy-001', // ID no formato V1/V2 (root level)
+                meta: {
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'api'
+                },
+                spec: {
+                    target: 'gemini',
+                    payload: {
+                        user_message: 'ID legado'
+                    }
+                },
+                state: {
+                    status: STATUS_VALUES.PENDING,
+                    attempts: 0
+                }
             };
 
-            const curada = schemas.parseTask(tarefa);
+            const resultado = schemas.parseTask(tarefaLegacyId);
 
-            assert.ok(curada.id, 'Deve ter ID gerado');
-            assert.match(curada.id, /^[a-f0-9-]+$/, 'ID deve ser válido');
+            assert.ok(resultado.meta.id, 'Deve migrar ID do root para meta.id');
+            assert.strictEqual(resultado.meta.id, 'legacy-001');
         });
 
         it('deve adicionar timestamps se não fornecidos', () => {
-            const tarefa = {
-                id: 'task-005',
-                target: 'chatgpt',
-                prompt: 'Teste timestamps'
+            const tarefaSemTimestamps = {
+                meta: {
+                    id: 'task-ts',
+                    priority: 3,
+                    source: 'gui'
+                },
+                spec: {
+                    target: 'chatgpt',
+                    payload: {
+                        user_message: 'Teste timestamps'
+                    }
+                },
+                state: {
+                    status: STATUS_VALUES.PENDING,
+                    attempts: 0
+                }
             };
 
-            const curada = schemas.parseTask(tarefa);
+            const resultado = schemas.parseTask(tarefaSemTimestamps);
 
-            assert.ok(curada.createdAt, 'Deve ter createdAt');
-            assert.ok(curada.updatedAt, 'Deve ter updatedAt');
+            assert.ok(resultado.meta.created_at, 'Deve adicionar created_at');
+            assert.ok(new Date(resultado.meta.created_at).getTime() > 0, 'created_at deve ser válido');
         });
 
         it('deve definir status PENDING por padrão', () => {
-            const tarefa = {
-                target: 'gemini',
-                prompt: 'Teste status'
-            };
-
-            const curada = schemas.parseTask(tarefa);
-
-            assert.strictEqual(curada.status, 'PENDING', 'Status padrão deve ser PENDING');
-        });
-
-        it('deve preservar campos fornecidos', () => {
-            const tarefa = {
-                id: 'task-custom',
-                target: 'chatgpt',
-                prompt: 'Teste preservação',
-                status: 'RUNNING',
-                priority: 10
-            };
-
-            const curada = schemas.parseTask(tarefa);
-
-            assert.strictEqual(curada.id, 'task-custom', 'ID deve ser preservado');
-            assert.strictEqual(curada.status, 'RUNNING', 'Status deve ser preservado');
-            assert.strictEqual(curada.priority, 10, 'Priority deve ser preservada');
-        });
-    });
-
-    describe('3. DnaSchema - Validação de DNA', () => {
-        it('deve validar DNA válido', () => {
-            const dnaValido = {
-                target: 'gemini',
-                url: 'https://gemini.google.com',
-                selectors: {
-                    textbox: 'textarea[aria-label="Prompt"]',
-                    sendButton: 'button[aria-label="Send"]'
+            const tarefaSemStatus = {
+                meta: {
+                    id: 'task-status',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'flow_manager'
+                },
+                spec: {
+                    target: 'gemini',
+                    payload: {
+                        user_message: 'Teste status'
+                    }
                 }
             };
 
-            const resultado = schemas.DnaSchema.safeParse(dnaValido);
+            const resultado = schemas.parseTask(tarefaSemStatus);
 
-            assert.ok(resultado.success, 'DNA válido deve passar');
+            assert.strictEqual(resultado.state.status, STATUS_VALUES.PENDING);
         });
 
-        it('deve rejeitar DNA sem seletores', () => {
-            const dnaInvalido = {
-                target: 'chatgpt',
-                url: 'https://chat.openai.com'
-                // Falta selectors
-            };
-
-            const resultado = schemas.DnaSchema.safeParse(dnaInvalido);
-
-            assert.strictEqual(resultado.success, false, 'DNA sem seletores deve falhar');
-        });
-
-        it('deve validar URL do DNA', () => {
-            const dnaUrlInvalida = {
-                target: 'gemini',
-                url: 'not-a-valid-url',
-                selectors: {
-                    textbox: 'input'
+        it('deve preservar campos opcionais fornecidos', () => {
+            const tarefaCompleta = {
+                meta: {
+                    id: 'task-completa',
+                    project_id: 'proj-123',
+                    parent_id: 'parent-456',
+                    correlation_id: 'corr-789',
+                    created_at: new Date().toISOString(),
+                    priority: 7,
+                    source: 'api',
+                    tags: ['test', 'priority']
+                },
+                spec: {
+                    target: 'chatgpt',
+                    model: 'gpt-4',
+                    payload: {
+                        system_message: 'Você é um assistente útil',
+                        user_message: 'Teste completo',
+                        context: 'Contexto adicional'
+                    },
+                    parameters: {
+                        temperature: 0.7,
+                        max_tokens: 1000
+                    }
+                },
+                state: {
+                    status: STATUS_VALUES.PENDING,
+                    attempts: 0
                 }
             };
 
-            const resultado = schemas.DnaSchema.safeParse(dnaUrlInvalida);
+            const resultado = schemas.parseTask(tarefaCompleta);
 
-            // Schema deve validar formato de URL
-            assert.strictEqual(resultado.success, false, 'URL inválida deve falhar');
+            assert.strictEqual(resultado.meta.project_id, 'proj-123');
+            assert.strictEqual(resultado.meta.parent_id, 'parent-456');
+            assert.strictEqual(resultado.spec.model, 'gpt-4');
+            assert.strictEqual(resultado.spec.payload.system_message, 'Você é um assistente útil');
+            assert.strictEqual(resultado.spec.parameters.temperature, 0.7);
         });
     });
 
-    describe('4. Tipos Compartilhados', () => {
-        it('deve exportar tipos primitivos', () => {
-            assert.ok(schemas.core.types, 'Deve exportar tipos');
-            assert.ok(schemas.core.types.ID, 'Deve ter tipo ID');
-            assert.ok(schemas.core.types.Timestamp, 'Deve ter tipo Timestamp');
-            assert.ok(schemas.core.types.Status, 'Deve ter tipo Status');
+    describe('Validação de tarefas inválidas', () => {
+        it('deve rejeitar tarefa sem target', () => {
+            const tarefaInvalida = {
+                meta: {
+                    id: 'task-no-target',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'manual'
+                },
+                spec: {
+                    payload: {
+                        user_message: 'Sem target'
+                    }
+                },
+                state: {
+                    status: STATUS_VALUES.PENDING,
+                    attempts: 0
+                }
+            };
+
+            assert.throws(
+                () => {
+                    schemas.parseTask(tarefaInvalida);
+                },
+                /target/i,
+                'Deve lançar erro sobre target ausente'
+            );
         });
 
-        it('deve validar tipo Status', () => {
-            const StatusSchema = schemas.core.types.Status;
+        it('deve rejeitar tarefa com target vazio', () => {
+            const tarefaInvalida = {
+                meta: {
+                    id: 'task-empty-target',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'manual'
+                },
+                spec: {
+                    target: '',
+                    payload: {
+                        user_message: 'Target vazio'
+                    }
+                }
+            };
 
-            assert.ok(StatusSchema.safeParse('PENDING').success);
-            assert.ok(StatusSchema.safeParse('RUNNING').success);
-            assert.ok(StatusSchema.safeParse('DONE').success);
-            assert.ok(StatusSchema.safeParse('FAILED').success);
-            assert.strictEqual(StatusSchema.safeParse('INVALID').success, false);
+            assert.throws(() => {
+                schemas.parseTask(tarefaInvalida);
+            }, 'Deve rejeitar target vazio');
         });
 
-        it('deve validar tipo Priority', () => {
-            const PrioritySchema = schemas.core.types.Priority;
+        it('deve rejeitar tarefa sem user_message', () => {
+            const tarefaInvalida = {
+                meta: {
+                    id: 'task-no-msg',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'manual'
+                },
+                spec: {
+                    target: 'gemini',
+                    payload: {}
+                }
+            };
 
-            assert.ok(PrioritySchema.safeParse(1).success, 'Priority 1 válida');
-            assert.ok(PrioritySchema.safeParse(10).success, 'Priority 10 válida');
-            assert.strictEqual(PrioritySchema.safeParse(0).success, false, 'Priority 0 inválida');
-            assert.strictEqual(PrioritySchema.safeParse(11).success, false, 'Priority 11 inválida');
+            assert.throws(
+                () => {
+                    schemas.parseTask(tarefaInvalida);
+                },
+                /user_message/i,
+                'Deve lançar erro sobre user_message ausente'
+            );
+        });
+
+        it('deve rejeitar prioridade negativa', () => {
+            const tarefaInvalida = {
+                meta: {
+                    id: 'task-bad-priority',
+                    created_at: new Date().toISOString(),
+                    priority: -5, // Prioridade negativa é inválida
+                    source: 'manual'
+                },
+                spec: {
+                    target: 'chatgpt',
+                    payload: {
+                        user_message: 'Prioridade inválida'
+                    }
+                }
+            };
+
+            assert.throws(() => {
+                schemas.parseTask(tarefaInvalida);
+            }, 'Deve rejeitar prioridade negativa');
+        });
+
+        it('deve rejeitar status inválido', () => {
+            const tarefaInvalida = {
+                meta: {
+                    id: 'task-bad-status',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'manual'
+                },
+                spec: {
+                    target: 'gemini',
+                    payload: {
+                        user_message: 'Status inválido'
+                    }
+                },
+                state: {
+                    status: 'INVALID_STATUS',
+                    attempts: 0
+                }
+            };
+
+            assert.throws(() => {
+                schemas.parseTask(tarefaInvalida);
+            }, 'Deve rejeitar status não reconhecido');
         });
     });
 
-    describe('5. Integração com Fixtures', () => {
-        it('deve validar fixture de tarefa Gemini', () => {
-            const fixture = require('../../fixtures/tasks/tarefa-valida-gemini.fixture.json');
+    describe('Validação de DNA (identidade)', () => {
+        it('deve validar DNA completo com targets', () => {
+            const dnaCompleto = {
+                targets: {
+                    'chatgpt.com': {
+                        selectors: {
+                            input_box: ['#prompt-textarea', 'textarea'],
+                            send_button: ['button[data-testid="send-button"]']
+                        },
+                        behavior_overrides: {
+                            idle_sleep_ms: 100,
+                            typing_speed_factor: 1.5
+                        }
+                    }
+                },
+                global_selectors: {
+                    input_box: ['textarea', '[contenteditable="true"]'],
+                    send_button: ['button[type="submit"]']
+                }
+            };
 
-            const resultado = schemas.TaskSchema.safeParse(fixture);
+            const resultado = schemas.DnaSchema.safeParse(dnaCompleto);
 
-            assert.ok(resultado.success, 'Fixture Gemini deve ser válida');
-            assert.strictEqual(resultado.data.target, 'gemini');
+            if (!resultado.success) {
+                console.error('Erro DNA completo:', JSON.stringify(resultado.error.issues, null, 2));
+            }
+
+            assert.ok(resultado.success, 'DNA completo deve passar');
+            assert.strictEqual(resultado.data._meta.version, 1);
+            assert.ok(resultado.data.targets['chatgpt.com']);
+            assert.strictEqual(resultado.data.targets['chatgpt.com'].selectors.input_box[0], '#prompt-textarea');
         });
 
-        it('deve validar fixture de tarefa ChatGPT', () => {
-            const fixture = require('../../fixtures/tasks/tarefa-valida-chatgpt.fixture.json');
+        it('deve validar DNA vazio com defaults', () => {
+            const dnaMinimo = {};
 
-            const resultado = schemas.TaskSchema.safeParse(fixture);
+            const resultado = schemas.DnaSchema.safeParse(dnaMinimo);
 
-            assert.ok(resultado.success, 'Fixture ChatGPT deve ser válida');
-            assert.strictEqual(resultado.data.target, 'chatgpt');
+            if (!resultado.success) {
+                console.error('Erro DNA vazio:', JSON.stringify(resultado.error.issues, null, 2));
+            }
+
+            assert.ok(resultado.success, 'DNA vazio deve passar');
+            assert.ok(resultado.data._meta);
+            assert.strictEqual(resultado.data._meta.version, 1);
+            assert.ok(resultado.data._meta.last_updated);
+            assert.strictEqual(resultado.data._meta.evolution_count, 0);
         });
 
-        it('deve rejeitar fixture inválida', () => {
-            const fixture = require('../../fixtures/tasks/tarefa-invalida.fixture.json');
+        it('deve validar DNA com SelectorProtocol SADI V10+', () => {
+            const dnaSADI = {
+                targets: {
+                    'gemini.google.com': {
+                        selectors: {
+                            input_box: {
+                                selector: 'textarea#prompt',
+                                context: 'root',
+                                isShadow: false,
+                                frameSelector: null,
+                                framePath: null,
+                                timestamp: Date.now()
+                            }
+                        }
+                    }
+                }
+            };
 
-            const resultado = schemas.TaskSchema.safeParse(fixture);
+            const resultado = schemas.DnaSchema.safeParse(dnaSADI);
 
-            assert.strictEqual(resultado.success, false, 'Fixture inválida deve falhar');
+            if (!resultado.success) {
+                console.error('Erro DNA SADI:', JSON.stringify(resultado.error.issues, null, 2));
+            }
+
+            assert.ok(resultado.success, 'DNA com SelectorProtocol deve passar');
+            assert.ok(resultado.data.targets['gemini.google.com']);
         });
     });
 });

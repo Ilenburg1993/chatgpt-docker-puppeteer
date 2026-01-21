@@ -31,8 +31,10 @@ const SelectorProtocolSchema = z.object({
 const DomainRulesSchema = z
     .object({
         // Mapeamento de intenção (ex: input_box) para protocolo ou seletor legado
+        // [FIX] z.record precisa de key schema explícito
         selectors: z
             .record(
+                z.string(), // Key: nome do seletor (input_box, send_button, etc)
                 z.union([
                     z.array(z.string()), // Legado: Lista de seletores em string
                     SelectorProtocolSchema // Moderno: Protocolo estruturado SADI V10+
@@ -63,13 +65,21 @@ const DnaSchema = z
                 updated_by: z.string().default('system_init'),
                 evolution_count: z.number().nonnegative().default(0)
             })
-            .default({}),
+            .optional()
+            .default({
+                version: 1,
+                last_updated: new Date().toISOString(),
+                updated_by: 'system_init',
+                evolution_count: 0
+            }),
 
         // Mapeamento de Domínio -> Regras (ex: { "chatgpt.com": { ... } })
-        targets: z.record(DomainRulesSchema).default({}),
+        // [FIX] z.record precisa de key schema explícito para validar corretamente
+        targets: z.record(z.string(), DomainRulesSchema).default({}),
 
         // Regras globais de fallback (Padrões universais de chat)
-        global_selectors: z.record(z.array(z.string())).default({
+        // [FIX] z.record precisa de key schema explícito
+        global_selectors: z.record(z.string(), z.array(z.string())).default({
             input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
             send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
         })

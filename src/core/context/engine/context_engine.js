@@ -19,23 +19,37 @@ const identity = require('../transformers/identity');
 const { log } = require('../../logger');
 
 /**
+ * Transform Types: Tipos de transformação de contexto suportados
+ * Escopo: Local ao módulo context_engine
+ */
+const TRANSFORM_TYPES = {
+    SUMMARY: 'SUMMARY',
+    JSON: 'JSON',
+    CODE: 'CODE',
+    STATUS: 'STATUS',
+    ERROR: 'ERROR',
+    METRICS: 'METRICS',
+    RAW: 'RAW'
+};
+
+/**
  * Pipeline de Transformação: Mapeia o token de transformação para a lógica real.
  */
 async function applyTransform(content, transform, targetTask) {
-    const type = (transform || 'RAW').toUpperCase();
+    const type = (transform || TRANSFORM_TYPES.RAW).toUpperCase();
 
     switch (type) {
-        case 'SUMMARY':
+        case TRANSFORM_TYPES.SUMMARY:
             return smartTruncate(content, 2000);
-        case 'JSON':
+        case TRANSFORM_TYPES.JSON:
             return extractJsonByStack(content);
-        case 'CODE':
+        case TRANSFORM_TYPES.CODE:
             return extractCodeBlocks(content);
-        case 'STATUS':
-        case 'ERROR':
-        case 'METRICS':
+        case TRANSFORM_TYPES.STATUS:
+        case TRANSFORM_TYPES.ERROR:
+        case TRANSFORM_TYPES.METRICS:
             return extractTaskMetadata(targetTask, type);
-        case 'RAW':
+        case TRANSFORM_TYPES.RAW:
             return identity(content);
         default:
             return identity(content);

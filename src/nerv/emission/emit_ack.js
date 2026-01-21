@@ -19,6 +19,8 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
+const { MessageType } = require('../../shared/nerv/constants');
+
 /* ===========================
    Fábrica do emissor de ACK
 =========================== */
@@ -56,7 +58,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
      */
     function emitAck(envelope) {
         telemetry.emit('nerv:emission:attempt', {
-            kind: 'ACK'
+            kind: MessageType.ACK
         });
 
         let normalized;
@@ -69,7 +71,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
             envelopes.assertValid(normalized);
         } catch (error) {
             telemetry.emit('nerv:emission:rejected', {
-                kind: 'ACK',
+                kind: MessageType.ACK,
                 reason: 'estrutura',
                 message: error.message
             });
@@ -86,14 +88,14 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
 
         if (!accepted) {
             telemetry.emit('nerv:emission:enqueue_failed', {
-                kind: 'ACK'
+                kind: MessageType.ACK
             });
             return;
         }
 
         // 5. Telemetria de sucesso técnico
         telemetry.emit('nerv:emission:success', {
-            kind: 'ACK'
+            kind: MessageType.ACK
         });
     }
 

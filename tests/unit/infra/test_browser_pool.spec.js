@@ -37,4 +37,10 @@ const BrowserPoolManager = require('../../../src/infra/browser_pool/pool_manager
     console.log('✅ Pool encerrado');
 
     console.log('\n🎉 BrowserPoolManager 100% funcional!');
-})();
+
+    // Força encerramento do processo
+    process.exit(0);
+})().catch(err => {
+    console.error('❌ Erro no teste:', err);
+    process.exit(1);
+});

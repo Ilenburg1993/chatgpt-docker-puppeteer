@@ -17,29 +17,30 @@ describe('NERV Envelope - Protocolo Universal', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.COMMAND,
-                actionCode: ActionCode.EXECUTE_TASK,
+                actionCode: ActionCode.TASK_START,
                 payload: { taskId: 'task-001' }
             });
 
             assert.ok(envelope, 'Envelope deve ser criado');
-            assert.strictEqual(envelope.actor, ActorRole.KERNEL);
-            assert.strictEqual(envelope.messageType, MessageType.COMMAND);
+            assert.strictEqual(envelope.identity.actor, ActorRole.KERNEL);
+            assert.strictEqual(envelope.type.message_type, MessageType.COMMAND);
+            assert.strictEqual(envelope.type.action_code, ActionCode.TASK_START);
         });
 
         it('deve gerar ID único para cada envelope', () => {
             const env1 = createEnvelope({
-                actor: ActorRole.DRIVER,
+                actor: ActorRole.INFRA,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.TASK_COMPLETED
+                actionCode: ActionCode.TASK_OBSERVED
             });
 
             const env2 = createEnvelope({
-                actor: ActorRole.DRIVER,
+                actor: ActorRole.INFRA,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.TASK_COMPLETED
+                actionCode: ActionCode.TASK_OBSERVED
             });
 
-            assert.notStrictEqual(env1.id, env2.id, 'IDs devem ser únicos');
+            assert.notStrictEqual(env1.causality.msg_id, env2.causality.msg_id, 'IDs devem ser únicos');
         });
 
         it('deve incluir timestamp automático', () => {
@@ -47,28 +48,28 @@ describe('NERV Envelope - Protocolo Universal', () => {
 
             const envelope = createEnvelope({
                 actor: ActorRole.SERVER,
-                messageType: MessageType.QUERY,
-                actionCode: ActionCode.GET_STATUS
+                messageType: MessageType.ACK,
+                actionCode: ActionCode.ACK_RECEIVED
             });
 
             const depois = Date.now();
 
-            assert.ok(envelope.timestamp, 'Deve ter timestamp');
-            const ts = new Date(envelope.timestamp).getTime();
+            assert.ok(envelope.protocol.timestamp, 'Deve ter timestamp');
+            const ts = envelope.protocol.timestamp;
             assert.ok(ts >= antes && ts <= depois, 'Timestamp deve estar no intervalo');
         });
     });
 
     describe('2. Validação de Atores', () => {
         it('deve aceitar atores válidos', () => {
-            const atoresValidos = [ActorRole.KERNEL, ActorRole.DRIVER, ActorRole.SERVER, ActorRole.NERV];
+            const atoresValidos = [ActorRole.KERNEL, ActorRole.SERVER, ActorRole.INFRA, ActorRole.OBSERVER];
 
             atoresValidos.forEach(actor => {
                 assert.doesNotThrow(() => {
                     createEnvelope({
                         actor,
                         messageType: MessageType.EVENT,
-                        actionCode: ActionCode.HEARTBEAT
+                        actionCode: ActionCode.ACK_RECEIVED
                     });
                 });
             });
@@ -79,7 +80,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
                 createEnvelope({
                     actor: 'INVALID_ACTOR',
                     messageType: MessageType.EVENT,
-                    actionCode: ActionCode.HEARTBEAT
+                    actionCode: ActionCode.ACK_RECEIVED
                 });
             }, /Invalid actor/);
         });
@@ -90,39 +91,39 @@ describe('NERV Envelope - Protocolo Universal', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.COMMAND,
-                actionCode: ActionCode.EXECUTE_TASK
+                actionCode: ActionCode.TASK_START
             });
 
-            assert.strictEqual(envelope.messageType, MessageType.COMMAND);
+            assert.strictEqual(envelope.type.message_type, MessageType.COMMAND);
         });
 
         it('deve aceitar tipo EVENT', () => {
             const envelope = createEnvelope({
-                actor: ActorRole.DRIVER,
+                actor: ActorRole.INFRA,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.TASK_COMPLETED
+                actionCode: ActionCode.TASK_OBSERVED
             });
 
-            assert.strictEqual(envelope.messageType, MessageType.EVENT);
+            assert.strictEqual(envelope.type.message_type, MessageType.EVENT);
         });
 
-        it('deve aceitar tipo QUERY', () => {
+        it('deve aceitar tipo ACK', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.SERVER,
-                messageType: MessageType.QUERY,
-                actionCode: ActionCode.GET_STATUS
+                messageType: MessageType.ACK,
+                actionCode: ActionCode.ACK_RECEIVED
             });
 
-            assert.strictEqual(envelope.messageType, MessageType.QUERY);
+            assert.strictEqual(envelope.type.message_type, MessageType.ACK);
         });
     });
 
     describe('4. Payload e Dados', () => {
         it('deve aceitar payload vazio', () => {
             const envelope = createEnvelope({
-                actor: ActorRole.NERV,
+                actor: ActorRole.OBSERVER,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.HEARTBEAT,
+                actionCode: ActionCode.ACK_RECEIVED,
                 payload: {}
             });
 
@@ -139,7 +140,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.TASK_STATE_CHANGE,
+                actionCode: ActionCode.TASK_OBSERVED,
                 payload
             });
 
@@ -156,9 +157,9 @@ describe('NERV Envelope - Protocolo Universal', () => {
             };
 
             const envelope = createEnvelope({
-                actor: ActorRole.DRIVER,
+                actor: ActorRole.INFRA,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.DRIVER_RESPONSE,
+                actionCode: ActionCode.DRIVER_STATE_OBSERVED,
                 payload
             });
 
@@ -168,27 +169,28 @@ describe('NERV Envelope - Protocolo Universal', () => {
 
     describe('5. Correlação de Mensagens', () => {
         it('deve aceitar correlationId opcional', () => {
-            const correlationId = 'corr-001';
+            const correlationId = '550e8400-e29b-41d4-a716-446655440000'; // UUID válido
 
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.COMMAND,
-                actionCode: ActionCode.EXECUTE_TASK,
+                actionCode: ActionCode.TASK_START,
                 correlationId
             });
 
-            assert.strictEqual(envelope.correlationId, correlationId);
+            assert.strictEqual(envelope.causality.correlation_id, correlationId);
         });
 
         it('deve permitir correlationId null', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.SERVER,
-                messageType: MessageType.QUERY,
-                actionCode: ActionCode.GET_STATUS,
+                messageType: MessageType.ACK,
+                actionCode: ActionCode.ACK_RECEIVED,
                 correlationId: null
             });
 
-            assert.strictEqual(envelope.correlationId, null);
+            // correlationId null usa msg_id como fallback
+            assert.ok(envelope.causality.correlation_id);
         });
     });
 
@@ -197,11 +199,11 @@ describe('NERV Envelope - Protocolo Universal', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.COMMAND,
-                actionCode: ActionCode.EXECUTE_TASK,
-                target: ActorRole.DRIVER
+                actionCode: ActionCode.TASK_START,
+                target: ActorRole.INFRA
             });
 
-            assert.strictEqual(envelope.target, ActorRole.DRIVER);
+            assert.strictEqual(envelope.identity.target, ActorRole.INFRA);
         });
 
         it('deve validar target se fornecido', () => {
@@ -209,7 +211,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
                 createEnvelope({
                     actor: ActorRole.KERNEL,
                     messageType: MessageType.COMMAND,
-                    actionCode: ActionCode.EXECUTE_TASK,
+                    actionCode: ActionCode.TASK_START,
                     target: 'INVALID_TARGET'
                 });
             }, /Invalid target/);
@@ -221,13 +223,13 @@ describe('NERV Envelope - Protocolo Universal', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
-                actionCode: ActionCode.TASK_COMPLETED
+                actionCode: ActionCode.TASK_OBSERVED
             });
 
-            // Tentar modificar (deve falhar silenciosamente ou throw em strict mode)
-            assert.throws(() => {
-                envelope.actor = ActorRole.DRIVER;
-            }, /Cannot/);
+            // Verificar se o envelope está congelado
+            assert.ok(Object.isFrozen(envelope), 'Envelope deve estar congelado');
+            assert.ok(Object.isFrozen(envelope.identity), 'identity deve estar congelado');
+            assert.ok(Object.isFrozen(envelope.type), 'type deve estar congelado');
         });
     });
 
@@ -236,7 +238,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
             const envelope = createEnvelope({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.COMMAND,
-                actionCode: ActionCode.EXECUTE_TASK,
+                actionCode: ActionCode.TASK_START,
                 payload: { taskId: 'task-001' }
             });
 
@@ -244,7 +246,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
                 const json = JSON.stringify(envelope);
                 const parsed = JSON.parse(json);
 
-                assert.strictEqual(parsed.actor, ActorRole.KERNEL);
+                assert.strictEqual(parsed.identity.actor, ActorRole.KERNEL);
                 assert.strictEqual(parsed.payload.taskId, 'task-001');
             });
         });

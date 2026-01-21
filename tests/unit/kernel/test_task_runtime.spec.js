@@ -9,7 +9,6 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
 describe('Kernel Task Runtime - Ambiente de Execução', () => {
-
     describe('1. Contexto de Execução', () => {
         it('deve criar contexto para tarefa', () => {
             const contexto = {
@@ -77,7 +76,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const timeout = 100; // 100ms
 
             let cancelado = false;
-            const promise = new Promise((resolve) => {
+            const promise = new Promise(resolve => {
                 setTimeout(() => {
                     cancelado = true;
                     resolve();
@@ -205,23 +204,23 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
 
     describe('8. Tratamento de Erros', () => {
         it('deve capturar exceções do runtime', () => {
-            let erroCap turado = null;
+            let errorCapturado = null;
 
             try {
                 throw new Error('Runtime error');
             } catch (error) {
-                erroCapturado = error;
+                errorCapturado = error;
             }
 
-            assert.ok(erroCapturado);
-            assert.match(erroCapturado.message, /Runtime error/);
+            assert.ok(errorCapturado);
+            assert.match(errorCapturado.message, /Runtime error/);
         });
 
         it('deve executar recovery após erro', () => {
             let recoveryExecutado = false;
 
             const runtime = {
-                onError: (error) => {
+                onError: error => {
                     recoveryExecutado = true;
                 }
             };

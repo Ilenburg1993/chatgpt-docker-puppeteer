@@ -20,6 +20,8 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
+const { MessageType } = require('../../shared/nerv/constants');
+
 /* ===========================
    Fábrica do emissor de EVENT
 =========================== */
@@ -57,7 +59,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
      */
     function emitEvent(envelope) {
         telemetry.emit('nerv:emission:attempt', {
-            kind: 'EVENT'
+            kind: MessageType.EVENT
         });
 
         let normalized;
@@ -70,7 +72,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
             envelopes.assertValid(normalized);
         } catch (error) {
             telemetry.emit('nerv:emission:rejected', {
-                kind: 'EVENT',
+                kind: MessageType.EVENT,
                 reason: 'estrutura',
                 message: error.message
             });
@@ -87,14 +89,14 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
 
         if (!accepted) {
             telemetry.emit('nerv:emission:enqueue_failed', {
-                kind: 'EVENT'
+                kind: MessageType.EVENT
             });
             return;
         }
 
         // 5. Telemetria de sucesso técnico
         telemetry.emit('nerv:emission:success', {
-            kind: 'EVENT'
+            kind: MessageType.EVENT
         });
     }
 

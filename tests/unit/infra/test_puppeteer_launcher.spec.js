@@ -24,4 +24,10 @@ const puppeteer = require('puppeteer');
     console.log('✅ Browser fechado');
 
     console.log('\n🎉 Puppeteer funcional! Use modo launcher no código.');
-})();
+
+    // Força encerramento do processo
+    process.exit(0);
+})().catch(err => {
+    console.error('❌ Erro no teste:', err);
+    process.exit(1);
+});

@@ -261,7 +261,7 @@ async function test5_CodeValidation() {
 
     log('INFO', 'Verificando arquivo recovery_system.js...');
 
-    const recoverySystemPath = path.join(__dirname, '..', 'src', 'driver', 'modules', 'recovery_system.js');
+    const recoverySystemPath = path.join(__dirname, '..', '..', 'src', 'driver', 'modules', 'recovery_system.js');
     const content = await fs.readFile(recoverySystemPath, 'utf-8');
 
     const checks = [

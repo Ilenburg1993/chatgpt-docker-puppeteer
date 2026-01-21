@@ -20,13 +20,11 @@
 
 const { log } = require('./core/logger');
 
-const {
-    CONNECTION_MODES: CONNECTION_MODES
-} = require('./core/constants/browser.js');
+const { ActorRole } = require('./shared/nerv/constants');
 
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('./core/constants/tasks.js');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('./core/constants/browser.js');
+
+const { STATUS_VALUES: STATUS_VALUES } = require('./core/constants/tasks.js');
 
 const CONFIG = require('./core/config');
 const identityManager = require('./core/identity_manager');
@@ -124,7 +122,7 @@ async function boot() {
         const kernel = await createKernel({
             nerv, // Passa NERV diretamente
             telemetry: {
-                source: 'kernel',
+                source: ActorRole.KERNEL.toLowerCase(),
                 retention: 1000
             },
             policy: {},

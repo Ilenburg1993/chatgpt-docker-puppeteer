@@ -5,6 +5,16 @@
 ========================================================================== */
 
 /**
+ * Metadata Types: Tipos de metadados extraíveis de uma Task
+ * Escopo: Local ao módulo metadata transformer
+ */
+const METADATA_TYPES = {
+    STATUS: 'STATUS',
+    METRICS: 'METRICS',
+    ERROR: 'ERROR'
+};
+
+/**
  * Extrai propriedades específicas do estado da tarefa.
  */
 function extractTaskMetadata(task, transformType) {
@@ -13,11 +23,11 @@ function extractTaskMetadata(task, transformType) {
     }
 
     switch (transformType.toUpperCase()) {
-        case 'STATUS':
+        case METADATA_TYPES.STATUS:
             return task.state.status || 'UNKNOWN';
-        case 'METRICS':
+        case METADATA_TYPES.METRICS:
             return JSON.stringify(task.state.metrics || {}, null, 2);
-        case 'ERROR':
+        case METADATA_TYPES.ERROR:
             return task.state.last_error || 'NONE';
         default:
             return 'UNKNOWN_METADATA_REQUEST';

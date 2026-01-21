@@ -50,7 +50,7 @@ async function test1_StabilizerCleanup() {
 
     log('INFO', 'Verificando código do stabilizer.js...');
 
-    const stabilizerPath = path.join(__dirname, '..', 'src', 'driver', 'modules', 'stabilizer.js');
+    const stabilizerPath = path.join(__dirname, '..', '..', 'src', 'driver', 'modules', 'stabilizer.js');
     const content = await fs.readFile(stabilizerPath, 'utf-8');
 
     const checks = [
@@ -90,7 +90,7 @@ async function test2_ServerShutdown() {
 
     log('INFO', 'Verificando main.js shutdown phases...');
 
-    const mainPath = path.join(__dirname, '..', 'src', 'main.js');
+    const mainPath = path.join(__dirname, '..', '..', 'src', 'main.js');
     const content = await fs.readFile(mainPath, 'utf-8');
 
     const checks = [
@@ -130,7 +130,7 @@ async function test3_SignalGuard() {
 
     log('INFO', 'Verificando signal handlers em main.js...');
 
-    const mainPath = path.join(__dirname, '..', 'src', 'main.js');
+    const mainPath = path.join(__dirname, '..', '..', 'src', 'main.js');
     const content = await fs.readFile(mainPath, 'utf-8');
 
     const checks = [
@@ -174,7 +174,7 @@ async function test4_KernelLocking() {
 
     log('INFO', 'Verificando task_runtime.js...');
 
-    const taskRuntimePath = path.join(__dirname, '..', 'src', 'kernel', 'task_runtime', 'task_runtime.js');
+    const taskRuntimePath = path.join(__dirname, '..', '..', 'src', 'kernel', 'task_runtime', 'task_runtime.js');
     const content = await fs.readFile(taskRuntimePath, 'utf-8');
 
     const checks = [
@@ -218,12 +218,30 @@ async function test5_CacheInvalidation() {
 
     log('INFO', 'Verificando io.js invalidation order...');
 
-    const ioPath = path.join(__dirname, '..', 'src', 'infra', 'io.js');
+    const ioPath = path.join(__dirname, '..', '..', 'src', 'infra', 'io.js');
     const content = await fs.readFile(ioPath, 'utf-8');
 
-    // Encontrar ordem de saveTask
-    const saveTaskMatch = content.match(/saveTask:[\s\S]{0,500}markDirty[\s\S]{0,500}saveTask\(task\)/);
-    const deleteTaskMatch = content.match(/deleteTask:[\s\S]{0,500}markDirty[\s\S]{0,500}deleteTask\(id\)/);
+    // Verificar ordem dentro das funções saveTask e deleteTask
+    // Procura por: async saveTask() { ... markDirty() ... taskStore.saveTask() }
+    const saveTaskFuncMatch = content.match(/async saveTask\([^)]*\)\s*\{[\s\S]{1,500}\}/);
+    const deleteTaskFuncMatch = content.match(/async deleteTask\([^)]*\)\s*\{[\s\S]{1,500}\}/);
+
+    let saveTaskOrderCorrect = false;
+    let deleteTaskOrderCorrect = false;
+
+    if (saveTaskFuncMatch) {
+        const funcBody = saveTaskFuncMatch[0];
+        const markDirtyIndex = funcBody.indexOf('markDirty');
+        const saveTaskIndex = funcBody.indexOf('taskStore.saveTask');
+        saveTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < saveTaskIndex;
+    }
+
+    if (deleteTaskFuncMatch) {
+        const funcBody = deleteTaskFuncMatch[0];
+        const markDirtyIndex = funcBody.indexOf('markDirty');
+        const deleteTaskIndex = funcBody.indexOf('taskStore.deleteTask');
+        deleteTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < deleteTaskIndex;
+    }
 
     const checks = [
         {
@@ -231,12 +249,12 @@ async function test5_CacheInvalidation() {
             pass: content.includes('P5.2 FIX')
         },
         {
-            name: 'saveTask: markDirty ANTES de saveTask',
-            pass: saveTaskMatch !== null
+            name: 'saveTask: markDirty ANTES de taskStore.saveTask',
+            pass: saveTaskOrderCorrect
         },
         {
-            name: 'deleteTask: markDirty ANTES de deleteTask',
-            pass: deleteTaskMatch !== null
+            name: 'deleteTask: markDirty ANTES de taskStore.deleteTask',
+            pass: deleteTaskOrderCorrect
         },
         {
             name: 'Comentário "defensivo" presente',

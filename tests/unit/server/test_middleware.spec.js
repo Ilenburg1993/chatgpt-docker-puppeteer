@@ -204,7 +204,7 @@ describe('Server Middleware - Request Processing', () => {
                 prompt: 'Teste',
                 target: 'gemini',
                 _internal: 'secret',
-                __proto__: {}
+                __proto__: { polluted: true }
             };
 
             const sanitized = {};
@@ -215,7 +215,8 @@ describe('Server Middleware - Request Processing', () => {
             }
 
             assert.ok(!('_internal' in sanitized));
-            assert.ok(!('__proto__' in sanitized));
+            // __proto__ existe em todos os objetos, mas não deve ter a propriedade polluted
+            assert.ok(!sanitized.__proto__ || !sanitized.__proto__.polluted);
         });
     });
 
@@ -400,7 +401,7 @@ describe('Server Middleware - Request Processing', () => {
         it('deve rejeitar JSON inválido', () => {
             const rawBody = '{invalid json}';
 
-            assert.throws(() => JSON.parse(rawBody), /Unexpected token/);
+            assert.throws(() => JSON.parse(rawBody), /(Unexpected token|Expected property name)/);
         });
 
         it('deve limitar tamanho do body', () => {

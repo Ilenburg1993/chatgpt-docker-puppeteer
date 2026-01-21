@@ -21,6 +21,7 @@
 ========================================================================== */
 
 const { v4: uuidv4 } = require('uuid');
+const { ActorRole, MessageType } = require('../../shared/nerv/constants');
 
 /* ===========================
    Utilitários internos
@@ -178,13 +179,13 @@ class KernelNERVBridge {
         });
 
         // Apenas EVENTs são fatos do mundo
-        if (data.kind === 'EVENT') {
+        if (data.kind === MessageType.EVENT) {
             this._processEvent(envelope, data);
             return;
         }
 
         // ACKs são confirmações físicas (ignoradas semanticamente)
-        if (data.kind === 'ACK') {
+        if (data.kind === MessageType.ACK) {
             this.telemetry.info('nerv_bridge_ack_received', {
                 msgId: data.msgId,
                 at: Date.now()
@@ -193,7 +194,7 @@ class KernelNERVBridge {
         }
 
         // COMMANDs recebidos são anomalia
-        if (data.kind === 'COMMAND') {
+        if (data.kind === MessageType.COMMAND) {
             this.telemetry.warning('nerv_bridge_unexpected_command', {
                 msgId: data.msgId,
                 source: data.source,
@@ -259,14 +260,14 @@ class KernelNERVBridge {
             header: {
                 version: 1,
                 timestamp: Date.now(),
-                source: 'kernel',
+                source: ActorRole.KERNEL.toLowerCase(),
                 target
             },
             ids: {
                 msg_id: msgId,
                 correlation_id: correlationId
             },
-            kind: 'COMMAND',
+            kind: MessageType.COMMAND,
             payload
         };
 
@@ -315,14 +316,14 @@ class KernelNERVBridge {
             header: {
                 version: 1,
                 timestamp: Date.now(),
-                source: 'kernel',
+                source: ActorRole.KERNEL.toLowerCase(),
                 ...(target && { target })
             },
             ids: {
                 msg_id: msgId,
                 correlation_id: correlationId
             },
-            kind: 'EVENT',
+            kind: MessageType.EVENT,
             payload
         };
 

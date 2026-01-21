@@ -228,7 +228,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 taskId: 'task-001',
                 status: 'DONE',
                 _internal: 'metadata',
-                __proto__: {}
+                __proto__: { polluted: true }
             };
 
             const sanitized = {
@@ -237,7 +237,8 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             };
 
             assert.ok(!('_internal' in sanitized));
-            assert.ok(!('__proto__' in sanitized));
+            // __proto__ existe em todos os objetos, mas não deve ter a propriedade polluted
+            assert.ok(!sanitized.__proto__ || !sanitized.__proto__.polluted);
         });
     });
 

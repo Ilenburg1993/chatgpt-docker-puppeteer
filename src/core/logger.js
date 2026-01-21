@@ -154,4 +154,4 @@ cleanOldFiles('agente_');
 cleanOldFiles('metrics_');
 cleanOldFiles('audit_');
 
-module.exports = { log, audit, metric, LOG_DIR };
+module.exports = { log, audit, metric, logMetric: metric, LOG_DIR };

@@ -5,9 +5,10 @@
  * @audit-level 32
  */
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const { criarNERVMock } = require('../../mocks/mock_nerv');
+const { ActorRole, MessageType, ActionCode } = require('../../../src/shared/nerv/constants');
 
 describe('NERV Core - Event Bus Central', () => {
     describe('1. Criação e Inicialização', () => {
@@ -22,7 +23,12 @@ describe('NERV Core - Event Bus Central', () => {
         it('deve inicializar sem erros', () => {
             assert.doesNotThrow(() => {
                 const nerv = criarNERVMock();
-                nerv.emit('TEST_EVENT', { data: 'test' });
+                nerv.emit({
+                    actor: ActorRole.KERNEL,
+                    messageType: MessageType.EVENT,
+                    actionCode: 'TEST_EVENT',
+                    payload: { data: 'test' }
+                });
             });
         });
     });
@@ -31,18 +37,37 @@ describe('NERV Core - Event Bus Central', () => {
         it('deve emitir evento simples', () => {
             const nerv = criarNERVMock();
 
-            const emitido = nerv.emit('TASK_CREATED', { taskId: 'task-001' });
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'TASK_CREATED', // String direta, ActionCode não tem TASK_CREATED
+                payload: { taskId: 'task-001' }
+            });
 
-            assert.ok(emitido, 'Evento deve ser emitido');
             assert.ok(nerv.verificarEventoEmitido('TASK_CREATED'), 'Evento deve estar registrado');
         });
 
         it('deve emitir múltiplos eventos', () => {
             const nerv = criarNERVMock();
 
-            nerv.emit('EVENT_1', { data: 1 });
-            nerv.emit('EVENT_2', { data: 2 });
-            nerv.emit('EVENT_3', { data: 3 });
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'EVENT_1',
+                payload: { data: 1 }
+            });
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'EVENT_2',
+                payload: { data: 2 }
+            });
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'EVENT_3',
+                payload: { data: 3 }
+            });
 
             const eventos = nerv.obterEventosEmitidos();
             assert.strictEqual(eventos.length, 3, 'Deve ter 3 eventos emitidos');
@@ -51,12 +76,17 @@ describe('NERV Core - Event Bus Central', () => {
         it('deve passar dados corretos no evento', () => {
             const nerv = criarNERVMock();
 
-            const dados = { taskId: 'task-002', status: 'RUNNING' };
-            nerv.emit('TASK_STATE_CHANGE', dados);
+            const payload = { taskId: 'task-002', status: 'RUNNING' };
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'TASK_STATE_CHANGE',
+                payload
+            });
 
-            const emitidos = nerv.obterEventosEmitidos('TASK_STATE_CHANGE');
-            assert.strictEqual(emitidos[0][0].taskId, 'task-002');
-            assert.strictEqual(emitidos[0][0].status, 'RUNNING');
+            const envelopes = nerv.obterEventosEmitidos('TASK_STATE_CHANGE');
+            assert.strictEqual(envelopes[0].payload.taskId, 'task-002');
+            assert.strictEqual(envelopes[0].payload.status, 'RUNNING');
         });
     });
 
@@ -64,7 +94,7 @@ describe('NERV Core - Event Bus Central', () => {
         it('deve registrar listener com on()', () => {
             const nerv = criarNERVMock();
 
-            const listener = data => {
+            const listener = _data => {
                 /* noop */
             };
             nerv.on('TEST_EVENT', listener);
@@ -80,7 +110,12 @@ describe('NERV Core - Event Bus Central', () => {
                 executado = true;
             });
 
-            nerv.emit('EXEC_TEST', {});
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'EXEC_TEST',
+                payload: {}
+            });
 
             // Aguardar execução assíncrona
             await new Promise(resolve => setTimeout(resolve, 10));
@@ -95,8 +130,15 @@ describe('NERV Core - Event Bus Central', () => {
                 contador++;
             });
 
-            nerv.emit('ONCE_TEST', {});
-            nerv.emit('ONCE_TEST', {});
+            const envelope = {
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'ONCE_TEST',
+                payload: {}
+            };
+
+            nerv.emit(envelope);
+            nerv.emit(envelope);
 
             await new Promise(resolve => setTimeout(resolve, 10));
             assert.strictEqual(contador, 1, 'Listener deve executar apenas uma vez');
@@ -134,7 +176,12 @@ describe('NERV Core - Event Bus Central', () => {
                 contador3++;
             });
 
-            nerv.emit('MULTI_TEST', {});
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'MULTI_TEST',
+                payload: {}
+            });
 
             await new Promise(resolve => setTimeout(resolve, 10));
             assert.strictEqual(contador1, 1, 'Listener 1 executado');
@@ -148,13 +195,18 @@ describe('NERV Core - Event Bus Central', () => {
             const nerv = criarNERVMock();
 
             setTimeout(() => {
-                nerv.emit('DELAYED_EVENT', { resultado: 'sucesso' });
+                nerv.emit({
+                    actor: ActorRole.KERNEL,
+                    messageType: MessageType.EVENT,
+                    actionCode: 'DELAYED_EVENT',
+                    payload: { resultado: 'sucesso' }
+                });
             }, 50);
 
-            const dados = await nerv.aguardarEvento('DELAYED_EVENT', 1000);
+            const envelope = await nerv.aguardarEvento('DELAYED_EVENT', 1000);
 
-            assert.ok(dados, 'Deve receber dados do evento');
-            assert.strictEqual(dados[0].resultado, 'sucesso');
+            assert.ok(envelope, 'Deve receber envelope do evento');
+            assert.strictEqual(envelope.payload.resultado, 'sucesso');
         });
 
         it('deve timeout se evento não chegar', async () => {
@@ -183,7 +235,12 @@ describe('NERV Core - Event Bus Central', () => {
                 eventoB = true;
             });
 
-            nerv.emit('EVENT_A', {});
+            nerv.emit({
+                actor: ActorRole.KERNEL,
+                messageType: MessageType.EVENT,
+                actionCode: 'EVENT_A',
+                payload: {}
+            });
 
             await new Promise(resolve => setTimeout(resolve, 10));
             assert.ok(eventoA, 'Evento A deve ser disparado');
@@ -195,8 +252,8 @@ describe('NERV Core - Event Bus Central', () => {
         it('deve limpar histórico de eventos', () => {
             const nerv = criarNERVMock();
 
-            nerv.emit('EVENT_1', {});
-            nerv.emit('EVENT_2', {});
+            nerv.emit({ actor: ActorRole.KERNEL, messageType: MessageType.EVENT, actionCode: 'EVENT_1', payload: {} });
+            nerv.emit({ actor: ActorRole.KERNEL, messageType: MessageType.EVENT, actionCode: 'EVENT_2', payload: {} });
 
             assert.ok(nerv.obterEventosEmitidos().length > 0);
 
@@ -224,7 +281,12 @@ describe('NERV Core - Event Bus Central', () => {
 
             assert.doesNotThrow(() => {
                 for (let i = 0; i < 1000; i++) {
-                    nerv.emit('PERF_TEST', { index: i });
+                    nerv.emit({
+                        actor: ActorRole.KERNEL,
+                        messageType: MessageType.EVENT,
+                        actionCode: 'PERF_TEST',
+                        payload: { index: i }
+                    });
                 }
             });
 

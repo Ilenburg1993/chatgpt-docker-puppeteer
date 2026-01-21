@@ -28,6 +28,8 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
+const { ActorRole, MessageType, ActionCode } = require('../../shared/nerv/constants');
+
 // ONDA 2.5: Removido EventEmitter, usa NERV para comunicação
 
 /* ===========================
@@ -135,9 +137,9 @@ class KernelTelemetry {
                 const discarded = this.buffer.shift();
                 // ONDA 2.5: Emitir via NERV (não mais EventEmitter interno)
                 this.nerv.emit({
-                    actor: 'KERNEL',
-                    messageType: 'EVENT',
-                    actionCode: 'TELEMETRY_DISCARDED',
+                    actor: ActorRole.KERNEL,
+                    messageType: MessageType.EVENT,
+                    actionCode: ActionCode.TELEMETRY_DISCARDED,
                     payload: {
                         discardedAt: Date.now(),
                         discardedEventType: discarded.type
@@ -148,9 +150,9 @@ class KernelTelemetry {
 
         // ONDA 2.5: Emissão via NERV (desacoplado)
         this.nerv.emit({
-            actor: 'KERNEL',
-            messageType: 'EVENT',
-            actionCode: 'KERNEL_TELEMETRY',
+            actor: ActorRole.KERNEL,
+            messageType: MessageType.EVENT,
+            actionCode: ActionCode.KERNEL_TELEMETRY,
             payload: event
         });
 
@@ -328,7 +330,7 @@ class KernelTelemetry {
 
         // ONDA 2.5: Delega para NERV, filtra apenas eventos KERNEL_TELEMETRY
         return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            if (envelope.actor === 'KERNEL') {
+            if (envelope.actor === ActorRole.KERNEL) {
                 handler(envelope.payload);
             }
         });
@@ -344,7 +346,7 @@ class KernelTelemetry {
         }
 
         return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            if (envelope.actor === 'KERNEL' && envelope.payload.type === type) {
+            if (envelope.actor === ActorRole.KERNEL && envelope.payload.type === type) {
                 handler(envelope.payload);
             }
         });
@@ -360,7 +362,7 @@ class KernelTelemetry {
         }
 
         return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            if (envelope.actor === 'KERNEL' && envelope.payload.severity === severity) {
+            if (envelope.actor === ActorRole.KERNEL && envelope.payload.severity === severity) {
                 handler(envelope.payload);
             }
         });

@@ -10,6 +10,8 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
+const errors = 0;
+
 describe('Core Config Completo - Configuração', () => {
     describe('1. config.json - Estrutura Básica', () => {
         it('deve existir e ser JSON válido', () => {
