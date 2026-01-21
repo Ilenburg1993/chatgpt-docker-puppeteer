@@ -6,8 +6,11 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 ![Status](https://img.shields.io/badge/status-pre--v1.0-orange)
 ![Stability](https://img.shields.io/badge/stability-unstable-red)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
 
 **Sistema de agente autônomo para controle de Large Language Models (ChatGPT, Gemini) via automação de browser usando Puppeteer e Chrome remote debugging.**
+
+> 💻 **Cross-Platform**: Totalmente compatível com **Windows** (cmd.exe/PowerShell), **Linux** e **macOS**. Super Launcher, scripts e Makefile funcionam nativamente em todas as plataformas.
 
 > ⚠️ **Status de Desenvolvimento**: Este projeto está em **desenvolvimento ativo** e **NÃO atingiu v1.0 stable**. A fase de testes e consolidação está em andamento. Features, APIs e comportamentos podem mudar sem aviso prévio. **NÃO use em produção**.
 
