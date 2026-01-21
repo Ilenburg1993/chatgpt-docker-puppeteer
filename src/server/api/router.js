@@ -11,14 +11,13 @@
 
 const tasksController = require('./controllers/tasks');
 
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('../../core/constants/tasks.js');
 
 const systemController = require('./controllers/system');
 const dnaController = require('./controllers/dna');
 const { notFound, errorHandler } = require('../middleware/error_handler');
 const { log } = require('../../core/logger');
+const { apiLimiter } = require('../engine/app');
 
 /**
  * Aplica a malha de rotas à instância do Express.
@@ -96,23 +95,23 @@ function applyRoutes(app) {
      * Namespace: /api/tasks, /api/queue, /api/results
      * Responsável pelo ciclo de vida das intenções de execução e download de .txt.
      */
-    app.use('/api/tasks', tasksController);
-    app.use('/api/queue', tasksController); // Alias para operações bulk de fila
-    app.use('/api/results', tasksController); // Alias para recuperação de respostas
+    app.use('/api/tasks', apiLimiter, tasksController);
+    app.use('/api/queue', apiLimiter, tasksController); // Alias para operações bulk de fila
+    app.use('/api/results', apiLimiter, tasksController); // Alias para recuperação de respostas
 
     /**
      * DOMÍNIO DE SISTEMA E OBSERVABILIDADE (Agentes e Infraestrutura)
      * Namespace: /api/system
      * Responsável pelo inventário IPC 2.0 (/agents), saúde (Doctor) e processos.
      */
-    app.use('/api/system', systemController);
+    app.use('/api/system', apiLimiter, systemController);
 
     /**
      * DOMÍNIO DE INTELIGÊNCIA E CONFIGURAÇÃO (DNA e Parâmetros)
      * Namespace: /api/config
      * Responsável pela evolução do genoma (SADI) e controle do config.json.
      */
-    app.use('/api/config', dnaController);
+    app.use('/api/config', apiLimiter, dnaController);
 
     /* --------------------------------------------------------------------------
        2. ESCUDOS DE PROTEÇÃO (ERROR BOUNDARY)

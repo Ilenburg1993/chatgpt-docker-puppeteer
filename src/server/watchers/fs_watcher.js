@@ -33,6 +33,11 @@ let fsWatcher = null;
 let signaling = false;
 
 /**
+ * Timer para debounce de eventos do filesystem.
+ */
+let debounceTimer = null;
+
+/**
  * Inicializa o sensor de filesystem da fila.
  * Monitora a pasta física definida na Fachada de IO.
  */

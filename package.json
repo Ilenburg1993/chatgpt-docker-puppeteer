@@ -128,6 +128,7 @@
     "dependencies": {
         "compression": "^1.7.4",
         "express": "^4.22.1",
+        "express-rate-limit": "8.2.1",
         "ghost-cursor": "^1.1.18",
         "js-yaml": "^4.1.0",
         "pm2": "^6.0.14",

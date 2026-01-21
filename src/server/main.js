@@ -10,9 +10,7 @@
 
 const fs = require('fs');
 
-const {
-    CONNECTION_MODES: CONNECTION_MODES
-} = require('../core/constants/browser.js');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('../core/constants/browser.js');
 
 const _path = require('path');
 
@@ -37,7 +35,11 @@ const reconciler = require('./supervisor/reconciler');
 const fsWatcher = require('./watchers/fs_watcher');
 const logWatcher = require('./watchers/log_watcher');
 
-// 6. Utilidades de Core e Infra
+// 6. Adaptador NERV (Comunicação com Barramento)
+const ServerNERVAdapter = require('./nerv_adapter/server_nerv_adapter');
+const NERV = require('../shared/nerv/nerv');
+
+// 7. Utilidades de Core e Infra
 const { log } = require('../core/logger');
 const PATHS = require('../infra/fs/paths');
 const { PROTOCOL_VERSION } = require('../shared/nerv/constants');
@@ -115,7 +117,12 @@ async function bootstrap() {
         logWatcher.init();
         log('DEBUG', '[BOOT] Vigilância de sistema de arquivos ativa.');
 
-        // PASSO 8: Ativar o Reconciliador (Autocura)
+        // PASSO 8: Inicializar ServerNERVAdapter (Comunicação NERV ↔ Socket.io)
+        const nervInstance = NERV.getInstance();
+        const serverAdapter = new ServerNERVAdapter(nervInstance, socketHub);
+        log('INFO', '[BOOT] ServerNERVAdapter conectado ao NERV.');
+
+        // PASSO 9: Ativar o Reconciliador (Autocura)
         // O Reconciler é o último a subir para garantir que os barramentos estejam prontos
         if (reconciler && typeof reconciler.start === 'function') {
             reconciler.start();

@@ -10,10 +10,23 @@
 const express = require('express');
 const path = require('path');
 const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const { ROOT, LOG_DIR } = require('../../infra/fs/fs_utils');
 
 // Middlewares de Soberania e Rastreabilidade
 const requestId = require('../middleware/request_id');
+
+/**
+ * Rate Limiter para proteção contra flood/DoS.
+ * Limita cada IP a 100 requests por minuto na API.
+ */
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: 100, // Limite de 100 requests por janela
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+    legacyHeaders: false // Disable `X-RateLimit-*` headers
+});
 
 /**
  * Instância do Express Prime.
@@ -68,3 +81,4 @@ app.use('/crash_reports', express.static(crashReportsPath));
  */
 
 module.exports = app;
+module.exports.apiLimiter = apiLimiter;
