@@ -99,13 +99,17 @@ Novo no projeto? Comece aqui:
 |-----------|-----------|--------|
 | [AUDITORIAS/00_ROOT_FILES_AUDIT.md](AUDITORIAS/00_ROOT_FILES_AUDIT.md) | Auditoria de arquivos root (fundação) | ✅ Completa |
 | [AUDITORIAS/01_CORE_AUDIT.md](AUDITORIAS/01_CORE_AUDIT.md) | Auditoria do subsistema CORE | ✅ Completa |
-| [AUDITORIAS/02_NERV_AUDIT.md](AUDITORIAS/02_NERV_AUDIT.md) | Auditoria do subsistema NERV | ⏳ Pendente |
-| [AUDITORIAS/03_INFRA_AUDIT.md](AUDITORIAS/03_INFRA_AUDIT.md) | Auditoria do subsistema INFRA | ⏳ Pendente |
-| [AUDITORIAS/04_KERNEL_AUDIT.md](AUDITORIAS/04_KERNEL_AUDIT.md) | Auditoria do subsistema KERNEL | ⏳ Pendente |
-| [AUDITORIAS/05_DRIVER_AUDIT.md](AUDITORIAS/05_DRIVER_AUDIT.md) | Auditoria do subsistema DRIVER | ⏳ Pendente |
+| [AUDITORIAS/02_NERV_AUDIT.md](AUDITORIAS/02_NERV_AUDIT.md) | Auditoria do subsistema NERV (IPC 2.0) | ✅ Completa (13 correções P1) |
+| [AUDITORIAS/03_INFRA_AUDIT.md](AUDITORIAS/03_INFRA_AUDIT.md) | Auditoria do subsistema INFRA (Browser, I/O) | ✅ Completa (4 correções P3) |
+| [AUDITORIAS/04_KERNEL_AUDIT.md](AUDITORIAS/04_KERNEL_AUDIT.md) | Auditoria do subsistema KERNEL (Decision Core) | ✅ Completa (5 correções P2+P3) |
+| [AUDITORIAS/05_DRIVER_AUDIT.md](AUDITORIAS/05_DRIVER_AUDIT.md) | Auditoria do subsistema DRIVER | ⏳ Próxima |
 | [AUDITORIAS/06_SERVER_AUDIT.md](AUDITORIAS/06_SERVER_AUDIT.md) | Auditoria do subsistema SERVER | ⏳ Pendente |
 | [AUDITORIAS/07_LOGIC_AUDIT.md](AUDITORIAS/07_LOGIC_AUDIT.md) | Auditoria do subsistema LOGIC | ⏳ Pendente |
 | [AUDITORIAS/08_DASHBOARD_AUDIT.md](AUDITORIAS/08_DASHBOARD_AUDIT.md) | Auditoria do DASHBOARD (futuro) | ⏳ Pendente |
+| [AUDITORIAS/NERV_CORRECTIONS_SUMMARY.md](AUDITORIAS/NERV_CORRECTIONS_SUMMARY.md) | Resumo de correções NERV (13 aplicadas) | ✅ Documentado |
+| [AUDITORIAS/INFRA_CORRECTIONS_SUMMARY.md](AUDITORIAS/INFRA_CORRECTIONS_SUMMARY.md) | Resumo de correções INFRA (4 aplicadas) | ✅ Documentado |
+| [AUDITORIAS/KERNEL_CORRECTIONS_SUMMARY.md](AUDITORIAS/KERNEL_CORRECTIONS_SUMMARY.md) | Resumo de correções KERNEL (5 aplicadas) | ✅ Documentado |
+| [AUDITORIAS/AUDIT_COVERAGE_MASTER_PLAN.md](AUDITORIAS/AUDIT_COVERAGE_MASTER_PLAN.md) | Plano mestre de cobertura de auditorias | ✅ Atualizado |
 
 ### 📝 Planejamento & Roadmap
 
@@ -194,14 +198,14 @@ Documentação obsoleta mantida apenas para referência:
 
 ### Por Subsistema
 
-- **CORE**: [AUDITORIAS/01_CORE_AUDIT.md](AUDITORIAS/01_CORE_AUDIT.md)
-- **NERV**: [AUDITORIAS/02_NERV_AUDIT.md](AUDITORIAS/02_NERV_AUDIT.md) + [TECHNICAL/NERV/](TECHNICAL/NERV/)
-- **INFRA**: [AUDITORIAS/03_INFRA_AUDIT.md](AUDITORIAS/03_INFRA_AUDIT.md) + [CONNECTION_ORCHESTRATOR.md](CONNECTION_ORCHESTRATOR.md)
-- **KERNEL**: [AUDITORIAS/04_KERNEL_AUDIT.md](AUDITORIAS/04_KERNEL_AUDIT.md)
-- **DRIVER**: [AUDITORIAS/05_DRIVER_AUDIT.md](AUDITORIAS/05_DRIVER_AUDIT.md) + [DRIVER_INTEGRATION_REPORT.md](DRIVER_INTEGRATION_REPORT.md)
-- **SERVER**: [AUDITORIAS/06_SERVER_AUDIT.md](AUDITORIAS/06_SERVER_AUDIT.md)
-- **LOGIC**: [AUDITORIAS/07_LOGIC_AUDIT.md](AUDITORIAS/07_LOGIC_AUDIT.md)
-- **DASHBOARD**: [AUDITORIAS/08_DASHBOARD_AUDIT.md](AUDITORIAS/08_DASHBOARD_AUDIT.md)
+- **CORE**: [AUDITORIAS/01_CORE_AUDIT.md](AUDITORIAS/01_CORE_AUDIT.md) ✅
+- **NERV**: [AUDITORIAS/02_NERV_AUDIT.md](AUDITORIAS/02_NERV_AUDIT.md) + [NERV_CORRECTIONS_SUMMARY.md](AUDITORIAS/NERV_CORRECTIONS_SUMMARY.md) ✅
+- **INFRA**: [AUDITORIAS/03_INFRA_AUDIT.md](AUDITORIAS/03_INFRA_AUDIT.md) + [INFRA_CORRECTIONS_SUMMARY.md](AUDITORIAS/INFRA_CORRECTIONS_SUMMARY.md) ✅
+- **KERNEL**: [AUDITORIAS/04_KERNEL_AUDIT.md](AUDITORIAS/04_KERNEL_AUDIT.md) + [KERNEL_CORRECTIONS_SUMMARY.md](AUDITORIAS/KERNEL_CORRECTIONS_SUMMARY.md) ✅
+- **DRIVER**: [AUDITORIAS/05_DRIVER_AUDIT.md](AUDITORIAS/05_DRIVER_AUDIT.md) ⏳ Próximo
+- **SERVER**: [AUDITORIAS/06_SERVER_AUDIT.md](AUDITORIAS/06_SERVER_AUDIT.md) ⏳
+- **LOGIC**: [AUDITORIAS/07_LOGIC_AUDIT.md](AUDITORIAS/07_LOGIC_AUDIT.md) ⏳
+- **DASHBOARD**: [AUDITORIAS/08_DASHBOARD_AUDIT.md](AUDITORIAS/08_DASHBOARD_AUDIT.md) ⏳
 
 ---
 
@@ -210,8 +214,9 @@ Documentação obsoleta mantida apenas para referência:
 - **Total de documentos**: 99+ arquivos .md
 - **Documentação ativa**: ~50 arquivos
 - **Documentação legacy**: 11 arquivos (movidos para analysis/legacy/)
-- **Auditorias completas**: 2/8 (ROOT, CORE)
-- **Auditorias pendentes**: 6/8 (NERV, INFRA, KERNEL, DRIVER, SERVER, LOGIC, DASHBOARD)
+- **Auditorias completas**: 5/8 (ROOT, CORE, NERV, INFRA, KERNEL)
+- **Auditorias pendentes**: 3/8 (DRIVER, SERVER, LOGIC/DASHBOARD)
+- **Correções aplicadas**: 22 total (NERV: 13, INFRA: 4, KERNEL: 5)
 - **Cobertura de testes**: 78% (após cleanup Jan 2026)
 - **Scripts npm**: 90+
 
