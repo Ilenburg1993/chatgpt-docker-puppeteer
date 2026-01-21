@@ -105,9 +105,12 @@
         "ecosystem.config.js": "javascript",
         "Dockerfile*": "dockerfile",
         "*.sh": "shellscript",
+        "*.bat": "bat",
+        "*.ps1": "powershell",
         "Makefile": "makefile",
         ".env*": "properties",
-        "*.md": "markdown"
+        "*.md": "markdown",
+        "*.code-snippets": "jsonc"
     },
     "files.watcherExclude": {
         "**/node_modules/**": true,
@@ -226,6 +229,9 @@
     "editor.suggest.showInlineDetails": true,
     "editor.suggest.snippetsPreventQuickSuggestions": false,
     "editor.snippetSuggestions": "top",
+    "editor.tabCompletion": "onlySnippets",
+    "editor.suggest.showSnippets": true,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
     "javascript.suggest.autoImports": true,
     "javascript.suggest.enabled": true,
     "javascript.referencesCodeLens.enabled": true,
@@ -280,7 +286,9 @@
         "Dockerfile": "Dockerfile.*, docker-compose.*.yml, .dockerignore",
         ".gitignore": ".gitattributes, .gitmodules, .gitkeep",
         "README.md": "CHANGELOG.md, CONTRIBUTING.md, LICENSE, SECURITY*.md",
-        "ecosystem.config.js": "temp_pm2.json"
+        "ecosystem.config.js": "temp_pm2.json",
+        "*.sh": "${capture}.bat, ${capture}.ps1",
+        "tasks.json": "tasks.json.old, keybindings.json, *.code-snippets"
     },
     "workbench.colorTheme": "Default Dark+",
     "workbench.iconTheme": "vs-seti",
