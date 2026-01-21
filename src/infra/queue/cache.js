@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const pLimit = require('p-limit'); // P9.7: Concurrency control
 const { log } = require('../../core/logger');
 const PATHS = require('../fs/paths');
 
@@ -28,6 +29,10 @@ let lastFullScan = 0;
 let currentScanPromise = null;
 let windowTimer = null;
 const watcherDebounceTimer = null; // Timer de debounce para watcher (P1.2)
+
+// P9.6: Contadores de cache metrics
+let cacheHits = 0;
+let cacheMisses = 0;
 
 /**
  * Lista arquivos de tarefa existentes no diretório físico.
@@ -71,14 +76,17 @@ async function scanQueue() {
     currentScanPromise = (async () => {
         try {
             const files = listTaskFiles();
-            const results = await Promise.all(files.map(loadTask));
+
+            // P9.7: Limita a 10 reads simultâneos para prevenir I/O spikes
+            const limit = pLimit(10);
+            const results = await Promise.all(files.map(file => limit(() => loadTask(file))));
 
             // Filtra nulos (falhas de leitura) e atualiza o estado global
             globalQueueCache = results.filter(Boolean);
             lastFullScan = Date.now();
             isCacheDirty = false;
 
-            log('DEBUG', `[CACHE] Snapshot da fila atualizado: ${globalQueueCache.length} tarefas.`);
+            log('DEBUG', `[CACHE] Snapshot da fila atualizado: ${globalQueueCache.length} tarefas (p-limit: 10).`);
             return globalQueueCache;
         } finally {
             currentScanPromise = null;
@@ -108,14 +116,20 @@ function openObservationWindow() {
 /**
  * API PÚBLICA: Retorna o snapshot atual da fila.
  * Implementa o Heartbeat de segurança para garantir consistência eventual.
+ * P9.6: Adiciona tracking de cache hits/misses
  */
 async function getQueue() {
     const now = Date.now();
     const needsHeartbeat = now - lastFullScan > CACHE_HEARTBEAT_MS;
 
     if (needsHeartbeat || isCacheDirty) {
+        // P9.6: Cache miss - precisa fazer scan
+        cacheMisses++;
         isCacheDirty = true;
         openObservationWindow();
+    } else {
+        // P9.6: Cache hit - retorna snapshot existente
+        cacheHits++;
     }
 
     // Se houver uma varredura em curso, aguarda; senão retorna o último snapshot
@@ -135,7 +149,27 @@ function markDirty() {
     openObservationWindow();
 }
 
+/**
+ * P9.6: Retorna métricas de cache para observabilidade.
+ * @returns {Object} Cache metrics
+ */
+function getCacheMetrics() {
+    const total = cacheHits + cacheMisses;
+    const hitRate = total > 0 ? ((cacheHits / total) * 100).toFixed(2) : 0;
+
+    return {
+        hits: cacheHits,
+        misses: cacheMisses,
+        total,
+        hitRate: parseFloat(hitRate),
+        queueSize: globalQueueCache.length,
+        lastScan: lastFullScan,
+        isDirty: isCacheDirty
+    };
+}
+
 module.exports = {
     getQueue,
-    markDirty
+    markDirty,
+    getCacheMetrics
 };

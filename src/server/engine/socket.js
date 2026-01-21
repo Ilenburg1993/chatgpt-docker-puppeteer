@@ -26,6 +26,32 @@ let ioInstance = null;
 const agentRegistry = new Map();
 
 /**
+ * P9.8: Debounce buffer para task updates (50ms window)
+ * Estrutura: taskId -> { data, timestamp }
+ */
+const taskUpdateBuffer = new Map();
+let taskUpdateTimer = null;
+
+/**
+ * P9.8: Flush accumulated task updates to dashboards
+ */
+function flushTaskUpdates() {
+    if (taskUpdateBuffer.size === 0) {
+        return;
+    }
+
+    const updates = Array.from(taskUpdateBuffer.values()).map(entry => entry.data);
+
+    if (ioInstance) {
+        ioInstance.to('dashboards').emit('task:updates_batch', { updates, count: updates.length });
+        log('DEBUG', `[HUB] Flushed ${updates.length} batched task updates`);
+    }
+
+    taskUpdateBuffer.clear();
+    taskUpdateTimer = null;
+}
+
+/**
  * Inicializa o barramento de eventos acoplando-o ao motor HTTP.
  * Implementa lógica de reset automático para suporte a testes e reconexões.
  *
@@ -261,11 +287,41 @@ function notify(event, data) {
     return true;
 }
 
+/**
+ * P9.8: Broadcast de task update com debouncing de 50ms.
+ * Acumula updates em buffer e envia em batch para reduzir overhead.
+ *
+ * @param {string} taskId - ID da task
+ * @param {Object} data - Dados do update
+ */
+function broadcastTaskUpdate(taskId, data) {
+    if (!ioInstance) {
+        return;
+    }
+
+    // Adiciona ao buffer
+    taskUpdateBuffer.set(taskId, {
+        taskId,
+        data,
+        timestamp: Date.now()
+    });
+
+    // Cancela timer anterior e agenda novo flush
+    if (taskUpdateTimer) {
+        clearTimeout(taskUpdateTimer);
+    }
+
+    taskUpdateTimer = setTimeout(() => {
+        flushTaskUpdates();
+    }, 50); // 50ms debounce window
+}
+
 module.exports = {
     init,
     sendCommand,
     notify,
     stop,
+    broadcastTaskUpdate,
     getRegistry: () => Array.from(agentRegistry.values()),
     getIO: () => ioInstance
 };

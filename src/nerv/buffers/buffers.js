@@ -68,6 +68,16 @@ function createBuffers({ telemetry, limits = {} }) {
         /* Outbound */
 
         async enqueueOutbound(item) {
+            // P9.3: Hard limit de 10000 items para prevenir buffer overflow
+            if (outbound.size() > 10000) {
+                telemetry.emit('nerv:buffer:overflow', {
+                    buffer: 'outbound',
+                    size: outbound.size(),
+                    limit: 10000
+                });
+                throw new Error('BUFFER_OVERFLOW: Outbound buffer exceeded 10000 items');
+            }
+
             const ok = outbound.enqueue(item);
             if (!ok) {
                 backpressure.signal({

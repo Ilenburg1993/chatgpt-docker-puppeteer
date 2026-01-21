@@ -89,7 +89,10 @@ const ConfigSchema = z
 
         // --- Tuning do Adaptativo ---
         ADAPTIVE_ALPHA: z.number().min(0).max(1).default(0.15),
-        ADAPTIVE_COOLDOWN_MS: z.number().min(1000).default(5000)
+        ADAPTIVE_COOLDOWN_MS: z.number().min(1000).default(5000),
+
+        // --- Concurrency & Workers (P9.9) ---
+        MAX_WORKERS: z.number().int().min(1).max(10).default(3)
     })
     .passthrough(); // Preserva chaves de comentário "//"
 

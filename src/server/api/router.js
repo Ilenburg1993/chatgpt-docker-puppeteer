@@ -351,6 +351,43 @@ function applyRoutes(app) {
         }
     });
 
+    /**
+     * GET /api/metrics
+     * P9.6: Endpoint de métricas de performance (cache, heap, etc).
+     * Usado para observabilidade e dashboards.
+     */
+    app.get('/api/metrics', async (req, res) => {
+        try {
+            const hardware = require('../../core/hardware');
+            const queueCache = require('../../infra/queue/cache');
+
+            const heapStats = hardware.getHeapStats();
+            const cacheMetrics = queueCache.getCacheMetrics();
+
+            res.json({
+                status: 'ok',
+                timestamp: Date.now(),
+                heap: {
+                    used_mb: heapStats.heap_used_mb,
+                    total_mb: heapStats.heap_total_mb,
+                    limit_mb: heapStats.heap_limit_mb,
+                    usage_percent: heapStats.heap_usage_percent
+                },
+                cache: {
+                    queue: cacheMetrics
+                },
+                uptime_seconds: Math.floor(process.uptime())
+            });
+        } catch (e) {
+            log('ERROR', `[METRICS] ${e.message}`);
+            res.status(500).json({
+                status: 'error',
+                timestamp: Date.now(),
+                error: e.message
+            });
+        }
+    });
+
     /* --------------------------------------------------------------------------
        1. MAPEAMENTO DE DOMÍNIOS SOBERANOS
     -------------------------------------------------------------------------- */

@@ -114,12 +114,19 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     /**
      * Cria um registro técnico mínimo a partir de um envelope.
      * Payload permanece opaco (não armazenado integralmente).
+     * P9.5: Adiciona memoization de JSON serialization
      */
     function createRecord(envelope) {
+        // P9.5: Lazy init de serialização cacheada
+        if (!envelope._serialized) {
+            envelope._serialized = JSON.stringify(envelope);
+        }
+
         return Object.freeze({
             timestamp: now(),
             kind: envelope.kind,
-            msg_id: envelope.ids ? envelope.ids.msg_id : null
+            msg_id: envelope.ids ? envelope.ids.msg_id : null,
+            _cached_json: envelope._serialized
         });
     }
 

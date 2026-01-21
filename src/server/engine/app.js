@@ -91,6 +91,20 @@ const crashReportsPath = path.join(LOG_DIR, 'crash_reports');
 app.use('/crash_reports', express.static(crashReportsPath));
 
 /* --------------------------------------------------------------------------
+   4. CAMADA DE OBSERVABILIDADE (P9.1)
+-------------------------------------------------------------------------- */
+const hardware = require('../../core/hardware');
+
+// Health endpoint com heap monitoring
+app.get('/api/health-metrics', (req, res) => {
+    const metrics = hardware.getAllMetrics();
+    res.json({
+        status: 'ok',
+        ...metrics
+    });
+});
+
+/* --------------------------------------------------------------------------
    NOTAS DE ARQUITETURA
 -------------------------------------------------------------------------- */
 /**

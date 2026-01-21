@@ -299,6 +299,7 @@ class KernelLoop {
     /**
      * Aplica decisões produzidas pelo ExecutionEngine.
      * [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
+     * [P9.4 CORREÇÃO] Adiciona timeout de 5s para prevenir kernel loop blocking
      *
      * @param {Array<Object>} proposals
      * Lista de propostas de decisão.
@@ -317,8 +318,12 @@ class KernelLoop {
             at: context.at
         });
 
-        // [P3.2 FIX] Aplica propostas em paralelo para reduzir latência
-        await Promise.all(
+        // P9.4: Timeout wrapper para prevenir blocking
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Decision application timeout after 5s')), 5000)
+        );
+
+        const decisionsPromise = Promise.all(
             proposals.map(async proposal => {
                 try {
                     await this._applyDecision(proposal, context);
@@ -331,6 +336,22 @@ class KernelLoop {
                 }
             })
         );
+
+        // Race entre decisions e timeout
+        try {
+            await Promise.race([decisionsPromise, timeoutPromise]);
+        } catch (error) {
+            if (error.message.includes('timeout')) {
+                this.telemetry.critical('kernel_loop_decision_timeout', {
+                    count: proposals.length,
+                    tickId: context.tickId,
+                    error: error.message,
+                    at: Date.now()
+                });
+            } else {
+                throw error;
+            }
+        }
     }
 
     /**

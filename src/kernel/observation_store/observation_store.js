@@ -34,11 +34,17 @@ const EventEmitter = require('events');
 
 /**
  * Cria registro imutável de uma observação.
+ * P9.5: Adiciona memoization de JSON serialization
  *
  * @param {Object} params
  * @returns {Object}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {
+    // P9.5: Lazy init de serialização cacheada para payload
+    if (payload && typeof payload === 'object' && !payload._serialized) {
+        payload._serialized = JSON.stringify(payload);
+    }
+
     return Object.freeze({
         msgId,
         correlationId,

@@ -252,9 +252,12 @@ class BrowserPoolManager {
 
     /**
      * Seleciona uma instância do pool baseado na estratégia configurada.
+     * P9.2: Circuit breaker - filtra apenas instâncias HEALTHY com 0 falhas consecutivas
      */
     _selectInstance(target) {
-        const healthyInstances = this.pool.filter(entry => entry.health.status === STATUS_VALUES.HEALTHY);
+        const healthyInstances = this.pool.filter(
+            entry => entry.health.status === STATUS_VALUES.HEALTHY && entry.health.consecutiveFailures === 0
+        );
 
         if (healthyInstances.length === 0) {
             log('ERROR', '[BrowserPool] Nenhuma instância saudável disponível');
