@@ -20,6 +20,9 @@ const path = require('path');
 const fs = require('fs');
 const { log } = require('../core/logger');
 
+// Importa configuração centralizada do .puppeteerrc.cjs (FONTE ÚNICA)
+const puppeteerConfig = require('../../.puppeteerrc.cjs');
+
 // Aplica stealth plugin para anti-detection
 puppeteerExtra.use(StealthPlugin());
 
@@ -63,9 +66,13 @@ const USER_AGENTS = [
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
 ];
 
+/* ========================================================================
+   DEFAULTS: Config específica do ConnectionOrchestrator
+   USA helpers de .puppeteerrc.cjs (isDocker, findChrome, getCacheDirectory)
+======================================================================== */
 const DEFAULTS = {
     // Modo de operação: 'launcher' | 'connect' | 'wsEndpoint' | 'executablePath' | 'auto'
-    mode: 'launcher',
+    mode: process.env.BROWSER_MODE || 'launcher',
 
     // Configurações de conexão (para modo connect/wsEndpoint)
     ports: [9222, 9223, 9224],
@@ -73,12 +80,13 @@ const DEFAULTS = {
     connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
 
     // Configurações de launcher
-    headless: 'new',
-    executablePath: null, // null = usa Chromium do Puppeteer
-    userDataDir: null, // null = profile temporário, ou path fixo
+    headless: process.env.HEADLESS === 'false' ? false : 'new',
+    executablePath: puppeteerConfig.findChromeExecutable(), // ✅ USA helper compartilhado
+    userDataDir: process.env.PROFILE_DIR || null,
 
     // Cache persistente (evita downloads repetidos)
-    cacheDir: path.join(process.env.HOME || '/home/node', '.cache', 'puppeteer'),
+    cacheDirectory: puppeteerConfig.getCacheDirectory(), // ✅ USA helper compartilhado
+    cacheDir: puppeteerConfig.getCacheDirectory(), // Backward compatibility
 
     // Argumentos do Chrome (launcher/executablePath)
     args: [
@@ -99,11 +107,11 @@ const DEFAULTS = {
         '--safebrowsing-disable-auto-update'
     ],
 
-    // Retry e timming
+    // Retry e timing
     retryDelayMs: 3000,
     maxRetryDelayMs: 15000,
-    maxConnectionAttempts: 5,
-    connectionTimeout: 30000,
+    maxConnectionAttempts: parseInt(process.env.MAX_CONNECTION_ATTEMPTS || '5'),
+    connectionTimeout: parseInt(process.env.CONNECTION_TIMEOUT || '30000'),
 
     // Página
     pageScanIntervalMs: 4000,
@@ -139,9 +147,10 @@ class ConnectionOrchestrator {
 
     _ensureCacheDir() {
         try {
-            if (this.config.cacheDir && !fs.existsSync(this.config.cacheDir)) {
-                fs.mkdirSync(this.config.cacheDir, { recursive: true });
-                log('INFO', `[ORCH] Cache dir criado: ${this.config.cacheDir}`);
+            const cacheDir = this.config.cacheDirectory || this.config.cacheDir;
+            if (cacheDir && !fs.existsSync(cacheDir)) {
+                fs.mkdirSync(cacheDir, { recursive: true });
+                log('INFO', `[ORCH] Cache directory created: ${cacheDir}`);
             }
         } catch (error) {
             log('WARN', `[ORCH] Não foi possível criar cache dir: ${error.message}`);
@@ -596,7 +605,7 @@ class ConnectionOrchestrator {
      * Obtém informações sobre o cache do Puppeteer
      */
     static getCacheInfo() {
-        const cacheDir = path.join(process.env.HOME || '/home/node', '.cache', 'puppeteer');
+        const cacheDir = puppeteerConfig.getCacheDirectory(); // ✅ USA helper compartilhado
 
         if (!fs.existsSync(cacheDir)) {
             return { exists: false, path: cacheDir };
@@ -631,42 +640,20 @@ class ConnectionOrchestrator {
      * ```
      */
     static exportConfig(outputPath = null) {
-        // Detecta ambiente
+        // Usa helpers de .puppeteerrc.cjs + DEFAULTS local
         const platform = os.platform();
         const env = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'mac' : 'linux';
-
-        // Detecta Chrome instalado em caminhos comuns
-        const commonChromePaths = {
-            windows: [
-                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-                process.env.LOCALAPPDATA
-                    ? path.join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe')
-                    : null
-            ].filter(Boolean),
-            mac: [
-                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                '/Applications/Chromium.app/Contents/MacOS/Chromium'
-            ],
-            linux: ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium']
-        };
-
-        let detectedChromePath = null;
-        for (const testPath of commonChromePaths[env] || []) {
-            if (fs.existsSync(testPath)) {
-                detectedChromePath = testPath;
-                break;
-            }
-        }
+        const detectedChromePath = puppeteerConfig.findChromeExecutable();
+        const isDockerEnv = puppeteerConfig.isDocker();
 
         // Monta configuração completa
         const config = {
-            // Metadata
             exportedAt: new Date().toISOString(),
-            version: '2.0',
+            version: '3.0',
+            source: 'ConnectionOrchestrator + .puppeteerrc.cjs helpers',
             environment: env,
+            isDocker: isDockerEnv,
 
-            // Configuração de conexão
             connection: {
                 mode: DEFAULTS.mode,
                 autoFallback: DEFAULTS.autoFallback,
@@ -679,17 +666,15 @@ class ConnectionOrchestrator {
                 maxRetryDelayMs: DEFAULTS.maxRetryDelayMs
             },
 
-            // Configuração de launcher
             launcher: {
                 headless: DEFAULTS.headless,
                 executablePath: DEFAULTS.executablePath,
-                detectedChromePath: detectedChromePath,
+                detectedChromePath,
                 userDataDir: DEFAULTS.userDataDir,
-                cacheDir: DEFAULTS.cacheDir,
+                cacheDirectory: DEFAULTS.cacheDirectory,
                 args: DEFAULTS.args
             },
 
-            // Configuração de página
             page: {
                 allowedDomains: DEFAULTS.allowedDomains,
                 pageSelectionPolicy: DEFAULTS.pageSelectionPolicy,
@@ -697,37 +682,36 @@ class ConnectionOrchestrator {
                 userAgents: USER_AGENTS
             },
 
-            // Health checks
             health: {
                 chromeDebugUrl: 'http://localhost:9222/json/version',
                 chromeDevtoolsUrl: 'http://localhost:9222',
                 expectedPorts: DEFAULTS.ports
             },
 
-            // Comandos úteis para launcher
-            commands: {
-                // Windows
-                startChromeWindows: detectedChromePath
-                    ? `start "" "${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir="C:\\chrome-automation-profile" ${DEFAULTS.args.join(' ')}`
-                    : null,
-                checkChromeWindows: 'netstat -ano | findstr ":9222"',
-                killChromeWindows: 'taskkill /F /IM chrome.exe',
+            commands:
+                env === 'windows'
+                    ? {
+                          startChrome: detectedChromePath
+                              ? `"${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\\chrome-automation" ${DEFAULTS.args.join(' ')}`
+                              : null,
+                          checkChrome: 'netstat -ano | findstr ":9222"',
+                          killChrome: 'taskkill /F /IM chrome.exe'
+                      }
+                    : {
+                          startChrome: detectedChromePath
+                              ? `"${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
+                              : null,
+                          checkChrome: 'lsof -i :9222 || netstat -an | grep :9222',
+                          killChrome: 'pkill -f "chrome.*remote-debugging-port=9222"'
+                      },
 
-                // Linux/Mac
-                startChromeUnix: detectedChromePath
-                    ? `"${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir="${process.env.HOME}/.chrome-automation-profile" ${DEFAULTS.args.join(' ')} &`
-                    : null,
-                checkChromeUnix: 'lsof -i :9222 || netstat -an | grep :9222',
-                killChromeUnix: 'pkill -f "chrome.*remote-debugging-port=9222"'
-            },
-
-            // Instruções de uso
             usage: {
-                description: 'Configuração exportada do ConnectionOrchestrator para consumo externo',
+                description: 'Configuração exportada do ConnectionOrchestrator',
+                helpers: 'Helpers compartilhados (.puppeteerrc.cjs): isDocker, findChrome, getCacheDirectory',
+                config: 'Config específica (ConnectionOrchestrator.js): DEFAULTS inline',
                 launcher: 'Use connection.mode para decidir como iniciar Chrome (launcher/connect/auto)',
                 healthCheck: 'Teste health.chromeDebugUrl para validar que Chrome está respondendo',
-                fallback:
-                    'Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente em caso de falha'
+                fallback: 'Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente'
             }
         };
 

@@ -354,3 +354,11 @@ module.exports = {
     // - Chrome DevTools Protocol: https://chromedevtools.github.io/devtools-protocol/
     // - Recorder Extension: https://chrome.google.com/webstore (search: Puppeteer Recorder)
 };
+
+// ==========================================================================
+// EXPORTS DE HELPERS: Para uso por ConnectionOrchestrator e outros módulos
+// ==========================================================================
+// Estes helpers são compartilhados (DRY) mas cada módulo mantém sua própria config
+module.exports.getCacheDirectory = getCacheDirectory;
+module.exports.findChromeExecutable = findChromeExecutable;
+module.exports.isDocker = isDocker;
