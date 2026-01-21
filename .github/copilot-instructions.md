@@ -1,8 +1,9 @@
 # AI Coding Agent Instructions for chatgpt-docker-puppeteer
 
-**Version**: 3.0 (Radical Upgrade - Jan 21, 2026)
+**Version**: 3.1 (Hardened Stack - Jan 21, 2026)
 **Target Platforms**: Windows + Linux (macOS optional)
-**Philosophy**: Cross-platform First, Make-driven, Exit Code Aware, JSON Safe
+**Philosophy**: Cross-platform First, Make-driven, Exit Code Aware, JSON Safe, DRY Helpers
+**Recent Upgrades**: Makefile v2.4, Scripts v3.0, Launcher v3.0 (all hardened editions)
 
 ## Architecture Overview
 
@@ -21,13 +22,16 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
     - Two-phase commit locks with PID validation
 - **Server** (`src/server/`): Dashboard + API (Express + Socket.io) via ServerNERVAdapter
 - **Core** (`src/core/`): Config, schemas (Zod), logger, identity (DNA), context management
-- **Makefile** (`Makefile`): Build system orchestrator (v2.3 Definitive Edition, 391 lines)
+- **Makefile** (`Makefile`): Build system orchestrator (v2.4 Hardened Edition, 461 lines)
     - Make → Scripts → npm → PM2 → Node.js delegation chain
-    - 40+ targets: start, stop, restart, health, test, logs, clean, backup
-    - Cross-platform: Windows (cmd/PowerShell) + Linux (bash)
+    - 58+ targets: start, stop, restart, health, test-fast, health-core, deps-consistency, git-push-safe
+    - Cross-platform: Windows (cmd/PowerShell) + Linux (bash/zsh)
+    - DRY Helpers: fail(), confirm(), PM2_APPS consolidation
+    - Strict Mode: STRICT=true for fail-fast CI behavior
 - **Shell Scripts** (`scripts/*.sh`, `scripts/*.bat`): Automation layer between Make and tools
-    - health-windows.ps1 / health-posix.sh (v2.0 hardened, exit code aware)
-    - quick-ops, watch-logs, install-pm2-gui (Windows + Linux pairs)
+    - health-windows.ps1 / health-posix.sh (v3.0 hardened, exit code aware)
+    - quick-ops, watch-logs, install-pm2-gui, LAUNCHER (Windows + Linux pairs, all v3.0)
+    - Cross-platform parity: identical features, error handling, validation
 
 ## Key Patterns
 
@@ -43,6 +47,10 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Cache Invalidation**: ✅ markDirty() called BEFORE write operations in io.js (P5.2 fixed 2026-01-21)
 - **Health Checks**: Browser pool detects both crashes AND degradation (>5s response time)
 - **Orphan Recovery**: UUID-based recovery locks prevent race conditions between multiple instances
+- **DRY Principles**: Makefile v2.4 uses centralized helpers (fail, confirm, PM2_APPS) to reduce duplication
+- **Git Protection**: git-push-safe blocks direct pushes to main/master branches
+- **Test Separation**: test-fast (pre-commit) vs test-integration (full CI) for optimal workflows
+- **Strict Mode**: STRICT=true enables fail-fast shell behavior for CI reliability
 
 ## Cross-Platform First Principle
 
@@ -83,22 +91,51 @@ Reference: See [CROSS_PLATFORM_SUPPORT.md](../CROSS_PLATFORM_SUPPORT.md) for com
 
 ## Build System & Automation
 
-### Makefile v2.3 (Definitive Edition)
+### Makefile v2.4 (Hardened Edition)
 
-**Philosophy**: Make = orchestrator, NOT implementation. Delegate to scripts/npm/PM2.
+**Philosophy**: Make = orchestrator, NOT implementation. Delegate to scripts/npm/PM2. Use DRY helpers.
 
 **Delegation Chain**: `Make` → `Scripts (.bat/.sh)` → `npm scripts` → `PM2` → `Node.js`
 
-**Key Targets** (40+ total):
+**Key Targets** (58+ total):
 
 - **Lifecycle**: `start`, `stop`, `restart`, `reload`, `pm2-status`
-- **Health**: `health` (checks 4 endpoints + PM2 status, validates exit codes)
-- **Testing**: `test`, `test-all`, `ci-test`
+- **Health**: `health` (4 endpoints + PM2), `health-core` (quick check for hooks)
+- **Testing**: `test`, `test-fast` (pre-commit), `test-integration`, `test-all`, `ci-test`
+- **Dependencies**: `check-deps`, `install-deps`, `update-deps`, `deps-consistency`
 - **Monitoring**: `logs`, `logs-follow`, `watch-logs`, `dashboard`
 - **Queue**: `queue-status`, `queue-add`, `queue-watch`
-- **Maintenance**: `clean`, `backup`, `reset`
-- **Info**: `help`, `version`, `info`, `check-deps`
+- **Maintenance**: `clean`, `backup`, `workspace-clean` (with confirmation)
+- **Git Safety**: `git-push-safe` (branch protection), `git-changed`, `format-code`
+- **Info**: `help`, `version`, `info`, `vscode-info`
 - **Quick Ops**: `quick CMD=pause`, `quick CMD=resume`, etc.
+
+**DRY Helpers** (v2.4 new):
+
+```makefile
+# Centralized error handling
+define fail
+	echo "$(RED)❌ $(1)$(NC)"; exit 1
+endef
+
+# Interactive confirmations
+define confirm
+	read -p "$(YELLOW)⚠ $(1) (y/N): $(NC)" ans && [ "$$ans" = "y" ]
+endef
+
+# Consolidated PM2 apps
+PM2_APPS := agente-gpt dashboard-web
+```
+
+**Strict Mode** (v2.4 new):
+
+```makefile
+STRICT ?= false
+
+ifeq ($(STRICT),true)
+.SHELLFLAGS := -eu -o pipefail -c  # Fail-fast for CI
+endif
+```
 
 **Cross-Platform Helpers**:
 
@@ -124,11 +161,49 @@ open_cmd = $(if $(filter Windows,$(DETECTED_OS)),start "" $(1),...)
 
 ```bash
 make start          # Start PM2 agent + dashboard
-make health         # Health checks (exit 0 or 1)
-make test-all       # Run all tests
+make health         # Full health checks (4 endpoints + PM2)
+make health-core    # Quick health check (for git hooks)
+make test-fast      # Pre-commit tests (seconds)
+make test-all       # Full test suite
+make deps-consistency  # Check package-lock.json sync
+make git-push-safe  # Safe push (lint + test + branch check)
 make quick CMD=pause  # Quick pause operation
 make logs-follow    # Tail logs in real-time
-make clean          # Remove logs/tmp/queue
+make workspace-clean  # Deep clean (with confirmation)
+make STRICT=true start  # Fail-fast mode for CI
+```
+
+### Makefile v2.4 Workflows
+
+**Pre-Commit Workflow** (fast feedback):
+```bash
+make test-fast        # Quick tests (FASE 8 only, seconds)
+make health-core      # Quick endpoint check
+git commit -m "..."
+```
+
+**CI Workflow** (fail-fast):
+```bash
+make STRICT=true deps-consistency  # Lockfile validation
+make STRICT=true test-all          # Full test suite
+make STRICT=true health            # All health checks
+```
+
+**Safe Push Workflow** (5-step validation):
+```bash
+make git-push-safe
+# 1. ✓ Branch OK (not main/master)
+# 2. ✓ No uncommitted changes
+# 3. ✓ Lint passed (ESLint --max-warnings 0)
+# 4. ✓ Tests passed (test-fast)
+# 5. ✓ Push successful
+```
+
+**Cleanup Workflow** (interactive):
+```bash
+make workspace-clean
+# ⚠ This will delete node_modules and clean cache (y/N): y
+# Only executes if confirmed
 ```
 
 ### Shell Scripts
@@ -177,12 +252,18 @@ try {
 exit $exitCode
 ```
 
-**Key Scripts**:
+**Key Scripts** (all v3.0 as of 2026-01-21):
 
-- `health-windows.ps1` / `health-posix.sh` (v2.0, 104/100 lines)
-- `quick-ops.bat` / `quick-ops.sh`
-- `watch-logs.bat` / `watch-logs.sh`
-- `install-pm2-gui.bat` / `install-pm2-gui.sh`
+- `health-windows.ps1` / `health-posix.sh` (v3.0, 115/103 lines)
+  - Enhanced error handling, exit codes, JSON parsing (no regex)
+- `quick-ops.bat` / `quick-ops.sh` (v3.0, 156/127 lines)
+  - Health validation, file counting in backup, proper exit codes
+- `watch-logs.bat` / `watch-logs.sh` (v3.0)
+  - PM2 checks, color-coded filtering, 100 lines context
+- `install-pm2-gui.bat` / `install-pm2-gui.sh` (v3.0)
+  - npm checks, install logging, troubleshooting hints
+- `LAUNCHER.bat` / `launcher.sh` (v3.0, 464/511 lines)
+  - Interactive menu, version bump, enhanced UX
 
 ## Code Evolution & Upgrade Strategy
 
@@ -191,7 +272,22 @@ exit $exitCode
 - **v1.0** (MVP): Minimum viable functionality - may have critical flaws
 - **v2.0** (Hardened): Production-ready - blockers fixed, patterns established
 - **v2.x** (Incremental): Quality improvements, feature additions
+  - Example: Makefile v2.3 → v2.4 (added strict mode, error helpers, DRY improvements)
 - **v3.0** (Definitive): Battle-tested, complete feature set
+  - Example: Scripts v1.0/v2.0 → v3.0 (cross-platform parity, enhanced validation)
+
+**Real-World Progression Examples**:
+
+1. **Makefile Evolution**:
+   - v2.1: Basic targets, manual error handling
+   - v2.2: Cross-platform helpers, delegated health checks
+   - v2.3: 40+ targets, documentation, Super Launcher v2.0
+   - v2.4: **Hardened Edition** - Strict mode, DRY helpers, 58+ targets, git protection
+
+2. **Scripts Evolution**:
+   - v1.0: Basic functionality, no exit codes, manual errors
+   - v2.0: Health scripts - exit codes, JSON parsing (no regex)
+   - v3.0: **Cross-Platform Parity** - All scripts, dependency checks, file counting, hints
 
 ### When to Upgrade (Not Just Patch)
 
@@ -274,15 +370,36 @@ v2.0 Health Script: 74/80 (all blockers fixed, proper parsing, exit codes)
 Use Makefile targets for all operations:
 
 ```bash
+# Lifecycle
 make start          # Start agent + dashboard (PM2)
 make stop           # Stop all processes
 make restart        # Restart (stop + start)
-make health         # Health check (4 endpoints + PM2, exit code aware)
-make test-all       # Run all tests
-make logs-follow    # Tail logs
+
+# Health & Testing
+make health         # Full health (4 endpoints + PM2, exit code aware)
+make health-core    # Quick health (core endpoint only)
+make test-fast      # Pre-commit tests (fast)
+make test-all       # Full test suite
+make deps-consistency  # Validate package-lock.json
+
+# Monitoring
+make logs-follow    # Tail logs in real-time
+make watch          # Watch logs with filters
+make dashboard      # Open HTML dashboard
+
+# Maintenance
 make clean          # Remove logs/tmp/queue
+make workspace-clean  # Deep clean + reinstall (with confirmation)
 make backup         # Backup data directories
+
+# Git & Quality
+make git-push-safe  # Safe push (5-step validation)
+make format-code    # ESLint + Prettier
+make git-changed    # Show modified files
+
+# Info
 make info           # Show configuration
+make version        # Show versions (Makefile v2.4, Launcher v3.0, etc.)
 make check-deps     # Verify tool availability
 ```
 
@@ -308,12 +425,51 @@ make check-deps     # Verify tool availability
 When creating new automation scripts:
 
 1. **Create both .bat and .sh** (Windows + Linux support)
-2. **Exit codes mandatory**: 0 (success), 1 (error)
-3. **Test both paths**: Success AND failure scenarios
-4. **JSON parsing**: Use proper tools (Invoke-RestMethod, jq), never regex/grep
-5. **Status validation**: Check VALUES (ok/healthy/online), not just field existence
-6. **ASCII fallback**: Support NO_UNICODE=1 for CI environments
-7. **Configurable params**: Use parameters ($Port, $TimeoutSec) with defaults
+2. **Version headers**: Add v3.0 header with timestamp and description
+3. **Exit codes mandatory**: 0 (success), 1 (error)
+4. **Test both paths**: Success AND failure scenarios
+5. **JSON parsing**: Use proper tools (Invoke-RestMethod, jq), never regex/grep
+6. **Status validation**: Check VALUES (ok/healthy/online), not just field existence
+7. **Dependency checks**: Validate tools (PM2, npm, node) before execution
+8. **Visual feedback**: Use [OK]/[FAIL]/[WARN]/[HINT] (Windows) or ✓/✗/⚠ (POSIX)
+9. **Error hints**: Provide actionable troubleshooting hints on failures
+10. **File counting**: Count and validate operations (e.g., backup file count)
+11. **ASCII fallback**: Support NO_UNICODE=1 for CI environments
+12. **Configurable params**: Use parameters ($Port, $TimeoutSec) with defaults
+
+**v3.0 Pattern Example** (quick-ops.sh):
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Version: 3.0 (2026-01-21) - Enhanced error handling
+
+# Dependency check
+command -v pm2 >/dev/null 2>&1 || { echo "[FAIL] PM2 not found"; exit 1; }
+
+# Operation with validation
+if ! npm run daemon:start; then
+    echo "[FAIL] Failed to start"
+    echo "[HINT] Check PM2 status: make pm2"
+    exit 1
+fi
+
+# File counting in backups
+FILES_BACKED=0
+for file in config.json controle.json; do
+    if [ -f "$file" ]; then
+        cp "$file" "backup/" && ((FILES_BACKED++))
+    fi
+done
+
+if [ $FILES_BACKED -eq 0 ]; then
+    echo "[FAIL] No files backed up"
+    exit 1
+fi
+
+echo "[OK] Backup complete ($FILES_BACKED files)"
+exit 0
+```
 
 ## Conventions
 
@@ -438,12 +594,34 @@ When creating new automation scripts:
 
 ## Known Issues (as of Jan 2026)
 
-1. ~~**P5.2 Cache Invalidation**~~: ✅ CORRIGIDO (2026-01-21) - markDirty() agora é chamado ANTES dos writes
-2. **npm test broken**: `scripts/run_all_tests.sh` line 3 has bash syntax issue (`set -euo pipefail`)
-3. **Integration tests**: 82% (9/11) were obsolete due to IPC refactoring - already cleaned up
-4. **Test dependencies**: 4 tests (lock, control_pause, running_recovery, stall_mitigation) require full agent running
+1. ~~**P5.2 Cache Invalidation**~~: ✅ FIXED (2026-01-21) - markDirty() now called BEFORE writes
+2. ~~**Health scripts syntax**~~: ✅ FIXED (2026-01-21) - v3.0 upgrade resolved all syntax issues
+3. ~~**Scripts inconsistency**~~: ✅ FIXED (2026-01-21) - All scripts now v3.0 with cross-platform parity
+4. **npm test broken**: `scripts/run_all_tests.sh` line 3 has bash syntax issue (use `make test-fast` instead)
+5. **Integration tests**: 82% (9/11) were obsolete due to IPC refactoring - already cleaned up
+6. **Test dependencies**: 4 tests (lock, control_pause, running_recovery, stall_mitigation) require full agent running
+7. **deps-consistency**: May fail if fsevents missing on Linux (expected, macOS-only package)
 
-## Recent Corrections (Jan 2026)
+## Recent Upgrades (Jan 2026)
+
+### Build System & Scripts (v2.4/v3.0 - Jan 21, 2026)
+
+**Makefile v2.4 - Hardened Edition** (commit 09184ea):
+- ✅ Strict Mode: STRICT=true opt-in for fail-fast CI
+- ✅ Error Helpers: fail() and confirm() functions (DRY)
+- ✅ PM2 Consolidation: PM2_APPS variable (centralized)
+- ✅ Test Separation: test-fast (pre-commit) + test-integration (full)
+- ✅ Health Granularity: health-core (quick) + health (full)
+- ✅ Dependencies: deps-consistency checks lockfile sync
+- ✅ Git Protection: git-push-safe blocks main/master pushes
+- ✅ UX: 58+ targets, enhanced help, version shows PM2_APPS
+
+**Scripts v3.0 - Cross-Platform Parity** (commits 4a9d09b, 758f3c5, a19b862):
+- ✅ POSIX Scripts: health-posix.sh, quick-ops.sh, watch-logs.sh, install-pm2-gui.sh, launcher.sh
+- ✅ Windows Scripts: health-windows.ps1, quick-ops.bat, watch-logs.bat, install-pm2-gui.bat, LAUNCHER.bat
+- ✅ Features: Version headers, dependency checks, file counting, exit codes, error hints
+- ✅ Validation: JSON parsing (no regex), status VALUES (not field existence)
+- ✅ UX: Visual feedback ([OK]/[FAIL]/[HINT]), color-coded output, 100 lines context
 
 ### NERV Subsystem (P1+P2+P3 - 13 corrections - ~30 hours)
 
