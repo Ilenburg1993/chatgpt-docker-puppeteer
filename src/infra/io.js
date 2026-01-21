@@ -61,12 +61,10 @@ module.exports = {
 
         for (const dir of targetDirs) {
             try {
-
                 const files = await fs.readdir(dir);
                 const tmpFiles = files.filter(f => f.includes('.tmp'));
 
                 for (const file of tmpFiles) {
-
                     await fs.unlink(path.join(dir, file)).catch(() => {});
                     totalCleaned++;
                 }
@@ -164,6 +162,15 @@ module.exports = {
     setCacheDirty: queueCache.markDirty,
     loadNextTask: taskLoader.loadNextTask,
     bulkRetryFailed: taskLoader.bulkRetryFailed,
+
+    /**
+     * Carrega todas as tarefas da fila (via cache inteligente).
+     * @returns {Promise<Array>} Lista de todas as tarefas
+     */
+    loadAllTasks: async () => {
+        const queue = await queueCache.getQueue();
+        return queue.tasks || [];
+    },
 
     /* ==========================================================================
        7. CONTROLE OPERACIONAL (SINAIS GLOBAIS)

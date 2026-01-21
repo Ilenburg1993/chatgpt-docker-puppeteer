@@ -604,6 +604,140 @@ class ConnectionOrchestrator {
             return { exists: true, path: cacheDir, error: error.message };
         }
     }
+
+    /**
+     * Exporta configuração completa do Chrome para consumo por launchers/scripts externos.
+     * Gera chrome-config.json com todas as configurações necessárias para iniciar/conectar Chrome.
+     *
+     * @param {string} outputPath - Caminho onde salvar o JSON (padrão: ./chrome-config.json)
+     * @returns {object} Configuração exportada
+     *
+     * Uso:
+     * ```javascript
+     * // CLI: node -e "require('./src/infra/ConnectionOrchestrator').ConnectionOrchestrator.exportConfig()"
+     * // Programático: ConnectionOrchestrator.exportConfig('./custom-path.json')
+     * ```
+     */
+    static exportConfig(outputPath = null) {
+        // Detecta ambiente
+        const platform = os.platform();
+        const env = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'mac' : 'linux';
+
+        // Detecta Chrome instalado em caminhos comuns
+        const commonChromePaths = {
+            windows: [
+                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                process.env.LOCALAPPDATA
+                    ? path.join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe')
+                    : null
+            ].filter(Boolean),
+            mac: [
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                '/Applications/Chromium.app/Contents/MacOS/Chromium'
+            ],
+            linux: ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium']
+        };
+
+        let detectedChromePath = null;
+        for (const testPath of commonChromePaths[env] || []) {
+            if (fs.existsSync(testPath)) {
+                detectedChromePath = testPath;
+                break;
+            }
+        }
+
+        // Monta configuração completa
+        const config = {
+            // Metadata
+            exportedAt: new Date().toISOString(),
+            version: '2.0',
+            environment: env,
+
+            // Configuração de conexão
+            connection: {
+                mode: DEFAULTS.mode,
+                autoFallback: DEFAULTS.autoFallback,
+                ports: DEFAULTS.ports,
+                hosts: DEFAULTS.hosts,
+                connectionStrategies: DEFAULTS.connectionStrategies,
+                connectionTimeout: DEFAULTS.connectionTimeout,
+                maxConnectionAttempts: DEFAULTS.maxConnectionAttempts,
+                retryDelayMs: DEFAULTS.retryDelayMs,
+                maxRetryDelayMs: DEFAULTS.maxRetryDelayMs
+            },
+
+            // Configuração de launcher
+            launcher: {
+                headless: DEFAULTS.headless,
+                executablePath: DEFAULTS.executablePath,
+                detectedChromePath: detectedChromePath,
+                userDataDir: DEFAULTS.userDataDir,
+                cacheDir: DEFAULTS.cacheDir,
+                args: DEFAULTS.args
+            },
+
+            // Configuração de página
+            page: {
+                allowedDomains: DEFAULTS.allowedDomains,
+                pageSelectionPolicy: DEFAULTS.pageSelectionPolicy,
+                pageScanIntervalMs: DEFAULTS.pageScanIntervalMs,
+                userAgents: USER_AGENTS
+            },
+
+            // Health checks
+            health: {
+                chromeDebugUrl: 'http://localhost:9222/json/version',
+                chromeDevtoolsUrl: 'http://localhost:9222',
+                expectedPorts: DEFAULTS.ports
+            },
+
+            // Comandos úteis para launcher
+            commands: {
+                // Windows
+                startChromeWindows: detectedChromePath
+                    ? `start "" "${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir="C:\\chrome-automation-profile" ${DEFAULTS.args.join(' ')}`
+                    : null,
+                checkChromeWindows: 'netstat -ano | findstr ":9222"',
+                killChromeWindows: 'taskkill /F /IM chrome.exe',
+
+                // Linux/Mac
+                startChromeUnix: detectedChromePath
+                    ? `"${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir="${process.env.HOME}/.chrome-automation-profile" ${DEFAULTS.args.join(' ')} &`
+                    : null,
+                checkChromeUnix: 'lsof -i :9222 || netstat -an | grep :9222',
+                killChromeUnix: 'pkill -f "chrome.*remote-debugging-port=9222"'
+            },
+
+            // Instruções de uso
+            usage: {
+                description: 'Configuração exportada do ConnectionOrchestrator para consumo externo',
+                launcher: 'Use connection.mode para decidir como iniciar Chrome (launcher/connect/auto)',
+                healthCheck: 'Teste health.chromeDebugUrl para validar que Chrome está respondendo',
+                fallback:
+                    'Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente em caso de falha'
+            }
+        };
+
+        // Salva em arquivo se outputPath fornecido
+        if (outputPath) {
+            const resolvedPath = path.resolve(outputPath);
+            fs.writeFileSync(resolvedPath, JSON.stringify(config, null, 2), 'utf-8');
+            log('INFO', `[ORCH] Configuração exportada para: ${resolvedPath}`);
+        }
+
+        return config;
+    }
+
+    /**
+     * Método de conveniência para exportar config no formato esperado pelo launcher.
+     * Simplifica chamadas via CLI.
+     */
+    static exportConfigForLauncher() {
+        const projectRoot = path.join(__dirname, '../..');
+        const outputPath = path.join(projectRoot, 'chrome-config.json');
+        return ConnectionOrchestrator.exportConfig(outputPath);
+    }
 }
 
 module.exports = { ConnectionOrchestrator, STATES };

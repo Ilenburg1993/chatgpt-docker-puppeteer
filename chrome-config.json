@@ -1,0 +1,93 @@
+{
+  "exportedAt": "2026-01-21T05:25:30.223Z",
+  "version": "2.0",
+  "environment": "linux",
+  "connection": {
+    "mode": "launcher",
+    "autoFallback": true,
+    "ports": [
+      9222,
+      9223,
+      9224
+    ],
+    "hosts": [
+      "127.0.0.1",
+      "localhost",
+      "host.docker.internal",
+      "172.17.0.1"
+    ],
+    "connectionStrategies": [
+      "BROWSER_URL",
+      "WS_ENDPOINT"
+    ],
+    "connectionTimeout": 30000,
+    "maxConnectionAttempts": 5,
+    "retryDelayMs": 3000,
+    "maxRetryDelayMs": 15000
+  },
+  "launcher": {
+    "headless": "new",
+    "executablePath": null,
+    "detectedChromePath": null,
+    "userDataDir": null,
+    "cacheDir": "/home/node/.cache/puppeteer",
+    "args": [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process",
+      "--disable-blink-features=AutomationControlled",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-extensions",
+      "--disable-sync",
+      "--metrics-recording-only",
+      "--mute-audio",
+      "--no-first-run",
+      "--safebrowsing-disable-auto-update"
+    ]
+  },
+  "page": {
+    "allowedDomains": [
+      "chatgpt.com",
+      "gemini.google.com",
+      "claude.ai",
+      "openai.com"
+    ],
+    "pageSelectionPolicy": "FIRST",
+    "pageScanIntervalMs": 4000,
+    "userAgents": [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    ]
+  },
+  "health": {
+    "chromeDebugUrl": "http://localhost:9222/json/version",
+    "chromeDevtoolsUrl": "http://localhost:9222",
+    "expectedPorts": [
+      9222,
+      9223,
+      9224
+    ]
+  },
+  "commands": {
+    "startChromeWindows": null,
+    "checkChromeWindows": "netstat -ano | findstr \":9222\"",
+    "killChromeWindows": "taskkill /F /IM chrome.exe",
+    "startChromeUnix": null,
+    "checkChromeUnix": "lsof -i :9222 || netstat -an | grep :9222",
+    "killChromeUnix": "pkill -f \"chrome.*remote-debugging-port=9222\""
+  },
+  "usage": {
+    "description": "Configuração exportada do ConnectionOrchestrator para consumo externo",
+    "launcher": "Use connection.mode para decidir como iniciar Chrome (launcher/connect/auto)",
+    "healthCheck": "Teste health.chromeDebugUrl para validar que Chrome está respondendo",
+    "fallback": "Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente em caso de falha"
+  }
+}
