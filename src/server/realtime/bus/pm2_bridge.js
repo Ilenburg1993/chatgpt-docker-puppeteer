@@ -95,6 +95,7 @@ function _startHealthCheck() {
         clearInterval(healthCheckInterval);
     }
 
+    const checkIntervalMs = CONFIG.get('SERVER_PM2_HEALTH_CHECK_INTERVAL_MS', 30000);
     healthCheckInterval = setInterval(() => {
         if (!isBusActive) {
             return;
@@ -107,7 +108,7 @@ function _startHealthCheck() {
                 init();
             }
         });
-    }, 30000);
+    }, checkIntervalMs);
 }
 
 /**

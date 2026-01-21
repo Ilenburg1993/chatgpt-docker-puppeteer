@@ -57,6 +57,9 @@ module.exports = {
             // [V700] Aponta para o novo ponto de entrada modular consolidado
             script: './src/server/main.js',
 
+            // Proteção contra vazamento de memória (limite generoso para servidor)
+            max_memory_restart: '2G',
+
             watch: false,
             ignore_watch: [
                 'node_modules',

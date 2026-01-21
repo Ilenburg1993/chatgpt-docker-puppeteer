@@ -44,10 +44,11 @@ async function gracefulShutdown(signal) {
     log('WARN', `[LIFECYCLE] Sinal ${signal} detectado. Iniciando Protocolo de Encerramento...`);
 
     // 0. WATCHDOG DE SEGURANÇA: Impede que o processo fique "pendurado" no SO.
+    const shutdownTimeoutMs = CONFIG.get('SERVER_SHUTDOWN_TIMEOUT_MS', 5000);
     const forceExitTimeout = setTimeout(() => {
-        log('FATAL', '[LIFECYCLE] Shutdown excedeu o tempo limite de 5s. Forçando saída.');
+        log('FATAL', `[LIFECYCLE] Shutdown excedeu o tempo limite de ${shutdownTimeoutMs}ms. Forçando saída.`);
         process.exit(1);
-    }, 5000);
+    }, shutdownTimeoutMs);
 
     try {
         // 1. DESATIVAÇÃO DOS OBSERVADORES (WATCHERS)

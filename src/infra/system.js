@@ -8,9 +8,13 @@
 const { exec } = require('child_process');
 const pm2 = require('pm2');
 const treeKill = require('tree-kill');
+const path = require('path');
 const { log } = require('../core/logger');
 
 const AGENTE_NAME = 'agente-gpt';
+
+// Importa a configuração oficial do PM2 (elimina duplicação - P3.1)
+const ecosystemConfig = require(path.join(__dirname, '../../ecosystem.config.js'));
 
 /**
  * Interface Promisificada interna para o PM2.
@@ -116,16 +120,19 @@ async function controlAgent(action) {
                 if (statusInfo.agent !== 'stopped' && statusInfo.agent !== 'not_found') {
                     await pm2p.restart(AGENTE_NAME);
                 } else {
-                    // Se não existe ou está totalmente parado, iniciamos com a spec oficial
+                    // Se não existe ou está totalmente parado, iniciamos com a spec oficial do ecosystem.config.js
+                    const agenteSpec = ecosystemConfig.apps.find(app => app.name === AGENTE_NAME);
+                    if (!agenteSpec) {
+                        throw new Error(`Configuração para "${AGENTE_NAME}" não encontrada em ecosystem.config.js`);
+                    }
+
                     await pm2p.start({
-                        name: AGENTE_NAME,
-                        script: './index.js',
-                        node_args: '--expose-gc',
-                        max_memory_restart: '1G',
-                        env: {
-                            NODE_ENV: 'production',
-                            FORCE_COLOR: '1'
-                        }
+                        name: agenteSpec.name,
+                        script: agenteSpec.script,
+                        node_args: agenteSpec.node_args,
+                        max_memory_restart: agenteSpec.max_memory_restart,
+                        exp_backoff_restart_delay: agenteSpec.exp_backoff_restart_delay,
+                        env: agenteSpec.env
                     });
                 }
                 break;
