@@ -1,22 +1,190 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/javascript-node
 {
-    "name": "Node.js",
-    // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye"
-
-    // Features to add to the dev container. More info: https://containers.dev/features.
-    // "features": {},
-
-    // Use 'forwardPorts' to make a list of ports inside the container available locally.
-    // "forwardPorts": [],
-
-    // Use 'postCreateCommand' to run commands after the container is created.
-    // "postCreateCommand": "yarn install",
-
-    // Configure tool-specific properties.
-    // "customizations": {},
-
-    // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-    // "remoteUser": "root"
+  // ============================================================
+  // Dev Container Configuration v2.0
+  // chatgpt-docker-puppeteer - Autonomous AI Agent
+  // ============================================================
+  "name": "ChatGPT Docker Puppeteer - Dev Container",
+  // Base image: Node.js 20 on Debian Bullseye
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+  // ============================================================
+  // FEATURES - Auto-install tools and utilities
+  // ============================================================
+  "features": {
+    // Common utilities (bash, git, curl, wget, etc)
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": false,
+      "upgradePackages": true,
+      "username": "node",
+      "userUid": "automatic",
+      "userGid": "automatic"
+    },
+    // Docker-in-Docker support (for testing containers)
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": true,
+      "moby": true
+    },
+    // Advanced Git features (LFS, etc)
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest",
+      "ppa": true
+    },
+    // GitHub CLI
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    },
+    // Node.js with nvm (multiple versions support)
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20",
+      "nodeGypDependencies": true,
+      "nvmVersion": "latest"
+    }
+  },
+  // ============================================================
+  // PORT FORWARDING - Make container ports available locally
+  // ============================================================
+  "forwardPorts": [
+    2998, // Dashboard - Express API
+    3008, // Server - Socket.io
+    9229, // Node.js debugger - PM2 agent
+    9230 // Node.js debugger - PM2 dashboard (alternative)
+  ],
+  "portsAttributes": {
+    "2998": {
+      "label": "Dashboard API",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    "3008": {
+      "label": "Socket.io Server",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    "9229": {
+      "label": "Node.js Debugger (Primary)",
+      "onAutoForward": "silent"
+    },
+    "9230": {
+      "label": "Node.js Debugger (Alternative)",
+      "onAutoForward": "silent"
+    }
+  },
+  // ============================================================
+  // LIFECYCLE HOOKS - Commands to run at different stages
+  // ============================================================
+  // Run once when container is created
+  "onCreateCommand": "npm ci",
+  // Run after container is created (setup environment)
+  "postCreateCommand": "bash scripts/setup-devcontainer.sh",
+  // Run every time container starts
+  "postStartCommand": "make info && make health || true",
+  // Run when attaching to container
+  "postAttachCommand": "echo '✅ DevContainer ready! Run: make help'",
+  // ============================================================
+  // VS CODE CUSTOMIZATIONS
+  // ============================================================
+  "customizations": {
+    "vscode": {
+      // Extensions to install automatically
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-vscode.makefile-tools",
+        "eamodio.gitlens",
+        "usernamehw.errorlens",
+        "christian-kohler.path-intellisense",
+        "christian-kohler.npm-intellisense"
+      ],
+      // Settings overrides for container
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash",
+            "icon": "terminal-bash"
+          }
+        },
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/logs/**": true,
+          "**/tmp/**": true,
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/profile/**": true,
+          "**/respostas/**": true
+        },
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/logs": true,
+          "**/tmp": true,
+          "**/profile": true,
+          "**/respostas": true
+        },
+        "git.autofetch": true,
+        "git.confirmSync": false,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        }
+      }
+    }
+  },
+  // ============================================================
+  // MOUNTS - Volume and bind mount configuration
+  // ============================================================
+  "mounts": [
+    // Bind mount .git for fast git operations
+    "source=${localWorkspaceFolder}/.git,target=${containerWorkspaceFolder}/.git,type=bind,consistency=cached",
+    // Volume for node_modules (better performance)
+    "source=devcontainer-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    // Volume for browser profile (persistence)
+    "source=devcontainer-profile,target=${containerWorkspaceFolder}/profile,type=volume",
+    // Volume for logs (don't pollute workspace)
+    "source=devcontainer-logs,target=${containerWorkspaceFolder}/logs,type=volume"
+  ],
+  // ============================================================
+  // CONTAINER ENVIRONMENT VARIABLES
+  // ============================================================
+  "containerEnv": {
+    "NODE_ENV": "development",
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium",
+    "FORCE_COLOR": "1",
+    "LOG_LEVEL": "debug",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "TZ": "America/Sao_Paulo",
+    "LANG": "pt_BR.UTF-8"
+  },
+  // ============================================================
+  // SECURITY & USER CONFIGURATION
+  // ============================================================
+  // Run as non-root user (security best practice)
+  "remoteUser": "node",
+  // Update remote user UID to match host (avoid permission issues)
+  "updateRemoteUserUID": true,
+  // Container runs as this user
+  "containerUser": "node",
+  // Don't run privileged (security)
+  "privileged": false,
+  // ============================================================
+  // RESOURCE LIMITS
+  // ============================================================
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "4gb",
+    "storage": "32gb"
+  },
+  // ============================================================
+  // ADDITIONAL CONFIGURATION
+  // ============================================================
+  // Shutdown action
+  "shutdownAction": "stopContainer",
+  // Update content command
+  "updateContentCommand": "npm install",
+  // Wait for command on first start
+  "waitFor": "onCreateCommand"
 }
