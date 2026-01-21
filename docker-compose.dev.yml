@@ -49,8 +49,13 @@ services:
       - "3008:3008"    # Dashboard web
       - "9229:9229"    # Node.js inspector (Chrome DevTools)
 
+    # Linux compatibility (comment out on Windows/macOS Docker Desktop)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     healthcheck:
-    test: ["CMD", "node", "/app/scripts/healthcheck.js"]
+      test: ["CMD", "node", "/app/scripts/healthcheck.js"]
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
@@ -61,6 +66,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
+    networks:
+      - dev-network
+
 # =============================================================================
 # Named Volumes
 # =============================================================================
@@ -69,6 +77,10 @@ volumes:
   # Prevents host node_modules conflicts and improves I/O on Windows/macOS
   node_modules_dev:
     driver: local
+
+networks:
+  dev-network:
+    driver: bridge
 
 # =============================================================================
 # Notes:

@@ -12,11 +12,11 @@ services:
       dockerfile: Dockerfile
       args:
         - NODE_ENV=production
-    
+
     image: chatgpt-agent:${VERSION:-latest}
     container_name: chatgpt-agent-prod
     restart: unless-stopped
-    
+
     environment:
       - NODE_ENV=production
       - TZ=${TZ:-America/Sao_Paulo}
@@ -24,41 +24,42 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - MAX_WORKERS=${MAX_WORKERS:-3}
       - ENABLE_TELEMETRY=${ENABLE_TELEMETRY:-false}
-    
-    # Load additional env vars from file
-    env_file:
-      - .env
-    
+
+    # Load additional env vars from file (optional)
+    # Uncomment if .env file exists:
+    # env_file:
+    #   - .env
+
     volumes:
       # Named volumes for data isolation
       - fila-prod:/app/fila
       - respostas-prod:/app/respostas
       - logs-prod:/app/logs
       - profile-prod:/app/profile
-      
+
       # Read-only config (optional)
       - ./config.json:/app/config.json:ro
       - ./dynamic_rules.json:/app/dynamic_rules.json:ro
-    
+
     ports:
       - "${PORT:-3008}:3008"
       # Optional: Prometheus metrics
       # - "9090:9090"
-    
+
     healthcheck:
       test: ["CMD", "node", "/app/scripts/healthcheck.js"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "5"
         compress: "true"
-    
+
     # Production-tuned resource limits
     deploy:
       resources:
@@ -68,21 +69,25 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-      
+
       # Restart policy
       restart_policy:
         condition: on-failure
         delay: 5s
         max_attempts: 3
         window: 120s
-    
+
+    # Linux compatibility
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     networks:
       - agent-network
-    
+
     # Security options
     security_opt:
       - no-new-privileges:true
-    
+
     # Read-only root filesystem (except writable volumes)
     # read_only: true
     # tmpfs:
@@ -96,17 +101,17 @@ services:
     container_name: prometheus
     profiles:
       - monitoring
-    
+
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    
+
     ports:
       - "9091:9090"
-    
+
     networks:
       - agent-network
-    
+
     restart: unless-stopped
 
   grafana:
@@ -114,59 +119,51 @@ services:
     container_name: grafana
     profiles:
       - monitoring
-    
+
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-    
+
     ports:
       - "3001:3000"
-    
+
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
-    
+
     networks:
       - agent-network
-    
+
     restart: unless-stopped
 
 # =============================================================================
 # Named Volumes
 # =============================================================================
 volumes:
+  # Option A: True named volumes (Docker-managed)
   fila-prod:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_DIR:-./data}/fila
-  
+
   respostas-prod:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_DIR:-./data}/respostas
-  
+
   logs-prod:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_DIR:-./data}/logs
-  
+
   profile-prod:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_DIR:-./data}/profile
-  
+
+  # Option B: Use bind mounts instead (uncomment and modify service volumes):
+  # volumes:
+  #   - ${DATA_DIR:-./data}/fila:/app/fila
+  #   - ${DATA_DIR:-./data}/respostas:/app/respostas
+  #   - ${DATA_DIR:-./data}/logs:/app/logs
+  #   - ${DATA_DIR:-./data}/profile:/app/profile
+
   # Monitoring volumes
   prometheus-data:
     driver: local
-  
+
   grafana-data:
     driver: local
 
