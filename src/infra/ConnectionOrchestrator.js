@@ -11,12 +11,17 @@
    - auto: Tenta todos os métodos em ordem de prioridade
 ========================================================================== */
 
-const puppeteer = require('puppeteer');
+const puppeteerExtra = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const puppeteer = puppeteerExtra; // Alias para compatibilidade
 const puppeteerCore = require('puppeteer-core');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { log } = require('../core/logger');
+
+// Aplica stealth plugin para anti-detection
+puppeteerExtra.use(StealthPlugin());
 
 /* ========================================================================
    ESTADOS GLOBAIS
@@ -46,8 +51,19 @@ const ISSUE_TYPES = Object.freeze({
     PAGE_INVALID: 'PAGE_INVALID'
 });
 
-const DEFAULTS = {
+/* ========================================================================
+   USER-AGENTS (ROTATION POOL)
+======================================================================== */
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+];
 
+const DEFAULTS = {
     // Modo de operação: 'launcher' | 'connect' | 'wsEndpoint' | 'executablePath' | 'auto'
     mode: 'launcher',
 
@@ -443,6 +459,16 @@ class ConnectionOrchestrator {
                 if (page) {
                     this.page = page;
                     this.setState(STATES.PAGE_SELECTED, { url: page.url() });
+
+                    // P3.2: User-Agent Rotation (anti-fingerprinting)
+                    const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+                    try {
+                        await page.setUserAgent(randomUA);
+                        log('DEBUG', `[ORCH] User-Agent rotacionado: ${randomUA.substring(0, 50)}...`);
+                    } catch (error) {
+                        log('WARN', `[ORCH] Falha ao definir User-Agent: ${error.message}`);
+                    }
+
                     return page;
                 }
 
