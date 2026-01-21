@@ -61,6 +61,7 @@ let state = defaultState;
 let isReady = false;
 let persistLock = false;
 let pendingPersist = false;
+let persistTimeout = null;
 
 /* --------------------------------------------------------------------------
    INIT (ANTIFRÁGIL)
@@ -94,8 +95,17 @@ async function init() {
 const readyPromise = init();
 
 /* --------------------------------------------------------------------------
-   PERSISTÊNCIA GARANTIDA (QUEUE PATTERN)
+   PERSISTÊNCIA GARANTIDA (QUEUE PATTERN + DEBOUNCE)
 -------------------------------------------------------------------------- */
+function debouncedPersist() {
+    if (persistTimeout) {
+        clearTimeout(persistTimeout);
+    }
+    persistTimeout = setTimeout(() => {
+        persist();
+    }, 5000); // 5s debounce
+}
+
 async function persist() {
     if (persistLock) {
         pendingPersist = true;
@@ -110,7 +120,7 @@ async function persist() {
     } catch (e) {
         log('ERROR', `[ADAPTIVE] Falha de escrita: ${e.message}`);
     } finally {
-    // eslint-disable-next-line require-atomic-updates -- Single-threaded execution, no race condition
+        // eslint-disable-next-line require-atomic-updates -- Single-threaded execution, no race condition
         persistLock = false;
         if (pendingPersist) {
             pendingPersist = false;
@@ -179,9 +189,7 @@ async function recordMetric(type, ms, target = 'generic') {
 
     state.last_adjustment_at = Date.now(); // [FIX] Atualização de contrato
 
-    if (Math.random() < 0.05) {
-        persist();
-    }
+    debouncedPersist(); // [P7.1] Debounce ao invés de probabilístico
 }
 
 async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 'STREAM') {
@@ -193,8 +201,8 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
     const stats = !profile
         ? createEmptyStats(phase === 'STREAM' ? SEED_STREAM : SEED_TTFT) // [FIX] Fallback consistente
         : phase === 'INITIAL' || phase === 'TTFT'
-            ? profile.ttft
-            : profile.stream;
+          ? profile.ttft
+          : profile.stream;
 
     const avg = Math.max(1, stats.avg);
     const std = Math.sqrt(Math.max(0, stats.var));
@@ -245,6 +253,7 @@ module.exports = {
     getAdjustedTimeout,
     getStabilityMetrics,
     getSnapshot: () => JSON.parse(JSON.stringify(state)),
+    forcePersist: persist, // [P7.5] Exposto para shutdown hooks e testes
     get values() {
         return {
             HEARTBEAT_TIMEOUT: Math.round(state.infra.avg * 5),
