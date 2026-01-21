@@ -1,9 +1,14 @@
-# EditorConfig - Consistency across editors
+# =============================================================================
+# EditorConfig - Cross-editor consistency for chatgpt-docker-puppeteer
 # https://editorconfig.org
+# Version: 2.0 (21/01/2026)
+# =============================================================================
 
 root = true
 
-# Default settings for all files
+# -----------------------------------------------------------------------------
+# DEFAULT: All files
+# -----------------------------------------------------------------------------
 [*]
 charset = utf-8
 end_of_line = lf
@@ -11,35 +16,179 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
+max_line_length = 120
 
-# JSON, YAML, TOML - 2 spaces
-[*.{json,jsonc,yml,yaml,toml}]
+# -----------------------------------------------------------------------------
+# JAVASCRIPT: Source code (4 spaces per ESLint config)
+# -----------------------------------------------------------------------------
+[*.{js,mjs,cjs}]
+indent_size = 4
+max_line_length = 120
+quote_type = single
+
+# Node.js entry points
+[{index.js,server.js}]
+indent_size = 4
+
+# ESLint config (flat config v9)
+[eslint.config.{js,mjs,cjs}]
+indent_size = 4
+
+# -----------------------------------------------------------------------------
+# CONFIGURATION FILES: JSON, YAML, TOML (2 spaces)
+# -----------------------------------------------------------------------------
+[*.{json,jsonc,json5}]
+indent_size = 2
+max_line_length = 120
+
+[*.{yml,yaml}]
+indent_size = 2
+max_line_length = 100
+
+[*.toml]
 indent_size = 2
 
-# Markdown - preserve trailing whitespace (for line breaks)
+# Specific config files
+[{package.json,package-lock.json,tsconfig.json,jsconfig.json}]
+indent_size = 2
+
+[{.eslintrc,.eslintrc.json,.prettierrc,.prettierrc.json,.babelrc,.babelrc.json}]
+indent_size = 2
+
+# Docker Compose files
+[docker-compose*.{yml,yaml}]
+indent_size = 2
+
+# Config JSON files in root
+[{config.json,dynamic_rules.json,controle.json,chrome-config.json}]
+indent_size = 2
+
+# PM2 ecosystem
+[ecosystem.config.js]
+indent_size = 4
+
+# -----------------------------------------------------------------------------
+# DOCUMENTATION: Markdown (2 spaces, preserve trailing whitespace)
+# -----------------------------------------------------------------------------
 [*.md]
+indent_size = 2
 trim_trailing_whitespace = false
+max_line_length = 100
+
+# Specific docs
+[{README.md,CHANGELOG.md,CONTRIBUTING.md}]
 indent_size = 2
 
-# Shell scripts
-[*.{sh,bash}]
+[DOCUMENTAÇÃO/*.md]
 indent_size = 2
 
-# Makefile - requires tabs
-[Makefile]
-indent_style = tab
+# -----------------------------------------------------------------------------
+# SHELL SCRIPTS: Bash, Batch, PowerShell (2 spaces)
+# -----------------------------------------------------------------------------
+[*.{sh,bash,zsh}]
+indent_size = 2
+end_of_line = lf
 
-# Docker files
+[*.{bat,cmd}]
+indent_size = 2
+end_of_line = crlf
+
+[*.ps1]
+indent_size = 2
+end_of_line = crlf
+
+# Specific launcher scripts
+[{launcher.sh,LAUNCHER.bat}]
+indent_size = 2
+
+# -----------------------------------------------------------------------------
+# PYTHON: Scripts (4 spaces per PEP 8)
+# -----------------------------------------------------------------------------
+[*.py]
+indent_size = 4
+max_line_length = 120
+
+[{colect.py,tools/*.py,analysis/*.py}]
+indent_size = 4
+
+# -----------------------------------------------------------------------------
+# DOCKER: Dockerfiles (2 spaces)
+# -----------------------------------------------------------------------------
 [Dockerfile*]
 indent_size = 2
 
-# Config files
-[{package.json,tsconfig.json,jsconfig.json}]
+[{.dockerignore,.gitignore,.npmignore}]
 indent_size = 2
 
-[{.eslintrc,.prettierrc,.babelrc}]
-indent_size = 2
-
-# Ecosystem config
-[ecosystem.config.js]
+# -----------------------------------------------------------------------------
+# BUILD TOOLS: Makefile (tabs required)
+# -----------------------------------------------------------------------------
+[Makefile]
+indent_style = tab
 indent_size = 4
+
+[{GNUmakefile,makefile}]
+indent_style = tab
+
+# -----------------------------------------------------------------------------
+# DATA FILES: Plain text, logs, prompts
+# -----------------------------------------------------------------------------
+[*.txt]
+indent_size = 2
+max_line_length = 100
+
+[prompts.txt]
+indent_size = 2
+max_line_length = 120
+
+# -----------------------------------------------------------------------------
+# ENVIRONMENT FILES: .env (no trailing whitespace)
+# -----------------------------------------------------------------------------
+[{.env,.env.*}]
+indent_size = 2
+trim_trailing_whitespace = true
+
+# -----------------------------------------------------------------------------
+# GIT FILES: .gitignore, .gitattributes
+# -----------------------------------------------------------------------------
+[{.gitignore,.gitattributes,.gitmodules}]
+indent_size = 2
+
+# -----------------------------------------------------------------------------
+# VSCODE: Workspace settings (2 spaces)
+# -----------------------------------------------------------------------------
+[.vscode/*.json]
+indent_size = 2
+
+# -----------------------------------------------------------------------------
+# GITHUB: Actions, workflows (2 spaces)
+# -----------------------------------------------------------------------------
+[.github/**/*.{yml,yaml}]
+indent_size = 2
+
+[.github/copilot-instructions.md]
+indent_size = 2
+
+# -----------------------------------------------------------------------------
+# TEST FILES: Test suites (4 spaces like source code)
+# -----------------------------------------------------------------------------
+[tests/**/*.js]
+indent_size = 4
+
+[{test_*.js,*_test.js,*.test.js,*.spec.js}]
+indent_size = 4
+
+# -----------------------------------------------------------------------------
+# ANALYSIS & TOOLS: Scripts and reports
+# -----------------------------------------------------------------------------
+[analysis/**/*.{py,js,sh}]
+indent_size = 4
+
+[tools/**/*.{py,js,sh}]
+indent_size = 4
+
+# -----------------------------------------------------------------------------
+# TEMPORARY FILES: Lock, cache, temp (2 spaces)
+# -----------------------------------------------------------------------------
+[{temp_*.json,*.lock}]
+indent_size = 2
