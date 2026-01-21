@@ -1,0 +1,1175 @@
+{
+    "// ============================================================": {},
+    "// VS Code Snippets v1.0 - chatgpt-docker-puppeteer": {},
+    "// Cross-Platform: Windows/Linux/macOS": {},
+    "// 60+ snippets organized in 8 categories": {},
+    "// ============================================================": {},
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 1. NERV Event Patterns (9 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "NERV - Emit Event": {
+        "prefix": ["nerv-emit", "emit"],
+        "body": [
+            "nerv.emit('${1|TASK_STATE_CHANGE,DRIVER_EXECUTE,OBSERVATION_STORED,SHUTDOWN_INITIATED,CONNECTION_ACQUIRED,BROWSER_CRASH|}', {",
+            "    taskId: ${2:'task123'},",
+            "    ${3:// event-specific payload}",
+            "}, {",
+            "    originComponent: '${4:COMPONENT_NAME}',",
+            "    originSubsystem: '${5|NERV,KERNEL,DRIVER,INFRA,SERVER,CORE|}',",
+            "    correlationId: ${6:correlationId}",
+            "});"
+        ],
+        "description": "NERV emit event with envelope metadata"
+    },
+
+    "NERV - Receive Event": {
+        "prefix": ["nerv-on", "receive"],
+        "body": [
+            "nerv.on('${1|TASK_STATE_CHANGE,DRIVER_EXECUTE,OBSERVATION_STORED,SHUTDOWN_INITIATED,CONNECTION_ACQUIRED|}', (envelope) => {",
+            "    const { payload, metadata } = envelope;",
+            "    const { taskId${2:, other} } = payload;",
+            "    ",
+            "    ${3:// Handle event}",
+            "});"
+        ],
+        "description": "NERV receive event handler with envelope unpacking"
+    },
+
+    "NERV - Correlation ID": {
+        "prefix": ["correlation", "corr-id"],
+        "body": [
+            "const correlationId = `${1:operation}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;"
+        ],
+        "description": "Generate NERV correlation ID"
+    },
+
+    "NERV - Envelope Canonical": {
+        "prefix": ["envelope", "nerv-env"],
+        "body": [
+            "const envelope = {",
+            "    eventType: '${1:EVENT_TYPE}',",
+            "    payload: {",
+            "        ${2:// payload data}",
+            "    },",
+            "    metadata: {",
+            "        originComponent: '${3:COMPONENT}',",
+            "        originSubsystem: '${4|NERV,KERNEL,DRIVER,INFRA,SERVER,CORE|}',",
+            "        correlationId: ${5:correlationId},",
+            "        timestamp: Date.now()",
+            "    }",
+            "};"
+        ],
+        "description": "NERV canonical envelope structure"
+    },
+
+    "NERV - Wait for Response": {
+        "prefix": ["nerv-wait", "wait-response"],
+        "body": [
+            "const response = await nerv.waitForResponse(",
+            "    '${1:REQUEST_EVENT}',",
+            "    { ${2:// request payload} },",
+            "    {",
+            "        originComponent: '${3:COMPONENT}',",
+            "        correlationId: ${4:correlationId},",
+            "        timeout: ${5:30000}",
+            "    }",
+            ");"
+        ],
+        "description": "NERV wait for response pattern (async)"
+    },
+
+    "NERV Bridge - KERNEL": {
+        "prefix": ["nerv-kernel", "kernel-bridge"],
+        "body": [
+            "const KernelNERVBridge = require('../nerv/adapters/KernelNERVBridge');",
+            "const bridge = new KernelNERVBridge(nerv, ${1:kernelInstance});",
+            "bridge.initialize();"
+        ],
+        "description": "Initialize KERNEL NERV Bridge"
+    },
+
+    "NERV Bridge - DRIVER": {
+        "prefix": ["nerv-driver", "driver-bridge"],
+        "body": [
+            "const DriverNERVAdapter = require('../nerv/adapters/DriverNERVAdapter');",
+            "const adapter = new DriverNERVAdapter(nerv, ${1:driverInstance});",
+            "adapter.initialize();"
+        ],
+        "description": "Initialize DRIVER NERV Adapter"
+    },
+
+    "NERV Bridge - SERVER": {
+        "prefix": ["nerv-server", "server-bridge"],
+        "body": [
+            "const ServerNERVAdapter = require('../nerv/adapters/ServerNERVAdapter');",
+            "const adapter = new ServerNERVAdapter(nerv, ${1:serverInstance});",
+            "adapter.initialize();"
+        ],
+        "description": "Initialize SERVER NERV Adapter"
+    },
+
+    "NERV - MessageType Constants": {
+        "prefix": ["nerv-types", "message-types"],
+        "body": [
+            "const { MessageType } = require('../core/constants/nerv_message_types');",
+            "",
+            "// Available: REQUEST, RESPONSE, EVENT, NOTIFICATION, ERROR, HEARTBEAT"
+        ],
+        "description": "Import NERV MessageType constants"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 2. Task Creation & Validation (7 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Task - Create Schema": {
+        "prefix": ["task-create", "new-task"],
+        "body": [
+            "const task = {",
+            "    id: `task-${Date.now()}`,",
+            "    target: '${1|chatgpt,gemini|}',",
+            "    prompt: '${2:Enter your prompt}',",
+            "    status: 'PENDING',",
+            "    attempts: 0,",
+            "    createdAt: new Date().toISOString(),",
+            "    metadata: {",
+            "        ${3:// additional metadata}",
+            "    }",
+            "};"
+        ],
+        "description": "Create new task object"
+    },
+
+    "Task - Validation with Zod": {
+        "prefix": ["task-validate", "validate"],
+        "body": [
+            "const schemas = require('../core/schemas');",
+            "",
+            "try {",
+            "    const validTask = schemas.parseTask(${1:taskData});",
+            "    ${2:// Use validTask}",
+            "} catch (err) {",
+            "    logger.log('ERROR', `[VALIDATION] Invalid task: ${err.message}`);",
+            "    ${3:// Handle validation error}",
+            "}"
+        ],
+        "description": "Validate task with Zod schema"
+    },
+
+    "Task - Save to Queue": {
+        "prefix": ["task-save", "save-task"],
+        "body": [
+            "const io = require('../infra/io');",
+            "",
+            "await io.saveTask(${1:task});",
+            "logger.log('INFO', `[QUEUE] Task ${${1:task}.id} saved`${2:, ${1:task}.id});"
+        ],
+        "description": "Save task to queue (atomic)"
+    },
+
+    "Task - Load from Queue": {
+        "prefix": ["task-load", "load-task"],
+        "body": [
+            "const io = require('../infra/io');",
+            "",
+            "const task = await io.loadTask(${1:taskId});",
+            "if (!task) {",
+            "    logger.log('WARN', `[QUEUE] Task ${${1:taskId}} not found`);",
+            "    return;",
+            "}",
+            "${2:// Use task}"
+        ],
+        "description": "Load task from queue with validation"
+    },
+
+    "Task - Update State": {
+        "prefix": ["task-state", "update-state"],
+        "body": [
+            "const { STATUS_VALUES } = require('../core/constants/tasks');",
+            "",
+            "task.status = STATUS_VALUES.${1|PENDING,RUNNING,DONE,FAILED|};",
+            "task.updatedAt = new Date().toISOString();",
+            "await io.saveTask(task);"
+        ],
+        "description": "Update task state with constants"
+    },
+
+    "Task - List Queue": {
+        "prefix": ["task-list", "list-queue"],
+        "body": [
+            "const io = require('../infra/io');",
+            "",
+            "const tasks = await io.listTasks();",
+            "const pending = tasks.filter(t => t.status === 'PENDING');",
+            "logger.log('INFO', `[QUEUE] ${pending.length}/${tasks.length} tasks pending`);"
+        ],
+        "description": "List all tasks in queue"
+    },
+
+    "Task - Constants Import": {
+        "prefix": ["task-constants", "import-task-constants"],
+        "body": [
+            "const { STATUS_VALUES, TASK_STATES, STATUS_VALUES_ARRAY } = require('../core/constants/tasks');"
+        ],
+        "description": "Import task constants (no magic strings)"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 3. Driver Implementation (6 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Driver - Factory Pattern": {
+        "prefix": ["driver-factory", "get-driver"],
+        "body": [
+            "const getDriver = require('../driver/factory');",
+            "",
+            "const driver = getDriver('${1|chatgpt,gemini|}');",
+            "await driver.initialize();"
+        ],
+        "description": "Get driver instance via factory"
+    },
+
+    "Driver - Execute Task": {
+        "prefix": ["driver-execute", "execute"],
+        "body": [
+            "const result = await driver.execute(",
+            "    ${1:page},",
+            "    ${2:task},",
+            "    {",
+            "        timeout: ${3:120000},",
+            "        maxAttempts: ${4:3}",
+            "    }",
+            ");",
+            "",
+            "if (!result.success) {",
+            "    logger.log('ERROR', `[DRIVER] Execution failed: ${result.error}`, ${2:task}.id);",
+            "}"
+        ],
+        "description": "Execute task with driver"
+    },
+
+    "Driver - New Implementation": {
+        "prefix": ["driver-new", "create-driver"],
+        "body": [
+            "class ${1:DriverName} {",
+            "    constructor() {",
+            "        this.target = '${2:target}';",
+            "        this.initialized = false;",
+            "    }",
+            "",
+            "    async initialize() {",
+            "        ${3:// Initialize driver}",
+            "        this.initialized = true;",
+            "    }",
+            "",
+            "    async execute(page, task, options = {}) {",
+            "        if (!this.initialized) {",
+            "            throw new Error('Driver not initialized');",
+            "        }",
+            "        ",
+            "        ${4:// Implement execution logic}",
+            "        ",
+            "        return {",
+            "            success: true,",
+            "            data: {}",
+            "        };",
+            "    }",
+            "}",
+            "",
+            "module.exports = ${1:DriverName};"
+        ],
+        "description": "Create new driver implementation"
+    },
+
+    "Driver - Selectors": {
+        "prefix": ["driver-selectors", "selectors"],
+        "body": [
+            "const SELECTORS = {",
+            "    ${1:inputPrompt}: '${2:textarea[data-id=\"root\"]}',",
+            "    ${3:sendButton}: '${4:button[data-testid=\"send-button\"]}',",
+            "    ${5:responseArea}: '${6:.response-container}'",
+            "};"
+        ],
+        "description": "Define driver selectors"
+    },
+
+    "Driver - Wait for Element": {
+        "prefix": ["driver-wait", "wait-element"],
+        "body": [
+            "await page.waitForSelector('${1:selector}', {",
+            "    visible: true,",
+            "    timeout: ${2:30000}",
+            "});"
+        ],
+        "description": "Wait for element with timeout"
+    },
+
+    "Driver - NERV Integration": {
+        "prefix": ["driver-nerv", "driver-adapter"],
+        "body": [
+            "const DriverNERVAdapter = require('../nerv/adapters/DriverNERVAdapter');",
+            "",
+            "// In driver class:",
+            "setNERVAdapter(adapter) {",
+            "    this.nervAdapter = adapter;",
+            "}",
+            "",
+            "// Emit execution event:",
+            "if (this.nervAdapter) {",
+            "    this.nervAdapter.emit('DRIVER_EXECUTE', {",
+            "        taskId: task.id,",
+            "        target: this.target,",
+            "        status: 'started'",
+            "    });",
+            "}"
+        ],
+        "description": "NERV integration in driver"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 4. Health Checks & Monitoring (5 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Health - Endpoint": {
+        "prefix": ["health-endpoint", "health"],
+        "body": [
+            "router.get('/health', async (req, res) => {",
+            "    try {",
+            "        const status = {",
+            "            status: 'ok',",
+            "            timestamp: new Date().toISOString(),",
+            "            uptime: process.uptime(),",
+            "            ${1:// additional checks}",
+            "        };",
+            "        ",
+            "        res.json(status);",
+            "    } catch (err) {",
+            "        res.status(503).json({",
+            "            status: 'error',",
+            "            error: err.message",
+            "        });",
+            "    }",
+            "});"
+        ],
+        "description": "Create health check endpoint"
+    },
+
+    "Health - Browser Pool Check": {
+        "prefix": ["health-pool", "pool-check"],
+        "body": [
+            "const poolManager = require('../infra/browser/pool_manager');",
+            "",
+            "const poolHealth = await poolManager.getHealthStatus();",
+            "const isHealthy = poolHealth.active > 0 && poolHealth.degraded === 0;",
+            "",
+            "if (!isHealthy) {",
+            "    logger.log('WARN', `[HEALTH] Pool degraded: ${JSON.stringify(poolHealth)}`);",
+            "}"
+        ],
+        "description": "Check browser pool health"
+    },
+
+    "Health - PM2 Check": {
+        "prefix": ["health-pm2", "pm2-check"],
+        "body": [
+            "const { exec } = require('child_process');",
+            "const { promisify } = require('util');",
+            "const execAsync = promisify(exec);",
+            "",
+            "try {",
+            "    const { stdout } = await execAsync('pm2 jlist');",
+            "    const processes = JSON.parse(stdout);",
+            "    const online = processes.filter(p => p.pm2_env.status === 'online');",
+            "    ",
+            "    logger.log('INFO', `[HEALTH] PM2: ${online.length}/${processes.length} online`);",
+            "} catch (err) {",
+            "    logger.log('ERROR', `[HEALTH] PM2 check failed: ${err.message}`);",
+            "}"
+        ],
+        "description": "Check PM2 process status"
+    },
+
+    "Health - Script Bash": {
+        "prefix": ["health-bash", "health-sh"],
+        "body": [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            "PORT=${1:-2998}",
+            "exit_code=0",
+            "",
+            "# Health check",
+            "if ! response=$(curl -sf http://localhost:$PORT/health 2>/dev/null); then",
+            "    echo \"[FAIL] Health endpoint unreachable\"",
+            "    exit 1",
+            "fi",
+            "",
+            "# Parse JSON (jq preferred)",
+            "if command -v jq >/dev/null 2>&1; then",
+            "    status=$(echo \"$response\" | jq -r '.status')",
+            "else",
+            "    status=$(echo \"$response\" | awk -F'\"' ''/status'/{print $4}')",
+            "fi",
+            "",
+            "if [[ \"$status\" != \"ok\" ]]; then",
+            "    echo \"[FAIL] Status: $status\"",
+            "    exit 1",
+            "fi",
+            "",
+            "echo \"[OK] Health check passed\"",
+            "exit 0"
+        ],
+        "description": "Health check bash script (v3.0 pattern)"
+    },
+
+    "Health - Script PowerShell": {
+        "prefix": ["health-ps1", "health-powershell"],
+        "body": [
+            "param(",
+            "    [int]$Port = 2998,",
+            "    [int]$TimeoutSec = 2",
+            ")",
+            "",
+            "$exitCode = 0",
+            "",
+            "try {",
+            "    $response = Invoke-RestMethod -Uri \"http://localhost:$Port/health\" -TimeoutSec $TimeoutSec",
+            "    ",
+            "    if ($response.status -notin @('ok', 'healthy', 'online')) {",
+            "        Write-Host \"[FAIL] Status: $($response.status)\"",
+            "        $exitCode = 1",
+            "    } else {",
+            "        Write-Host \"[OK] Health check passed\"",
+            "    }",
+            "} catch {",
+            "    Write-Host \"[FAIL] Health endpoint unreachable\"",
+            "    $exitCode = 1",
+            "}",
+            "",
+            "exit $exitCode"
+        ],
+        "description": "Health check PowerShell script (v3.0 pattern)"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 5. Testing Patterns (8 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Test - Suite Structure": {
+        "prefix": ["test-suite", "test"],
+        "body": [
+            "// ============================================================",
+            "// Test: ${1:Feature Name}",
+            "// ${2:Description}",
+            "// ============================================================",
+            "",
+            "const logger = require('../src/core/logger');",
+            "const { expect } = require('chai');",
+            "",
+            "async function test${3:FeatureName}() {",
+            "    logger.log('INFO', '[TEST] Starting ${1:Feature Name} tests...');",
+            "    ",
+            "    let passed = 0;",
+            "    let failed = 0;",
+            "    ",
+            "    // Test 1: ${4:Test Description}",
+            "    try {",
+            "        ${5:// Test logic}",
+            "        passed++;",
+            "        logger.log('INFO', '[TEST] ✓ ${4:Test Description}');",
+            "    } catch (err) {",
+            "        failed++;",
+            "        logger.log('ERROR', `[TEST] ✗ ${4:Test Description}: ${err.message}`);",
+            "    }",
+            "    ",
+            "    logger.log('INFO', `[TEST] Results: ${passed} passed, ${failed} failed`);",
+            "    return failed === 0;",
+            "}",
+            "",
+            "if (require.main === module) {",
+            "    test${3:FeatureName}().then(success => {",
+            "        process.exit(success ? 0 : 1);",
+            "    });",
+            "}",
+            "",
+            "module.exports = test${3:FeatureName};"
+        ],
+        "description": "Create test suite structure"
+    },
+
+    "Test - Mock NERV": {
+        "prefix": ["test-nerv", "mock-nerv"],
+        "body": [
+            "const EventEmitter = require('events');",
+            "",
+            "class MockNERV extends EventEmitter {",
+            "    constructor() {",
+            "        super();",
+            "        this.emittedEvents = [];",
+            "    }",
+            "    ",
+            "    emit(eventType, payload, metadata) {",
+            "        this.emittedEvents.push({ eventType, payload, metadata });",
+            "        super.emit(eventType, { payload, metadata });",
+            "    }",
+            "    ",
+            "    getEmittedEvents(type) {",
+            "        return type ? this.emittedEvents.filter(e => e.eventType === type) : this.emittedEvents;",
+            "    }",
+            "}",
+            "",
+            "const mockNerv = new MockNERV();"
+        ],
+        "description": "Create mock NERV for testing"
+    },
+
+    "Test - Mock Driver": {
+        "prefix": ["test-driver", "mock-driver"],
+        "body": [
+            "const mockDriver = {",
+            "    target: '${1:chatgpt}',",
+            "    initialized: true,",
+            "    executionCount: 0,",
+            "    ",
+            "    async execute(page, task, options = {}) {",
+            "        this.executionCount++;",
+            "        return {",
+            "            success: ${2:true},",
+            "            data: { response: 'Mock response' }",
+            "        };",
+            "    }",
+            "};"
+        ],
+        "description": "Create mock driver for testing"
+    },
+
+    "Test - Mock Browser": {
+        "prefix": ["test-browser", "mock-browser"],
+        "body": [
+            "const mockPage = {",
+            "    goto: async (url) => {},",
+            "    waitForSelector: async (selector, options) => {},",
+            "    \\$: async (selector) => ({",
+            "        type: async (text) => {},",
+            "        click: async () => {}",
+            "    }),",
+            "    evaluate: async (fn) => fn(),",
+            "    screenshot: async (options) => Buffer.from('mock'),",
+            "    close: async () => {}",
+            "};"
+        ],
+        "description": "Create mock Puppeteer page"
+    },
+
+    "Test - Assertion Patterns": {
+        "prefix": ["test-assert", "assert"],
+        "body": [
+            "const { expect } = require('chai');",
+            "",
+            "// Basic assertions",
+            "expect(${1:actual}).to.equal(${2:expected});",
+            "expect(${3:value}).to.be.${4|true,false,null,undefined|};",
+            "expect(${5:array}).to.have.lengthOf(${6:length});",
+            "expect(${7:object}).to.have.property('${8:key}');",
+            "",
+            "// NERV assertions",
+            "const events = mockNerv.getEmittedEvents('${9:EVENT_TYPE}');",
+            "expect(events).to.have.lengthOf(${10:count});",
+            "expect(events[0].payload).to.have.property('${11:key}');"
+        ],
+        "description": "Common test assertions"
+    },
+
+    "Test - Integration Pattern": {
+        "prefix": ["test-integration", "integration"],
+        "body": [
+            "// ============================================================",
+            "// Integration Test: ${1:Feature Name}",
+            "// Requires: ${2:Full agent running}",
+            "// ============================================================",
+            "",
+            "const { startAgent, stopAgent } = require('./helpers');",
+            "",
+            "async function testIntegration${3:FeatureName}() {",
+            "    logger.log('INFO', '[INTEGRATION] Starting test...');",
+            "    ",
+            "    // Start agent",
+            "    await startAgent();",
+            "    ",
+            "    try {",
+            "        ${4:// Integration test logic}",
+            "        ",
+            "        logger.log('INFO', '[INTEGRATION] ✓ Test passed');",
+            "        return true;",
+            "    } catch (err) {",
+            "        logger.log('ERROR', `[INTEGRATION] ✗ Test failed: ${err.message}`);",
+            "        return false;",
+            "    } finally {",
+            "        await stopAgent();",
+            "    }",
+            "}",
+            "",
+            "if (require.main === module) {",
+            "    testIntegration${3:FeatureName}().then(success => {",
+            "        process.exit(success ? 0 : 1);",
+            "    });",
+            "}"
+        ],
+        "description": "Integration test pattern with agent lifecycle"
+    },
+
+    "Test - Run All Helper": {
+        "prefix": ["test-runner", "run-tests"],
+        "body": [
+            "const tests = [",
+            "    require('./test_${1:feature1}'),",
+            "    require('./test_${2:feature2}'),",
+            "];",
+            "",
+            "async function runAllTests() {",
+            "    let totalPassed = 0;",
+            "    let totalFailed = 0;",
+            "    ",
+            "    for (const test of tests) {",
+            "        const success = await test();",
+            "        if (success) totalPassed++;",
+            "        else totalFailed++;",
+            "    }",
+            "    ",
+            "    logger.log('INFO', `[TEST] Summary: ${totalPassed} passed, ${totalFailed} failed`);",
+            "    return totalFailed === 0;",
+            "}",
+            "",
+            "if (require.main === module) {",
+            "    runAllTests().then(success => {",
+            "        process.exit(success ? 0 : 1);",
+            "    });",
+            "}"
+        ],
+        "description": "Test runner for multiple suites"
+    },
+
+    "Test - Mock IO": {
+        "prefix": ["test-io", "mock-io"],
+        "body": [
+            "const mockIO = {",
+            "    tasks: new Map(),",
+            "    ",
+            "    async saveTask(task) {",
+            "        this.tasks.set(task.id, { ...task });",
+            "    },",
+            "    ",
+            "    async loadTask(taskId) {",
+            "        return this.tasks.get(taskId);",
+            "    },",
+            "    ",
+            "    async listTasks() {",
+            "        return Array.from(this.tasks.values());",
+            "    },",
+            "    ",
+            "    clear() {",
+            "        this.tasks.clear();",
+            "    }",
+            "};"
+        ],
+        "description": "Mock IO module for testing"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 6. Logging & Error Handling (7 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Logger - Import": {
+        "prefix": ["logger", "log-import"],
+        "body": [
+            "const logger = require('../core/logger');"
+        ],
+        "description": "Import logger module"
+    },
+
+    "Logger - Structured Log": {
+        "prefix": ["log", "logger-log"],
+        "body": [
+            "logger.log('${1|INFO,WARN,ERROR,DEBUG|}', '[${2:COMPONENT}] ${3:Message}', ${4:taskId});"
+        ],
+        "description": "Structured log with severity and component"
+    },
+
+    "Logger - Error with Stack": {
+        "prefix": ["log-error", "error-log"],
+        "body": [
+            "logger.log('ERROR', `[${1:COMPONENT}] ${2:Operation failed}: ${err.message}`, ${3:taskId});",
+            "logger.log('DEBUG', `[${1:COMPONENT}] Stack trace: ${err.stack}`, ${3:taskId});"
+        ],
+        "description": "Log error with stack trace"
+    },
+
+    "Error - Classify and Save": {
+        "prefix": ["error-classify", "classify-failure"],
+        "body": [
+            "const { classifyAndSaveFailure } = require('../kernel/error_classifier');",
+            "",
+            "await classifyAndSaveFailure(",
+            "    ${1:task},",
+            "    '${2|TASK_ERROR,INFRA_ERROR,DRIVER_ERROR|}',",
+            "    ${3:err}.message,",
+            "    { ${4:// additional context} }",
+            ");"
+        ],
+        "description": "Classify and save failure with history"
+    },
+
+    "Error - Try-Catch Pattern": {
+        "prefix": ["try-catch", "trycatch"],
+        "body": [
+            "try {",
+            "    ${1:// Code that may throw}",
+            "} catch (err) {",
+            "    logger.log('ERROR', `[${2:COMPONENT}] ${3:Operation failed}: ${err.message}`${4:, taskId});",
+            "    ${5:// Handle error}",
+            "}"
+        ],
+        "description": "Try-catch with structured logging"
+    },
+
+    "Error - Forensics": {
+        "prefix": ["forensics", "crash-dump"],
+        "body": [
+            "const { saveForensics } = require('../infra/forensics');",
+            "",
+            "await saveForensics(",
+            "    ${1:task},",
+            "    ${2:page},",
+            "    {",
+            "        error: ${3:err}.message,",
+            "        stack: ${3:err}.stack,",
+            "        ${4:// additional context}",
+            "    }",
+            ");"
+        ],
+        "description": "Save forensics crash dump"
+    },
+
+    "Logger - Component Tag Pattern": {
+        "prefix": ["log-tag", "component-tag"],
+        "body": [
+            "// Use descriptive component tags:",
+            "logger.log('INFO', '[${1|BOOT,LIFECYCLE,NERV,KERNEL,DRIVER,INFRA,SERVER,HEALTH,QUEUE,LOCK,POOL,CONNECTION|}] ${2:Message}', ${3:taskId});"
+        ],
+        "description": "Log with component tag (copilot-instructions pattern)"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 7. Makefile & Scripts (6 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Makefile - New Target": {
+        "prefix": ["make-target", "target"],
+        "body": [
+            "${1:target-name}:",
+            "\t@echo \"${2:Description}\"",
+            "\t@${3:command}",
+            "$0"
+        ],
+        "description": "Create new Makefile target"
+    },
+
+    "Makefile - Phony Target": {
+        "prefix": ["make-phony", "phony"],
+        "body": [
+            ".PHONY: ${1:target}",
+            "${1:target}:",
+            "\t@echo \"${2:Description}\"",
+            "\t@${3:command}",
+            "$0"
+        ],
+        "description": "Create phony Makefile target"
+    },
+
+    "Makefile - Cross-Platform Check": {
+        "prefix": ["make-os", "os-detect"],
+        "body": [
+            "ifeq ($(OS),Windows_NT)",
+            "\t${1:# Windows commands}",
+            "else",
+            "\tifeq ($(DETECTED_OS),Linux)",
+            "\t\t${2:# Linux commands}",
+            "\tendif",
+            "\tifeq ($(DETECTED_OS),macOS)",
+            "\t\t${3:# macOS commands}",
+            "\tendif",
+            "endif"
+        ],
+        "description": "Cross-platform OS detection in Makefile"
+    },
+
+    "Script - Bash v3.0 Pattern": {
+        "prefix": ["script-bash", "bash-v3"],
+        "body": [
+            "#!/usr/bin/env bash",
+            "# Version: 3.0 (2026-01-21) - ${1:Description}",
+            "set -euo pipefail",
+            "",
+            "exit_code=0",
+            "",
+            "# Dependency check",
+            "command -v ${2:tool} >/dev/null 2>&1 || {",
+            "    echo \"[FAIL] ${2:tool} not found\"",
+            "    echo \"[HINT] Install with: ${3:install command}\"",
+            "    exit 1",
+            "}",
+            "",
+            "# Main logic",
+            "${4:# Implementation}",
+            "",
+            "if [ $exit_code -eq 0 ]; then",
+            "    echo \"[OK] Operation successful\"",
+            "else",
+            "    echo \"[FAIL] Operation failed\"",
+            "fi",
+            "",
+            "exit $exit_code"
+        ],
+        "description": "Bash script v3.0 pattern (cross-platform)"
+    },
+
+    "Script - Batch v3.0 Pattern": {
+        "prefix": ["script-batch", "bat-v3"],
+        "body": [
+            "@echo off",
+            "REM Version: 3.0 (2026-01-21) - ${1:Description}",
+            "setlocal enabledelayedexpansion",
+            "",
+            "set EXIT_CODE=0",
+            "",
+            "REM Dependency check",
+            "where ${2:tool} >nul 2>&1",
+            "if !ERRORLEVEL! neq 0 (",
+            "    echo [FAIL] ${2:tool} not found",
+            "    echo [HINT] Install with: ${3:install command}",
+            "    exit /b 1",
+            ")",
+            "",
+            "REM Main logic",
+            "${4:REM Implementation}",
+            "",
+            "if !EXIT_CODE! equ 0 (",
+            "    echo [OK] Operation successful",
+            ") else (",
+            "    echo [FAIL] Operation failed",
+            ")",
+            "",
+            "exit /b !EXIT_CODE!"
+        ],
+        "description": "Batch script v3.0 pattern (cross-platform)"
+    },
+
+    "Script - PowerShell v3.0 Pattern": {
+        "prefix": ["script-ps1", "powershell-v3"],
+        "body": [
+            "# Version: 3.0 (2026-01-21) - ${1:Description}",
+            "param(",
+            "    ${2:[string]\\$Parameter = \"default\"}",
+            ")",
+            "",
+            "$exitCode = 0",
+            "",
+            "# Dependency check",
+            "if (-not (Get-Command ${3:tool} -ErrorAction SilentlyContinue)) {",
+            "    Write-Host \"[FAIL] ${3:tool} not found\"",
+            "    Write-Host \"[HINT] Install with: ${4:install command}\"",
+            "    exit 1",
+            "}",
+            "",
+            "try {",
+            "    ${5:# Main logic}",
+            "    ",
+            "    Write-Host \"[OK] Operation successful\"",
+            "} catch {",
+            "    Write-Host \"[FAIL] Operation failed: $_\"",
+            "    $exitCode = 1",
+            "}",
+            "",
+            "exit $exitCode"
+        ],
+        "description": "PowerShell script v3.0 pattern (cross-platform)"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 8. Constants & Configuration (7 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Constants - Import Task": {
+        "prefix": ["const-task", "import-task"],
+        "body": [
+            "const { STATUS_VALUES, TASK_STATES, STATUS_VALUES_ARRAY } = require('../core/constants/tasks');"
+        ],
+        "description": "Import task constants"
+    },
+
+    "Constants - Import Browser": {
+        "prefix": ["const-browser", "import-browser"],
+        "body": [
+            "const { CONNECTION_MODES, BROWSER_STATES, BROWSER_STATES_ARRAY } = require('../core/constants/browser');"
+        ],
+        "description": "Import browser constants"
+    },
+
+    "Constants - Import NERV": {
+        "prefix": ["const-nerv", "import-nerv"],
+        "body": [
+            "const { MessageType, ActionCode } = require('../core/constants/nerv_message_types');"
+        ],
+        "description": "Import NERV message type constants"
+    },
+
+    "Constants - Define New": {
+        "prefix": ["const-define", "define-constants"],
+        "body": [
+            "// ${1:Description}",
+            "const ${2:CONSTANT_NAME} = Object.freeze({",
+            "    ${3:KEY1}: '${4:VALUE1}',",
+            "    ${5:KEY2}: '${6:VALUE2}'",
+            "});",
+            "",
+            "// Array variant for Zod enums",
+            "const ${2:CONSTANT_NAME}_ARRAY = Object.values(${2:CONSTANT_NAME});",
+            "",
+            "module.exports = {",
+            "    ${2:CONSTANT_NAME},",
+            "    ${2:CONSTANT_NAME}_ARRAY",
+            "};"
+        ],
+        "description": "Define new constants module"
+    },
+
+    "Config - Load": {
+        "prefix": ["config-load", "load-config"],
+        "body": [
+            "const config = require('../core/config');",
+            "",
+            "// Access config values:",
+            "const port = config.server.port;",
+            "const timeout = config.execution.timeout;"
+        ],
+        "description": "Load configuration"
+    },
+
+    "Config - Hot Reload": {
+        "prefix": ["config-reload", "hot-reload"],
+        "body": [
+            "const fs = require('fs');",
+            "const path = require('path');",
+            "",
+            "fs.watch(path.join(__dirname, '../../config.json'), (eventType) => {",
+            "    if (eventType === 'change') {",
+            "        logger.log('INFO', '[CONFIG] Reloading configuration...');",
+            "        delete require.cache[require.resolve('../core/config')];",
+            "        const newConfig = require('../core/config');",
+            "        ${1:// Apply new config}",
+            "    }",
+            "});"
+        ],
+        "description": "Hot reload configuration"
+    },
+
+    "Zod - Schema Validation": {
+        "prefix": ["zod-schema", "schema"],
+        "body": [
+            "const { z } = require('zod');",
+            "",
+            "const ${1:schemaName}Schema = z.object({",
+            "    ${2:field}: z.${3|string,number,boolean,array,object|}()${4:.optional()}",
+            "});",
+            "",
+            "function parse${1:SchemaName}(data) {",
+            "    return ${1:schemaName}Schema.parse(data);",
+            "}"
+        ],
+        "description": "Create Zod schema for validation"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 9. Browser & Puppeteer (5 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "Browser - Get Instance": {
+        "prefix": ["browser-get", "get-browser"],
+        "body": [
+            "const poolManager = require('../infra/browser/pool_manager');",
+            "",
+            "const { browser, page } = await poolManager.acquire(",
+            "    '${1:taskId}',",
+            "    { timeout: ${2:30000} }",
+            ");",
+            "",
+            "try {",
+            "    ${3:// Use browser and page}",
+            "} finally {",
+            "    await poolManager.release('${1:taskId}', browser);",
+            "}"
+        ],
+        "description": "Acquire browser from pool"
+    },
+
+    "Browser - Connection Modes": {
+        "prefix": ["browser-mode", "connection-mode"],
+        "body": [
+            "const { ConnectionOrchestrator } = require('../infra/browser/ConnectionOrchestrator');",
+            "const { CONNECTION_MODES } = require('../core/constants/browser');",
+            "",
+            "const orchestrator = new ConnectionOrchestrator({",
+            "    mode: CONNECTION_MODES.${1|HYBRID,LAUNCHER,EXTERNAL,AUTO|}",
+            "});",
+            "",
+            "await orchestrator.initialize();"
+        ],
+        "description": "Initialize browser connection mode"
+    },
+
+    "Browser - Stealth Mode": {
+        "prefix": ["browser-stealth", "stealth"],
+        "body": [
+            "const puppeteer = require('puppeteer-extra');",
+            "const StealthPlugin = require('puppeteer-extra-plugin-stealth');",
+            "",
+            "puppeteer.use(StealthPlugin());",
+            "",
+            "const browser = await puppeteer.launch({",
+            "    headless: ${1:false},",
+            "    args: [",
+            "        '--no-sandbox',",
+            "        '--disable-setuid-sandbox',",
+            "        '--disable-blink-features=AutomationControlled'",
+            "    ]",
+            "});"
+        ],
+        "description": "Launch browser with stealth plugin"
+    },
+
+    "Browser - Screenshot": {
+        "prefix": ["browser-screenshot", "screenshot"],
+        "body": [
+            "await page.screenshot({",
+            "    path: path.join(__dirname, '../../logs/screenshots', `${${1:taskId}}-${Date.now()}.png`),",
+            "    fullPage: ${2:true}",
+            "});"
+        ],
+        "description": "Take page screenshot"
+    },
+
+    "Browser - Wait Patterns": {
+        "prefix": ["browser-wait", "wait-patterns"],
+        "body": [
+            "// Wait for navigation",
+            "await page.waitForNavigation({ waitUntil: '${1|networkidle0,networkidle2,load,domcontentloaded|}' });",
+            "",
+            "// Wait for selector",
+            "await page.waitForSelector('${2:selector}', { visible: true, timeout: ${3:30000} });",
+            "",
+            "// Wait for function",
+            "await page.waitForFunction(",
+            "    () => ${4:document.querySelector('.loaded')},",
+            "    { timeout: ${5:30000} }",
+            ");"
+        ],
+        "description": "Common browser wait patterns"
+    },
+
+    "// ═══════════════════════════════════════════════════════════": {},
+    "// 10. PM2 & Process Management (4 snippets)": {},
+    "// ═══════════════════════════════════════════════════════════": {},
+
+    "PM2 - Ecosystem Config": {
+        "prefix": ["pm2-config", "ecosystem"],
+        "body": [
+            "module.exports = {",
+            "    apps: [",
+            "        {",
+            "            name: '${1:app-name}',",
+            "            script: '${2:index.js}',",
+            "            instances: ${3:1},",
+            "            exec_mode: '${4|fork,cluster|}',",
+            "            max_memory_restart: '${5:1G}',",
+            "            env: {",
+            "                NODE_ENV: 'production',",
+            "                ${6:// additional env vars}",
+            "            },",
+            "            error_file: 'logs/error.log',",
+            "            out_file: 'logs/output.log',",
+            "            log_date_format: 'YYYY-MM-DD HH:mm:ss Z'",
+            "        }",
+            "    ]",
+            "};"
+        ],
+        "description": "PM2 ecosystem configuration"
+    },
+
+    "PM2 - Programmatic Start": {
+        "prefix": ["pm2-start", "pm2-prog"],
+        "body": [
+            "const pm2 = require('pm2');",
+            "",
+            "pm2.connect((err) => {",
+            "    if (err) {",
+            "        console.error(err);",
+            "        process.exit(2);",
+            "    }",
+            "    ",
+            "    pm2.start(",
+            "        {",
+            "            script: '${1:index.js}',",
+            "            name: '${2:app-name}'",
+            "        },",
+            "        (err, apps) => {",
+            "            pm2.disconnect();",
+            "            if (err) throw err;",
+            "        }",
+            "    );",
+            "});"
+        ],
+        "description": "PM2 programmatic start"
+    },
+
+    "PM2 - Check Status": {
+        "prefix": ["pm2-status", "pm2-check"],
+        "body": [
+            "const pm2 = require('pm2');",
+            "",
+            "pm2.connect((err) => {",
+            "    if (err) throw err;",
+            "    ",
+            "    pm2.list((err, processes) => {",
+            "        pm2.disconnect();",
+            "        if (err) throw err;",
+            "        ",
+            "        processes.forEach(proc => {",
+            "            console.log(`${proc.name}: ${proc.pm2_env.status}`);",
+            "        });",
+            "    });",
+            "});"
+        ],
+        "description": "Check PM2 process status programmatically"
+    },
+
+    "PM2 - Graceful Shutdown": {
+        "prefix": ["pm2-shutdown", "graceful-exit"],
+        "body": [
+            "process.on('SIGINT', async () => {",
+            "    logger.log('INFO', '[LIFECYCLE] Received SIGINT, shutting down gracefully...');",
+            "    ",
+            "    ${1:// Cleanup operations}",
+            "    ",
+            "    setTimeout(() => {",
+            "        logger.log('WARN', '[LIFECYCLE] Forced exit after timeout');",
+            "        process.exit(1);",
+            "    }, ${2:30000});",
+            "    ",
+            "    process.exit(0);",
+            "});"
+        ],
+        "description": "PM2 graceful shutdown handler"
+    }
+}

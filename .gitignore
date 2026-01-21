@@ -50,6 +50,13 @@ build/
 .vscode/
 !.vscode/extensions.json
 !.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/*.code-snippets
+!.vscode/keybindings.json
+# VS Code auto-generated logs (Makefile Tools extension)
+.vscode/*.log
+.vscode/configurationCache.log
 .idea/
 *.swp
 *.swo

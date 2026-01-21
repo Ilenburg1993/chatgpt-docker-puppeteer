@@ -1,0 +1,223 @@
+[
+    // ============================================================
+    // VS Code Keybindings v1.0 - chatgpt-docker-puppeteer
+    // Cross-Platform: Windows/Linux/macOS
+    // ============================================================
+    // ═══════════════════════════════════════════════════════════
+    // Testing & Quality (5 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+t",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Test: Fast (Pre-commit)",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+shift+alt+t",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Test: All Tests",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+shift+i",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Test: Integration (Full)",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+shift+f",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Format Code (ESLint + Prettier)"
+    },
+    {
+        "key": "ctrl+shift+l",
+        "command": "workbench.action.tasks.runTask",
+        "args": "ESLint: Check All Files"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Health Checks (2 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+h",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Health: Quick Check (Core)"
+    },
+    {
+        "key": "ctrl+shift+alt+h",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Health: Full Check (4 endpoints + PM2)"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // PM2 Lifecycle (5 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+s",
+        "command": "workbench.action.tasks.runTask",
+        "args": "PM2: Start System"
+    },
+    {
+        "key": "ctrl+shift+q",
+        "command": "workbench.action.tasks.runTask",
+        "args": "PM2: Stop System"
+    },
+    {
+        "key": "ctrl+shift+r",
+        "command": "workbench.action.tasks.runTask",
+        "args": "PM2: Restart System"
+    },
+    {
+        "key": "ctrl+shift+p",
+        "command": "workbench.action.tasks.runTask",
+        "args": "PM2: Show Status"
+    },
+    {
+        "key": "ctrl+shift+m",
+        "command": "workbench.action.tasks.runTask",
+        "args": "PM2: Monitor (Dashboard)"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Logs & Monitoring (3 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+o",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Logs: Follow (Real-time)"
+    },
+    {
+        "key": "ctrl+shift+w",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Logs: Watch with Filters"
+    },
+    {
+        "key": "ctrl+shift+d",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Dashboard: Open HTML"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Queue Operations (2 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+u",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Queue: Show Status"
+    },
+    {
+        "key": "ctrl+shift+alt+w",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Queue: Watch (Live)"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Compound Workflows (3 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+c",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Workflow: Pre-Commit Check"
+    },
+    {
+        "key": "ctrl+shift+alt+c",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Workflow: Full CI Check"
+    },
+    {
+        "key": "ctrl+shift+alt+s",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Workflow: Start & Monitor"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Git Workflows (2 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+g",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Git: Safe Push (5-step validation)"
+    },
+    {
+        "key": "ctrl+shift+alt+g",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Git: Show Changed Files"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Maintenance & Info (3 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+b",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Backup: Create Backup"
+    },
+    {
+        "key": "ctrl+shift+v",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Info: Show Version"
+    },
+    {
+        "key": "ctrl+shift+alt+i",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Info: Show System Information"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Navigation Enhancements (5 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+e",
+        "command": "workbench.view.explorer",
+        "when": "!explorerViewletVisible"
+    },
+    {
+        "key": "ctrl+shift+x",
+        "command": "workbench.view.extensions"
+    },
+    {
+        "key": "ctrl+shift+j",
+        "command": "workbench.action.togglePanel"
+    },
+    {
+        "key": "ctrl+shift+k",
+        "command": "workbench.action.terminal.toggleTerminal"
+    },
+    {
+        "key": "ctrl+shift+n",
+        "command": "workbench.action.files.newUntitledFile"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Advanced Editing (4 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+up",
+        "command": "editor.action.moveLinesUpAction",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "ctrl+shift+down",
+        "command": "editor.action.moveLinesDownAction",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "ctrl+shift+alt+up",
+        "command": "editor.action.copyLinesUpAction",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "ctrl+shift+alt+down",
+        "command": "editor.action.copyLinesDownAction",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    // ═══════════════════════════════════════════════════════════
+    // Quick Commands (3 bindings)
+    // ═══════════════════════════════════════════════════════════
+    {
+        "key": "ctrl+shift+/",
+        "command": "editor.action.commentLine",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "ctrl+shift+alt+/",
+        "command": "editor.action.blockComment",
+        "when": "editorTextFocus && !editorReadonly"
+    },
+    {
+        "key": "ctrl+shift+space",
+        "command": "editor.action.triggerSuggest",
+        "when": "editorHasCompletionItemProvider && textInputFocus && !editorReadonly"
+    }
+]
