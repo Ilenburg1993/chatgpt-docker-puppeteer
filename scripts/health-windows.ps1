@@ -1,9 +1,10 @@
 # =============================================================================
-# Health Check Script for Windows (PowerShell)
+# Health Check Script for Windows (PowerShell) - v3.0
 # =============================================================================
 # Usage: powershell -ExecutionPolicy Bypass -File health-windows.ps1 [PORT] [TIMEOUT]
 # Default PORT: 2998, TIMEOUT: 2
 # Exit codes: 0 = healthy, 1 = unhealthy
+# Version: 3.0 (2026-01-21) - Enhanced error handling, robust status validation
 # =============================================================================
 
 param(

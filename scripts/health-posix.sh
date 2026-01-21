@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Health Check Script for POSIX (Linux/macOS)
+# Health Check Script for POSIX (Linux/macOS) - v3.0
 # =============================================================================
 # Usage: bash health-posix.sh [PORT] [TIMEOUT]
 # Default PORT: 2998, TIMEOUT: 2
 # Exit codes: 0 = healthy, 1 = unhealthy
+# Version: 3.0 (2026-01-21) - Syntax fixed, enhanced error handling
 # =============================================================================
 
 set -euo pipefail
@@ -27,7 +28,7 @@ echo ""
 http_get_json() {
   local url="$1"
   # use curl with timeout and fail silently
-  curl -sS --max-time "$TIMEOUT" "$url" || return 1
+  curl -sS --max-time "$TIMEOUT" "$url" 2>/dev/null || return 1
 }
 
 # helper: parse status field using jq if present
@@ -36,8 +37,8 @@ parse_status() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq -r 'if .status then .status else "" end' 2>/dev/null || echo ""
   else
-    # fallback: crude extraction; not ideal but better than raw match
-    echo "$json" | awk -F'"status"[[:space:]]*:[[:space:]]*' '{if (NF>1) {gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"',]+$/,"",$2); split($2,a,","); print a[1]} else { print "" }}' | tr -d '"'
+    # fallback: simple awk extraction (fixed escaping)
+    echo "$json" | awk -F'"status"' 'NF>1 {split($2,a,":"); gsub(/[",{}[:space:]]/,"",a[2]); print a[2]; exit}' || echo ""
   fi
 }
 

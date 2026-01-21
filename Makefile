@@ -231,7 +231,17 @@ pm2:
 health:
 	@echo "$(GREEN)🏥 Running Health Checks (port $(HEALTH_PORT))...$(NC)"
 	@echo ""
-	@$(HEALTH_SCRIPT) $(HEALTH_PORT) 2>/dev/null || (echo "$(YELLOW)⚠ Health script not found — ensure scripts exist$(NC)"; exit 0)
+	@$(HEALTH_SCRIPT) $(HEALTH_PORT) || { \
+		echo ""; \
+		echo "$(RED)❌ Health check failed! Some services are offline or unreachable.$(NC)"; \
+		echo "$(YELLOW)💡 Quick fixes:$(NC)"; \
+		echo "   - Start services: make start"; \
+		echo "   - Check PM2 status: make pm2"; \
+		echo "   - View logs: make logs"; \
+		exit 1; \
+	}
+	@echo "$(GREEN)✓ All health checks passed!$(NC)"
+	@echo ""
 
 logs:
 	@echo "$(CYAN)📜 Following PM2 logs...$(NC)"
