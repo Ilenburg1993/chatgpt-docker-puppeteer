@@ -14,7 +14,7 @@ services:
       dockerfile: Dockerfile
     container_name: chatgpt-agent
     restart: unless-stopped
-    
+
     environment:
       - NODE_ENV=production
       - TZ=America/Sao_Paulo
@@ -25,7 +25,7 @@ services:
       # Optional settings
       # - MAX_RETRIES=3
       # - LOG_LEVEL=info
-    
+
     volumes:
       # Persistent data
       - ./fila:/app/fila
@@ -35,24 +35,23 @@ services:
       # Optional: Mount configs for hot-reload
       # - ./config.json:/app/config.json:ro
       # - ./dynamic_rules.json:/app/dynamic_rules.json:ro
-    
+
     ports:
       - "3008:3008"
-    
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
-      interval: 30s
+    test: ["CMD", "node", "/app/scripts/healthcheck.js"]
       timeout: 10s
       retries: 3
       start_period: 40s
-    
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
         compress: "true"
-    
+
     # Resource limits (optional but recommended)
     deploy:
       resources:
@@ -62,7 +61,7 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    
+
     # Networking
     networks:
       - agent-network
@@ -78,12 +77,12 @@ services:
     container_name: chatgpt-agent-dev
     profiles:
       - dev
-    
+
     environment:
       - NODE_ENV=development
       - TZ=America/Sao_Paulo
       - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
-    
+
     volumes:
       # Mount entire source for hot reload
       - .:/app
@@ -92,11 +91,11 @@ services:
       - ./respostas:/app/respostas
       - ./logs:/app/logs
       - ./profile:/app/profile
-    
+
     ports:
       - "3008:3008"
       - "9229:9229"  # Node.js debugger port
-    
+
     networks:
       - agent-network
 

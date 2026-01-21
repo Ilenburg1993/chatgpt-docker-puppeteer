@@ -1,0 +1,131 @@
+name: Docker Security Scan
+
+on:
+    push:
+        branches: [main, develop]
+        paths:
+            - 'Dockerfile*'
+            - 'docker-compose*.yml'
+            - 'package.json'
+            - 'package-lock.json'
+    pull_request:
+        branches: [main, develop]
+    schedule:
+        # Scan diariamente às 2 AM UTC
+        - cron: '0 2 * * *'
+    workflow_dispatch: # Permite execução manual
+
+jobs:
+    build-and-scan:
+        name: Build & Scan Docker Image
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+            security-events: write # Para upload de SARIF
+            actions: read
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build production image
+              run: |
+                  docker build -t chatgpt-agent:${{ github.sha }} -f Dockerfile .
+
+            - name: Run Trivy vulnerability scan
+              uses: aquasecurity/trivy-action@master
+              with:
+                  image-ref: chatgpt-agent:${{ github.sha }}
+                  format: 'sarif'
+                  output: 'trivy-results.sarif'
+                  severity: 'CRITICAL,HIGH,MEDIUM'
+                  ignore-unfixed: false
+                  vuln-type: 'os,library'
+
+            - name: Upload Trivy results to GitHub Security
+              uses: github/codeql-action/upload-sarif@v3
+              if: always()
+              with:
+                  sarif_file: 'trivy-results.sarif'
+                  category: 'trivy-container'
+
+            - name: Run Trivy scan (table format for logs)
+              uses: aquasecurity/trivy-action@master
+              if: always()
+              with:
+                  image-ref: chatgpt-agent:${{ github.sha }}
+                  format: 'table'
+                  severity: 'CRITICAL,HIGH'
+
+            - name: Scan for secrets (Gitleaks)
+              uses: gitleaks/gitleaks-action@v2
+              if: always()
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Check image size
+              if: always()
+              run: |
+                  IMAGE_SIZE=$(docker images chatgpt-agent:${{ github.sha }} --format "{{.Size}}")
+                  echo "📦 Image size: $IMAGE_SIZE"
+
+                  # Alert se imagem > 500MB
+                  SIZE_MB=$(docker images chatgpt-agent:${{ github.sha }} --format "{{.Size}}" | grep -oE '[0-9]+' | head -1)
+                  if [ "$SIZE_MB" -gt 500 ]; then
+                    echo "⚠️ Warning: Image size exceeds 500MB"
+                  else
+                    echo "✅ Image size is optimal"
+                  fi
+
+            - name: Generate SBOM (Software Bill of Materials)
+              if: always()
+              run: |
+                  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                    anchore/syft:latest \
+                    chatgpt-agent:${{ github.sha }} -o json > sbom.json
+
+            - name: Upload SBOM artifact
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: sbom-${{ github.sha }}
+                  path: sbom.json
+                  retention-days: 30
+
+            - name: Security scan summary
+              if: always()
+              run: |
+                  echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Image**: chatgpt-agent:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Size**: $(docker images chatgpt-agent:${{ github.sha }} --format '{{.Size}}')" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Scan Date**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "✅ Security scan completed. Check Security tab for detailed results." >> $GITHUB_STEP_SUMMARY
+
+    scan-dockerfile:
+        name: Scan Dockerfile Best Practices
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Run Hadolint (Dockerfile linter)
+              uses: hadolint/hadolint-action@v3.1.0
+              with:
+                  dockerfile: Dockerfile
+                  failure-threshold: warning
+                  format: sarif
+                  output-file: hadolint-results.sarif
+
+            - name: Upload Hadolint results
+              uses: github/codeql-action/upload-sarif@v3
+              if: always()
+              with:
+                  sarif_file: hadolint-results.sarif
+                  category: 'hadolint'

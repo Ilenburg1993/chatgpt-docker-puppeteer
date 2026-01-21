@@ -50,8 +50,7 @@ services:
       - "9229:9229"    # Node.js inspector (Chrome DevTools)
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
-      interval: 30s
+    test: ["CMD", "node", "/app/scripts/healthcheck.js"]
       timeout: 10s
       retries: 3
       start_period: 40s

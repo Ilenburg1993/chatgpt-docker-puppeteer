@@ -1,0 +1,51 @@
+# =============================================================================
+# Git Attributes - Line Ending Configuration
+# Força LF (Unix-style) em arquivos críticos para containers
+# =============================================================================
+
+# Default behavior: Auto-detect text files and normalize to LF
+* text=auto
+
+# Docker files - MUST be LF (breaks in containers with CRLF)
+Dockerfile* text eol=lf
+docker-compose*.yml text eol=lf
+.dockerignore text eol=lf
+
+# Shell scripts - MUST be LF (breaks with CRLF)
+*.sh text eol=lf
+
+# Node.js entry points
+*.js text eol=lf
+*.mjs text eol=lf
+
+# Configuration files
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Documentation
+*.md text eol=lf
+
+# Windows batch files - MUST be CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# PowerShell scripts - prefer CRLF but LF works
+*.ps1 text eol=lf
+
+# Binary files (explicitly mark to avoid corruption)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.gz binary
+*.zip binary
+*.tar binary
+
+# Node.js
+package-lock.json -diff

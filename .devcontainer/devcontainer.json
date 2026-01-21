@@ -45,17 +45,11 @@
     // PORT FORWARDING - Make container ports available locally
     // ============================================================
     "forwardPorts": [
-        2998, // Dashboard - Express API
-        3008, // Server - Socket.io
+        3008, // Server - Socket.io + Express API
         9229, // Node.js debugger - PM2 agent
         9230 // Node.js debugger - PM2 dashboard (alternative)
     ],
     "portsAttributes": {
-        "2998": {
-            "label": "Dashboard API",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
         "3008": {
             "label": "Socket.io Server",
             "onAutoForward": "notify",

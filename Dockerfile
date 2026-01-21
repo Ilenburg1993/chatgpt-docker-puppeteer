@@ -27,7 +27,6 @@ FROM node:20-alpine
 # Combined into single layer to reduce image size
 RUN apk add --no-cache \
     ca-certificates \
-    curl \
     dumb-init \
     && rm -rf /var/cache/apk/*
 
@@ -37,7 +36,6 @@ WORKDIR /app
 # Puppeteer skips Chromium download (connects to remote Chrome)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NODE_ENV=production \
-    TZ=UTC \
     CHROME_REMOTE_DEBUGGING_PORT=9222
 
 # Copy dependencies from build stage
