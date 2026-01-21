@@ -1,1 +1,61 @@
-{"recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "ms-azuretools.vscode-docker"], "unwantedRecommendations": ["ms-vscode.powershell"]}
+{
+  // ============================================================
+  // VS Code Extensions Configuration v2.0
+  // chatgpt-docker-puppeteer project
+  // ============================================================
+  "recommendations": [
+    // === CORE ESSENTIALS ===
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    // === BUILD & TOOLS ===
+    "ms-vscode.makefile-tools",
+    "ms-vscode.node-debug2",
+    "christian-kohler.npm-intellisense",
+    "eg2.vscode-npm-script",
+    "cmstead.jsrefactor",
+    // === GIT & VERSION CONTROL ===
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    // === CODE QUALITY & PRODUCTIVITY ===
+    "usernamehw.errorlens",
+    "aaron-bond.better-comments",
+    "christian-kohler.path-intellisense",
+    "oderwat.indent-rainbow",
+    "gruntfuggly.todo-tree",
+    // === TESTING & API ===
+    "rangav.vscode-thunder-client",
+    "humao.rest-client",
+    // === DOCUMENTATION ===
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-preview-github-styles",
+    // === OPTIONAL (Visual & Utilities) ===
+    "PKief.material-icon-theme",
+    "formulahendry.code-runner",
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "unwantedRecommendations": [
+    // Language servers não relevantes para Node.js project
+    "ms-vscode.powershell",
+    "ms-python.python",
+    "ms-dotnettools.csharp",
+    "vscjava.vscode-java-pack",
+    "golang.go",
+    "rust-lang.rust-analyzer",
+    // IDE alternative keybindings (conflitam)
+    "ms-vscode.sublime-keybindings",
+    "ms-vscode.atom-keybindings",
+    "vscodevim.vim",
+    // Linters conflitantes com ESLint
+    "standard.vscode-standard",
+    "dbaeumer.jshint",
+    // Formatters conflitantes com Prettier
+    "HookyQR.beautify",
+    "esbenp.beautify",
+    // Live servers (projeto usa Express)
+    "ms-vscode.live-server",
+    "ritwickdey.LiveServer"
+  ]
+}
