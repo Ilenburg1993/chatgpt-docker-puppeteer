@@ -20,7 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const { log } = require('../core/logger');
 
-// Importa configuração centralizada do .puppeteerrc.cjs (FONTE ÚNICA)
+// Importa HELPERS compartilhados de .puppeteerrc.cjs (isDocker, findChrome, getCacheDirectory)
 const puppeteerConfig = require('../../.puppeteerrc.cjs');
 
 // Aplica stealth plugin para anti-detection
@@ -518,7 +518,7 @@ class ConnectionOrchestrator {
             await page.bringToFront().catch(() => {});
             this.setState(STATES.PAGE_VALIDATED, { url: page.url() });
             return true;
-        } catch (e) {
+        } catch (_e) {
             this.page = null;
             this.setState(STATES.PAGE_INVALID);
             return false;

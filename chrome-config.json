@@ -1,7 +1,9 @@
 {
-  "exportedAt": "2026-01-21T05:25:30.223Z",
-  "version": "2.0",
+  "exportedAt": "2026-01-21T16:53:07.641Z",
+  "version": "3.0",
+  "source": "ConnectionOrchestrator + .puppeteerrc.cjs helpers",
   "environment": "linux",
+  "isDocker": false,
   "connection": {
     "mode": "launcher",
     "autoFallback": true,
@@ -27,10 +29,10 @@
   },
   "launcher": {
     "headless": "new",
-    "executablePath": null,
-    "detectedChromePath": null,
+    "executablePath": "/usr/bin/chromium",
+    "detectedChromePath": "/usr/bin/chromium",
     "userDataDir": null,
-    "cacheDir": "/home/node/.cache/puppeteer",
+    "cacheDirectory": "/home/node/.cache/puppeteer",
     "args": [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -77,17 +79,16 @@
     ]
   },
   "commands": {
-    "startChromeWindows": null,
-    "checkChromeWindows": "netstat -ano | findstr \":9222\"",
-    "killChromeWindows": "taskkill /F /IM chrome.exe",
-    "startChromeUnix": null,
-    "checkChromeUnix": "lsof -i :9222 || netstat -an | grep :9222",
-    "killChromeUnix": "pkill -f \"chrome.*remote-debugging-port=9222\""
+    "startChrome": "\"/usr/bin/chromium\" --remote-debugging-port=9222 --user-data-dir=~/chrome-automation --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --disable-web-security --disable-features=IsolateOrigins,site-per-process --disable-blink-features=AutomationControlled --disable-background-networking --disable-default-apps --disable-extensions --disable-sync --metrics-recording-only --mute-audio --no-first-run --safebrowsing-disable-auto-update",
+    "checkChrome": "lsof -i :9222 || netstat -an | grep :9222",
+    "killChrome": "pkill -f \"chrome.*remote-debugging-port=9222\""
   },
   "usage": {
-    "description": "Configuração exportada do ConnectionOrchestrator para consumo externo",
+    "description": "Configuração exportada do ConnectionOrchestrator",
+    "helpers": "Helpers compartilhados (.puppeteerrc.cjs): isDocker, findChrome, getCacheDirectory",
+    "config": "Config específica (ConnectionOrchestrator.js): DEFAULTS inline",
     "launcher": "Use connection.mode para decidir como iniciar Chrome (launcher/connect/auto)",
     "healthCheck": "Teste health.chromeDebugUrl para validar que Chrome está respondendo",
-    "fallback": "Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente em caso de falha"
+    "fallback": "Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente"
   }
 }
