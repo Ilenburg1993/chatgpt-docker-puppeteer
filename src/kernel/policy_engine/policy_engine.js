@@ -285,6 +285,7 @@ class PolicyEngine {
 
     /**
      * Avalia estagnação lógica.
+     * [P2.1 CORREÇÃO] Adiciona contexto semântico para reduzir falsos positivos
      */
     _assessStagnation(task, observations, at, alerts) {
         // Tarefa ativa sem progresso recente
@@ -294,7 +295,12 @@ class PolicyEngine {
             const lastObs = sorted[sorted.length - 1];
             const stalledMs = at - lastObs.ingestedAt;
 
-            if (stalledMs > 120000) {
+            // [P2.1 FIX] Adiciona contexto semântico para reduzir falsos positivos
+            const isWaitingForUser = task.metadata?.waitingForInput === true;
+            const isLongOperation = task.metadata?.expectedDuration > 120000;
+
+            // Só alerta se estagnado E não for operação esperada
+            if (stalledMs > 120000 && !isWaitingForUser && !isLongOperation) {
                 // 2 minutos sem progresso
                 alerts.push(
                     Object.freeze({
@@ -302,6 +308,20 @@ class PolicyEngine {
                         message: 'Tarefa ativa sem progresso recente',
                         value: stalledMs,
                         severity: 'HIGH'
+                    })
+                );
+            }
+        }
+
+        // [P2.2 FIX] Usa contador de ciclos estagnados (maxStalledCycles)
+        if (task.state === 'ACTIVE' && task.stalledCycleCount !== undefined) {
+            if (task.stalledCycleCount > this.limits.maxStalledCycles) {
+                alerts.push(
+                    Object.freeze({
+                        type: PolicyAlertType.TASK_STAGNATION,
+                        message: 'Tarefa excedeu máximo de ciclos sem progresso',
+                        value: task.stalledCycleCount,
+                        severity: 'CRITICAL'
                     })
                 );
             }

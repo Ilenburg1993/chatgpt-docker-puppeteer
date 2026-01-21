@@ -10,6 +10,12 @@
 
 class ObservationStore {
     constructor(config = {}) {
+        // [P3.1 DEPRECATION WARNING]
+        console.warn(
+            '[DEPRECATED] ObservationStore (state/) is deprecated. Use ObservationStore (src/kernel/observation_store/) instead.'
+        );
+        console.warn('[DEPRECATED] This class will be removed in a future version.');
+
         this.limit = config.HISTORY_LIMIT || 100; // Mantém as últimas 100
         this.pending = []; // Fila de processamento (O que o Kernel precisa ver)
         this.history = []; // Arquivo morto (O que já aconteceu)

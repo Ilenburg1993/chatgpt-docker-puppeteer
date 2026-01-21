@@ -113,6 +113,12 @@ class TaskRuntime extends EventEmitter {
             history: [],
 
             /**
+             * [P2.2 FIX] Contador de ciclos sem progresso.
+             * Usado pelo PolicyEngine para detecção de estagnação.
+             */
+            stalledCycleCount: 0,
+
+            /**
              * Metadados livres.
              * Definidos externamente, nunca interpretados aqui.
              */

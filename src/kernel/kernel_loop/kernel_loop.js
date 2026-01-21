@@ -157,7 +157,7 @@ class KernelLoop {
      * 3. Aplicação de decisões
      * 4. Drenagem de buffers do NERV (outbound)
      */
-    step() {
+    async step() {
         if (!this._running) {
             return;
         }
@@ -183,7 +183,8 @@ class KernelLoop {
             });
 
             // 3. Aplicação de decisões
-            this._applyDecisions(proposals, { tickId, at: startedAt });
+            // [P3.2 FIX] Agora async para suportar paralelização
+            await this._applyDecisions(proposals, { tickId, at: startedAt });
 
             // 4. Drenagem de buffer outbound (COMMANDs/EVENTs a enviar)
             this._drainOutbound();
@@ -297,6 +298,7 @@ class KernelLoop {
 
     /**
      * Aplica decisões produzidas pelo ExecutionEngine.
+     * [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
      *
      * @param {Array<Object>} proposals
      * Lista de propostas de decisão.
@@ -304,7 +306,7 @@ class KernelLoop {
      * @param {Object} context
      * Contexto do ciclo atual.
      */
-    _applyDecisions(proposals, context) {
+    async _applyDecisions(proposals, context) {
         if (!Array.isArray(proposals) || proposals.length === 0) {
             return;
         }
@@ -315,17 +317,20 @@ class KernelLoop {
             at: context.at
         });
 
-        for (const proposal of proposals) {
-            try {
-                this._applyDecision(proposal, context);
-            } catch (error) {
-                this.telemetry.critical('kernel_loop_decision_application_failed', {
-                    proposal,
-                    error: error.message,
-                    at: Date.now()
-                });
-            }
-        }
+        // [P3.2 FIX] Aplica propostas em paralelo para reduzir latência
+        await Promise.all(
+            proposals.map(async proposal => {
+                try {
+                    await this._applyDecision(proposal, context);
+                } catch (error) {
+                    this.telemetry.critical('kernel_loop_decision_application_failed', {
+                        proposal,
+                        error: error.message,
+                        at: Date.now()
+                    });
+                }
+            })
+        );
     }
 
     /**

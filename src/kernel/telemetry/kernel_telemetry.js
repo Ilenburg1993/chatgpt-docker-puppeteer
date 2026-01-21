@@ -57,11 +57,12 @@ class KernelTelemetry {
      *
      * @param {number|null} [config.retention]
      * Política de retenção em memória (null = sem retenção interna).
+     * [P3.3 FIX] Padrão aumentado de 1000 para 5000 para melhor análise pós-mortem.
      *
      * @param {boolean} [config.enabled]
      * Habilita/desabilita telemetria (default: true).
      */
-    constructor({ nerv = null, source = 'kernel', retention = null, enabled = true } = {}) {
+    constructor({ nerv = null, source = 'kernel', retention = 5000, enabled = true } = {}) {
         // ONDA 2.5: NERV obrigatório para desacoplamento
         if (!nerv) {
             throw new Error('KernelTelemetry requer instância do NERV (config.nerv)');

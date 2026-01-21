@@ -10,9 +10,7 @@
 
 const fs = require('fs');
 
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('../../core/constants/tasks.js');
 
 const path = require('path');
 
@@ -21,6 +19,10 @@ const STATE_FILE_PATH = path.resolve(process.cwd(), 'estado.json');
 
 class TaskStore {
     constructor() {
+        // [P3.1 DEPRECATION WARNING]
+        console.warn('[DEPRECATED] TaskStore is deprecated. Use TaskRuntime (src/kernel/task_runtime/) instead.');
+        console.warn('[DEPRECATED] This class will be removed in a future version.');
+
         // O Estado Mutável do Kernel
         this.activeTask = null; // null ou Objeto de Tarefa
         this.failureCount = 0;
