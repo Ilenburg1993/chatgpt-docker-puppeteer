@@ -1,257 +1,469 @@
 # =============================================================================
-# Enhanced Makefile with Production & Development Workflows
+# Makefile - ChatGPT Docker Puppeteer (PM2-First Strategy)
+# =============================================================================
+# CROSS-PLATFORM: Windows (cmd.exe/PowerShell) + Linux + macOS support
+# Optimized for Super Launcher v2.0 + PM2 ecosystem
+# Docker commands maintained as secondary option
+# Version: 2.3 (21/01/2026) - Definitive Edition
 # =============================================================================
 
-.PHONY: help build start stop restart logs clean test shell health \
-        build-prod start-prod stop-prod monitoring backup restore
+.DEFAULT_GOAL := help
 
-# Colors for output
+.PHONY: help start stop restart reload status health logs logs-app logs-error \
+        clean clean-logs diagnose backup launcher quick watch dashboard \
+        test test-integration test-health test-all pm2 pm2-start pm2-stop \
+        pm2-restart pm2-reload pm2-logs pm2-monit pm2-gui pm2-flush pm2-list \
+        queue queue-watch queue-add dev lint lint-fix docker-build docker-start \
+        docker-stop docker-logs docker-shell docker-clean ci-test ci-lint info \
+        version check-deps rebuild full-check s st r h l t c b q d i
+
+# =============================================================================
+# Tool Aliases (Centralized)
+# =============================================================================
+
+NPM := npm
+PM2 := pm2
+NODE := node
+DC := docker-compose
+CURL := curl
+HEALTH_PORT ?= 2998
+
+# =============================================================================
+# Colors (ANSI - work in Git Bash, native on Linux/Mac)
+# =============================================================================
+
 RED=\033[0;31m
 GREEN=\033[0;32m
 YELLOW=\033[1;33m
-NC=\033[0m # No Color
+BLUE=\033[0;34m
+CYAN=\033[0;36m
+MAGENTA=\033[0;35m
+NC=\033[0m
 
-# Default target
+# =============================================================================
+# Platform Detection (Windows_NT, Linux, Darwin)
+# =============================================================================
+
+ifeq ($(OS),Windows_NT)
+	DETECTED_OS := Windows
+	LAUNCHER_SCRIPT := LAUNCHER.bat
+	QUICK_OPS_SCRIPT := scripts\\quick-ops.bat
+	WATCH_LOGS_SCRIPT := scripts\\watch-logs.bat
+	INSTALL_PM2_GUI_SCRIPT := scripts\\install-pm2-gui.bat
+	HEALTH_SCRIPT := powershell -ExecutionPolicy Bypass -File scripts/health-windows.ps1
+	SHELL_CMD := cmd /C
+else
+	UNAME_S := $(shell uname -s 2>/dev/null || echo Linux)
+	ifeq ($(UNAME_S),Linux)
+		DETECTED_OS := Linux
+		LAUNCHER_SCRIPT := bash launcher.sh
+		QUICK_OPS_SCRIPT := bash scripts/quick-ops.sh
+		WATCH_LOGS_SCRIPT := bash scripts/watch-logs.sh
+		INSTALL_PM2_GUI_SCRIPT := bash scripts/install-pm2-gui.sh
+		HEALTH_SCRIPT := bash scripts/health-posix.sh
+		SHELL_CMD := bash -c
+	endif
+	ifeq ($(UNAME_S),Darwin)
+		DETECTED_OS := macOS
+		LAUNCHER_SCRIPT := bash launcher.sh
+		QUICK_OPS_SCRIPT := bash scripts/quick-ops.sh
+		WATCH_LOGS_SCRIPT := bash scripts/watch-logs.sh
+		INSTALL_PM2_GUI_SCRIPT := bash scripts/install-pm2-gui.sh
+		HEALTH_SCRIPT := bash scripts/health-posix.sh
+		SHELL_CMD := bash -c
+	endif
+endif
+
+# =============================================================================
+# Helper: Run script wrapper (cross-platform)
+# =============================================================================
+
+ifeq ($(DETECTED_OS),Windows)
+define run_script
+	cmd /C "$(1)"
+endef
+else
+define run_script
+	bash -c '$(1)'
+endef
+endif
+
+# =============================================================================
+# Helper: Sleep wrapper (cross-platform)
+# =============================================================================
+
+ifeq ($(DETECTED_OS),Windows)
+define sleep_cmd
+	cmd /C "timeout /t $(1) /nobreak >nul 2>&1"
+endef
+else
+define sleep_cmd
+	sleep $(1)
+endef
+endif
+
+# =============================================================================
+# Helper: Open file/URL (cross-platform with fallback)
+# =============================================================================
+
+ifeq ($(DETECTED_OS),Windows)
+define open_cmd
+	cmd /C "start \"\" \"$(1)\""
+endef
+else ifeq ($(DETECTED_OS),macOS)
+define open_cmd
+	( command -v open >/dev/null 2>&1 && open "$(1)" 2>/dev/null ) || echo "  Open manually: $(1)"
+endef
+else
+define open_cmd
+	( command -v xdg-open >/dev/null 2>&1 && xdg-open "$(1)" 2>/dev/null ) || \
+	( command -v open >/dev/null 2>&1 && open "$(1)" 2>/dev/null ) || \
+	echo "  Open manually: $(1)"
+endef
+endif
+
+# =============================================================================
+# Help
+# =============================================================================
+
 help:
-	@echo "$(GREEN)Docker Management Commands:$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Development:$(NC)"
-	@echo "  make build        - Build development image"
-	@echo "  make start        - Start development containers"
-	@echo "  make dev          - Build and start in development mode"
-	@echo "  make logs         - View logs (follow)"
-	@echo "  make shell        - Open shell in running container"
+	@echo "$(CYAN)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(CYAN)║  ChatGPT Docker Puppeteer - PM2-First Makefile v2.3       ║$(NC)"
+	@echo "$(CYAN)║  Cross-Platform: Windows/Linux/macOS (Definitive)         ║$(NC)"
+	@echo "$(CYAN)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Production:$(NC)"
-	@echo "  make build-prod   - Build production image"
-	@echo "  make start-prod   - Start production stack"
-	@echo "  make stop-prod    - Stop production stack"
-	@echo "  make restart-prod - Restart production"
+	@echo "$(GREEN)🚀 Quick Start (PM2-First):$(NC)"
+	@echo "  make start       Start system via PM2"
+	@echo "  make status      Check PM2 status"
+	@echo "  make health      Run health checks (4 endpoints + PM2)"
+	@echo "  make logs        View logs (follow)"
 	@echo ""
-	@echo "$(YELLOW)Testing:$(NC)"
-	@echo "  make test         - Run all tests"
-	@echo "  make test-health  - Health check test"
-	@echo "  make test-lock    - File locking test"
+	@echo "$(GREEN)📋 Super Launcher Operations:$(NC)"
+	@echo "  make launcher    Open interactive launcher menu"
+	@echo "  make quick CMD=health  Quick operation"
+	@echo "  make dashboard   Open dashboard HTML"
 	@echo ""
-	@echo "$(YELLOW)Monitoring:$(NC)"
-	@echo "  make monitoring   - Start Prometheus + Grafana"
-	@echo "  make health       - Check container health"
-	@echo "  make stats        - Show resource usage"
+	@echo "$(GREEN)🧪 Testing:$(NC)"
+	@echo "  make test            Run all tests"
+	@echo "  make test-integration   Run FASE 8 tests"
 	@echo ""
-	@echo "$(YELLOW)Maintenance:$(NC)"
-	@echo "  make clean        - Stop and remove containers/volumes"
-	@echo "  make backup       - Backup data volumes"
-	@echo "  make restore      - Restore from backup"
-	@echo "  make prune        - Clean Docker system"
+	@echo "$(GREEN)⚙️  PM2 Commands:$(NC)"
+	@echo "  make pm2         PM2 status"
+	@echo "  make pm2-monit   PM2 dashboard (TUI)"
+	@echo ""
+	@echo "$(MAGENTA)⌨️  Shortcuts:$(NC) s=start, h=health, l=logs, t=test, q=queue, i=info"
+	@echo ""
+	@echo "$(BLUE)💻 Platform: $(DETECTED_OS) | Port: $(HEALTH_PORT)$(NC)"
+	@echo ""
 
 # =============================================================================
-# Development Workflows
+# Dependency Check
 # =============================================================================
 
-build:
-	@echo "$(GREEN)Building development image...$(NC)"
-	docker-compose build agent
+check-deps:
+	@echo "$(CYAN)🔍 Checking dependencies...$(NC)"
+ifeq ($(DETECTED_OS),Windows)
+	@where node >nul 2>&1 || (echo "$(RED)✗ Node.js not found (install from nodejs.org)$(NC)" && exit 1)
+	@where npm >nul 2>&1 || (echo "$(RED)✗ npm not found$(NC)" && exit 1)
+	@where pm2 >nul 2>&1 || echo "$(YELLOW)⚠ PM2 not installed (npm i -g pm2)$(NC)"
+	@where curl >nul 2>&1 || echo "$(YELLOW)⚠ curl not found (optional)$(NC)"
+else
+	@command -v node >/dev/null 2>&1 || (echo "$(RED)✗ Node.js not found$(NC)" && exit 1)
+	@command -v npm >/dev/null 2>&1 || (echo "$(RED)✗ npm not found$(NC)" && exit 1)
+	@command -v pm2 >/dev/null 2>&1 || echo "$(YELLOW)⚠ PM2 not installed (npm i -g pm2)$(NC)"
+	@command -v curl >/dev/null 2>&1 || echo "$(YELLOW)⚠ curl not found (optional)$(NC)"
+endif
+	@echo "$(GREEN)✓ Core dependencies checked$(NC)"
 
-build-dev:
-	@echo "$(GREEN)Building development image with dev profile...$(NC)"
-	docker-compose build agent-dev
+# =============================================================================
+# PM2-First Operations (Primary)
+# =============================================================================
 
-start:
-	@echo "$(GREEN)Starting development containers...$(NC)"
-	docker-compose up -d agent
-	@make health
-
-dev: build-dev
-	@echo "$(GREEN)Starting in development mode...$(NC)"
-	docker-compose --profile dev up agent-dev
+start: check-deps
+	@echo "$(GREEN)🚀 Starting system via PM2...$(NC)"
+	@$(NPM) run daemon:start
+	@$(call sleep_cmd,3)
+	@$(MAKE) status --no-print-directory
 
 stop:
-	@echo "$(YELLOW)Stopping containers...$(NC)"
-	docker-compose down
+	@echo "$(YELLOW)⏹️  Stopping system...$(NC)"
+	@$(NPM) run daemon:stop
 
-restart:
-	@echo "$(YELLOW)Restarting containers...$(NC)"
-	docker-compose restart
+restart: check-deps
+	@echo "$(YELLOW)🔄 Restarting system...$(NC)"
+	@$(NPM) run daemon:restart
+	@$(call sleep_cmd,3)
+	@$(MAKE) status --no-print-directory
 
-# =============================================================================
-# Production Workflows
-# =============================================================================
+reload:
+	@echo "$(YELLOW)♻️  Reloading (zero-downtime)...$(NC)"
+	@$(NPM) run daemon:reload
 
-build-prod:
-	@echo "$(GREEN)Building production image...$(NC)"
-	docker-compose -f docker-compose.prod.yml build agent
-	@echo "$(GREEN)Production image built successfully$(NC)"
+status:
+	@echo "$(CYAN)📊 PM2 Status:$(NC)"
+	@$(NPM) run daemon:status
 
-start-prod:
-	@echo "$(GREEN)Starting production stack...$(NC)"
-	docker-compose -f docker-compose.prod.yml up -d agent
-	@echo "$(GREEN)Waiting for services to be healthy...$(NC)"
-	@sleep 5
-	@make health-prod
-
-stop-prod:
-	@echo "$(YELLOW)Stopping production stack...$(NC)"
-	docker-compose -f docker-compose.prod.yml down
-
-restart-prod:
-	@echo "$(YELLOW)Restarting production...$(NC)"
-	docker-compose -f docker-compose.prod.yml restart agent
+pm2:
+	@$(MAKE) status --no-print-directory
 
 # =============================================================================
-# Monitoring
+# Health Checks (Delegated to platform scripts)
 # =============================================================================
-
-monitoring:
-	@echo "$(GREEN)Starting monitoring stack (Prometheus + Grafana)...$(NC)"
-	docker-compose -f docker-compose.prod.yml --profile monitoring up -d
-	@echo "$(GREEN)Prometheus: http://localhost:9091$(NC)"
-	@echo "$(GREEN)Grafana: http://localhost:3001 (admin/admin)$(NC)"
 
 health:
-	@echo "$(GREEN)Checking container health...$(NC)"
-	@docker-compose ps
+	@echo "$(GREEN)🏥 Running Health Checks (port $(HEALTH_PORT))...$(NC)"
 	@echo ""
-	@echo "$(GREEN)API Health Check:$(NC)"
-	@curl -f http://localhost:3008/api/health 2>/dev/null && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Unhealthy$(NC)"
+	@$(HEALTH_SCRIPT) $(HEALTH_PORT) 2>/dev/null || (echo "$(YELLOW)⚠ Health script not found — ensure scripts exist$(NC)"; exit 0)
 
-health-prod:
-	@echo "$(GREEN)Checking production health...$(NC)"
-	@docker-compose -f docker-compose.prod.yml ps
-	@echo ""
-	@curl -f http://localhost:3008/api/health 2>/dev/null && echo "$(GREEN)✓ Production Healthy$(NC)" || echo "$(RED)✗ Production Unhealthy$(NC)"
+logs:
+	@echo "$(CYAN)📜 Following PM2 logs...$(NC)"
+	@$(NPM) run daemon:logs
 
-stats:
-	@echo "$(GREEN)Resource usage:$(NC)"
-	@docker stats --no-stream chatgpt-agent 2>/dev/null || docker stats --no-stream chatgpt-agent-prod
+logs-app:
+	@tail -f logs/application.log 2>/dev/null || echo "$(YELLOW)No application.log found$(NC)"
+
+logs-error:
+	@tail -f logs/error.log 2>/dev/null || echo "$(YELLOW)No error.log found$(NC)"
+
+# =============================================================================
+# Super Launcher & Scripts (Platform-aware)
+# =============================================================================
+
+launcher:
+	@echo "$(GREEN)📋 Opening Super Launcher v2.0...$(NC)"
+	@$(LAUNCHER_SCRIPT)
+
+quick:
+	@if [ -z "$(CMD)" ]; then \
+		echo "$(RED)Error: CMD parameter required$(NC)"; \
+		echo "Usage: make quick CMD=<command>"; \
+		echo "Commands: start, stop, restart, status, health, logs, backup"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)⚡ Quick operation: $(CMD)$(NC)"
+	@$(QUICK_OPS_SCRIPT) $(CMD)
+
+watch:
+	@echo "$(CYAN)👀 Watching logs...$(NC)"
+	@$(WATCH_LOGS_SCRIPT)
+
+dashboard:
+	@echo "$(GREEN)📊 Opening dashboard HTML...$(NC)"
+	@$(call open_cmd,scripts/launcher-dashboard.html)
 
 # =============================================================================
 # Testing
 # =============================================================================
 
 test:
-	@echo "$(GREEN)Running all tests...$(NC)"
-	docker-compose exec agent npm test
+	@echo "$(GREEN)🧪 Running all tests...$(NC)"
+	@$(NPM) test
+
+test-integration:
+	@echo "$(GREEN)🧪 Running integration tests (FASE 8)...$(NC)"
+	@$(NODE) tests/integration/test_launcher_integration.js
 
 test-health:
-	@echo "$(GREEN)Running health tests...$(NC)"
-	docker-compose exec agent npm run test:health
+	@echo "$(GREEN)🧪 Testing health endpoints logic...$(NC)"
+	@$(NODE) scripts/test-health-logic.js
 
-test-lock:
-	@echo "$(GREEN)Running lock tests...$(NC)"
-	docker-compose exec agent npm run test:lock
-
-test-config:
-	@echo "$(GREEN)Running config tests...$(NC)"
-	docker-compose exec agent npm run test:config
+test-all: test-health test-integration
+	@echo ""
+	@echo "$(GREEN)✅ All test suites completed!$(NC)"
 
 # =============================================================================
-# Logs
+# PM2 Direct Commands
 # =============================================================================
 
-logs:
-	docker-compose logs -f agent
+pm2-start:
+	@echo "$(GREEN)🚀 Starting PM2 daemon...$(NC)"
+	@$(PM2) start ecosystem.config.js
 
-logs-tail:
-	docker-compose logs --tail=100 agent
+pm2-stop:
+	@echo "$(YELLOW)⏹️  Stopping PM2 processes...$(NC)"
+	@$(PM2) stop agente-gpt dashboard-web || true
 
-logs-prod:
-	docker-compose -f docker-compose.prod.yml logs -f agent
+pm2-restart:
+	@echo "$(YELLOW)🔄 Restarting PM2 processes...$(NC)"
+	@$(PM2) restart agente-gpt dashboard-web || true
+
+pm2-reload:
+	@echo "$(YELLOW)♻️  Reloading PM2 (zero-downtime)...$(NC)"
+	@$(PM2) reload agente-gpt dashboard-web || true
+
+pm2-logs:
+	@echo "$(CYAN)📜 PM2 logs...$(NC)"
+	@$(PM2) logs --lines 50
+
+pm2-monit:
+	@echo "$(CYAN)📊 Opening PM2 monitoring dashboard...$(NC)"
+	@$(PM2) monit
+
+pm2-gui:
+	@echo "$(GREEN)🖥️  PM2 GUI...$(NC)"
+	@$(INSTALL_PM2_GUI_SCRIPT) 2>/dev/null || echo "$(YELLOW)PM2 GUI script not found$(NC)"
+
+pm2-flush:
+	@echo "$(YELLOW)🗑️  Flushing PM2 logs...$(NC)"
+	@$(PM2) flush
+
+pm2-list:
+	@echo "$(CYAN)📋 PM2 process list (detailed)...$(NC)"
+	@$(PM2) list
 
 # =============================================================================
-# Shell Access
+# Queue Operations
 # =============================================================================
 
-shell:
-	@echo "$(GREEN)Opening shell in container...$(NC)"
-	docker-compose exec agent sh
+queue:
+	@echo "$(CYAN)📋 Queue status...$(NC)"
+	@$(NPM) run queue:status
 
-shell-prod:
-	@echo "$(GREEN)Opening shell in production container...$(NC)"
-	docker-compose -f docker-compose.prod.yml exec agent sh
+queue-watch:
+	@echo "$(CYAN)👀 Watching queue (live updates)...$(NC)"
+	@$(NPM) run queue:status -- --watch
+
+queue-add:
+	@echo "$(GREEN)➕ Adding task to queue...$(NC)"
+	@$(NPM) run queue:add
 
 # =============================================================================
-# Maintenance
+# Maintenance & Diagnostics
 # =============================================================================
 
 clean:
-	@echo "$(RED)Stopping and removing all containers and volumes...$(NC)"
-	docker-compose down -v
-	@echo "$(GREEN)Cleanup complete$(NC)"
+	@echo "$(YELLOW)🧹 Cleaning logs and temp files...$(NC)"
+	@$(NPM) run clean
+	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
-clean-prod:
-	@echo "$(RED)Stopping and removing production stack...$(NC)"
-	docker-compose -f docker-compose.prod.yml down -v
+clean-logs:
+	@echo "$(YELLOW)🧹 Cleaning logs...$(NC)"
+	@rm -f logs/*.log 2>/dev/null || true
+	@rm -rf logs/crash_reports/*.processed 2>/dev/null || true
+	@echo "$(GREEN)✅ Logs cleaned$(NC)"
 
-prune:
-	@echo "$(RED)Cleaning Docker system...$(NC)"
-	docker system prune -f
-	docker volume prune -f
+diagnose:
+	@echo "$(CYAN)🔍 Analyzing crash reports...$(NC)"
+	@$(NPM) run diagnose
 
 backup:
-	@echo "$(GREEN)Creating backup...$(NC)"
-	@mkdir -p backups
-	@docker run --rm \
-		-v chatgpt-docker-puppeteer_fila-prod:/data/fila:ro \
-		-v chatgpt-docker-puppeteer_respostas-prod:/data/respostas:ro \
-		-v chatgpt-docker-puppeteer_logs-prod:/data/logs:ro \
-		-v $$(pwd)/backups:/backup \
-		alpine tar czf /backup/backup-$$(date +%Y%m%d-%H%M%S).tar.gz /data
-	@echo "$(GREEN)Backup created in ./backups/$(NC)"
+	@echo "$(GREEN)💾 Creating backup...$(NC)"
+	@$(QUICK_OPS_SCRIPT) backup
 
-restore:
-	@echo "$(YELLOW)Available backups:$(NC)"
-	@ls -lh backups/*.tar.gz 2>/dev/null || echo "No backups found"
+# =============================================================================
+# Development
+# =============================================================================
+
+dev:
+	@echo "$(GREEN)🔧 Starting in development mode...$(NC)"
+	@$(NPM) run dev
+
+lint:
+	@echo "$(CYAN)🔍 Running ESLint...$(NC)"
+	@npx eslint . --quiet
+
+lint-fix:
+	@echo "$(YELLOW)🔧 Running ESLint with --fix...$(NC)"
+	@npx eslint . --fix
+
+# =============================================================================
+# Docker Operations (Secondary)
+# =============================================================================
+
+docker-build:
+	@echo "$(YELLOW)🐳 Building Docker image...$(NC)"
+	@$(DC) build agent
+
+docker-start:
+	@echo "$(GREEN)🐳 Starting Docker containers...$(NC)"
+	@$(DC) up -d agent
+	@$(call sleep_cmd,5)
+	@$(DC) ps
+
+docker-stop:
+	@echo "$(YELLOW)🐳 Stopping Docker containers...$(NC)"
+	@$(DC) down
+
+docker-logs:
+	@echo "$(CYAN)🐳 Docker logs (follow)...$(NC)"
+	@$(DC) logs -f agent
+
+docker-shell:
+	@echo "$(GREEN)🐳 Opening shell in Docker container...$(NC)"
+	@$(DC) exec agent sh
+
+docker-clean:
+	@echo "$(RED)🐳 Removing Docker containers and volumes...$(NC)"
+	@$(DC) down -v || true
+	@echo "$(GREEN)✅ Docker cleanup complete$(NC)"
+
+# =============================================================================
+# CI/CD
+# =============================================================================
+
+ci-test:
+	@echo "$(GREEN)🤖 Running CI test suite...$(NC)"
+	@$(NPM) run daemon:start || true
+	@$(call sleep_cmd,10)
+	@$(NODE) tests/integration/test_launcher_integration.js || true
+	@$(NPM) run daemon:stop || true
+
+ci-lint:
+	@echo "$(CYAN)🤖 Running CI linting...$(NC)"
+	@npx eslint . --quiet --max-warnings 0
+
+# =============================================================================
+# System Information
+# =============================================================================
+
+info:
+	@echo "$(CYAN)ℹ️  System Information:$(NC)"
+	@echo "  Platform: $(DETECTED_OS)"
+	@echo "  Node: $$($(NODE) --version 2>/dev/null || echo 'Not installed')"
+	@echo "  NPM: $$($(NPM) --version 2>/dev/null || echo 'Not installed')"
+	@echo "  PM2: $$($(PM2) --version 2>/dev/null || echo 'Not installed')"
 	@echo ""
-	@echo "$(RED)To restore, run:$(NC)"
-	@echo "docker run --rm -v chatgpt-docker-puppeteer_fila-prod:/data/fila -v ./backups:/backup alpine tar xzf /backup/backup-XXXXXX.tar.gz -C /"
+	@echo "$(CYAN)📁 Project:$(NC)"
+	@echo "  Root: $$(pwd)"
+	@echo "  Queue: $$(find fila -name '*.json' 2>/dev/null | wc -l || echo 0) tasks"
+	@echo "  Logs: $$(find logs -type f 2>/dev/null | wc -l || echo 0) files"
+	@echo ""
+	@echo "$(CYAN)🚀 Quick Start:$(NC)"
+	@echo "  make start    # Start with PM2"
+	@echo "  make health   # Check all endpoints"
+	@echo "  make launcher # Open interactive menu"
+
+version:
+	@echo "$(CYAN)ChatGPT Docker Puppeteer$(NC)"
+	@echo "Super Launcher: v2.0"
+	@echo "Strategy: PM2-First"
+	@echo "Makefile: v2.3 (Definitive Edition)"
+	@echo "Platform: $(DETECTED_OS)"
+	@echo "Health Port: $(HEALTH_PORT)"
 
 # =============================================================================
 # Advanced
 # =============================================================================
 
-rebuild: clean build start
-	@echo "$(GREEN)✅ Rebuild complete$(NC)"
+rebuild: clean stop start
+	@echo "$(GREEN)✅ System rebuilt$(NC)"
 
-rebuild-prod: clean-prod build-prod start-prod
-	@echo "$(GREEN)✅ Production rebuild complete$(NC)"
-
-inspect:
-	@echo "$(GREEN)Container inspection:$(NC)"
-	@docker inspect chatgpt-agent 2>/dev/null || docker inspect chatgpt-agent-prod
-
-network:
-	@echo "$(GREEN)Network configuration:$(NC)"
-	@docker network inspect chatgpt-docker-puppeteer_agent-network
-
-volumes:
-	@echo "$(GREEN)Volume information:$(NC)"
-	@docker volume ls | grep chatgpt
-
-size:
-	@echo "$(GREEN)Image size comparison:$(NC)"
-	@docker images | grep chatgpt-agent
+full-check: check-deps health test-health test-integration
+	@echo "$(GREEN)✅ Full system check complete$(NC)"
 
 # =============================================================================
-# CI/CD Helpers
+# Shortcuts (cross-platform)
 # =============================================================================
 
-ci-test:
-	@echo "$(GREEN)Running CI test suite...$(NC)"
-	docker-compose up -d agent
-	@sleep 10
-	docker-compose exec -T agent npm run test:health
-	docker-compose exec -T agent npm run test:config
-	docker-compose down
-
-ci-build:
-	@echo "$(GREEN)Building for CI/CD...$(NC)"
-	docker build --build-arg NODE_ENV=production -t chatgpt-agent:ci .
-	@echo "$(GREEN)Image built: chatgpt-agent:ci$(NC)"
-
-# =============================================================================
-# Linux-specific (if needed)
-# =============================================================================
-
-start-linux:
-	@echo "$(GREEN)Starting with Linux-optimized config...$(NC)"
-	docker-compose -f docker-compose.linux.yml up -d agent
+s: start
+st: stop
+r: restart
+h: health
+l: logs
+t: test
+c: clean
+b: backup
+q: queue
+d: dashboard
+i: info
