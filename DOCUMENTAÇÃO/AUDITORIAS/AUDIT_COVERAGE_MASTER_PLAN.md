@@ -29,9 +29,9 @@ DOCUMENTAÇÃO/AUDITORIAS/
 ├── 01_CORE_AUDIT.md                       ✅ COMPLETO (SUBSISTEMA)
 ├── 02_NERV_AUDIT.md                       ⏳ PRÓXIMO (SUBSISTEMA)
 ├── 03_INFRA_AUDIT.md                      📋 PENDENTE (SUBSISTEMA)
-├── 04_KERNEL_AUDIT.md                     📋 PENDENTE (SUBSISTEMA)
-├── 05_DRIVER_AUDIT.md                     📋 PENDENTE (SUBSISTEMA)
-├── 06_SERVER_AUDIT.md                     📋 PENDENTE (SUBSISTEMA)
+├── 04_KERNEL_AUDIT.md                     ✅ COMPLETO (SUBSISTEMA)
+├── 05_DRIVER_AUDIT.md                     ✅ COMPLETO (SUBSISTEMA)
+├── 06_SERVER_AUDIT.md                     ✅ COMPLETO (SUBSISTEMA)
 ├── 07_LOGIC_AUDIT.md                      📋 PENDENTE (SUBSISTEMA)
 ├── 08_DASHBOARD_AUDIT.md                  📋 PENDENTE (SUBSISTEMA)
 │
@@ -91,11 +91,11 @@ Um **subsistema** é definido como:
 - **Módulos**: 13 principais + 4 constants + 6 schemas + 5 context
 - **Audit Levels**: 32-740
 
-#### ⏳ 02 - NERV (PRÓXIMO)
+#### ✅ 02 - NERV (COMPLETO + CORRIGIDO - 2026-01-21)
 - **Escopo**: `src/shared/nerv/` + `src/nerv/` (IPC 2.0, Event Bus)
 - **Arquivo**: `02_NERV_AUDIT.md`
-- **Status**: ⏳ PRÓXIMO
-- **Estimativa**: 3-4 horas
+- **Status**: ✅ COMPLETO + ✅ CORREÇÕES P1 APLICADAS (13 correções)
+- **Tempo**: 6h audit + 30h correções = 36h total
 - **Componentes**:
   - `envelope.js` - Message envelope protocol
   - `constants.js` - NERV event types
@@ -135,11 +135,11 @@ Um **subsistema** é definido como:
   - Queue watching and hot-reload
   - Memory management (WeakMap, GC)
 
-#### 📋 04 - KERNEL (PENDENTE)
+#### ✅ 04 - KERNEL (COMPLETO + CORRIGIDO - 2026-01-21)
 - **Escopo**: `src/kernel/` (Task execution engine)
 - **Arquivo**: `04_KERNEL_AUDIT.md`
-- **Status**: 📋 PENDENTE
-- **Estimativa**: 3-4 horas
+- **Status**: ✅ COMPLETO + ✅ CORREÇÕES P2+P3 APLICADAS (5 correções)
+- **Tempo**: 4h audit + 8h correções = 12h total
 - **Componentes**:
   - `execution_engine.js` - Task executor
   - `kernel_loop.js` - Main execution loop
@@ -150,20 +150,21 @@ Um **subsistema** é definido como:
   - `policies/` - Execution policies
 - **Aspectos-chave**:
   - Task state machine (PENDING → RUNNING → DONE/FAILED)
-  - Optimistic locking (expectedState P5.1 fix)
+  - ✅ **P5.1 CORRIGIDO**: Optimistic locking (expectedState)
   - Policy-driven execution
   - NERV event emission
   - Stall detection and mitigation
 
-#### 📋 05 - DRIVER (PENDENTE)
+#### ✅ 05 - DRIVER (COMPLETO + CORRIGIDO - 2026-01-21)
 - **Escopo**: `src/driver/` (ChatGPT/Gemini drivers, DNA)
 - **Arquivo**: `05_DRIVER_AUDIT.md`
-- **Status**: 📋 PENDENTE
-- **Estimativa**: 4-5 horas (maior complexidade)
+- **Status**: ✅ COMPLETO + ✅ CORREÇÕES P3 APLICADAS (1 correção)
+- **Tempo**: 5h audit + 1h correções = 6h total
 - **Componentes**:
   - `dna_core.js` - Driver selection via Evolutionary DNA
   - `DriverNERVAdapter.js` - NERV integration
-  - `modules/` - 20+ driver modules
+  - `BaseDriver.js` - Modular orchestration (10/10 quality)
+  - `modules/` - 17+ driver modules
     - `analyzer.js` - Response analysis
     - `submission_controller.js` - Send message
     - `triage.js` - Element detection
@@ -177,24 +178,33 @@ Um **subsistema** é definido como:
   - Target-specific implementations (ChatGPT, Gemini)
   - Incremental response collection
   - Anti-loop heuristics
-  - NERV adapter integration
+  - ✅ **P3.2 CORRIGIDO**: state_persistence.js deletado (orphan file)
+  - NERV adapter 100% pub/sub (zero coupling)
 
-#### 📋 06 - SERVER (PENDENTE)
+#### ✅ 06 - SERVER (COMPLETO + CORRIGIDO - 2026-01-21)
 - **Escopo**: `src/server/` (Dashboard backend, API, WebSocket)
 - **Arquivo**: `06_SERVER_AUDIT.md`
-- **Status**: 📋 PENDENTE
-- **Estimativa**: 3-4 horas
+- **Status**: ✅ COMPLETO + ✅ CORREÇÕES P2+P3 APLICADAS (4 correções)
+- **Tempo**: 3h audit + 1h correções = 4h total
 - **Componentes**:
   - `main.js` - Bootstrap and lifecycle
   - `engine/server.js` - HTTP server with port hunting
   - `engine/app.js` - Express app factory
-  - `engine/socket.js` - Socket.io hub
-  - `engine/lifecycle.js` - Graceful shutdown
-  - `routes/` - REST API endpoints
+  - `engine/socket.js` - Socket.io hub (IPC 2.0)
+  - `engine/lifecycle.js` - Graceful shutdown (5s watchdog)
+  - `api/router.js` - REST API gateway
+  - `api/controllers/` - Tasks, System, DNA controllers
+  - `middleware/` - Error handler, request ID, schema guard
   - `nerv_adapter/` - NERV integration
+  - `watchers/` - Filesystem and log watchers
+  - `realtime/` - PM2 bridge, log streaming, hardware telemetry
+  - `supervisor/` - Reconciler and remediation engine
 - **Aspectos-chave**:
-  - Port hunting algorithm
-  - ServerNERVAdapter (Socket.io bridge)
+  - Port hunting algorithm (recursive EADDRINUSE)
+  - ✅ **P2.1 CORRIGIDO**: debounceTimer declared in fs_watcher.js
+  - ✅ **P3.1 CORRIGIDO**: ServerNERVAdapter integrated (main.js)
+  - ✅ **P3.2 CORRIGIDO**: Timeouts centralized in config.json
+  - ✅ **P3.3 CORRIGIDO**: Rate limiting (100 req/min) applied to all API routes
   - REST API endpoints (/api/health, /api/tasks, etc.)
   - Real-time events (Socket.io)
   - Graceful shutdown sequence
