@@ -1,510 +1,746 @@
-# Deployment Guide
+# 🚀 Guia de Deploy
 
-## Overview
-
-This guide covers deploying chatgpt-docker-puppeteer in various environments.
-
----
-
-## Prerequisites
-
-- **Chrome**: Installed and accessible on host system
-- **Docker** (optional): For containerized deployment
-- **Node.js**: ≥20.0.0 (if running natively)
-- **Network**: Access to LLM websites (ChatGPT, Gemini)
+**Versão**: 1.0
+**Última Atualização**: 21/01/2026
+**Público-Alvo**: DevOps, SRE
+**Tempo de Leitura**: ~25 min
 
 ---
 
-## Deployment Options
+## 📖 Visão Geral
 
-### 1. Native Deployment (Windows/Linux/macOS)
-
-**Advantages:**
-
-- Direct access to system Chrome
-- Simpler debugging
-- Lower resource overhead
-
-**Steps:**
-
-1. **Install Dependencies**
-
-```bash
-npm install --production
-```
-
-2. **Configure Environment**
-
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-3. **Start Chrome**
-
-```bash
-# Windows
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
-
-# Linux/macOS
-google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation-profile"
-```
-
-4. **Run with PM2**
-
-```bash
-npm install -g pm2
-npm run daemon:start
-
-# Check status
-pm2 status
-
-# View logs
-pm2 logs chatgpt-agent
-```
+Este documento detalha **estratégias de deployment** do sistema `chatgpt-docker-puppeteer`: Docker, PM2, HTTPS/TLS, reverse proxy, scaling horizontal, monitoring e backup.
 
 ---
 
-### 2. Docker Deployment (Recommended)
+## 🐳 Docker Setup
 
-**Advantages:**
+### 1. Dockerfile (Production)
 
-- Isolated environment
-- Easy scaling
-- Consistent across systems
+**Localização**: `Dockerfile` (root)
 
-**Steps:**
+```dockerfile
+FROM node:20-slim
 
-1. **Start Chrome on Host**
+# Install Chromium dependencies
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
 
-```bash
-# See DOCKER_SETUP.md for OS-specific commands
-chrome --remote-debugging-port=9222
-```
-
-2. **Configure Environment**
-
-```bash
-# docker-compose.yml already configured for host.docker.internal
-# No changes needed for standard setup
-```
-
-3. **Build and Run**
-
-```bash
-make build
-make start
-
-# Or using docker-compose directly
-docker-compose up -d
-```
-
-4. **Verify Health**
-
-```bash
-make health
-# or
-curl http://localhost:3008/api/health
-```
-
----
-
-### 3. Production Server Deployment
-
-**For VPS/dedicated servers:**
-
-#### Setup Script
-
-```bash
-#!/bin/bash
-# deploy.sh
-
-set -e
-
-echo "🚀 Deploying chatgpt-docker-puppeteer..."
-
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# Install Chrome
-wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-sudo apt update
-sudo apt install -y google-chrome-stable
-
-# Clone repository
-git clone https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
-cd chatgpt-docker-puppeteer
+WORKDIR /app
 
 # Install dependencies
-npm install --production
+COPY package*.json ./
+RUN npm ci --only=production
 
-# Configure environment
-cp .env.example .env
-# Edit .env manually or use sed
-sed -i 's/development/production/' .env
-sed -i 's/debug/info/' .env
+# Copy source
+COPY . .
 
-# Install PM2 globally
-sudo npm install -g pm2
+# Create directories
+RUN mkdir -p logs fila respostas tmp profile backups
 
-# Start Chrome service
-cat << EOF | sudo tee /etc/systemd/system/chrome-automation.service
-[Unit]
-Description=Chrome Remote Debugging Service
-After=network.target
+# Expose port
+EXPOSE 3008
 
-[Service]
-Type=simple
-User=$USER
-ExecStart=/usr/bin/google-chrome --remote-debugging-port=9222 --user-data-dir=/home/$USER/chrome-automation-profile --no-first-run --no-sandbox --disable-dev-shm-usage
-Restart=always
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3008/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); });"
 
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable chrome-automation
-sudo systemctl start chrome-automation
-
-# Start agent
-npm run daemon:start
-
-# Setup PM2 startup script
-pm2 startup systemd
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp /home/$USER
-
-echo "✅ Deployment complete!"
-echo "Dashboard: http://localhost:3008"
-echo "Status: pm2 status"
-```
-
-Make executable and run:
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
+# Start
+CMD ["npm", "run", "daemon:start"]
 ```
 
 ---
 
-## Reverse Proxy Setup
+### 2. docker-compose.yml (Production)
 
-### Nginx Configuration
+```yaml
+version: '3.8'
+
+services:
+  agente-gpt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agente-gpt-prod
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=production
+      - MAX_WORKERS=10
+      - LOG_LEVEL=WARN
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD}
+      - BROWSER_MODE=launcher
+    volumes:
+      - ./fila:/app/fila
+      - ./respostas:/app/respostas
+      - ./logs:/app/logs
+      - ./profile:/app/profile
+      - ./backups:/app/backups
+    mem_limit: 1g
+    mem_reservation: 512m
+    cpus: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: agente-network
+```
+
+---
+
+### 3. docker-compose.dev.yml (Development)
+
+```yaml
+version: '3.8'
+
+services:
+  agente-gpt-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: agente-gpt-dev
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+      - "9222:9222"  # Chrome DevTools
+    environment:
+      - NODE_ENV=development
+      - MAX_WORKERS=1
+      - LOG_LEVEL=DEBUG
+      - BROWSER_MODE=external
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+```
+
+---
+
+### Comandos Docker
+
+```bash
+# Build
+docker-compose -f docker-compose.yml build
+
+# Start
+docker-compose -f docker-compose.yml up -d
+
+# Logs
+docker-compose -f docker-compose.yml logs -f agente-gpt
+
+# Stop
+docker-compose -f docker-compose.yml down
+
+# Restart
+docker-compose -f docker-compose.yml restart agente-gpt
+
+# Stats
+docker stats agente-gpt-prod
+
+# Health
+docker inspect --format='{{.State.Health.Status}}' agente-gpt-prod
+```
+
+---
+
+## 🔄 PM2 Setup (Bare Metal)
+
+### 1. Instalação PM2
+
+```bash
+# Global install
+npm install -g pm2
+
+# Verify
+pm2 --version  # 5.3.0
+```
+
+---
+
+### 2. Start com PM2
+
+```bash
+# Start
+pm2 start ecosystem.config.js
+
+# Status
+pm2 status
+
+# Logs
+pm2 logs agente-gpt --lines 100
+
+# Monitoring
+pm2 monit
+
+# Stop
+pm2 stop agente-gpt
+
+# Restart
+pm2 restart agente-gpt
+
+# Reload (zero-downtime)
+pm2 reload agente-gpt
+
+# Delete
+pm2 delete agente-gpt
+```
+
+---
+
+### 3. PM2 Startup (Auto-start no Boot)
+
+```bash
+# Generate startup script
+pm2 startup
+
+# Save current processes
+pm2 save
+
+# Unstartup (remove)
+pm2 unstartup systemd
+```
+
+---
+
+### 4. PM2 Plus (Monitoring Cloud)
+
+```bash
+# Link to PM2 Plus
+pm2 link <secret_key> <public_key>
+
+# Dashboard: https://app.pm2.io
+```
+
+---
+
+## 🔐 HTTPS/TLS Setup
+
+### 1. Nginx Reverse Proxy
+
+**Install Nginx**:
+```bash
+sudo apt update
+sudo apt install nginx
+```
+
+**Config**: `/etc/nginx/sites-available/agente-gpt`
 
 ```nginx
-# /etc/nginx/sites-available/chatgpt-agent
-upstream chatgpt_agent {
-    server 127.0.0.1:3008;
-}
-
 server {
     listen 80;
-    server_name agent.yourdomain.com;
+    server_name agente.example.com;
 
-    # Redirect HTTP to HTTPS
-    return 301 https://$server_name$request_uri;
+    # Redirect to HTTPS
+    return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name agent.yourdomain.com;
+    server_name agente.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/agent.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/agent.yourdomain.com/privkey.pem;
+    # SSL certificates (Let's Encrypt)
+    ssl_certificate /etc/letsencrypt/live/agente.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/agente.example.com/privkey.pem;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
 
     # Security headers
-    add_header Strict-Transport-Security "max-age=31536000" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
 
-    # Rate limiting
-    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
-    limit_req zone=api_limit burst=20 nodelay;
-
+    # Proxy to Node.js
     location / {
-        proxy_pass http://chatgpt_agent;
+        proxy_pass http://localhost:3008;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 300s;  # 5min for long tasks
     }
 
     # WebSocket support
     location /socket.io/ {
-        proxy_pass http://chatgpt_agent;
+        proxy_pass http://localhost:3008;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_read_timeout 86400;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://localhost:3008;
     }
 }
 ```
 
-Enable and restart:
-
+**Enable site**:
 ```bash
-sudo ln -s /etc/nginx/sites-available/chatgpt-agent /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/agente-gpt /etc/nginx/sites-enabled/
 sudo nginx -t
-sudo systemctl restart nginx
+sudo systemctl reload nginx
 ```
 
 ---
 
-## SSL/TLS Setup
-
-### Using Let's Encrypt (Certbot)
+### 2. Let's Encrypt (Certbot)
 
 ```bash
-# Install certbot
+# Install Certbot
 sudo apt install certbot python3-certbot-nginx
 
 # Obtain certificate
-sudo certbot --nginx -d agent.yourdomain.com
+sudo certbot --nginx -d agente.example.com
 
-# Auto-renewal (already configured by certbot)
+# Auto-renewal (cron)
 sudo certbot renew --dry-run
+
+# Check expiry
+sudo certbot certificates
 ```
 
 ---
 
-## Monitoring Setup
+## 📈 Scaling Horizontal
+
+### Estratégia: Load Balancer + Múltiplas Instâncias
+
+**Arquitetura**:
+```
+         ┌─────────────┐
+         │ Load Balancer│ (Nginx/HAProxy)
+         └──────┬───────┘
+                │
+      ┌─────────┼─────────┐
+      │         │         │
+   ┌──▼──┐   ┌──▼──┐   ┌──▼──┐
+   │ PM2 │   │ PM2 │   │ PM2 │
+   │ Inst│   │ Inst│   │ Inst│
+   │  1  │   │  2  │   │  3  │
+   └─────┘   └─────┘   └─────┘
+      │         │         │
+      └─────────┼─────────┘
+                │
+         ┌──────▼───────┐
+         │ Shared Queue │ (NFS/S3)
+         │ Shared Data  │
+         └──────────────┘
+```
+
+---
+
+### Nginx Load Balancer
+
+```nginx
+upstream agente_backend {
+    least_conn;  # Least connections algorithm
+
+    server 192.168.1.10:3008 max_fails=3 fail_timeout=30s;
+    server 192.168.1.11:3008 max_fails=3 fail_timeout=30s;
+    server 192.168.1.12:3008 max_fails=3 fail_timeout=30s;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name agente.example.com;
+
+    location / {
+        proxy_pass http://agente_backend;
+        # ... headers
+    }
+}
+```
+
+---
+
+### Shared Storage (NFS)
+
+**Server** (192.168.1.100):
+```bash
+# Install NFS
+sudo apt install nfs-kernel-server
+
+# Export directory
+echo "/mnt/agente-data 192.168.1.0/24(rw,sync,no_subtree_check)" | sudo tee -a /etc/exports
+
+# Restart NFS
+sudo exportfs -a
+sudo systemctl restart nfs-kernel-server
+```
+
+**Clients** (PM2 instances):
+```bash
+# Install NFS client
+sudo apt install nfs-common
+
+# Mount
+sudo mount 192.168.1.100:/mnt/agente-data /app/data
+
+# Auto-mount (fstab)
+echo "192.168.1.100:/mnt/agente-data /app/data nfs defaults 0 0" | sudo tee -a /etc/fstab
+```
+
+---
+
+### Lock Coordination (Redis)
+
+```bash
+# Install Redis
+sudo apt install redis-server
+
+# Configure
+sudo nano /etc/redis/redis.conf
+# Set: bind 0.0.0.0
+# Set: requirepass YOUR_PASSWORD
+
+# Restart
+sudo systemctl restart redis
+```
+
+**Node.js Integration**:
+```javascript
+const Redis = require('ioredis');
+const redis = new Redis({
+    host: '192.168.1.100',
+    port: 6379,
+    password: 'YOUR_PASSWORD'
+});
+
+// Distributed lock
+async function acquireDistributedLock(taskId) {
+    const lockKey = `lock:${taskId}`;
+    const lockValue = `${agentDNA}:${process.pid}`;
+
+    const result = await redis.set(
+        lockKey,
+        lockValue,
+        'NX',  // Only if not exists
+        'EX',  // Expiry
+        60     // 60 seconds
+    );
+
+    return result === 'OK';
+}
+```
+
+---
+
+## 📊 Monitoring
 
 ### 1. PM2 Monitoring
 
 ```bash
-# Enable PM2 monitoring (keymetrics.io)
-pm2 register
+# Built-in monitoring
+pm2 monit
 
-# Link application
-pm2 link <secret> <public>
+# Logs
+pm2 logs agente-gpt --lines 100 --timestamp
+
+# Flush logs
+pm2 flush
 ```
-
-### 2. Prometheus + Grafana
-
-**Install Prometheus:**
-
-```bash
-# Add Prometheus repository
-sudo apt install prometheus
-
-# Configure scraping
-cat << EOF | sudo tee -a /etc/prometheus/prometheus.yml
-  - job_name: 'chatgpt-agent'
-    static_configs:
-      - targets: ['localhost:9090']
-EOF
-
-sudo systemctl restart prometheus
-```
-
-**Install Grafana:**
-
-```bash
-sudo apt install grafana
-sudo systemctl enable grafana-server
-sudo systemctl start grafana-server
-```
-
-Access Grafana: http://localhost:3000 (admin/admin)
 
 ---
 
-## Backup Strategy
+### 2. Health Check Script
 
-### Automated Backup Script
+```bash
+#!/bin/bash
+# health-check.sh
+
+URL="http://localhost:3008/api/health"
+THRESHOLD_RESPONSE_TIME=2000  # 2s
+
+RESPONSE=$(curl -s -w "\n%{http_code}\n%{time_total}" "$URL")
+STATUS_CODE=$(echo "$RESPONSE" | tail -2 | head -1)
+RESPONSE_TIME=$(echo "$RESPONSE" | tail -1 | awk '{print int($1*1000)}')
+
+if [ "$STATUS_CODE" -ne 200 ]; then
+    echo "UNHEALTHY: Status $STATUS_CODE"
+    exit 1
+elif [ "$RESPONSE_TIME" -gt "$THRESHOLD_RESPONSE_TIME" ]; then
+    echo "DEGRADED: Response time ${RESPONSE_TIME}ms"
+    exit 2
+else
+    echo "HEALTHY: ${RESPONSE_TIME}ms"
+    exit 0
+fi
+```
+
+**Cron** (every 5 min):
+```bash
+*/5 * * * * /usr/local/bin/health-check.sh >> /var/log/agente-health.log 2>&1
+```
+
+---
+
+### 3. Alerting (Email)
+
+```bash
+#!/bin/bash
+# alert-on-failure.sh
+
+if ! /usr/local/bin/health-check.sh; then
+    echo "Agente GPT is DOWN!" | mail -s "ALERT: Agente GPT Down" admin@example.com
+fi
+```
+
+---
+
+## 💾 Backup Strategy
+
+### 1. Backup Script
 
 ```bash
 #!/bin/bash
 # backup.sh
 
-BACKUP_DIR="/backups/chatgpt-agent"
-DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/backups/agente-$(date +%Y%m%d_%H%M%S)"
 
-# Create backup directory
 mkdir -p "$BACKUP_DIR"
 
-# Backup queue
-tar -czf "$BACKUP_DIR/fila_$DATE.tar.gz" fila/
+# Backup data
+cp -r /app/fila "$BACKUP_DIR/"
+cp -r /app/respostas "$BACKUP_DIR/"
+cp /app/config.json "$BACKUP_DIR/"
+cp /app/controle.json "$BACKUP_DIR/"
+cp /app/.env "$BACKUP_DIR/"
 
-# Backup responses
-tar -czf "$BACKUP_DIR/respostas_$DATE.tar.gz" respostas/
+# Compress
+tar -czf "$BACKUP_DIR.tar.gz" "$BACKUP_DIR"
+rm -rf "$BACKUP_DIR"
 
-# Backup logs
-tar -czf "$BACKUP_DIR/logs_$DATE.tar.gz" logs/
+echo "Backup created: $BACKUP_DIR.tar.gz"
 
-# Backup configuration
-tar -czf "$BACKUP_DIR/config_$DATE.tar.gz" config.json dynamic_rules.json .env
-
-# Remove backups older than 30 days
-find "$BACKUP_DIR" -name "*.tar.gz" -mtime +30 -delete
-
-echo "✅ Backup completed: $DATE"
+# Retention (keep last 7 days)
+find /backups -name "agente-*.tar.gz" -mtime +7 -delete
 ```
 
-Setup cron job:
-
+**Cron** (daily at 2am):
 ```bash
-crontab -e
-# Add: 0 2 * * * /path/to/backup.sh
+0 2 * * * /usr/local/bin/backup.sh >> /var/log/agente-backup.log 2>&1
 ```
 
 ---
 
-## Scaling
+### 2. Restore
 
-### Horizontal Scaling
+```bash
+#!/bin/bash
+# restore.sh
 
-**Option 1: Multiple PM2 Instances**
+BACKUP_FILE=$1
 
+if [ -z "$BACKUP_FILE" ]; then
+    echo "Usage: restore.sh <backup.tar.gz>"
+    exit 1
+fi
+
+# Stop service
+pm2 stop agente-gpt
+
+# Extract
+tar -xzf "$BACKUP_FILE" -C /tmp/
+
+# Restore
+cp -r /tmp/agente-*/fila /app/
+cp -r /tmp/agente-*/respostas /app/
+cp /tmp/agente-*/config.json /app/
+cp /tmp/agente-*/controle.json /app/
+
+# Cleanup
+rm -rf /tmp/agente-*
+
+# Start service
+pm2 start agente-gpt
+
+echo "Restore completed"
+```
+
+---
+
+## 🔄 Zero-Downtime Deployment
+
+### Strategy: PM2 Reload
+
+```bash
+# Deploy new version
+git pull origin main
+npm ci --only=production
+
+# Reload (zero-downtime)
+pm2 reload agente-gpt --update-env
+
+# Verify
+pm2 logs agente-gpt --lines 50
+curl http://localhost:3008/api/health
+```
+
+---
+
+### Blue-Green Deployment
+
+```bash
+# Start blue (current)
+pm2 start ecosystem.config.js --name agente-gpt-blue --env production
+
+# Start green (new version)
+pm2 start ecosystem.config.js --name agente-gpt-green --env production --update-env PORT=3009
+
+# Test green
+curl http://localhost:3009/api/health
+
+# Switch Nginx to green
+sudo nano /etc/nginx/sites-available/agente-gpt
+# Change: proxy_pass http://localhost:3009;
+sudo nginx -t && sudo systemctl reload nginx
+
+# Stop blue
+pm2 stop agente-gpt-blue
+pm2 delete agente-gpt-blue
+
+# Rename green to blue
+pm2 restart agente-gpt-green --name agente-gpt-blue
+```
+
+---
+
+## 📋 Deployment Checklist
+
+### Pre-Deployment
+
+- [ ] Code testado (make test-all)
+- [ ] Lint passando (make lint)
+- [ ] Dependências atualizadas (npm audit fix)
+- [ ] Config validado (schema Zod)
+- [ ] Variáveis .env configuradas
+- [ ] Backup criado (make backup)
+- [ ] Health checks configurados
+- [ ] SSL certificates válidos (>30 dias)
+
+### Post-Deployment
+
+- [ ] PM2/Docker status OK
+- [ ] Health checks passando (200 OK)
+- [ ] Logs sem erros críticos
+- [ ] Dashboard acessível
+- [ ] Tasks executando (adicionar test task)
+- [ ] WebSocket conectando
+- [ ] Métricas normais (CPU <30%, Memory <600MB)
+- [ ] HTTPS funcionando
+- [ ] Rate limiting ativo
+
+---
+
+## 🐛 Troubleshooting Deploy
+
+### Problema: Container não inicia
+
+**Logs**:
+```bash
+docker logs agente-gpt-prod
+```
+
+**Causas comuns**:
+- Porta 3008 ocupada
+- Volume mounts incorretos
+- Variáveis de ambiente faltando
+
+---
+
+### Problema: PM2 restart loop
+
+**Debug**:
+```bash
+pm2 logs agente-gpt --err --lines 100
+```
+
+**Causas**:
+- Error no boot (syntax, missing files)
+- Port already in use
+- max_restarts atingido
+
+**Solução**:
+```bash
+pm2 reset agente-gpt  # Reset restart counter
+```
+
+---
+
+### Problema: High memory usage
+
+**Monitor**:
+```bash
+pm2 monit
+```
+
+**Solução**:
 ```javascript
 // ecosystem.config.js
-module.exports = {
-    apps: [
-        {
-            name: 'chatgpt-agent',
-            script: './index.js',
-            instances: 4, // Number of instances
-            exec_mode: 'cluster'
-        }
-    ]
-};
-```
-
-**Option 2: Multiple Servers**
-
-```
-┌──────────────┐     ┌──────────────┐
-│   Agent 1    │     │   Agent 2    │
-│  (Server A)  │     │  (Server B)  │
-└──────┬───────┘     └──────┬───────┘
-       │                    │
-       └──────────┬─────────┘
-                  │
-           ┌──────▼──────┐
-           │  Redis Queue│
-           │  (Shared)   │
-           └─────────────┘
+max_memory_restart: '600M',  // Auto-restart on high memory
+node_args: '--max-old-space-size=512'
 ```
 
 ---
 
-## Health Checks
+## 📚 Referências
 
-### Systemd Health Check
-
-```bash
-# /etc/systemd/system/chatgpt-agent-health.service
-[Unit]
-Description=ChatGPT Agent Health Check
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/curl -f http://localhost:3008/api/health || /usr/bin/systemctl restart chatgpt-agent
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-# /etc/systemd/system/chatgpt-agent-health.timer
-[Unit]
-Description=Run ChatGPT Agent Health Check every 5 minutes
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=5min
-
-[Install]
-WantedBy=timers.target
-```
-
-Enable:
-
-```bash
-sudo systemctl enable chatgpt-agent-health.timer
-sudo systemctl start chatgpt-agent-health.timer
-```
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuração detalhada
+- [API_REFERENCE.md](API_REFERENCE.md) - Endpoints
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Desenvolvimento local
 
 ---
 
-## Troubleshooting
-
-### Container Won't Start
-
-```bash
-# Check logs
-docker logs chatgpt-docker-puppeteer-agent-1
-
-# Check Chrome connection
-docker exec -it chatgpt-docker-puppeteer-agent-1 curl http://host.docker.internal:9222/json/version
-```
-
-### High Memory Usage
-
-```bash
-# Check memory
-docker stats
-
-# Restart with lower memory limit
-docker-compose down
-# Edit docker-compose.yml: memory: 1g
-docker-compose up -d
-```
-
-### Queue Not Processing
-
-```bash
-# Check queue status
-npm run queue:status
-
-# Clear locks
-npm run clean
-
-# Restart agent
-pm2 restart chatgpt-agent
-```
-
----
-
-## Security Checklist
-
-- [ ] Use strong passwords
-- [ ] Enable firewall (allow only 22, 80, 443)
-- [ ] Use SSL/TLS for dashboard
-- [ ] Set API_KEY in .env
-- [ ] Disable root SSH login
-- [ ] Enable fail2ban
-- [ ] Regular updates (apt update && apt upgrade)
-- [ ] Backup sensitive data
-- [ ] Monitor logs for suspicious activity
-- [ ] Use non-root user for application
-
----
-
-## Post-Deployment
-
-1. **Verify Dashboard**: http://your-domain.com
-2. **Test Task Creation**: Add test task
-3. **Monitor Logs**: `pm2 logs` or `make logs`
-4. **Setup Monitoring**: Configure alerts
-5. **Schedule Backups**: Enable cron jobs
-6. **Documentation**: Update with deployment specifics
-
----
-
-## Support
-
-- **Logs**: `pm2 logs chatgpt-agent`
-- **Diagnostics**: `npm run diagnose`
-- **Issues**: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/issues
+*Última revisão: 21/01/2026 | Contribuidores: AI Architect, DevOps Team*
