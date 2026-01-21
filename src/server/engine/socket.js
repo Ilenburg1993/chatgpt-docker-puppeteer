@@ -60,6 +60,21 @@ function init(httpServer) {
             log('DEBUG', `[HUB] Tentativa de acoplamento de agente (ID: ${socket.id}).`);
             _setupMaestroProtocol(socket);
         } else {
+            // [P8.4] SECURITY: Dashboard authentication (optional but recommended)
+            const dashboardPassword = process.env.DASHBOARD_PASSWORD || null;
+
+            if (dashboardPassword) {
+                const userPassword = socket.handshake.auth?.password;
+
+                if (userPassword !== dashboardPassword) {
+                    log('WARN', `[HUB] Dashboard authentication failed for ${socket.id}`);
+                    socket.emit('auth_required', { message: 'Password required for dashboard access' });
+                    socket.disconnect(true);
+                    return;
+                }
+                log('DEBUG', `[HUB] Dashboard authenticated: ${socket.id}`);
+            }
+
             // Terminais de visualização (Dashboard) entram na sala de broadcast de telemetria
             socket.join('dashboards');
             log('DEBUG', `[HUB] Terminal Dashboard conectado: ${socket.id}`);

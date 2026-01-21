@@ -13,6 +13,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { ROOT, LOG_DIR } = require('../../infra/fs/fs_utils');
 
+// [P8.3] SECURITY: CORS policy
+const cors = require('cors');
+
 // Middlewares de Soberania e Rastreabilidade
 const requestId = require('../middleware/request_id');
 
@@ -40,6 +43,23 @@ const app = express();
    permitindo a correlação de logs entre Dashboard e Server.
 -------------------------------------------------------------------------- */
 app.use(requestId);
+
+/* --------------------------------------------------------------------------
+   1.5. CAMADA DE SEGURANÇA (P8.3 - CORS POLICY)
+   Restringe origens permitidas para prevenir CSRF e access não autorizado.
+-------------------------------------------------------------------------- */
+app.use(
+    cors({
+        origin: [
+            'http://localhost:3008',
+            'http://127.0.0.1:3008',
+            process.env.DASHBOARD_ORIGIN || 'http://localhost:3008'
+        ],
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
+    })
+);
 
 /* --------------------------------------------------------------------------
    2. CAMADA DE PERFORMANCE E INTEGRIDADE DE DADOS

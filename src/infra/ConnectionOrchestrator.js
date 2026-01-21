@@ -431,7 +431,19 @@ class ConnectionOrchestrator {
         const pages = await this.browser.pages();
         const candidates = pages.filter(p => {
             const url = p.url();
-            return url && url !== 'about:blank' && this.config.allowedDomains.some(d => url.includes(d));
+            // [P8.2] SECURITY: Use URL parsing instead of .includes() to prevent bypass
+            if (!url || url === 'about:blank') {
+                return false;
+            }
+            try {
+                const parsed = new URL(url);
+                return this.config.allowedDomains.some(d => {
+                    // Match exact hostname or subdomain
+                    return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
+                });
+            } catch {
+                return false; // Invalid URL
+            }
         });
         if (!candidates.length) {
             return null;

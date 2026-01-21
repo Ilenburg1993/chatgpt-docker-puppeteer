@@ -98,7 +98,23 @@ module.exports = {
         await taskStore.deleteTask(id);
     },
 
-    loadTask: taskStore.loadTask,
+    loadTask: async id => {
+        // [P8.8] SECURITY: Validate not a symlink (prevent symlink attacks)
+        const filePath = path.join(PATHS.QUEUE, `${id}.json`);
+        try {
+            const stats = await fs.lstat(filePath);
+            if (stats.isSymbolicLink()) {
+                throw new Error('SECURITY_SYMLINK_DENIED: Symbolic links not allowed in queue');
+            }
+        } catch (err) {
+            if (err.message && err.message.includes('SECURITY_SYMLINK_DENIED')) {
+                throw err;
+            }
+            // File doesn't exist or other error, let taskLoader handle it
+        }
+
+        return taskStore.loadTask(id);
+    },
     clearQueue: taskStore.clearQueue,
 
     /* ==========================================================================

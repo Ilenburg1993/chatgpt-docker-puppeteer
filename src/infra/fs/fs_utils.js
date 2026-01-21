@@ -8,6 +8,7 @@
 ========================================================================== */
 
 const fs = require('fs');
+const path = require('path');
 const PATHS = require('./paths');
 
 /**
@@ -76,6 +77,29 @@ const sleep = ms =>
         setTimeout(r, ms);
     });
 
+/**
+ * [P8.7] SECURITY: Valida se path está dentro do workspace (previne path traversal)
+ * @param {string} filePath - Path a validar
+ * @returns {boolean} True se path é seguro
+ */
+function isPathSafe(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return false;
+    }
+
+    // Null byte check (path injection)
+    if (filePath.includes('\0')) {
+        return false;
+    }
+
+    // Resolve to absolute path
+    const ROOT = path.resolve(__dirname, '../..');
+    const normalized = path.normalize(path.resolve(filePath));
+
+    // Must start with workspace root
+    return normalized.startsWith(ROOT);
+}
+
 module.exports = {
     // Re-exporta os caminhos para manter compatibilidade com a Fachada de IO
     ...PATHS,
@@ -87,5 +111,6 @@ module.exports = {
     ensureInfrastructure,
     sanitizeFilename,
     cleanText,
-    sleep
+    sleep,
+    isPathSafe
 };

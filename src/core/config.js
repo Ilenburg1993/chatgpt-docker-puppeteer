@@ -13,6 +13,31 @@ const { log } = require('./logger');
 const PATHS = require('../infra/fs/paths');
 const { safeReadJSON } = require('../infra/fs/safe_read');
 
+/* --------------------------------------------------------------------------
+   ENV VALIDATION (P8.5)
+-------------------------------------------------------------------------- */
+function validateEnvFile() {
+    const requiredEnvVars = ['NODE_ENV'];
+
+    const recommendedEnvVars = ['SERVER_PORT', 'DASHBOARD_PORT', 'CHROME_REMOTE_DEBUGGING_ADDRESS'];
+
+    const missing = requiredEnvVars.filter(v => !process.env[v]);
+    const missingRecommended = recommendedEnvVars.filter(v => !process.env[v]);
+
+    if (missing.length > 0) {
+        log('ERROR', `[CONFIG] Missing required env vars: ${missing.join(', ')}`);
+        log('ERROR', '[CONFIG] Copy .env.example to .env and configure');
+    }
+
+    if (missingRecommended.length > 0) {
+        log('WARN', `[CONFIG] Missing recommended env vars: ${missingRecommended.join(', ')}`);
+        log('WARN', '[CONFIG] Using defaults (may not be optimal for production)');
+    }
+}
+
+// Run validation on module load
+validateEnvFile();
+
 /**
  * 1. SCHEMA MESTRE (O Contrato Paramétrico)
  * Define a estrutura rigorosa e os limites de segurança para cada parâmetro.

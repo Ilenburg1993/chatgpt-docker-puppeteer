@@ -151,9 +151,21 @@ async function humanType(page, ctx, selector, text, currentLag = 0, signal = nul
     const neighbors = LAYOUTS[layoutKey] || LAYOUTS.qwerty;
     let charsSinceLastPause = 0;
 
+    // [P8.1] SECURITY: Sanitize prompt to remove control characters
+    // Remove \x00-\x1F (except \n and \t) and \x7F to prevent protocol injection
+    const sanitizedText = text
+        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove control chars
+        .replace(/\r\n/g, '\n') // Normalize line endings
+        .trim();
+
+    if (!sanitizedText) {
+        _log('WARN', '[HUMAN] Empty prompt after sanitization');
+        return;
+    }
+
     await ctx.focus(selector).catch(() => {});
 
-    for (let i = 0; i < text.length; i++) {
+    for (let i = 0; i < sanitizedText.length; i++) {
         if (signal?.aborted || page.isClosed()) {
             break;
         }
@@ -179,22 +191,23 @@ async function humanType(page, ctx, selector, text, currentLag = 0, signal = nul
             }
         }
 
-        const char = text[i];
+        const char = sanitizedText[i];
         const lowerChar = char.toLowerCase();
 
         // [V500] Reporta o pulso de digitação
         if (onPulse) {
-            onPulse({ type: 'KEY_PRESS', char, index: i, total: text.length });
+            onPulse({ type: 'KEY_PRESS', char, index: i, total: sanitizedText.length });
         }
 
         // Typos e Transposição
         if (i > 2 && Math.random() < 0.012) {
-            if (Math.random() > 0.7 && text[i + 1]) {
-                await page.keyboard.type(text[i + 1] + char);
+            if (Math.random() > 0.7 && sanitizedText[i + 1]) {
+                await page.keyboard.type(sanitizedText[i + 1] + char);
                 i++;
             } else {
                 const list = neighbors[lowerChar];
-                const typo = list && list.length > 0 ? list[Math.floor(Math.random() * list.length)] : text[i - 1];
+                const typo =
+                    list && list.length > 0 ? list[Math.floor(Math.random() * list.length)] : sanitizedText[i - 1];
                 await page.keyboard.type(typo || ' ');
             }
             await new Promise(r => {
