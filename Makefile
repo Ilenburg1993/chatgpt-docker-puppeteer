@@ -16,7 +16,8 @@
         queue queue-watch queue-add dev lint lint-fix docker-build docker-start \
         docker-stop docker-logs docker-shell docker-clean ci-test ci-lint info \
         version check-deps rebuild full-check vscode-info commit-settings \
-        git-changed reload-vscode s st r h l t c b q d i v g
+        git-changed reload-vscode install-deps update-deps format-code \
+        workspace-clean git-push-safe s st r h l t c b q d i v g
 
 # =============================================================================
 # Tool Aliases (Centralized)
@@ -158,6 +159,15 @@ help:
 	@echo "  make commit-settings   Commit .vscode/ changes"
 	@echo "  make git-changed       Show modified files (detailed)"
 	@echo "  make reload-vscode     Instructions to reload VS Code"
+	@echo ""
+	@echo "$(CYAN)📦 Dependencies & Maintenance:$(NC)"
+	@echo "  make install-deps      Install PM2 + project deps"
+	@echo "  make update-deps       Check outdated packages"
+	@echo "  make workspace-clean   Deep clean + reinstall"
+	@echo ""
+	@echo "$(CYAN)🎨 Code Quality:$(NC)"
+	@echo "  make format-code       ESLint + Prettier format"
+	@echo "  make git-push-safe     Lint + Test + Push"
 	@echo ""
 	@echo "$(MAGENTA)⌨️  Shortcuts:$(NC) s=start, h=health, l=logs, t=test, v=vscode, g=git"
 	@echo ""
@@ -450,6 +460,63 @@ version:
 	@echo "Health Port: $(HEALTH_PORT)"
 
 # =============================================================================
+# Dependency Management
+# =============================================================================
+
+install-deps:
+	@echo "$(GREEN)📦 Installing/Checking dependencies...$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Checking Node.js...$(NC)"
+	@command -v node >/dev/null 2>&1 && echo "  ✅ Node.js: $$(node --version)" || (echo "  ❌ Node.js not found"; exit 1)
+	@echo ""
+	@echo "$(CYAN)2. Checking npm...$(NC)"
+	@command -v npm >/dev/null 2>&1 && echo "  ✅ npm: $$(npm --version)" || (echo "  ❌ npm not found"; exit 1)
+	@echo ""
+	@echo "$(CYAN)3. Installing PM2 globally...$(NC)"
+	@if command -v pm2 >/dev/null 2>&1; then \
+		echo "  ✅ PM2 already installed: $$(pm2 --version)"; \
+	else \
+		echo "  📥 Installing PM2..."; \
+		npm install -g pm2; \
+	fi
+	@echo ""
+	@echo "$(CYAN)4. Installing project dependencies...$(NC)"
+	@$(NPM) install
+	@echo ""
+	@echo "$(GREEN)✅ All dependencies installed!$(NC)"
+
+update-deps:
+	@echo "$(YELLOW)🔄 Updating dependencies...$(NC)"
+	@echo ""
+	@echo "$(CYAN)Checking outdated packages:$(NC)"
+	@$(NPM) outdated || echo "  ✅ All packages up to date"
+	@echo ""
+	@echo "$(YELLOW)⚠ Run 'npm update' to update packages$(NC)"
+	@echo "$(YELLOW)⚠ Run 'npm install <package>@latest' for major updates$(NC)"
+
+workspace-clean:
+	@echo "$(RED)🧹 Deep cleaning workspace...$(NC)"
+	@echo ""
+	@echo "$(YELLOW)⚠ This will:$(NC)"
+	@echo "  - Stop PM2 processes"
+	@echo "  - Remove node_modules/"
+	@echo "  - Clean npm cache"
+	@echo "  - Reinstall dependencies"
+	@echo ""
+	@read -p "Continue? (y/N) " confirm && [ "$$confirm" = "y" ] || exit 1
+	@echo ""
+	@echo "$(CYAN)1. Stopping PM2...$(NC)"
+	@$(MAKE) stop --no-print-directory 2>/dev/null || true
+	@echo "$(CYAN)2. Removing node_modules...$(NC)"
+	@rm -rf node_modules
+	@echo "$(CYAN)3. Cleaning npm cache...$(NC)"
+	@npm cache clean --force
+	@echo "$(CYAN)4. Reinstalling dependencies...$(NC)"
+	@$(NPM) install
+	@echo ""
+	@echo "$(GREEN)✅ Workspace cleaned and ready!$(NC)"
+
+# =============================================================================
 # VS Code & Git Management
 # =============================================================================
 
@@ -538,6 +605,45 @@ reload-vscode:
 	@echo "  ✅ 10 tabs limit"
 	@echo "  ✅ Smart case search"
 	@echo ""
+
+# =============================================================================
+# Code Quality & Safe Push
+# =============================================================================
+
+format-code:
+	@echo "$(CYAN)🎨 Formatting code...$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Running ESLint with --fix...$(NC)"
+	@npx eslint . --fix --quiet || echo "  ⚠ Some lint errors found"
+	@echo ""
+	@echo "$(CYAN)2. Running Prettier...$(NC)"
+	@npx prettier --write "**/*.{js,json,md,yml,yaml}" 2>/dev/null || echo "  ℹ Prettier not configured"
+	@echo ""
+	@echo "$(GREEN)✅ Code formatted!$(NC)"
+
+git-push-safe:
+	@echo "$(GREEN)🛡️ Safe push with checks...$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Checking for uncommitted changes...$(NC)"
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "$(RED)  ❌ Uncommitted changes found!$(NC)"; \
+		git status --short; \
+		exit 1; \
+	fi
+	@echo "  ✅ No uncommitted changes"
+	@echo ""
+	@echo "$(CYAN)2. Running ESLint...$(NC)"
+	@npx eslint . --quiet --max-warnings 0 || (echo "$(RED)  ❌ Lint errors found!$(NC)"; exit 1)
+	@echo "  ✅ Lint passed"
+	@echo ""
+	@echo "$(CYAN)3. Running tests...$(NC)"
+	@$(MAKE) test-integration --no-print-directory || (echo "$(RED)  ❌ Tests failed!$(NC)"; exit 1)
+	@echo "  ✅ Tests passed"
+	@echo ""
+	@echo "$(CYAN)4. Pushing to origin...$(NC)"
+	@git push
+	@echo ""
+	@echo "$(GREEN)✅ Push successful! All checks passed.$(NC)"
 
 # =============================================================================
 # Advanced
