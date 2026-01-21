@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ============================================================================
-#  QUICK-OPS - Operações rápidas via CLI
+#  QUICK-OPS v3.0 - Operações rápidas via CLI
 #  Uso: quick-ops.sh <comando> [args]
 #  Comandos: start, stop, restart, status, health, logs, backup
+#  Version: 3.0 (2026-01-21) - Enhanced error handling & exit codes
 # ============================================================================
 
 set -euo pipefail
@@ -52,9 +53,15 @@ ARG1="${2:-}"
 case "$COMMAND" in
     start)
         echo -e "${COLOR_YELLOW}[QUICK-OPS] Iniciando sistema...${COLOR_RESET}"
-        npm run daemon:start
-        sleep 5
-        "$0" health
+        if npm run daemon:start; then
+            echo -e "${COLOR_GREEN}✓ PM2 processes started${COLOR_RESET}"
+            echo -e "${COLOR_YELLOW}⏳ Waiting for services to be ready (5s)...${COLOR_RESET}"
+            sleep 5
+            "$0" health || { echo -e "${COLOR_RED}⚠ Services started but health checks failed${COLOR_RESET}"; exit 1; }
+        else
+            echo -e "${COLOR_RED}✗ Failed to start PM2 processes${COLOR_RESET}"
+            exit 1
+        fi
         ;;
 
     stop)
@@ -74,21 +81,30 @@ case "$COMMAND" in
 
     health)
         echo -e "${COLOR_YELLOW}[QUICK-OPS] Health Check:${COLOR_RESET}"
-        response=$(curl -s http://localhost:2998/api/health 2>/dev/null)
+        response=$(curl -sS --max-time 3 http://localhost:2998/api/health 2>/dev/null || echo "")
         if [ -n "$response" ]; then
-            echo "$response" | node -e "
-                const s=require('fs').readFileSync(0,'utf8');
-                try {
-                    const j=JSON.parse(s);
-                    console.log('  Status: '+j.status);
-                    const components = Object.keys(j).filter(k=>k!=='status');
-                    console.log('  Components: '+components.join(', '));
-                } catch(e) {
-                    console.log('  [ERROR] Invalid response');
-                }
-            " 2>/dev/null || echo -e "  ${COLOR_RED}[ERROR] Failed to parse response${COLOR_RESET}"
+            # Use jq if available, fallback to node
+            if command -v jq >/dev/null 2>&1; then
+                status=$(echo "$response" | jq -r '.status // "unknown"' 2>/dev/null || echo "error")
+                echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} Status: $status"
+                echo "$response" | jq -r 'to_entries | .[] | select(.key != "status") | "  \(.key): \(.value.status // .value)"' 2>/dev/null || true
+            else
+                echo "$response" | node -e "
+                    const s=require('fs').readFileSync(0,'utf8');
+                    try {
+                        const j=JSON.parse(s);
+                        console.log('  ✓ Status: '+j.status);
+                        const components = Object.keys(j).filter(k=>k!=='status');
+                        console.log('  Components: '+components.join(', '));
+                    } catch(e) {
+                        console.log('  [ERROR] Invalid response');
+                        process.exit(1);
+                    }
+                " 2>/dev/null || echo -e "  ${COLOR_RED}✗ Failed to parse response${COLOR_RESET}"
+            fi
         else
-            echo -e "  ${COLOR_RED}[ERROR] Health endpoint not responding${COLOR_RESET}"
+            echo -e "  ${COLOR_RED}✗ Health endpoint not responding${COLOR_RESET}"
+            exit 1
         fi
         ;;
 
@@ -105,11 +121,24 @@ case "$COMMAND" in
     backup)
         echo -e "${COLOR_YELLOW}[QUICK-OPS] Criando backup...${COLOR_RESET}"
         BACKUP_NAME="quickops-$(date +%Y%m%d-%H%M%S)-$$"
-        mkdir -p "backups/$BACKUP_NAME"
-        cp -f config.json "backups/$BACKUP_NAME/" 2>/dev/null || true
-        cp -f controle.json "backups/$BACKUP_NAME/" 2>/dev/null || true
-        cp -f dynamic_rules.json "backups/$BACKUP_NAME/" 2>/dev/null || true
-        echo -e "${COLOR_GREEN}[SUCCESS] Backup: backups/$BACKUP_NAME${COLOR_RESET}"
+        mkdir -p "backups/$BACKUP_NAME" || { echo -e "${COLOR_RED}✗ Failed to create backup directory${COLOR_RESET}"; exit 1; }
+
+        files_backed=0
+        for file in config.json controle.json dynamic_rules.json ecosystem.config.js; do
+            if [ -f "$file" ]; then
+                if cp -f "$file" "backups/$BACKUP_NAME/" 2>/dev/null; then
+                    echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} $file"
+                    ((files_backed++))
+                fi
+            fi
+        done
+
+        if [ $files_backed -eq 0 ]; then
+            echo -e "${COLOR_RED}✗ No files were backed up${COLOR_RESET}"
+            exit 1
+        fi
+
+        echo -e "${COLOR_GREEN}✓ Backup complete: backups/$BACKUP_NAME ($files_backed files)${COLOR_RESET}"
         ;;
 
     help)

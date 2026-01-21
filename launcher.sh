@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ============================================================================
-#  SUPER LAUNCHER v2.0 - ChatGPT Docker Puppeteer
+#  SUPER LAUNCHER v3.0 - ChatGPT Docker Puppeteer
 #  Audit Level: PM2-First Strategy (Opção A)
 #  Estratégia: Menu interativo + validações + health checks + automações
+#  Version: 3.0 (2026-01-21) - Enhanced robustness & error handling
 # ============================================================================
 
 set -euo pipefail
@@ -35,7 +36,7 @@ COLOR_BOLD='\033[1m'
 print_header() {
     clear
     echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
-    echo -e "${COLOR_BOLD}          SUPER LAUNCHER v2.0 - ChatGPT Puppeteer${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}          SUPER LAUNCHER v3.0 - ChatGPT Puppeteer${COLOR_RESET}"
     echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
 }
 

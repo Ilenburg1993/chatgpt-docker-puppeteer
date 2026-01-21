@@ -1,8 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ============================================================================
-#  INSTALL-PM2-GUI - Helper para instalação do pm2-gui
+#  INSTALL-PM2-GUI v3.0 - Helper para instalação do pm2-gui
 #  Interface gráfica Electron para gerenciar processos PM2
+#  Version: 3.0 (2026-01-21) - Enhanced validation & error handling
 # ============================================================================
+
+set -euo pipefail
 
 COLOR_GREEN="\033[92m"
 COLOR_YELLOW="\033[93m"
@@ -26,6 +29,12 @@ echo "Repositório: https://github.com/Tjatse/pm2-gui"
 echo ""
 echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
 echo ""
+
+# Verificar se npm está disponível
+if ! command -v npm &> /dev/null; then
+    echo -e "${COLOR_RED}✗ npm não encontrado! Instale Node.js primeiro.${COLOR_RESET}"
+    exit 1
+fi
 
 # Verificar se já está instalado
 if command -v pm2-gui &> /dev/null; then
@@ -55,7 +64,7 @@ echo -e "${COLOR_YELLOW}[INFO] Instalando pm2-gui via npm...${COLOR_RESET}"
 echo "       Isso pode levar alguns minutos..."
 echo ""
 
-if npm install -g pm2-gui; then
+if npm install -g pm2-gui 2>&1 | tee /tmp/pm2-gui-install.log; then
     echo ""
     echo -e "${COLOR_GREEN}============================================================${COLOR_RESET}"
     echo -e "${COLOR_GREEN}  [SUCCESS] pm2-gui instalado com sucesso!${COLOR_RESET}"
@@ -73,14 +82,24 @@ if npm install -g pm2-gui; then
         echo ""
         echo "Abrindo pm2-gui..."
         pm2-gui &
+        echo -e "${COLOR_GREEN}✓ pm2-gui iniciado em background${COLOR_RESET}"
+        echo -e "${COLOR_CYAN}Acesse: http://localhost:8088${COLOR_RESET}"
     fi
+    exit 0
 else
     echo ""
-    echo -e "${COLOR_RED}[ERROR] Falha na instalação!${COLOR_RESET}"
+    echo -e "${COLOR_RED}============================================================${COLOR_RESET}"
+    echo -e "${COLOR_RED}  [ERROR] Falha na instalação!${COLOR_RESET}"
+    echo -e "${COLOR_RED}============================================================${COLOR_RESET}"
+    echo ""
+    echo "Verifique o log: /tmp/pm2-gui-install.log"
     echo ""
     echo "Tente manualmente:"
     echo "  npm install -g pm2-gui"
     echo ""
+    echo "Problemas comuns:"
+    echo "  - Permissões: tente com 'sudo npm install -g pm2-gui'"
+    echo "  - Rede: verifique conexão com npmjs.com"
+    echo ""
+    exit 1
 fi
-
-exit 0
