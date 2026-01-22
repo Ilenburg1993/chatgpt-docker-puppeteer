@@ -1,9 +1,9 @@
 # AI Coding Agent Instructions for chatgpt-docker-puppeteer
 
-**Version**: 3.1 (Hardened Stack - Jan 21, 2026)
+**Version**: 3.2 (Config Architecture Refactor - Jan 22, 2026)
 **Target Platforms**: Windows + Linux (macOS optional)
-**Philosophy**: Cross-platform First, Make-driven, Exit Code Aware, JSON Safe, DRY Helpers
-**Recent Upgrades**: Makefile v2.4, Scripts v3.0, Launcher v3.0 (all hardened editions)
+**Philosophy**: Cross-platform First, Make-driven, Exit Code Aware, JSON Safe, DRY Helpers, Shared Helpers
+**Recent Upgrades**: Config Architecture v3.0, ConnectionOrchestrator v3.0, .puppeteerrc.cjs v2.0, chrome-config.json v3.0
 
 ## Architecture Overview
 
@@ -18,8 +18,9 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Driver** (`src/driver/`): Target-specific automation (ChatGPT, Gemini) via factory pattern
     - DriverNERVAdapter connects drivers to NERV (no direct KERNEL/SERVER access)
 - **Infra** (`src/infra/`): Browser pool, locks, queue, storage (tasks/responses/DNA)
-    - ConnectionOrchestrator: multi-mode browser connection (launcher/external/auto)
+    - ConnectionOrchestrator v3.0: multi-mode browser connection (launcher/external/auto)
     - Two-phase commit locks with PID validation
+    - .puppeteerrc.cjs v2.0: Puppeteer config + shared helpers (isDocker, findChrome, getCacheDirectory)
 - **Server** (`src/server/`): Dashboard + API (Express + Socket.io) via ServerNERVAdapter
 - **Core** (`src/core/`): Config, schemas (Zod), logger, identity (DNA), context management
 - **Makefile** (`Makefile`): Build system orchestrator (v2.4 Hardened Edition, 461 lines)
@@ -48,6 +49,8 @@ This is a domain-driven autonomous agent using Puppeteer for browser automation 
 - **Health Checks**: Browser pool detects both crashes AND degradation (>5s response time)
 - **Orphan Recovery**: UUID-based recovery locks prevent race conditions between multiple instances
 - **DRY Principles**: Makefile v2.4 uses centralized helpers (fail, confirm, PM2_APPS) to reduce duplication
+- **Shared Helpers Pattern**: .puppeteerrc.cjs exports helpers (isDocker, findChrome, getCacheDirectory) used by ConnectionOrchestrator and other modules - configs stay separate, helpers are DRY
+- **Config Separation**: Each module maintains own config (DEFAULTS inline) but imports shared helpers - avoids tight coupling while eliminating duplication
 - **Git Protection**: git-push-safe blocks direct pushes to main/master branches
 - **Test Separation**: test-fast (pre-commit) vs test-integration (full CI) for optimal workflows
 - **Strict Mode**: STRICT=true enables fail-fast shell behavior for CI reliability
@@ -471,6 +474,30 @@ echo "[OK] Backup complete ($FILES_BACKED files)"
 exit 0
 ```
 
+### EditorConfig v2.0 (209 lines)
+
+**Upgraded**: Jan 2026 - Comprehensive cross-editor consistency
+
+**Coverage**: 10 organized sections
+1. **Default**: charset, indent (4 spaces), trim whitespace
+2. **JavaScript/Node**: single quotes, 120 char lines, ES2022+
+3. **Config Files**: JSON/YAML specific settings
+4. **Documentation**: 100 char lines for markdown
+5. **Shell Scripts**: LF line endings, executable
+6. **Python**: 4 spaces (PEP 8)
+7. **Docker**: LF line endings
+8. **Build Tools**: Makefile tabs
+9. **Environment**: dotenv files
+10. **VSCode/GitHub**: metadata files
+
+**Key Settings**:
+- `max_line_length = 120` (code), `100` (docs/yaml)
+- `quote_type = single` (JavaScript)
+- Platform-specific line endings (LF for bash, CRLF for Windows batch)
+- Specific patterns: `docker-compose*.yml`, `*.sh/.bat/.ps1`, etc.
+
+**Benefit**: Consistent formatting across VSCode, Sublime, Atom, JetBrains IDEs
+
 ## Conventions
 
 - **Logging**: `logger.log('INFO', msg, taskId?)` with structured telemetry
@@ -479,6 +506,111 @@ exit 0
 - **Task States**: `PENDING` → `RUNNING` → `DONE`/`FAILED`; use `schemas.parseTask()` for validation
 - **File Paths**: Responses in `respostas/{taskId}.txt`; queue tasks as `{taskId}.json` in `fila/`
 - **Browser Profiles**: Isolated in `profile/` with stealth plugins and user-agent rotation
+
+## Configuration Architecture (v3.0 - Jan 2026)
+
+**Philosophy**: Shared Helpers + Separated Configs = DRY without tight coupling
+
+### .puppeteerrc.cjs v2.0 (238 lines)
+
+**Purpose**: Puppeteer configuration file + shared helpers for cross-module use
+
+**Structure**:
+```javascript
+// Helpers (exportados para uso externo)
+function isDocker() { /* detecta containers via /proc/self/cgroup */ }
+function getCacheDirectory() { /* /home/node/.cache (Docker) ou ~/.cache (Host) */ }
+function findChromeExecutable() { /* detecta Chrome instalado: Linux/Mac/Windows paths */ }
+
+module.exports = {
+    cacheDirectory: getCacheDirectory(),      // Config Puppeteer
+    executablePath: findChromeExecutable()    // Config Puppeteer
+};
+
+// Exports de helpers para outros módulos
+module.exports.getCacheDirectory = getCacheDirectory;
+module.exports.findChromeExecutable = findChromeExecutable;
+module.exports.isDocker = isDocker;
+```
+
+**Exports**:
+- `cacheDirectory`: Onde Chromium é armazenado (usado pelo Puppeteer)
+- `executablePath`: Chrome customizado ou null para bundled Chromium
+- `getCacheDirectory()`: Helper compartilhado (DRY)
+- `findChromeExecutable()`: Helper compartilhado (DRY)
+- `isDocker()`: Helper compartilhado (DRY)
+
+**Documentation**: 25+ Puppeteer tools/features documentadas inline (Recorder, Replay, Adblocker, Tracing, Coverage, Network Interception, etc.)
+
+### ConnectionOrchestrator.js v3.0 (739 lines)
+
+**Config Pattern**:
+```javascript
+const puppeteerConfig = require('../../.puppeteerrc.cjs');
+
+// DEFAULTS inline (config própria do ConnectionOrchestrator)
+const DEFAULTS = {
+    mode: process.env.BROWSER_MODE || 'launcher',
+    ports: [9222, 9223, 9224],
+    hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
+    connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
+
+    // USA helpers compartilhados (DRY)
+    executablePath: puppeteerConfig.findChromeExecutable(),
+    cacheDirectory: puppeteerConfig.getCacheDirectory(),
+
+    args: ['--no-sandbox', '--disable-setuid-sandbox', ...],
+    retryDelayMs: 3000,
+    maxConnectionAttempts: 5,
+    // ... mais config específica
+};
+```
+
+**Benefits**:
+1. ✅ **Separation of Concerns**: .puppeteerrc.cjs = Puppeteer config + helpers; ConnectionOrchestrator = own config
+2. ✅ **DRY**: Helpers compartilhados eliminam duplicação de lógica (isDocker, findChrome, getCacheDirectory)
+3. ✅ **No Tight Coupling**: Cada módulo mantém autonomia, apenas importa helpers
+4. ✅ **Testability**: Helpers podem ser testados isoladamente
+5. ✅ **Standards Compliance**: .puppeteerrc.cjs segue convenção npm do Puppeteer
+
+### chrome-config.json v3.0
+
+**Purpose**: Snapshot de configuração para launchers/scripts externos
+
+**Generation**: `ConnectionOrchestrator.exportConfig('./chrome-config.json')`
+
+**Content**:
+```json
+{
+  "version": "3.0",
+  "source": "ConnectionOrchestrator + .puppeteerrc.cjs helpers",
+  "isDocker": false,
+  "detectedChromePath": "/usr/bin/chromium",
+  "connection": { "mode": "launcher", "ports": [9222, 9223, 9224], ... },
+  "launcher": { "executablePath": "/usr/bin/chromium", "cacheDirectory": "...", ... },
+  "commands": {
+    "startChrome": "\"/usr/bin/chromium\" --remote-debugging-port=9222 ...",
+    "checkChrome": "lsof -i :9222 || netstat -an | grep :9222",
+    "killChrome": "pkill -f \"chrome.*remote-debugging-port=9222\""
+  },
+  "usage": {
+    "helpers": "Helpers compartilhados (.puppeteerrc.cjs): isDocker, findChrome, getCacheDirectory",
+    "config": "Config específica (ConnectionOrchestrator.js): DEFAULTS inline"
+  }
+}
+```
+
+**Usage**: CLI tools, external launchers, documentation
+
+### Anti-Patterns to Avoid
+
+❌ **NEVER**: Centralizar TODA config em um único arquivo (viola separação de responsabilidades)
+❌ **NEVER**: .puppeteerrc.cjs conhecendo estrutura do ConnectionOrchestrator (acoplamento)
+❌ **NEVER**: Duplicar lógica de detecção (isDocker, findChrome) em múltiplos módulos
+
+✅ **DO**: Exportar helpers de .puppeteerrc.cjs para uso compartilhado
+✅ **DO**: Cada módulo mantém própria config (DEFAULTS inline)
+✅ **DO**: Importar helpers quando necessário, não config completa
 
 ## Integration Points
 
@@ -597,12 +729,91 @@ exit 0
 1. ~~**P5.2 Cache Invalidation**~~: ✅ FIXED (2026-01-21) - markDirty() now called BEFORE writes
 2. ~~**Health scripts syntax**~~: ✅ FIXED (2026-01-21) - v3.0 upgrade resolved all syntax issues
 3. ~~**Scripts inconsistency**~~: ✅ FIXED (2026-01-21) - All scripts now v3.0 with cross-platform parity
-4. **npm test broken**: `scripts/run_all_tests.sh` line 3 has bash syntax issue (use `make test-fast` instead)
-5. **Integration tests**: 82% (9/11) were obsolete due to IPC refactoring - already cleaned up
-6. **Test dependencies**: 4 tests (lock, control_pause, running_recovery, stall_mitigation) require full agent running
-7. **deps-consistency**: May fail if fsevents missing on Linux (expected, macOS-only package)
+4. ~~**Config duplication**~~: ✅ FIXED (2026-01-22) - Shared helpers pattern eliminates duplication
+5. ~~**ESLint warnings**~~: ✅ FIXED (2026-01-22) - Zero warnings in ConnectionOrchestrator and .puppeteerrc.cjs
+6. **npm test broken**: `scripts/run_all_tests.sh` line 3 has bash syntax issue (use `make test-fast` instead)
+7. **Integration tests**: 82% (9/11) were obsolete due to IPC refactoring - already cleaned up
+8. **Test dependencies**: 4 tests (lock, control_pause, running_recovery, stall_mitigation) require full agent running
+9. **deps-consistency**: May fail if fsevents missing on Linux (expected, macOS-only package)
 
 ## Recent Upgrades (Jan 2026)
+
+### Configuration Architecture v3.0 (Jan 22, 2026)
+
+**Commits**: e16d52b, 7a41830
+
+**Problem**: Configuration duplication across 3 sources:
+- .puppeteerrc.cjs (helper functions)
+- ConnectionOrchestrator.js (DEFAULTS object)
+- chrome-config.json (generated snapshot)
+
+**Solution**: Shared Helpers + Separated Configs
+
+**Changes**:
+1. **.puppeteerrc.cjs v2.0** (238 lines):
+   - ✅ ONLY Puppeteer config (cacheDirectory, executablePath)
+   - ✅ Exports 3 helpers: getCacheDirectory(), findChromeExecutable(), isDocker()
+   - ✅ 25+ Puppeteer tools documented inline
+   - ❌ Removed getPuppeteerConfig() (was violating separation of concerns)
+
+2. **ConnectionOrchestrator.js v3.0** (739 lines):
+   - ✅ DEFAULTS inline (own config: ports, hosts, args, retry, etc.)
+   - ✅ Imports helpers: `puppeteerConfig.{getCacheDirectory, findChrome, isDocker}`
+   - ✅ Maintains autonomy (no dependency on external config)
+   - ✅ exportConfig() uses DEFAULTS local + helpers
+
+3. **chrome-config.json v3.0**:
+   - ✅ version: '3.0'
+   - ✅ source: 'ConnectionOrchestrator + .puppeteerrc.cjs helpers'
+   - ✅ isDocker: detected at runtime
+   - ✅ detectedChromePath: '/usr/bin/chromium'
+   - ✅ commands: unified by platform (startChrome, checkChrome, killChrome)
+   - ✅ usage.helpers: documents shared helpers
+
+**Benefits**:
+- ✅ Clear separation of responsibilities
+- ✅ DRY (helpers shared, not configs)
+- ✅ .puppeteerrc.cjs follows npm standard
+- ✅ Each module independent
+- ✅ Zero ESLint warnings
+
+### EditorConfig v2.0 (Jan 21, 2026)
+
+**Commit**: f9d6438
+
+**Changes**: 45 → 209 lines (+364%)
+- ✅ 10 organized sections (default, JS, config, docs, shell, Python, Docker, build, env, VSCode)
+- ✅ max_line_length: 120 (code), 100 (docs)
+- ✅ quote_type: single (JavaScript)
+- ✅ Platform-specific line endings
+- ✅ 30+ configuration rules
+
+### Puppeteer Tools Documentation (Jan 21, 2026)
+
+**Commit**: 52230ca
+
+**Changes**: +185 lines in .puppeteerrc.cjs
+- ✅ 25 Puppeteer tools/features documented
+- ✅ Already Used (6): stealth, UA rotation, profile rotation, pool, CDP, screenshots
+- ✅ Available (19): Recorder, Replay, Adblocker, Tracing, Coverage, Network Interception, PDF, etc.
+- ✅ Priority recommendations: High (Tracing, Network Interception), Medium (Recorder, Coverage), Low (PDF, Accessibility)
+
+### Docker Infrastructure (Jan 21, 2026)
+
+**Commits**: 022af5c, 674e331
+
+**Changes**:
+1. **docker-compose fixes** (3 files):
+   - ✅ Fixed healthcheck YAML syntax (docker-compose.yml, docker-compose.dev.yml)
+   - ✅ Added extra_hosts for Linux (host.docker.internal)
+   - ✅ Fixed volumes config (docker-compose.prod.yml)
+   - ✅ Added networks definitions
+
+2. **DOCKER_README.md** (created):
+   - ✅ ~400 lines comprehensive guide
+   - ✅ 4 compose files explained (default/dev/prod/linux)
+   - ✅ Quick Start, Operations, Debugging, Security, Monitoring
+   - ✅ Troubleshooting (10 common scenarios)
 
 ### Build System & Scripts (v2.4/v3.0 - Jan 21, 2026)
 
