@@ -57,6 +57,19 @@
         "esbenp.beautify",
         // Live servers (projeto usa Express)
         "ms-vscode.live-server",
-        "ritwickdey.LiveServer"
+        "ritwickdey.LiveServer",
+        // DEPRECATED/OBSOLETE EXTENSIONS (NEVER INSTALL)
+        "ms-vscode.node-debug",
+        "octref.vetur",
+        "formulahendry.auto-close-tag",
+        "formulahendry.auto-rename-tag",
+        "DotJoshJohnson.xml",
+        "fabiospampinato.vscode-highlight",
+        "wix.vscode-import-cost",
+        "alefragnani.Bookmarks",
+        "CoenraadS.bracket-pair-colorizer",
+        "CoenraadS.bracket-pair-colorizer-2",
+        "2gua.rainbow-brackets",
+        "ms-vscode.vscode-typescript-tslint-plugin"
     ]
 }
