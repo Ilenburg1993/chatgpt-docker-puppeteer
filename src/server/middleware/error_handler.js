@@ -7,7 +7,7 @@
    Sincronizado com: request_id.js V50, logger.js V40, app.js V100.
 ========================================================================== */
 
-const { log, audit } = require('../../core/logger');
+const { log, audit } = require('@core/logger');
 
 /**
  * Middleware para tratamento de rotas não localizadas (404).

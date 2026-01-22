@@ -7,9 +7,9 @@
    Sincronizado com: doctor.js V39, engine/socket.js V600, main.js V700.
 ========================================================================== */
 
-const doctor = require('../../../core/doctor');
-const { notify } = require('../../engine/socket');
-const { log } = require('../../../core/logger');
+const doctor = require('@core/doctor');
+const { notify } = require('@server/engine/socket');
+const { log } = require('@core/logger');
 
 /**
  * Referência privada para o temporizador do ciclo de amostragem.

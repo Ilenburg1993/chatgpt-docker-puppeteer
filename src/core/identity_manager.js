@@ -10,12 +10,12 @@
 ========================================================================== */
 
 const { v4: uuidv4 } = require('uuid');
-const io = require('../infra/io');
+const io = require('@infra/io');
 const { log } = require('./logger');
 
 // Importação do Shared Kernel (Validação Nativa)
-const { validateRobotIdentity } = require('../shared/nerv/schemas');
-const { ActorRole, PROTOCOL_VERSION } = require('../shared/nerv/constants');
+const { validateRobotIdentity } = require('@shared/nerv/schemas');
+const { ActorRole, PROTOCOL_VERSION } = require('@shared/nerv/constants');
 
 class IdentityManager {
     constructor() {

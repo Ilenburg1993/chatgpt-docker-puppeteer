@@ -22,7 +22,7 @@
 
 const EventEmitter = require('events');
 
-const { CONNECTION_MODES: CONNECTION_MODES } = require('../../core/constants/browser.js');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
 
 /**
  * Cria transporte híbrido com suporte local + remoto.

@@ -10,9 +10,9 @@
 
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
-const { log } = require('../../core/logger');
-const { validateRobotIdentity, validateIPCEnvelope } = require('../../shared/nerv/schemas');
-const { PROTOCOL_VERSION, ActorRole } = require('../../shared/nerv/constants');
+const { log } = require('@core/logger');
+const { validateRobotIdentity, validateIPCEnvelope } = require('@shared/nerv/schemas');
+const { PROTOCOL_VERSION, ActorRole } = require('@shared/nerv/constants');
 
 /**
  * Instância única do barramento (Singleton).

@@ -10,8 +10,8 @@
 const { z } = require('zod');
 const EventEmitter = require('events');
 const { log } = require('./logger');
-const PATHS = require('../infra/fs/paths');
-const { safeReadJSON } = require('../infra/fs/safe_read');
+const PATHS = require('@infra/fs/paths');
+const { safeReadJSON } = require('@infra/fs/safe_read');
 
 /* --------------------------------------------------------------------------
    ENV VALIDATION (P8.5)

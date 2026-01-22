@@ -8,7 +8,7 @@
    Sincronizado com: BaseDriver V320, input_resolver.js V500, i18n.js V32.
 ========================================================================== */
 
-const i18n = require('../../core/i18n');
+const i18n = require('@core/i18n');
 
 /**
  * Assinaturas vetoriais (SVG) para identificação de botões de envio e parada.

@@ -20,9 +20,9 @@
 =========================== */
 
 // Protocolo universal NERV
-const { createEnvelope } = require('../shared/nerv/envelope');
+const { createEnvelope } = require('@shared/nerv/envelope');
 
-const { CONNECTION_MODES: CONNECTION_MODES } = require('../core/constants/browser.js');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
 
 // Núcleo estrutural
 const createCorrelation = require('./correlation/correlation_store');
@@ -46,7 +46,7 @@ const createHealth = require('./health/health');
  * Bootstrap: Socket.io adapter para modo híbrido
  */
 function bootstrapSocketAdapter(config) {
-    const createSocketAdapter = require('../infra/transport/socket_io_adapter');
+    const createSocketAdapter = require('@infra/transport/socket_io_adapter');
 
     const socketAdapter = createSocketAdapter({
         url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3333',

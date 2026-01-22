@@ -51,11 +51,43 @@ npm run dev
 
 ## Code Style
 
+### Import Conventions (IMPORTANTE)
+
+Este projeto usa **module-alias** para imports limpos. SEMPRE use aliases ao invés de caminhos relativos:
+
+```javascript
+// ❌ NUNCA fazer (caminhos relativos)
+const logger = require('../../../core/logger');
+const io = require('../../infra/io');
+const { ActorRole } = require('../../../shared/nerv/constants');
+
+// ✅ SEMPRE fazer (aliases)
+const logger = require('@core/logger');
+const io = require('@infra/io');
+const { ActorRole } = require('@shared/nerv/constants');
+```
+
+**Aliases disponíveis:**
+- `@` → `src/` (raiz do projeto)
+- `@core` → `src/core/` (config, logger, constants, schemas)
+- `@shared` → `src/shared/` (NERV constants, utilities)
+- `@nerv` → `src/nerv/` (event bus, pub/sub)
+- `@kernel` → `src/kernel/` (task execution engine)
+- `@driver` → `src/driver/` (ChatGPT, Gemini drivers)
+- `@infra` → `src/infra/` (browser pool, locks, queue, storage)
+- `@server` → `src/server/` (dashboard, API, Socket.io)
+- `@logic` → `src/logic/` (business rules)
+
+**IntelliSense:** Configure seu editor lendo `jsconfig.json` para autocomplete automático dos aliases.
+
+### Convenções Gerais
+
 - Use ES6+ features
 - Follow existing code patterns
 - Add JSDoc comments for functions
 - Keep functions small and focused
 - Use meaningful variable names
+- **Import com aliases** (nunca caminhos relativos profundos)
 
 ## Testing
 

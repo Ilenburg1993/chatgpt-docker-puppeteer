@@ -118,7 +118,9 @@ describe('NERV Core - Event Bus Central', () => {
             });
 
             // Aguardar execução assíncrona
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => {
+                setTimeout(resolve, 10);
+            });
             assert.ok(executado, 'Listener deve ser executado');
         });
 
@@ -140,7 +142,9 @@ describe('NERV Core - Event Bus Central', () => {
             nerv.emit(envelope);
             nerv.emit(envelope);
 
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => {
+                setTimeout(resolve, 10);
+            });
             assert.strictEqual(contador, 1, 'Listener deve executar apenas uma vez');
         });
 
@@ -183,7 +187,9 @@ describe('NERV Core - Event Bus Central', () => {
                 payload: {}
             });
 
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => {
+                setTimeout(resolve, 10);
+            });
             assert.strictEqual(contador1, 1, 'Listener 1 executado');
             assert.strictEqual(contador2, 1, 'Listener 2 executado');
             assert.strictEqual(contador3, 1, 'Listener 3 executado');
@@ -242,7 +248,9 @@ describe('NERV Core - Event Bus Central', () => {
                 payload: {}
             });
 
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => {
+                setTimeout(resolve, 10);
+            });
             assert.ok(eventoA, 'Evento A deve ser disparado');
             assert.ok(!eventoB, 'Evento B não deve ser disparado');
         });

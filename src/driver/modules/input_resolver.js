@@ -8,9 +8,9 @@
 ========================================================================== */
 
 const analyzer = require('./analyzer');
-const io = require('../../infra/io');
-const CONFIG = require('../../core/config');
-const { log } = require('../../core/logger');
+const io = require('@infra/io');
+const CONFIG = require('@core/config');
+const { log } = require('@core/logger');
 
 class InputResolver {
     /**

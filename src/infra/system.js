@@ -9,7 +9,7 @@ const { exec } = require('child_process');
 const pm2 = require('pm2');
 const treeKill = require('tree-kill');
 const path = require('path');
-const { log } = require('../core/logger');
+const { log } = require('@core/logger');
 
 const AGENTE_NAME = 'agente-gpt';
 

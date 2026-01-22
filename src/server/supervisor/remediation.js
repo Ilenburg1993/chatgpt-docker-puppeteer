@@ -7,13 +7,13 @@
    Sincronizado com: reconciler.js V700, triage.js V70, constants.js V400.
 ========================================================================== */
 
-const { ActionCode } = require('../../shared/nerv/constants');
+const { ActionCode } = require('@shared/nerv/constants');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
-const { log } = require('../../../core/logger');
+const { log } = require('@core/logger');
 
 /**
  * Tabela de Políticas de Remediação (The Remediation Matrix).

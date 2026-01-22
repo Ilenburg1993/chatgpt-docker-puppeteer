@@ -7,9 +7,9 @@
    Sincronizado com: BaseDriver V320, system.js V45, stabilizer.js V43.
 ========================================================================== */
 
-const system = require('../../infra/system');
+const system = require('@infra/system');
 const stabilizer = require('./stabilizer');
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 class RecoverySystem {
     /**

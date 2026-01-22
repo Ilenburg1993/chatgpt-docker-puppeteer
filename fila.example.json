@@ -1,23 +1,23 @@
 {
+    "_version": "2.0",
     "_comment": "========================================",
-    "_comment_2": "ATENÇÃO: Este é apenas um EXEMPLO de estrutura",
-    "_comment_3": "A fila real fica na pasta fila/ com arquivos task-{id}.json",
-    "_comment_4": "Este arquivo NÃO é lido pelo sistema",
-    "_comment_5": "========================================",
-    "fila": [
+    "_notice": "EXEMPLO - NÃO é lido pelo sistema",
+    "_real_queue": "Arquivos individuais em fila/task-{uuid}.json",
+    "_updated": "2026-01-22",
+    "_comment_end": "========================================",
+    "examples": [
         {
-            "id": "task-001",
+            "id": "task-001-example",
             "prompt": "Explique em um parágrafo o que é ontologia negativa.",
             "status": "PENDING",
             "prioridade": 1,
-            "criadoEm": "2026-01-12T21:00:00Z",
+            "target": "chatgpt.com",
+            "criadoEm": "2026-01-22T10:00:00Z",
             "resultado": null,
-            "_schema_notes": "Campos obrigatórios: id, prompt, status",
-            "_status_values": "PENDING | RUNNING | DONE | FAILED",
-            "_optional_fields": "prioridade, target, spec, criadoEm, resultado"
+            "_notes": "Exemplo básico - campos obrigatórios: id, prompt, status"
         },
         {
-            "id": "task-002",
+            "id": "task-002-example",
             "prompt": "Resuma em 3 parágrafos a teoria da evolução de Darwin.",
             "status": "PENDING",
             "prioridade": 2,
@@ -28,18 +28,105 @@
                     "min_length": 300,
                     "max_length": 1000,
                     "forbidden_terms": [
-                        "copia",
+                        "cópia",
                         "plágio"
+                    ],
+                    "required_keywords": [
+                        "evolução",
+                        "seleção natural"
                     ]
+                },
+                "retry": {
+                    "max_attempts": 3,
+                    "backoff_ms": 5000
                 }
             },
-            "criadoEm": "2026-01-12T21:05:00Z",
-            "resultado": null
+            "criadoEm": "2026-01-22T10:05:00Z",
+            "resultado": null,
+            "_notes": "Exemplo avançado com validação e retry"
+        },
+        {
+            "id": "task-003-example",
+            "prompt": "Liste os 5 principais benefícios da automação com IA.",
+            "status": "PENDING",
+            "prioridade": 3,
+            "target": "gemini.google.com",
+            "spec": {
+                "model": "gemini-pro",
+                "validation": {
+                    "min_length": 200,
+                    "format": "markdown"
+                },
+                "timeout_ms": 60000
+            },
+            "criadoEm": "2026-01-22T10:10:00Z",
+            "resultado": null,
+            "_notes": "Exemplo usando Gemini como target"
         }
     ],
-    "_usage_instructions": {
-        "como_adicionar_tarefa": "Use `npm run queue:add` ou crie arquivo task-{uuid}.json em fila/",
-        "como_ver_fila": "Use `npm run queue:status` ou acesse dashboard em http://localhost:3008",
-        "schema_completo": "Veja src/core/schemas/task_schema.js para validação Zod completa"
+"_documentation": {
+    "schema": {
+        "required_fields": [
+            "id",
+            "prompt",
+            "status"
+        ],
+        "optional_fields": [
+            "prioridade",
+            "target",
+            "spec",
+            "criadoEm",
+            "resultado",
+            "updatedAt",
+            "failureHistory"
+        ],
+        "status_values": [
+            "PENDING",
+            "RUNNING",
+            "DONE",
+            "FAILED"
+        ],
+        "target_values": [
+            "chatgpt.com",
+            "gemini.google.com"
+        ],
+        "priority_range": "1 (mais alta) a 10 (mais baixa)"
+    },
+    "usage": {
+        "add_task": [
+            "CLI: npm run queue:add",
+            "API: POST http://localhost:3008/api/tasks",
+            "File: Criar fila/task-{uuid}.json manualmente"
+        ],
+        "view_queue": [
+            "CLI: npm run queue:status",
+            "CLI Watch: npm run queue:status -- --watch",
+            "Dashboard: http://localhost:3008",
+            "API: GET http://localhost:3008/api/queue"
+        ],
+        "monitor": [
+            "Makefile: make queue",
+            "Makefile Watch: make queue-watch",
+            "Logs: make logs-follow"
+        ]
+    },
+    "validation": {
+        "schema_file": "src/core/schemas/task_schema.js",
+        "validator": "Zod v3.22+",
+        "corrupted_tasks": "Movidos para fila/corrupted/ automaticamente"
+    },
+    "best_practices": {
+        "ids": "Use UUIDs para evitar conflitos (task-{uuid}.json)",
+        "priority": "1 = urgente, 5 = normal, 10 = baixa",
+        "prompts": "Seja específico e claro para melhores resultados",
+        "validation": "Defina min_length para evitar respostas incompletas",
+        "timeout": "Configure timeout_ms para tarefas longas (padrão: 180000 = 3min)"
+    },
+    "files": {
+        "queue_dir": "fila/",
+        "responses_dir": "respostas/",
+        "corrupted_dir": "fila/corrupted/",
+        "example_file": "fila.example.json (este arquivo)"
+    }
     }
 }

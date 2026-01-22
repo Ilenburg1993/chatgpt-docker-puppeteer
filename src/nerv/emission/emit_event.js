@@ -20,7 +20,7 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
-const { MessageType } = require('../../shared/nerv/constants');
+const { MessageType } = require('@shared/nerv/constants');
 
 /* ===========================
    Fábrica do emissor de EVENT

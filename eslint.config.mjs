@@ -15,6 +15,7 @@ import json from '@eslint/json';
 import markdown from '@eslint/markdown';
 import css from '@eslint/css';
 import i18next from 'eslint-plugin-i18next';
+import prettier from 'eslint-config-prettier';
 
 export default [
     // ===== GLOBAL IGNORES =====
@@ -250,5 +251,10 @@ export default [
             css
         },
         language: 'css/css'
-    }
+    },
+
+    // ===== PRETTIER INTEGRATION =====
+    // Desabilita regras ESLint que conflitam com Prettier
+    // DEVE SER O ÚLTIMO NO ARRAY
+    prettier
 ];

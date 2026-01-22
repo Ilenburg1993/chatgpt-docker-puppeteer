@@ -7,10 +7,10 @@
    Sincronizado com: system.js V45, ipc_client.js V600, constants.js V400.
 ========================================================================== */
 
-const system = require('../infra/system');
+const system = require('@infra/system');
 const { log, audit } = require('./logger');
-const { ActionCode, MessageType, ActorRole } = require('../shared/nerv/constants');
-const { createEnvelope } = require('../shared/nerv/envelope');
+const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
+const { createEnvelope } = require('@shared/nerv/envelope');
 
 // NERV instance will be injected via setNERV()
 let nervInstance = null;

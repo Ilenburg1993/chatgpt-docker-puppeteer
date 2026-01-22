@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { LOG_DIR, log } = require('../../core/logger');
+const { LOG_DIR, log } = require('@core/logger');
 
 /**
  * Caminho absoluto do alvo de vigilância.

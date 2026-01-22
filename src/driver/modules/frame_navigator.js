@@ -7,7 +7,7 @@
    Sincronizado com: BaseDriver V320, TelemetryBridge V500, analyzer.js V500.
 ========================================================================== */
 
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 class FrameNavigator {
     /**

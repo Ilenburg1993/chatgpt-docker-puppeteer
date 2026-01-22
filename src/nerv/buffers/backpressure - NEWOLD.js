@@ -1,6 +1,6 @@
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 /* ==========================================================================
    src/nerv/buffers/backpressure.js

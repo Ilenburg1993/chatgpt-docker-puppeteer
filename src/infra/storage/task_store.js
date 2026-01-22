@@ -11,7 +11,7 @@ const fs = require('fs');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 const fsp = fs.promises;
 const path = require('path');
@@ -19,7 +19,7 @@ const path = require('path');
 // [V700] Importação da Bússola Física para quebrar dependências circulares
 const PATHS = require('../fs/paths');
 const { atomicWrite, safeReadJSON } = require('../fs/fs_core');
-const { parseTask } = require('../../core/schemas');
+const { parseTask } = require('@core/schemas');
 
 /**
  * Salva uma tarefa no disco após validação estrita do Schema V4 Gold.

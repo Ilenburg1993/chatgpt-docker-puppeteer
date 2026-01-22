@@ -65,6 +65,7 @@ Sistema **autônomo** para automação de Large Language Models via browser:
 - **Schema validation**: Zod para validação de dados
 - **Adaptive backoff**: Retry inteligente com backoff exponencial
 - **Typed constants**: Centralized constants (`src/core/constants/`) eliminam magic strings
+- **Module aliases**: Path aliases (@core, @infra, @shared) para imports limpos
 
 **Componentes Core:**
 
@@ -74,6 +75,33 @@ Sistema **autônomo** para automação de Large Language Models via browser:
 - **`src/driver/`**: Target-specific automation (ChatGPT, Gemini drivers)
 - **`src/infra/`**: Browser pool, locks, queue, storage (tasks/responses/DNA)
 - **`src/server/`**: Dashboard API (Express + Socket.io)
+
+**Module Aliases** (Novo):
+
+Este projeto usa **module-alias** para simplificar imports:
+
+```javascript
+// ❌ Antes (caminhos relativos profundos)
+const logger = require('../../../core/logger');
+const io = require('../../../infra/io');
+
+// ✅ Agora (aliases limpos)
+const logger = require('@core/logger');
+const io = require('@infra/io');
+```
+
+**Aliases disponíveis:**
+- `@` → `src/`
+- `@core` → `src/core/`
+- `@shared` → `src/shared/`
+- `@nerv` → `src/nerv/`
+- `@kernel` → `src/kernel/`
+- `@driver` → `src/driver/`
+- `@infra` → `src/infra/`
+- `@server` → `src/server/`
+- `@logic` → `src/logic/`
+
+**IntelliSense:** Configurado em `jsconfig.json` para autocomplete completo no VSCode.
 
 ---
 

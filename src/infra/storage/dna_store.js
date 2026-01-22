@@ -10,8 +10,8 @@
 const _path = require('path');
 const PATHS = require('../fs/paths');
 const { atomicWrite, safeReadJSON } = require('../fs/fs_core');
-const { DnaSchema } = require('../../core/schemas');
-const { log } = require('../../core/logger');
+const { DnaSchema } = require('@core/schemas');
+const { log } = require('@core/logger');
 
 /**
  * ESTRUTURA BÁSICA V4 GOLD (Baseline de Segurança)

@@ -7,7 +7,7 @@
    Sincronizado com: core/schemas V100, logger.js V40, request_id.js V600.
 ========================================================================== */
 
-const { log, audit } = require('../../core/logger');
+const { log, audit } = require('@core/logger');
 
 /**
  * Factory de Validação: Cria um middleware Express para um Schema específico.

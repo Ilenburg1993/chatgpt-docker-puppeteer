@@ -7,7 +7,7 @@
    Sincronizado com: io.js (V36), ref_parser.js (V1.0), budget_manager.js (V1.0).
 ========================================================================== */
 
-const io = require('../../../infra/io');
+const io = require('@infra/io');
 const { parseReferences } = require('../parsing/ref_parser');
 const { assertSafetyDepth } = require('../limits/guardrails');
 const { BudgetManager } = require('../limits/budget_manager');

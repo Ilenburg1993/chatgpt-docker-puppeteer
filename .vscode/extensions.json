@@ -12,30 +12,25 @@
         "ms-azuretools.vscode-docker",
         // === BUILD & TOOLS ===
         "ms-vscode.makefile-tools",
-        "ms-vscode.node-debug2",
         "christian-kohler.npm-intellisense",
-        "eg2.vscode-npm-script",
         "cmstead.jsrefactor",
         "pflannery.vscode-versionlens",
         // === GIT & VERSION CONTROL ===
         "eamodio.gitlens",
-        "mhutchie.git-graph",
         // === CODE QUALITY & PRODUCTIVITY ===
         "usernamehw.errorlens",
         "aaron-bond.better-comments",
         "christian-kohler.path-intellisense",
-        "oderwat.indent-rainbow",
         "gruntfuggly.todo-tree",
         // === TESTING & API ===
-        "rangav.vscode-thunder-client",
         "humao.rest-client",
         // === DOCUMENTATION ===
         "yzhang.markdown-all-in-one",
         "bierner.markdown-preview-github-styles",
         // === OPTIONAL (Visual & Utilities) ===
         "PKief.material-icon-theme",
-        "formulahendry.code-runner",
-        "streetsidesoftware.code-spell-checker"
+        "streetsidesoftware.code-spell-checker",
+        "oderwat.indent-rainbow" // Cores arco-íris por nível de indentação (funcionalidade única)
     ],
     "unwantedRecommendations": [
         // Language servers não relevantes para Node.js project
@@ -60,6 +55,8 @@
         "ritwickdey.LiveServer",
         // DEPRECATED/OBSOLETE EXTENSIONS (NEVER INSTALL)
         "ms-vscode.node-debug",
+        "ms-vscode.node-debug2",
+        "eg2.vscode-npm-script",
         "octref.vetur",
         "formulahendry.auto-close-tag",
         "formulahendry.auto-rename-tag",
@@ -70,6 +67,10 @@
         "CoenraadS.bracket-pair-colorizer",
         "CoenraadS.bracket-pair-colorizer-2",
         "2gua.rainbow-brackets",
-        "ms-vscode.vscode-typescript-tslint-plugin"
+        "ms-vscode.vscode-typescript-tslint-plugin",
+        // PROBLEMATIC EXTENSIONS (Don't install)
+        "formulahendry.code-runner",
+        "mhutchie.git-graph",
+        "rangav.vscode-thunder-client"
     ]
 }

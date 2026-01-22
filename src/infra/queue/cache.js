@@ -14,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const pLimit = require('p-limit'); // P9.7: Concurrency control
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 const PATHS = require('../fs/paths');
 
 // --- CONFIGURAÇÃO DE CADÊNCIA ---

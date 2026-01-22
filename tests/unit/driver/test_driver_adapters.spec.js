@@ -36,7 +36,9 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
 
             const adapter = {
                 waitForLoad: async () => {
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => {
+                        setTimeout(resolve, 100);
+                    });
                     carregado = true;
                 }
             };
@@ -108,6 +110,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve sanitizar prompt', () => {
             const promptBruto = 'Texto com\nquebras\re\u0000caracteres\u0001especiais';
 
+            // eslint-disable-next-line no-control-regex
             const sanitizado = promptBruto.replace(/[\x00-\x1F\x7F]/g, ' ').trim();
 
             assert.ok(!sanitizado.includes('\u0000'));
@@ -150,7 +153,9 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             let completo = false;
 
             const aguardar = async () => {
-                await new Promise(resolve => setTimeout(resolve, 150));
+                await new Promise(resolve => {
+                    setTimeout(resolve, 150);
+                });
                 completo = true;
             };
 
@@ -259,7 +264,9 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             let apareceu = false;
 
             const waitFor = async (selector, timeout) => {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => {
+                    setTimeout(resolve, 100);
+                });
                 apareceu = true;
             };
 
@@ -271,7 +278,9 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve falhar após timeout', async () => {
             const waitFor = async (selector, timeout) => {
                 const start = Date.now();
-                await new Promise(resolve => setTimeout(resolve, timeout + 100));
+                await new Promise(resolve => {
+                    setTimeout(resolve, timeout + 100);
+                });
                 const elapsed = Date.now() - start;
 
                 if (elapsed > timeout) {

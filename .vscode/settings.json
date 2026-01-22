@@ -1,5 +1,51 @@
 {
     "typescript.tsdk": "node_modules/typescript/lib",
+    // ============================================================
+    // FUNCIONALIDADES NATIVAS DO VS CODE (Não precisam de extensões)
+    // ============================================================
+    // Auto Close/Rename Tags: html.autoClosingTags (nativo desde v1.16)
+    // Bracket Colorization: editor.bracketPairColorization (nativo desde v1.60)
+    // Indent Guides: editor.guides.indentation (sempre foi nativo)
+    // NPM Scripts: npm.autoDetect (nativo desde v1.30)
+    // Node Debugger: JavaScript debugger built-in (nativo desde v1.30)
+    // Auto Imports: javascript.suggest.autoImports (nativo)
+    // Linked Editing: editor.linkedEditing (nativo desde v1.60)
+    // Sticky Scroll: editor.stickyScroll.enabled (nativo desde v1.70)
+    // Semantic Highlighting: editor.semanticHighlighting (nativo desde v1.43)
+    // Inlay Hints: javascript.inlayHints.* (nativo desde v1.60)
+    // Test Explorer: testing.* (nativo desde v1.59)
+    // Debug Inline Values: debug.inlineValues (nativo desde v1.43)
+    // Terminal GPU Acceleration: terminal.integrated.gpuAcceleration (nativo desde v1.56)
+    // Search on Type: search.searchOnType (nativo sempre)
+    // Large File Optimizations: editor.largeFileOptimizations (nativo desde v1.47)
+    // Timeline: timeline.* (nativo desde v1.44)
+    // Emmet: emmet.* (sempre nativo)
+    // Color Decorators: editor.colorDecorators (nativo desde v1.10)
+    // ============================================================
+    // CORREÇÕES v4.0 (2026-01-22): 2 críticos + 3 warnings + 8 melhorias
+    // - FIX CRÍTICO: files.hotExit "off" → "onExitAndWindowClose" (previne perda de dados)
+    // - FIX CRÍTICO: Removido security.workspace.trust.enabled: false (vulnerabilidade)
+    // - FIX: workbench.iconTheme "vs-seti" → "material-icon-theme" (extensão instalada)
+    // - PERFORMANCE: quickSuggestionsDelay 0→10ms, hover.delay 300→500ms, editor.limit 10→15 tabs
+    // - PRODUTIVIDADE: +formatOnSaveMode, +colorDecorators, +problems.showCurrentInStatus
+    // - GIT: +scm.defaultViewMode, +git.openRepositoryInParentFolders, +git.timeline
+    // - TIMELINE: +excludeSources, +pageSize (histórico de arquivos)
+    // - EMMET: +includeLanguages, +triggerExpansionOnTab (HTML/CSS abbreviations)
+    // ============================================================
+    // OTIMIZAÇÕES v4.1 (2026-01-22): ESLint + Comunicação de Erros
+    // - ESLINT: +eslint-config-prettier (elimina conflitos com Prettier)
+    // - PROBLEMS: +defaultViewMode=tree, +visibility=true, +maxProblems=10000, +panelWidth=300px
+    // - EDITOR: +showUnused, +showDeprecated, +gotoLocation settings
+    // - ESLINT RULES: +no-shadow, +no-unused-vars, +no-console customizations
+    // - ESLINT OUTPUT: +showOutputChannelOn=onError, +useESLintClass=true
+    // - VISUAL FEEDBACK: 6 canais (squiggles, decorators, problems panel, status bar, minimap, scrollbar)
+    // ============================================================
+    // DEV CONTAINERS
+    // ============================================================
+    "dev.containers.defaultExtensions": [],
+    "dev.containers.executeInWSL": false,
+    "remote.autoForwardPorts": true,
+    "remote.restoreForwardedPorts": true,
     "dev.containers.gpuAvailability": "none",
     "git.enableSmartCommit": true,
     "git.ignoreLimitWarning": true,
@@ -41,11 +87,36 @@
     "eslint.lintTask.enable": true,
     "eslint.alwaysShowStatus": true,
     "eslint.debug": false,
+    "eslint.quiet": false,
+    "eslint.workingDirectories": [
+        {
+            "mode": "auto"
+        }
+    ],
     "eslint.codeActionsOnSave.mode": "all",
     "eslint.problems.shortenToSingleLine": true,
+    "eslint.rules.customizations": [
+        {
+            "rule": "no-shadow",
+            "severity": "warn"
+        },
+        {
+            "rule": "no-unused-vars",
+            "severity": "warn"
+        },
+        {
+            "rule": "no-console",
+            "severity": "off"
+        }
+    ],
+    "eslint.showOutputChannelOn": "onError",
+    "eslint.useESLintClass": true,
     "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modificationsIfAvailable",
     "editor.formatOnPaste": false,
     "editor.formatOnType": false,
+    "editor.colorDecorators": true,
+    "editor.colorDecoratorsLimit": 500,
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "explicit",
@@ -65,13 +136,32 @@
     "editor.guides.bracketPairs": "active",
     "editor.guides.indentation": true,
     "editor.guides.highlightActiveIndentation": true,
+    // Indent Rainbow: Cores arco-íris por nível de indentação
+    "indentRainbow.colors": [
+        "rgba(255,64,64,0.07)",
+        "rgba(255,215,0,0.07)",
+        "rgba(0,255,127,0.07)",
+        "rgba(0,191,255,0.07)"
+    ],
+    "indentRainbow.ignoreErrorLanguages": [
+        "markdown",
+        "plaintext"
+    ],
+    "indentRainbow.indicatorStyle": "light",
+    "indentRainbow.lightIndicatorStyleLineWidth": 1,
     "editor.minimap.enabled": true,
     "editor.minimap.maxColumn": 120,
     "editor.minimap.renderCharacters": false,
     "editor.minimap.showSlider": "always",
     "editor.stickyScroll.enabled": true,
     "editor.stickyScroll.maxLineCount": 5,
+    "editor.stickyScroll.defaultModel": "outlineModel",
     "editor.linkedEditing": true,
+    // Semantic Highlighting (v1.43+) - Melhor destaque de código
+    "editor.semanticHighlighting.enabled": true,
+    "editor.semanticTokenColorCustomizations": {
+        "enabled": true
+    },
     "editor.matchBrackets": "always",
     "editor.cursorBlinking": "smooth",
     "editor.cursorSmoothCaretAnimation": "on",
@@ -81,10 +171,22 @@
     "editor.renderWhitespace": "boundary",
     "editor.renderControlCharacters": true,
     "editor.renderLineHighlight": "all",
+    "editor.gotoLocation.multipleDefinitions": "goto",
+    "editor.gotoLocation.multipleReferences": "goto",
+    "editor.showUnused": true,
+    "editor.showDeprecated": true,
+    // Large File Optimizations (v1.47+) - Desabilita features pesadas em arquivos grandes
+    "editor.largeFileOptimizations": true,
+    // Folding settings - Melhor organização de código
+    "editor.folding": true,
+    "editor.foldingStrategy": "auto",
+    "editor.foldingHighlight": true,
+    "editor.showFoldingControls": "always",
+    "editor.foldingMaximumRegions": 5000,
     "editor.occurrencesHighlight": "multiFile",
     "editor.selectionHighlight": true,
     "editor.hover.enabled": "on",
-    "editor.hover.delay": 300,
+    "editor.hover.delay": 500,
     "editor.hover.sticky": true,
     "files.eol": "\n",
     "files.encoding": "utf8",
@@ -105,6 +207,19 @@
         "*.md": "markdown",
         "*.code-snippets": "jsonc"
     },
+    "shellcheck.enable": true,
+    "shellcheck.run": "onType",
+    "shellcheck.executablePath": "",
+    "shellcheck.exclude": [],
+    "shellcheck.customArgs": [],
+    "shellcheck.ignorePatterns": {
+        "**/*.bat": true,
+        "**/*.ps1": true
+    },
+    "html.autoClosingTags": true,
+    "javascript.autoClosingTags": true,
+    "typescript.autoClosingTags": true,
+    "html.autoCreateQuotes": true,
     "files.watcherExclude": {
         "**/node_modules/**": true,
         "**/dist/**": true,
@@ -147,10 +262,16 @@
     "js/ts.implicitProjectConfig.strictFunctionTypes": false,
     "json.format.enable": true,
     "json.validate.enable": true,
+    "json.schemaDownload.enable": true,
+    "json.maxItemsComputed": 10000,
+    "json.trace.server": "off",
     "typescript.validate.enable": false,
     "typescript.tsserver.useSeparateSyntaxServer": false,
     "typescript.disableAutomaticTypeAcquisition": false,
     "typescript.preferences.importModuleSpecifier": "relative",
+    "typescript.reportStyleChecksAsWarnings": false,
+    "typescript.tsserver.maxTsServerMemory": 4096,
+    "typescript.tsserver.watchOptions": {},
     "[javascript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
@@ -173,6 +294,14 @@
         "editor.defaultFormatter": "yzhang.markdown-all-in-one",
         "editor.wordWrap": "on"
     },
+    "markdown.validate.enabled": true,
+    "markdown.validate.referenceLinks.enabled": "warning",
+    "markdown.validate.fragmentLinks.enabled": "warning",
+    "markdown.validate.fileLinks.enabled": "warning",
+    "markdown.validate.fileLinks.markdownFragmentLinks": "warning",
+    "markdown.validate.ignoredLinks": [],
+    "markdown.validate.unusedLinkDefinitions.enabled": "warning",
+    "markdown.validate.duplicateLinkDefinitions.enabled": "warning",
     "github.copilot.enable": {
         "*": true,
         "javascript": true,
@@ -216,7 +345,7 @@
         "comments": "on",
         "strings": "on"
     },
-    "editor.quickSuggestionsDelay": 0,
+    "editor.quickSuggestionsDelay": 10,
     "editor.parameterHints.enabled": true,
     "editor.suggest.preview": true,
     "editor.suggest.showInlineDetails": true,
@@ -236,6 +365,12 @@
     "javascript.suggest.paths": true,
     "javascript.suggest.completeJSDocs": true,
     "npm.scriptExplorerAction": "run",
+    "npm.scriptExplorerExclude": [
+        "**/node_modules/**",
+        "**/dist/**"
+    ],
+    "npm.enableRunFromFolder": true,
+    "npm.autoDetect": "on",
     "terminal.integrated.defaultProfile.linux": "bash",
     "terminal.integrated.enableMultiLinePasteWarning": "never",
     "terminal.integrated.tabs.enabled": true,
@@ -252,6 +387,12 @@
     "terminal.integrated.shellIntegration.history": 1000,
     "terminal.integrated.suggest.enabled": true,
     "terminal.integrated.suggest.quickSuggestions": true,
+    // Terminal Performance (v1.56+)
+    "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.gpuAcceleration": "auto",
+    "terminal.integrated.rightClickBehavior": "default",
+    "terminal.integrated.confirmOnExit": "hasChildProcesses",
+    "terminal.integrated.confirmOnKill": "editor",
     "makefile.configureOnOpen": true,
     "makefile.extensionOutputFolder": "./.vscode",
     "makefile.launchConfigurations": [
@@ -264,6 +405,12 @@
     "debug.console.fontSize": 13,
     "debug.console.lineHeight": 18,
     "debug.console.wordWrap": true,
+    // Debug Settings Avançados
+    "debug.inlineValues": "on",
+    "debug.focusEditorOnBreak": true,
+    "debug.showBreakpointsInOverviewRuler": true,
+    "debug.showInlineBreakpointCandidates": true,
+    "debug.toolBarLocation": "docked",
     "explorer.confirmDelete": false,
     "explorer.confirmDragAndDrop": false,
     "explorer.sortOrder": "type",
@@ -280,13 +427,22 @@
         "tasks.json": "tasks.json.old, keybindings.json, *.code-snippets"
     },
     "workbench.colorTheme": "Default Dark+",
-    "workbench.iconTheme": "vs-seti",
+    "workbench.iconTheme": "material-icon-theme",
     "workbench.startupEditor": "none",
     "workbench.editor.enablePreview": false,
     "workbench.editor.closeEmptyGroups": true,
     "workbench.editor.highlightModifiedTabs": true,
     "problems.autoReveal": true,
     "problems.decorations.enabled": true,
+    "problems.showCurrentInStatus": true,
+    "problems.sortOrder": "severity",
+    "problems.defaultViewMode": "tree",
+    "problems.visibility": true,
+    "problems.maxNumberOfProblems": 10000,
+    "problems.resultsPanelMinWidth": 300,
+    "problems.tabSize": 10,
+    "problems.multiline.enabled": true,
+    "problems.multiline.indentSize": 4,
     "diffEditor.ignoreTrimWhitespace": false,
     "diffEditor.renderSideBySide": true,
     "diffEditor.renderMarginRevertIcon": true,
@@ -297,17 +453,32 @@
     "scm.diffDecorations": "all",
     "scm.diffDecorationsGutterWidth": 3,
     "scm.alwaysShowProviders": true,
+    "scm.defaultViewMode": "tree",
+    "git.openRepositoryInParentFolders": "always",
+    "git.timeline.showUncommitted": true,
     "merge-conflict.autoNavigateNextConflict.enabled": true,
-    "security.workspace.trust.enabled": false,
+    "merge-conflict.decorators.enabled": true,
+    "merge-conflict.diffViewPosition": "Below",
+    "merge-conflict.codeLens.enabled": true,
     "breadcrumbs.enabled": true,
     "breadcrumbs.filePath": "on",
     "breadcrumbs.symbolPath": "on",
+    "timeline.excludeSources": [],
+    "timeline.pageSize": 20,
     "outline.showFiles": true,
     "outline.showModules": true,
     "outline.showFunctions": true,
     "outline.showVariables": true,
+    "emmet.includeLanguages": {
+        "javascript": "javascriptreact",
+        "markdown": "html"
+    },
+    "emmet.triggerExpansionOnTab": true,
+    "emmet.showExpandedAbbreviation": "always",
     "telemetry.telemetryLevel": "off",
     "redhat.telemetry.enabled": false,
+    "output.smartScroll.enabled": true,
+    "extensions.ignoreRecommendations": false,
     "update.showReleaseNotes": false,
     "extensions.autoCheckUpdates": false,
     "editor.accessibilitySupport": "off",
@@ -327,11 +498,14 @@
     "editor.suggest.snippetsPreventQuickSuggestions": false,
     "editor.wordBasedSuggestions": "matchingDocuments",
     "editor.wordBasedSuggestionsMode": "matchingDocuments",
-    "files.hotExit": "off",
-    "files.restoreUndoStack": false,
+    "files.hotExit": "onExitAndWindowClose",
+    "files.restoreUndoStack": true,
     "files.refactoring.autoSave": true,
     "search.smartCase": true,
     "search.globalFindClipboard": true,
+    // Search on Type (mostra resultados enquanto digita)
+    "search.searchOnType": true,
+    "search.searchOnTypeDebouncePeriod": 300,
     "search.quickOpen.includeHistory": true,
     "search.quickOpen.includeSymbols": true,
     "workbench.list.smoothScrolling": true,
@@ -339,7 +513,29 @@
     "workbench.tree.renderIndentGuides": "always",
     "workbench.editor.revealIfOpen": true,
     "workbench.editor.limit.enabled": true,
-    "workbench.editor.limit.value": 10,
+    "workbench.editor.limit.value": 15,
     "workbench.editor.limit.perEditorGroup": true,
-    "workbench.settings.enableNaturalLanguageSearch": false
+    "workbench.settings.enableNaturalLanguageSearch": false,
+    // ============================================================
+    // TESTING (v1.59+)
+    // ============================================================
+    "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
+    "testing.openTesting": "neverOpen",
+    "testing.saveBeforeTest": true,
+    "testing.followRunningTest": true,
+    "testing.alwaysRevealTestOnStateChange": false,
+    "task.problemMatchers.neverPrompt": false,
+    "task.autoDetect": "on",
+    "task.slowProviderWarning": true,
+    "task.quickOpen.detail": true,
+    "task.quickOpen.skip": false,
+    // ============================================================
+    // EDITOR SUGGESTIONS (Melhorias)
+    // ============================================================
+    "editor.suggestOnTriggerCharacters": true,
+    "editor.acceptSuggestionOnCommitCharacter": true,
+    "editor.suggest.filterGraceful": true,
+    "editor.suggest.matchOnWordStartOnly": false,
+    "editor.suggest.showStatusBar": true,
+    "testing.automaticallyOpenTestResults": "neverOpen"
 }

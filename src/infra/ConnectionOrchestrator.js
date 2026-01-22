@@ -18,7 +18,7 @@ const puppeteerCore = require('puppeteer-core');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
-const { log } = require('../core/logger');
+const { log } = require('@core/logger');
 
 // Importa HELPERS compartilhados de .puppeteerrc.cjs (isDocker, findChrome, getCacheDirectory)
 const puppeteerConfig = require('../../.puppeteerrc.cjs');

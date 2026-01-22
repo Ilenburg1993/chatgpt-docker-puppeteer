@@ -11,9 +11,9 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 
-const io = require('../../../infra/io');
-const { audit, log } = require('../../../core/logger');
-const { ROOT } = require('../../../infra/fs/fs_utils');
+const io = require('@infra/io');
+const { audit, log } = require('@core/logger');
+const { ROOT } = require('@infra/fs/fs_utils');
 
 // Caminho físico absoluto para o arquivo de configuração mestre
 const CONFIG_PATH = path.join(ROOT, 'config.json');

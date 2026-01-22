@@ -18,9 +18,9 @@
 ========================================================================== */
 
 const fs = require('fs');
-const io = require('../../infra/io');
-const { notify, notifyAgent } = require('../engine/socket');
-const { log } = require('../../core/logger');
+const io = require('@infra/io');
+const { notify, notifyAgent } = require('@server/engine/socket');
+const { log } = require('@core/logger');
 
 /**
  * Instância ativa do watcher do SO.

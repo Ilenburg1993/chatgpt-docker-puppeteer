@@ -7,7 +7,7 @@
 ========================================================================== */
 
 const { createCursor } = require('ghost-cursor');
-const { log: _log } = require('../../core/logger');
+const { log: _log } = require('@core/logger');
 
 const cursorCache = new WeakMap();
 
@@ -154,6 +154,7 @@ async function humanType(page, ctx, selector, text, currentLag = 0, signal = nul
     // [P8.1] SECURITY: Sanitize prompt to remove control characters
     // Remove \x00-\x1F (except \n and \t) and \x7F to prevent protocol injection
     const sanitizedText = text
+        // eslint-disable-next-line no-control-regex
         .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove control chars
         .replace(/\r\n/g, '\n') // Normalize line endings
         .trim();

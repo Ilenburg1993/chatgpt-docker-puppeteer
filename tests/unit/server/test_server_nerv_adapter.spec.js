@@ -238,6 +238,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
 
             assert.ok(!('_internal' in sanitized));
             // __proto__ existe em todos os objetos, mas não deve ter a propriedade polluted
+            // eslint-disable-next-line no-proto
             assert.ok(!sanitized.__proto__ || !sanitized.__proto__.polluted);
         });
     });
@@ -267,7 +268,9 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             debounced();
             debounced();
 
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => {
+                setTimeout(resolve, 100);
+            });
 
             assert.strictEqual(emitCount, 1, 'Deve emitir apenas 1 vez');
         });

@@ -8,13 +8,13 @@
    Sincronizado com: BaseDriver V320, adaptive.js V100, TelemetryBridge V500.
 ========================================================================== */
 
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
-const adaptive = require('../../logic/adaptive');
+const adaptive = require('@logic/adaptive');
 
 /**
  * Mede o atraso (lag) do Event Loop no contexto do Browser.

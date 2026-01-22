@@ -8,8 +8,8 @@ const fs = require('fs').promises;
 const fss = require('fs');
 const path = require('path');
 const { z } = require('zod');
-const { log, LOG_DIR } = require('../core/logger');
-const CONFIG = require('../core/config');
+const { log, LOG_DIR } = require('@core/logger');
+const CONFIG = require('@core/config');
 
 /* --------------------------------------------------------------------------
    CONSTANTES DE SEMENTE (SEEDS)

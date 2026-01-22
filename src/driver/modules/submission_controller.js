@@ -7,8 +7,8 @@
    Sincronizado com: BaseDriver V320, adaptive.js V100, TelemetryBridge V500.
 ========================================================================== */
 
-const adaptive = require('../../logic/adaptive');
-const { log } = require('../../core/logger');
+const adaptive = require('@logic/adaptive');
+const { log } = require('@core/logger');
 
 class SubmissionController {
     /**

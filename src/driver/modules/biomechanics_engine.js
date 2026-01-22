@@ -11,16 +11,16 @@ const human = require('./human');
 
 const {
     CONNECTION_MODES: CONNECTION_MODES
-} = require('../../core/constants/browser.js');
+} = require('@core/constants/browser.js');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 const analyzer = require('./analyzer');
 const stabilizer = require('./stabilizer');
-const adaptive = require('../../logic/adaptive');
-const { log } = require('../../core/logger');
+const adaptive = require('@logic/adaptive');
+const { log } = require('@core/logger');
 
 class BiomechanicsEngine {
     /**

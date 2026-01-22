@@ -11,7 +11,7 @@
 const fs = require('fs');
 const fsp = require('fs').promises;
 const readline = require('readline');
-const { MAX_JSON_SIZE } = require('../../infra/fs/fs_utils');
+const { MAX_JSON_SIZE } = require('@infra/fs/fs_utils');
 const { checkPhysicalIntegrity } = require('./rules/physical_rules');
 const { evaluateLine, compileForbiddenList } = require('./rules/semantic_rules');
 const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/format_rules');

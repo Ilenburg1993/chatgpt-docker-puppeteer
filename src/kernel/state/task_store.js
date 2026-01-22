@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 
-const { STATUS_VALUES: STATUS_VALUES } = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
 
 const path = require('path');
 

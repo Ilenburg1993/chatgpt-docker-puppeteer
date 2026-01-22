@@ -136,7 +136,9 @@ describe('Logger - Sistema de Logging Unificado', () => {
             logger.log('INFO', 'Teste de escrita em arquivo');
 
             // Aguardar escrita assíncrona
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => {
+                setTimeout(resolve, 100);
+            });
 
             const logFile = path.join(__dirname, '../../../logs/agente_current.log');
             if (fs.existsSync(logFile)) {

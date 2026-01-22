@@ -7,17 +7,17 @@
    Sincronizado com: BaseDriver V320, TelemetryBridge V500, stabilizer.js V500.
 ========================================================================== */
 
-const BaseDriver = require('../core/BaseDriver');
+const BaseDriver = require('@core/BaseDriver');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 const triage = require('../modules/triage');
-const adaptive = require('../../logic/adaptive');
+const adaptive = require('@logic/adaptive');
 const analyzer = require('../modules/analyzer');
 const stabilizer = require('../modules/stabilizer');
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 class ChatGPTDriver extends BaseDriver {
     /**

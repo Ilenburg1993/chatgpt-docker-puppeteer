@@ -12,11 +12,11 @@ const path = require('path');
 const { log } = require('./logger');
 
 // Infraestrutura e Shared Kernel
-const PATHS = require('../infra/fs/paths');
-const io = require('../infra/io');
+const PATHS = require('@infra/fs/paths');
+const io = require('@infra/io');
 const identityManager = require('./identity_manager');
-const { ActionCode, MessageType, ActorRole } = require('../shared/nerv/constants');
-const { createEnvelope } = require('../shared/nerv/envelope');
+const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
+const { createEnvelope } = require('@shared/nerv/envelope');
 
 // NERV instance will be injected via setNERV()
 let nervInstance = null;

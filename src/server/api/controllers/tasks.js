@@ -12,9 +12,9 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 
-const io = require('../../../infra/io');
-const schemas = require('../../../core/schemas');
-const { audit, log } = require('../../../core/logger');
+const io = require('@infra/io');
+const schemas = require('@core/schemas');
+const { audit, log } = require('@core/logger');
 
 /* --------------------------------------------------------------------------
    1. OPERAÇÕES DE CONSULTA E CRIAÇÃO (CRUD)

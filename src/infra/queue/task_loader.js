@@ -9,14 +9,12 @@
 
 const cache = require('./cache');
 
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
 
 const { getNextEligible } = require('./scheduler');
 const { saveTask } = require('../storage/task_store');
-const CONFIG = require('../../core/config');
-const { log } = require('../../core/logger');
+const CONFIG = require('@core/config');
+const { log } = require('@core/logger');
 
 /**
  * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima

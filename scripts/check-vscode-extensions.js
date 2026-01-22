@@ -52,8 +52,10 @@ try {
 
     if (missingCount > 0) {
         console.log('\n💡 Para instalar extensões faltando:');
-        console.log('   npm run vscode:extensions');
-        console.log('   (ou) make install-extensions');
+        console.log('   1. Abra o Command Palette: Ctrl+Shift+P (Windows/Linux) ou Cmd+Shift+P (Mac)');
+        console.log('   2. Digite: "Extensions: Show Recommended Extensions"');
+        console.log('   3. Clique em "Install" nas extensões desejadas');
+        console.log('\n   Ou instale via DevContainer rebuild (auto-install)');
         process.exit(1);
     } else {
         console.log('\n✅ Todas as extensões recomendadas estão instaladas!');

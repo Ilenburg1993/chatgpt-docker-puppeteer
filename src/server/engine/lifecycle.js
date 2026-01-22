@@ -16,8 +16,9 @@ const logTail = require('../realtime/streams/log_tail');
 const hardwareTelemetry = require('../realtime/telemetry/hardware');
 const fsWatcher = require('../watchers/fs_watcher');
 const logWatcher = require('../watchers/log_watcher');
-const { log } = require('../../core/logger');
-const { ROOT } = require('../../infra/fs/fs_utils');
+const { log } = require('@core/logger');
+const CONFIG = require('@core/config');
+const { ROOT } = require('@infra/fs/fs_utils');
 
 /**
  * Localização do arquivo de descoberta para limpeza no shutdown.

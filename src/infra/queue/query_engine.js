@@ -15,7 +15,7 @@ const cache = require('./cache');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 /**
  * Filtra e ordena as tarefas concluídas de um projeto específico.

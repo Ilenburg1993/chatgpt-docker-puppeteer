@@ -12,9 +12,9 @@ const EventEmitter = require('events');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 /**
  * EVENTOS PADRONIZADOS (The IPC 2.0 Pulse)

@@ -319,9 +319,9 @@ class KernelLoop {
         });
 
         // P9.4: Timeout wrapper para prevenir blocking
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Decision application timeout after 5s')), 5000)
-        );
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Decision application timeout after 5s')), 5000);
+        });
 
         const decisionsPromise = Promise.all(
             proposals.map(async proposal => {

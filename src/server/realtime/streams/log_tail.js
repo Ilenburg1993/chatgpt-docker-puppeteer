@@ -12,9 +12,9 @@ const fsp = require('fs').promises;
 const path = require('path');
 
 // [V700] Importação da autoridade de caminhos para evitar dependências circulares
-const PATHS = require('../../../infra/fs/paths');
-const { log: internalLog } = require('../../../core/logger');
-const { notify } = require('../../engine/socket');
+const PATHS = require('@infra/fs/paths');
+const { log: internalLog } = require('@core/logger');
+const { notify } = require('@server/engine/socket');
 
 /**
  * Localização física do alvo de streaming.

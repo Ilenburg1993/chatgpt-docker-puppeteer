@@ -8,10 +8,10 @@
                      shared/nerv/constants.js (NERV Protocol 2.0)
 ========================================================================== */
 
-const socketHub = require('../engine/socket');
+const socketHub = require('@server/engine/socket');
 const remediation = require('./remediation');
-const { log } = require('../../../core/logger');
-const { ActionCode, MessageType } = require('../../../shared/nerv/constants');
+const { log } = require('@core/logger');
+const { ActionCode, MessageType } = require('@shared/nerv/constants');
 
 class SupervisorReconciler {
     constructor() {

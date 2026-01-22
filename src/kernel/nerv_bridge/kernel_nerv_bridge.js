@@ -21,8 +21,8 @@
 ========================================================================== */
 
 const { v4: uuidv4 } = require('uuid');
-const { ActorRole, MessageType, ActionCode } = require('../../shared/nerv/constants');
-const { createEnvelope } = require('../../shared/nerv/envelope');
+const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
+const { createEnvelope } = require('@shared/nerv/envelope');
 
 /* ===========================
    Utilitários internos

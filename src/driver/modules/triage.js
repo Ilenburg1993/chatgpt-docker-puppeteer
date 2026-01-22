@@ -11,10 +11,10 @@ const stabilizer = require('./stabilizer');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
-const i18n = require('../../core/i18n');
-const { log } = require('../../core/logger');
+const i18n = require('@core/i18n');
+const { log } = require('@core/logger');
 
 const SNAPSHOT_DELAY_MS = 600;
 const MAX_TEXT_PARTS = 1000;

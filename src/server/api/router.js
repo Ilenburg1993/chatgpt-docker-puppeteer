@@ -11,13 +11,13 @@
 
 const tasksController = require('./controllers/tasks');
 
-const { STATUS_VALUES: STATUS_VALUES } = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
 
 const systemController = require('./controllers/system');
 const dnaController = require('./controllers/dna');
 const { notFound, errorHandler } = require('../middleware/error_handler');
-const { log } = require('../../core/logger');
-const { apiLimiter } = require('../engine/app');
+const { log } = require('@core/logger');
+const { apiLimiter } = require('@server/engine/app');
 
 /**
  * Aplica a malha de rotas à instância do Express.
@@ -39,8 +39,8 @@ function applyRoutes(app) {
      */
     app.get('/api/health', async (req, res) => {
         try {
-            const doctor = require('../../core/doctor');
-            const io = require('../../infra/io');
+            const doctor = require('@core/doctor');
+            const io = require('@infra/io');
 
             // Verificação rápida de Chrome (timeout curto)
             const chrome = await doctor.probeChromeConnection();
@@ -97,7 +97,7 @@ function applyRoutes(app) {
      */
     app.get('/api/health/chrome', async (req, res) => {
         try {
-            const doctor = require('../../core/doctor');
+            const doctor = require('@core/doctor');
             const chromeConfig = require('../../../chrome-config.json');
 
             const chrome = await doctor.probeChromeConnection();
@@ -131,7 +131,7 @@ function applyRoutes(app) {
      */
     app.get('/api/health/pm2', async (req, res) => {
         try {
-            const system = require('../../infra/system');
+            const system = require('@infra/system');
 
             const status = await system.getAgentStatus();
 
@@ -193,7 +193,7 @@ function applyRoutes(app) {
     app.get('/api/health/kernel', async (req, res) => {
         try {
             // Verifica se NERV bus está disponível
-            const nerv = require('../../nerv/nerv');
+            const nerv = require('@nerv/nerv');
 
             // Tenta obter estado do Kernel via NERV
             let kernelState = 'unknown';
@@ -228,7 +228,7 @@ function applyRoutes(app) {
             } catch (kernelErr) {
                 log('WARN', `[HEALTH:KERNEL] ${kernelErr.message}`);
                 // Fallback: verifica se há tarefas ativas (indica Kernel vivo)
-                const io = require('../../infra/io');
+                const io = require('@infra/io');
                 const tasks = await io.loadAllTasks();
                 const runningTasks = tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length;
                 isActive = runningTasks > 0;
@@ -358,8 +358,8 @@ function applyRoutes(app) {
      */
     app.get('/api/metrics', async (req, res) => {
         try {
-            const hardware = require('../../core/hardware');
-            const queueCache = require('../../infra/queue/cache');
+            const hardware = require('@core/hardware');
+            const queueCache = require('@infra/queue/cache');
 
             const heapStats = hardware.getHeapStats();
             const cacheMetrics = queueCache.getCacheMetrics();

@@ -28,7 +28,7 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
-const { ActorRole, MessageType, ActionCode } = require('../../shared/nerv/constants');
+const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
 
 // ONDA 2.5: Removido EventEmitter, usa NERV para comunicação
 

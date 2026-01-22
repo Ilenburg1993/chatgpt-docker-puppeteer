@@ -17,8 +17,8 @@
    - Comunicação 100% via NERV (pub/sub)
 ========================================================================== */
 
-const { log } = require('../../core/logger');
-const { ActionCode, MessageType, ActorRole } = require('../../shared/nerv/constants');
+const { log } = require('@core/logger');
+const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
 
 class ServerNERVAdapter {
     /**

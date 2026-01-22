@@ -8,11 +8,11 @@
      - Garantir que o robô não viole limites de segurança (Retries, Timeouts).
 ========================================================================== */
 
-const { ActionCode, MessageType } = require('../../shared/nerv/constants');
+const { ActionCode, MessageType } = require('@shared/nerv/constants');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 class PolicyEngine {
     constructor(config) {
@@ -113,8 +113,8 @@ class PolicyEngine {
 
     _createRejectionEnvelope(originalObs, reason) {
         // Cria um envelope virtual para ser enviado pelo NERV
-        const { createEnvelope } = require('../../shared/nerv/envelope');
-        const { ActorRole } = require('../../shared/nerv/constants');
+        const { createEnvelope } = require('@shared/nerv/envelope');
+        const { ActorRole } = require('@shared/nerv/constants');
 
         return createEnvelope({
             actor: ActorRole.MAESTRO,
@@ -127,8 +127,8 @@ class PolicyEngine {
     }
 
     _createTaskFailedEnvelope(task, reason) {
-        const { createEnvelope } = require('../../shared/nerv/envelope');
-        const { ActorRole } = require('../../shared/nerv/constants');
+        const { createEnvelope } = require('@shared/nerv/envelope');
+        const { ActorRole } = require('@shared/nerv/constants');
 
         return createEnvelope({
             actor: ActorRole.MAESTRO,

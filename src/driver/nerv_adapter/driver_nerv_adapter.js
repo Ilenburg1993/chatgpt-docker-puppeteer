@@ -21,10 +21,10 @@ const DriverLifecycleManager = require('../DriverLifecycleManager');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
-const { log } = require('../../core/logger');
-const { ActionCode, MessageType, ActorRole } = require('../../shared/nerv/constants');
+const { log } = require('@core/logger');
+const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
 
 class DriverNERVAdapter {
     /**

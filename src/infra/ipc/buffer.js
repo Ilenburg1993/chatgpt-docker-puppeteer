@@ -7,7 +7,7 @@
                      e o replay ordenado (FIFO) após a reconexão.
 ========================================================================== */
 
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 class IPCBuffer {
     /**

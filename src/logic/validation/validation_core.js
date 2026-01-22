@@ -7,9 +7,9 @@
    Sincronizado com: scan_engine.js (V1.1), i18n.js (V32), index.js (V190).
 ========================================================================== */
 
-const i18n = require('../../core/i18n');
+const i18n = require('@core/i18n');
 const { runSinglePassValidation } = require('./scan_engine');
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 /**
  * Realiza a auditoria completa de qualidade de um resultado em disco.

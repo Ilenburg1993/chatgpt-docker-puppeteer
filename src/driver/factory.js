@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const TargetDriver = require('./core/TargetDriver');
-const { log } = require('../core/logger');
+const { log } = require('@core/logger');
 
 /**
  * Localização dos drivers específicos (targets).

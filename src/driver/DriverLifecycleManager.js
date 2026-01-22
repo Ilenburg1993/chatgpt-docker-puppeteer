@@ -9,7 +9,7 @@
 ========================================================================== */
 
 const driverFactory = require('./factory');
-const { log } = require('../core/logger');
+const { log } = require('@core/logger');
 
 class DriverLifecycleManager {
     /**

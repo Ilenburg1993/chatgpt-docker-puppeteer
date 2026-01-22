@@ -5,7 +5,7 @@
    Responsabilidade: Gestão de handles do Puppeteer com cleanup automático.
 ========================================================================== */
 
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 class HandleManager {
     constructor(driver) {

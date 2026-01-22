@@ -2,6 +2,153 @@
   "version": "2.0.0",
   "tasks": [
     // =========================================================================
+    // 🔍 DEBUG MODE - Workspace-Wide Validation (Comprehensive Suite)
+    // =========================================================================
+    {
+        "label": "🔍 Debug Mode: Full Workspace Scan",
+        "type": "shell",
+        "command": "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=stylish --max-warnings=999999",
+        "problemMatcher": [
+            "$eslint-stylish"
+        ],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "showReuseMessage": false,
+            "focus": true
+        },
+        "group": {
+            "kind": "test",
+            "isDefault": false
+        }
+    },
+    {
+        "label": "🔍 Debug Mode: Full Workspace + Stats",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+            "-c",
+            "echo '=== 🔍 WORKSPACE SCAN ===' && npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=stylish --max-warnings=999999 && echo '' && echo '=== 📊 STATS ===' && echo \"Files: $(find . -name '*.js' -not -path './node_modules/*' -not -path './backups/*' -not -path './tmp/*' | wc -l)\" && echo \"Total Issues: $(npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --format=json 2>/dev/null | grep -o '\"severity\":' | wc -l)\""
+        ],
+        "problemMatcher": [
+            "$eslint-stylish"
+        ],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "showReuseMessage": false,
+            "focus": true
+        }
+    },
+    {
+        "label": "🔍 Debug Mode: Source Code Only (src/)",
+        "type": "shell",
+        "command": "npx eslint src/ --format=stylish --max-warnings=999999",
+        "problemMatcher": [
+            "$eslint-stylish"
+        ],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    {
+        "label": "🔍 Debug Mode: Tests Only (tests/)",
+        "type": "shell",
+        "command": "npx eslint tests/ --format=stylish --max-warnings=999999",
+        "problemMatcher": [
+            "$eslint-stylish"
+        ],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    {
+        "label": "🔍 Debug Mode: Scripts Only (scripts/)",
+        "type": "shell",
+        "command": "npx eslint scripts/ --format=stylish --max-warnings=999999",
+        "problemMatcher": [
+            "$eslint-stylish"
+        ],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    {
+        "label": "🔍 Debug Mode: Errors Only (No Warnings)",
+        "type": "shell",
+        "command": "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --quiet --format=stylish",
+        "problemMatcher": [
+            "$eslint-stylish"
+        ],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    {
+        "label": "📊 Debug Mode: Export JSON Report",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+            "-c",
+            "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=json --output-file=eslint-report.json && echo '✅ Report saved: eslint-report.json' && wc -l eslint-report.json"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    {
+        "label": "📊 Debug Mode: Export HTML Report",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+            "-c",
+            "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=html --output-file=eslint-report.html && echo '✅ Report saved: eslint-report.html' && echo 'Open with: xdg-open eslint-report.html'"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    {
+        "label": "🎯 Debug Mode: Master Scan (All Validations)",
+        "dependsOn": [
+            "🔍 Debug Mode: Full Workspace + Stats",
+            "Validate: JSON Files",
+            "Validate: Shell Scripts",
+            "Validate: Git Status",
+            "Validate: Node Syntax"
+        ],
+        "dependsOrder": "sequence",
+        "problemMatcher": [],
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "clear": true,
+            "focus": true
+        }
+    },
+    // =========================================================================
     // Build & Quality (ESLint, Format, Lint)
     // =========================================================================
     {
@@ -22,7 +169,7 @@
     {
       "label": "ESLint: Check All Files",
       "type": "shell",
-      "command": "npx eslint . --quiet",
+    "command": "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**'",
       "problemMatcher": ["$eslint-stylish"],
       "presentation": {
         "reveal": "always",
@@ -428,6 +575,148 @@
         "reveal": "always",
         "panel": "dedicated"
       }
+    },
+    // =========================================================================
+    // VALIDATION TASKS (Maximiza uso da aba Problems)
+    // =========================================================================
+    {
+        "label": "🔍 Validate All: Complete Workspace Check",
+        "type": "shell",
+        "command": "echo",
+        "args": [
+            "✅ Running comprehensive validation across all tools..."
+        ],
+        "dependsOn": [
+            "Validate: JSON Files",
+            "Validate: Shell Scripts",
+            "Validate: Git Status",
+            "Validate: Node Syntax"
+        ],
+        "dependsOrder": "parallel",
+        "problemMatcher": [],
+        "group": {
+            "kind": "test",
+            "isDefault": false
+        },
+        "presentation": {
+            "reveal": "always",
+            "panel": "dedicated",
+            "showReuseMessage": false,
+            "clear": true
+        }
+    },
+    {
+        "label": "Validate: JSON Files",
+        "type": "shell",
+        "command": "node",
+        "args": [
+            "-e",
+            "const fs=require('fs');const path=require('path');const files=['package.json','config.json','controle.json','dynamic_rules.json','ecosystem.config.js'];let errors=0;files.forEach(f=>{if(!fs.existsSync(f))return;try{const content=fs.readFileSync(f,'utf8');if(f.endsWith('.json'))JSON.parse(content);console.log(`✓ ${f}`)}catch(e){console.error(`${path.resolve(f)}:1: ${e.message}`);errors++}});process.exit(errors)"
+        ],
+        "problemMatcher": {
+            "owner": "json-validator",
+            "source": "json",
+            "fileLocation": "absolute",
+            "pattern": {
+                "regexp": "^(.+):(\\d+): (.+)$",
+                "file": 1,
+                "line": 2,
+                "message": 3
+            }
+        },
+        "presentation": {
+            "reveal": "silent",
+            "panel": "shared"
+        }
+    },
+    {
+        "label": "Validate: Shell Scripts",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+            "-c",
+            "if command -v shellcheck >/dev/null 2>&1; then find . -name '*.sh' -not -path './node_modules/*' -not -path './backups/*' -exec shellcheck -f gcc {} +; else echo 'ShellCheck not installed (optional)'; fi"
+        ],
+        "problemMatcher": {
+            "owner": "shellcheck",
+            "source": "shellcheck",
+            "fileLocation": "absolute",
+            "pattern": {
+                "regexp": "^(.+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.+)\\s+\\[(.+)\\]$",
+                "file": 1,
+                "line": 2,
+                "column": 3,
+                "severity": 4,
+                "message": 5,
+                "code": 6
+            }
+        },
+        "presentation": {
+            "reveal": "silent",
+            "panel": "shared"
+        }
+    },
+    {
+        "label": "Validate: Git Status",
+        "type": "shell",
+        "command": "git",
+        "args": [
+            "diff",
+            "--check"
+        ],
+        "problemMatcher": {
+            "owner": "git",
+            "source": "git",
+            "fileLocation": "relative",
+            "pattern": {
+                "regexp": "^(.+):(\\d+): (.+)$",
+                "file": 1,
+                "line": 2,
+                "message": 3
+            }
+        },
+        "presentation": {
+            "reveal": "silent",
+            "panel": "shared"
+        }
+    },
+    {
+        "label": "Validate: Node Syntax",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+            "-c",
+            "errors=0; for file in $(find src tests -name '*.js' 2>/dev/null); do node --check \"$file\" 2>&1 | grep -v 'Debugger' && ((errors++)); done; exit $errors"
+        ],
+        "problemMatcher": {
+            "owner": "node-syntax",
+            "source": "node",
+            "fileLocation": "absolute",
+            "pattern": {
+                "regexp": "^(.+):(\\d+)$",
+                "file": 1,
+                "line": 2,
+                "message": 0
+            }
+        },
+        "presentation": {
+            "reveal": "silent",
+            "panel": "shared"
+        }
+    },
+    {
+        "label": "Validate: Package Dependencies",
+        "type": "shell",
+        "command": "npm",
+        "args": [
+            "audit",
+            "--audit-level=moderate"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+            "reveal": "silent",
+            "panel": "shared"
+        }
     }
   ]
 }

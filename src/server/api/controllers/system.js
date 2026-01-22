@@ -14,12 +14,12 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Motores de Infraestrutura, Core e Comunicação
-const system = require('../../../infra/system');
-const doctor = require('../../../core/doctor');
-const io = require('../../../infra/io');
-const socketHub = require('../../engine/socket');
-const { audit, log } = require('../../../core/logger');
-const { ROOT } = require('../../../infra/fs/fs_utils');
+const system = require('@infra/system');
+const doctor = require('@core/doctor');
+const io = require('@infra/io');
+const socketHub = require('@server/engine/socket');
+const { audit, log } = require('@core/logger');
+const { ROOT } = require('@infra/fs/fs_utils');
 
 /* --------------------------------------------------------------------------
    1. OBSERVABILIDADE DE AGENTES (IPC 2.0)

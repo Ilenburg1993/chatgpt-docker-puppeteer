@@ -11,7 +11,7 @@ const express = require('express');
 const path = require('path');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const { ROOT, LOG_DIR } = require('../../infra/fs/fs_utils');
+const { ROOT, LOG_DIR } = require('@infra/fs/fs_utils');
 
 // [P8.3] SECURITY: CORS policy
 const cors = require('cors');
@@ -93,7 +93,7 @@ app.use('/crash_reports', express.static(crashReportsPath));
 /* --------------------------------------------------------------------------
    4. CAMADA DE OBSERVABILIDADE (P9.1)
 -------------------------------------------------------------------------- */
-const hardware = require('../../core/hardware');
+const hardware = require('@core/hardware');
 
 // Health endpoint com heap monitoring
 app.get('/api/health-metrics', (req, res) => {

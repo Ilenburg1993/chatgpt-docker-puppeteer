@@ -222,7 +222,7 @@ async function validateDNASanity() {
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
-    const io = require('../infra/io'); // Carrega dinamicamente para evitar ciclos
+    const io = require('@infra/io'); // Carrega dinamicamente para evitar ciclos
 
     const targets = ['https://www.google.com', ...(CONFIG.allowedDomains || []).map(d => `https://${d}`)];
     const [networkResults, storage, dna, lag, chrome] = await Promise.all([

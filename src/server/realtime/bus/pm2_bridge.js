@@ -7,9 +7,10 @@
    Sincronizado com: system.js V45, engine/socket.js V600, main.js V700.
 ========================================================================== */
 
-const { pm2Raw } = require('../../../infra/system');
-const { notify } = require('../../engine/socket');
-const { log } = require('../../../core/logger');
+const { pm2Raw } = require('@infra/system');
+const { notify } = require('@server/engine/socket');
+const { log } = require('@core/logger');
+const CONFIG = require('@core/config');
 
 /**
  * Nome do processo alvo conforme definido no ecossistema PM2.

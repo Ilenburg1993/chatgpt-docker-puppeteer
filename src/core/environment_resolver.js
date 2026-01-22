@@ -7,7 +7,7 @@
    Sincronizado com: driver/factory.js V50, execution_engine.js V1.4.0.
 ========================================================================== */
 
-const driverFactory = require('../driver/factory');
+const driverFactory = require('@driver/factory');
 
 class EnvironmentResolver {
     /**

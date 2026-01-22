@@ -9,7 +9,7 @@
 ========================================================================== */
 
 const TargetDriver = require('./TargetDriver');
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 // Subsistemas Modulares (Músculos e Sentidos Físicos)
 const RecoverySystem = require('../modules/recovery_system');

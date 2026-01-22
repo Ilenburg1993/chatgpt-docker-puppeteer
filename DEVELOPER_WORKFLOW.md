@@ -1,7 +1,7 @@
 # Developer Workflow Guide
 
-**Última atualização:** 21/01/2026
-**Versão:** 1.0
+**Última atualização:** 22/01/2026
+**Versão:** 1.1 (module-alias migration)
 **Makefile:** v2.4 (573 linhas, 49+ targets)
 
 ## 📋 Filosofia: Makefile como Interface Única
@@ -14,6 +14,90 @@ O **Makefile v2.4** é a interface centralizada para todas operações de desenv
 - ✅ **Documentado**: `make help` sempre disponível
 - ✅ **Composição**: Targets chamam outros targets (DRY)
 - ✅ **Shortcuts**: Comandos de 1 letra para operações frequentes
+
+---
+
+## 🔧 Convenções de Código: Module Aliases (NOVO)
+
+### ⚠️ IMPORTANTE: Use Aliases, Não Caminhos Relativos
+
+Este projeto migrou para **module-alias** (v2.2.3) em 22/01/2026. SEMPRE use aliases ao invés de `../../../`:
+
+```javascript
+// ❌ ERRADO (caminhos relativos - DEPRECATED)
+const logger = require('../../../core/logger');
+const io = require('../../infra/io');
+const { ActorRole } = require('../../../shared/nerv/constants');
+
+// ✅ CORRETO (aliases)
+const logger = require('@core/logger');
+const io = require('@infra/io');
+const { ActorRole } = require('@shared/nerv/constants');
+```
+
+### 📚 Aliases Disponíveis
+
+| Alias     | Caminho       | Uso                                           |
+| --------- | ------------- | --------------------------------------------- |
+| `@`       | `src/`        | Raiz do código (raramente usado)              |
+| `@core`   | `src/core/`   | Config, logger, constants, schemas, forensics |
+| `@shared` | `src/shared/` | NERV constants, utilities compartilhadas      |
+| `@nerv`   | `src/nerv/`   | Event bus, pub/sub, correlation               |
+| `@kernel` | `src/kernel/` | Task execution engine, policy                 |
+| `@driver` | `src/driver/` | ChatGPT, Gemini drivers                       |
+| `@infra`  | `src/infra/`  | Browser pool, locks, queue, storage           |
+| `@server` | `src/server/` | Dashboard, API, Socket.io                     |
+| `@logic`  | `src/logic/`  | Business rules, domain logic                  |
+
+### 🎯 Como Escolher o Alias Certo
+
+**1. Config, Logger, Constants → `@core`**
+```javascript
+const CONFIG = require('@core/config');
+const { log } = require('@core/logger');
+const { STATUS_VALUES } = require('@core/constants/tasks');
+```
+
+**2. Browser, Queue, Storage → `@infra`**
+```javascript
+const io = require('@infra/io');
+const pool = require('@infra/pool/pool_manager');
+const locks = require('@infra/locks/lock_manager');
+```
+
+**3. NERV Events, IPC → `@shared` ou `@nerv`**
+```javascript
+const { ActorRole, MessageType } = require('@shared/nerv/constants');
+const emitter = require('@nerv/emitter');
+```
+
+**4. API, Dashboard → `@server`**
+```javascript
+const socket = require('@server/engine/socket');
+const routes = require('@server/api/routes');
+```
+
+### 🛠️ IntelliSense & Autocomplete
+
+O VSCode está configurado (`jsconfig.json`) para autocomplete dos aliases:
+
+1. Digite `require('@c` → IntelliSense sugere `@core`, `@kernel`
+2. Digite `@core/` → IntelliSense lista `config`, `logger`, `constants/`, etc.
+3. **Ctrl+Click** em um import salta direto para o arquivo
+
+### ✅ Validação (antes de commit)
+
+```bash
+# 1. Verificar se há imports relativos profundos (deprecated)
+grep -r "require(['\"]\.\..*\.\./\.\." src --include="*.js" | wc -l
+# Deve retornar: 0 (zero imports com ../../ ou ../../../)
+
+# 2. Verificar se aliases estão funcionando
+npm test
+
+# 3. ESLint deve passar limpo
+make lint
+```
 
 ---
 

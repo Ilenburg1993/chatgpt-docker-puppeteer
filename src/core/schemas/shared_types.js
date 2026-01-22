@@ -8,7 +8,7 @@
 ========================================================================== */
 
 const { z } = require('zod');
-const { cleanText } = require('../../infra/fs/fs_utils');
+const { cleanText } = require('@infra/fs/fs_utils');
 const { STATUS_VALUES, STATUS_VALUES_ARRAY } = require('../constants/tasks.js');
 
 /**

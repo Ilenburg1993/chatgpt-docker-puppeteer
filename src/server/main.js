@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 
-const { CONNECTION_MODES: CONNECTION_MODES } = require('../core/constants/browser.js');
+const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
 
 const _path = require('path');
 
@@ -37,12 +37,12 @@ const logWatcher = require('./watchers/log_watcher');
 
 // 6. Adaptador NERV (Comunicação com Barramento)
 const ServerNERVAdapter = require('./nerv_adapter/server_nerv_adapter');
-const NERV = require('../shared/nerv/nerv');
+const NERV = require('@shared/nerv/nerv');
 
 // 7. Utilidades de Core e Infra
-const { log } = require('../core/logger');
-const PATHS = require('../infra/fs/paths');
-const { PROTOCOL_VERSION } = require('../shared/nerv/constants');
+const { log } = require('@core/logger');
+const PATHS = require('@infra/fs/paths');
+const { PROTOCOL_VERSION } = require('@shared/nerv/constants');
 
 /**
  * === BOOTSTRAP ANCHOR ===

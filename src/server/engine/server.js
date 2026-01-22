@@ -9,7 +9,7 @@
 
 const http = require('http');
 const app = require('./app'); // Fábrica Express desidratada e configurada
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 
 /**
  * Referência privada para a instância do servidor.

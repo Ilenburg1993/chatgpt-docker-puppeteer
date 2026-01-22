@@ -19,10 +19,10 @@
 
 const _puppeteer = require('puppeteer');
 
-const { STATUS_VALUES: STATUS_VALUES } = require('../../core/constants/tasks.js');
+const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
 
 const _puppeteerCore = require('puppeteer-core');
-const { log } = require('../../core/logger');
+const { log } = require('@core/logger');
 const { ConnectionOrchestrator } = require('../ConnectionOrchestrator');
 
 class BrowserPoolManager {

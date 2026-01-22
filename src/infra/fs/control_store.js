@@ -8,7 +8,7 @@ const { CONTROL_FILE, safeReadJSON } = require('./fs_core');
 
 const {
     STATUS_VALUES: STATUS_VALUES
-} = require('../../core/constants/tasks.js');
+} = require('@core/constants/tasks.js');
 
 async function checkControlPause() {
     try {
