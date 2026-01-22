@@ -177,7 +177,7 @@
         "madge": "^8.0.0",
         "mermaid": "^11.12.2",
         "nodemon": "^3.1.9",
-        "prettier": "3.8.0",
+        "prettier": "3.8.1",
         "puppeteer-core": "^24.35.0",
         "sinon": "21.0.1",
         "supertest": "7.2.2"
