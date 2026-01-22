@@ -1,62 +1,324 @@
 name: CI
 
-# ⚠️ DEVELOPMENT STATUS: Pre-v1.0 - Tests may be incomplete
-# This workflow validates basic functionality during active development
+# CI/CD Pipeline v2.0 - Module Alias Support (22/01/2026)
+# Validates: ESLint, tests, alias resolution, dependency consistency
+# Platforms: Ubuntu, Windows, macOS (cross-platform validation)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '20'
+  STRICT_MODE: true  # Fail-fast for CI reliability
 
 jobs:
+  # Job 1: Dependency Validation
+  dependencies:
+    name: Validate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check package-lock.json consistency
+        run: |
+          npm install --package-lock-only
+          git diff --exit-code package-lock.json || {
+            echo "❌ package-lock.json is out of sync with package.json"
+            echo "Run: npm install --package-lock-only"
+            exit 1
+          }
+
+      - name: Validate module-alias configuration
+        run: |
+          echo "✓ Validating module-alias setup..."
+          node -e "
+          const pkg = require('./package.json');
+          if (!pkg._moduleAliases) {
+            console.error('❌ Missing _moduleAliases in package.json');
+            process.exit(1);
+          }
+          const aliases = Object.keys(pkg._moduleAliases);
+          if (aliases.length < 9) {
+            console.error('❌ Expected 9 aliases, found:', aliases.length);
+            process.exit(1);
+          }
+          console.log('✓ Module aliases configured:', aliases.join(', '));
+          "
+
+      - name: Check for deprecated relative imports
+        run: |
+          echo "🔍 Checking for deprecated relative imports (../../..)..."
+          COUNT=$(grep -r "require(['\"]\.\..*\.\./\.\." src --include="*.js" | wc -l || echo 0)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "❌ Found $COUNT deep relative imports (deprecated)"
+            echo "Use aliases instead: @core, @infra, @shared, etc."
+            grep -r "require(['\"]\.\..*\.\./\.\." src --include="*.js" || true
+            exit 1
+          fi
+          echo "✓ No deprecated relative imports found"
+
+  # Job 2: Code Quality (Lint + Format)
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    needs: dependencies
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint check (strict)
+        run: |
+          echo "🔍 Running ESLint with --max-warnings 0..."
+          npx eslint . --max-warnings 0 --quiet
+
+      - name: Prettier format check
+        run: npm run format:check
+
+  # Job 3: Tests (Multi-platform)
   test:
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: dependencies
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
-      fail-fast: false  # Continue testing even if one OS fails
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-    - name: Install dependencies (if package.json present)
-      # Run install with the shell appropriate for the runner
-      # Linux install
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        if [ -f package.json ]; then npm ci; fi
+      - uses: actions/checkout@v4
 
-    - name: Install dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        if (Test-Path -Path package.json) { npm ci }
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-    - name: Validate Node.js setup
-      run: node --version
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Check package.json structure
-      run: node -e "const pkg = require('./package.json'); console.log('✓ Package:', pkg.name, pkg.version);"
-
-    - name: Run tests (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      continue-on-error: true  # Pre-v1.0: Don't fail CI on test errors
-      run: |
-        if [ -f package.json ]; then
-          npm test || echo "⚠️ Tests failed (expected in development)"
-        fi
-
-    - name: Run tests (Windows)
-      if: matrix.os == 'windows-latest'
-      continue-on-error: true  # Pre-v1.0: Don't fail CI on test errors
-      shell: pwsh
-      run: |
-        if (Test-Path -Path package.json) {
-          npm test
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "⚠️ Tests failed (expected in development)" -ForegroundColor Yellow
+      - name: Verify module-alias activation
+        run: |
+          node -e "
+          try {
+            require('module-alias/register');
+            const logger = require('@core/logger');
+            console.log('✓ Module aliases working');
+          } catch (err) {
+            console.error('❌ Module alias resolution failed:', err.message);
+            process.exit(1);
           }
-        }
+          "
+
+      - name: Run test suite
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      - name: Run fast tests (pre-commit)
+        run: |
+          if [ -f tests/test_p1_p5_fixes.js ]; then
+            node tests/test_p1_p5_fixes.js
+          fi
+        shell: bash
+
+      - name: Validate test coverage
+        run: |
+          echo "📊 Test coverage validation..."
+          npm test 2>&1 | tee test-output.txt
+          PASS_COUNT=$(grep -E "(✅|✓|PASS|pass)" test-output.txt | wc -l || echo 0)
+          echo "✓ Assertions passed: $PASS_COUNT"
+          if [ "$PASS_COUNT" -lt 70 ]; then
+            echo "⚠️ Warning: Low test coverage (expected 70+)"
+          fi
+        shell: bash
+
+  # Job 4: Integration Tests (Linux only - requires Docker)
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run config validation tests
+        run: node tests/test_config_validation.js
+
+      - name: Run NERV integration tests
+        run: node tests/test_driver_nerv_integration.js
+
+      - name: Run boot sequence tests
+        run: node tests/test_boot_sequence.js
+
+  # Job 5: Build Validation
+  build:
+    name: Validate Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate syntax (all JS files)
+        run: |
+          echo "🔍 Validating JavaScript syntax..."
+          find src -name "*.js" -type f | while read file; do
+            node -c "$file" || {
+              echo "❌ Syntax error in: $file"
+              exit 1
+            }
+          done
+          echo "✓ All JS files have valid syntax"
+
+      - name: Check for module resolution errors
+        run: |
+          echo "🔍 Testing module resolution..."
+          node scripts/test-aliases.js
+
+      - name: Validate ecosystem.config.js (PM2)
+        run: |
+          node -e "
+          const config = require('./ecosystem.config.js');
+          if (!config.apps || config.apps.length === 0) {
+            console.error('❌ Invalid PM2 config');
+            process.exit(1);
+          }
+          console.log('✓ PM2 config valid');
+          "
+
+  # Job 6: Security Scan (only on main/develop)
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: npm audit (high/critical only)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Check for secrets in code
+        run: |
+          if command -v git-secrets &> /dev/null; then
+            git secrets --scan
+          else
+            echo "⚠️ git-secrets not installed, skipping"
+          fi
+        continue-on-error: true
+
+  # Job 7: Documentation Check
+  docs:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required documentation
+        run: |
+          echo "📚 Validating documentation..."
+          REQUIRED_DOCS=(
+            "README.md"
+            "CONTRIBUTING.md"
+            "DEVELOPER_WORKFLOW.md"
+            "DOCUMENTAÇÃO/MODULE_ALIASES.md"
+            "DOCUMENTAÇÃO/ALIAS_VALIDATION_REPORT.md"
+          )
+
+          MISSING=0
+          for doc in "${REQUIRED_DOCS[@]}"; do
+            if [ ! -f "$doc" ]; then
+              echo "❌ Missing: $doc"
+              MISSING=$((MISSING + 1))
+            else
+              echo "✓ Found: $doc"
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "❌ $MISSING required documentation files missing"
+            exit 1
+          fi
+          echo "✓ All required documentation present"
+
+      - name: Validate markdown links
+        run: |
+          echo "🔗 Checking for broken markdown links..."
+          # Simple check for common issues
+          if grep -r "](DOCUMENTAÇÃO" . --include="*.md" | grep -v "DOCUMENTAÇÃO/"; then
+            echo "⚠️ Found potential broken relative links"
+          fi
+        continue-on-error: true
+
+  # Job 8: CI Summary
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [dependencies, lint, test, integration, build, docs]
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo "  CI/CD Pipeline Summary (Module Alias v1.0)"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "✅ Dependencies: ${{ needs.dependencies.result }}"
+          echo "✅ Lint: ${{ needs.lint.result }}"
+          echo "✅ Tests: ${{ needs.test.result }}"
+          echo "✅ Integration: ${{ needs.integration.result }}"
+          echo "✅ Build: ${{ needs.build.result }}"
+          echo "✅ Docs: ${{ needs.docs.result }}"
+          echo ""
+          if [ "${{ needs.dependencies.result }}" != "success" ] || \
+             [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.integration.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.docs.result }}" != "success" ]; then
+            echo "❌ CI FAILED - Check logs above"
+            exit 1
+          fi
+          echo "✅ CI PASSED - All checks successful!"

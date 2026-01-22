@@ -98,7 +98,8 @@ function applyRoutes(app) {
     app.get('/api/health/chrome', async (req, res) => {
         try {
             const doctor = require('@core/doctor');
-            const chromeConfig = require('../../../chrome-config.json');
+            const path = require('path');
+            const chromeConfig = require(path.join(process.cwd(), 'chrome-config.json'));
 
             const chrome = await doctor.probeChromeConnection();
 
@@ -264,8 +265,7 @@ function applyRoutes(app) {
             const fs = require('fs');
             const path = require('path');
             const { execSync } = require('child_process');
-
-            const ROOT = path.join(__dirname, '../../..');
+            const { ROOT } = require('@infra/fs/fs_utils');
 
             // Função helper para obter tamanho de diretório
             const getDirSize = dirPath => {
