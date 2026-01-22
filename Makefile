@@ -40,7 +40,7 @@ endef
         docker-stop docker-logs docker-shell docker-clean ci-test ci-lint info \
         version check-deps rebuild full-check vscode-info commit-settings \
         git-changed reload-vscode install-deps update-deps deps-consistency format-code \
-        workspace-clean git-push-safe s st r h l t c b q d i v g
+        workspace-clean git-push-safe install-extensions check-extensions s st r h l t c b q d i v g
 
 # =============================================================================
 # Tool Aliases (Centralized)
@@ -182,6 +182,8 @@ help:
 	@echo ""
 	@echo "$(CYAN)📝 VS Code & Git:$(NC)"
 	@echo "  make vscode-info       Show VS Code config stats"
+	@echo "  make install-extensions   Install missing VS Code extensions"
+	@echo "  make check-extensions     Check extensions status"
 	@echo "  make commit-settings   Commit .vscode/ changes"
 	@echo "  make git-changed       Show modified files (detailed)"
 	@echo "  make reload-vscode     Instructions to reload VS Code"
@@ -586,6 +588,19 @@ vscode-info:
 	@echo "$(CYAN)Key Optimizations:$(NC)"
 	@grep -E '(copilot|git|terminal|inlayHints)' .vscode/settings.json 2>/dev/null | head -5 | sed 's/^/  /'
 	@echo ""
+
+install-extensions:
+	@echo "$(GREEN)📦 Installing VS Code extensions...$(NC)"
+	@bash scripts/install-extensions.sh
+
+check-extensions:
+	@echo "$(CYAN)🔍 Checking VS Code extensions status...$(NC)"
+	@echo ""
+	@$(NPM) run vscode:check || true
+	@echo ""
+	@echo "$(YELLOW)💡 To install missing extensions:$(NC)"
+	@echo "   make install-extensions"
+	@echo "   (or) npm run vscode:extensions"
 
 commit-settings:
 	@echo "$(GREEN)📝 Committing VS Code settings v2.0...$(NC)"

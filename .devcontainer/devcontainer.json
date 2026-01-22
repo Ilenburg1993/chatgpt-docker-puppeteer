@@ -82,6 +82,7 @@
         "vscode": {
             // Extensions to install automatically
             "extensions": [
+                // === CORE ESSENTIALS (Auto-install) ===
                 "dbaeumer.vscode-eslint",
                 "esbenp.prettier-vscode",
                 "ms-azuretools.vscode-docker",
@@ -91,7 +92,15 @@
                 "eamodio.gitlens",
                 "usernamehw.errorlens",
                 "christian-kohler.path-intellisense",
-                "christian-kohler.npm-intellisense"
+                "christian-kohler.npm-intellisense",
+                // === ADDITIONAL RECOMMENDED ===
+                "aaron-bond.better-comments",
+                "gruntfuggly.todo-tree",
+                "humao.rest-client",
+                "yzhang.markdown-all-in-one",
+                "PKief.material-icon-theme",
+                "streetsidesoftware.code-spell-checker",
+                "pflannery.vscode-versionlens"
             ],
             // Settings overrides for container
             "settings": {
