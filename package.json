@@ -162,7 +162,7 @@
         "@eslint/json": "^0.14.0",
         "@eslint/markdown": "^7.5.1",
         "@faker-js/faker": "10.2.0",
-        "@types/node": "25.0.9",
+        "@types/node": "25.0.10",
         "c8": "10.1.3",
         "complexity-report": "^2.0.0-alpha",
         "cross-env": "^10.1.0",
