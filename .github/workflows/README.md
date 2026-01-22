@@ -1,25 +1,33 @@
 # GitHub Actions Workflows - Documentação
 
 **Última atualização:** 22/01/2026
-**CI/CD Version:** v2.0 (Module Alias Support)
+**CI/CD Version:** v2.0 (Module Alias Support + Security Consolidation)
 
 ---
 
 ## 📋 Overview
 
-Este diretório contém 7 workflows do GitHub Actions para CI/CD, segurança e qualidade de código.
+Este diretório contém **3 workflows principais** do GitHub Actions para CI/CD, segurança e qualidade de código.
 
-### Workflows Ativos
+### Workflows Ativos (v2.0 Consolidation)
 
 | Workflow | Trigger | Plataformas | Duração Estimada | Status |
 |----------|---------|-------------|------------------|--------|
-| **ci.yml** | Push/PR | Ubuntu, Windows, macOS | ~8-12 min | ✅ v2.0 |
-| **pre-commit.yml** | Push/PR | Ubuntu | ~2 min | ✅ Active |
-| **secret-scan.yml** | Push | Ubuntu | ~1 min | ✅ Active |
-| **secret-scan-schedule.yml** | Cron (daily) | Ubuntu | ~1 min | ✅ Active |
-| **secret-scan-dispatch.yml** | Manual | Ubuntu | ~1 min | ✅ Active |
-| **docker-security-scan.yml** | Push (Docker files) | Ubuntu | ~3 min | ✅ Active |
-| **git-secrets-scan.yml** | Push | Ubuntu | ~1 min | ✅ Active |
+| **ci.yml** | Push/PR | Ubuntu, Windows, macOS | ~8-12 min | ✅ v2.0 (8 jobs) |
+| **pre-commit.yml** | Push/PR | Ubuntu | ~2-5 min | ✅ v2.0 (module-alias) |
+| **security-scan.yml** | Push/PR/Cron/Manual | Ubuntu | ~3-5 min | ✅ v2.0 (consolidated) |
+
+**Migration Notes:**
+- ✅ **Consolidated** 5 security workflows → 1 unified workflow (`security-scan.yml`)
+- ✅ **Enhanced** pre-commit.yml with module-alias validation
+- ✅ **Upgraded** ci.yml with 8 parallel jobs and multi-platform testing
+
+**Deprecated workflows** (replaced by `security-scan.yml`):
+- ~~secret-scan-schedule.yml~~ → Now schedule trigger in security-scan.yml
+- ~~secret-scan-dispatch.yml~~ → Now workflow_dispatch in security-scan.yml
+- ~~docker-security-scan.yml~~ → Now docker-security job in security-scan.yml
+- ~~git-secrets-scan.yml~~ → Now git-secrets job in security-scan.yml
+- ~~secret-scan.yml (old)~~ → Replaced with v2.0 consolidated version
 
 ---
 

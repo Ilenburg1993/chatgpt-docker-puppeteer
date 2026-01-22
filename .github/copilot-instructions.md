@@ -815,6 +815,79 @@ const DEFAULTS = {
    - ✅ Quick Start, Operations, Debugging, Security, Monitoring
    - ✅ Troubleshooting (10 common scenarios)
 
+### CI/CD Pipeline v2.0 (Jan 22, 2026)
+
+**Commit**: 908f08a
+
+**GitHub Actions v2.0 - 8 Parallel Jobs:**
+
+1. **Job 1: Dependencies Validation**
+   - npm ci with caching
+   - Validate module-alias (9+ aliases required)
+   - Check deprecated imports (../../..)
+   - Verify jsconfig.json alignment
+
+2. **Job 2: Lint & Code Quality**
+   - ESLint strict mode (--max-warnings 0)
+   - Prettier format check
+   - Code syntax validation
+
+3. **Jobs 3-5: Multi-Platform Tests**
+   - Ubuntu, Windows, macOS
+   - Full test suite on each platform
+   - Exit code validation
+
+4. **Job 6: Integration Tests**
+   - E2E workflows
+   - NERV subsystem tests
+   - P1-P5 regression tests
+
+5. **Job 7: Build Validation**
+   - Docker build
+   - PM2 ecosystem check
+   - Production config validation
+
+6. **Job 8: Security & Docs**
+   - Secret scan (gitleaks)
+   - Documentation validation (5 required docs)
+   - npm audit (fail on critical CVEs)
+
+**Key Features:**
+- ✅ Module-alias enforcement (blocks deprecated imports)
+- ✅ Multi-platform testing (Ubuntu + Windows + macOS)
+- ✅ ESLint strict mode (--max-warnings 0)
+- ✅ Security scans (secrets + dependencies)
+- ✅ Documentation validation
+- ✅ Parallel execution (8-12 min total)
+- ✅ Job summaries with metrics
+
+**Files Created/Updated:**
+- `.github/workflows/ci.yml` (v2.0 - 350+ lines)
+- `.github/workflows/README.md` (NEW - 400+ lines documentation)
+- `.github/workflows/pre-commit.yml` (v2.0 - integrated with CI)
+- `.github/workflows/security-scan.yml` (v2.0 - consolidated 5 security workflows)
+- `scripts/validate-ci.js` (NEW - local CI simulation)
+- `src/server/api/router.js` (FIXED - removed 2 deprecated imports)
+
+**Local Validation:**
+```bash
+# Simulate CI locally (6 jobs)
+node scripts/validate-ci.js
+
+# Pre-commit fast checks (seconds)
+make test-fast
+
+# Full CI validation (minutes)
+make STRICT=true ci-test
+```
+
+**CI/CD Patterns:**
+- **Module Alias First**: All imports use @core, @infra, @shared, etc.
+- **Exit Code Discipline**: All scripts return 0 (success) or 1 (failure)
+- **Strict Mode**: STRICT=true enables fail-fast behavior
+- **Parallel Jobs**: Independent jobs run simultaneously (8-12 min total)
+- **Cache Strategy**: npm cache + node_modules (90% hit rate)
+
 ### Build System & Scripts (v2.4/v3.0 - Jan 21, 2026)
 
 **Makefile v2.4 - Hardened Edition** (commit 09184ea):

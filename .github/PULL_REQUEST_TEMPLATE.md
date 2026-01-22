@@ -21,12 +21,29 @@
 
 ## Checklist
 
+### Code Quality
 - [ ] My code follows the project's code style
 - [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have updated the documentation accordingly
 - [ ] My changes generate no new warnings or errors
+- [ ] ESLint passes with `--max-warnings 0`
+- [ ] Prettier formatting applied
+
+### Module Aliases (IMPORTANT)
+- [ ] I used module aliases (`@core`, `@infra`, `@shared`, etc.) instead of relative paths
+- [ ] No deprecated imports (`../../..`) introduced
+- [ ] Validated with: `node scripts/validate-ci.js`
+- [ ] All imports resolve correctly
+
+### Testing
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
+- [ ] Regression tests (P1-P5) still pass
+- [ ] Integration tests pass (if applicable)
+
+### Documentation
+- [ ] I have updated the documentation accordingly
+- [ ] Added JSDoc comments for new functions/classes
+- [ ] Updated README.md if public API changed
 - [ ] Any dependent changes have been merged and published
 
 ## Related Issues

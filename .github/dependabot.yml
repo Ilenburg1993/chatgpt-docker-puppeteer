@@ -12,9 +12,32 @@ updates:
       - "Ilenburg1993"
     labels:
       - "dependencies"
+      - "npm"
     commit-message:
       prefix: "deps"
       include: "scope"
+    groups:
+      # Group module-alias with path resolution deps
+      module-system:
+        patterns:
+          - "module-alias"
+          - "@types/node"
+      # Group ESLint and formatters
+      linting:
+        patterns:
+          - "eslint*"
+          - "prettier*"
+          - "@eslint/*"
+      # Group test frameworks
+      testing:
+        patterns:
+          - "*test*"
+          - "*mock*"
+      # Group Puppeteer ecosystem
+      automation:
+        patterns:
+          - "puppeteer*"
+          - "*stealth*"
 
   # Enable version updates for Docker
   - package-ecosystem: "docker"

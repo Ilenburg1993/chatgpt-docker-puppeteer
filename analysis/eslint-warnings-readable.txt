@@ -1,0 +1,232 @@
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/public/js/app.js[24m[0m
+[0m    [2m6:5[22m   [33mwarning[39m  'selectedTaskId' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m   [2m42:13[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u               [2mno-unused-vars[22m[0m
+[0m   [2m52:13[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u               [2mno-unused-vars[22m[0m
+[0m  [2m105:10[22m  [33mwarning[39m  'copyToClipboard' is defined but never used. Allowed unused vars must match /^_/u          [2mno-unused-vars[22m[0m
+[0m  [2m141:10[22m  [33mwarning[39m  'openTaskWizard' is defined but never used. Allowed unused vars must match /^_/u           [2mno-unused-vars[22m[0m
+[0m  [2m182:16[22m  [33mwarning[39m  'submitWizard' is defined but never used. Allowed unused vars must match /^_/u             [2mno-unused-vars[22m[0m
+[0m  [2m203:16[22m  [33mwarning[39m  'openDiagnostics' is defined but never used. Allowed unused vars must match /^_/u          [2mno-unused-vars[22m[0m
+[0m  [2m229:16[22m  [33mwarning[39m  'openCrashGallery' is defined but never used. Allowed unused vars must match /^_/u         [2mno-unused-vars[22m[0m
+[0m  [2m249:16[22m  [33mwarning[39m  'saveTaskChanges' is defined but never used. Allowed unused vars must match /^_/u          [2mno-unused-vars[22m[0m
+[0m  [2m276:16[22m  [33mwarning[39m  'control' is defined but never used. Allowed unused vars must match /^_/u                  [2mno-unused-vars[22m[0m
+[0m  [2m282:16[22m  [33mwarning[39m  'addTask' is defined but never used. Allowed unused vars must match /^_/u                  [2mno-unused-vars[22m[0m
+[0m  [2m304:16[22m  [33mwarning[39m  'deleteTask' is defined but never used. Allowed unused vars must match /^_/u               [2mno-unused-vars[22m[0m
+[0m  [2m310:16[22m  [33mwarning[39m  'retryTask' is defined but never used. Allowed unused vars must match /^_/u                [2mno-unused-vars[22m[0m
+[0m  [2m315:16[22m  [33mwarning[39m  'clearQueue' is defined but never used. Allowed unused vars must match /^_/u               [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/analyze-code-graph.js[24m[0m
+[0m   [2m51:7[22m   [33mwarning[39m  'typeChecker' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m107:11[22m  [33mwarning[39m  'filePath' is assigned a value but never used. Allowed unused vars must match /^_/u     [2mno-unused-vars[22m[0m
+[0m  [2m140:11[22m  [33mwarning[39m  'filePath' is assigned a value but never used. Allowed unused vars must match /^_/u     [2mno-unused-vars[22m[0m
+[0m  [2m227:24[22m  [33mwarning[39m  'path' is already declared in the upper scope on line 23 column 7                       [2mno-shadow[22m[0m
+[0m  [2m408:15[22m  [33mwarning[39m  'color' is assigned a value but never used. Allowed unused vars must match /^_/u        [2mno-unused-vars[22m[0m
+[0m  [2m409:15[22m  [33mwarning[39m  'colorMap' is assigned a value but never used. Allowed unused vars must match /^_/u     [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/audit-tmp-scripts.js[24m[0m
+[0m  [2m25:9[22m  [33mwarning[39m  'execSync' is assigned a value but never used. Allowed unused vars must match /^_/u     [2mno-unused-vars[22m[0m
+[0m  [2m28:7[22m  [33mwarning[39m  'SCRIPTS_DIR' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/check-vscode-extensions.js[24m[0m
+[0m  [2m32:14[22m  [33mwarning[39m  'error' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/codemods/transform-connection-modes.js[24m[0m
+[0m  [2m42:58[22m  [33mwarning[39m  'path' is already declared in the upper scope on line 13 column 7  [2mno-shadow[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/codemods/transform-log-categories.js[24m[0m
+[0m  [2m76:16[22m  [33mwarning[39m  'path' is already declared in the upper scope on line 27 column 7  [2mno-shadow[22m[0m
+[0m  [2m92:59[22m  [33mwarning[39m  'path' is already declared in the upper scope on line 27 column 7  [2mno-shadow[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/codemods/transform-status-values.js[24m[0m
+[0m  [2m50:56[22m  [33mwarning[39m  'path' is already declared in the upper scope on line 13 column 7  [2mno-shadow[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/fixes/fix-unused-vars.js[24m[0m
+[0m  [2m85:11[22m  [33mwarning[39m  'content' is already declared in the upper scope on line 47 column 7  [2mno-shadow[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/flow_manager.js[24m[0m
+[0m  [2m154:21[22m  [33mwarning[39m  Arrow function has a complexity of 25. Maximum allowed is 20                  [2mcomplexity[22m[0m
+[0m  [2m213:22[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/gerador_tarefa.js[24m[0m
+[0m  [2m37:7[22m  [33mwarning[39m  'VALID_MODELS' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/importar_prompts.js[24m[0m
+[0m  [2m101:18[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m153:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/puppeteer_maintenance.js[24m[0m
+[0m  [2m36:21[22m  [33mwarning[39m  'execSync' is already declared in the upper scope on line 16 column 9             [2mno-shadow[22m[0m
+[0m  [2m39:18[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u      [2mno-unused-vars[22m[0m
+[0m  [2m57:23[22m  [33mwarning[39m  'stats' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m60:22[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u      [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/rotate-profiles.js[24m[0m
+[0m  [2m153:14[22m  [33mwarning[39m  'error' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/run-all-tests.js[24m[0m
+[0m  [2m144:11[22m  [33mwarning[39m  'currentSuite' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m203:15[22m  [33mwarning[39m  'fullPath' is assigned a value but never used. Allowed unused vars must match /^_/u      [2mno-unused-vars[22m[0m
+[0m  [2m325:30[22m  [33mwarning[39m  'startTime' is assigned a value but never used. Allowed unused vars must match /^_/u     [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/scan_literals.js[24m[0m
+[0m  [2m68:18[22m  [33mwarning[39m  'error' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/scan_literals_deep.js[24m[0m
+[0m  [2m130:20[22m  [33mwarning[39m  Arrow function has a complexity of 25. Maximum allowed is 20                      [2mcomplexity[22m[0m
+[0m  [2m133:11[22m  [33mwarning[39m  'lines' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/status_fila.js[24m[0m
+[0m  [2m132:18[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/test-aliases.js[24m[0m
+[0m  [2m4:7[22m  [33mwarning[39m  'path' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/validate_config.js[24m[0m
+[0m  [2m81:5[22m  [33mwarning[39m  Method 'validateConfigFile' has a complexity of 23. Maximum allowed is 20  [2mcomplexity[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/scripts/visualizar_fila.js[24m[0m
+[0m  [2m50:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/driver/modules/human.js[24m[0m
+[0m  [2m149:1[22m  [33mwarning[39m  Async function 'humanType' has too many parameters (7). Maximum allowed is 6  [2mmax-params[22m[0m
+[0m  [2m149:1[22m  [33mwarning[39m  Async function 'humanType' has a complexity of 28. Maximum allowed is 20      [2mcomplexity[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/driver/modules/stabilizer.js[24m[0m
+[0m  [2m186:49[22m  [33mwarning[39m  Blocks are nested too deeply (6). Maximum allowed is 5  [2mmax-depth[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/infra/fs/control_store.js[24m[0m
+[0m  [2m17:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/infra/fs/safe_read.js[24m[0m
+[0m  [2m50:22[22m  [33mwarning[39m  'moveErr' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/infra/queue/cache.js[24m[0m
+[0m  [2m23:7[22m  [33mwarning[39m  'WATCHER_DEBOUNCE_MS' is assigned a value but never used. Allowed unused vars must match /^_/u   [2mno-unused-vars[22m[0m
+[0m  [2m31:7[22m  [33mwarning[39m  'watcherDebounceTimer' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/infra/storage/dna_store.js[24m[0m
+[0m  [2m64:9[22m  [33mwarning[39m  Possible race condition: `cachedDna` might be reassigned based on an outdated value of `cachedDna`  [2mrequire-atomic-updates[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/kernel/execution_engine/execution_engine.js[24m[0m
+[0m  [2m268:33[22m  [33mwarning[39m  'observations' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/main.js[24m[0m
+[0m  [2m408:19[22m  [33mwarning[39m  'forensics' is already declared in the upper scope on line 39 column 7  [2mno-shadow[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/server/api/router.js[24m[0m
+[0m  [2m28:1[22m  [33mwarning[39m  Function 'applyRoutes' has too many lines (287). Maximum allowed is 200  [2mmax-lines-per-function[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/server/main.js[24m[0m
+[0m  [2m122:15[22m  [33mwarning[39m  'serverAdapter' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/server/realtime/streams/log_tail.js[24m[0m
+[0m  [2m116:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m128:18[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/server/supervisor/reconcilier.js[24m[0m
+[0m  [2m153:21[22m  [33mwarning[39m  'agent' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m153:28[22m  [33mwarning[39m  'now' is defined but never used. Allowed unused args must match /^_/u    [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/src/shared/nerv/envelope.js[24m[0m
+[0m  [2m31:10[22m  [33mwarning[39m  'assertUUID' is defined but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/test_nerv_pulse.js[24m[0m
+[0m  [2m11:33[22m  [33mwarning[39m  'ActionCode' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/e2e/test_ariadne_thread.spec.js[24m[0m
+[0m   [2m19:7[22m   [33mwarning[39m  'path' is assigned a value but never used. Allowed unused vars must match /^_/u                    [2mno-unused-vars[22m[0m
+[0m  [2m333:22[22m  [33mwarning[39m  'error' is defined but never used. Allowed unused caught errors must match /^_/u                   [2mno-unused-vars[22m[0m
+[0m  [2m336:17[22m  [33mwarning[39m  Possible race condition: `process.exit` might be assigned based on an outdated state of `process`  [2mrequire-atomic-updates[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/e2e/test_boot_sequence.spec.js[24m[0m
+[0m  [2m1:7[22m  [33mwarning[39m  'path' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/helpers/test_helpers.js[24m[0m
+[0m   [2m77:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m   [2m87:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m   [2m97:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m167:22[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m171:14[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m183:18[22m  [33mwarning[39m  'e' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/integration/api/test_health_endpoint.spec.js[24m[0m
+[0m  [2m8:7[22m  [33mwarning[39m  'http' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/integration/browser/test_connection_orchestrator.spec.js[24m[0m
+[0m  [2m6:33[22m  [33mwarning[39m  'STATES' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/integration/kernel/test_identity_lifecycle.spec.js[24m[0m
+[0m  [2m41:15[22m  [33mwarning[39m  'oldInstanceId' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/integration/kernel/test_lock.spec.js[24m[0m
+[0m  [2m12:5[22m   [33mwarning[39m  'sleep' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m15:11[22m  [33mwarning[39m  Async arrow function has a complexity of 23. Maximum allowed is 20                [2mcomplexity[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/regression/test_p2_fixes.spec.js[24m[0m
+[0m  [2m22:37[22m  [33mwarning[39m  'context' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/regression/test_p3_fixes.spec.js[24m[0m
+[0m  [2m27:11[22m  [33mwarning[39m  'timestamp' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m47:22[22m  [33mwarning[39m  'pid' is defined but never used. Allowed unused args must match /^_/u                 [2mno-unused-vars[22m[0m
+[0m  [2m66:31[22m  [33mwarning[39m  'correlationId' is defined but never used. Allowed unused args must match /^_/u       [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/regression/test_p4_p5_fixes.spec.js[24m[0m
+[0m  [2m366:15[22m  [33mwarning[39m  'result' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/setup.js[24m[0m
+[0m  [2m78:47[22m  [33mwarning[39m  'promise' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/test_errors_communication.js[24m[0m
+[0m  [2m15:7[22m   [33mwarning[39m  'x' is assigned a value but never used. Allowed unused vars must match /^_/u                [2mno-unused-vars[22m[0m
+[0m  [2m17:11[22m  [33mwarning[39m  'x' is already declared in the upper scope on line 15 column 7                              [2mno-shadow[22m[0m
+[0m  [2m22:5[22m   [33mwarning[39m  'y' is assigned a value but never used. Allowed unused vars must match /^_/u                [2mno-unused-vars[22m[0m
+[0m  [2m22:5[22m   [33mwarning[39m  'y' is never reassigned. Use 'const' instead                                                [2mprefer-const[22m[0m
+[0m  [2m26:5[22m   [33mwarning[39m  'neverReassigned' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m26:5[22m   [33mwarning[39m  'neverReassigned' is never reassigned. Use 'const' instead                                  [2mprefer-const[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/core/test_logger.spec.js[24m[0m
+[0m  [2m22:11[22m  [33mwarning[39m  'TEST_LOG_FILE' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/driver/test_driver_adapters.spec.js[24m[0m
+[0m  [2m266:36[22m  [33mwarning[39m  'selector' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m266:46[22m  [33mwarning[39m  'timeout' is defined but never used. Allowed unused args must match /^_/u   [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/infra/test_io.spec.js[24m[0m
+[0m   [2m25:18[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m158:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m223:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m250:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/infra/test_lock_manager.spec.js[24m[0m
+[0m   [2m86:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m   [2m99:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m117:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m224:26[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/kernel/test_execution_engine.spec.js[24m[0m
+[0m  [2m257:33[22m  [33mwarning[39m  'oldState' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m257:43[22m  [33mwarning[39m  'newState' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/kernel/test_policy_engine.spec.js[24m[0m
+[0m  [2m247:19[22m  [33mwarning[39m  'task' is assigned a value but never used. Allowed unused vars must match /^_/u      [2mno-unused-vars[22m[0m
+[0m  [2m252:19[22m  [33mwarning[39m  'recursos' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m263:19[22m  [33mwarning[39m  'task' is assigned a value but never used. Allowed unused vars must match /^_/u      [2mno-unused-vars[22m[0m
+[0m  [2m268:19[22m  [33mwarning[39m  'recursos' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m279:19[22m  [33mwarning[39m  'task' is assigned a value but never used. Allowed unused vars must match /^_/u      [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/kernel/test_task_runtime.spec.js[24m[0m
+[0m  [2m223:26[22m  [33mwarning[39m  'error' is defined but never used. Allowed unused args must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/nerv/test_nerv_core.spec.js[24m[0m
+[0m  [2m11:33[22m  [33mwarning[39m  'ActionCode' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/server/test_middleware.spec.js[24m[0m
+[0m  [2m99:19[22m  [33mwarning[39m  'req' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[4m/workspaces/chatgpt-docker-puppeteer/tests/unit/server/test_server_nerv_adapter.spec.js[24m[0m
+[0m  [2m102:19[22m  [33mwarning[39m  'command' is assigned a value but never used. Allowed unused vars must match /^_/u  [2mno-unused-vars[22m[0m
+[0m  [2m188:22[22m  [33mwarning[39m  'err' is defined but never used. Allowed unused caught errors must match /^_/u      [2mno-unused-vars[22m[0m
+[0m[0m
+[0m[33m[1m✖ 116 problems (0 errors, 116 warnings)[22m[39m[0m
+[0m[33m[1m[22m[39m[33m[1m  0 errors and 2 warnings potentially fixable with the `--fix` option.[22m[39m[0m
+[0m[33m[1m[22m[39m[0m

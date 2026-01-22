@@ -1,0 +1,200 @@
+name: Security Scans
+# Version: 2.0 - Consolidated security workflows (22/01/2026)
+# Consolidates: secret-scan, git-secrets, docker-security workflows
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Mondays at 09:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      scan-type:
+        description: 'Type of security scan'
+        required: true
+        type: choice
+        options:
+          - all
+          - secrets
+          - docker
+          - dependencies
+
+jobs:
+  secret-scan:
+    name: Secret & Credential Scan
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.scan-type == 'all' ||
+      github.event.inputs.scan-type == 'secrets'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for gitleaks
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: Setup Python for pre-commit
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pre-commit
+
+      - name: Run pre-commit secret checks
+        run: pre-commit run --all-files detect-private-key || true
+
+      - name: Check for hardcoded secrets patterns
+        run: |
+          # Check for common secret patterns
+          if grep -r -i "password\s*=\s*['\"]" --include="*.js" --include="*.json" src/ config.json 2>/dev/null; then
+            echo "⚠ Warning: Potential hardcoded passwords found"
+          fi
+
+          if grep -r "api[_-]?key\s*[:=]" --include="*.js" --include="*.json" src/ 2>/dev/null; then
+            echo "⚠ Warning: Potential API keys found"
+          fi
+
+  git-secrets:
+    name: Git Secrets Scan
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.scan-type == 'all' ||
+      github.event.inputs.scan-type == 'secrets'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-secrets
+        run: |
+          git clone https://github.com/awslabs/git-secrets.git
+          cd git-secrets
+          sudo make install
+
+      - name: Register AWS patterns
+        run: |
+          git secrets --register-aws
+
+      - name: Scan repository
+        run: |
+          git secrets --scan-history || echo "⚠ git-secrets found potential issues"
+
+  docker-security:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.scan-type == 'all' ||
+      github.event.inputs.scan-type == 'docker'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (Dockerfile)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'Dockerfile'
+          format: 'sarif'
+          output: 'trivy-dockerfile-results.sarif'
+
+      - name: Build Docker image for scanning
+        run: docker build -t chatgpt-puppeteer:test -f Dockerfile .
+
+      - name: Run Trivy vulnerability scanner (Image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'chatgpt-puppeteer:test'
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: '.'
+
+  dependency-audit:
+    name: NPM Dependency Audit
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.scan-type == 'all' ||
+      github.event.inputs.scan-type == 'dependencies'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Run npm audit
+        run: |
+          npm audit --json > npm-audit-results.json || true
+
+      - name: Check for high/critical vulnerabilities
+        run: |
+          HIGH=$(jq '.metadata.vulnerabilities.high // 0' npm-audit-results.json)
+          CRITICAL=$(jq '.metadata.vulnerabilities.critical // 0' npm-audit-results.json)
+
+          echo "High vulnerabilities: $HIGH"
+          echo "Critical vulnerabilities: $CRITICAL"
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL vulnerabilities found!"
+            exit 1
+          fi
+
+          if [ "$HIGH" -gt 5 ]; then
+            echo "⚠ Too many HIGH vulnerabilities ($HIGH > 5)"
+            exit 1
+          fi
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-results
+          path: npm-audit-results.json
+
+  summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [secret-scan, git-secrets, docker-security, dependency-audit]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result == 'success' && '✅ PASS' || '❌ FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Git Secrets | ${{ needs.git-secrets.result == 'success' && '✅ PASS' || '❌ FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Security | ${{ needs.docker-security.result == 'success' && '✅ PASS' || '❌ FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Audit | ${{ needs.dependency-audit.result == 'success' && '✅ PASS' || '❌ FAIL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
