@@ -1,0 +1,291 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        // =========================================================================
+        // Build & Quality (ESLint, Format, Lint)
+        // =========================================================================
+        {
+            "label": "ESLint: Fix All Files",
+            "type": "shell",
+            "command": "npx eslint . --fix",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "ESLint: Check All Files",
+            "type": "shell",
+            "command": "npx eslint . --quiet",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Format Code (ESLint + Prettier)",
+            "type": "shell",
+            "command": "make format-code",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        // =========================================================================
+        // Testing (Fast, Integration, All)
+        // =========================================================================
+        {
+            "label": "Test: Fast (Pre-commit)",
+            "type": "shell",
+            "command": "make test-fast",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Test: Integration (Full)",
+            "type": "shell",
+            "command": "make test-integration",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Test: All Tests",
+            "type": "shell",
+            "command": "make test-all",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            }
+        },
+        // =========================================================================
+        // Health Checks (Core, Full, Strict)
+        // =========================================================================
+        {
+            "label": "Health: Quick Check (Core)",
+            "type": "shell",
+            "command": "make health-core",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Health: Full Check (4 endpoints + PM2)",
+            "type": "shell",
+            "command": "make health",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        // =========================================================================
+        // PM2 Lifecycle (Start, Stop, Restart, Status)
+        // =========================================================================
+        {
+            "label": "PM2: Start System",
+            "type": "shell",
+            "command": "make start",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "PM2: Stop System",
+            "type": "shell",
+            "command": "make stop",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "PM2: Restart System",
+            "type": "shell",
+            "command": "make restart",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "PM2: Show Status",
+            "type": "shell",
+            "command": "make status",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "PM2: Monitor (Dashboard)",
+            "type": "shell",
+            "command": "make pm2-monit",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            }
+        },
+        {
+            "label": "Diagnostics: Run Full Report",
+            "type": "shell",
+            "command": "make diagnose",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Backup: Create Backup",
+            "type": "shell",
+            "command": "make backup",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        // =========================================================================
+        // System Information
+        // =========================================================================
+        {
+            "label": "Info: Show System Information",
+            "type": "shell",
+            "command": "make info",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Info: Show Version",
+            "type": "shell",
+            "command": "make version",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Info: Check Dependencies",
+            "type": "shell",
+            "command": "make check-deps",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        // =========================================================================
+        // Compound Workflows
+        // =========================================================================
+        {
+            "label": "Workflow: Pre-Commit Check",
+            "dependsOn": [
+                "Format Code (ESLint + Prettier)",
+                "Test: Fast (Pre-commit)",
+                "Health: Quick Check (Core)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Workflow: Full CI Check",
+            "dependsOn": [
+                "Dependencies: Check Consistency",
+                "ESLint: Check All Files",
+                "Test: All Tests",
+                "Health: Full Check (4 endpoints + PM2)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Workflow: Start & Monitor",
+            "dependsOn": [
+                "PM2: Start System",
+                "Health: Full Check (4 endpoints + PM2)",
+                "Logs: Follow (Real-time)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ]
+}

@@ -61,6 +61,17 @@
         "main",
         "master"
     ],
+    // "remote.extensionKind": {
+    //    "github.copilot-chat": [
+    //       "ui"
+    //    ],
+    //    "claude-code": [
+    ////        "ui"
+    //   ],
+    //   "io.github.github-mcp-server": [
+    //       "ui"
+    //   ]
+    // },
     "cSpell.enabled": false,
     "cSpell.language": "en,pt-BR",
     "cSpell.enabledFileTypes": {
@@ -320,22 +331,17 @@
     "github.copilot.editor.enableAutoCompletions": true,
     "github.copilot.nextEditSuggestions.enabled": true,
     "github.copilot.advanced": {
-        "length": 1000,
-        "temperature": 0.2,
+        "length": 2000,
+        "temperature": 0.8,
         "top_p": 1,
-        "stops": {
-            "*": [
-                "\n\n\n"
-            ]
-        },
         "indentationMode": {
             "javascript": "spaces",
             "typescript": "spaces",
             "json": "spaces"
         }
     },
+    "github.copilot.chat.welcomeMessage": "once",
     "github.copilot.chat.localeOverride": "pt-br",
-    "github.copilot.chat.welcomeMessage": "always",
     "editor.inlineSuggest.enabled": true,
     "editor.inlineSuggest.suppressSuggestions": false,
     "editor.suggestSelection": "first",
@@ -537,5 +543,24 @@
     "editor.suggest.filterGraceful": true,
     "editor.suggest.matchOnWordStartOnly": false,
     "editor.suggest.showStatusBar": true,
-    "testing.automaticallyOpenTestResults": "neverOpen"
+    "testing.automaticallyOpenTestResults": "neverOpen",
+    "[dockerfile]": {
+        "editor.defaultFormatter": "ms-azuretools.vscode-containers"
+    },
+    "chat.mcp.serverSampling": {
+        "chatgpt-docker-puppeteer/.vscode/mcp.json: io.github.github/github-mcp-server": {
+            "allowedModels": [
+                "copilot/gpt-5-mini",
+                "copilot/auto",
+                "copilot/claude-sonnet-4.5"
+            ]
+        },
+        "chatgpt-docker-puppeteer/.vscode/mcp.json: github-mcp": {
+            "allowedModels": [
+                "copilot/gpt-5-mini",
+                "copilot/auto",
+                "copilot/claude-sonnet-4.5"
+            ]
+        }
+    }
 }

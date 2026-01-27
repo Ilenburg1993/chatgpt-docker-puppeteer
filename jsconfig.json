@@ -1,118 +1,129 @@
 {
-    "compilerOptions": {
-        /* Plataforma e módulos - Node.js 20+ CommonJS */
-        "target": "ES2022",
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "lib": ["ES2022"],
+  "$schema": "https://json.schemastore.org/jsconfig",
 
-        /* Verificações JavaScript (leve para JS puro) */
-        "checkJs": false,
-        "allowJs": true,
-        "maxNodeModuleJsDepth": 1,
+  "compilerOptions": {
+    // ============================================================
+    // [A] PLATAFORMA E MÓDULOS — Node.js 20+ (CommonJS)
+    // ============================================================
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
 
-        /* Modo estrito desabilitado (projeto JS sem tipos) */
-        "strict": false,
-        "noImplicitAny": false,
-        "noImplicitThis": false,
+    // ============================================================
+    // [B] JAVASCRIPT PURO (SEM TYPESCRIPT)
+    // ============================================================
+    "checkJs": false,
+    "allowJs": true,
+    "maxNodeModuleJsDepth": 1,
 
-        /* Interoperabilidade Node.js */
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "resolveJsonModule": true,
-        "forceConsistentCasingInFileNames": true,
+    // Projeto deliberadamente NÃO-STRICT (JS dinâmico)
+    "strict": false,
+    "noImplicitAny": false,
+    "noImplicitThis": false,
 
-        /* IntelliSense otimizado */
-        "baseUrl": ".",
-        "paths": {
-            "@/*": [
-                "src/*"
-            ],
-            "@core/*": [
-                "src/core/*"
-            ],
-            "@shared/*": [
-                "src/shared/*"
-            ],
-            "@nerv/*": [
-                "src/nerv/*"
-            ],
-            "@kernel/*": [
-                "src/kernel/*"
-            ],
-            "@driver/*": [
-                "src/driver/*"
-            ],
-            "@infra/*": [
-                "src/infra/*"
-            ],
-            "@server/*": [
-                "src/server/*"
-            ],
-            "@logic/*": [
-                "src/logic/*"
-            ]
-        },
-        "typeRoots": [
-            "./node_modules/@types"
-        ],
-        "types": [
-            "node"
-        ],
-        "skipLibCheck": true,
-        /* Sugestões de código */
-        "allowUnreachableCode": false,
-        "allowUnusedLabels": false,
-        "noFallthroughCasesInSwitch": true,
-        "noImplicitReturns": false,
-        "noUnusedLocals": false,
-        "noUnusedParameters": false,
-        /* Performance e precisão */
-        "disableSizeLimit": false,
-        "assumeChangesOnlyAffectDirectDependencies": true
+    // ============================================================
+    // [C] INTEROPERABILIDADE E COMPATIBILIDADE
+    // ============================================================
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // ============================================================
+    // [D] INTELLISENSE / ALIASES DE CAMINHO
+    // ============================================================
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@core/*": ["src/core/*"],
+      "@shared/*": ["src/shared/*"],
+      "@nerv/*": ["src/nerv/*"],
+      "@kernel/*": ["src/kernel/*"],
+      "@driver/*": ["src/driver/*"],
+      "@infra/*": ["src/infra/*"],
+      "@server/*": ["src/server/*"],
+      "@logic/*": ["src/logic/*"]
     },
 
-    /* Escopo do projeto - arquivos monitorados pelo IntelliSense */
-    "include": [
-        "src/**/*.js",
-        "scripts/**/*.js",
-        "tests/**/*.js",
-        "*.js",
-        "*.mjs",
-        "*.cjs",
-        "ecosystem.config.js",
-        ".puppeteerrc.cjs",
-        "eslint.config.mjs"
-    ],
+    // ============================================================
+    // [E] TIPOS (APENAS NODE)
+    // ============================================================
+    "typeRoots": ["./node_modules/@types"],
+    "types": ["node"],
 
-    /* Excluir artefatos, dependências e dados */
-    "exclude": [
-        "node_modules",
-        "dist",
-        "build",
-        "coverage",
-        "logs",
-        "fila",
-        "respostas",
-        "profile",
-        "public",
-        "backups",
-        "monitoring",
-        "tmp",
-        "analysis",
-        "local-login",
-        "DOCUMENTAÇÃO",
-        ".git",
-        ".vscode",
-        ".devcontainer",
-        ".tmp.drivedownload",
-        ".tmp.driveupload",
-        "**/node_modules/**",
-        "**/.tmp.*/**",
-        "**/.*",
-        "**/*.min.js",
-        "**/*.map",
-        "**/bundle.js",
-        "**/*.bundle.js"
-    ]
+    // ============================================================
+    // [F] VERIFICAÇÕES E SUGESTÕES DE CÓDIGO
+    // ============================================================
+    "skipLibCheck": true,
+
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noFallthroughCasesInSwitch": true,
+
+    // Mantidos permissivos por design (JS exploratório)
+    "noImplicitReturns": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+
+    // ============================================================
+    // [G] PERFORMANCE DO LANGUAGE SERVICE
+    // ============================================================
+    "disableSizeLimit": false,
+    "assumeChangesOnlyAffectDirectDependencies": true
+  },
+
+  // ==============================================================
+  // [H] ESCOPO DO PROJETO — ARQUIVOS MONITORADOS
+  // ==============================================================
+  "include": [
+    "src/**/*.js",
+    "scripts/**/*.js",
+    "tests/**/*.js",
+
+    "*.js",
+    "*.mjs",
+    "*.cjs",
+
+    "ecosystem.config.js",
+    ".puppeteerrc.cjs",
+    "eslint.config.mjs"
+  ],
+
+  // ==============================================================
+  // [I] EXCLUSÕES — ARTEFATOS, DADOS E RUÍDO
+  // ==============================================================
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "logs",
+    "fila",
+    "respostas",
+    "profile",
+    "public",
+    "backups",
+    "monitoring",
+    "tmp",
+    "analysis",
+    "local-login",
+    "DOCUMENTAÇÃO",
+
+    ".git",
+    ".vscode",
+    ".devcontainer",
+
+    ".tmp.drivedownload",
+    ".tmp.driveupload",
+
+    "**/node_modules/**",
+    "**/.tmp.*/**",
+    "**/.*",
+
+    "**/*.min.js",
+    "**/*.map",
+    "**/bundle.js",
+    "**/*.bundle.js"
+  ]
 }

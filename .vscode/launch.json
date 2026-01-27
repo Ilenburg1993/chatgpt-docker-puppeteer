@@ -1,27 +1,15 @@
 {
   "version": "0.2.0",
   "configurations": [
-    // =========================================================================
-    // MAIN SYSTEM - Enhanced with advanced debugging features
-    // =========================================================================
     {
       "type": "node",
       "request": "launch",
       "name": "🚀 Debug Agente (Enhanced)",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048",
-        "--expose-gc"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048", "--expose-gc"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "autoAttachChildProcesses": true,
       "smartStep": true,
       "showAsyncStacks": true,
@@ -40,19 +28,11 @@
       "type": "node",
       "request": "launch",
       "name": "📊 Debug Dashboard (Enhanced)",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/src/server/main.js",
-      "runtimeArgs": [
-        "--max-old-space-size=1024"
-      ],
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "autoAttachChildProcesses": true,
       "smartStep": true,
       "showAsyncStacks": true,
@@ -70,14 +50,9 @@
       "type": "node",
       "request": "launch",
       "name": "🔧 Debug Agente (Production Mode)",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "env": {
         "NODE_ENV": "production",
@@ -86,21 +61,13 @@
       "console": "integratedTerminal",
       "outputCapture": "std"
     },
-    // =========================================================================
-    // SUBSYSTEMS - Specific debugging for each major component
-    // =========================================================================
     {
       "type": "node",
       "request": "launch",
       "name": "🧠 Debug NERV Subsystem",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -116,14 +83,9 @@
       "type": "node",
       "request": "launch",
       "name": "⚙️ Debug Kernel Engine",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -139,14 +101,9 @@
       "type": "node",
       "request": "launch",
       "name": "🎮 Debug Driver (ChatGPT/Gemini)",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -163,14 +120,9 @@
       "type": "node",
       "request": "launch",
       "name": "🌊 Debug Browser Pool",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -182,21 +134,13 @@
       "console": "integratedTerminal",
       "outputCapture": "std"
     },
-    // =========================================================================
-    // CRITICAL SCENARIOS - Pre-configured for specific debugging cases
-    // =========================================================================
     {
       "type": "node",
       "request": "launch",
       "name": "🔧 Debug Boot Sequence",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/src/main.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "stopOnEntry": true,
       "autoAttachChildProcesses": true,
@@ -213,14 +157,9 @@
       "type": "node",
       "request": "launch",
       "name": "💥 Debug Crash Recovery",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -236,14 +175,9 @@
       "type": "node",
       "request": "launch",
       "name": "🔒 Debug Lock Contention",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -259,16 +193,9 @@
       "type": "node",
       "request": "launch",
       "name": "📊 Debug Memory Profiling",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048",
-        "--expose-gc",
-        "--inspect-brk=9229"
-      ],
+      "runtimeArgs": ["--max-old-space-size=2048", "--expose-gc", "--inspect-brk=9229"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -281,22 +208,14 @@
       "outputCapture": "std",
       "port": 9229
     },
-    // =========================================================================
-    // TESTING - Enhanced test debugging configurations
-    // =========================================================================
     {
       "type": "node",
       "request": "launch",
       "name": "🧪 Debug Current Test File",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
       "program": "${file}",
       "cwd": "${workspaceFolder}",
-      "runtimeArgs": [
-        "--max-old-space-size=1024"
-      ],
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -309,35 +228,10 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "🧪 Debug All Tests",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
-      "program": "${workspaceFolder}/scripts/run-tests.js",
-      "runtimeArgs": [
-        "--max-old-space-size=1024"
-      ],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "info"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug P1-P5 Fixes Tests",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
-      "program": "${workspaceFolder}/tests/test_p1_fixes.js",
-      "runtimeArgs": [
-        "--max-old-space-size=1024"
-      ],
+      "name": "🧪 Debug P1 Fixes",
+      "program": "${workspaceFolder}/tests/regression/test_p1_fixes.spec.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -350,15 +244,58 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "🧪 Debug Driver Integration Tests",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
-      "program": "${workspaceFolder}/tests/test_driver_nerv_integration.js",
-      "runtimeArgs": [
-        "--max-old-space-size=1024"
-      ],
+      "name": "🧪 Debug P2 Fixes",
+      "program": "${workspaceFolder}/tests/regression/test_p2_fixes.spec.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "showAsyncStacks": true,
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "🧪 Debug P3 Fixes",
+      "program": "${workspaceFolder}/tests/regression/test_p3_fixes.spec.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "showAsyncStacks": true,
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "🧪 Debug P4-P5 Fixes",
+      "program": "${workspaceFolder}/tests/regression/test_p4_p5_fixes.spec.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "showAsyncStacks": true,
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "🧪 Debug Driver NERV",
+      "program": "${workspaceFolder}/tests/integration/driver/test_driver_nerv.spec.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true,
@@ -372,15 +309,10 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "🧪 Debug Launcher Integration Tests",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
+      "name": "🧪 Debug Launcher Integration",
       "program": "${workspaceFolder}/tests/integration/test_launcher_integration.js",
-      "runtimeArgs": [
-        "--max-old-space-size=1024"
-      ],
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "autoAttachChildProcesses": true,
       "env": {
@@ -389,121 +321,134 @@
       },
       "console": "integratedTerminal"
     },
-    // =========================================================================
-    // ATTACH - Enhanced attachment configurations with retry and multi-port
-    // =========================================================================
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "🧪 Debug Browser Connection",
+      "program": "${workspaceFolder}/tests/integration/browser/test_connection_orchestrator.spec.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "showAsyncStacks": true,
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug",
+        "DEBUG": "connection:*,pool:*"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "⚡ Debug CI Validation",
+      "program": "${workspaceFolder}/scripts/validate-ci.js",
+      "runtimeArgs": ["--max-old-space-size=512"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "sourceMaps": true,
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "🌐 Debug Puppeteer Test",
+      "program": "${workspaceFolder}/test-puppeteer.js",
+      "runtimeArgs": ["--max-old-space-size=1024"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "showAsyncStacks": true,
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug",
+        "DEBUG": "puppeteer:*,connection:*",
+        "PUPPETEER_HEADLESS": "false"
+      },
+      "console": "integratedTerminal"
+    },
     {
       "type": "node",
       "request": "attach",
-      "name": "📌 Attach to PM2 Process",
+      "name": "📌 Attach to PM2 (9229)",
       "port": 9229,
       "restart": true,
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "${workspaceFolder}",
-      "protocol": "inspector",
       "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true
     },
     {
       "type": "node",
       "request": "attach",
-      "name": "📌 Attach PM2 (Alternative Port 9230)",
+      "name": "📌 Attach to PM2 (9230)",
       "port": 9230,
       "restart": true,
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "${workspaceFolder}",
-      "protocol": "inspector",
       "sourceMaps": true,
       "autoAttachChildProcesses": true
     },
     {
       "type": "node",
       "request": "attach",
-      "name": "🐳 Attach to Docker Container",
+      "name": "🐳 Attach to Docker (9229)",
       "port": 9229,
       "address": "localhost",
       "restart": false,
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "/app",
       "sourceMaps": true,
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/**",
-        "!**/node_modules/**"
-      ],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "autoAttachChildProcesses": true,
       "showAsyncStacks": true
     },
     {
       "type": "node",
       "request": "attach",
-      "name": "🐳 Attach Docker (Alternative Port 9230)",
+      "name": "🐳 Attach to Docker (9230)",
       "port": 9230,
       "address": "localhost",
       "restart": false,
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "/app",
       "sourceMaps": true,
       "autoAttachChildProcesses": true
     }
   ],
-  // ===========================================================================
-  // COMPOUND CONFIGURATIONS - Debug multiple processes simultaneously
-  // ===========================================================================
   "compounds": [
     {
-      "name": "🚀 Full System Debug (Agent + Dashboard)",
-      "configurations": [
-        "🚀 Debug Agente (Enhanced)",
-        "📊 Debug Dashboard (Enhanced)"
-      ],
-      "stopAll": true,
-      "preLaunchTask": null
-    },
-    {
-      "name": "🧪 Complete Test Suite",
-      "configurations": [
-        "🧪 Debug P1-P5 Fixes Tests",
-        "🧪 Debug Driver Integration Tests"
-      ],
+      "name": "🚀 Full System (Agent + Dashboard)",
+      "configurations": ["🚀 Debug Agente (Enhanced)", "📊 Debug Dashboard (Enhanced)"],
       "stopAll": true
     },
     {
-      "name": "🔍 Full Subsystems Debug",
-      "configurations": [
-        "🧠 Debug NERV Subsystem",
-        "⚙️ Debug Kernel Engine",
-        "🎮 Debug Driver (ChatGPT/Gemini)"
-      ],
+      "name": "🧪 Regression Tests (P1-P5)",
+      "configurations": ["🧪 Debug P1 Fixes", "🧪 Debug P2 Fixes", "🧪 Debug P3 Fixes", "🧪 Debug P4-P5 Fixes"],
       "stopAll": true
     },
     {
-      "name": "⚡ Critical Path Debug (Boot + NERV + Kernel)",
-      "configurations": [
-        "🔧 Debug Boot Sequence",
-        "🧠 Debug NERV Subsystem",
-        "⚙️ Debug Kernel Engine"
-      ],
+      "name": "🧪 Integration Tests",
+      "configurations": ["🧪 Debug Driver NERV", "🧪 Debug Launcher Integration", "🧪 Debug Browser Connection"],
+      "stopAll": true
+    },
+    {
+      "name": "🔍 Full Subsystems",
+      "configurations": ["🧠 Debug NERV Subsystem", "⚙️ Debug Kernel Engine", "🎮 Debug Driver (ChatGPT/Gemini)"],
+      "stopAll": true
+    },
+    {
+      "name": "⚡ Critical Path (Boot + NERV + Kernel)",
+      "configurations": ["🔧 Debug Boot Sequence", "🧠 Debug NERV Subsystem", "⚙️ Debug Kernel Engine"],
       "stopAll": true
     }
   ]

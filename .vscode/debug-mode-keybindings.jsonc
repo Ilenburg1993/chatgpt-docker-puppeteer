@@ -1,0 +1,28 @@
+// 🔍 DEBUG MODE - Suggested Keybindings
+// Copy these to your User keybindings.json (Ctrl+Shift+P → "Preferences: Open Keyboard Shortcuts (JSON)")
+[
+    {
+        "key": "ctrl+shift+alt+d",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🔍 Debug Mode: Full Workspace Scan",
+        "when": "!inDebugMode"
+    },
+    {
+        "key": "ctrl+shift+alt+s",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🔍 Debug Mode: Full Workspace + Stats",
+        "when": "!inDebugMode"
+    },
+    {
+        "key": "ctrl+shift+alt+m",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🎯 Debug Mode: Master Scan (All Validations)",
+        "when": "!inDebugMode"
+    },
+    {
+        "key": "ctrl+shift+alt+e",
+        "command": "workbench.action.tasks.runTask",
+        "args": "🔍 Debug Mode: Errors Only (No Warnings)",
+        "when": "!inDebugMode"
+    }
+]

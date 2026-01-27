@@ -1,57 +1,59 @@
 {
+  "$schema": "https://json.schemastore.org/c8rc.json",
+
   "all": true,
+
   "include": [
-    "src/**/*.js",
-    "index.js"
+    "index.js",
+    "src/**/*.js"
   ],
+
   "exclude": [
     "node_modules/**",
+    "coverage/**",
+    ".c8/**",
+
     "tests/**",
+    "**/*.test.js",
+    "**/*.spec.js",
+
     "scripts/**",
     "tools/**",
     "analysis/**",
     "backups/**",
-    "coverage/**",
-    "public/**",
     "profile/**",
+    "public/**",
     "local-login/**",
+
     "*.config.js",
-    "*.config.mjs",
-    "**/*.spec.js",
-    "**/*.test.js"
+    "*.config.mjs"
   ],
+
   "reporter": [
-    "html",
     "text",
+    "html",
     "lcov",
     "json-summary"
   ],
+
   "report-dir": "coverage",
   "temp-directory": ".c8",
+
   "clean": true,
+
   "check-coverage": true,
+  "per-file": false,
+  "skip-full": false,
+
   "lines": 80,
   "functions": 75,
   "branches": 75,
   "statements": 80,
-  "per-file": false,
-  "skip-full": false,
+
   "watermarks": {
-    "lines": [
-      70,
-      80
-    ],
-    "functions": [
-      65,
-      75
-    ],
-    "branches": [
-      65,
-      75
-    ],
-    "statements": [
-      70,
-      80
-    ]
+    "lines": [70, 80],
+    "functions": [65, 75],
+    "branches": [65, 75],
+    "statements": [70, 80]
   }
 }

@@ -1,94 +1,128 @@
-# Dependencies
-node_modules/
+# =============================================================================
+# .dockerignore - ChatGPT Docker Puppeteer
+# Version: 2.0 FINAL (23/01/2026)
+# =============================================================================
+#
+# Objetivo:
+# • Reduzir build context
+# • Evitar vazamento de lixo do host
+# • NAO quebrar DevContainer, VS Code ou Puppeteer
+#
+# IMPORTANTE:
+# • Este arquivo afeta SOMENTE o build do Docker
+# • NAO afeta volumes, runtime ou VS Code Server
+#
+# CHANGELOG v2.0:
+# • Nome consistente: ChatGPT Docker Puppeteer
+# • Encoding UTF-8 limpo
+# • Organizacao clara por categoria
+# • Validado para build sem erros
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Dependencias locais (NUNCA copiar do host)
+# -----------------------------------------------------------------------------
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Runtime data
-*.pid
-*.seed
-*.pid.lock
-RUNNING.lock
+# -----------------------------------------------------------------------------
+# Cache e artefatos temporarios
+# -----------------------------------------------------------------------------
+.cache
+.tmp
+.tmp/*
+tmp
+tmp/*
+logs
+logs/*
+coverage
+coverage/*
+dist
+dist/*
+build
+build/*
+out
+out/*
 
-# Directories
-logs/
-respostas/
-fila/
-profile/
-tests/tmp/
-.tmp*/
-
-# Git
-.git/
-.github/
-.gitignore
-.gitattributes
-
-# Documentation
-DOCUMENTAÇÃO/
-analysis/
-*.md
-!README.md
-
-# Environment
-.env
-.env.local
-.env.*.local
-.env.example
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# -----------------------------------------------------------------------------
+# OS / Editor
+# -----------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Testing
-tests/
-coverage/
-*.test.js
-*.spec.js
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
-# Build artifacts
-dist/
-build/
+.idea
+*.swp
+*.swo
 
-# Temporary files
+# -----------------------------------------------------------------------------
+# Git (parcial)
+# -----------------------------------------------------------------------------
+.git/logs
+.git/modules
+.git/worktrees
+
+# NAO ignorar .git inteiro (necessario em alguns fluxos)
+!.git
+
+# -----------------------------------------------------------------------------
+# Docker / DevContainer
+# -----------------------------------------------------------------------------
+# NAO ignorar .devcontainer - scripts e configs sao usados no build
+# (intencionalmente vazio aqui)
+
+# -----------------------------------------------------------------------------
+# Environment / Secrets
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# -----------------------------------------------------------------------------
+# Backups e arquivos gerados automaticamente
+# -----------------------------------------------------------------------------
+*.bak
 *.tmp
-*.temp
+*.old
+*.orig
+*.rej
+
+# -----------------------------------------------------------------------------
+# Documentacao temporaria
+# -----------------------------------------------------------------------------
 *.log
-.cache/
+*.trace
 
-# Archives
-*.rar
-*.zip
-*.tar.gz
-*.7z
+# -----------------------------------------------------------------------------
+# Testes e benchmarks opcionais
+# -----------------------------------------------------------------------------
+__tests__
+__mocks__
 
-# Windows batch files
-*.bat
-*.BAT
+# -----------------------------------------------------------------------------
+# Dados de runtime (gerenciados via volumes)
+# -----------------------------------------------------------------------------
+# Esses diretorios sao criados pelo container e gerenciados via volumes nomeados
+# NAO devem ser copiados do host para o build context
+profile
+profile/*
+respostas
+respostas/*
+fila
+fila/*
+backups
+backups/*
+monitoring
+monitoring/*
 
-# Python
-*.pyc
-__pycache__/
-*.py
-
-# Docker files (not needed in image)
-Dockerfile*
-docker-compose*.yml
-.dockerignore
-
-# CI/CD
-.github/
-.pre-commit-config.yaml
-
-# Development tools
-tools/
-Makefile
-jsconfig.json
+# -----------------------------------------------------------------------------
+# Fim
+# -----------------------------------------------------------------------------

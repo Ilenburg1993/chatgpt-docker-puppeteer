@@ -1,51 +1,89 @@
 # =============================================================================
-# Git Attributes - Line Ending Configuration
-# Força LF (Unix-style) em arquivos críticos para containers
+# .gitattributes — Normalização de Quebras de Linha (Line Endings)
+# Version: 2.1 FIXED (23/01/2026)
+# =============================================================================
+# PROPÓSITO:
+# Garantir que todos os arquivos de texto usem LF (Unix Style),
+# independentemente de quem os edita (Windows, Linux, Mac).
+# Isso previne erros de execução dentro do Docker/Linux.
 # =============================================================================
 
-# Default behavior: Auto-detect text files and normalize to LF
-* text=auto
+# 1. REGRA GLOBAL (O mais importante)
+# Detecta arquivos de texto e força LF na hora de salvar no Git.
+# No checkout, mantém LF (ideal para WSL2 e Containers).
+* text=auto eol=lf
 
-# Docker files - MUST be LF (breaks in containers with CRLF)
+# 2. SCRIPTS E EXECUTÁVEIS (CRÍTICO)
+# Estes arquivos JAMAIS devem ter CRLF, senão o Linux falha.
+*.sh      text eol=lf
+*.bash    text eol=lf
+*.zsh     text eol=lf
+*.js      text eol=lf
+*.mjs     text eol=lf
+*.ts      text eol=lf
+*.py      text eol=lf
+*.pl      text eol=lf
+*.rb      text eol=lf
+
+# 3. ARQUIVOS DE CONFIGURAÇÃO DOCKER
 Dockerfile* text eol=lf
-docker-compose*.yml text eol=lf
-.dockerignore text eol=lf
+docker-compose*.yml     text eol=lf
+docker-compose*.yaml    text eol=lf
+.dockerignore           text eol=lf
 
-# Shell scripts - MUST be LF (breaks with CRLF)
-*.sh text eol=lf
+# 4. CONFIGURAÇÕES VS CODE E EDITOR
+.gitattributes          text eol=lf
+.gitignore              text eol=lf
+.editorconfig           text eol=lf
+*.json                  text eol=lf
+*.jsonc                 text eol=lf
+*.xml                   text eol=lf
+*.yaml                  text eol=lf
+*.yml                   text eol=lf
+*.toml                  text eol=lf
+*.ini                   text eol=lf
+*.env                   text eol=lf
+*.env.* text eol=lf
+.eslintrc               text eol=lf
+.prettierrc             text eol=lf
 
-# Node.js entry points
-*.js text eol=lf
-*.mjs text eol=lf
+# 5. EXCEÇÕES WINDOWS (Mantém CRLF nativo)
+# Apenas arquivos batch do Windows precisam de CRLF
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=lf  # PowerShell Core (Linux/Docker) prefere LF
 
-# Configuration files
-*.json text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
+# 6. ARQUIVOS BINÁRIOS (Git não deve tocar)
+# Imagens
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.svg     binary
+*.webp    binary
 
-# Documentation
-*.md text eol=lf
+# Fontes
+*.ttf     binary
+*.eot     binary
+*.otf     binary
+*.woff    binary
+*.woff2   binary
 
-# Windows batch files - MUST be CRLF
-*.bat text eol=crlf
-*.cmd text eol=crlf
+# Arquivos compactados e documentos
+*.zip     binary
+*.tar.gz  binary
+*.tgz     binary
+*.rar     binary
+*.7z      binary
+*.pdf     binary
+*.doc     binary
+*.docx    binary
+*.xls     binary
+*.xlsx    binary
+*.ppt     binary
+*.pptx    binary
 
-# PowerShell scripts - prefer CRLF but LF works
-*.ps1 text eol=lf
-
-# Binary files (explicitly mark to avoid corruption)
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.woff binary
-*.woff2 binary
-*.ttf binary
-*.eot binary
-*.gz binary
-*.zip binary
-*.tar binary
-
-# Node.js
-package-lock.json -diff
+# Node
+package-lock.json binary
+yarn.lock         binary
