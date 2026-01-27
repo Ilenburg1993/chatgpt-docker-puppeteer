@@ -90,9 +90,6 @@
         "typescript",
         "typescriptreact"
     ],
-    "eslint.options": {
-        "overrideConfigFile": "eslint.config.mjs"
-    },
     "eslint.run": "onType",
     "eslint.format.enable": true,
     "eslint.lintTask.enable": true,
@@ -535,6 +532,8 @@
     "task.slowProviderWarning": true,
     "task.quickOpen.detail": true,
     "task.quickOpen.skip": false,
+    "npm-intellisense.scanDevDependencies": true,
+
     // ============================================================
     // EDITOR SUGGESTIONS (Melhorias)
     // ============================================================
@@ -562,5 +561,6 @@
                 "copilot/claude-sonnet-4.5"
             ]
         }
-    }
+    },
+    "claudeCodeChat.permissions.yoloMode": false
 }

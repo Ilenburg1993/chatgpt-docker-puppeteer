@@ -5,6 +5,7 @@
 # Default owner for everything
 * @Ilenburg1993
 
+
 # Critical core files (Module Alias: @core, @shared)
 /src/core/ @Ilenburg1993
 /src/shared/ @Ilenburg1993
@@ -14,8 +15,7 @@
 # Infrastructure and deployment (Module Alias: @infra, @server)
 /src/infra/ @Ilenburg1993
 /src/server/ @Ilenburg1993
-/Dockerfile @Ilenburg1993
-/docker-compose*.yml @Ilenburg1993
+.devcontainer/Dockerfile @Ilenburg1993
 /ecosystem.config.js @Ilenburg1993
 
 # CI/CD and GitHub workflows
@@ -37,5 +37,5 @@
 # Documentation (Module Alias guides)
 /DOCUMENTAÇÃO/MODULE_ALIASES.md @Ilenburg1993
 /DOCUMENTAÇÃO/ALIAS_VALIDATION_REPORT.md @Ilenburg1993
-/DEVELOPER_WORKFLOW.md @Ilenburg1993
-/CONTRIBUTING.md @Ilenburg1993
+/DOCUMENTAÇÃO/DEVELOPER_WORKFLOW.md @Ilenburg1993
+/DOCUMENTAÇÃO/CONTRIBUTING.md @Ilenburg1993
