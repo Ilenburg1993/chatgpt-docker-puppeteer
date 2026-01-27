@@ -47,17 +47,17 @@ build/
 *.tgz
 
 # IDE and editors
-.vscode/
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/*.code-snippets
-!.vscode/keybindings.json
+# .vscode/ (permitido para versionamento dos arquivos de configuração)
+#!.vscode/extensions.json
+#!.vscode/settings.json
+#!.vscode/tasks.json
+#!.vscode/launch.json
+#!.vscode/*.code-snippets
+#!.vscode/keybindings.json
 # VS Code auto-generated logs (Makefile Tools extension)
-.vscode/*.log
-.vscode/configurationCache.log
-.idea/
+#.vscode/*.log
+#.vscode/configurationCache.log
+#.idea/
 *.swp
 *.swo
 *~

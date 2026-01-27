@@ -1,40 +1,73 @@
 # =============================================================================
 # .gitattributes — Normalização de Quebras de Linha (Line Endings)
-# Version: 2.1 FIXED (23/01/2026)
-# =============================================================================
-# PROPÓSITO:
-# Garantir que todos os arquivos de texto usem LF (Unix Style),
-# independentemente de quem os edita (Windows, Linux, Mac).
-# Isso previne erros de execução dentro do Docker/Linux.
+# Version: 2.3 (Node + Puppeteer + DevContainer + CI + VS)
+# Objetivo: garantir consistência LF para desenvolvimento em WSL/Containers/CI,
+#           compatibilidade com VS Code, e segurança para artefatos binários.
 # =============================================================================
 
-# 1. REGRA GLOBAL (O mais importante)
-# Detecta arquivos de texto e força LF na hora de salvar no Git.
-# No checkout, mantém LF (ideal para WSL2 e Containers).
+# Regra global: detectar texto automaticamente e forçar LF no repositório
 * text=auto eol=lf
 
-# 2. SCRIPTS E EXECUTÁVEIS (CRÍTICO)
-# Estes arquivos JAMAIS devem ter CRLF, senão o Linux falha.
-*.sh      text eol=lf
-*.bash    text eol=lf
-*.zsh     text eol=lf
-*.js      text eol=lf
-*.mjs     text eol=lf
-*.ts      text eol=lf
-*.py      text eol=lf
-*.pl      text eol=lf
-*.rb      text eol=lf
+# -----------------------------
+# Scripts e executáveis (sensitive to EOL)
+# -----------------------------
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.zsh       text eol=lf
+*.ps1       text eol=lf
+*.js        text eol=lf
+*.cjs       text eol=lf
+*.mjs       text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.jsx       text eol=lf
+*.py        text eol=lf
+*.pl        text eol=lf
+*.rb        text eol=lf
 
-# 3. ARQUIVOS DE CONFIGURAÇÃO DOCKER
-Dockerfile* text eol=lf
+# -----------------------------
+# Node / package managers
+# -----------------------------
+package.json            text eol=lf
+package-lock.json       text eol=lf
+yarn.lock               text eol=lf
+pnpm-lock.yaml          text eol=lf
+.npmrc                  text eol=lf
+.yarnrc                 text eol=lf
+.editorconfig           text eol=lf
+
+# -----------------------------
+# Puppeteer / Chromium local artifacts (se NÃO for ignorado)
+# -----------------------------
+# Marcar como binário evita tentativa de normalização caso alguém versione artefatos locais.
+.local-chromium/**      binary
+chrome-linux/**         binary
+chrome-win/**           binary
+chrome-mac/**           binary
+
+# -----------------------------
+# Docker / DevContainer / CI configs
+# -----------------------------
+Dockerfile*             text eol=lf
 docker-compose*.yml     text eol=lf
 docker-compose*.yaml    text eol=lf
 .dockerignore           text eol=lf
+.devcontainer/**        text eol=lf
+.github/workflows/**    text eol=lf
 
-# 4. CONFIGURAÇÕES VS CODE E EDITOR
+# -----------------------------
+# VS Code / IDE
+# -----------------------------
+.vscode/**              text eol=lf
+
+# -----------------------------
+# Metadados, documentação e dados legíveis
+# -----------------------------
 .gitattributes          text eol=lf
 .gitignore              text eol=lf
-.editorconfig           text eol=lf
+README*                 text eol=lf
+LICENSE*                text eol=lf
+*.md                    text eol=lf
 *.json                  text eol=lf
 *.jsonc                 text eol=lf
 *.xml                   text eol=lf
@@ -43,47 +76,75 @@ docker-compose*.yaml    text eol=lf
 *.toml                  text eol=lf
 *.ini                   text eol=lf
 *.env                   text eol=lf
-*.env.* text eol=lf
+*.env.*                 text eol=lf
 .eslintrc               text eol=lf
 .prettierrc             text eol=lf
 
-# 5. EXCEÇÕES WINDOWS (Mantém CRLF nativo)
-# Apenas arquivos batch do Windows precisam de CRLF
-*.bat     text eol=crlf
-*.cmd     text eol=crlf
-*.ps1     text eol=lf  # PowerShell Core (Linux/Docker) prefere LF
+# -----------------------------
+# Exceções Windows (CRLF necessárias)
+# -----------------------------
+*.bat                    text eol=crlf
+*.cmd                    text eol=crlf
 
-# 6. ARQUIVOS BINÁRIOS (Git não deve tocar)
-# Imagens
-*.png     binary
-*.jpg     binary
-*.jpeg    binary
-*.gif     binary
-*.ico     binary
-*.svg     binary
-*.webp    binary
+# -----------------------------
+# Imagens e mídia (binários)
+# -----------------------------
+*.png                    binary
+*.jpg                    binary
+*.jpeg                   binary
+*.gif                    binary
+*.ico                    binary
+*.webp                   binary
 
-# Fontes
-*.ttf     binary
-*.eot     binary
-*.otf     binary
-*.woff    binary
-*.woff2   binary
+# SVG é texto (XML) — mantemos como texto para diffs/otimização
+*.svg                    text eol=lf
 
-# Arquivos compactados e documentos
-*.zip     binary
-*.tar.gz  binary
-*.tgz     binary
-*.rar     binary
-*.7z      binary
-*.pdf     binary
-*.doc     binary
-*.docx    binary
-*.xls     binary
-*.xlsx    binary
-*.ppt     binary
-*.pptx    binary
+# -----------------------------
+# Fontes (binários)
+# -----------------------------
+*.ttf                    binary
+*.eot                    binary
+*.otf                    binary
+*.woff                   binary
+*.woff2                  binary
 
-# Node
-package-lock.json binary
-yarn.lock         binary
+# -----------------------------
+# Arquivos compactados e artefatos intensivos
+# -----------------------------
+*.zip                    binary
+*.tar                    binary
+*.tar.gz                 binary
+*.tgz                    binary
+*.gz                     binary
+*.rar                    binary
+*.7z                     binary
+
+# -----------------------------
+# Documentos binários
+# -----------------------------
+*.pdf                    binary
+*.doc                    binary
+*.docx                   binary
+*.xls                    binary
+*.xlsx                   binary
+*.ppt                    binary
+*.pptx                   binary
+
+# -----------------------------
+# Segurança / chaves / certificados (não normalizar)
+# -----------------------------
+*.key                    binary
+*.pem                    binary
+*.p12                    binary
+*.crt                    binary
+
+# -----------------------------
+# Outros: arquivos de build e caches (tipicamente não versionados)
+# -----------------------------
+dist/**                  binary
+build/**                 binary
+coverage/**              binary
+.cache/**                binary
+node_modules/**          binary
+
+# EOF
