@@ -1,0 +1,426 @@
+// ============================================================
+// Dev Container Configuration v3.0 (Auditoria Completa)
+// chatgpt-docker-puppeteer - Autonomous AI Agent
+// Last Updated: January 22, 2026
+// ============================================================
+// CHANGES v3.0:
+// - ✅ Removed redundant 'node' feature (base image already has Node 20.19.2)
+// - ✅ Added npm-cache and puppeteer-cache volumes (50-70% faster rebuilds)
+// - ✅ Optimized npm ci: --prefer-offline --no-audit --progress=false
+// - ✅ Git mount changed to 'delegated' (better I/O performance)
+// - ✅ Documented all 17 extensions (0 deprecated)
+// - ✅ Documented 6 native VS Code features (no extensions needed)
+// ============================================================
+{
+    "name": "ChatGPT Docker Puppeteer - Dev Container",
+    // Workspace derivado do nome real do repositório no host,
+    // evitando hardcode e mantendo previsibilidade interna
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    // ============================================================
+    // BUILD CONFIGURATION
+    // ============================================================
+    "build": {
+        // Context explícito: assume que o devcontainer está
+        // na raiz do repositório (ou que o Dockerfile está ali)
+        "context": ".",
+        // Dockerfile único, versionado junto ao projeto
+        "dockerfile": "Dockerfile",
+        // Build arguments: identidade, rastreabilidade e controle
+        "args": {
+            // Versão lógica do ambiente (não confundir com app)
+            "VERSION": "3.3.0",
+            // Metadata de build (opcionais, mas recomendadas)
+            "BUILD_DATE": "${localEnv:BUILD_DATE}",
+            "VCS_REF": "${localEnv:GIT_COMMIT}",
+            // Identidade da imagem
+            "IMAGE_NAME": "chatgpt-docker-puppeteer",
+            "IMAGE_VENDOR": "Yuri",
+            // Ambiente-alvo do build (não runtime)
+            "BUILD_ENV": "dev"
+            // Flags de build condicionais
+            // Ex.: instalar Chromium apenas se necessário
+            // "INSTALL_CHROMIUM": "false"
+        }
+    },
+    // ============================================================
+    // FEATURES - Auto-install tools and utilities
+    // ============================================================
+    "features": {
+        // Common utilities (bash, git, curl, wget, etc)
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": false,
+            "installOhMyZsh": false,
+            "upgradePackages": false,
+            "username": "node",
+            "userUid": "automatic",
+            "userGid": "automatic"
+        },
+        // GitHub CLI
+        "ghcr.io/devcontainers/features/github-cli:1": {
+            "version": "2.83.2"
+        }
+    },
+    // ============================================================
+    // PORT FORWARDING - Make container ports available locally
+    // ============================================================
+    "forwardPorts": [
+        3008, // Server - Socket.io + Express API
+        9222, // Chrome DevTools Protocol - Conexão com Chrome EXTERNO (host Windows)
+        9229, // Node.js debugger - PM2 agent
+        9230 // Node.js debugger - PM2 dashboard (alternative)
+    ],
+    "portsAttributes": {
+        "3008": {
+            "label": "Socket.io Server",
+            "onAutoForward": "notify",
+            "protocol": "http"
+        },
+        "9222": {
+            "label": "Chrome DevTools Protocol (external host)",
+            "onAutoForward": "silent",
+            "protocol": "http"
+        },
+        "9229": {
+            "label": "Node.js Debugger (Primary)",
+            "onAutoForward": "silent"
+        },
+        "9230": {
+            "label": "Node.js Debugger (Alternative)",
+            "onAutoForward": "silent"
+        }
+    },
+    // ============================================================
+    // RUNTIME ARGS - Docker runtime configuration
+    // ============================================================
+    "runArgs": [
+        // =========================================================
+        // NETWORKING & HOST INTEGRATION
+        // =========================================================
+        // Acesso explícito ao host (Chrome externo via CDP)
+        "--add-host=host.docker.internal:host-gateway",
+        // DNS previsível (evita falhas intermitentes de Copilot, npm, MCP)
+        "--dns=8.8.8.8",
+        "--dns=1.1.1.1",
+        // =========================================================
+        // SHARED MEMORY & PROCESS STABILITY
+        // =========================================================
+        // Shared memory ampla para Puppeteer / Chromium
+        "--shm-size=4g",
+        // Limite alto de arquivos abertos (VS Code Server, Node, watchers)
+        "--ulimit",
+        "nofile=65536:65536",
+        // =========================================================
+        // DOCKER-FROM-DOCKER (CLI VIA SOCKET)
+        // =========================================================
+        // Permite uso do docker CLI pelo usuário node
+        "--group-add=docker",
+        // =========================================================
+        // METADATA & INSPECTION
+        // =========================================================
+        "--label",
+        "project=chatgpt-docker-puppeteer",
+        "--label",
+        "role=devcontainer",
+        "--label",
+        "version=3.3.0"
+    ],
+    // ============================================================
+    // LIFECYCLE HOOKS - Commands to run at different stages
+    // ============================================================
+    // Run once after container creation (heavy setup, versioned)
+    "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
+    // Run every time container starts (technical validation)
+    "postStartCommand": "make info",
+    // Run when attaching to container (human-friendly feedback)
+    "postAttachCommand": "bash .devcontainer/scripts/post-attach.sh",
+    // ============================================================
+    // VS CODE CUSTOMIZATIONS
+    // ============================================================
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                // ========================================================
+                // EXTENSIONS AUTO-INSTALL — RATIONALE-DRIVEN SELECTION
+                // ========================================================
+                // Objetivo:
+                // - Não duplicar funcionalidades nativas do VS Code
+                // - Não competir com GitHub Copilot
+                // - Cobrir lacunas reais: infraestrutura, testes, scripts e observabilidade
+                // - Favorecer um fluxo Makefile-first + DevContainer-first
+                //
+                // Critério de inclusão:
+                // ✔ VS Code não faz isso nativamente (ou faz pior)
+                // ✔ Copilot não substitui essa funcionalidade
+                // ✔ Melhora confiabilidade, legibilidade ou diagnóstico
+                //
+                // Funcionalidades NATIVAS do VS Code (não requerem extensões):
+                // - Auto Close/Rename Tags
+                // - Bracket Pair Colorization
+                // - Indent Guides
+                // - NPM Scripts Explorer
+                // - Node.js Debugger
+                // ========================================================
+                // === CORE ESSENTIALS (Execution, Automation, AI) ===
+                "dbaeumer.vscode-eslint", // Linting JS/Node (depende de node_modules)
+                "esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
+                "ms-azuretools.vscode-docker", // Docker / DevContainer DX
+                "GitHub.copilot", // Assistente IA
+                "GitHub.copilot-chat", // Chat contextual com IA
+                "ms-vscode.makefile-tools", // Makefile como árbitro do sistema
+                // === GIT & VERSION CONTROL (Insight, not operations) ===
+                "eamodio.gitlens", // Histórico avançado, blame, graph
+                // === CODE QUALITY & STRUCTURE ===
+                "usernamehw.errorlens", // Erros e warnings inline
+                "christian-kohler.path-intellisense", // Autocomplete de paths
+                "christian-kohler.npm-intellisense", // Autocomplete de módulos npm
+                "aaron-bond.better-comments", // TODO / FIXME estruturados
+                "EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
+                "timonwong.shellcheck", // Análise estática de scripts .sh
+                "redhat.vscode-yaml", // YAML com schema e validação
+                "eriklynd.json-tools", // Manipulação e validação JSON
+                // === PRODUCTIVITY & OPERATIONS ===
+                "gruntfuggly.todo-tree", // Visão global de TODOs
+                "humao.rest-client", // Testes de API dentro do editor
+                "yzhang.markdown-all-in-one", // Documentação Markdown viva
+                "pflannery.vscode-versionlens", // Visibilidade de versões de deps
+                "hbenl.vscode-test-explorer", // UI unificada para testes (Makefile-friendly)
+                // === NAVIGATION & COMPREHENSION ===
+                // === VISUAL & UX (Low noise, high clarity) ===
+                "PKief.material-icon-theme", // Ícones de arquivos
+                "streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
+                "streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
+                "oderwat.indent-rainbow" // Indentação visual por nível
+            ],
+            "settings": {
+                // ========================================================
+                // TERMINAL (Shell canônico, previsível e reprodutível)
+                // ========================================================
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash",
+                        "icon": "terminal-bash"
+                    }
+                },
+                "terminal.integrated.persistentSessionReviveProcess": "onExit",
+                "terminal.integrated.scrollback": 20000,
+                "terminal.integrated.cursorBlinking": true,
+                "terminal.integrated.enableMultiLinePasteWarning": "never",
+                // ========================================================
+                // FILE SYSTEM, WATCHERS & SEARCH (performance + foco)
+                // ========================================================
+                "files.watcherExclude": {
+                    "**/node_modules/**": true,
+                    "**/logs/**": true,
+                    "**/.git/objects/**": true,
+                    "**/.git/subtree-cache/**": true,
+                    "**/profile/**": true,
+                    "**/respostas/**": true
+                },
+                "search.exclude": {
+                    "**/node_modules": true,
+                    "**/logs": true,
+                    "**/profile": true,
+                    "**/respostas": true
+                },
+                "files.autoSave": "onFocusChange",
+                "files.trimTrailingWhitespace": true,
+                "files.insertFinalNewline": true,
+                // ========================================================
+                // GIT (fluxo profissional, baixo atrito)
+                // ========================================================
+                "git.autofetch": true,
+                "git.confirmSync": false,
+                "git.enableSmartCommit": true,
+                "git.decorations.enabled": true,
+                // ========================================================
+                // EDITOR & FORMATTING (controle humano explícito)
+                // ========================================================
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.eslint": "explicit",
+                    "source.organizeImports": "explicit"
+                },
+                "editor.bracketPairColorization.enabled": true,
+                "editor.guides.indentation": true,
+                "editor.renderWhitespace": "boundary",
+                "editor.minimap.enabled": true,
+                "editor.minimap.renderCharacters": false,
+                "editor.smoothScrolling": true,
+                // ========================================================
+                // JAVASCRIPT / NODE.JS (infra + backend)
+                // ========================================================
+                "javascript.preferences.importModuleSpecifier": "relative",
+                "javascript.updateImportsOnFileMove.enabled": "always",
+                "debug.javascript.autoAttachFilter": "onlyWithFlag",
+                "[javascript]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                // ========================================================
+                // ESLINT (fonte de verdade para qualidade)
+                // ========================================================
+                "eslint.validate": [
+                    "javascript",
+                    "javascriptreact"
+                ],
+                "eslint.workingDirectories": [
+                    {
+                        "mode": "auto"
+                    }
+                ],
+                "eslint.alwaysShowStatus": true,
+                // ========================================================
+                // PRETTIER (somente com configuração explícita)
+                // ========================================================
+                "prettier.requireConfig": true,
+                // ========================================================
+                // TESTING (Jest + Test Explorer)
+                // ========================================================
+                "testExplorer.useNativeTesting": false,
+                "jest.runMode": "on-demand",
+                "jest.autoRun": "off",
+                // ========================================================
+                // YAML / JSON / SHELL (infra, contratos, scripts)
+                // ========================================================
+                "yaml.validate": true,
+                "json.validate.enable": true,
+                "shellcheck.enable": true,
+                // ========================================================
+                // MARKDOWN & DOCUMENTATION
+                // ========================================================
+                "markdown.preview.breaks": true,
+                "markdown.preview.scrollPreviewWithEditor": true,
+                // ========================================================
+                // SPELL CHECKER (EN + PT-BR)
+                // ========================================================
+                "cSpell.language": "pt-BR,en",
+                "cSpell.enabledFileTypes": {
+                    "javascript": true,
+                    "markdown": true,
+                    "json": true,
+                    "yaml": true
+                },
+                // ========================================================
+                // REFERENCES & NAVIGATION
+                // ========================================================
+                "references.preferredLocation": "peek",
+                // ========================================================
+                // WORKSPACE TRUST & SECURITY
+                // ========================================================
+                "security.workspace.trust.enabled": true,
+                // ========================================================
+                // TELEMETRY & NOISE REDUCTION
+                // ========================================================
+                "telemetry.telemetryLevel": "off",
+                "github.copilot.enable": {
+                    "*": true,
+                    "markdown": true,
+                    "plaintext": false
+                },
+                "github.copilot.advanced": {
+                    "debug.overrideEngine": "stable"
+                }
+            }
+        }
+    },
+    // ============================================================
+    // MOUNTS - Volume and bind mount configuration
+    // ============================================================
+    "mounts": [
+        "source=devcontainer-npm-cache,target=/home/node/.npm,type=volume",
+        "source=devcontainer-puppeteer-cache,target=/home/node/.cache/puppeteer,type=volume",
+        "source=devcontainer-vscode-server,target=/home/node/.vscode-server,type=volume",
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    ],
+    // ============================================================
+    // CONTAINER ENVIRONMENT VARIABLES
+    // ============================================================
+    "containerEnv": {
+        // ============================================================
+        // ENVIRONMENT & APPLICATION IDENTITY
+        // ============================================================
+        // Definem em que tipo de ambiente o código está rodando
+        // e qual o papel lógico deste container no sistema.
+        "NODE_ENV": "development", // Ambiente Node.js (DEV, nunca production aqui)
+        "APP_ENV": "dev", // Ambiente lógico da aplicação
+        "APP_ROLE": "agent", // Papel funcional (agent, dashboard, worker, etc.)
+        "APP_NAME": "chatgpt-agent", // Identidade simbólica do processo/app
+        // ============================================================
+        // PUPPETEER / CHROME INTEGRATION (External Chrome, CDP)
+        // ============================================================
+        // Configuração explícita para uso de Chrome EXTERNO via
+        // Chrome DevTools Protocol (CDP), não Chromium interno.
+        "PUPPETEER_MODE": "connect", // Puppeteer opera conectando a um browser existente
+        "PUPPETEER_WS_ENDPOINT": "http://host.docker.internal:9222", // Endpoint CDP do Chrome no host
+        "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true", // Evita download de Chromium (não usado)
+        "PUPPETEER_CONNECT_TIMEOUT": "30000", // Timeout de conexão CDP (ms)
+        // ============================================================
+        // NODE.JS / V8 RUNTIME TUNING
+        // ============================================================
+        // Ajustes de runtime para evitar OOM e melhorar estabilidade
+        // em workloads com Puppeteer e múltiplos processos.
+        "NODE_OPTIONS": "--max-old-space-size=4096", // Limite de heap V8 (MB)
+        // ============================================================
+        // PM2 (Process Manager) CONFIGURATION
+        // ============================================================
+        // PM2 é usado apenas quando o sistema é explicitamente iniciado.
+        // Este path garante isolamento e persistência previsível.
+        "PM2_HOME": "/home/node/.pm2", // Diretório de estado/logs do PM2
+        // ============================================================
+        // NPM CONFIGURATION (Noise reduction + reproducibility)
+        // ============================================================
+        // Reduz ruído, acelera installs e evita comportamento implícito.
+        "NPM_CONFIG_CACHE": "/home/node/.npm", // Cache local persistente
+        "NPM_CONFIG_PREFIX": "/home/node/.npm-global", // Prefixo para bins globais (se usados)
+        "NPM_CONFIG_LOGLEVEL": "warn", // Menos ruído em logs
+        "NPM_CONFIG_AUDIT": "false", // Evita audit automático (CI/dev-friendly)
+        "NPM_CONFIG_FUND": "false", // Evita mensagens de funding
+        // ============================================================
+        // LOGGING & DEBUGGING
+        // ============================================================
+        // Controle explícito de verbosidade e namespaces de debug.
+        // Não implica inicialização de serviços.
+        "LOG_LEVEL": "debug", // Nível lógico de logs da aplicação
+        "DEBUG": "puppeteer:*,agent:*", // Namespaces de debug (node-debug)
+        // ============================================================
+        // TERMINAL / OUTPUT FORMATTING
+        // ============================================================
+        // Força cores em logs e CLIs para melhor legibilidade
+        // em terminais remotos e logs do VS Code.
+        "FORCE_COLOR": "1",
+        // ============================================================
+        // LOCALE & TIMEZONE
+        // ============================================================
+        // Garante consistência de datas, logs, ordenação e encoding
+        // independentemente do host.
+        "TZ": "America/Sao_Paulo", // Timezone padrão do container
+        "LANG": "pt_BR.UTF-8", // Locale principal
+        "LC_ALL": "pt_BR.UTF-8", // Override completo de locale
+        "DOCKER_BUILDKIT": "1",
+        "BUILDKIT_PROGRESS": "plain",
+        "MCP_DISABLE_DOCKER": "1",
+        "MCP_SERVER_MODE": "client-only",
+        "WATCHPACK_POLLING": "true"
+    },
+    // ============================================================
+    // SECURITY & USER CONFIGURATION
+    // ============================================================
+    "remoteUser": "node",
+    "updateRemoteUserUID": false,
+    "containerUser": "node",
+    "privileged": false,
+    // ============================================================
+    // RESOURCE LIMITS
+    // ============================================================
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "4gb",
+        "storage": "32gb"
+    },
+    // ============================================================
+    // ADDITIONAL CONFIGURATION
+    // ============================================================
+    "shutdownAction": "stopContainer",
+    "waitFor": "postStartCommand"
+}

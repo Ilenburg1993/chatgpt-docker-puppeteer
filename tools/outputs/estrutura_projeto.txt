@@ -4,45 +4,990 @@ PROJETO: chatgpt-docker-puppeteer
 ├── .git/ [conteúdo oculto]
 ├── .github/ [conteúdo oculto]
 ├── .tmp.driveupload/ [conteúdo oculto]
+├── .vscode/ [conteúdo oculto]
 ├── analysis/ [conteúdo oculto]
+├── backups/
+│   ├── pre-constants-migration-20260120_073843/
+│   │   └── src/
+│   │       ├── core/
+│   │       │   ├── constants/
+│   │       │   │   ├── browser.js
+│   │       │   │   ├── index.js
+│   │       │   │   ├── logging.js
+│   │       │   │   └── tasks.js
+│   │       │   ├── context/
+│   │       │   │   ├── engine/
+│   │       │   │   │   └── context_engine.js
+│   │       │   │   ├── extractors/
+│   │       │   │   │   ├── code_logic.js
+│   │       │   │   │   └── json_logic.js
+│   │       │   │   ├── limits/
+│   │       │   │   │   ├── budget_manager.js
+│   │       │   │   │   └── guardrails.js
+│   │       │   │   ├── parsing/
+│   │       │   │   │   └── ref_parser.js
+│   │       │   │   ├── transformers/
+│   │       │   │   │   ├── identity.js
+│   │       │   │   │   ├── metadata.js
+│   │       │   │   │   └── summary.js
+│   │       │   │   └── context_core.js
+│   │       │   ├── schemas/
+│   │       │   │   ├── bootstrap_state_schema.js
+│   │       │   │   ├── dna_schema.js
+│   │       │   │   ├── schema_core.js
+│   │       │   │   ├── shared_types.js
+│   │       │   │   ├── task_healer.js
+│   │       │   │   └── task_schema.js
+│   │       │   ├── config.js
+│   │       │   ├── doctor.js
+│   │       │   ├── environment_resolver.js
+│   │       │   ├── forensics.js
+│   │       │   ├── i18n.js
+│   │       │   ├── identity_manager.js
+│   │       │   ├── infra_failure_policy.js
+│   │       │   ├── logger.js
+│   │       │   ├── memory.js
+│   │       │   └── schemas.js
+│   │       ├── driver/
+│   │       │   ├── core/
+│   │       │   │   ├── BaseDriver.js
+│   │       │   │   └── TargetDriver.js
+│   │       │   ├── modules/
+│   │       │   │   ├── analyzer.js
+│   │       │   │   ├── biomechanics_engine.js
+│   │       │   │   ├── frame_navigator.js
+│   │       │   │   ├── handle_manager.js
+│   │       │   │   ├── human.js
+│   │       │   │   ├── input_resolver.js
+│   │       │   │   ├── recovery_system.js
+│   │       │   │   ├── stabilizer.js
+│   │       │   │   ├── submission_controller.js
+│   │       │   │   └── triage.js
+│   │       │   ├── nerv_adapter/
+│   │       │   │   └── driver_nerv_adapter.js
+│   │       │   ├── targets/
+│   │       │   │   └── ChatGPTDriver.js
+│   │       │   ├── DriverLifecycleManager.js
+│   │       │   ├── factory.js
+│   │       │   └── state_persistence.js
+│   │       ├── effectors/
+│   │       │   ├── io_effector.js
+│   │       │   └── task_effector.js
+│   │       ├── infra/
+│   │       │   ├── browser_pool/
+│   │       │   │   └── pool_manager.js
+│   │       │   ├── fs/
+│   │       │   │   ├── atomic_write.js
+│   │       │   │   ├── control_store.js
+│   │       │   │   ├── fs_core.js
+│   │       │   │   ├── fs_utils.js
+│   │       │   │   ├── paths.js
+│   │       │   │   └── safe_read.js
+│   │       │   ├── ipc/
+│   │       │   │   └── buffer.js
+│   │       │   ├── locks/
+│   │       │   │   ├── lock_manager.js
+│   │       │   │   └── process_guard.js
+│   │       │   ├── queue/
+│   │       │   │   ├── cache.js
+│   │       │   │   ├── query_engine.js
+│   │       │   │   ├── scheduler.js
+│   │       │   │   └── task_loader.js
+│   │       │   ├── storage/
+│   │       │   │   ├── dna_store.js
+│   │       │   │   ├── response_store.js
+│   │       │   │   ├── robot_identity.json
+│   │       │   │   └── task_store.js
+│   │       │   ├── transport/
+│   │       │   │   └── socket_io_adapter.js
+│   │       │   ├── ConnectionOrchestrator.js
+│   │       │   ├── io.js
+│   │       │   ├── ipc_client_v800_patch.js
+│   │       │   └── system.js
+│   │       ├── kernel/
+│   │       │   ├── adapters/
+│   │       │   │   └── state_persistence.js
+│   │       │   ├── example/
+│   │       │   │   └── kernel_nerv_integration.js
+│   │       │   ├── execution_engine/
+│   │       │   │   └── execution_engine.js
+│   │       │   ├── kernel_loop/
+│   │       │   │   └── kernel_loop.js
+│   │       │   ├── nerv_bridge/
+│   │       │   │   └── kernel_nerv_bridge.js
+│   │       │   ├── observation_store/
+│   │       │   │   └── observation_store.js
+│   │       │   ├── policies/
+│   │       │   │   └── policy_engine.js
+│   │       │   ├── policy_engine/
+│   │       │   │   └── policy_engine.js
+│   │       │   ├── state/
+│   │       │   │   ├── observation_store.js
+│   │       │   │   └── task_store.js
+│   │       │   ├── task_runtime/
+│   │       │   │   └── task_runtime.js
+│   │       │   ├── telemetry/
+│   │       │   │   └── kernel_telemetry.js
+│   │       │   ├── consolidado_KERNEL.txt
+│   │       │   ├── DOC.docx
+│   │       │   ├── kernel.js
+│   │       │   └── TUDO.py
+│   │       ├── logic/
+│   │       │   ├── validation/
+│   │       │   │   ├── rules/
+│   │       │   │   │   ├── format_rules.js
+│   │       │   │   │   ├── physical_rules.js
+│   │       │   │   │   └── semantic_rules.js
+│   │       │   │   ├── scan_engine.js
+│   │       │   │   └── validation_core.js
+│   │       │   ├── adaptive.js
+│   │       │   └── validator.js
+│   │       ├── nerv/
+│   │       │   ├── buffers/
+│   │       │   │   ├── backpressure - NEWOLD.js
+│   │       │   │   ├── backpressure.js
+│   │       │   │   ├── buffers.js
+│   │       │   │   ├── inbound_queue.js
+│   │       │   │   └── outbound_queue.js
+│   │       │   ├── correlation/
+│   │       │   │   ├── correlation_context.js
+│   │       │   │   └── correlation_store.js
+│   │       │   ├── emission/
+│   │       │   │   ├── emission.js
+│   │       │   │   ├── emit_ack.js
+│   │       │   │   ├── emit_command.js
+│   │       │   │   └── emit_event.js
+│   │       │   ├── health/
+│   │       │   │   └── health.js
+│   │       │   ├── reception/
+│   │       │   │   ├── receive.js
+│   │       │   │   └── reception.js
+│   │       │   ├── telemetry/
+│   │       │   │   ├── ipc_telemetry.js
+│   │       │   │   └── metrics.js
+│   │       │   ├── transport/
+│   │       │   │   ├── connection.js
+│   │       │   │   ├── framing.js
+│   │       │   │   ├── hybrid_transport.js
+│   │       │   │   ├── reconnect.js
+│   │       │   │   └── transport.js
+│   │       │   ├── nerv.js
+│   │       │   └── TUDO.py
+│   │       ├── server/
+│   │       │   ├── api/
+│   │       │   │   ├── controllers/
+│   │       │   │   │   ├── dna.js
+│   │       │   │   │   ├── system.js
+│   │       │   │   │   └── tasks.js
+│   │       │   │   └── router.js
+│   │       │   ├── engine/
+│   │       │   │   ├── app.js
+│   │       │   │   ├── lifecycle.js
+│   │       │   │   ├── server.js
+│   │       │   │   └── socket.js
+│   │       │   ├── middleware/
+│   │       │   │   ├── error_handler.js
+│   │       │   │   ├── request_id.js
+│   │       │   │   └── schema_guard.js
+│   │       │   ├── nerv_adapter/
+│   │       │   │   └── server_nerv_adapter.js
+│   │       │   ├── realtime/
+│   │       │   │   ├── bus/
+│   │       │   │   │   └── pm2_bridge.js
+│   │       │   │   ├── streams/
+│   │       │   │   │   └── log_tail.js
+│   │       │   │   └── telemetry/
+│   │       │   │       └── hardware.js
+│   │       │   ├── supervisor/
+│   │       │   │   ├── reconcilier.js
+│   │       │   │   └── remediation.js
+│   │       │   ├── watchers/
+│   │       │   │   ├── fs_watcher.js
+│   │       │   │   └── log_watcher.js
+│   │       │   └── main.js
+│   │       ├── shared/
+│   │       │   └── nerv/
+│   │       │       ├── constants.js
+│   │       │       ├── envelope.js
+│   │       │       ├── README.md
+│   │       │       └── schemas.js
+│   │       ├── state/
+│   │       │   ├── kernel/
+│   │       │   ├── memory/
+│   │       │   ├── tasks/
+│   │       │   ├── workflows/
+│   │       │   └── README.md
+│   │       ├── CONSOLIDAÇÃO.py
+│   │       ├── copiar_com_cabecalho_e_log.py
+│   │       └── main.js
+│   ├── pre-constants-migration-20260120_080540/
+│   │   └── src/
+│   │       ├── core/
+│   │       │   ├── constants/
+│   │       │   │   ├── browser.js
+│   │       │   │   ├── index.js
+│   │       │   │   ├── logging.js
+│   │       │   │   └── tasks.js
+│   │       │   ├── context/
+│   │       │   │   ├── engine/
+│   │       │   │   │   └── context_engine.js
+│   │       │   │   ├── extractors/
+│   │       │   │   │   ├── code_logic.js
+│   │       │   │   │   └── json_logic.js
+│   │       │   │   ├── limits/
+│   │       │   │   │   ├── budget_manager.js
+│   │       │   │   │   └── guardrails.js
+│   │       │   │   ├── parsing/
+│   │       │   │   │   └── ref_parser.js
+│   │       │   │   ├── transformers/
+│   │       │   │   │   ├── identity.js
+│   │       │   │   │   ├── metadata.js
+│   │       │   │   │   └── summary.js
+│   │       │   │   └── context_core.js
+│   │       │   ├── schemas/
+│   │       │   │   ├── bootstrap_state_schema.js
+│   │       │   │   ├── dna_schema.js
+│   │       │   │   ├── schema_core.js
+│   │       │   │   ├── shared_types.js
+│   │       │   │   ├── task_healer.js
+│   │       │   │   └── task_schema.js
+│   │       │   ├── config.js
+│   │       │   ├── doctor.js
+│   │       │   ├── environment_resolver.js
+│   │       │   ├── forensics.js
+│   │       │   ├── i18n.js
+│   │       │   ├── identity_manager.js
+│   │       │   ├── infra_failure_policy.js
+│   │       │   ├── logger.js
+│   │       │   ├── memory.js
+│   │       │   └── schemas.js
+│   │       ├── driver/
+│   │       │   ├── core/
+│   │       │   │   ├── BaseDriver.js
+│   │       │   │   └── TargetDriver.js
+│   │       │   ├── modules/
+│   │       │   │   ├── analyzer.js
+│   │       │   │   ├── biomechanics_engine.js
+│   │       │   │   ├── frame_navigator.js
+│   │       │   │   ├── handle_manager.js
+│   │       │   │   ├── human.js
+│   │       │   │   ├── input_resolver.js
+│   │       │   │   ├── recovery_system.js
+│   │       │   │   ├── stabilizer.js
+│   │       │   │   ├── submission_controller.js
+│   │       │   │   └── triage.js
+│   │       │   ├── nerv_adapter/
+│   │       │   │   └── driver_nerv_adapter.js
+│   │       │   ├── targets/
+│   │       │   │   └── ChatGPTDriver.js
+│   │       │   ├── DriverLifecycleManager.js
+│   │       │   ├── factory.js
+│   │       │   └── state_persistence.js
+│   │       ├── effectors/
+│   │       │   ├── io_effector.js
+│   │       │   └── task_effector.js
+│   │       ├── infra/
+│   │       │   ├── browser_pool/
+│   │       │   │   └── pool_manager.js
+│   │       │   ├── fs/
+│   │       │   │   ├── atomic_write.js
+│   │       │   │   ├── control_store.js
+│   │       │   │   ├── fs_core.js
+│   │       │   │   ├── fs_utils.js
+│   │       │   │   ├── paths.js
+│   │       │   │   └── safe_read.js
+│   │       │   ├── ipc/
+│   │       │   │   └── buffer.js
+│   │       │   ├── locks/
+│   │       │   │   ├── lock_manager.js
+│   │       │   │   └── process_guard.js
+│   │       │   ├── queue/
+│   │       │   │   ├── cache.js
+│   │       │   │   ├── query_engine.js
+│   │       │   │   ├── scheduler.js
+│   │       │   │   └── task_loader.js
+│   │       │   ├── storage/
+│   │       │   │   ├── dna_store.js
+│   │       │   │   ├── response_store.js
+│   │       │   │   ├── robot_identity.json
+│   │       │   │   └── task_store.js
+│   │       │   ├── transport/
+│   │       │   │   └── socket_io_adapter.js
+│   │       │   ├── ConnectionOrchestrator.js
+│   │       │   ├── io.js
+│   │       │   ├── ipc_client_v800_patch.js
+│   │       │   └── system.js
+│   │       ├── kernel/
+│   │       │   ├── adapters/
+│   │       │   │   └── state_persistence.js
+│   │       │   ├── example/
+│   │       │   │   └── kernel_nerv_integration.js
+│   │       │   ├── execution_engine/
+│   │       │   │   └── execution_engine.js
+│   │       │   ├── kernel_loop/
+│   │       │   │   └── kernel_loop.js
+│   │       │   ├── nerv_bridge/
+│   │       │   │   └── kernel_nerv_bridge.js
+│   │       │   ├── observation_store/
+│   │       │   │   └── observation_store.js
+│   │       │   ├── policies/
+│   │       │   │   └── policy_engine.js
+│   │       │   ├── policy_engine/
+│   │       │   │   └── policy_engine.js
+│   │       │   ├── state/
+│   │       │   │   ├── observation_store.js
+│   │       │   │   └── task_store.js
+│   │       │   ├── task_runtime/
+│   │       │   │   └── task_runtime.js
+│   │       │   ├── telemetry/
+│   │       │   │   └── kernel_telemetry.js
+│   │       │   ├── consolidado_KERNEL.txt
+│   │       │   ├── DOC.docx
+│   │       │   ├── kernel.js
+│   │       │   └── TUDO.py
+│   │       ├── logic/
+│   │       │   ├── validation/
+│   │       │   │   ├── rules/
+│   │       │   │   │   ├── format_rules.js
+│   │       │   │   │   ├── physical_rules.js
+│   │       │   │   │   └── semantic_rules.js
+│   │       │   │   ├── scan_engine.js
+│   │       │   │   └── validation_core.js
+│   │       │   ├── adaptive.js
+│   │       │   └── validator.js
+│   │       ├── nerv/
+│   │       │   ├── buffers/
+│   │       │   │   ├── backpressure - NEWOLD.js
+│   │       │   │   ├── backpressure.js
+│   │       │   │   ├── buffers.js
+│   │       │   │   ├── inbound_queue.js
+│   │       │   │   └── outbound_queue.js
+│   │       │   ├── correlation/
+│   │       │   │   ├── correlation_context.js
+│   │       │   │   └── correlation_store.js
+│   │       │   ├── emission/
+│   │       │   │   ├── emission.js
+│   │       │   │   ├── emit_ack.js
+│   │       │   │   ├── emit_command.js
+│   │       │   │   └── emit_event.js
+│   │       │   ├── health/
+│   │       │   │   └── health.js
+│   │       │   ├── reception/
+│   │       │   │   ├── receive.js
+│   │       │   │   └── reception.js
+│   │       │   ├── telemetry/
+│   │       │   │   ├── ipc_telemetry.js
+│   │       │   │   └── metrics.js
+│   │       │   ├── transport/
+│   │       │   │   ├── connection.js
+│   │       │   │   ├── framing.js
+│   │       │   │   ├── hybrid_transport.js
+│   │       │   │   ├── reconnect.js
+│   │       │   │   └── transport.js
+│   │       │   ├── nerv.js
+│   │       │   └── TUDO.py
+│   │       ├── server/
+│   │       │   ├── api/
+│   │       │   │   ├── controllers/
+│   │       │   │   │   ├── dna.js
+│   │       │   │   │   ├── system.js
+│   │       │   │   │   └── tasks.js
+│   │       │   │   └── router.js
+│   │       │   ├── engine/
+│   │       │   │   ├── app.js
+│   │       │   │   ├── lifecycle.js
+│   │       │   │   ├── server.js
+│   │       │   │   └── socket.js
+│   │       │   ├── middleware/
+│   │       │   │   ├── error_handler.js
+│   │       │   │   ├── request_id.js
+│   │       │   │   └── schema_guard.js
+│   │       │   ├── nerv_adapter/
+│   │       │   │   └── server_nerv_adapter.js
+│   │       │   ├── realtime/
+│   │       │   │   ├── bus/
+│   │       │   │   │   └── pm2_bridge.js
+│   │       │   │   ├── streams/
+│   │       │   │   │   └── log_tail.js
+│   │       │   │   └── telemetry/
+│   │       │   │       └── hardware.js
+│   │       │   ├── supervisor/
+│   │       │   │   ├── reconcilier.js
+│   │       │   │   └── remediation.js
+│   │       │   ├── watchers/
+│   │       │   │   ├── fs_watcher.js
+│   │       │   │   └── log_watcher.js
+│   │       │   └── main.js
+│   │       ├── shared/
+│   │       │   └── nerv/
+│   │       │       ├── constants.js
+│   │       │       ├── envelope.js
+│   │       │       ├── README.md
+│   │       │       └── schemas.js
+│   │       ├── state/
+│   │       │   ├── kernel/
+│   │       │   ├── memory/
+│   │       │   ├── tasks/
+│   │       │   ├── workflows/
+│   │       │   └── README.md
+│   │       ├── CONSOLIDAÇÃO.py
+│   │       ├── copiar_com_cabecalho_e_log.py
+│   │       └── main.js
+│   ├── pre-constants-migration-20260120_080735/
+│   │   └── src/
+│   │       ├── core/
+│   │       │   ├── constants/
+│   │       │   │   ├── browser.js
+│   │       │   │   ├── index.js
+│   │       │   │   ├── logging.js
+│   │       │   │   └── tasks.js
+│   │       │   ├── context/
+│   │       │   │   ├── engine/
+│   │       │   │   │   └── context_engine.js
+│   │       │   │   ├── extractors/
+│   │       │   │   │   ├── code_logic.js
+│   │       │   │   │   └── json_logic.js
+│   │       │   │   ├── limits/
+│   │       │   │   │   ├── budget_manager.js
+│   │       │   │   │   └── guardrails.js
+│   │       │   │   ├── parsing/
+│   │       │   │   │   └── ref_parser.js
+│   │       │   │   ├── transformers/
+│   │       │   │   │   ├── identity.js
+│   │       │   │   │   ├── metadata.js
+│   │       │   │   │   └── summary.js
+│   │       │   │   └── context_core.js
+│   │       │   ├── schemas/
+│   │       │   │   ├── bootstrap_state_schema.js
+│   │       │   │   ├── dna_schema.js
+│   │       │   │   ├── schema_core.js
+│   │       │   │   ├── shared_types.js
+│   │       │   │   ├── task_healer.js
+│   │       │   │   └── task_schema.js
+│   │       │   ├── config.js
+│   │       │   ├── doctor.js
+│   │       │   ├── environment_resolver.js
+│   │       │   ├── forensics.js
+│   │       │   ├── i18n.js
+│   │       │   ├── identity_manager.js
+│   │       │   ├── infra_failure_policy.js
+│   │       │   ├── logger.js
+│   │       │   ├── memory.js
+│   │       │   └── schemas.js
+│   │       ├── driver/
+│   │       │   ├── core/
+│   │       │   │   ├── BaseDriver.js
+│   │       │   │   └── TargetDriver.js
+│   │       │   ├── modules/
+│   │       │   │   ├── analyzer.js
+│   │       │   │   ├── biomechanics_engine.js
+│   │       │   │   ├── frame_navigator.js
+│   │       │   │   ├── handle_manager.js
+│   │       │   │   ├── human.js
+│   │       │   │   ├── input_resolver.js
+│   │       │   │   ├── recovery_system.js
+│   │       │   │   ├── stabilizer.js
+│   │       │   │   ├── submission_controller.js
+│   │       │   │   └── triage.js
+│   │       │   ├── nerv_adapter/
+│   │       │   │   └── driver_nerv_adapter.js
+│   │       │   ├── targets/
+│   │       │   │   └── ChatGPTDriver.js
+│   │       │   ├── DriverLifecycleManager.js
+│   │       │   ├── factory.js
+│   │       │   └── state_persistence.js
+│   │       ├── effectors/
+│   │       │   ├── io_effector.js
+│   │       │   └── task_effector.js
+│   │       ├── infra/
+│   │       │   ├── browser_pool/
+│   │       │   │   └── pool_manager.js
+│   │       │   ├── fs/
+│   │       │   │   ├── atomic_write.js
+│   │       │   │   ├── control_store.js
+│   │       │   │   ├── fs_core.js
+│   │       │   │   ├── fs_utils.js
+│   │       │   │   ├── paths.js
+│   │       │   │   └── safe_read.js
+│   │       │   ├── ipc/
+│   │       │   │   └── buffer.js
+│   │       │   ├── locks/
+│   │       │   │   ├── lock_manager.js
+│   │       │   │   └── process_guard.js
+│   │       │   ├── queue/
+│   │       │   │   ├── cache.js
+│   │       │   │   ├── query_engine.js
+│   │       │   │   ├── scheduler.js
+│   │       │   │   └── task_loader.js
+│   │       │   ├── storage/
+│   │       │   │   ├── dna_store.js
+│   │       │   │   ├── response_store.js
+│   │       │   │   ├── robot_identity.json
+│   │       │   │   └── task_store.js
+│   │       │   ├── transport/
+│   │       │   │   └── socket_io_adapter.js
+│   │       │   ├── ConnectionOrchestrator.js
+│   │       │   ├── io.js
+│   │       │   ├── ipc_client_v800_patch.js
+│   │       │   └── system.js
+│   │       ├── kernel/
+│   │       │   ├── adapters/
+│   │       │   │   └── state_persistence.js
+│   │       │   ├── example/
+│   │       │   │   └── kernel_nerv_integration.js
+│   │       │   ├── execution_engine/
+│   │       │   │   └── execution_engine.js
+│   │       │   ├── kernel_loop/
+│   │       │   │   └── kernel_loop.js
+│   │       │   ├── nerv_bridge/
+│   │       │   │   └── kernel_nerv_bridge.js
+│   │       │   ├── observation_store/
+│   │       │   │   └── observation_store.js
+│   │       │   ├── policies/
+│   │       │   │   └── policy_engine.js
+│   │       │   ├── policy_engine/
+│   │       │   │   └── policy_engine.js
+│   │       │   ├── state/
+│   │       │   │   ├── observation_store.js
+│   │       │   │   └── task_store.js
+│   │       │   ├── task_runtime/
+│   │       │   │   └── task_runtime.js
+│   │       │   ├── telemetry/
+│   │       │   │   └── kernel_telemetry.js
+│   │       │   ├── consolidado_KERNEL.txt
+│   │       │   ├── DOC.docx
+│   │       │   ├── kernel.js
+│   │       │   └── TUDO.py
+│   │       ├── logic/
+│   │       │   ├── validation/
+│   │       │   │   ├── rules/
+│   │       │   │   │   ├── format_rules.js
+│   │       │   │   │   ├── physical_rules.js
+│   │       │   │   │   └── semantic_rules.js
+│   │       │   │   ├── scan_engine.js
+│   │       │   │   └── validation_core.js
+│   │       │   ├── adaptive.js
+│   │       │   └── validator.js
+│   │       ├── nerv/
+│   │       │   ├── buffers/
+│   │       │   │   ├── backpressure - NEWOLD.js
+│   │       │   │   ├── backpressure.js
+│   │       │   │   ├── buffers.js
+│   │       │   │   ├── inbound_queue.js
+│   │       │   │   └── outbound_queue.js
+│   │       │   ├── correlation/
+│   │       │   │   ├── correlation_context.js
+│   │       │   │   └── correlation_store.js
+│   │       │   ├── emission/
+│   │       │   │   ├── emission.js
+│   │       │   │   ├── emit_ack.js
+│   │       │   │   ├── emit_command.js
+│   │       │   │   └── emit_event.js
+│   │       │   ├── health/
+│   │       │   │   └── health.js
+│   │       │   ├── reception/
+│   │       │   │   ├── receive.js
+│   │       │   │   └── reception.js
+│   │       │   ├── telemetry/
+│   │       │   │   ├── ipc_telemetry.js
+│   │       │   │   └── metrics.js
+│   │       │   ├── transport/
+│   │       │   │   ├── connection.js
+│   │       │   │   ├── framing.js
+│   │       │   │   ├── hybrid_transport.js
+│   │       │   │   ├── reconnect.js
+│   │       │   │   └── transport.js
+│   │       │   ├── nerv.js
+│   │       │   └── TUDO.py
+│   │       ├── server/
+│   │       │   ├── api/
+│   │       │   │   ├── controllers/
+│   │       │   │   │   ├── dna.js
+│   │       │   │   │   ├── system.js
+│   │       │   │   │   └── tasks.js
+│   │       │   │   └── router.js
+│   │       │   ├── engine/
+│   │       │   │   ├── app.js
+│   │       │   │   ├── lifecycle.js
+│   │       │   │   ├── server.js
+│   │       │   │   └── socket.js
+│   │       │   ├── middleware/
+│   │       │   │   ├── error_handler.js
+│   │       │   │   ├── request_id.js
+│   │       │   │   └── schema_guard.js
+│   │       │   ├── nerv_adapter/
+│   │       │   │   └── server_nerv_adapter.js
+│   │       │   ├── realtime/
+│   │       │   │   ├── bus/
+│   │       │   │   │   └── pm2_bridge.js
+│   │       │   │   ├── streams/
+│   │       │   │   │   └── log_tail.js
+│   │       │   │   └── telemetry/
+│   │       │   │       └── hardware.js
+│   │       │   ├── supervisor/
+│   │       │   │   ├── reconcilier.js
+│   │       │   │   └── remediation.js
+│   │       │   ├── watchers/
+│   │       │   │   ├── fs_watcher.js
+│   │       │   │   └── log_watcher.js
+│   │       │   └── main.js
+│   │       ├── shared/
+│   │       │   └── nerv/
+│   │       │       ├── constants.js
+│   │       │       ├── envelope.js
+│   │       │       ├── README.md
+│   │       │       └── schemas.js
+│   │       ├── state/
+│   │       │   ├── kernel/
+│   │       │   ├── memory/
+│   │       │   ├── tasks/
+│   │       │   ├── workflows/
+│   │       │   └── README.md
+│   │       ├── CONSOLIDAÇÃO.py
+│   │       ├── copiar_com_cabecalho_e_log.py
+│   │       └── main.js
+│   └── pre-constants-migration-20260120_092344/
+│       └── src/
+│           ├── core/
+│           │   ├── constants/
+│           │   │   ├── browser.js
+│           │   │   ├── index.js
+│           │   │   ├── logging.js
+│           │   │   └── tasks.js
+│           │   ├── context/
+│           │   │   ├── engine/
+│           │   │   │   └── context_engine.js
+│           │   │   ├── extractors/
+│           │   │   │   ├── code_logic.js
+│           │   │   │   └── json_logic.js
+│           │   │   ├── limits/
+│           │   │   │   ├── budget_manager.js
+│           │   │   │   └── guardrails.js
+│           │   │   ├── parsing/
+│           │   │   │   └── ref_parser.js
+│           │   │   ├── transformers/
+│           │   │   │   ├── identity.js
+│           │   │   │   ├── metadata.js
+│           │   │   │   └── summary.js
+│           │   │   └── context_core.js
+│           │   ├── schemas/
+│           │   │   ├── bootstrap_state_schema.js
+│           │   │   ├── dna_schema.js
+│           │   │   ├── schema_core.js
+│           │   │   ├── shared_types.js
+│           │   │   ├── task_healer.js
+│           │   │   └── task_schema.js
+│           │   ├── config.js
+│           │   ├── doctor.js
+│           │   ├── environment_resolver.js
+│           │   ├── forensics.js
+│           │   ├── i18n.js
+│           │   ├── identity_manager.js
+│           │   ├── infra_failure_policy.js
+│           │   ├── logger.js
+│           │   ├── memory.js
+│           │   └── schemas.js
+│           ├── driver/
+│           │   ├── core/
+│           │   │   ├── BaseDriver.js
+│           │   │   └── TargetDriver.js
+│           │   ├── modules/
+│           │   │   ├── analyzer.js
+│           │   │   ├── biomechanics_engine.js
+│           │   │   ├── frame_navigator.js
+│           │   │   ├── handle_manager.js
+│           │   │   ├── human.js
+│           │   │   ├── input_resolver.js
+│           │   │   ├── recovery_system.js
+│           │   │   ├── stabilizer.js
+│           │   │   ├── submission_controller.js
+│           │   │   └── triage.js
+│           │   ├── nerv_adapter/
+│           │   │   └── driver_nerv_adapter.js
+│           │   ├── targets/
+│           │   │   └── ChatGPTDriver.js
+│           │   ├── DriverLifecycleManager.js
+│           │   ├── factory.js
+│           │   └── state_persistence.js
+│           ├── effectors/
+│           │   ├── io_effector.js
+│           │   └── task_effector.js
+│           ├── infra/
+│           │   ├── browser_pool/
+│           │   │   └── pool_manager.js
+│           │   ├── fs/
+│           │   │   ├── atomic_write.js
+│           │   │   ├── control_store.js
+│           │   │   ├── fs_core.js
+│           │   │   ├── fs_utils.js
+│           │   │   ├── paths.js
+│           │   │   └── safe_read.js
+│           │   ├── ipc/
+│           │   │   └── buffer.js
+│           │   ├── locks/
+│           │   │   ├── lock_manager.js
+│           │   │   └── process_guard.js
+│           │   ├── queue/
+│           │   │   ├── cache.js
+│           │   │   ├── query_engine.js
+│           │   │   ├── scheduler.js
+│           │   │   └── task_loader.js
+│           │   ├── storage/
+│           │   │   ├── dna_store.js
+│           │   │   ├── response_store.js
+│           │   │   ├── robot_identity.json
+│           │   │   └── task_store.js
+│           │   ├── transport/
+│           │   │   └── socket_io_adapter.js
+│           │   ├── ConnectionOrchestrator.js
+│           │   ├── io.js
+│           │   ├── ipc_client_v800_patch.js
+│           │   └── system.js
+│           ├── kernel/
+│           │   ├── adapters/
+│           │   │   └── state_persistence.js
+│           │   ├── example/
+│           │   │   └── kernel_nerv_integration.js
+│           │   ├── execution_engine/
+│           │   │   └── execution_engine.js
+│           │   ├── kernel_loop/
+│           │   │   └── kernel_loop.js
+│           │   ├── nerv_bridge/
+│           │   │   └── kernel_nerv_bridge.js
+│           │   ├── observation_store/
+│           │   │   └── observation_store.js
+│           │   ├── policies/
+│           │   │   └── policy_engine.js
+│           │   ├── policy_engine/
+│           │   │   └── policy_engine.js
+│           │   ├── state/
+│           │   │   ├── observation_store.js
+│           │   │   └── task_store.js
+│           │   ├── task_runtime/
+│           │   │   └── task_runtime.js
+│           │   ├── telemetry/
+│           │   │   └── kernel_telemetry.js
+│           │   ├── consolidado_KERNEL.txt
+│           │   ├── DOC.docx
+│           │   ├── kernel.js
+│           │   └── TUDO.py
+│           ├── logic/
+│           │   ├── validation/
+│           │   │   ├── rules/
+│           │   │   │   ├── format_rules.js
+│           │   │   │   ├── physical_rules.js
+│           │   │   │   └── semantic_rules.js
+│           │   │   ├── scan_engine.js
+│           │   │   └── validation_core.js
+│           │   ├── adaptive.js
+│           │   └── validator.js
+│           ├── nerv/
+│           │   ├── buffers/
+│           │   │   ├── backpressure - NEWOLD.js
+│           │   │   ├── backpressure.js
+│           │   │   ├── buffers.js
+│           │   │   ├── inbound_queue.js
+│           │   │   └── outbound_queue.js
+│           │   ├── correlation/
+│           │   │   ├── correlation_context.js
+│           │   │   └── correlation_store.js
+│           │   ├── emission/
+│           │   │   ├── emission.js
+│           │   │   ├── emit_ack.js
+│           │   │   ├── emit_command.js
+│           │   │   └── emit_event.js
+│           │   ├── health/
+│           │   │   └── health.js
+│           │   ├── reception/
+│           │   │   ├── receive.js
+│           │   │   └── reception.js
+│           │   ├── telemetry/
+│           │   │   ├── ipc_telemetry.js
+│           │   │   └── metrics.js
+│           │   ├── transport/
+│           │   │   ├── connection.js
+│           │   │   ├── framing.js
+│           │   │   ├── hybrid_transport.js
+│           │   │   ├── reconnect.js
+│           │   │   └── transport.js
+│           │   ├── nerv.js
+│           │   └── TUDO.py
+│           ├── server/
+│           │   ├── api/
+│           │   │   ├── controllers/
+│           │   │   │   ├── dna.js
+│           │   │   │   ├── system.js
+│           │   │   │   └── tasks.js
+│           │   │   └── router.js
+│           │   ├── engine/
+│           │   │   ├── app.js
+│           │   │   ├── lifecycle.js
+│           │   │   ├── server.js
+│           │   │   └── socket.js
+│           │   ├── middleware/
+│           │   │   ├── error_handler.js
+│           │   │   ├── request_id.js
+│           │   │   └── schema_guard.js
+│           │   ├── nerv_adapter/
+│           │   │   └── server_nerv_adapter.js
+│           │   ├── realtime/
+│           │   │   ├── bus/
+│           │   │   │   └── pm2_bridge.js
+│           │   │   ├── streams/
+│           │   │   │   └── log_tail.js
+│           │   │   └── telemetry/
+│           │   │       └── hardware.js
+│           │   ├── supervisor/
+│           │   │   ├── reconcilier.js
+│           │   │   └── remediation.js
+│           │   ├── watchers/
+│           │   │   ├── fs_watcher.js
+│           │   │   └── log_watcher.js
+│           │   └── main.js
+│           ├── shared/
+│           │   └── nerv/
+│           │       ├── constants.js
+│           │       ├── envelope.js
+│           │       ├── README.md
+│           │       └── schemas.js
+│           ├── state/
+│           │   ├── kernel/
+│           │   ├── memory/
+│           │   ├── tasks/
+│           │   ├── workflows/
+│           │   └── README.md
+│           ├── CONSOLIDAÇÃO.py
+│           ├── copiar_com_cabecalho_e_log.py
+│           └── main.js
 ├── DOCUMENTAÇÃO/
+│   ├── AUDITORIAS/
+│   │   ├── 00_ROOT_FILES_AUDIT.md
+│   │   ├── 01_CORE_AUDIT.md
+│   │   ├── 02_NERV_AUDIT.md
+│   │   ├── 03_INFRA_AUDIT.md
+│   │   ├── 04_KERNEL_AUDIT.md
+│   │   ├── 05_DRIVER_AUDIT.md
+│   │   ├── 06_SERVER_AUDIT.md
+│   │   ├── 07_LOGIC_AUDIT.md
+│   │   ├── AUDIT_COVERAGE_MASTER_PLAN.md
+│   │   ├── CORE_CORRECTIONS_SUMMARY.md
+│   │   ├── CROSS_CUTTING_DOCKER_AUDIT.md
+│   │   ├── CROSS_CUTTING_PERFORMANCE_AUDIT.md
+│   │   ├── CROSS_CUTTING_PM2_DAEMON_AUDIT.md
+│   │   ├── CROSS_CUTTING_PORTS_AUDIT.md
+│   │   ├── CROSS_CUTTING_PUPPETEER_AUDIT.md
+│   │   ├── CROSS_CUTTING_SECURITY_AUDIT.md
+│   │   ├── DRIVER_CORRECTIONS_SUMMARY.md
+│   │   ├── INFRA_CORRECTIONS_SUMMARY.md
+│   │   ├── KERNEL_CORRECTIONS_SUMMARY.md
+│   │   ├── NERV_CORRECTIONS_SUMMARY.md
+│   │   ├── PERFORMANCE_IMPLEMENTATION_REPORT.md
+│   │   ├── PORTS_CORRECTIONS_SUMMARY.md
+│   │   ├── PUPPETEER_CORRECTIONS_SUMMARY.md
+│   │   ├── SECURITY_IMPLEMENTATION_REPORT.md
+│   │   └── SERVER_CORRECTIONS_SUMMARY.md
+│   ├── TECHNICAL/
+│   │   ├── NERV/
+│   │   │   └── ANALISE_NERV_ENVELOPE.md
+│   │   └── ONDA2_NERV_MIGRATION.md
+│   ├── ALIAS_ANALYSIS_REPORT.md
+│   ├── ALIAS_VALIDATION_REPORT.md
+│   ├── ANALISE_TECNICA.md
 │   ├── API.md
+│   ├── API_REFERENCE.md
 │   ├── ARCHITECTURE.md
+│   ├── ARCHITECTURE_DIAGRAMS.md
+│   ├── ARCHITECTURE_old_backup.md
+│   ├── AUDIT_TO_CANONICAL_PLAN.md
+│   ├── CANONICAL_DOCS_ORGANIZATION_PLAN.md
+│   ├── CANONICAL_DOCS_PLAN.md
 │   ├── CONFIG_FILES.md
 │   ├── CONFIGURATION.md
+│   ├── CONNECTION_ORCHESTRATOR.md
+│   ├── CONNECTION_ORCHESTRATOR_ANALYSIS.md
+│   ├── CONTRIBUTING.md
+│   ├── CRITICAL_CASES_ANALYSIS.md
+│   ├── CRITICAL_CASES_ANALYSIS_V2.md
+│   ├── DATA_FLOW.md
+│   ├── DEPENDENCY_UPGRADE_RISK_ANALYSIS.md
 │   ├── DEPLOYMENT.md
+│   ├── DEVCONTAINER.md
+│   ├── DEVELOPMENT.md
+│   ├── DIAGNOSTIC_CONSOLIDADO.md
 │   ├── DOC-SISTEMA.docx
 │   ├── DOCUMENTAÇÃO GERAL 2.0.docx
 │   ├── DOCUMENTAÇÃO GERAL 2.0.pdf
 │   ├── DOCUMENTAÇÃO GERAL 2.0.txt
 │   ├── DOCUMENTAÇÃO GERAL.docx
 │   ├── DOCUMENTAÇÃO GERAL.txt
+│   ├── DRIVER_INTEGRATION_REPORT.md
+│   ├── EFFECTORS_ANALYSIS.md
+│   ├── ESLINT_ERROR_FIXES.md
+│   ├── ESLINT_FIXES_SUMMARY.md
+│   ├── ESLINT_GUIDE.md
+│   ├── ESLINT_SETUP_SUMMARY.md
+│   ├── EXECUTIVE_SUMMARY_MIGRACAO.md
+│   ├── FAQ.md
+│   ├── GAP_ANALYSIS.md
+│   ├── GLOSSARY.md
 │   ├── HEALTH_ENDPOINT.md
+│   ├── INDEX.md
+│   ├── INTEGRATION_GAP_ANALYSIS.md
+│   ├── INTELLISENSE_OPTIMIZATION.md
 │   ├── IPC 2.0.docx
 │   ├── ipc 2.0.pdf
+│   ├── LAUNCHER.md
+│   ├── MODULE_ALIASES.md
 │   ├── NERV.docx
 │   ├── NERV.pdf
+│   ├── NETWORKING.md
+│   ├── P1_FIXES_SUMMARY.md
+│   ├── PATTERNS.md
+│   ├── PHILOSOPHY.md
+│   ├── PROJECT_CONFIGURATION_AUDIT.md
 │   ├── PROTOCOLOS.docx
 │   ├── PROTOCOLOS.txt
 │   ├── QUICK_START.md
+│   ├── README.md
+│   ├── ROADMAP.md
+│   ├── ROADMAP_DOCUMENTATION.md
+│   ├── ROADMAP_LAUNCHER_DASHBOARD.md
+│   ├── SCRIPTS.md
 │   ├── SECURITY.md
-│   └── SINGULARIDADE.pdf
+│   ├── SINGULARIDADE.pdf
+│   ├── SUBSYSTEMS.md
+│   ├── SUMMARY.md
+│   ├── SYSTEM_ANALYSIS_COMPLETE.md
+│   ├── SYSTEM_DESIGN.md
+│   ├── TESTING.md
+│   └── TROUBLESHOOTING.md
 ├── fila/
 │   ├── corrupted/
-│   ├── TASK-GUI-1768290824104.json.tmp.4016.1768291472697
-│   ├── TASK-GUI-1768345886917.json
-│   ├── task-test-51.json
-│   ├── test-lock-001.json.tmp.19100.1768200422288
-│   └── test-lock-atomic.json
+│   ├── test-lock-atomic.json
+│   ├── test-pause-check.json
+│   ├── test-stall-001.json
+│   └── test-zombie-v3.json
 ├── local-login/ [conteúdo oculto]
 ├── logs/
 │   ├── crash_reports/
 │   │   ├── crash_2026-01-17T15-39-11-585Z_task-test-51/
 │   │   ├── crash_2026-01-17T15-41-53-300Z_task-test-51/
 │   │   └── crash_2026-01-17T16-01-45-087Z_task-test-51/
+│   ├── test-reports/
+│   │   ├── test-report-2026-01-20T23-51-50.json
+│   │   └── test-report-2026-01-20T23-51-50.md
+│   ├── agente-error.log
+│   ├── agente-out.log
 │   ├── agente_current.log
 │   ├── audit.log
-│   └── health_trends.json
+│   ├── dashboard-error.log
+│   ├── dashboard-out.log
+│   ├── metrics.log
+│   └── scan_literals_report.txt
+├── monitoring/
+│   ├── alerts/
+│   ├── metrics/
+│   └── prometheus.yml
 ├── node_modules/ [conteúdo oculto]
 ├── profile/ [conteúdo oculto]
 ├── public/
@@ -52,22 +997,73 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   └── app.js
 │   └── index.html
 ├── respostas/
-│   ├── task-001.txt
-│   ├── TASK-GUI-1768290824104.txt
-│   └── TASK-GUI-1768292704476.txt
 ├── scripts/
+│   ├── codemods/
+│   │   ├── transform-connection-modes.js
+│   │   ├── transform-log-categories.js
+│   │   └── transform-status-values.js
+│   ├── fixes/
+│   │   └── fix-unused-vars.js
+│   ├── legacy/
+│   │   ├── README.md
+│   │   └── rodar_agente.bat
+│   ├── analyze-code-graph.js
+│   ├── apply-all-codemods.sh
+│   ├── audit-dependencies.js
+│   ├── audit-tmp-scripts.js
+│   ├── check-vscode-extensions.js
+│   ├── doctor.sh
+│   ├── fix-empty-catch.js
+│   ├── fix-eslint-errors.js
+│   ├── fix-promise-executor-return.js
 │   ├── flow_manager.js
 │   ├── gerador_tarefa.js
+│   ├── health-posix.sh
+│   ├── health-windows.ps1
+│   ├── healthcheck.js
 │   ├── importar_prompts.js
+│   ├── install-extensions.sh
+│   ├── install-pm2-gui.bat
+│   ├── install-pm2-gui.sh
+│   ├── launcher-dashboard.html
+│   ├── puppeteer_maintenance.js
+│   ├── quick-ops.bat
+│   ├── quick-ops.sh
+│   ├── README-CODE-GRAPH.md
+│   ├── README.md
+│   ├── refactor-to-aliases.js
+│   ├── rotate-profiles.js
+│   ├── run-all-tests.js
 │   ├── run-tests.js
 │   ├── run_all_tests.ps1
 │   ├── run_all_tests.sh
+│   ├── scan_literals.js
+│   ├── scan_literals_deep.js
+│   ├── scan_magic_strings.js
 │   ├── setup-dev-tools.sh
+│   ├── setup-devcontainer.sh
+│   ├── setup-pm2-plus.bat
+│   ├── setup-pm2-plus.sh
+│   ├── setup.sh
 │   ├── status_fila.js
+│   ├── test-aliases.js
+│   ├── test-codemods.sh
+│   ├── test-health-endpoints.sh
+│   ├── test-health-logic.js
 │   ├── test_schema_validation.js
-│   └── visualizar_fila.js
+│   ├── validate-ci.js
+│   ├── validate-nerv-constants.js
+│   ├── validate_config.js
+│   ├── visualizar_fila.js
+│   ├── watch-logs.bat
+│   └── watch-logs.sh
 ├── src/
 │   ├── core/
+│   │   ├── constants/
+│   │   │   ├── browser.js
+│   │   │   ├── index.js
+│   │   │   ├── logging.js
+│   │   │   └── tasks.js
 │   │   ├── context/
 │   │   │   ├── engine/
 │   │   │   │   └── context_engine.js
@@ -94,8 +1090,8 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── config.js
 │   │   ├── doctor.js
 │   │   ├── environment_resolver.js
-│   │   ├── execution_engine.js
 │   │   ├── forensics.js
+│   │   ├── hardware.js
 │   │   ├── i18n.js
 │   │   ├── identity_manager.js
 │   │   ├── infra_failure_policy.js
@@ -116,17 +1112,16 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   ├── recovery_system.js
 │   │   │   ├── stabilizer.js
 │   │   │   ├── submission_controller.js
-│   │   │   ├── telemetry_bridge.js
 │   │   │   └── triage.js
+│   │   ├── nerv_adapter/
+│   │   │   └── driver_nerv_adapter.js
 │   │   ├── targets/
 │   │   │   └── ChatGPTDriver.js
 │   │   ├── DriverLifecycleManager.js
-│   │   ├── factory.js
-│   │   └── state_persistence.js
-│   ├── effectors/
-│   │   ├── io_effector.js
-│   │   └── task_effector.js
+│   │   └── factory.js
 │   ├── infra/
+│   │   ├── browser_pool/
+│   │   │   └── pool_manager.js
 │   │   ├── fs/
 │   │   │   ├── atomic_write.js
 │   │   │   ├── control_store.js
@@ -153,12 +1148,11 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   └── socket_io_adapter.js
 │   │   ├── ConnectionOrchestrator.js
 │   │   ├── io.js
-│   │   ├── ipc_client.js
+│   │   ├── ipc_client_v800_patch.js
 │   │   └── system.js
 │   ├── kernel/
 │   │   ├── adapters/
-│   │   │   ├── state_persistence.js
-│   │   │   └── task_executor.js
+│   │   │   └── state_persistence.js
 │   │   ├── example/
 │   │   │   └── kernel_nerv_integration.js
 │   │   ├── execution_engine/
@@ -180,7 +1174,6 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   └── task_runtime.js
 │   │   ├── telemetry/
 │   │   │   └── kernel_telemetry.js
-│   │   ├── consolidado_KERNEL.txt
 │   │   ├── DOC.docx
 │   │   ├── kernel.js
 │   │   └── TUDO.py
@@ -209,10 +1202,6 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   ├── emit_ack.js
 │   │   │   ├── emit_command.js
 │   │   │   └── emit_event.js
-│   │   ├── envelopes/
-│   │   │   ├── normalizer.js
-│   │   │   ├── schemas.js
-│   │   │   └── validator.js
 │   │   ├── health/
 │   │   │   └── health.js
 │   │   ├── reception/
@@ -224,6 +1213,7 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── transport/
 │   │   │   ├── connection.js
 │   │   │   ├── framing.js
+│   │   │   ├── hybrid_transport.js
 │   │   │   ├── reconnect.js
 │   │   │   └── transport.js
 │   │   ├── nerv.js
@@ -244,6 +1234,8 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   ├── error_handler.js
 │   │   │   ├── request_id.js
 │   │   │   └── schema_guard.js
+│   │   ├── nerv_adapter/
+│   │   │   └── server_nerv_adapter.js
 │   │   ├── realtime/
 │   │   │   ├── bus/
 │   │   │   │   └── pm2_bridge.js
@@ -259,74 +1251,167 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   └── log_watcher.js
 │   │   └── main.js
 │   ├── shared/
-│   │   ├── ipc/
-│   │   │   ├── constants.js
-│   │   │   ├── envelope.js
-│   │   │   └── schemas.js
-│   │   └── ipcNEWOLD/
+│   │   └── nerv/
 │   │       ├── constants.js
 │   │       ├── envelope.js
+│   │       ├── README.md
 │   │       └── schemas.js
+│   ├── state/
+│   │   ├── kernel/
+│   │   ├── memory/
+│   │   ├── tasks/
+│   │   ├── workflows/
+│   │   └── README.md
 │   ├── CONSOLIDAÇÃO.py
 │   ├── copiar_com_cabecalho_e_log.py
-│   ├── driver.rar.old
-│   ├── kernel.rar
-│   └── nerv.rar
+│   └── main.js
 ├── tests/
+│   ├── e2e/
+│   │   ├── test_ariadne_thread.spec.js
+│   │   ├── test_boot_sequence.spec.js
+│   │   └── test_integration_complete.spec.js
+│   ├── fixtures/
+│   │   ├── config/
+│   │   │   ├── config-invalido.fixture.json
+│   │   │   └── config-valido.fixture.json
+│   │   ├── dna/
+│   │   │   └── identidade-valida.fixture.json
+│   │   ├── responses/
+│   │   │   ├── resposta-ia.fixture.txt
+│   │   │   └── resposta-valida.fixture.txt
+│   │   └── tasks/
+│   │       ├── tarefa-invalida.fixture.json
+│   │       ├── tarefa-valida-chatgpt.fixture.json
+│   │       └── tarefa-valida-gemini.fixture.json
+│   ├── helpers/
+│   │   └── test_helpers.js
 │   ├── integration/
-│   │   ├── biomechanical_pulse.test.js
-│   │   ├── causality_tracing.test.js
-│   │   ├── discovery.test.js
-│   │   ├── engine_telemetry.test.js
-│   │   ├── genetic_evolution.test.js
-│   │   ├── handshake_security.test.js
-│   │   ├── identity_lifecycle.test.js
-│   │   ├── ipc_tester.js
-│   │   ├── resilience_buffer.test.js
-│   │   └── resilience_test.js
+│   │   ├── api/
+│   │   │   └── test_health_endpoint.spec.js
+│   │   ├── browser/
+│   │   │   └── test_connection_orchestrator.spec.js
+│   │   ├── driver/
+│   │   │   └── test_driver_nerv.spec.js
+│   │   ├── kernel/
+│   │   │   ├── test_control_pause.spec.js
+│   │   │   ├── test_identity_lifecycle.spec.js
+│   │   │   ├── test_lock.spec.js
+│   │   │   ├── test_running_recovery.spec.js
+│   │   │   └── test_stall_mitigation.spec.js
+│   │   ├── queue/
+│   │   └── test_launcher_integration.js
+│   ├── manual/
+│   │   └── test_chrome_connection.js
+│   ├── mocks/
+│   │   ├── mock_browser.js
+│   │   ├── mock_logger.js
+│   │   └── mock_nerv.js
+│   ├── performance/
+│   ├── regression/
+│   │   ├── test_p1_fixes.spec.js
+│   │   ├── test_p2_fixes.spec.js
+│   │   ├── test_p3_fixes.spec.js
+│   │   └── test_p4_p5_fixes.spec.js
 │   ├── tmp/
+│   │   ├── stdout-1768889803747.log
+│   │   ├── stdout-1768889803755.log
+│   │   ├── stdout-1768890250790.log
+│   │   ├── stdout-1768890300307.log
+│   │   └── stdout-1768890323519.log
 │   ├── unit/
-│   │   ├── ipc_envelope.test.js
-│   │   └── ipc_identity.test.js
-│   ├── helpers.js
-│   ├── test_config_validation.js
-│   ├── test_control_pause.js
-│   ├── test_health_endpoint.js
-│   ├── test_lock.js
+│   │   ├── core/
+│   │   │   ├── test_config.spec.js
+│   │   │   ├── test_logger.spec.js
+│   │   │   └── test_schemas.spec.js
+│   │   ├── driver/
+│   │   │   ├── test_driver_adapters.spec.js
+│   │   │   └── test_driver_factory.spec.js
+│   │   ├── infra/
+│   │   │   ├── test_browser_pool.spec.js
+│   │   │   ├── test_io.spec.js
+│   │   │   ├── test_lock_manager.spec.js
+│   │   │   └── test_puppeteer_launcher.spec.js
+│   │   ├── kernel/
+│   │   │   ├── test_execution_engine.spec.js
+│   │   │   ├── test_policy_engine.spec.js
+│   │   │   └── test_task_runtime.spec.js
+│   │   ├── logic/
+│   │   ├── nerv/
+│   │   │   ├── test_envelope.spec.js
+│   │   │   └── test_nerv_core.spec.js
+│   │   ├── server/
+│   │   │   ├── test_api_router.spec.js
+│   │   │   ├── test_middleware.spec.js
+│   │   │   └── test_server_nerv_adapter.spec.js
+│   │   └── state/
+│   ├── corrigir_imports.js
+│   ├── README.md
+│   ├── setup.js
+│   ├── teardown.js
+│   ├── test_errors_communication.js
 │   ├── test_multi_tab_manual.txt
-│   ├── test_running_recovery.js
-│   ├── test_stall_mitigation.js
 │   └── test_stall_simulation_manual.txt
+├── tmp/
 ├── tools/
 │   ├── bin/ [conteúdo oculto]
 │   └── outputs/
 │       └── estrutura_projeto.txt
+├── .c8rc.json
 ├── .dockerignore
+├── .editorconfig
 ├── .env.example
+├── .gitattributes
 ├── .gitignore
+├── .npmrc
 ├── .pre-commit-config.yaml
-├── .secrets.baseline
+├── .prettierignore
+├── .prettierrc
+├── .puppeteerrc.cjs
+├── AUDITORIA_STATUS_ATUAL.md
 ├── CHANGELOG.md
+├── chrome-config.json
+├── CHROME_EXTERNAL_SETUP.md
 ├── colect.py
 ├── config.json
+├── CONSTANTS_INVENTORY.md
 ├── CONTRIBUTING.md
+├── controle.json
+├── CROSS_PLATFORM_SUPPORT.md
+├── DEVELOPER_WORKFLOW.md
+├── docker-compose.dev.yml
+├── docker-compose.linux.yml
+├── docker-compose.prod.yml
 ├── docker-compose.yml
+├── DOCKER_README.md
 ├── DOCKER_SETUP.md
 ├── Dockerfile
 ├── Dockerfile.dev
+├── DOCUMENTACAO_AUDITORIA_COMPLETA.md
 ├── dynamic_rules.json
 ├── ecosystem.config.js
-├── fila.json
+├── eslint.config.mjs
+├── FASE_ESCLARECIMENTO.md
+├── fila.example.json
+├── IMPLEMENTATION_PLAN.md
 ├── index.js
 ├── INICIAR_TUDO.BAT
+├── jsconfig.json
+├── LAUNCHER.bat
+├── launcher.sh
 ├── LICENSE
 ├── Makefile
+├── MINI_AUDITORIAS_SUBSISTEMAS.md
 ├── package.json
+├── PLANO_EXECUCAO_LAUNCHER.md
 ├── prompts.txt
 ├── README.md
-├── rodar_agente.bat
 ├── SECURITY_SCAN_POLICY.md
 ├── server.js.old
-├── src.rar
 ├── test-puppeteer.js
-└── test_nerv_pulse.js
+├── test_nerv_pulse.js
+├── TESTES_MAPEAMENTO.md
+├── TESTS_COVERAGE_MATRIX.md
+├── TESTS_IMPLEMENTATION_PLAN.md
+├── TESTS_STRATEGY.md
+├── TYPES_ARCHITECTURE.md
+└── TYPESCRIPT_MIGRATION_ANALYSIS.md
