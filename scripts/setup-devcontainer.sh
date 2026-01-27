@@ -1,188 +1,528 @@
 #!/usr/bin/env bash
-# ============================================================
-# setup-devcontainer.sh - Dev Container Post-Create Setup
-# Runs automatically after Dev Container is created
-# ============================================================
+# ============================================================================
+# setup-devcontainer.sh v4.0 — Infraestrutura pós-criação do Dev Container
+# ============================================================================
+#
+# FINALIDADE
+# ----------
+# Script de infraestrutura executado via postCreateCommand (fase 6/9).
+# Prepara ambiente de desenvolvimento de forma segura, idempotente e previsível.
+#
+# PRINCÍPIOS
+# ----------
+# • Workspace dinâmico (detecta automaticamente)
+# • Privilégios mínimos (sudo apenas se necessário)
+# • Idempotente (execuções repetidas são seguras)
+# • Seguro para bind mounts (chown é opt-in)
+# • Separação clara entre infra (container) e runtime (projeto)
+# • Otimizado para Debian (host primário) + Windows/WSL2 (secundário)
+#
+# ESCOPO
+# ------
+# Este script cuida de:
+#   ✓ Configuração básica do Git
+#   ✓ Estrutura de diretórios do projeto
+#   ✓ Permissões de ownership (opt-in)
+#   ✓ Permissões de execução de scripts
+#   ✓ Verificação de toolchain base
+#   ✓ Detecção de host OS (Debian/WSL2)
+#   ✓ Scripts modulares do .devcontainer
+#
+# Este script NÃO cuida de:
+#   ✗ Instalação de pacotes de sistema (apt, apk) → Dockerfile
+#   ✗ Instalação de ferramentas globais (npm -g, pip) → Dockerfile
+#   ✗ Instalação de dependências do projeto → npm ci (postCreateCommand fase 5)
+#   ✗ Validação de Chromium/Chrome → postCreateCommand fase 2-3
+#   ✗ Inicialização de serviços → pm2, systemd (runtime)
+#
+# VARIÁVEIS DE CONTROLE
+# ---------------------
+# DEVCONTAINER_APPLY_CHOWN=true
+#   → Aplica chown em diretórios específicos
+#   ⚠️  Pode afetar permissões de arquivos do host em bind mounts
+#
+# DEVCONTAINER_WORKSPACE_FOLDER
+#   → Path do workspace (detectado automaticamente se ausente)
+#
+# CONTAINER_SCRIPTS_PATH
+#   → Path dos scripts modulares (default: /usr/local/bin)
+#
+# CHANGELOG
+# ---------
+# v4.0 (2026-01-23):
+#   • Sincronizado com devcontainer.json v11.0
+#   • Detecção de host OS (Debian/WSL2) via /tmp/host-os.txt
+#   • Suporte a scripts modulares (CONTAINER_SCRIPTS_PATH)
+#   • Validação de scripts do .devcontainer
+#   • Avisos específicos por OS
+#   • Melhorada estrutura de logs
+#   • Remoção de código duplicado (Chrome/Chromium movido para postCreate)
+# ============================================================================
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# ============================================================================
+# CONFIGURAÇÃO CENTRALIZADA
+# ============================================================================
 
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║  🚀 DevContainer Setup - chatgpt-docker-puppeteer               ║"
-echo "╚═══════════════════════════════════════════════════════════════════╝"
-echo ""
+readonly SCRIPT_VERSION="4.0"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ============================================================
-# 1. Install PM2 globally
-# ============================================================
-echo -e "${BLUE}[1/7]${NC} Installing PM2 globally..."
-if ! command -v pm2 &> /dev/null; then
-    npm install -g pm2@latest
-    echo -e "${GREEN}✓${NC} PM2 installed successfully"
+readonly PROJECT_DIRS=(
+    fila
+    respostas
+    logs
+    tmp
+    backups
+    monitoring
+    monitoring/alerts
+    monitoring/metrics
+    profile
+    node_modules
+)
+
+readonly CHOWN_TARGETS=(
+    node_modules
+    profile
+    logs
+    tmp
+    backups
+    respostas
+    fila
+)
+
+readonly EXECUTABLE_SCRIPTS=(
+    scripts/*.sh
+    launcher.sh
+)
+
+# ============================================================================
+# LOGGING & CORES
+# ============================================================================
+
+LOG_FILE="/tmp/devcontainer-setup.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly NC='\033[0m'
+
+log_info()    { echo -e "${BLUE}ℹ${NC}  $*"; }
+log_success() { echo -e "${GREEN}✓${NC}  $*"; }
+log_warning() { echo -e "${YELLOW}⚠${NC}  $*"; }
+log_error()   { echo -e "${RED}✗${NC}  $*"; }
+
+# ============================================================================
+# FUNÇÕES AUXILIARES
+# ============================================================================
+
+safe_chown() {
+    local target="$1"
+
+    if [ ! -e "$target" ]; then
+        log_warning "chown: alvo não existe: $target"
+        return 1
+    fi
+
+    if [ "$RUN_MODE" = "user-no-sudo" ]; then
+        log_warning "chown: sem privilégios: $target"
+        return 1
+    fi
+
+    if $SUDO_CMD chown -R node:node "$target" 2>/dev/null; then
+        local owner
+        owner=$(stat -c '%U:%G' "$target" 2>/dev/null || echo 'unknown')
+        log_success "chown executado: $target → $owner"
+        return 0
+    else
+        log_warning "chown falhou (não-crítico): $target"
+        return 1
+    fi
+}
+
+has_command() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# ============================================================================
+# DETECÇÃO DO HOST OS
+# ============================================================================
+
+HOST_OS="unknown"
+if [ -f /tmp/host-os.txt ]; then
+    HOST_OS=$(cat /tmp/host-os.txt)
 else
-    echo -e "${GREEN}✓${NC} PM2 already installed ($(pm2 --version))"
+    if [ -f /proc/version ]; then
+        if grep -qi microsoft /proc/version; then
+            HOST_OS="wsl2"
+        elif grep -qi debian /proc/version || [ -f /etc/debian_version ]; then
+            HOST_OS="debian"
+        else
+            HOST_OS="linux"
+        fi
+    fi
 fi
 
-# ============================================================
-# 2. Install Chromium dependencies (for Puppeteer)
-# ============================================================
-echo -e "${BLUE}[2/7]${NC} Installing Chromium dependencies..."
-sudo apt-get update -qq
-sudo apt-get install -y -qq \
-    chromium \
-    chromium-sandbox \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libx11-6 \
-    libxcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxkbcommon0 \
-    libxrandr2 \
-    xdg-utils \
-    > /dev/null 2>&1
+# ============================================================================
+# DETECÇÃO DO WORKSPACE
+# ============================================================================
 
-echo -e "${GREEN}✓${NC} Chromium dependencies installed"
+WORKSPACE="${DEVCONTAINER_WORKSPACE_FOLDER:-}"
+WORKSPACE_DETECTED_BY="env:DEVCONTAINER_WORKSPACE_FOLDER"
 
-# ============================================================
-# 3. Configure Git
-# ============================================================
-echo -e "${BLUE}[3/7]${NC} Configuring Git..."
+if [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE" ]; then
+    if has_command git; then
+        if git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+            WORKSPACE="$git_root"
+            WORKSPACE_DETECTED_BY="git:rev-parse"
+        fi
+    fi
+fi
 
-# Check if Git user is configured
-if ! git config --global user.name > /dev/null 2>&1; then
+if [ -z "$WORKSPACE" ] && [ -f "${PWD}/package.json" ]; then
+    WORKSPACE="$PWD"
+    WORKSPACE_DETECTED_BY="pwd:package.json"
+fi
+
+if [ -z "$WORKSPACE" ]; then
+    WORKSPACE="/workspaces"
+    WORKSPACE_DETECTED_BY="fallback:/workspaces"
+fi
+
+# ============================================================================
+# DETECÇÃO DE PRIVILÉGIOS
+# ============================================================================
+
+RUN_MODE="user"
+SUDO_CMD=""
+
+if [ "$(id -u)" -eq 0 ]; then
+    RUN_MODE="root"
+elif has_command sudo && sudo -n true 2>/dev/null; then
+    RUN_MODE="user-with-sudo"
+    SUDO_CMD="sudo"
+else
+    RUN_MODE="user-no-sudo"
+fi
+
+# ============================================================================
+# CABEÇALHO
+# ============================================================================
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════════════╗"
+echo "║  🚀 DevContainer Setup v${SCRIPT_VERSION} — Infraestrutura Adicional          ║"
+echo "╚════════════════════════════════════════════════════════════════════╝"
+echo ""
+log_info "Host OS: ${CYAN}${HOST_OS}${NC}"
+log_info "Workspace: ${CYAN}${WORKSPACE}${NC}"
+log_info "Detectado por: ${CYAN}${WORKSPACE_DETECTED_BY}${NC}"
+log_info "Modo de execução: ${CYAN}${RUN_MODE}${NC}"
+log_info "chown opt-in: ${CYAN}${DEVCONTAINER_APPLY_CHOWN:-false}${NC}"
+log_info "Log: ${CYAN}${LOG_FILE}${NC}"
+echo ""
+
+if [ "${DEVCONTAINER_APPLY_CHOWN:-false}" = "true" ]; then
+    log_warning "chown ativado — pode afetar arquivos do host em bind mounts"
+    echo ""
+fi
+
+# ============================================================================
+# FASE 1: GIT
+# ============================================================================
+
+echo -e "${BLUE}[1/6]${NC} Configurando Git..."
+
+git config --global init.defaultBranch main 2>/dev/null || true
+git config --global pull.rebase false 2>/dev/null || true
+git config --global core.autocrlf input 2>/dev/null || true
+
+if [ "$HOST_OS" = "wsl2" ]; then
+    git config --global core.eol lf 2>/dev/null || true
+    log_info "core.eol=lf configurado (WSL2)"
+fi
+
+if ! git config --global user.name >/dev/null 2>&1; then
     git config --global user.name "DevContainer User"
-    echo -e "${YELLOW}⚠${NC}  Git user.name set to 'DevContainer User' (change with: git config --global user.name 'Your Name')"
+    log_info "user.name definido (padrão)"
 else
-    echo -e "${GREEN}✓${NC} Git user.name: $(git config --global user.name)"
+    existing_name=$(git config --global user.name)
+    log_info "user.name preservado: ${CYAN}${existing_name}${NC}"
 fi
 
-if ! git config --global user.email > /dev/null 2>&1; then
+if ! git config --global user.email >/dev/null 2>&1; then
     git config --global user.email "devcontainer@example.com"
-    echo -e "${YELLOW}⚠${NC}  Git user.email set to 'devcontainer@example.com' (change with: git config --global user.email 'your@email.com')"
+    log_info "user.email definido (padrão)"
 else
-    echo -e "${GREEN}✓${NC} Git user.email: $(git config --global user.email)"
+    existing_email=$(git config --global user.email)
+    log_info "user.email preservado: ${CYAN}${existing_email}${NC}"
 fi
 
-# Set useful Git defaults
-git config --global init.defaultBranch main
-git config --global pull.rebase false
-git config --global core.autocrlf input
+log_success "Git configurado"
+echo ""
 
-echo -e "${GREEN}✓${NC} Git configured"
+# ============================================================================
+# FASE 2: DIRETÓRIOS
+# ============================================================================
 
-# ============================================================
-# 4. Create necessary directories
-# ============================================================
-echo -e "${BLUE}[4/7]${NC} Creating project directories..."
+echo -e "${BLUE}[2/6]${NC} Criando estrutura de diretórios..."
 
-mkdir -p fila respostas logs tmp backups monitoring/alerts monitoring/metrics
+DIRS_CREATED=0
+DIRS_EXISTED=0
 
-echo -e "${GREEN}✓${NC} Directories created"
+for dir in "${PROJECT_DIRS[@]}"; do
+    full_path="$WORKSPACE/$dir"
 
-# ============================================================
-# 5. Set correct permissions
-# ============================================================
-echo -e "${BLUE}[5/7]${NC} Setting permissions..."
+    if [ -d "$full_path" ]; then
+        ((DIRS_EXISTED++))
+    else
+        if mkdir -p "$full_path" 2>/dev/null; then
+            log_success "Criado: $dir"
+            ((DIRS_CREATED++))
+        else
+            log_error "Falha ao criar: $dir"
+        fi
+    fi
+done
 
-# Make scripts executable
-chmod +x scripts/*.sh 2>/dev/null || true
-chmod +x launcher.sh 2>/dev/null || true
+log_info "Criados: ${CYAN}${DIRS_CREATED}${NC} | Já existiam: ${CYAN}${DIRS_EXISTED}${NC}"
+log_success "Estrutura de diretórios pronta"
+echo ""
 
-# Set directory permissions
-chmod 755 fila respostas logs tmp backups monitoring 2>/dev/null || true
+# ============================================================================
+# FASE 3: OWNERSHIP
+# ============================================================================
 
-echo -e "${GREEN}✓${NC} Permissions set"
+if [ "${DEVCONTAINER_APPLY_CHOWN:-false}" = "true" ]; then
+    echo -e "${BLUE}[3/6]${NC} Ajustando ownership (modo opt-in)..."
 
-# ============================================================
-# 6. Verify dependencies
-# ============================================================
-echo -e "${BLUE}[6/7]${NC} Verifying dependencies..."
+    CHOWN_EXECUTED=0
+    CHOWN_SKIPPED=0
+    CHOWN_FAILED=0
 
-if command -v make &> /dev/null; then
-    echo -e "${GREEN}✓${NC} Make: $(make --version | head -n1)"
+    for target in "${CHOWN_TARGETS[@]}"; do
+        full_path="$WORKSPACE/$target"
+
+        if [ ! -e "$full_path" ]; then
+            ((CHOWN_SKIPPED++))
+            continue
+        fi
+
+        if safe_chown "$full_path"; then
+            ((CHOWN_EXECUTED++))
+        else
+            ((CHOWN_FAILED++))
+        fi
+    done
+
+    log_info "Executados: ${CYAN}${CHOWN_EXECUTED}${NC} | Ignorados: ${CYAN}${CHOWN_SKIPPED}${NC} | Falhas: ${CYAN}${CHOWN_FAILED}${NC}"
+    log_success "Ownership processado"
 else
-    echo -e "${RED}✗${NC} Make not found"
+    echo -e "${BLUE}[3/6]${NC} Ajuste de ownership ignorado (opt-in desativado)"
+fi
+echo ""
+
+# ============================================================================
+# FASE 4: SCRIPTS
+# ============================================================================
+
+echo -e "${BLUE}[4/6]${NC} Ajustando permissões de scripts..."
+
+SCRIPTS_FOUND=0
+SCRIPTS_FAILED=0
+
+for pattern in "${EXECUTABLE_SCRIPTS[@]}"; do
+    for script in $WORKSPACE/$pattern 2>/dev/null; do
+        if [ -f "$script" ]; then
+            if chmod +x "$script" 2>/dev/null; then
+                log_success "Executável (projeto): $(basename "$script")"
+                ((SCRIPTS_FOUND++))
+            else
+                log_warning "Falha: $(basename "$script")"
+                ((SCRIPTS_FAILED++))
+            fi
+        fi
+    done
+done
+
+if [ -d "$WORKSPACE/.devcontainer/scripts" ]; then
+    for script in "$WORKSPACE/.devcontainer/scripts"/*.sh 2>/dev/null; do
+        if [ -f "$script" ]; then
+            if chmod +x "$script" 2>/dev/null; then
+                log_success "Executável (.devcontainer): $(basename "$script")"
+                ((SCRIPTS_FOUND++))
+            else
+                log_warning "Falha: $(basename "$script")"
+                ((SCRIPTS_FAILED++))
+            fi
+        fi
+    done
 fi
 
-if command -v node &> /dev/null; then
-    echo -e "${GREEN}✓${NC} Node.js: $(node --version)"
+if [ $SCRIPTS_FOUND -eq 0 ]; then
+    log_info "Nenhum script encontrado (normal em primeiro setup)"
 else
-    echo -e "${RED}✗${NC} Node.js not found"
+    log_info "Processados: ${CYAN}${SCRIPTS_FOUND}${NC} | Falhas: ${CYAN}${SCRIPTS_FAILED}${NC}"
+    log_success "$SCRIPTS_FOUND scripts tornados executáveis"
+fi
+echo ""
+
+# ============================================================================
+# FASE 5: SCRIPTS MODULARES
+# ============================================================================
+
+echo -e "${BLUE}[5/6]${NC} Verificando scripts modulares..."
+
+CONTAINER_SCRIPTS_PATH="${CONTAINER_SCRIPTS_PATH:-/usr/local/bin}"
+
+SCRIPTS_MODULAR_OK=0
+SCRIPTS_MODULAR_MISSING=0
+
+if [ -x "${CONTAINER_SCRIPTS_PATH}/devcontainer-healthcheck.sh" ]; then
+    log_success "devcontainer-healthcheck.sh disponível"
+    ((SCRIPTS_MODULAR_OK++))
+else
+    log_warning "devcontainer-healthcheck.sh ausente"
+    ((SCRIPTS_MODULAR_MISSING++))
 fi
 
-if command -v npm &> /dev/null; then
-    echo -e "${GREEN}✓${NC} npm: $(npm --version)"
+if [ -x "${CONTAINER_SCRIPTS_PATH}/validate-chrome.sh" ]; then
+    log_success "validate-chrome.sh disponível"
+    ((SCRIPTS_MODULAR_OK++))
 else
-    echo -e "${RED}✗${NC} npm not found"
+    log_warning "validate-chrome.sh ausente"
+    ((SCRIPTS_MODULAR_MISSING++))
 fi
 
-if command -v docker &> /dev/null; then
-    echo -e "${GREEN}✓${NC} Docker: $(docker --version)"
+log_info "Scripts modulares: ${CYAN}${SCRIPTS_MODULAR_OK}${NC} OK | ${CYAN}${SCRIPTS_MODULAR_MISSING}${NC} ausentes"
+echo ""
+
+# ============================================================================
+# FASE 6: TOOLCHAIN
+# ============================================================================
+
+echo -e "${BLUE}[6/6]${NC} Verificando ferramentas..."
+
+TOOLS_CRITICAL_OK=0
+TOOLS_CRITICAL_MISSING=0
+TOOLS_OPTIONAL_OK=0
+TOOLS_OPTIONAL_MISSING=0
+
+if has_command node; then
+    log_success "Node.js $(node --version)"
+    ((TOOLS_CRITICAL_OK++))
 else
-    echo -e "${YELLOW}⚠${NC}  Docker not available (Docker-in-Docker may need rebuild)"
+    log_error "Node.js ausente (CRÍTICO)"
+    ((TOOLS_CRITICAL_MISSING++))
 fi
 
-if command -v gh &> /dev/null; then
-    echo -e "${GREEN}✓${NC} GitHub CLI: $(gh --version | head -n1)"
+if has_command npm; then
+    log_success "npm $(npm --version)"
+    ((TOOLS_CRITICAL_OK++))
 else
-    echo -e "${YELLOW}⚠${NC}  GitHub CLI not available"
+    log_error "npm ausente (CRÍTICO)"
+    ((TOOLS_CRITICAL_MISSING++))
 fi
 
-# ============================================================
-# 7. Display welcome message
-# ============================================================
+if has_command git; then
+    log_success "git $(git --version | head -1)"
+    ((TOOLS_CRITICAL_OK++))
+else
+    log_error "git ausente (CRÍTICO)"
+    ((TOOLS_CRITICAL_MISSING++))
+fi
+
+if has_command make; then
+    log_success "make disponível"
+    ((TOOLS_OPTIONAL_OK++))
+else
+    log_info "make não encontrado (opcional)"
+    ((TOOLS_OPTIONAL_MISSING++))
+fi
+
+if has_command curl; then
+    log_success "curl disponível"
+    ((TOOLS_OPTIONAL_OK++))
+else
+    log_info "curl não encontrado (opcional)"
+    ((TOOLS_OPTIONAL_MISSING++))
+fi
+
+for tool in bat fd rg fzf tree; do
+    if has_command "$tool"; then
+        log_success "$tool disponível"
+        ((TOOLS_OPTIONAL_OK++))
+    else
+        log_info "$tool não encontrado (opcional)"
+        ((TOOLS_OPTIONAL_MISSING++))
+    fi
+done
+
 echo ""
-echo -e "${BLUE}[7/7]${NC} Setup complete!"
+
+# ============================================================================
+# RESUMO FINAL
+# ============================================================================
+
+echo "╔════════════════════════════════════════════════════════════════════╗"
+echo "║  🎉 SETUP ADICIONAL CONCLUÍDO                                     ║"
+echo "╚════════════════════════════════════════════════════════════════════╝"
 echo ""
-echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║  ✅ DevContainer Setup Complete!                                 ║"
-echo "╚═══════════════════════════════════════════════════════════════════╝"
+echo "═══ RESUMO DO AMBIENTE ═══"
 echo ""
-echo -e "${GREEN}🎉 Environment is ready!${NC}"
+echo "  Versão do script:         v${SCRIPT_VERSION}"
+echo "  Host OS:                  ${HOST_OS}"
+echo "  Workspace:                ${WORKSPACE}"
+echo "  Detectado por:            ${WORKSPACE_DETECTED_BY}"
+echo "  Modo de execução:         ${RUN_MODE}"
 echo ""
-echo "Quick Start:"
-echo "  • make help          - Show all available commands"
-echo "  • make info          - Show project info"
-echo "  • make start         - Start PM2 agent + dashboard"
-echo "  • make health        - Check system health"
-echo "  • make test-all      - Run all tests"
+echo "═══ AÇÕES EXECUTADAS ═══"
 echo ""
-echo "Debugging:"
-echo "  • F5                 - Start debugging (see launch.json)"
-echo "  • make logs-follow   - Tail logs in real-time"
-echo "  • make dashboard     - Open dashboard in browser"
+echo "  Diretórios criados:       ${DIRS_CREATED}"
+echo "  Diretórios existentes:    ${DIRS_EXISTED}"
+
+if [ "${DEVCONTAINER_APPLY_CHOWN:-false}" = "true" ]; then
+echo "  chown executados:         ${CHOWN_EXECUTED}"
+echo "  chown ignorados:          ${CHOWN_SKIPPED}"
+echo "  chown falhas:             ${CHOWN_FAILED}"
+else
+echo "  chown:                    desativado (opt-in)"
+fi
+
+echo "  Scripts executáveis:      ${SCRIPTS_FOUND}"
+echo "  Scripts modulares:        ${SCRIPTS_MODULAR_OK} OK | ${SCRIPTS_MODULAR_MISSING} ausentes"
 echo ""
-echo "Documentation:"
-echo "  • README.md          - Project overview"
-echo "  • DEVELOPER_WORKFLOW.md - Development guide"
-echo "  • .devcontainer/README.md - DevContainer info"
+echo "═══ TOOLCHAIN ═══"
 echo ""
-echo -e "${YELLOW}⚠  Important:${NC}"
-echo "  • Configure Git user: git config --global user.name 'Your Name'"
-echo "  • Configure Git email: git config --global user.email 'your@email.com'"
+echo "  Ferramentas críticas:     ${TOOLS_CRITICAL_OK} OK | ${TOOLS_CRITICAL_MISSING} ausentes"
+echo "  Ferramentas opcionais:    ${TOOLS_OPTIONAL_OK} OK | ${TOOLS_OPTIONAL_MISSING} ausentes"
+
+if [ $TOOLS_CRITICAL_MISSING -gt 0 ]; then
 echo ""
-echo "Happy coding! 🚀"
+echo "  ⚠️  AMBIENTE INCONSISTENTE: Ferramentas críticas ausentes"
+echo "  Verifique o Dockerfile e reconstrua o container"
+fi
+
 echo ""
+echo "═══ AVISOS ESPECÍFICOS DO HOST ═══"
+echo ""
+
+if [ "$HOST_OS" = "debian" ]; then
+    echo "  🐧 Debian detectado (host primário)"
+    echo "  • Performance de I/O otimizada"
+    echo "  • Chrome remoto: google-chrome --remote-debugging-port=9222"
+elif [ "$HOST_OS" = "wsl2" ]; then
+    echo "  🪟 Windows/WSL2 detectado"
+    echo "  • Verifique que projeto está em ~/workspace (não /mnt/c/)"
+    echo "  • Chrome remoto: Rodar no Windows (chrome.exe)"
+    echo "  • Line endings: Configurado para LF"
+fi
+
+echo ""
+echo "  Log completo: ${LOG_FILE}"
+echo ""
+
+exit 0
