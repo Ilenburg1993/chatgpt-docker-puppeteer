@@ -10,6 +10,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const router = express.Router();
 
 const io = require('@infra/io');
@@ -186,7 +187,9 @@ const downloadResult = async (req, res) => {
         const safeId = req.params.id.replace(/[^a-zA-Z0-9._-]/g, '');
         const filePath = path.join(io.RESPONSE_DIR, `${safeId}.txt`);
 
-        if (!fs.existsSync(filePath)) {
+        try {
+            await fsp.access(filePath);
+        } catch (err) {
             return res.status(404).json({
                 success: false,
                 error: 'Resultado não localizado no disco.',

@@ -90,6 +90,7 @@ const router = require('./api/router');
 const pm2Bridge = require('./realtime/bus/pm2_bridge');
 const logTail = require('./realtime/streams/log_tail');
 const hardwareTelemetry = require('./realtime/telemetry/hardware');
+const snapshot = require('./telemetry/snapshot');
 
 /* --------------------------------------------------------------------------
    WATCHERS DE INFRA
@@ -245,7 +246,15 @@ async function bootstrap(options = {}) {
         pm2Bridge.init();
         logTail.init();
         hardwareTelemetry.init();
-        log('DEBUG', '[BOOT] Telemetria online');
+        // Inicia snapshot de telemetria em background para respostas rápidas
+        try {
+            const intervalMs = parseInt(process.env.SNAPSHOT_INTERVAL_MS || '60000', 10);
+            snapshot.start(intervalMs);
+        } catch (e) {
+            log('WARN', `[BOOT] Falha ao iniciar snapshot de telemetria: ${e.message}`);
+        }
+
+        log('DEBUG', '[BOOT] Telemetria online (snapshot ativo)');
 
         /* --------------------------------------------------------------
            FASE 7 — Watchers

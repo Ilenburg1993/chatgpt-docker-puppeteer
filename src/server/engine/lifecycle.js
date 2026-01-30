@@ -14,6 +14,7 @@ const socketHub = require('./socket');
 const pm2Bridge = require('../realtime/bus/pm2_bridge');
 const logTail = require('../realtime/streams/log_tail');
 const hardwareTelemetry = require('../realtime/telemetry/hardware');
+const snapshot = require('../telemetry/snapshot');
 const fsWatcher = require('../watchers/fs_watcher');
 const logWatcher = require('../watchers/log_watcher');
 const { log } = require('@core/logger');
@@ -81,6 +82,14 @@ async function gracefulShutdown(signal) {
         log('DEBUG', '[LIFECYCLE] Encerrando barramentos de dados vivos...');
         if (hardwareTelemetry && typeof hardwareTelemetry.stop === 'function') {
             hardwareTelemetry.stop();
+        }
+        // Parar snapshot de telemetria em background
+        try {
+            if (snapshot && typeof snapshot.stop === 'function') {
+                snapshot.stop();
+            }
+        } catch (e) {
+            log('WARN', `[LIFECYCLE] Falha ao parar snapshot: ${e.message}`);
         }
         if (logTail && typeof logTail.stop === 'function') {
             logTail.stop();
