@@ -18,6 +18,7 @@
 ========================================================================== */
 
 const fs = require('fs');
+const fsp = require('fs').promises;
 const io = require('@infra/io');
 const { notify, notifyAgent } = require('@server/engine/socket');
 const { log } = require('@core/logger');
@@ -49,35 +50,39 @@ function init() {
     const queuePath = io.QUEUE_DIR;
 
     // Garantia de Infraestrutura: O sensor exige a existência física do alvo
-    if (!fs.existsSync(queuePath)) {
-        log('WARN', `[FS_WATCHER] Alvo ausente: ${queuePath}. Tentando restauração...`);
+    (async () => {
         try {
-            fs.mkdirSync(queuePath, { recursive: true });
+            await fsp.access(queuePath);
         } catch (e) {
-            log('ERROR', `[FS_WATCHER] Falha crítica ao preparar alvo: ${e.message}`);
-            return;
-        }
-    }
-
-    log('INFO', '[FS_WATCHER] Sensor de filesystem da fila em prontidão.');
-
-    try {
-        /**
-         * fs.watch: Utiliza notificações nativas do kernel do SO (inotify/fsevents).
-         */
-        fsWatcher = fs.watch(queuePath, (event, filename) => {
-            // Filtra cirurgicamente apenas arquivos de intenção (.json)
-            if (filename && filename.endsWith('.json')) {
-                // P1.2: Debounce de 100ms para prevenir múltiplos eventos da mesma mudança
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    _signalChange();
-                }, 100);
+            log('WARN', `[FS_WATCHER] Alvo ausente: ${queuePath}. Tentando restauração...`);
+            try {
+                await fsp.mkdir(queuePath, { recursive: true });
+            } catch (err) {
+                log('ERROR', `[FS_WATCHER] Falha crítica ao preparar alvo: ${err.message}`);
+                return;
             }
-        });
-    } catch (e) {
-        log('ERROR', `[FS_WATCHER] Falha ao acoplar sensor ao SO: ${e.message}`);
-    }
+        }
+
+        log('INFO', '[FS_WATCHER] Sensor de filesystem da fila em prontidão.');
+
+        try {
+            /**
+             * fs.watch: Utiliza notificações nativas do kernel do SO (inotify/fsevents).
+             */
+            fsWatcher = fs.watch(queuePath, (event, filename) => {
+                // Filtra cirurgicamente apenas arquivos de intenção (.json)
+                if (filename && filename.endsWith('.json')) {
+                    // P1.2: Debounce de 100ms para prevenir múltiplos eventos da mesma mudança
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        _signalChange();
+                    }, 100);
+                }
+            });
+        } catch (e) {
+            log('ERROR', `[FS_WATCHER] Falha ao acoplar sensor ao SO: ${e.message}`);
+        }
+    })();
 }
 
 /**

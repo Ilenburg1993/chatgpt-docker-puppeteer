@@ -8,6 +8,7 @@
 ========================================================================== */
 
 const fs = require('fs');
+const fsp = require('fs').promises;
 const path = require('path');
 const { LOG_DIR, log } = require('@core/logger');
 
@@ -26,12 +27,14 @@ let reconnectTimeout = null;
  * Inicializa o monitoramento de integridade do log.
  * Focado em resiliência de sistema de arquivos e persistência de handle.
  */
-function init() {
+async function init() {
     // 1. Prevenção de Duplicidade: Limpa recursos antes de iniciar
     stop();
 
     // 2. Verificação de Existência Física (Pre-flight Check)
-    if (!fs.existsSync(LOG_FILE)) {
+    try {
+        await fsp.access(LOG_FILE);
+    } catch (e) {
         log('WARN', '[LOG_WATCHER] Arquivo de log ausente. Aguardando criação pelo Maestro...');
         _scheduleReconnect(5000); // Tenta novamente em 5s
         return;
