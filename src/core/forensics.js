@@ -119,7 +119,8 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
 /**
  * Captura Screenshot e Snapshot do DOM de forma inteligente.
  */
-async function _captureVisualEvidence(page, folder, _correlationId) {
+/* global document */
+async function _captureVisualEvidence(page, folder, _) {
     // A. Screenshot (JPEG comprimido para performance)
     await page.screenshot({
         path: path.join(folder, 'screenshot.jpg'),

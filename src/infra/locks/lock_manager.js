@@ -142,7 +142,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
 
         // Caso C: Lock válido (processo ativo)
         return false;
-    } catch (_err) {
+    } catch (_) {
         // Falha na fase 1: cleanup e abort
         await fs.unlink(tempLockFile).catch(() => {});
         return false;

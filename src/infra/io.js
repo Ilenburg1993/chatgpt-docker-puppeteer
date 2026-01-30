@@ -68,7 +68,7 @@ module.exports = {
                     await fs.unlink(path.join(dir, file)).catch(() => {});
                     totalCleaned++;
                 }
-            } catch (_e) {
+            } catch (_) {
                 /* Falha em diretório específico não interrompe a higiene */
             }
         }

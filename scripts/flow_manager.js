@@ -210,7 +210,7 @@ try {
                     return;
                 }
                 action = 'UPDATE';
-            } catch (e) {
+            } catch (_e) {
                 action = 'REPAIR';
             }
         }

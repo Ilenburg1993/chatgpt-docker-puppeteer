@@ -105,7 +105,14 @@ function start(port, attempt = 0) {
                     `[ENGINE] Porta ${port} ocupada → ${nextPort} (${attempt + 1}/${MAX_PORT_OFFSET})`
                 );
 
-                try { httpServer.close(); } catch (_) {}
+                try {
+                    httpServer.close();
+                } catch (errClose) {
+                    log(
+                        'DEBUG',
+                        `[ENGINE] httpServer.close() failed: ${errClose && errClose.message ? errClose.message : String(errClose)}`
+                    );
+                }
                 httpServer = null;
 
                 resolve(start(nextPort, attempt + 1));

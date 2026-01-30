@@ -46,7 +46,7 @@ for (const file of allFiles) {
             const allowed = ALLOWED_PATTERNS.some(p => rel.startsWith(p) || rel === p);
             matches.push({ file: rel, allowed });
         }
-    } catch (e) {
+    } catch (_e) {
         // ignore binary or unreadable files
     }
 }

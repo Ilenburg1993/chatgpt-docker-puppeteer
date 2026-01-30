@@ -45,7 +45,7 @@ function cleanOldFiles(prefix) {
             files.slice(MAX_ARCHIVES).forEach(f => {
                 try {
                     fs.unlinkSync(path.join(LOG_DIR, f.name));
-                } catch (_e) {
+                } catch (_) {
                     // Ignore cleanup errors
                 }
             });
@@ -104,7 +104,7 @@ function log(level, msg, taskId = '-') {
     console.log(line);
     try {
         fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
-    } catch (_e) {
+    } catch (_) {
         // Silent failure - console.log already logged
     }
 }
@@ -121,7 +121,7 @@ function audit(action, details) {
 
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
-    } catch (_e) {
+    } catch (_) {
         // Fallback para console em caso de falha crítica de I/O na auditoria
         console.error(`[CRITICAL_AUDIT_FAIL] ${entry}`);
     }
@@ -144,7 +144,7 @@ function metric(name, payload) {
             )
         );
         fs.appendFileSync(METRICS_FILE, `${entry}\\n`, 'utf-8');
-    } catch (_e) {
+    } catch (_) {
         // Silent failure - metrics are non-critical
     }
 }

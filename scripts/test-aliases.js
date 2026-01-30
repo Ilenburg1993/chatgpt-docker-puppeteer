@@ -1,7 +1,7 @@
 require('module-alias/register');
 
 // Teste simples sem inicializar infraestrutura
-const path = require('path');
+const _path = require('path');
 
 // Mock simples para evitar erros de permissão
 process.env.NODE_ENV = 'test';

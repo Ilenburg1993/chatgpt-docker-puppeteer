@@ -265,7 +265,7 @@ class ExecutionEngine {
      * @returns {Object|null}
      * Proposta de decisão ou null se nenhuma ação necessária.
      */
-    _synthesizeProposal({ task, observations, policyAssessment, semanticDecisions, at }) {
+    _synthesizeProposal({ task, observations: _, policyAssessment, semanticDecisions, at }) {
         // Regra 1: Suspender tarefa se avaliação normativa crítica
         if (policyAssessment?.level === 'CRITICAL' && task.state === 'ACTIVE') {
             return {

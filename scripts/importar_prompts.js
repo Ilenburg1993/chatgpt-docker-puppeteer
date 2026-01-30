@@ -14,7 +14,7 @@ function sanitizePrompt(text) {
         return '';
     }
     // Remove caracteres de controle ASCII que podem confundir o Puppeteer
-     
+
     return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
 }
 
@@ -98,7 +98,7 @@ lines.forEach((line, idx) => {
             if (Array.isArray(json.tags)) {
                 taskData.tags.push(...json.tags);
             }
-        } catch (e) {
+        } catch (_e) {
             console.error(`   [!] Linha ${idx + 1}: JSON inválido. Pulando.`);
             errors++;
             return;
@@ -150,7 +150,7 @@ lines.forEach((line, idx) => {
         if (imported % 10 === 0) {
             process.stdout.write('.');
         }
-    } catch (e) {
+    } catch (_e) {
         errors++;
     }
 });

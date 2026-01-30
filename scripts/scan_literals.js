@@ -65,7 +65,7 @@ function grepScan() {
                     }
                 });
             }
-        } catch (error) {
+        } catch (_error) {
             // Grep não encontrou nada (exit code 1) - ok
         }
     });

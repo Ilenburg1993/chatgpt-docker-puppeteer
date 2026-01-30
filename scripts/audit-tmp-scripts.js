@@ -22,10 +22,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync: _execSync } = require('child_process');
 
 const TMP_DIR = '/tmp';
-const SCRIPTS_DIR = path.join(__dirname);
+const _SCRIPTS_DIR = path.join(__dirname);
 const AUTO_CLEANUP = process.argv.includes('--auto-cleanup');
 
 // Classification rules based on filename and content patterns

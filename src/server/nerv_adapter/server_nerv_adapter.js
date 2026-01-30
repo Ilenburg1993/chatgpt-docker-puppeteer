@@ -341,7 +341,12 @@ class ServerNERVAdapter {
             if (this._handlers.nervReceive && this.nerv.offReceive) {
                 this.nerv.offReceive(this._handlers.nervReceive);
             }
-        } catch (_) {}
+        } catch (err) {
+            log(
+                'WARN',
+                `[ServerNERVAdapter] Falha ao remover nervReceive listener: ${err && err.message ? err.message : String(err)}`
+            );
+        }
 
         if (this.socketHub.off) {
             this.socketHub.off('dashboard:command', this._handlers.dashboardCommand);

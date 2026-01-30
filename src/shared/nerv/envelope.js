@@ -62,6 +62,8 @@ function createEnvelope({ actor, messageType, actionCode, payload = {}, correlat
      * LAYER 3 — CAUSALITY
      * ---------------------------------------------------------------------- */
     const msgId = uuidv4();
+    // Sanity-check do msgId gerado para manter invariantes do protocolo
+    assertUUID(msgId, 'msg_id');
 
     if (correlationId !== null) {
         assert(typeof correlationId === 'string', 'correlationId must be a string');

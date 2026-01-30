@@ -48,7 +48,7 @@ console.log(`📦 Files: ${parsedConfig.fileNames.length}\n`);
 
 // Create TypeScript program
 const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
-const typeChecker = program.getTypeChecker();
+const _typeChecker = program.getTypeChecker();
 
 // Data structures for analysis
 const dependencyGraph = new Map(); // file -> [dependencies]
@@ -104,7 +104,7 @@ function getModuleCategory(filePath) {
  * Extract dependencies from a source file
  */
 function extractDependencies(sourceFile) {
-    const filePath = normalizePath(sourceFile.fileName);
+    const _filePath = normalizePath(sourceFile.fileName);
     const deps = [];
 
     function visit(node) {
@@ -137,7 +137,7 @@ function extractDependencies(sourceFile) {
  * Extract NERV event emissions and listeners
  */
 function extractNervEvents(sourceFile) {
-    const filePath = normalizePath(sourceFile.fileName);
+    const _filePath = normalizePath(sourceFile.fileName);
     const events = { emits: [], listens: [] };
 
     function visit(node) {
@@ -405,8 +405,8 @@ if (options.exportDot) {
     dot += '  node [shape=box, style=rounded];\n\n';
 
     dependencyGraph.forEach((deps, file) => {
-        const color = getModuleCategory(path.join(ROOT, file));
-        const colorMap = {
+        const _color = getModuleCategory(path.join(ROOT, file));
+        const _colorMap = {
             NERV: 'lightblue',
             KERNEL: 'lightgreen',
             DRIVER: 'lightyellow',

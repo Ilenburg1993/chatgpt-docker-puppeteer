@@ -129,8 +129,14 @@ const patterns = {
 
 files.forEach(file => {
     const relativePath = path.relative(ROOT, file);
-    const content = fs.readFileSync(file, 'utf8');
-    const lines = content.split('\n');
+    let content = '';
+    try {
+        content = fs.readFileSync(file, 'utf8');
+    } catch (_error) {
+        console.error(`Erro ao processar ${file}:`, _error.message);
+        return;
+    }
+    const _lines = content.split('\n');
 
     // Task states
     let match;

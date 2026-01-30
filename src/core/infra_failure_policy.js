@@ -45,7 +45,7 @@ class InfraFailurePolicy {
      * @param {Error} params.error - Objeto de erro original para evidência.
      * @param {string} params.correlationId - Rastro de causalidade da tarefa.
      */
-    async escalate({ ctx, reason, error: _error, correlationId }) {
+    async escalate({ ctx, reason, error: _, correlationId }) {
         const traceId = correlationId || 'sys-infra-escalation';
 
         log('WARN', `[POLICY] Avaliando escalada de infraestrutura: ${reason}`, traceId);
@@ -141,7 +141,7 @@ class InfraFailurePolicy {
                 const proc = ctx.browser.process();
                 return proc ? proc.pid : null;
             }
-        } catch (_e) {
+        } catch (_) {
             return null;
         }
         return null;

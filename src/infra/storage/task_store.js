@@ -72,7 +72,7 @@ async function deleteTask(id) {
 function listTaskFiles() {
     try {
         return fs.readdirSync(PATHS.QUEUE).filter(f => f.endsWith('.json'));
-    } catch (_e) {
+    } catch (_) {
         return [];
     }
 }
@@ -101,7 +101,7 @@ async function clearQueue() {
 
             await fsp.unlink(filepath);
             deleted++;
-        } catch (_e) {
+        } catch (_) {
             // Em caso de erro de leitura ou exclusão de um arquivo específico, incrementa preservados
             preserved++;
         }

@@ -7,7 +7,6 @@
    Sincronizado com: paths.js V700, fs_core.js V700, dna_schema.js V100.
 ========================================================================== */
 
-const _path = require('path');
 const PATHS = require('../fs/paths');
 const { atomicWrite, safeReadJSON } = require('../fs/fs_core');
 const { DnaSchema } = require('@core/schemas');
@@ -53,7 +52,7 @@ async function getDna() {
     if (!rawDna) {
         log('WARN', '[DNA_STORE] dynamic_rules.json ausente. Inicializando estrutura V4 Gold.');
         await saveDna(DEFAULT_DNA, 'system_init');
-         
+
         cachedDna = DEFAULT_DNA;
         return cachedDna;
     }

@@ -129,7 +129,7 @@ function render() {
                     activeTasks.push(taskData);
                 }
             }
-        } catch (e) {
+        } catch (_e) {
             /* arquivo sendo escrito */
         }
     });

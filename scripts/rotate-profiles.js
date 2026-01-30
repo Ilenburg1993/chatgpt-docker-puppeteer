@@ -32,7 +32,7 @@ async function rotateProfile() {
         // 1. Verifica se profile existe
         try {
             await fs.access(PROFILE_DIR);
-        } catch {
+        } catch (_err) {
             log('INFO', '[ROTATE] Nenhum profile para rotacionar (diretório não existe)');
             return { rotated: false, reason: 'NO_PROFILE' };
         }
@@ -150,7 +150,7 @@ async function getDirectorySize(dirPath) {
                 totalSize += stats.size;
             }
         }
-    } catch (error) {
+    } catch (_error) {
         // Ignora erros de permissão ou arquivos bloqueados
     }
 

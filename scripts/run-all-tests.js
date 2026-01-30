@@ -141,7 +141,7 @@ async function runTests() {
     });
 
     let output = '';
-    const currentSuite = null;
+        const _currentSuite = null;
     const suiteResults = new Map();
 
     testProcess.stdout.on('data', data => {
@@ -200,7 +200,7 @@ async function runTests() {
     printSection('📊 PARSING TEST RESULTS');
 
     for (const suite of TEST_SUITES) {
-        const fullPath = path.join(ROOT, suite.path);
+        const _fullPath = path.join(ROOT, suite.path);
         const relativePath = suite.path;
 
         let status = 'unknown';
@@ -322,7 +322,7 @@ async function runTests() {
 // ============================================================================
 
 function generateMarkdownReport(results) {
-    const { suites, summary, startTime, endTime } = results;
+    const { suites, summary, startTime: _startTime, endTime } = results;
 
     let md = '';
 

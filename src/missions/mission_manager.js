@@ -670,8 +670,16 @@ class MissionManager {
             return -1;
         }
 
-        // TODO: Implementar busca no workflow real
-        // Por ora, retorna current_step do cache
+        // Se stepId não fornecido, retorna índice corrente
+        if (!stepId) return missionCache.currentStepIndex;
+
+        // Se houver lista de steps no cache, tenta localizar pelo step_id
+        if (Array.isArray(missionCache.steps)) {
+            const idx = missionCache.steps.findIndex(s => s.step_id === stepId || s.id === stepId);
+            if (idx >= 0) return idx;
+        }
+
+        // Fallback: retorna currentStepIndex se não encontrar
         return missionCache.currentStepIndex;
     }
 

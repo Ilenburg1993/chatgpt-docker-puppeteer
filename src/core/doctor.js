@@ -123,7 +123,7 @@ async function saveTrends(trends) {
             ts: new Date().toISOString()
         };
         await fsp.writeFile(TREND_FILE, JSON.stringify(simplified, null, 2));
-    } catch (_e) {
+    } catch (_) {
         /* Fail-safe */
     }
 }
@@ -182,7 +182,7 @@ async function checkStorageSLA() {
         await fsp.unlink(testFile);
         ioLatency = Date.now() - t0;
         writeOk = true;
-    } catch (_e) {
+    } catch (_) {
         writeOk = false;
     }
 

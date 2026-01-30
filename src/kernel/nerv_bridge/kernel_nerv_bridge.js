@@ -20,7 +20,7 @@
    Linguagem: JavaScript (Node.js)
 ========================================================================== */
 
-const { v4: uuidv4 } = require('uuid');
+// UUID helper removed (not used in this module)
 const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
 const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 

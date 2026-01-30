@@ -34,7 +34,7 @@ function generateUniqueId(prefix = 'TASK-CLI') {
 
 // --- CONFIGURAÇÃO DE MODELOS ---
 const VALID_TARGETS = ['chatgpt', 'gemini', 'claude', 'perplexity'];
-const VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claude-3-opus'];
+const _VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claude-3-opus'];
 
 // --- PARSER DE ARGUMENTOS ---
 function parseArgs(args) {

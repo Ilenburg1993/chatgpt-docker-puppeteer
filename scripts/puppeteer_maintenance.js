@@ -36,7 +36,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
             const { execSync } = require('child_process');
             const size = execSync(`du -sh ${cacheInfo.path} 2>/dev/null | cut -f1`).toString().trim();
             console.log('  Size:', size);
-        } catch (e) {
+        } catch (_e) {
             console.log('  Size: (não disponível)');
         }
     }
@@ -54,10 +54,10 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
         for (const profile of profiles) {
             const profilePath = path.join(tmpDir, profile);
             try {
-                const stats = fs.statSync(profilePath);
+                const _stats = fs.statSync(profilePath);
                 const size = execSync(`du -sh ${profilePath} 2>/dev/null | cut -f1`).toString().trim();
                 console.log(`    - ${profile} (${size})`);
-            } catch (e) {
+            } catch (_e) {
                 console.log(`    - ${profile} (size unknown)`);
             }
         }

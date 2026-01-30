@@ -20,15 +20,15 @@ const PATHS = require('../fs/paths');
 // --- CONFIGURAÇÃO DE CADÊNCIA ---
 const CACHE_HEARTBEAT_MS = 5000; // Varredura forçada a cada 5s
 const OBSERVATION_WINDOW_MS = 300; // Janela de estabilização para eventos de disco
-const WATCHER_DEBOUNCE_MS = 100; // Debounce para file watcher (P1.2)
 
 // --- ESTADO VOLÁTIL DO CACHE ---
 let globalQueueCache = [];
 let isCacheDirty = true;
 let lastFullScan = 0;
 let currentScanPromise = null;
+// const WATCHER_DEBOUNCE_MS = 100; // Debounce para file watcher (P1.2) - not used yet
 let windowTimer = null;
-const watcherDebounceTimer = null; // Timer de debounce para watcher (P1.2)
+// watcherDebounceTimer reserved for future use
 
 // P9.6: Contadores de cache metrics
 let cacheHits = 0;
@@ -58,7 +58,7 @@ async function loadTask(filePath) {
     try {
         const raw = await fs.promises.readFile(filePath, 'utf-8');
         return JSON.parse(raw);
-    } catch (_err) {
+    } catch (_) {
         // Falha silenciosa para arquivos em processo de escrita/deleção
         return null;
     }

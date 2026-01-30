@@ -85,7 +85,7 @@ async function deleteResponse(taskId) {
         if (fss.existsSync(filepath)) {
             await fs.unlink(filepath);
         }
-    } catch (_e) {
+    } catch (_) {
         // Falha no delete não deve interromper o fluxo principal (Best-effort)
     }
 }

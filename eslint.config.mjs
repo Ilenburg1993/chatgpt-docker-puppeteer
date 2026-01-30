@@ -23,7 +23,15 @@ export default [
     // ======================================================
     {
         files: ['src/core/**', 'src/kernel/**', 'src/logic/**', 'src/nerv/**'],
-        ignores: ['node_modules/**', 'dist/**', 'coverage/**', 'backups/**', 'old/**', 'public/**'],
+        ignores: [
+            'node_modules/**',
+            'dist/**',
+            'coverage/**',
+            'backups/**',
+            'old/**',
+            'public/**',
+            'src/dashboard-ui/**'
+        ],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'commonjs',
@@ -55,7 +63,15 @@ export default [
     // ======================================================
     {
         files: ['src/**/*.js', '*.js'],
-        ignores: ['node_modules/**', 'dist/**', 'coverage/**', 'backups/**', 'old/**', 'public/**'],
+        ignores: [
+            'node_modules/**',
+            'dist/**',
+            'coverage/**',
+            'backups/**',
+            'old/**',
+            'public/**',
+            'src/dashboard-ui/**'
+        ],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'commonjs',
@@ -89,7 +105,7 @@ export default [
     // ======================================================
     {
         files: ['src/driver/**/*.js', 'src/driver/modules/**/*.js', 'src/driver/targets/**/*.js'],
-        ignores: ['node_modules/**', 'dist/**', 'coverage/**', 'backups/**', 'old/**'],
+        ignores: ['node_modules/**', 'dist/**', 'coverage/**', 'backups/**', 'old/**', 'src/dashboard-ui/**'],
         languageOptions: {
             globals: {
                 ...globals.browser

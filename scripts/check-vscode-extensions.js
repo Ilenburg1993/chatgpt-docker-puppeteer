@@ -29,7 +29,7 @@ try {
             .split('\n')
             .filter(e => e.trim())
             .map(e => e.toLowerCase());
-    } catch (error) {
+    } catch (_error) {
         console.log('⚠️  Aviso: Não foi possível obter lista de extensões instaladas');
         installed = [];
     }

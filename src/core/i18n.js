@@ -76,7 +76,7 @@ async function atomicWrite(filepath, content) {
             try {
                 fs.renameSync(tmp, filepath);
                 return;
-            } catch (_e) {
+            } catch (_) {
                 attempts++;
                 await sleep(100 * attempts);
             }
@@ -123,7 +123,7 @@ async function loadVocab() {
                 return vocabCache;
             }
         }
-    } catch (_e) {
+    } catch (_) {
         log('ERROR', `[i18n] Vocabulário corrompido ou ilegível. Restaurando base.`);
     }
 

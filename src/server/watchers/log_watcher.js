@@ -101,8 +101,9 @@ function stop() {
     if (watcher) {
         try {
             watcher.close();
-        } catch (_e) {
-            // Falha ao fechar watcher já inválido é ignorada
+        } catch (err) {
+            // Falha ao fechar watcher já inválido — registra debug e segue
+            log('DEBUG', `[LOG_WATCHER] watcher.close failed: ${err && err.message ? err.message : String(err)}`);
         }
         watcher = null;
     }

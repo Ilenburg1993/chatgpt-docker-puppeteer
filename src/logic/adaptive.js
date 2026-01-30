@@ -76,7 +76,7 @@ async function init() {
             const rawContent = await fs.readFile(STATE_FILE, 'utf-8');
             try {
                 state = AdaptiveStateSchema.parse(JSON.parse(rawContent));
-            } catch (_parseErr) {
+            } catch (_) {
                 // [FIX] Preservação forense de dados corrompidos
                 const bak = `${STATE_FILE}.bak.${Date.now()}`;
                 await fs.writeFile(bak, rawContent);
@@ -120,7 +120,7 @@ async function persist() {
     } catch (e) {
         log('ERROR', `[ADAPTIVE] Falha de escrita: ${e.message}`);
     } finally {
-         
+
         persistLock = false;
         if (pendingPersist) {
             pendingPersist = false;

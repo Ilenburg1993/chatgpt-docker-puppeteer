@@ -152,6 +152,9 @@ class SupervisorReconciler {
      */
     _checkTaskDrift(agent, now) {
         // Implementação futura: detecção de inconsistência entre disco (Tarefa RUNNING) e memória (Robô IDLE).
+        // Referências temporárias para evitar avisos de variáveis não utilizadas até a implementação completa.
+        void agent;
+        void now;
     }
 
     /**

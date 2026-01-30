@@ -49,9 +49,7 @@ class ContextManager {
         this.contextCache = new Map();
 
         // Memory store (patterns aprendidos)
-        this.memoryStore = this.config.enableMemory
-            ? new MemoryStore({ maxSize: this.config.memoryRetention })
-            : null;
+        this.memoryStore = this.config.enableMemory ? new MemoryStore({ maxSize: this.config.memoryRetention }) : null;
 
         log(
             'INFO',
@@ -137,7 +135,7 @@ class ContextManager {
     /**
      * Aplica estratégia de chunking
      */
-    _applyChunkingStrategy(context, currentStepId) {
+    _applyChunkingStrategy(context, _) {
         switch (this.config.chunkingStrategy) {
             case CHUNKING_STRATEGY.NONE:
                 return this._buildFullContext(context);
@@ -289,7 +287,7 @@ class ContextManager {
         }
 
         // Summary básico: concatena outputs
-        const summaryText = oldSteps.map((s) => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`).join('\n');
+        const summaryText = oldSteps.map(s => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`).join('\n');
 
         // Atualiza context
         context.summary = (context.summary || '') + '\n' + summaryText;

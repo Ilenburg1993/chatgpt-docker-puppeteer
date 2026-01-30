@@ -47,7 +47,7 @@ async function safeReadJSON(filepath) {
             try {
                 await fs.rename(filepath, badFile);
                 console.error(`[FS] Quarentena: ${fileName} isolado por erro de integridade.`);
-            } catch (moveErr) {
+            } catch (_) {
                 // Fallback: Se não puder mover, tenta deletar para não travar o sistema
                 await fs.unlink(filepath).catch(() => {});
             }

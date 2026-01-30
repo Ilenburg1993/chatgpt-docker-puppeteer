@@ -172,7 +172,7 @@ app.use((req, res, next) => {
 /* --------------------------------------------------------------------------
    9. ERROR BOUNDARY GLOBAL
 -------------------------------------------------------------------------- */
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
     const status = err.status || 500;
 
     res.status(status).json({

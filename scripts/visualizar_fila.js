@@ -47,7 +47,7 @@ files.forEach(f => {
     try {
         const content = fs.readFileSync(path.join(QUEUE_DIR, f), 'utf-8');
         tasks.push(JSON.parse(content));
-    } catch (e) {
+    } catch (_e) {
         /* arquivo em escrita */
     }
 });
@@ -131,13 +131,13 @@ if (MODE_HTML) {
         var container = document.getElementById('mynetwork');
         var data = { nodes: nodes, edges: edges };
         var options = {
-            layout: { 
-                hierarchical: { 
-                    direction: "LR", 
-                    sortMethod: "directed", 
+            layout: {
+                hierarchical: {
+                    direction: "LR",
+                    sortMethod: "directed",
                     levelSeparation: 300,
                     nodeSpacing: 100
-                } 
+                }
             },
             physics: false,
             interaction: { hover: true, tooltipDelay: 200 },

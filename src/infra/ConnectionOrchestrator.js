@@ -13,7 +13,7 @@
 
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const puppeteer = puppeteerExtra; // Alias para compatibilidade
+// Note: avoid unused alias 'puppeteer' to satisfy lint rules
 const puppeteerCore = require('puppeteer-core');
 const os = require('os');
 const path = require('path');
@@ -573,7 +573,7 @@ class ConnectionOrchestrator {
             await page.bringToFront().catch(() => {});
             this.setState(STATES.PAGE_VALIDATED, { url: page.url() });
             return true;
-        } catch (_e) {
+        } catch (_) {
             this.page = null;
             this.setState(STATES.PAGE_INVALID);
             return false;

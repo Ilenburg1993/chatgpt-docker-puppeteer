@@ -38,67 +38,41 @@ function init() {
 
     // 2. Verificação de Existência Física
     // Se o Maestro ainda não criou o log, entra em modo de espera progressiva.
-    fsp.access(LOG_FILE).then(() => {
-        try {
-            /**
-             * fs.watch: Monitoramento de baixo nível via Kernel do SO.
-             * Detecta mudanças de conteúdo (change) e de referência física (rename).
-             */
-            logWatcher = fs.watch(LOG_FILE, event => {
-                if (event === 'rename') {
-                    /**
-                     * ROTAÇÃO DETECTADA:
-                     * O handle atual tornou-se inválido (o arquivo foi movido para backup).
-                     * Reiniciamos o motor para capturar o novo arquivo que será criado.
-                     */
-                    internalLog('DEBUG', '[LOG_TAIL] Inode alterado (Rotação). Re-anexando handle...');
-                    setTimeout(init, 1000);
-                    return;
-                }
-
-                if (event === 'change' && !logReadActive) {
-                    // Conteúdo adicionado. Dispara leitura incremental do final do arquivo.
-                    _streamLastChunk();
-                }
-            });
-
-            internalLog('INFO', '[LOG_TAIL] Streaming de telemetria textual ativo.');
-        } catch (_e) {
-            internalLog('ERROR', `[LOG_TAIL] Falha catastrófica no watcher: ${_e.message}`);
-            retryTimeout = setTimeout(init, 10000);
-        }
-    }).catch(() => {
-        internalLog('DEBUG', '[LOG_TAIL] Alvo ausente. Aguardando inicialização do Maestro...');
-        retryTimeout = setTimeout(init, 5000);
-        return;
-    });
-        /**
-         * fs.watch: Monitoramento de baixo nível via Kernel do SO.
-         * Detecta mudanças de conteúdo (change) e de referência física (rename).
-         */
-        logWatcher = fs.watch(LOG_FILE, event => {
-            if (event === 'rename') {
+    fsp.access(LOG_FILE)
+        .then(() => {
+            try {
                 /**
-                 * ROTAÇÃO DETECTADA:
-                 * O handle atual tornou-se inválido (o arquivo foi movido para backup).
-                 * Reiniciamos o motor para capturar o novo arquivo que será criado.
+                 * fs.watch: Monitoramento de baixo nível via Kernel do SO.
+                 * Detecta mudanças de conteúdo (change) e de referência física (rename).
                  */
-                internalLog('DEBUG', '[LOG_TAIL] Inode alterado (Rotação). Re-anexando handle...');
-                setTimeout(init, 1000);
-                return;
-            }
+                logWatcher = fs.watch(LOG_FILE, event => {
+                    if (event === 'rename') {
+                        /**
+                         * ROTAÇÃO DETECTADA:
+                         * O handle atual tornou-se inválido (o arquivo foi movido para backup).
+                         * Reiniciamos o motor para capturar o novo arquivo que será criado.
+                         */
+                        internalLog('DEBUG', '[LOG_TAIL] Inode alterado (Rotação). Re-anexando handle...');
+                        setTimeout(init, 1000);
+                        return;
+                    }
 
-            if (event === 'change' && !logReadActive) {
-                // Conteúdo adicionado. Dispara leitura incremental do final do arquivo.
-                _streamLastChunk();
+                    if (event === 'change' && !logReadActive) {
+                        // Conteúdo adicionado. Dispara leitura incremental do final do arquivo.
+                        _streamLastChunk();
+                    }
+                });
+
+                internalLog('INFO', '[LOG_TAIL] Streaming de telemetria textual ativo.');
+            } catch (err) {
+                internalLog('ERROR', `[LOG_TAIL] Falha catastrófica no watcher: ${err && err.message ? err.message : String(err)}`);
+                retryTimeout = setTimeout(init, 10000);
             }
+        })
+        .catch(() => {
+            internalLog('DEBUG', '[LOG_TAIL] Alvo ausente. Aguardando inicialização do Maestro...');
+            retryTimeout = setTimeout(init, 5000);
         });
-
-        internalLog('INFO', '[LOG_TAIL] Streaming de telemetria textual ativo.');
-    } catch (_e) {
-        internalLog('ERROR', `[LOG_TAIL] Falha catastrófica no watcher: ${_e.message}`);
-        retryTimeout = setTimeout(init, 10000);
-    }
 }
 
 /**

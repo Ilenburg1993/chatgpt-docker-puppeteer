@@ -83,7 +83,7 @@ function validateRegex(content, patternStr, signal = null) {
             };
         }
         return { ok: true, reason: null };
-    } catch (_e) {
+    } catch (_) {
         return { ok: false, reason: 'INVALID_REGEX_RULE: Expressão regular malformada.' };
     }
 }
