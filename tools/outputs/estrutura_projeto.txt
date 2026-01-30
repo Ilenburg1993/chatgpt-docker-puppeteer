@@ -1,11 +1,47 @@
 PROJETO: chatgpt-docker-puppeteer
 .
+├── .claude/
+│   └── settings.local.json
 ├── .devcontainer/ [conteúdo oculto]
 ├── .git/ [conteúdo oculto]
 ├── .github/ [conteúdo oculto]
+├── .tmp.drivedownload/ [conteúdo oculto]
 ├── .tmp.driveupload/ [conteúdo oculto]
 ├── .vscode/ [conteúdo oculto]
+├── agents/
+│   ├── __pycache__/ [conteúdo oculto]
+│   ├── code_explainer/
+│   │   ├── __pycache__/ [conteúdo oculto]
+│   │   ├── __init__.py
+│   │   ├── agent.py
+│   │   ├── cli.py
+│   │   ├── generate_summary.py
+│   │   ├── model_client.py
+│   │   ├── prompts.py
+│   │   ├── README.md
+│   │   ├── requirements.txt
+│   │   └── run.sh
+│   ├── cooking_ai/
+│   │   ├── __pycache__/ [conteúdo oculto]
+│   │   ├── __init__.py
+│   │   ├── agent.py
+│   │   ├── cli.py
+│   │   ├── github_client.py
+│   │   ├── prompts.py
+│   │   ├── README.md
+│   │   ├── requirements.txt
+│   │   ├── run.sh
+│   │   ├── run_demo.py
+│   │   ├── show_traces.py
+│   │   ├── tracing.py
+│   │   └── utils.py
+│   ├── __init__.py
+│   └── teste.js
 ├── analysis/ [conteúdo oculto]
+├── assistant/
+│   ├── ASSISTANT_INSTRUCTIONS.md
+│   ├── docs-scope.md
+│   └── inventory-src.md
 ├── backups/
 │   ├── pre-constants-migration-20260120_073843/
 │   │   └── src/
@@ -212,10 +248,6 @@ PROJETO: chatgpt-docker-puppeteer
 │   │       │       ├── README.md
 │   │       │       └── schemas.js
 │   │       ├── state/
-│   │       │   ├── kernel/
-│   │       │   ├── memory/
-│   │       │   ├── tasks/
-│   │       │   ├── workflows/
 │   │       │   └── README.md
 │   │       ├── CONSOLIDAÇÃO.py
 │   │       ├── copiar_com_cabecalho_e_log.py
@@ -425,10 +457,6 @@ PROJETO: chatgpt-docker-puppeteer
 │   │       │       ├── README.md
 │   │       │       └── schemas.js
 │   │       ├── state/
-│   │       │   ├── kernel/
-│   │       │   ├── memory/
-│   │       │   ├── tasks/
-│   │       │   ├── workflows/
 │   │       │   └── README.md
 │   │       ├── CONSOLIDAÇÃO.py
 │   │       ├── copiar_com_cabecalho_e_log.py
@@ -638,10 +666,6 @@ PROJETO: chatgpt-docker-puppeteer
 │   │       │       ├── README.md
 │   │       │       └── schemas.js
 │   │       ├── state/
-│   │       │   ├── kernel/
-│   │       │   ├── memory/
-│   │       │   ├── tasks/
-│   │       │   ├── workflows/
 │   │       │   └── README.md
 │   │       ├── CONSOLIDAÇÃO.py
 │   │       ├── copiar_com_cabecalho_e_log.py
@@ -851,14 +875,12 @@ PROJETO: chatgpt-docker-puppeteer
 │           │       ├── README.md
 │           │       └── schemas.js
 │           ├── state/
-│           │   ├── kernel/
-│           │   ├── memory/
-│           │   ├── tasks/
-│           │   ├── workflows/
 │           │   └── README.md
 │           ├── CONSOLIDAÇÃO.py
 │           ├── copiar_com_cabecalho_e_log.py
 │           └── main.js
+├── config/
+│   └── ports.json
 ├── DOCUMENTAÇÃO/
 │   ├── AUDITORIAS/
 │   │   ├── 00_ROOT_FILES_AUDIT.md
@@ -870,6 +892,10 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── 06_SERVER_AUDIT.md
 │   │   ├── 07_LOGIC_AUDIT.md
 │   │   ├── AUDIT_COVERAGE_MASTER_PLAN.md
+│   │   ├── AUDITORIA_STATUS_ATUAL.md
+│   │   ├── CHROME_EXTERNAL_SETUP.md
+│   │   ├── CONSTANTS_INVENTORY.md
+│   │   ├── CONTRIBUTING.md
 │   │   ├── CORE_CORRECTIONS_SUMMARY.md
 │   │   ├── CROSS_CUTTING_DOCKER_AUDIT.md
 │   │   ├── CROSS_CUTTING_PERFORMANCE_AUDIT.md
@@ -877,15 +903,88 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── CROSS_CUTTING_PORTS_AUDIT.md
 │   │   ├── CROSS_CUTTING_PUPPETEER_AUDIT.md
 │   │   ├── CROSS_CUTTING_SECURITY_AUDIT.md
+│   │   ├── CROSS_PLATFORM_SUPPORT.md
+│   │   ├── DEVELOPER_WORKFLOW.md
+│   │   ├── DOCKER_README.md
+│   │   ├── DOCKER_SETUP.md
+│   │   ├── DOCUMENTACAO_AUDITORIA_COMPLETA.md
 │   │   ├── DRIVER_CORRECTIONS_SUMMARY.md
+│   │   ├── FASE_ESCLARECIMENTO.md
+│   │   ├── IMPLEMENTATION_PLAN.md
 │   │   ├── INFRA_CORRECTIONS_SUMMARY.md
 │   │   ├── KERNEL_CORRECTIONS_SUMMARY.md
+│   │   ├── MINI_AUDITORIAS_SUBSISTEMAS.md
 │   │   ├── NERV_CORRECTIONS_SUMMARY.md
 │   │   ├── PERFORMANCE_IMPLEMENTATION_REPORT.md
+│   │   ├── PLANO_EXECUCAO_LAUNCHER.md
 │   │   ├── PORTS_CORRECTIONS_SUMMARY.md
 │   │   ├── PUPPETEER_CORRECTIONS_SUMMARY.md
+│   │   ├── README.md
 │   │   ├── SECURITY_IMPLEMENTATION_REPORT.md
-│   │   └── SERVER_CORRECTIONS_SUMMARY.md
+│   │   ├── SECURITY_SCAN_POLICY.md
+│   │   ├── SERVER_CORRECTIONS_SUMMARY.md
+│   │   ├── TESTES_MAPEAMENTO.md
+│   │   ├── TESTS_COVERAGE_MATRIX.md
+│   │   ├── TESTS_IMPLEMENTATION_PLAN.md
+│   │   ├── TESTS_STRATEGY.md
+│   │   ├── TYPES_ARCHITECTURE.md
+│   │   └── TYPESCRIPT_MIGRATION_ANALYSIS.md
+│   ├── diagrams/
+│   │   ├── architecture.mmd
+│   │   ├── boot_sequence.mmd
+│   │   ├── chrome-proxy-architecture.txt
+│   │   └── dataflow.mmd
+│   ├── PLANO/
+│   │   ├── SCRIP_EXEMPLO/
+│   │   │   ├── base_driver_v2.js
+│   │   │   ├── constants_v2.js
+│   │   │   ├── cost_tracker.js
+│   │   │   ├── driver_factory_v2.js
+│   │   │   ├── orchestratorengine.js
+│   │   │   ├── qualitydashboard.vue
+│   │   │   ├── semantic_telemetry.js
+│   │   │   ├── TASK.txt
+│   │   │   ├── task_schema_v5.js
+│   │   │   ├── TaskVS.txt
+│   │   │   ├── validation_service.js
+│   │   │   └── workflowdesigner.vue
+│   │   ├── 01-MISSION_ARCHITECTURE.md
+│   │   ├── 02-AUTONOMOUS_EXECUTION.md
+│   │   ├── 03-FEEDBACK_LOOPS.md
+│   │   ├── 04-MISSION_EXAMPLES.md
+│   │   ├── 05-IMPLEMENTATION_ROADMAP.md
+│   │   ├── dynamic-singing-llama-PLANO ATUALIZADO.md
+│   │   ├── hashed-riding-dove.md
+│   │   ├── SOLUCAO_DEFINITIVA_PORTAS.md
+│   │   └── tudo.md
+│   ├── RESUMOS_TECNICOS/
+│   │   ├── core.md
+│   │   ├── driver.md
+│   │   ├── infra.md
+│   │   ├── kernel.md
+│   │   ├── logic.md
+│   │   ├── nerv.md
+│   │   ├── README.md
+│   │   ├── server.md
+│   │   └── shared.md
+│   ├── resumos_tecnicos_subpastas/
+│   │   ├── agents.md
+│   │   ├── analysis.md
+│   │   ├── audits.md
+│   │   ├── backups.md
+│   │   ├── fila.md
+│   │   ├── local-login.md
+│   │   ├── logs.md
+│   │   ├── monitoring.md
+│   │   ├── old.md
+│   │   ├── profile.md
+│   │   ├── public.md
+│   │   ├── README.md
+│   │   ├── respostas.md
+│   │   ├── scripts.md
+│   │   ├── src.md
+│   │   ├── tests.md
+│   │   └── tools.md
 │   ├── TECHNICAL/
 │   │   ├── NERV/
 │   │   │   └── ANALISE_NERV_ENVELOPE.md
@@ -901,10 +1000,13 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── AUDIT_TO_CANONICAL_PLAN.md
 │   ├── CANONICAL_DOCS_ORGANIZATION_PLAN.md
 │   ├── CANONICAL_DOCS_PLAN.md
+│   ├── CHROME_PROXY_INTEGRATION_GUIDE.md
+│   ├── CHROME_PROXY_SETUP.md
 │   ├── CONFIG_FILES.md
 │   ├── CONFIGURATION.md
 │   ├── CONNECTION_ORCHESTRATOR.md
 │   ├── CONNECTION_ORCHESTRATOR_ANALYSIS.md
+│   ├── CONTEXT_MANAGEMENT.md
 │   ├── CONTRIBUTING.md
 │   ├── CRITICAL_CASES_ANALYSIS.md
 │   ├── CRITICAL_CASES_ANALYSIS_V2.md
@@ -920,6 +1022,8 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── DOCUMENTAÇÃO GERAL 2.0.txt
 │   ├── DOCUMENTAÇÃO GERAL.docx
 │   ├── DOCUMENTAÇÃO GERAL.txt
+│   ├── DRIVER.md
+│   ├── DRIVER_EXAMPLES.md
 │   ├── DRIVER_INTEGRATION_REPORT.md
 │   ├── EFFECTORS_ANALYSIS.md
 │   ├── ESLINT_ERROR_FIXES.md
@@ -928,21 +1032,27 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── ESLINT_SETUP_SUMMARY.md
 │   ├── EXECUTIVE_SUMMARY_MIGRACAO.md
 │   ├── FAQ.md
+│   ├── full_repo_summary.md
 │   ├── GAP_ANALYSIS.md
 │   ├── GLOSSARY.md
 │   ├── HEALTH_ENDPOINT.md
 │   ├── INDEX.md
+│   ├── INFRA.md
 │   ├── INTEGRATION_GAP_ANALYSIS.md
 │   ├── INTELLISENSE_OPTIMIZATION.md
 │   ├── IPC 2.0.docx
 │   ├── ipc 2.0.pdf
+│   ├── KERNEL.md
 │   ├── LAUNCHER.md
+│   ├── MISSION_ORCHESTRATION_PLAN.md
 │   ├── MODULE_ALIASES.md
 │   ├── NERV.docx
+│   ├── NERV.md
 │   ├── NERV.pdf
 │   ├── NETWORKING.md
 │   ├── P1_FIXES_SUMMARY.md
 │   ├── PATTERNS.md
+│   ├── PHASE2_INTEGRATION_REPORT.md
 │   ├── PHILOSOPHY.md
 │   ├── PROJECT_CONFIGURATION_AUDIT.md
 │   ├── PROTOCOLOS.docx
@@ -954,6 +1064,7 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── ROADMAP_LAUNCHER_DASHBOARD.md
 │   ├── SCRIPTS.md
 │   ├── SECURITY.md
+│   ├── SERVER.md
 │   ├── SINGULARIDADE.pdf
 │   ├── SUBSYSTEMS.md
 │   ├── SUMMARY.md
@@ -972,23 +1083,414 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── crash_reports/
 │   │   ├── crash_2026-01-17T15-39-11-585Z_task-test-51/
 │   │   ├── crash_2026-01-17T15-41-53-300Z_task-test-51/
-│   │   └── crash_2026-01-17T16-01-45-087Z_task-test-51/
+│   │   ├── crash_2026-01-17T16-01-45-087Z_task-test-51/
+│   │   └── crash_2026-01-29T11-58-55-882Z_sys-crash/
 │   ├── test-reports/
 │   │   ├── test-report-2026-01-20T23-51-50.json
 │   │   └── test-report-2026-01-20T23-51-50.md
+│   ├── agente-error-0.log
 │   ├── agente-error.log
+│   ├── agente-out-0.log
 │   ├── agente-out.log
 │   ├── agente_current.log
 │   ├── audit.log
+│   ├── chrome-launcher.log
+│   ├── dashboard-error-1.log
 │   ├── dashboard-error.log
+│   ├── dashboard-out-1.log
 │   ├── dashboard-out.log
 │   ├── metrics.log
 │   └── scan_literals_report.txt
+├── missions/
+│   ├── mission-019da206-3d3e-45f1-b0d5-420dd565379a/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-07b89536-ed8d-430c-a914-5e8569c37773/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-0c388683-369e-454d-b52a-5ae15f3e9222/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-0dbd6bc1-32ef-4e41-a09b-3472c3eddbef/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-10b6771f-7321-4b37-9f4b-10e72dc7ba01/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-111e4b76-5b6b-4dbd-a268-a2ffb6070f67/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-1512367d-2883-406c-b738-4e82c6a053db/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-159928f6-f3f6-4971-8ac7-2ac128ac4156/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-1b0bccfa-582a-4fd0-bc6f-4842307d93fa/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-247a4f23-0134-4432-aa7a-c281f934ba4f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-25dbe36f-5869-413c-aefa-7e3e92075ead/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-2ae31d79-b7a9-4333-a559-d58afcdda7df/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-3247b68d-d03a-4d8d-8d2b-8a552ddebcd0/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-3cf95eff-8370-4d39-9b98-b18b9f539489/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-3dd8cb79-2168-48b6-a84b-eb6d07326dca/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-3fd5c2c7-5cde-4983-a1e7-c32bf81fa2f9/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-40c640f2-77ba-4ee4-b299-9d898e4f2153/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-43aa9f26-19db-4db5-a3c6-9de7b0eb8f38/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-45167769-581d-4164-af8a-baed92ca050f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-4a0e859b-b0d5-4d77-9124-cc6cfe67169f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-4bee6c97-d3f7-4737-92c3-aa49637d24b8/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-4df53394-1b54-42a7-8d57-869e5acee171/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-5178fddb-a9d1-47a6-b6e2-c7de48d8d27a/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-51e548c2-f408-4274-b298-f1cf07613ce9/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-5484df2e-1363-4e47-a2fd-3e261ab9c62e/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-58e31b84-5356-435e-8b87-3bc715f98d29/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-5e2ff91b-e631-440b-a5fb-692ccb04425c/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-5f44499e-e08c-4940-8f11-869c4d7fef24/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-7154aa5a-4e37-475d-9490-8d93db8f997b/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-72bd5622-8785-48ef-b9de-12db042f382f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-7b44303e-8f04-4160-b65a-71db1caa3006/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-7bfde3ec-93ea-4239-89ad-99b238eee20f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-934bc0c0-4b3a-4bf2-aa7b-c08f06912b52/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-97cfc457-07d4-454b-9aa8-18cbae0af6fa/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-9826c912-5fc3-422f-a48f-15c629a6ae11/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-99b7fd66-209a-4bfc-b471-3605e1d35888/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-9eb0a86a-a534-4624-8367-8b752e202062/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-a1e15fc4-7ab2-4615-881f-c6a2feec87cc/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-a4e37cda-af0f-4813-9163-6c95761d9b4a/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-a5aa0f1c-f45c-4184-9ab5-bf92b245b674/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-a7e4aedd-3e04-4251-bab4-1697d3b324b1/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-ac1b2aee-afdd-45fa-bb0f-2f652e9078cb/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-ace265d5-19a7-4f9b-bbd9-e1705e095004/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-af3ccc2a-188b-4fae-a69f-7f764747d5ee/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-afd30335-eae9-4b77-be28-83ece98e8a21/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-b0767481-e2ca-4fd9-8862-68dd4601dd8e/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-b1b10583-f15f-4700-a667-9781bd0e8403/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-b6abaf00-08c7-45e7-863d-cfef4771cdb0/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-bb4c1fb5-7ae6-4b67-ba77-455ce54b0442/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c28094a4-475f-4d55-a29c-0bebed033ce7/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c47fe224-46c4-4222-8578-e7d41884e5a4/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c6692199-f112-49ba-ae1b-a1ba04de2655/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c847ae4a-bc4b-42dc-9410-ce7e1f7b2073/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c84a081d-5d53-4169-afce-ca4dcb803cd9/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c8a9422d-32d6-4cf8-892c-1be63ae0cf91/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-c96dc41b-c1ff-4f1d-b9d4-5a840f378dc5/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-ce181d0e-3225-4598-bf72-a2915ce38e3c/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-d028d263-f5a5-4de8-9324-a106b5b79422/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-d25d9a16-ef75-487e-a2f1-740bb3b4e156/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-d42f02ab-7345-4dc3-80fe-273beef5aa74/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-d6fefed5-aac7-443b-9302-1ff0263f9131/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-d93da985-c3af-4d14-8819-0ad568b2e226/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-e2a728ce-2fee-476d-b33b-ad32b83198f1/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-e494d8e8-ab04-4e0f-a01f-2f9e0d9ab46f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-e4cea4a7-fba2-42db-a297-d0790a43b6e0/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-e9518be1-694e-4209-8cf5-5f2e3e35367a/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-ef81d340-65ad-4788-9e94-434b82b73559/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-f0679f9d-e789-40db-8f8b-a30cb68179a2/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-f0bc63ad-bbda-4792-9ad8-36816389005f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-f4b72b50-6e44-459f-9918-b3cf1b0c86b4/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   ├── mission-fb51bbbb-d89c-4abd-9b23-ea1476753b2f/
+│   │   ├── checkpoints/
+│   │   ├── logs/
+│   │   ├── outputs/
+│   │   └── state.json
+│   └── mission-fb9e1825-a410-49a5-81ea-584921a7dd99/
+│       ├── checkpoints/
+│       ├── logs/
+│       ├── outputs/
+│       └── state.json
+├── missions-test-boot/
+│   ├── mission-ce181d0e-3225-4598-bf72-a2915ce38e3c/
+│   │   └── checkpoints/
+│   │       ├── checkpoint-1769668529138.json
+│   │       └── checkpoint-latest.json
+│   └── mission-ef81d340-65ad-4788-9e94-434b82b73559/
+│       └── checkpoints/
+│           ├── checkpoint-1769668547251.json
+│           └── checkpoint-latest.json
 ├── monitoring/
-│   ├── alerts/
-│   ├── metrics/
 │   └── prometheus.yml
 ├── node_modules/ [conteúdo oculto]
+├── old/
+│   ├── install/
+│   │   └── setup-devcontainer.sh
+│   ├── oldrecente/
+│   │   └── Dockerfile
+│   ├── .bashrc
+│   ├── devcontainer.json
+│   ├── Makefile
+│   ├── mcp.json
+│   ├── NATIVE_FEATURES_ANALYSIS.md
+│   ├── OPTIMIZATION_REPORT.md
+│   ├── postattach-summary.sh
+│   ├── postcreate-diagnostics.sh
+│   ├── poststart-healthcheck.sh
+│   ├── README.md
+│   ├── setup-devcontainer.sh
+│   └── validate-chrome.sh
 ├── profile/ [conteúdo oculto]
 ├── public/
 │   ├── css/
@@ -1012,6 +1514,7 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── audit-dependencies.js
 │   ├── audit-tmp-scripts.js
 │   ├── check-vscode-extensions.js
+│   ├── chrome-proxy-service.js
 │   ├── doctor.sh
 │   ├── fix-empty-catch.js
 │   ├── fix-eslint-errors.js
@@ -1026,6 +1529,7 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── install-pm2-gui.bat
 │   ├── install-pm2-gui.sh
 │   ├── launcher-dashboard.html
+│   ├── port-manager.js
 │   ├── puppeteer_maintenance.js
 │   ├── quick-ops.bat
 │   ├── quick-ops.sh
@@ -1045,6 +1549,9 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── setup-pm2-plus.bat
 │   ├── setup-pm2-plus.sh
 │   ├── setup.sh
+│   ├── start-chrome-proxy-linux.sh
+│   ├── start-chrome.bat.deprecated
+│   ├── start-chrome.sh
 │   ├── status_fila.js
 │   ├── test-aliases.js
 │   ├── test-codemods.sh
@@ -1054,6 +1561,7 @@ PROJETO: chatgpt-docker-puppeteer
 │   ├── validate-ci.js
 │   ├── validate-nerv-constants.js
 │   ├── validate_config.js
+│   ├── verify-chrome-config-consistency.js
 │   ├── visualizar_fila.js
 │   ├── watch-logs.bat
 │   └── watch-logs.sh
@@ -1083,10 +1591,13 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── schemas/
 │   │   │   ├── bootstrap_state_schema.js
 │   │   │   ├── dna_schema.js
+│   │   │   ├── migrator_v4_to_v5.js
 │   │   │   ├── schema_core.js
 │   │   │   ├── shared_types.js
 │   │   │   ├── task_healer.js
-│   │   │   └── task_schema.js
+│   │   │   ├── task_schema.js
+│   │   │   └── task_schema_v5.js
+│   │   ├── boot_resilience_manager.js
 │   │   ├── config.js
 │   │   ├── doctor.js
 │   │   ├── environment_resolver.js
@@ -1098,6 +1609,66 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── logger.js
 │   │   ├── memory.js
 │   │   └── schemas.js
+│   ├── dashboard-ui/
+│   │   ├── .vscode/ [conteúdo oculto]
+│   │   ├── dist/ [conteúdo oculto]
+│   │   ├── node_modules/ [conteúdo oculto]
+│   │   ├── public/
+│   │   │   └── vite.svg
+│   │   ├── src/
+│   │   │   ├── assets/
+│   │   │   │   └── vue.svg
+│   │   │   ├── components/
+│   │   │   │   ├── charts/
+│   │   │   │   │   ├── BarChart.vue
+│   │   │   │   │   ├── GaugeChart.vue
+│   │   │   │   │   ├── index.js
+│   │   │   │   │   └── LineChart.vue
+│   │   │   │   ├── common/
+│   │   │   │   ├── health/
+│   │   │   │   ├── layout/
+│   │   │   │   │   ├── AppLayout.vue
+│   │   │   │   │   ├── Header.vue
+│   │   │   │   │   └── Sidebar.vue
+│   │   │   │   ├── task/
+│   │   │   │   ├── telemetry/
+│   │   │   │   ├── workflow/
+│   │   │   │   └── HelloWorld.vue
+│   │   │   ├── composables/
+│   │   │   │   ├── useRealtime.js
+│   │   │   │   └── useSocket.js
+│   │   │   ├── router/
+│   │   │   │   └── index.js
+│   │   │   ├── services/
+│   │   │   │   ├── api/
+│   │   │   │   ├── mappers/
+│   │   │   │   └── socket/
+│   │   │   ├── stores/
+│   │   │   │   ├── system.js
+│   │   │   │   ├── tasks.js
+│   │   │   │   └── telemetry.js
+│   │   │   ├── types/
+│   │   │   ├── utils/
+│   │   │   ├── views/
+│   │   │   │   ├── Dashboard.vue
+│   │   │   │   ├── EventCorrelation.vue
+│   │   │   │   ├── MissionDetail.vue
+│   │   │   │   ├── Missions.vue
+│   │   │   │   ├── NotFound.vue
+│   │   │   │   ├── PerformanceMetrics.vue
+│   │   │   │   ├── SystemHealth.vue
+│   │   │   │   ├── TaskDetail.vue
+│   │   │   │   ├── TaskQueue.vue
+│   │   │   │   ├── Templates.vue
+│   │   │   │   └── WorkflowEditor.vue
+│   │   │   ├── App.vue
+│   │   │   ├── main.js
+│   │   │   └── style.css
+│   │   ├── .gitignore
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   ├── README.md
+│   │   └── vite.config.js
 │   ├── driver/
 │   │   ├── core/
 │   │   │   ├── BaseDriver.js
@@ -1121,7 +1692,8 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   └── factory.js
 │   ├── infra/
 │   │   ├── browser_pool/
-│   │   │   └── pool_manager.js
+│   │   │   ├── pool_manager.js
+│   │   │   └── puppeteer_guard.js
 │   │   ├── fs/
 │   │   │   ├── atomic_write.js
 │   │   │   ├── control_store.js
@@ -1147,8 +1719,9 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── transport/
 │   │   │   └── socket_io_adapter.js
 │   │   ├── ConnectionOrchestrator.js
+│   │   ├── disk.js
 │   │   ├── io.js
-│   │   ├── ipc_client_v800_patch.js
+│   │   ├── pm2.js
 │   │   └── system.js
 │   ├── kernel/
 │   │   ├── adapters/
@@ -1167,15 +1740,13 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   └── policy_engine.js
 │   │   ├── policy_engine/
 │   │   │   └── policy_engine.js
-│   │   ├── state/
-│   │   │   ├── observation_store.js
-│   │   │   └── task_store.js
 │   │   ├── task_runtime/
 │   │   │   └── task_runtime.js
 │   │   ├── telemetry/
 │   │   │   └── kernel_telemetry.js
 │   │   ├── DOC.docx
 │   │   ├── kernel.js
+│   │   ├── task_execution_orchestrator.js
 │   │   └── TUDO.py
 │   ├── logic/
 │   │   ├── validation/
@@ -1187,6 +1758,13 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   └── validation_core.js
 │   │   ├── adaptive.js
 │   │   └── validator.js
+│   ├── missions/
+│   │   ├── templates/
+│   │   │   └── book_writing.json
+│   │   ├── feedback_processor.js
+│   │   ├── mission_manager.js
+│   │   ├── mission_state_manager.js
+│   │   └── workflow_generator.js
 │   ├── nerv/
 │   │   ├── buffers/
 │   │   │   ├── backpressure - NEWOLD.js
@@ -1216,21 +1794,38 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   ├── hybrid_transport.js
 │   │   │   ├── reconnect.js
 │   │   │   └── transport.js
+│   │   ├── health.js
 │   │   ├── nerv.js
 │   │   └── TUDO.py
+│   ├── orchestrator/
+│   │   ├── validation/
+│   │   │   └── validation_service.js
+│   │   ├── checkpoint_manager.js
+│   │   ├── context_manager.js
+│   │   ├── index.js
+│   │   ├── memory_store.js
+│   │   └── orchestrator_engine.js
 │   ├── server/
 │   │   ├── api/
 │   │   │   ├── controllers/
+│   │   │   │   ├── dashboard.js
 │   │   │   │   ├── dna.js
+│   │   │   │   ├── health.js
+│   │   │   │   ├── metrics.js
+│   │   │   │   ├── missions.js
 │   │   │   │   ├── system.js
 │   │   │   │   └── tasks.js
 │   │   │   └── router.js
+│   │   ├── dashboard-api/
+│   │   │   ├── task_sync_bridge.js
+│   │   │   └── telemetry_aggregator.js
 │   │   ├── engine/
 │   │   │   ├── app.js
 │   │   │   ├── lifecycle.js
 │   │   │   ├── server.js
 │   │   │   └── socket.js
 │   │   ├── middleware/
+│   │   │   ├── deny_if_delegated.js
 │   │   │   ├── error_handler.js
 │   │   │   ├── request_id.js
 │   │   │   └── schema_guard.js
@@ -1257,15 +1852,12 @@ PROJETO: chatgpt-docker-puppeteer
 │   │       ├── README.md
 │   │       └── schemas.js
 │   ├── state/
-│   │   ├── kernel/
-│   │   ├── memory/
-│   │   ├── tasks/
-│   │   ├── workflows/
 │   │   └── README.md
 │   ├── CONSOLIDAÇÃO.py
 │   ├── copiar_com_cabecalho_e_log.py
 │   └── main.js
 ├── tests/
+│   ├── __pycache__/ [conteúdo oculto]
 │   ├── e2e/
 │   │   ├── test_ariadne_thread.spec.js
 │   │   ├── test_boot_sequence.spec.js
@@ -1298,15 +1890,20 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   ├── test_lock.spec.js
 │   │   │   ├── test_running_recovery.spec.js
 │   │   │   └── test_stall_mitigation.spec.js
-│   │   ├── queue/
-│   │   └── test_launcher_integration.js
+│   │   ├── test_boot_integration_phase2.spec.js
+│   │   ├── test_boot_sanity.spec.js
+│   │   ├── test_chrome_proxy_integration.spec.js
+│   │   ├── test_context_flow.spec.js
+│   │   ├── test_feedback_flow.spec.js
+│   │   ├── test_launcher_integration.js
+│   │   ├── test_mission_system_integration.spec.js
+│   │   └── test_phase2_integration.spec.js
 │   ├── manual/
 │   │   └── test_chrome_connection.js
 │   ├── mocks/
 │   │   ├── mock_browser.js
 │   │   ├── mock_logger.js
 │   │   └── mock_nerv.js
-│   ├── performance/
 │   ├── regression/
 │   │   ├── test_p1_fixes.spec.js
 │   │   ├── test_p2_fixes.spec.js
@@ -1322,6 +1919,7 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   ├── core/
 │   │   │   ├── test_config.spec.js
 │   │   │   ├── test_logger.spec.js
+│   │   │   ├── test_schema_v5.spec.js
 │   │   │   └── test_schemas.spec.js
 │   │   ├── driver/
 │   │   │   ├── test_driver_adapters.spec.js
@@ -1333,25 +1931,32 @@ PROJETO: chatgpt-docker-puppeteer
 │   │   │   └── test_puppeteer_launcher.spec.js
 │   │   ├── kernel/
 │   │   │   ├── test_execution_engine.spec.js
+│   │   │   ├── test_kernel_orchestration_integration.spec.js
 │   │   │   ├── test_policy_engine.spec.js
 │   │   │   └── test_task_runtime.spec.js
-│   │   ├── logic/
+│   │   ├── missions/
+│   │   │   ├── test_feedback_processor.spec.js
+│   │   │   └── test_mission_manager_integration.spec.js
 │   │   ├── nerv/
 │   │   │   ├── test_envelope.spec.js
 │   │   │   └── test_nerv_core.spec.js
-│   │   ├── server/
-│   │   │   ├── test_api_router.spec.js
-│   │   │   ├── test_middleware.spec.js
-│   │   │   └── test_server_nerv_adapter.spec.js
-│   │   └── state/
+│   │   ├── orchestrator/
+│   │   │   ├── test_checkpoint_manager.spec.js
+│   │   │   ├── test_context_manager.spec.js
+│   │   │   └── test_orchestrator_engine.spec.js
+│   │   └── server/
+│   │       ├── test_api_router.spec.js
+│   │       ├── test_middleware.spec.js
+│   │       └── test_server_nerv_adapter.spec.js
 │   ├── corrigir_imports.js
 │   ├── README.md
 │   ├── setup.js
 │   ├── teardown.js
+│   ├── test_code_explainer.py
+│   ├── test_cooking_agent.py
 │   ├── test_errors_communication.js
 │   ├── test_multi_tab_manual.txt
 │   └── test_stall_simulation_manual.txt
-├── tmp/
 ├── tools/
 │   ├── bin/ [conteúdo oculto]
 │   └── outputs/
@@ -1363,55 +1968,47 @@ PROJETO: chatgpt-docker-puppeteer
 ├── .gitattributes
 ├── .gitignore
 ├── .npmrc
+├── .nvmrc
 ├── .pre-commit-config.yaml
 ├── .prettierignore
 ├── .prettierrc
 ├── .puppeteerrc.cjs
-├── AUDITORIA_STATUS_ATUAL.md
+├── .shellcheckrc
+├── BAT_LINE_ENDINGS_FIX.md
 ├── CHANGELOG.md
+├── check-ports.bat
 ├── chrome-config.json
-├── CHROME_EXTERNAL_SETUP.md
+├── CHROME_LAUNCHER_README.md
+├── CLAUDE.MD
 ├── colect.py
 ├── config.json
-├── CONSTANTS_INVENTORY.md
-├── CONTRIBUTING.md
 ├── controle.json
-├── CROSS_PLATFORM_SUPPORT.md
-├── DEVELOPER_WORKFLOW.md
-├── docker-compose.dev.yml
-├── docker-compose.linux.yml
-├── docker-compose.prod.yml
-├── docker-compose.yml
-├── DOCKER_README.md
-├── DOCKER_SETUP.md
-├── Dockerfile
-├── Dockerfile.dev
-├── DOCUMENTACAO_AUDITORIA_COMPLETA.md
 ├── dynamic_rules.json
 ├── ecosystem.config.js
 ├── eslint.config.mjs
-├── FASE_ESCLARECIMENTO.md
+├── estado.json
 ├── fila.example.json
-├── IMPLEMENTATION_PLAN.md
 ├── index.js
 ├── INICIAR_TUDO.BAT
+├── INTEGRATION_REPORT.md
 ├── jsconfig.json
+├── kill-ports-and-start.bat
+├── launcher-ascii.sh
 ├── LAUNCHER.bat
 ├── launcher.sh
 ├── LICENSE
 ├── Makefile
-├── MINI_AUDITORIAS_SUBSISTEMAS.md
+├── MIGRATION_CHROME_LAUNCHERS.md
 ├── package.json
-├── PLANO_EXECUCAO_LAUNCHER.md
+├── Primeiro Agente - GPT-5-MINI.prompt.yml
 ├── prompts.txt
-├── README.md
-├── SECURITY_SCAN_POLICY.md
-├── server.js.old
+├── start-chrome-proxy-simple.bat
+├── start-chrome-proxy-v4.bat
+├── start-chrome-proxy.bat
 ├── test-puppeteer.js
 ├── test_nerv_pulse.js
-├── TESTES_MAPEAMENTO.md
-├── TESTS_COVERAGE_MATRIX.md
-├── TESTS_IMPLEMENTATION_PLAN.md
-├── TESTS_STRATEGY.md
-├── TYPES_ARCHITECTURE.md
-└── TYPESCRIPT_MIGRATION_ANALYSIS.md
+├── verify-chrome-setup-debug.bat
+├── verify-chrome-setup-no-close.bat
+├── verify-chrome-setup.bat
+├── verify-chrome-setup.bat.old
+└── WINDOWS_UTF8_FIX.md

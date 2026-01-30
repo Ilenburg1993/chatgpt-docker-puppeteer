@@ -1,38 +1,41 @@
 /* ============================================================================
    ecosystem.config.js
-   Audit Level: 700 — Sovereign Process Orchestration
-   Status: CONSOLIDATED (Protocol 11 — Zero-Bug Tolerance)
+   Audit Level: 800 — Sovereign Process Orchestration (Canonical Runtime)
+   Status: CANONICAL / HARDENED / AUDIT-READY
 
    Responsabilidade:
-   • Orquestração soberana de processos Node.js via PM2 API
-   • Compatível com pm2, pm2-runtime, containers e CI/CD
-   • Zero dependência de shell
-   • Execução previsível, controlada e auditável
+   • Orquestração soberana de processos Node.js via PM2
+   • Runtime explícito, previsível e observável
+   • Fail-fast ativado no nível do processo
+   • Compatível com pm2, pm2-runtime, Docker e CI/CD
 
-   Ambiente:
-   • Windows (host) + Linux (container)
-   • DevContainer / Docker
+   Princípios:
+   • Um processo = uma responsabilidade
+   • Zero comportamento implícito
+   • Nenhum fallback silencioso
 ============================================================================ */
+
+const NODE_ARGS_BASE = [
+    '--expose-gc',                 // GC manual controlado (processos long-lived)
+    '--unhandled-rejections=strict',// Promises não tratadas derrubam o processo
+    '--enable-source-maps',         // Stack traces corretos em produção
+    '--trace-warnings'              // Avisos nunca silenciosos
+];
 
 module.exports = {
     apps: [
 
         /* =====================================================================
            1. AGENTE-GPT — Execution Kernel (Maestro)
-           ---------------------------------------------------------------------
-           Núcleo principal de execução lógica e coordenação.
-           Processo único, long-lived, com controle explícito de memória.
-        ===================================================================== */
+           ===================================================================== */
         {
             name: 'agente-gpt',
 
-            // Diretório base explícito (requisito da PM2 API)
             cwd: __dirname,
-
             script: './index.js',
 
-            // GC manual para sessões longas
-            node_args: ['--expose-gc'],
+            // Runtime Node explícito e endurecido
+            node_args: NODE_ARGS_BASE,
 
             exec_mode: 'fork',
             instances: 1,
@@ -49,15 +52,15 @@ module.exports = {
                 'src/infra/storage/robot_identity.json'
             ],
 
-            // Limites e tolerância a falhas
+            // Limites e resiliência
             max_memory_restart: '1G',
             exp_backoff_restart_delay: 100,
 
-            // Shutdown previsível (evita processos zumbis)
+            // Shutdown determinístico
             kill_timeout: 8000,
             listen_timeout: 8000,
 
-            // Logs
+            // Logs estruturados
             merge_logs: false,
             time: true,
             log_date_format: 'YYYY-MM-DD HH:mm:ss',
@@ -77,17 +80,20 @@ module.exports = {
         },
 
         /* =====================================================================
-           2. DASHBOARD-WEB — Mission Control
-           ---------------------------------------------------------------------
-           Interface web e plano de observabilidade.
-           Processo isolado, sem cluster, focado em previsibilidade.
-        ===================================================================== */
+           2. DASHBOARD-WEB — Mission Control (HTTP / Socket)
+           ===================================================================== */
         {
             name: 'dashboard-web',
 
             cwd: __dirname,
-
             script: './src/server/main.js',
+
+            // Runtime Node explícito (sem GC manual necessário)
+            node_args: [
+                '--unhandled-rejections=strict',
+                '--enable-source-maps',
+                '--trace-warnings'
+            ],
 
             exec_mode: 'fork',
             instances: 1,
