@@ -109,3 +109,4 @@ tests/**/*.log
 # Security scan outputs
 .secrets.baseline
 trufflehog_output.json
+src/dashboard-ui/node_modules/
