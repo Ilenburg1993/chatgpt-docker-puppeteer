@@ -1,9 +1,9 @@
 # 🔬 DIAGNÓSTICO PROFUNDO CONSOLIDADO
 
-> **Data**: 19 de Janeiro de 2026  
-> **Método**: Análise automatizada multi-ferramenta + inspeção manual  
-> **Ferramentas**: madge, jscpd, complexity-report, grep avançado, métricas customizadas  
-> **Status**: **COMPLETO** - Base para planejamento de ação  
+> **Data**: 19 de Janeiro de 2026
+> **Método**: Análise automatizada multi-ferramenta + inspeção manual
+> **Ferramentas**: madge, jscpd, complexity-report, grep avançado, métricas customizadas
+> **Status**: **COMPLETO** - Base para planejamento de ação
 > **Update**: **Estratégia de migração KERNEL→NERV adicionada**
 
 ---
@@ -122,7 +122,7 @@ Distribuição por Camada:
 20. correlation_store.js (nerv)        215 LOC  ⚠️  MÉDIO
 ```
 
-**Análise**: 8 arquivos >350 LOC - candidatos a split.  
+**Análise**: 8 arquivos >350 LOC - candidatos a split.
 **Recomendação**: Arquivos >300 LOC devem ser modularizados.
 
 ### Dependências
@@ -477,7 +477,8 @@ ESTIMATIVA: ~30% de funcionalidade faltando
 class IPCClient {
   // CONEXÃO
   async connect(port) {}              // Socket.io connect
-  _discoverPort() {}                  // Lê estado.json
+  _discoverPort() {}                  // Lê estado.json (DEPRECATED) — usar NERV `SERVER_READY` via `src/nerv/discovery.js`;
+                                      // fallback legado pode ser ativado com `ENABLE_STATE_FILE=true`
 
   // HANDSHAKE V2
   _performHandshake() {}              // Identidade + versão
@@ -606,7 +607,7 @@ IMPLEMENTADO no NERV:
 FALTANDO no NERV (legacy tem):
 - ❌ Socket.io adapter concreto (só interface)
 - ❌ Handshake V2 específico (identidade_manager)
-- ❌ Discovery de porta (estado.json)
+- ❌ Discovery de porta (estado.json) — DEPRECATED: use NERV `SERVER_READY` (ver DOCUMENTAÇÃO/DEPRECATIONS/estado-json-deprecated.md)
 - ❌ Comandos específicos (IPCCommand.*)
 - ❌ Eventos específicos (IPCEvent.*)
 - ❌ Integração com identity_manager
@@ -742,7 +743,7 @@ const ipc = CONFIG.USE_NERV_IPC
 - [ ] Dashboard conecta via NERV
 - [ ] Zero regressões em staging
 
-**Esforço**: 5 dias  
+**Esforço**: 5 dias
 **Rollback**: Trocar feature flag para `false`
 
 ---
@@ -871,7 +872,7 @@ if (CONFIG.USE_KERNEL) {
 - [ ] Remediação (abort, reboot) funcionando
 - [ ] Zero regressões em staging
 
-**Esforço**: 10 dias  
+**Esforço**: 10 dias
 **Rollback**: Trocar feature flag para `false`
 
 ---
@@ -1009,7 +1010,7 @@ $ grep "require.*kernel\|require.*nerv" index.js
 
 **Estratégia Correta**: Migração incremental com feature flags (ver seção "ESTRATÉGIA DE MIGRAÇÃO")
 
-**Esforço**: 4 semanas full-time  
+**Esforço**: 4 semanas full-time
 **Risco de não resolver**: **Projeto inviável para v1.0**
 
 ---
@@ -1045,7 +1046,7 @@ task_loader.js é usado por:  12 arquivos (9% do código)
 Risco: MUITO ALTO - Módulos centrais em ciclo
 ```
 
-**Esforço**: 1 dia (injeção de dependência)  
+**Esforço**: 1 dia (injeção de dependência)
 **Risco de não resolver**: **Bloqueio total de testes**
 
 ---
@@ -1089,7 +1090,7 @@ Coverage real:                   4.9% ❌
 - **Confiança zero** em deploys
 - **Débito técnico exponencial** - cada feature adiciona mais código não testado
 
-**Esforço**: 3 semanas (40% coverage) → 8 semanas (80% coverage)  
+**Esforço**: 3 semanas (40% coverage) → 8 semanas (80% coverage)
 **Risco de não resolver**: **Instabilidade crônica**
 
 ---
@@ -1135,7 +1136,7 @@ Socket Systems:
 - **Decisões ambíguas** - qual código usar?
 - **Bloat** - código inflado artificialmente
 
-**Esforço**: 1 semana (cleanup após integração)  
+**Esforço**: 1 semana (cleanup após integração)
 **Risco**: BAIXO se integração for feita primeiro
 
 ---
@@ -1190,7 +1191,7 @@ execution_engine.js faz:
 - **Difícil de modificar** - mudanças arriscadas
 - **Alta probabilidade de bugs** - complexidade ↑ = bugs ↑
 
-**Esforço**: 2 semanas (refactor top 5)  
+**Esforço**: 2 semanas (refactor top 5)
 **Prioridade**: MÉDIA (após integração)
 
 ---
@@ -1238,7 +1239,7 @@ logger.error('critical_failure', { error }, correlationId);
 - **Alerting impossível** (sem métricas)
 - **Root cause analysis** demorado
 
-**Esforço**: 1 semana (Pino + Prometheus + Correlation IDs)  
+**Esforço**: 1 semana (Pino + Prometheus + Correlation IDs)
 **Prioridade**: ALTA (Semana 1 do plano)
 
 ---
@@ -1329,7 +1330,7 @@ Latência Otimizada:        ~31s   (-19% improvement)
 Throughput com Pool(5):    ~9 tasks/min (+500%)
 ```
 
-**Esforço**: 2 semanas (browser pool + async validation)  
+**Esforço**: 2 semanas (browser pool + async validation)
 **Prioridade**: MÉDIA (Semana 2-3 do plano)
 
 ---
@@ -1411,7 +1412,7 @@ SCORE GERAL:                ███░░░░░░░ 3.4/10  ❌
 5. npm audit fix
 6. Secrets management (dotenv-vault)
 
-**Esforço**: 1-2 semanas (hardening completo)  
+**Esforço**: 1-2 semanas (hardening completo)
 **Prioridade**: MÉDIA-ALTA (Fase 4 do roadmap)
 
 ---
@@ -2022,9 +2023,9 @@ Conteúdo:
 
 ---
 
-**Analista**: GitHub Copilot (Claude Sonnet 4.5)  
-**Data**: 19 de Janeiro de 2026  
-**Método**: Análise multi-ferramenta automatizada  
-**Ferramentas**: madge, jscpd, complexity-report, métricas customizadas  
-**Status**: ✅ DIAGNÓSTICO COMPLETO + ESTRATÉGIA DE MIGRAÇÃO  
+**Analista**: GitHub Copilot (Claude Sonnet 4.5)
+**Data**: 19 de Janeiro de 2026
+**Método**: Análise multi-ferramenta automatizada
+**Ferramentas**: madge, jscpd, complexity-report, métricas customizadas
+**Status**: ✅ DIAGNÓSTICO COMPLETO + ESTRATÉGIA DE MIGRAÇÃO
 **Próximo**: Plano de Ação Detalhado

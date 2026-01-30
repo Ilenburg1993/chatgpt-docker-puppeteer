@@ -9,6 +9,8 @@
 ========================================================================== */
 
 const logger = require('@core/logger');
+const { ActionCode, ActorRole } = require('@shared/nerv/constants');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 /**
  * ValidationService - Serviço de validação de outputs.
@@ -225,12 +227,16 @@ class ValidationService {
 
         // Emite evento NERV
         if (this.nerv) {
-            this.nerv.emit('VALIDATION_COMPLETED', {
-                passed,
-                overall_score,
-                num_validators: validators.length,
-                num_issues: issues.length
-            });
+            try {
+                HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, ActionCode.VALIDATION_COMPLETED, {
+                    passed,
+                    overall_score,
+                    num_validators: validators.length,
+                    num_issues: issues.length
+                });
+            } catch (e) {
+                logger.error('[ValidationService] Falha ao emitir VALIDATION_COMPLETED via NERV:', e.message);
+            }
         }
 
         return {

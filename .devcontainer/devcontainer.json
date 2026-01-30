@@ -174,10 +174,6 @@
             "label": "Chrome DevTools Variant (PROIBIDO)",
             "onAutoForward": "ignore"
         },
-        "9224": {
-            "label": "Chrome DevTools Direto no Host (PROIBIDO)",
-            "onAutoForward": "ignore"
-        },
         "9223": {
             "label": "Chrome DevTools Fallback (PROIBIDO)",
             "onAutoForward": "ignore"

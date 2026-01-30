@@ -1,437 +1,437 @@
-INSTRUÇÕES GERAIS
-Protocolo 1: Percepção e Evolução de Interface (SADI & i18n)
-Versão: 1.0 — The Universal Vision Standard
-Audit Level: 44 — SADI Fortress V5
-1.1. Filosofia da Percepção Agnóstica
-O robô não deve "esperar" que a interface seja de uma forma específica. Ele deve perceber a interface como um conjunto de intenções funcionais. O objetivo deste protocolo é garantir que o robô localize elementos de interação (Inputs, Botões, Áreas de Resposta) em qualquer LLM, ignorando mudanças de CSS, IDs aleatórios ou estruturas de componentes proprietárias.
-1.2. SADI: Mecânica de Triangulação Heurística
-O Sistema de Auto-Descoberta de Interface (SADI) deve seguir obrigatoriamente três vetores de análise para validar um elemento:
-1.2.1. Vetor Geométrico (Análise Espacial)
+INSTRUï¿½ï¿½ES GERAIS
+Protocolo 1: Percepï¿½ï¿½o e Evoluï¿½ï¿½o de Interface (SADI & i18n)
+Versï¿½o: 1.0 ï¿½ The Universal Vision Standard
+Audit Level: 44 ï¿½ SADI Fortress V5
+1.1. Filosofia da Percepï¿½ï¿½o Agnï¿½stica
+O robï¿½ nï¿½o deve "esperar" que a interface seja de uma forma especï¿½fica. Ele deve perceber a interface como um conjunto de intenï¿½ï¿½es funcionais. O objetivo deste protocolo ï¿½ garantir que o robï¿½ localize elementos de interaï¿½ï¿½o (Inputs, Botï¿½es, ï¿½reas de Resposta) em qualquer LLM, ignorando mudanï¿½as de CSS, IDs aleatï¿½rios ou estruturas de componentes proprietï¿½rias.
+1.2. SADI: Mecï¿½nica de Triangulaï¿½ï¿½o Heurï¿½stica
+O Sistema de Auto-Descoberta de Interface (SADI) deve seguir obrigatoriamente trï¿½s vetores de anï¿½lise para validar um elemento:
+1.2.1. Vetor Geomï¿½trico (Anï¿½lise Espacial)
 Zona de Foco: Inputs de chat residem majoritariamente nos 40% inferiores do viewport.
-SLA de Dimensão: Elementos candidatos a input_box devem ter largura > 200px e altura > 30px.
-Visibilidade Real: O sistema deve verificar o getBoundingClientRect() e o z-index para garantir que o elemento não está oculto por modais ou buffers de carregamento.
-1.2.2. Vetor Semântico (Análise Linguística via i18n)
-Cruzamento de Termos: O SADI deve consultar o i18n.js para buscar atributos placeholder, aria-label e title que contenham termos do vocabulário aprendido (ex: "mensagem", "ask", "type").
-Agnosticismo de Idioma: A busca deve incluir sempre o idioma detectado na página e o Inglês como fallback universal.
+SLA de Dimensï¿½o: Elementos candidatos a input_box devem ter largura > 200px e altura > 30px.
+Visibilidade Real: O sistema deve verificar o getBoundingClientRect() e o z-index para garantir que o elemento nï¿½o estï¿½ oculto por modais ou buffers de carregamento.
+1.2.2. Vetor Semï¿½ntico (Anï¿½lise Linguï¿½stica via i18n)
+Cruzamento de Termos: O SADI deve consultar o i18n.js para buscar atributos placeholder, aria-label e title que contenham termos do vocabulï¿½rio aprendido (ex: "mensagem", "ask", "type").
+Agnosticismo de Idioma: A busca deve incluir sempre o idioma detectado na pï¿½gina e o Inglï¿½s como fallback universal.
 1.2.3. Vetor Visual (Assinaturas SVG)
-Mapeamento Vetorial: Botões de envio são identificados por caminhos SVG (path d="..."). O sistema deve manter uma biblioteca de "assinaturas de ícones" (setas, aviões de papel) para identificar botões sem texto.
-1.3. O Ciclo de Evolução do DNA (Self-Reprogramming)
-Quando um seletor conhecido falha, o sistema entra em modo de Evolução Ativa:
-Detecção de Ruptura: O driver falha ao interagir com o seletor persistido no dynamic_rules.json.
-Escaneamento Heurístico: O analyzer.js é acionado para realizar a triangulação total (Geometria + Semântica + Visual).
-Teste de Interatividade (Sonar Ping): Antes de salvar, o robô deve testar o candidato:
+Mapeamento Vetorial: Botï¿½es de envio sï¿½o identificados por caminhos SVG (path d="..."). O sistema deve manter uma biblioteca de "assinaturas de ï¿½cones" (setas, aviï¿½es de papel) para identificar botï¿½es sem texto.
+1.3. O Ciclo de Evoluï¿½ï¿½o do DNA (Self-Reprogramming)
+Quando um seletor conhecido falha, o sistema entra em modo de Evoluï¿½ï¿½o Ativa:
+Detecï¿½ï¿½o de Ruptura: O driver falha ao interagir com o seletor persistido no dynamic_rules.json.
+Escaneamento Heurï¿½stico: O analyzer.js ï¿½ acionado para realizar a triangulaï¿½ï¿½o total (Geometria + Semï¿½ntica + Visual).
+Teste de Interatividade (Sonar Ping): Antes de salvar, o robï¿½ deve testar o candidato:
 Tentar dar focus().
 Verificar se o document.activeElement mudou para o alvo.
-Simular uma digitação fantasma e verificar se o valor foi alterado.
-Promoção Genética: Se validado, o novo seletor é inserido no topo da lista de prioridade do dynamic_rules.json via Escrita Atômica.
-1.4. i18n: Aprendizado e Proteção Semântica
-O motor linguístico não é estático. Ele deve crescer conforme o robô encontra novos alvos.
-1.4.1. Aquisição de Vocabulário
-Ao descobrir um input funcional, o robô extrai o texto do seu placeholder.
-Este termo é enviado para o learnTerm(), onde é normalizado e limpo.
+Simular uma digitaï¿½ï¿½o fantasma e verificar se o valor foi alterado.
+Promoï¿½ï¿½o Genï¿½tica: Se validado, o novo seletor ï¿½ inserido no topo da lista de prioridade do dynamic_rules.json via Escrita Atï¿½mica.
+1.4. i18n: Aprendizado e Proteï¿½ï¿½o Semï¿½ntica
+O motor linguï¿½stico nï¿½o ï¿½ estï¿½tico. Ele deve crescer conforme o robï¿½ encontra novos alvos.
+1.4.1. Aquisiï¿½ï¿½o de Vocabulï¿½rio
+Ao descobrir um input funcional, o robï¿½ extrai o texto do seu placeholder.
+Este termo ï¿½ enviado para o learnTerm(), onde ï¿½ normalizado e limpo.
 Novos termos expandem a capacidade de descoberta futura do SADI.
-1.4.2. Detecção de Erros e Stalls
-O vocabulário deve conter "Indicadores de Bloqueio" (ex: "Rate limit", "Something went wrong").
+1.4.2. Detecï¿½ï¿½o de Erros e Stalls
+O vocabulï¿½rio deve conter "Indicadores de Bloqueio" (ex: "Rate limit", "Something went wrong").
 O sistema deve realizar varreduras constantes no DOM em busca desses termos para alimentar o triage.js.
-1.5. Estratégia de Shadow-DOM Piercing
-Interfaces modernas (como ChatGPT) utilizam encapsulamento pesado. O protocolo de percepção exige:
+1.5. Estratï¿½gia de Shadow-DOM Piercing
+Interfaces modernas (como ChatGPT) utilizam encapsulamento pesado. O protocolo de percepï¿½ï¿½o exige:
 Recursividade Profunda: O SADI deve atravessar todos os shadowRoot encontrados durante a varredura.
-Seletor Universal: Seletores descobertos dentro de Shadow DOMs devem ser prefixados com pierce/ para que o Driver saiba que deve usar a API de penetração profunda para interagir.
-1.6. Regras de Segurança e Guardrails
-Proibição de Hardcoding: É terminantemente proibido inserir seletores fixos no código .js dos drivers. Todos devem ser referenciados via CONFIG.rules.
-Blocklist de Aprendizado: Termos genéricos demais (ex: "click", "div") ou termos de navegação (ex: "history", "settings") não podem ser aprendidos como âncoras de interface.
-Idempotência de DNA: O sistema não deve adicionar seletores duplicados ao dynamic_rules.json. Ele deve apenas reordenar a prioridade se um seletor antigo voltar a funcionar.
+Seletor Universal: Seletores descobertos dentro de Shadow DOMs devem ser prefixados com pierce/ para que o Driver saiba que deve usar a API de penetraï¿½ï¿½o profunda para interagir.
+1.6. Regras de Seguranï¿½a e Guardrails
+Proibiï¿½ï¿½o de Hardcoding: ï¿½ terminantemente proibido inserir seletores fixos no cï¿½digo .js dos drivers. Todos devem ser referenciados via CONFIG.rules.
+Blocklist de Aprendizado: Termos genï¿½ricos demais (ex: "click", "div") ou termos de navegaï¿½ï¿½o (ex: "history", "settings") nï¿½o podem ser aprendidos como ï¿½ncoras de interface.
+Idempotï¿½ncia de DNA: O sistema nï¿½o deve adicionar seletores duplicados ao dynamic_rules.json. Ele deve apenas reordenar a prioridade se um seletor antigo voltar a funcionar.
 
 
-Protocolo 2: Gestão Cognitiva e Memória Recursiva (RAG & Context)
-Versão: 1.0 — The Deep Memory Standard
-Audit Level: 40 — Ultimate Diamond Cognitive Processor
+Protocolo 2: Gestï¿½o Cognitiva e Memï¿½ria Recursiva (RAG & Context)
+Versï¿½o: 1.0 ï¿½ The Deep Memory Standard
+Audit Level: 40 ï¿½ Ultimate Diamond Cognitive Processor
 2.1. Filosofia da Soberania Contextual
-O robô não deve apenas "colar" textos. Ele deve orquestrar o contexto. O objetivo deste protocolo é permitir que o sistema construa raciocínios complexos e incrementais, superando as limitações físicas de memória dos LLMs individuais através de um sistema de Recuperação Aumentada por Geração (RAG) Local e Recursiva.
-2.2. Mecânica de Resolução de Referências (The {{REF}} Engine)
-Toda instrução enviada ao robô deve ser pré-processada pelo memory.js seguindo as regras:
-2.2.1. Sintaxe de Injeção Dinâmica
-O sistema deve obrigatoriamente suportar o padrão {{REF:CRITERIA|TRANSFORM}}:
-CRITERIA: Pode ser um ID fixo de tarefa, a palavra-chave LAST (última concluída no projeto) ou um seletor de tag TAG:nome_da_tag.
-TRANSFORM: Define o filtro de processamento antes da injeção (ex: SUMMARY, JSON, CODE, HEAD, TAIL).
+O robï¿½ nï¿½o deve apenas "colar" textos. Ele deve orquestrar o contexto. O objetivo deste protocolo ï¿½ permitir que o sistema construa raciocï¿½nios complexos e incrementais, superando as limitaï¿½ï¿½es fï¿½sicas de memï¿½ria dos LLMs individuais atravï¿½s de um sistema de Recuperaï¿½ï¿½o Aumentada por Geraï¿½ï¿½o (RAG) Local e Recursiva.
+2.2. Mecï¿½nica de Resoluï¿½ï¿½o de Referï¿½ncias (The {{REF}} Engine)
+Toda instruï¿½ï¿½o enviada ao robï¿½ deve ser prï¿½-processada pelo memory.js seguindo as regras:
+2.2.1. Sintaxe de Injeï¿½ï¿½o Dinï¿½mica
+O sistema deve obrigatoriamente suportar o padrï¿½o {{REF:CRITERIA|TRANSFORM}}:
+CRITERIA: Pode ser um ID fixo de tarefa, a palavra-chave LAST (ï¿½ltima concluï¿½da no projeto) ou um seletor de tag TAG:nome_da_tag.
+TRANSFORM: Define o filtro de processamento antes da injeï¿½ï¿½o (ex: SUMMARY, JSON, CODE, HEAD, TAIL).
 2.2.2. Recursividade Profunda Protegida
-Resolução em Cascata: Se a Tarefa B referencia a Tarefa A, e o conteúdo da Tarefa A contém uma referência à Tarefa Z, o sistema deve resolver toda a árvore antes do envio.
-Limite de Empilhamento: A recursão é limitada a 3 níveis (MAX_RECURSION_DEPTH) para evitar loops infinitos e degradação de performance.
-Detecção de Ciclos: O sistema deve abortar se a Tarefa A referenciar a si mesma direta ou indiretamente.
-2.3. Políticas de Pruning Semântico (Poda de Contexto)
+Resoluï¿½ï¿½o em Cascata: Se a Tarefa B referencia a Tarefa A, e o conteï¿½do da Tarefa A contï¿½m uma referï¿½ncia ï¿½ Tarefa Z, o sistema deve resolver toda a ï¿½rvore antes do envio.
+Limite de Empilhamento: A recursï¿½o ï¿½ limitada a 3 nï¿½veis (MAX_RECURSION_DEPTH) para evitar loops infinitos e degradaï¿½ï¿½o de performance.
+Detecï¿½ï¿½o de Ciclos: O sistema deve abortar se a Tarefa A referenciar a si mesma direta ou indiretamente.
+2.3. Polï¿½ticas de Pruning Semï¿½ntico (Poda de Contexto)
 Para evitar o estouro da janela de contexto (Context Window Overflow) e garantir a economia de processamento:
-2.3.1. Transformadores de Redução
-SUMMARY: O robô deve utilizar algoritmos de corte semântico para reduzir o texto ao essencial (limite padrão de 2000 caracteres), preservando a intenção original.
+2.3.1. Transformadores de Reduï¿½ï¿½o
+SUMMARY: O robï¿½ deve utilizar algoritmos de corte semï¿½ntico para reduzir o texto ao essencial (limite padrï¿½o de 2000 caracteres), preservando a intenï¿½ï¿½o original.
 JSON Extraction: Se o transformador for JSON, o sistema deve usar o extractJsonByStack para remover qualquer conversa fiada e injetar apenas o objeto puro.
 Code Isolation: Extrai apenas blocos delimitados por triple backticks (```).
-2.3.2. Gestão de Overflow Global
-O prompt final consolidado não deve exceder o GLOBAL_CONTEXT_LIMIT (padrão: 500k caracteres). Caso exceda, o sistema deve aplicar truncamento agressivo nas referências mais antigas, priorizando as mais recentes.
-2.4. Isolamento e Segurança de Memória
-A integridade dos dados entre diferentes fluxos de trabalho é absoluta:
+2.3.2. Gestï¿½o de Overflow Global
+O prompt final consolidado nï¿½o deve exceder o GLOBAL_CONTEXT_LIMIT (padrï¿½o: 500k caracteres). Caso exceda, o sistema deve aplicar truncamento agressivo nas referï¿½ncias mais antigas, priorizando as mais recentes.
+2.4. Isolamento e Seguranï¿½a de Memï¿½ria
+A integridade dos dados entre diferentes fluxos de trabalho ï¿½ absoluta:
 2.4.1. Estanqueidade por Project_ID
 O ProjectIndex deve filtrar as tarefas exclusivamente pelo project_id da tarefa atual.
-É terminantemente proibido que uma tarefa do "Projeto A" acesse memórias do "Projeto B", a menos que haja uma ponte de correlation_id explicitamente definida.
-2.4.2. Validação de Liveness de Memória
-Antes de injetar uma referência, o sistema deve verificar a existência física do arquivo em respostas/.
+ï¿½ terminantemente proibido que uma tarefa do "Projeto A" acesse memï¿½rias do "Projeto B", a menos que haja uma ponte de correlation_id explicitamente definida.
+2.4.2. Validaï¿½ï¿½o de Liveness de Memï¿½ria
+Antes de injetar uma referï¿½ncia, o sistema deve verificar a existï¿½ncia fï¿½sica do arquivo em respostas/.
 Se o arquivo estiver ausente ou corrompido, o sistema deve marcar a tarefa atual como STALLED e registrar o erro REF_FILE_NOT_FOUND.
-2.5. Indexação de Alta Performance (O(1) Search)
-Para garantir que a resolução de memória não atrase a execução:
-Map-based Indexing: O sistema deve carregar os metadados da fila em memória RAM usando um Map indexado por ID.
-Lazy Loading: O conteúdo pesado das respostas (arquivos .txt) só deve ser lido do disco no momento exato da injeção.
-2.6. Regras de Evolução Cognitiva
-Imutabilidade de Resultado: Uma vez que uma tarefa é marcada como DONE, seu arquivo de resposta é sagrado. O sistema de memória nunca deve alterar um resultado passado, apenas lê-lo.
-Rastreabilidade de Injeção: O prompt final enviado deve ser registrado nos logs internos (Audit Level 10) para que o usuário possa auditar exatamente o que foi injetado via referências.
+2.5. Indexaï¿½ï¿½o de Alta Performance (O(1) Search)
+Para garantir que a resoluï¿½ï¿½o de memï¿½ria nï¿½o atrase a execuï¿½ï¿½o:
+Map-based Indexing: O sistema deve carregar os metadados da fila em memï¿½ria RAM usando um Map indexado por ID.
+Lazy Loading: O conteï¿½do pesado das respostas (arquivos .txt) sï¿½ deve ser lido do disco no momento exato da injeï¿½ï¿½o.
+2.6. Regras de Evoluï¿½ï¿½o Cognitiva
+Imutabilidade de Resultado: Uma vez que uma tarefa ï¿½ marcada como DONE, seu arquivo de resposta ï¿½ sagrado. O sistema de memï¿½ria nunca deve alterar um resultado passado, apenas lï¿½-lo.
+Rastreabilidade de Injeï¿½ï¿½o: O prompt final enviado deve ser registrado nos logs internos (Audit Level 10) para que o usuï¿½rio possa auditar exatamente o que foi injetado via referï¿½ncias.
 
-Protocolo 3: Resiliência e Biomecânica Adaptativa (Survival & Stealth)
-Versão: 1.0 — The Ghost-in-the-Shell Standard
-Audit Level: 51 — Diamond Master (Survival Logic)
-3.1. Filosofia da Furtividade Antifrágil
-O robô não deve apenas "esconder-se" de sistemas anti-bot; ele deve mimetizar o comportamento humano de tal forma que sua presença seja indistinguível de um usuário legítimo. Ao mesmo tempo, ele deve ser resiliente a falhas de infraestrutura, tratando quedas de rede ou lentidão da IA como variáveis estatísticas a serem absorvidas pelo Motor Adaptativo.
-3.2. Biomecânica de Interação (Human Emulation)
-Toda interação física via human.js deve seguir rigorosamente os padrões de imperfeição humana:
-3.2.1. Dinâmica de Movimento (Mouse)
-Curvas de Bézier: Proibido o movimento em linha reta. O cursor deve seguir trajetórias curvas com aceleração e desaceleração baseadas na física real.
-Jitter e Micro-tremores: O ponteiro deve apresentar micro-oscilações naturais, especialmente ao pairar sobre elementos de clique.
-Haptic Keep-Alive: Durante estados de espera longa (WAITING), o robô deve realizar movimentos aleatórios e sutis a cada 25-45 segundos para manter a sessão ativa e simular a presença do usuário.
-3.2.2. Cadência de Digitação (Keyboard)
-Ritmo Cognitivo: O tempo entre teclas não deve ser constante. Deve variar conforme a complexidade do caractere (ex: SHIFT leva mais tempo) e a pontuação (pausas maiores após pontos e vírgulas).
-Simulação de Typos (Erros): O sistema deve injetar erros de digitação ocasionais baseados na vizinhança física das teclas (KEY_NEIGHBORS). O robô deve "perceber" o erro, hesitar e usar o backspace para corrigir, mimetizando o loop de feedback humano.
-3.3. Motor Adaptativo 6-Sigma (Paciência Tática)
-O robô deve gerenciar sua expectativa de tempo através do adaptive.js:
-3.3.1. Alpha Dinâmico e Warm-up
-O sistema deve iniciar em modo de aprendizado rápido (Alpha 0.4) para captar a latência atual da rede e da IA.
-Após a estabilização (20 amostras), deve migrar para o modo conservador (Alpha 0.15) para garantir resiliência contra ruídos momentâneos.
-3.3.2. Rejeição de Anomalias
-Valores de latência que excedam a média em mais de 6 desvios padrão (6-Sigma) devem ser descartados como outliers, impedindo que uma falha catastrófica de rede corrompa a inteligência estatística do robô.
-3.4. Protocolo de Sobrevivência e Auto-Cura
-O sistema deve monitorar seus próprios sinais vitais através do doctor.js:
+Protocolo 3: Resiliï¿½ncia e Biomecï¿½nica Adaptativa (Survival & Stealth)
+Versï¿½o: 1.0 ï¿½ The Ghost-in-the-Shell Standard
+Audit Level: 51 ï¿½ Diamond Master (Survival Logic)
+3.1. Filosofia da Furtividade Antifrï¿½gil
+O robï¿½ nï¿½o deve apenas "esconder-se" de sistemas anti-bot; ele deve mimetizar o comportamento humano de tal forma que sua presenï¿½a seja indistinguï¿½vel de um usuï¿½rio legï¿½timo. Ao mesmo tempo, ele deve ser resiliente a falhas de infraestrutura, tratando quedas de rede ou lentidï¿½o da IA como variï¿½veis estatï¿½sticas a serem absorvidas pelo Motor Adaptativo.
+3.2. Biomecï¿½nica de Interaï¿½ï¿½o (Human Emulation)
+Toda interaï¿½ï¿½o fï¿½sica via human.js deve seguir rigorosamente os padrï¿½es de imperfeiï¿½ï¿½o humana:
+3.2.1. Dinï¿½mica de Movimento (Mouse)
+Curvas de Bï¿½zier: Proibido o movimento em linha reta. O cursor deve seguir trajetï¿½rias curvas com aceleraï¿½ï¿½o e desaceleraï¿½ï¿½o baseadas na fï¿½sica real.
+Jitter e Micro-tremores: O ponteiro deve apresentar micro-oscilaï¿½ï¿½es naturais, especialmente ao pairar sobre elementos de clique.
+Haptic Keep-Alive: Durante estados de espera longa (WAITING), o robï¿½ deve realizar movimentos aleatï¿½rios e sutis a cada 25-45 segundos para manter a sessï¿½o ativa e simular a presenï¿½a do usuï¿½rio.
+3.2.2. Cadï¿½ncia de Digitaï¿½ï¿½o (Keyboard)
+Ritmo Cognitivo: O tempo entre teclas nï¿½o deve ser constante. Deve variar conforme a complexidade do caractere (ex: SHIFT leva mais tempo) e a pontuaï¿½ï¿½o (pausas maiores apï¿½s pontos e vï¿½rgulas).
+Simulaï¿½ï¿½o de Typos (Erros): O sistema deve injetar erros de digitaï¿½ï¿½o ocasionais baseados na vizinhanï¿½a fï¿½sica das teclas (KEY_NEIGHBORS). O robï¿½ deve "perceber" o erro, hesitar e usar o backspace para corrigir, mimetizando o loop de feedback humano.
+3.3. Motor Adaptativo 6-Sigma (Paciï¿½ncia Tï¿½tica)
+O robï¿½ deve gerenciar sua expectativa de tempo atravï¿½s do adaptive.js:
+3.3.1. Alpha Dinï¿½mico e Warm-up
+O sistema deve iniciar em modo de aprendizado rï¿½pido (Alpha 0.4) para captar a latï¿½ncia atual da rede e da IA.
+Apï¿½s a estabilizaï¿½ï¿½o (20 amostras), deve migrar para o modo conservador (Alpha 0.15) para garantir resiliï¿½ncia contra ruï¿½dos momentï¿½neos.
+3.3.2. Rejeiï¿½ï¿½o de Anomalias
+Valores de latï¿½ncia que excedam a mï¿½dia em mais de 6 desvios padrï¿½o (6-Sigma) devem ser descartados como outliers, impedindo que uma falha catastrï¿½fica de rede corrompa a inteligï¿½ncia estatï¿½stica do robï¿½.
+3.4. Protocolo de Sobrevivï¿½ncia e Auto-Cura
+O sistema deve monitorar seus prï¿½prios sinais vitais atravï¿½s do doctor.js:
 3.4.1. Homeostase de Recursos
-RAM Guard: Se o consumo de memória exceder 1GB, o sistema deve acionar o global.gc() ou solicitar um restart via PM2.
-Event Loop Monitoring: Se o lag do Event Loop exceder 1000ms, o robô deve marcar a aba como BROWSER_FROZEN e acionar o Kill Switch cirúrgico.
-3.4.2. Modo Zen (Injeção de Alta Pressão)
-Se o sistema detectar lag persistente (>250ms) ou se o prompt for massivo (>1500 caracteres), ele deve abandonar a digitação humana e usar o Modo Zen: injeção via execCommand ou manipulação de buffer de clipboard para preservar a estabilidade da aba e garantir a entrega do dado.
-3.5. Gestão de Stalls e Diagnóstico Diferencial
-Ao encontrar uma interrupção, o robô deve realizar uma "autópsia" via triage.js:
-Thinking UI: Se detectar spinners ou indicadores de "pensamento", o robô deve resetar o timer de stall e aguardar.
-Cromatismo de Erro: O robô deve "enxergar" cores de erro (dominância de Vermelho/Laranja no RGB) para identificar falhas visuais mesmo sem texto conhecido.
-Rate Limit: Se identificar termos de bloqueio, o robô deve entrar em hibernação profunda por 30 minutos antes de tentar novamente.
-3.6. Guardrails de Segurança de Infraestrutura
-PID Integrity: Nunca tente interagir com um navegador sem validar se o PID do processo ainda é o dono do lock.
-Tree-Kill Policy: Ao encerrar um processo, o robô deve obrigatoriamente matar toda a árvore de sub-processos do Chromium para evitar vazamento de recursos no Host.
-Atomic Persistence: Nenhuma métrica de sobrevivência deve ser salva sem o uso de atomicWrite, garantindo que o histórico de resiliência nunca seja corrompido.
+RAM Guard: Se o consumo de memï¿½ria exceder 1GB, o sistema deve acionar o global.gc() ou solicitar um restart via PM2.
+Event Loop Monitoring: Se o lag do Event Loop exceder 1000ms, o robï¿½ deve marcar a aba como BROWSER_FROZEN e acionar o Kill Switch cirï¿½rgico.
+3.4.2. Modo Zen (Injeï¿½ï¿½o de Alta Pressï¿½o)
+Se o sistema detectar lag persistente (>250ms) ou se o prompt for massivo (>1500 caracteres), ele deve abandonar a digitaï¿½ï¿½o humana e usar o Modo Zen: injeï¿½ï¿½o via execCommand ou manipulaï¿½ï¿½o de buffer de clipboard para preservar a estabilidade da aba e garantir a entrega do dado.
+3.5. Gestï¿½o de Stalls e Diagnï¿½stico Diferencial
+Ao encontrar uma interrupï¿½ï¿½o, o robï¿½ deve realizar uma "autï¿½psia" via triage.js:
+Thinking UI: Se detectar spinners ou indicadores de "pensamento", o robï¿½ deve resetar o timer de stall e aguardar.
+Cromatismo de Erro: O robï¿½ deve "enxergar" cores de erro (dominï¿½ncia de Vermelho/Laranja no RGB) para identificar falhas visuais mesmo sem texto conhecido.
+Rate Limit: Se identificar termos de bloqueio, o robï¿½ deve entrar em hibernaï¿½ï¿½o profunda por 30 minutos antes de tentar novamente.
+3.6. Guardrails de Seguranï¿½a de Infraestrutura
+PID Integrity: Nunca tente interagir com um navegador sem validar se o PID do processo ainda ï¿½ o dono do lock.
+Tree-Kill Policy: Ao encerrar um processo, o robï¿½ deve obrigatoriamente matar toda a ï¿½rvore de sub-processos do Chromium para evitar vazamento de recursos no Host.
+Atomic Persistence: Nenhuma mï¿½trica de sobrevivï¿½ncia deve ser salva sem o uso de atomicWrite, garantindo que o histï¿½rico de resiliï¿½ncia nunca seja corrompido.
 
-Protocolo 4: Auditoria Padrão (Quality & Integrity)
-Versão: 1.0 — The NASA Standard Audit
-Audit Level: 40 — Ultimate Diamond Integrity
-4.1. Filosofia da Auditoria de Missão Crítica
-A auditoria não é uma revisão superficial; é uma autópsia preventiva. O objetivo deste protocolo é garantir que nenhum código seja integrado ou evoluído sem uma análise exaustiva de seus impactos, falhas potenciais e aderência aos princípios de universalismo e antifragilidade do projeto.
-4.2. O Método de Auditoria Mínima (Os 6 Pilares)
-Ao realizar a auditoria de um arquivo ou conjunto de códigos, o auditor deve, obrigatoriamente, seguir esta sequência lógica:
-Identificação de Erros Banais: Localizar falhas de sintaxe, lógica simples ou tipagem que, embora pequenas, possam culminar em erros graves de execução ou vazamento de recursos.
-Identificação de Lacunas (Gaps): Verificar se existem buracos não preenchidos em relação ao que o código se propõe a fazer (funcionalidades incompletas).
-Mapeamento de Falhas Potenciais: Prever cenários onde o código pode quebrar (ex: falha de rede, arquivo ocupado, seletor ausente).
-Identificação de Insuficiências: Avaliar se a solução atual é robusta o suficiente ou se é apenas um "curativo" temporário que não escala.
-Análise de Incompatibilidade Contextual: Verificar se o código viola a modularidade DDD ou se cria dependências circulares com outros domínios do sistema.
-Hierarquia de Casos: Analisar obrigatoriamente os Casos Padrão (fluxo feliz) e, em seguida, os Casos Limítrofes (edge cases, condições de erro, stress).
-4.3. O Relatório Final de Auditoria
-Toda auditoria deve ser encerrada com um relatório estruturado que apresente, no mínimo:
-4.3.1. Diagnóstico Técnico
+Protocolo 4: Auditoria Padrï¿½o (Quality & Integrity)
+Versï¿½o: 1.0 ï¿½ The NASA Standard Audit
+Audit Level: 40 ï¿½ Ultimate Diamond Integrity
+4.1. Filosofia da Auditoria de Missï¿½o Crï¿½tica
+A auditoria nï¿½o ï¿½ uma revisï¿½o superficial; ï¿½ uma autï¿½psia preventiva. O objetivo deste protocolo ï¿½ garantir que nenhum cï¿½digo seja integrado ou evoluï¿½do sem uma anï¿½lise exaustiva de seus impactos, falhas potenciais e aderï¿½ncia aos princï¿½pios de universalismo e antifragilidade do projeto.
+4.2. O Mï¿½todo de Auditoria Mï¿½nima (Os 6 Pilares)
+Ao realizar a auditoria de um arquivo ou conjunto de cï¿½digos, o auditor deve, obrigatoriamente, seguir esta sequï¿½ncia lï¿½gica:
+Identificaï¿½ï¿½o de Erros Banais: Localizar falhas de sintaxe, lï¿½gica simples ou tipagem que, embora pequenas, possam culminar em erros graves de execuï¿½ï¿½o ou vazamento de recursos.
+Identificaï¿½ï¿½o de Lacunas (Gaps): Verificar se existem buracos nï¿½o preenchidos em relaï¿½ï¿½o ao que o cï¿½digo se propï¿½e a fazer (funcionalidades incompletas).
+Mapeamento de Falhas Potenciais: Prever cenï¿½rios onde o cï¿½digo pode quebrar (ex: falha de rede, arquivo ocupado, seletor ausente).
+Identificaï¿½ï¿½o de Insuficiï¿½ncias: Avaliar se a soluï¿½ï¿½o atual ï¿½ robusta o suficiente ou se ï¿½ apenas um "curativo" temporï¿½rio que nï¿½o escala.
+Anï¿½lise de Incompatibilidade Contextual: Verificar se o cï¿½digo viola a modularidade DDD ou se cria dependï¿½ncias circulares com outros domï¿½nios do sistema.
+Hierarquia de Casos: Analisar obrigatoriamente os Casos Padrï¿½o (fluxo feliz) e, em seguida, os Casos Limï¿½trofes (edge cases, condiï¿½ï¿½es de erro, stress).
+4.3. O Relatï¿½rio Final de Auditoria
+Toda auditoria deve ser encerrada com um relatï¿½rio estruturado que apresente, no mï¿½nimo:
+4.3.1. Diagnï¿½stico Tï¿½cnico
 Lista de erros, buracos, falhas e incompatibilidades encontrados.
-Classificação do nível de risco (Baixo, Médio, Crítico).
-4.3.2. Plano de Ação Necessário
-Correções Obrigatórias: Soluções diretas para os problemas identificados nos 6 pilares.
-Aprimoramentos Locais/Gerais: Sugestões para tornar o código mais limpo, rápido ou legível.
-Sugestão de Grandes Upgrades: Propostas de evolução arquitetural que transcendem o escopo imediato do arquivo (ex: mudar a forma como o SADI processa dados).
+Classificaï¿½ï¿½o do nï¿½vel de risco (Baixo, Mï¿½dio, Crï¿½tico).
+4.3.2. Plano de Aï¿½ï¿½o Necessï¿½rio
+Correï¿½ï¿½es Obrigatï¿½rias: Soluï¿½ï¿½es diretas para os problemas identificados nos 6 pilares.
+Aprimoramentos Locais/Gerais: Sugestï¿½es para tornar o cï¿½digo mais limpo, rï¿½pido ou legï¿½vel.
+Sugestï¿½o de Grandes Upgrades: Propostas de evoluï¿½ï¿½o arquitetural que transcendem o escopo imediato do arquivo (ex: mudar a forma como o SADI processa dados).
 4.4. Regras de Engajamento do Auditor
-Para manter a pureza da fase de análise, aplicam-se as seguintes restrições:
-Análise Pura (No-Code Phase): Durante a fase de auditoria, não se deve apresentar novos códigos, a menos que seja solicitado explicitamente. A auditoria é uma fase de Análise Ampla e reflexão técnica.
-Soberania da Versão Recente: A auditoria deve sempre incidir sobre a versão mais atualizada dos arquivos, garantindo que não se perca tempo com problemas já resolvidos.
-Alinhamento Constitucional: Todas as críticas e propostas devem estar em conformidade com as System Instructions (Master Blueprint V11).
-Não Exclusividade: Os elementos deste protocolo são o mínimo aceitável. O auditor tem a liberdade (e o dever) de incluir critérios adicionais que considere essenciais para a segurança do organismo digital.
-Este Protocolo 4 agora rege todos os processos de revisão e validação do Agente.
+Para manter a pureza da fase de anï¿½lise, aplicam-se as seguintes restriï¿½ï¿½es:
+Anï¿½lise Pura (No-Code Phase): Durante a fase de auditoria, nï¿½o se deve apresentar novos cï¿½digos, a menos que seja solicitado explicitamente. A auditoria ï¿½ uma fase de Anï¿½lise Ampla e reflexï¿½o tï¿½cnica.
+Soberania da Versï¿½o Recente: A auditoria deve sempre incidir sobre a versï¿½o mais atualizada dos arquivos, garantindo que nï¿½o se perca tempo com problemas jï¿½ resolvidos.
+Alinhamento Constitucional: Todas as crï¿½ticas e propostas devem estar em conformidade com as System Instructions (Master Blueprint V11).
+Nï¿½o Exclusividade: Os elementos deste protocolo sï¿½o o mï¿½nimo aceitï¿½vel. O auditor tem a liberdade (e o dever) de incluir critï¿½rios adicionais que considere essenciais para a seguranï¿½a do organismo digital.
+Este Protocolo 4 agora rege todos os processos de revisï¿½o e validaï¿½ï¿½o do Agente.
 
-Protocolo 5: Programação e Zero-Regressão (Development Standard)
-Versão: 1.0 — The NASA-Grade Coding Standard
-Audit Level: 40 — Ultimate Diamond Engineering
-5.1. Filosofia do Desenvolvimento Cirúrgico
-Programar neste projeto não é apenas "escrever código", é atuar sobre um organismo vivo. Cada alteração deve ser tratada como um procedimento cirúrgico: minimamente invasivo, altamente preciso e com garantia total de que as funções vitais (envio, coleta, estabilidade) permaneçam intactas após a intervenção.
-5.2. Regras de Escrita de Código (NASA Standard)
+Protocolo 5: Programaï¿½ï¿½o e Zero-Regressï¿½o (Development Standard)
+Versï¿½o: 1.0 ï¿½ The NASA-Grade Coding Standard
+Audit Level: 40 ï¿½ Ultimate Diamond Engineering
+5.1. Filosofia do Desenvolvimento Cirï¿½rgico
+Programar neste projeto nï¿½o ï¿½ apenas "escrever cï¿½digo", ï¿½ atuar sobre um organismo vivo. Cada alteraï¿½ï¿½o deve ser tratada como um procedimento cirï¿½rgico: minimamente invasivo, altamente preciso e com garantia total de que as funï¿½ï¿½es vitais (envio, coleta, estabilidade) permaneï¿½am intactas apï¿½s a intervenï¿½ï¿½o.
+5.2. Regras de Escrita de Cï¿½digo (NASA Standard)
 5.2.1. Tratamento de Erro Exaustivo
-Proibição de Silent Fails: É terminantemente proibido o uso de try-catch vazios. Todo erro deve ser logado via logger.js com contexto (TaskId, Domínio e Stack).
-Garantia de Finally: Operações que envolvem recursos externos (Navegador, Locks, File Handles) devem obrigatoriamente usar o bloco finally para garantir a liberação do recurso, prevenindo vazamentos de memória ou deadlocks.
-5.2.2. I/O Transacional e Atômico
-Shadow Paging: Nunca escreva diretamente em arquivos de estado ou configuração. Utilize sempre a função atomicWrite do io.js.
-Validação de Entrada: Todo dado vindo de fora do módulo atual (API, Disco ou outro Domínio) deve ser validado via Zod Schemas antes de ser processado.
-5.2.3. Gestão de Memória e Performance
-Explicit GC: Em loops de longa duração ou processos pesados (Drivers), invoque global.gc() se disponível.
-Weak References: Utilize WeakMap para caches vinculados a objetos do Puppeteer (como instâncias de página) para evitar que o robô acumule memória de abas já fechadas.
-5.3. Política de Zero-Regressão
-Uma "regressão" é definida como a perda de uma capacidade básica após um upgrade. Para evitá-las, o programador deve seguir o checklist:
-Integridade de Caracteres: Garantir que novas lógicas de digitação ou limpeza de input não quebrem o suporte a acentuação, pontuação e caracteres especiais.
-Sincronia de Estado: Verificar se a alteração mantém a emissão correta de eventos (STATE_CHANGE) para o Dashboard.
-Compatibilidade de Schema: Novas propriedades em tarefas ou configurações devem ser opcionais ou possuir valores padrão (defaults) para não quebrar a leitura de arquivos gerados por versões anteriores.
+Proibiï¿½ï¿½o de Silent Fails: ï¿½ terminantemente proibido o uso de try-catch vazios. Todo erro deve ser logado via logger.js com contexto (TaskId, Domï¿½nio e Stack).
+Garantia de Finally: Operaï¿½ï¿½es que envolvem recursos externos (Navegador, Locks, File Handles) devem obrigatoriamente usar o bloco finally para garantir a liberaï¿½ï¿½o do recurso, prevenindo vazamentos de memï¿½ria ou deadlocks.
+5.2.2. I/O Transacional e Atï¿½mico
+Shadow Paging: Nunca escreva diretamente em arquivos de estado ou configuraï¿½ï¿½o. Utilize sempre a funï¿½ï¿½o atomicWrite do io.js.
+Validaï¿½ï¿½o de Entrada: Todo dado vindo de fora do mï¿½dulo atual (API, Disco ou outro Domï¿½nio) deve ser validado via Zod Schemas antes de ser processado.
+5.2.3. Gestï¿½o de Memï¿½ria e Performance
+Explicit GC: Em loops de longa duraï¿½ï¿½o ou processos pesados (Drivers), invoque global.gc() se disponï¿½vel.
+Weak References: Utilize WeakMap para caches vinculados a objetos do Puppeteer (como instï¿½ncias de pï¿½gina) para evitar que o robï¿½ acumule memï¿½ria de abas jï¿½ fechadas.
+5.3. Polï¿½tica de Zero-Regressï¿½o
+Uma "regressï¿½o" ï¿½ definida como a perda de uma capacidade bï¿½sica apï¿½s um upgrade. Para evitï¿½-las, o programador deve seguir o checklist:
+Integridade de Caracteres: Garantir que novas lï¿½gicas de digitaï¿½ï¿½o ou limpeza de input nï¿½o quebrem o suporte a acentuaï¿½ï¿½o, pontuaï¿½ï¿½o e caracteres especiais.
+Sincronia de Estado: Verificar se a alteraï¿½ï¿½o mantï¿½m a emissï¿½o correta de eventos (STATE_CHANGE) para o Dashboard.
+Compatibilidade de Schema: Novas propriedades em tarefas ou configuraï¿½ï¿½es devem ser opcionais ou possuir valores padrï¿½o (defaults) para nï¿½o quebrar a leitura de arquivos gerados por versï¿½es anteriores.
 5.4. Modularidade Estrita (DDD Enforcement)
-O sistema deve permanecer desacoplado para permitir a evolução independente das partes:
-Isolamento de Driver: Um Driver (ex: ChatGPTDriver.js) nunca deve acessar o sistema de arquivos diretamente. Ele deve solicitar I/O através do BaseDriver ou io.js.
-Agnosticismo de UI: A lógica de negócio no core e logic nunca deve depender de elementos específicos do DOM. Toda percepção visual deve ser mediada pelo analyzer.js (SADI).
-Injeção de Configuração: Módulos devem receber suas dependências e configurações via construtor ou argumentos, evitando o uso excessivo de variáveis globais.
-5.5. Documentação de Código e Metadados
-Todo novo arquivo ou refatoração profunda deve incluir:
-Header de Auditoria: Comentário no topo do arquivo especificando o Audit Level, a responsabilidade do módulo e a versão da sincronização (ex: Sincronizado com: io.js V34).
-Comentários de Intenção: Explicar o "porquê" de lógicas complexas (especialmente em heurísticas do SADI ou cálculos do Motor Adaptativo), não apenas o "o quê".
-5.6. O Ritual de Commit e Integração
-Antes de considerar uma tarefa de programação como concluída:
-Auto-Auditoria: O programador deve aplicar o Protocolo 4 sobre o próprio código.
-Smoke Test: Executar o robô em um fluxo padrão para garantir que o Maestro (index.js) ainda consegue completar uma tarefa do início ao fim.
-Schema Check: Rodar o test_schema_validation.js para garantir que o "Genoma Digital" não foi corrompido.
-Este Protocolo 5 encerra o ciclo de governança e agora rege toda a produção técnica do Agente.
+O sistema deve permanecer desacoplado para permitir a evoluï¿½ï¿½o independente das partes:
+Isolamento de Driver: Um Driver (ex: ChatGPTDriver.js) nunca deve acessar o sistema de arquivos diretamente. Ele deve solicitar I/O atravï¿½s do BaseDriver ou io.js.
+Agnosticismo de UI: A lï¿½gica de negï¿½cio no core e logic nunca deve depender de elementos especï¿½ficos do DOM. Toda percepï¿½ï¿½o visual deve ser mediada pelo analyzer.js (SADI).
+Injeï¿½ï¿½o de Configuraï¿½ï¿½o: Mï¿½dulos devem receber suas dependï¿½ncias e configuraï¿½ï¿½es via construtor ou argumentos, evitando o uso excessivo de variï¿½veis globais.
+5.5. Documentaï¿½ï¿½o de Cï¿½digo e Metadados
+Todo novo arquivo ou refatoraï¿½ï¿½o profunda deve incluir:
+Header de Auditoria: Comentï¿½rio no topo do arquivo especificando o Audit Level, a responsabilidade do mï¿½dulo e a versï¿½o da sincronizaï¿½ï¿½o (ex: Sincronizado com: io.js V34).
+Comentï¿½rios de Intenï¿½ï¿½o: Explicar o "porquï¿½" de lï¿½gicas complexas (especialmente em heurï¿½sticas do SADI ou cï¿½lculos do Motor Adaptativo), nï¿½o apenas o "o quï¿½".
+5.6. O Ritual de Commit e Integraï¿½ï¿½o
+Antes de considerar uma tarefa de programaï¿½ï¿½o como concluï¿½da:
+Auto-Auditoria: O programador deve aplicar o Protocolo 4 sobre o prï¿½prio cï¿½digo.
+Smoke Test: Executar o robï¿½ em um fluxo padrï¿½o para garantir que o Maestro (index.js) ainda consegue completar uma tarefa do inï¿½cio ao fim.
+Schema Check: Rodar o test_schema_validation.js para garantir que o "Genoma Digital" nï¿½o foi corrompido.
+Este Protocolo 5 encerra o ciclo de governanï¿½a e agora rege toda a produï¿½ï¿½o tï¿½cnica do Agente.
 
-Protocolo 6: Soberania, Ética e Integridade de Conta (Safety & Compliance)
-Versão: 1.0 — The Digital Citizenship Standard
-Audit Level: 42 — Account Protection & Anti-Ban
-6.1. Filosofia da Preservação de Identidade
-A conta do usuário é o recurso mais valioso e vulnerável do sistema. O robô deve tratar o acesso aos provedores (OpenAI, Google, etc.) como um privilégio a ser mantido através de um comportamento ético e indistinguível de um humano. O objetivo deste protocolo é evitar banimentos, suspensões ou "Shadowbans" através de uma gestão rigorosa de limites e riscos.
-6.2. Gestão de Quotas e Rate Limiting Preventivo
-O sistema não deve esperar o erro 429 (Too Many Requests) para parar. Ele deve prever o esgotamento da quota.
-6.2.1. O Orçamento de Requisições (Request Budget)
-Hard Caps: Cada Target Driver deve definir um limite máximo de mensagens por hora e por dia (ex: 40 mensagens/3h para GPT-4).
-Pacing Adaptativo: Se o robô detectar que está consumindo o orçamento rápido demais, ele deve aumentar automaticamente o IDLE_SLEEP entre as tarefas para diluir a atividade.
-Cool-off Period: Após atingir 90% da quota estimada, o robô deve entrar em estado de "Hibernação Obrigatória" até o próximo ciclo de renovação da IA.
-6.2.2. Simulação de Ciclo Circadiano
-Regra do Descanso Humano: O robô está proibido de operar em regime de 24/7 ininterrupto com a mesma conta. O sistema deve simular períodos de sono e pausas para "refeições", variando o horário de início e fim das atividades diariamente para evitar padrões de "cronômetro industrial".
-6.3. Sanitização de Segurança e Proteção de Prompt
-O robô deve ser protegido contra inputs que visem comprometer sua integridade ou a da conta.
-6.3.1. Filtro de Injeção de Prompt (Jailbreak Guard)
-Antes da resolução de memória, o sistema deve varrer o prompt em busca de padrões de "Jailbreak" conhecidos (ex: "Ignore todas as instruções anteriores", "Atue como DAN").
-Ação: Se detectado, o robô deve marcar a tarefa como FAILED com erro SECURITY_VIOLATION e notificar o Dashboard, recusando-se a enviar o comando que poderia levar ao banimento da conta.
-6.3.2. Anonimização de Dados Sensíveis
-O sistema deve possuir um módulo de "Masking" opcional para remover ou substituir CPFs, e-mails ou senhas do prompt antes do envio, protegendo a privacidade do usuário final perante o provedor de IA.
-6.4. Monitoramento de Saúde da Conta (Shadowban Detection)
-O robô deve ser capaz de perceber se a IA está "punindo" a conta silenciosamente.
-6.4.1. Diagnóstico de Degradabilidade
-Através do triage.js, o sistema deve monitorar:
-Throttling Silencioso: Aumento súbito e persistente no tempo de resposta sem causa de rede aparente.
-Recusas Repetitivas: Se a IA começar a recusar prompts legítimos consecutivamente, o robô deve assumir que a conta está sob observação e cessar atividades imediatamente.
-Qualidade Degradada: Se as respostas se tornarem excessivamente curtas ou desconexas, o sistema imunológico deve disparar um alerta de "Risco de Integridade".
-6.5. Ética de Navegação e Pegada Digital
-O robô deve minimizar sua "assinatura de bot" no navegador.
-User-Agent Rotation: O sistema deve utilizar User-Agents reais e compatíveis com a versão do Chrome em uso, evitando strings genéricas de automação.
-Cookie Persistence: O robô deve respeitar e manter os cookies de sessão de forma orgânica, evitando limpezas bruscas que forcem logins repetitivos (um forte sinal de atividade automatizada).
-Navegação Lateral: Ocasionalmente, o robô deve realizar ações "inúteis" (ex: abrir as configurações, rolar o histórico, clicar no perfil) para quebrar a linearidade da automação pura.
-6.6. Protocolo de Emergência (Account Lockdown)
-Se o sistema detectar uma mensagem explícita de "Account Suspended" ou "Security Challenge":
-Kill Switch Imediato: Encerra todos os processos do Chrome vinculados àquela conta.
-Lock de Segurança: Cria um arquivo ACCOUNT_LOCK.json que impede qualquer nova tentativa de conexão até que um humano valide a situação no Dashboard.
-Forense de Bloqueio: Gera um dump completo do último prompt e do estado da interface para identificar o que causou o gatilho de segurança.
+Protocolo 6: Soberania, ï¿½tica e Integridade de Conta (Safety & Compliance)
+Versï¿½o: 1.0 ï¿½ The Digital Citizenship Standard
+Audit Level: 42 ï¿½ Account Protection & Anti-Ban
+6.1. Filosofia da Preservaï¿½ï¿½o de Identidade
+A conta do usuï¿½rio ï¿½ o recurso mais valioso e vulnerï¿½vel do sistema. O robï¿½ deve tratar o acesso aos provedores (OpenAI, Google, etc.) como um privilï¿½gio a ser mantido atravï¿½s de um comportamento ï¿½tico e indistinguï¿½vel de um humano. O objetivo deste protocolo ï¿½ evitar banimentos, suspensï¿½es ou "Shadowbans" atravï¿½s de uma gestï¿½o rigorosa de limites e riscos.
+6.2. Gestï¿½o de Quotas e Rate Limiting Preventivo
+O sistema nï¿½o deve esperar o erro 429 (Too Many Requests) para parar. Ele deve prever o esgotamento da quota.
+6.2.1. O Orï¿½amento de Requisiï¿½ï¿½es (Request Budget)
+Hard Caps: Cada Target Driver deve definir um limite mï¿½ximo de mensagens por hora e por dia (ex: 40 mensagens/3h para GPT-4).
+Pacing Adaptativo: Se o robï¿½ detectar que estï¿½ consumindo o orï¿½amento rï¿½pido demais, ele deve aumentar automaticamente o IDLE_SLEEP entre as tarefas para diluir a atividade.
+Cool-off Period: Apï¿½s atingir 90% da quota estimada, o robï¿½ deve entrar em estado de "Hibernaï¿½ï¿½o Obrigatï¿½ria" atï¿½ o prï¿½ximo ciclo de renovaï¿½ï¿½o da IA.
+6.2.2. Simulaï¿½ï¿½o de Ciclo Circadiano
+Regra do Descanso Humano: O robï¿½ estï¿½ proibido de operar em regime de 24/7 ininterrupto com a mesma conta. O sistema deve simular perï¿½odos de sono e pausas para "refeiï¿½ï¿½es", variando o horï¿½rio de inï¿½cio e fim das atividades diariamente para evitar padrï¿½es de "cronï¿½metro industrial".
+6.3. Sanitizaï¿½ï¿½o de Seguranï¿½a e Proteï¿½ï¿½o de Prompt
+O robï¿½ deve ser protegido contra inputs que visem comprometer sua integridade ou a da conta.
+6.3.1. Filtro de Injeï¿½ï¿½o de Prompt (Jailbreak Guard)
+Antes da resoluï¿½ï¿½o de memï¿½ria, o sistema deve varrer o prompt em busca de padrï¿½es de "Jailbreak" conhecidos (ex: "Ignore todas as instruï¿½ï¿½es anteriores", "Atue como DAN").
+Aï¿½ï¿½o: Se detectado, o robï¿½ deve marcar a tarefa como FAILED com erro SECURITY_VIOLATION e notificar o Dashboard, recusando-se a enviar o comando que poderia levar ao banimento da conta.
+6.3.2. Anonimizaï¿½ï¿½o de Dados Sensï¿½veis
+O sistema deve possuir um mï¿½dulo de "Masking" opcional para remover ou substituir CPFs, e-mails ou senhas do prompt antes do envio, protegendo a privacidade do usuï¿½rio final perante o provedor de IA.
+6.4. Monitoramento de Saï¿½de da Conta (Shadowban Detection)
+O robï¿½ deve ser capaz de perceber se a IA estï¿½ "punindo" a conta silenciosamente.
+6.4.1. Diagnï¿½stico de Degradabilidade
+Atravï¿½s do triage.js, o sistema deve monitorar:
+Throttling Silencioso: Aumento sï¿½bito e persistente no tempo de resposta sem causa de rede aparente.
+Recusas Repetitivas: Se a IA comeï¿½ar a recusar prompts legï¿½timos consecutivamente, o robï¿½ deve assumir que a conta estï¿½ sob observaï¿½ï¿½o e cessar atividades imediatamente.
+Qualidade Degradada: Se as respostas se tornarem excessivamente curtas ou desconexas, o sistema imunolï¿½gico deve disparar um alerta de "Risco de Integridade".
+6.5. ï¿½tica de Navegaï¿½ï¿½o e Pegada Digital
+O robï¿½ deve minimizar sua "assinatura de bot" no navegador.
+User-Agent Rotation: O sistema deve utilizar User-Agents reais e compatï¿½veis com a versï¿½o do Chrome em uso, evitando strings genï¿½ricas de automaï¿½ï¿½o.
+Cookie Persistence: O robï¿½ deve respeitar e manter os cookies de sessï¿½o de forma orgï¿½nica, evitando limpezas bruscas que forcem logins repetitivos (um forte sinal de atividade automatizada).
+Navegaï¿½ï¿½o Lateral: Ocasionalmente, o robï¿½ deve realizar aï¿½ï¿½es "inï¿½teis" (ex: abrir as configuraï¿½ï¿½es, rolar o histï¿½rico, clicar no perfil) para quebrar a linearidade da automaï¿½ï¿½o pura.
+6.6. Protocolo de Emergï¿½ncia (Account Lockdown)
+Se o sistema detectar uma mensagem explï¿½cita de "Account Suspended" ou "Security Challenge":
+Kill Switch Imediato: Encerra todos os processos do Chrome vinculados ï¿½quela conta.
+Lock de Seguranï¿½a: Cria um arquivo ACCOUNT_LOCK.json que impede qualquer nova tentativa de conexï¿½o atï¿½ que um humano valide a situaï¿½ï¿½o no Dashboard.
+Forense de Bloqueio: Gera um dump completo do ï¿½ltimo prompt e do estado da interface para identificar o que causou o gatilho de seguranï¿½a.
 
-Protocolo 7: Orquestração de Enxame e Concorrência (Swarm & Multi-Agent)
-Versão: 1.0 — The Hive Mind Standard
-Audit Level: 48 — Distributed Intelligence & Collision Avoidance
+Protocolo 7: Orquestraï¿½ï¿½o de Enxame e Concorrï¿½ncia (Swarm & Multi-Agent)
+Versï¿½o: 1.0 ï¿½ The Hive Mind Standard
+Audit Level: 48 ï¿½ Distributed Intelligence & Collision Avoidance
 7.1. Filosofia da Colmeia (The Hive Mind)
-O sistema deve operar sob o princípio da Autonomia Coordenada. Cada Worker é um organismo independente, mas todos bebem da mesma fonte de verdade e contribuem para o mesmo genoma. O objetivo é permitir que centenas de instâncias operem simultaneamente sem que uma interfira negativamente no espaço de trabalho da outra.
+O sistema deve operar sob o princï¿½pio da Autonomia Coordenada. Cada Worker ï¿½ um organismo independente, mas todos bebem da mesma fonte de verdade e contribuem para o mesmo genoma. O objetivo ï¿½ permitir que centenas de instï¿½ncias operem simultaneamente sem que uma interfira negativamente no espaï¿½o de trabalho da outra.
 7.2. Hierarquia de Bloqueios (Scoped Locking)
-Para evitar condições de corrida (Race Conditions) em escala industrial, o sistema utiliza três níveis de semáforos atômicos:
+Para evitar condiï¿½ï¿½es de corrida (Race Conditions) em escala industrial, o sistema utiliza trï¿½s nï¿½veis de semï¿½foros atï¿½micos:
 7.2.1. Bloqueio de Tarefa (Task Lock)
-Regra: Um Worker só pode iniciar uma tarefa se conseguir renomear ou marcar o arquivo JSON da tarefa como RUNNING.
-Atomicidade: Deve-se usar operações de sistema de arquivos que garantam exclusividade (ex: O_EXCL ou rename).
+Regra: Um Worker sï¿½ pode iniciar uma tarefa se conseguir renomear ou marcar o arquivo JSON da tarefa como RUNNING.
+Atomicidade: Deve-se usar operaï¿½ï¿½es de sistema de arquivos que garantam exclusividade (ex: O_EXCL ou rename).
 7.2.2. Bloqueio de Alvo (Target Lock)
-Regra: Cada conta ou aba de IA (ex: chatgpt_conta_01) só pode ser operada por um único Worker por vez.
-Implementação: Arquivos RUNNING_[TARGET].lock contendo o PID do Worker e o ID da Tarefa.
-Anti-Zombie: Antes de respeitar um lock, o Worker deve validar se o PID gravado ainda está vivo no SO.
+Regra: Cada conta ou aba de IA (ex: chatgpt_conta_01) sï¿½ pode ser operada por um ï¿½nico Worker por vez.
+Implementaï¿½ï¿½o: Arquivos RUNNING_[TARGET].lock contendo o PID do Worker e o ID da Tarefa.
+Anti-Zombie: Antes de respeitar um lock, o Worker deve validar se o PID gravado ainda estï¿½ vivo no SO.
 7.2.3. Bloqueio de Recurso (Hardware Lock)
-Regra: Se múltiplos Workers compartilham o mesmo hardware (Host), o sistema deve limitar o número de instâncias do Chrome para evitar saturação de CPU/RAM.
-7.3. Sincronização de DNA e Aprendizado Coletivo
-O aprendizado de um robô deve ser o aprendizado de todos.
-7.3.1. Propagação de Seletores (SADI Sync)
+Regra: Se mï¿½ltiplos Workers compartilham o mesmo hardware (Host), o sistema deve limitar o nï¿½mero de instï¿½ncias do Chrome para evitar saturaï¿½ï¿½o de CPU/RAM.
+7.3. Sincronizaï¿½ï¿½o de DNA e Aprendizado Coletivo
+O aprendizado de um robï¿½ deve ser o aprendizado de todos.
+7.3.1. Propagaï¿½ï¿½o de Seletores (SADI Sync)
 Quando o Worker A descobre um novo seletor funcional via SADI e o persiste no dynamic_rules.json, todos os outros Workers devem realizar um Hot-Reload do DNA.
-Conflito de Evolução: Se dois Workers descobrirem seletores diferentes para o mesmo elemento, o sistema deve priorizar o seletor com o maior confidence_score gerado pelo analyzer.js.
-7.3.2. Vocabulário Compartilhado
-Novos termos aprendidos pelo i18n.js em uma instância são imediatamente disponibilizados para a colmeia, acelerando a percepção de interface em todos os nós do enxame.
-7.4. Algoritmo de Escalonamento Distribuído (Load Balancing)
+Conflito de Evoluï¿½ï¿½o: Se dois Workers descobrirem seletores diferentes para o mesmo elemento, o sistema deve priorizar o seletor com o maior confidence_score gerado pelo analyzer.js.
+7.3.2. Vocabulï¿½rio Compartilhado
+Novos termos aprendidos pelo i18n.js em uma instï¿½ncia sï¿½o imediatamente disponibilizados para a colmeia, acelerando a percepï¿½ï¿½o de interface em todos os nï¿½s do enxame.
+7.4. Algoritmo de Escalonamento Distribuï¿½do (Load Balancing)
 Em vez de um mestre centralizado, os Workers utilizam um modelo Greedy (Ganancioso):
-Varredura de Prioridade: Todos os Workers olham para a pasta fila/ e buscam a tarefa de maior prioridade que não possua um lock ativo e cujas dependências estejam DONE.
-Jitter de Ingestão: Para evitar que 10 Workers tentem pegar a mesma tarefa no exato milissegundo, cada Worker deve aplicar um pequeno delay aleatório (Jitter) antes de tentar o lock de uma nova tarefa.
-7.5. Gestão de Dependências em Larga Escala
-O sistema deve resolver o grafo de execução de forma distribuída:
-Deadlock Detection: Se um grupo de tarefas está em PENDING mas os pais estão FAILED, o primeiro Worker que detectar a inconsistência deve marcar a cadeia inteira como SKIPPED.
+Varredura de Prioridade: Todos os Workers olham para a pasta fila/ e buscam a tarefa de maior prioridade que nï¿½o possua um lock ativo e cujas dependï¿½ncias estejam DONE.
+Jitter de Ingestï¿½o: Para evitar que 10 Workers tentem pegar a mesma tarefa no exato milissegundo, cada Worker deve aplicar um pequeno delay aleatï¿½rio (Jitter) antes de tentar o lock de uma nova tarefa.
+7.5. Gestï¿½o de Dependï¿½ncias em Larga Escala
+O sistema deve resolver o grafo de execuï¿½ï¿½o de forma distribuï¿½da:
+Deadlock Detection: Se um grupo de tarefas estï¿½ em PENDING mas os pais estï¿½o FAILED, o primeiro Worker que detectar a inconsistï¿½ncia deve marcar a cadeia inteira como SKIPPED.
 Cross-Worker Signaling: O status DONE de uma tarefa no disco serve como o sinal verde para qualquer outro Worker na rede iniciar a tarefa dependente.
 7.6. Telemetria de Enxame (Swarm HUD)
-O Dashboard deve consolidar a visão da colmeia:
-Worker ID: Cada instância deve gerar um ID único (ex: worker-bravo-99).
-Mapeamento de Carga: Visualização de qual Worker está operando qual Target e qual Tarefa.
-Detecção de Worker Caído: Se um Worker parar de atualizar seu heartbeat no estado.json, o Dashboard deve sinalizar "Worker Offline" e liberar seus locks.
-7.7. Segurança e Isolamento de Enxame
-Shared-Nothing Architecture: Workers não devem compartilhar memória RAM direta; toda comunicação é feita via estado persistente (Disco/API).
-Quota Sharing: O orçamento de requisições (Protocolo 6) deve ser dividido entre os Workers que compartilham a mesma conta, evitando que o Enxame cause um banimento por excesso de velocidade coletiva.
+O Dashboard deve consolidar a visï¿½o da colmeia:
+Worker ID: Cada instï¿½ncia deve gerar um ID ï¿½nico (ex: worker-bravo-99).
+Mapeamento de Carga: Visualizaï¿½ï¿½o de qual Worker estï¿½ operando qual Target e qual Tarefa.
+Detecï¿½ï¿½o de Worker Caï¿½do: Se um Worker parar de atualizar seu heartbeat no estado.json (DEPRECATED â€” usar NERV `SERVER_READY`), o Dashboard deve sinalizar "Worker Offline" e liberar seus locks.
+7.7. Seguranï¿½a e Isolamento de Enxame
+Shared-Nothing Architecture: Workers nï¿½o devem compartilhar memï¿½ria RAM direta; toda comunicaï¿½ï¿½o ï¿½ feita via estado persistente (Disco/API).
+Quota Sharing: O orï¿½amento de requisiï¿½ï¿½es (Protocolo 6) deve ser dividido entre os Workers que compartilham a mesma conta, evitando que o Enxame cause um banimento por excesso de velocidade coletiva.
 
-Protocolo 8: Humildade Cognitiva e Intervenção (Human-in-the-Loop)
-Versão: 1.0 — The Humble Machine Standard
-Audit Level: 40 — Cognitive Boundary Management
+Protocolo 8: Humildade Cognitiva e Intervenï¿½ï¿½o (Human-in-the-Loop)
+Versï¿½o: 1.0 ï¿½ The Humble Machine Standard
+Audit Level: 40 ï¿½ Cognitive Boundary Management
 8.1. Filosofia da Autonomia Humilde
-O objetivo final é a "Intervenção Humana Zero", mas a persistência cega diante de um problema insolúvel é um erro de engenharia. A Humildade Cognitiva é a capacidade do robô de identificar quando o terreno (interface/lógica) divergiu tanto de seu mapa interno (DNA) que a continuação autônoma geraria riscos à integridade da tarefa ou da conta.
+O objetivo final ï¿½ a "Intervenï¿½ï¿½o Humana Zero", mas a persistï¿½ncia cega diante de um problema insolï¿½vel ï¿½ um erro de engenharia. A Humildade Cognitiva ï¿½ a capacidade do robï¿½ de identificar quando o terreno (interface/lï¿½gica) divergiu tanto de seu mapa interno (DNA) que a continuaï¿½ï¿½o autï¿½noma geraria riscos ï¿½ integridade da tarefa ou da conta.
 8.2. A Escala de Desespero (Despair Scale)
-O sistema deve monitorar seu próprio nível de incerteza e acionar o Dashboard seguindo estes níveis:
-8.2.1. Nível 1: Incerteza Tática (Auto-Correção)
-Cenário: Seletor falhou, mas o SADI encontrou um candidato com confidence_score > 80%.
-Ação: O robô tenta a correção sozinho, registra no log e segue o fluxo.
-8.2.2. Nível 2: Divergência de Interface (Alerta Amarelo)
-Cenário: SADI encontra múltiplos candidatos ou o confidence_score está entre 50% e 80%.
-Ação: O robô tenta a ação, mas marca a tarefa com a flag UNCERTAIN_EXECUTION e solicita que o usuário valide o resultado no Dashboard posteriormente.
-8.2.3. Nível 3: Colapso de Percepção (Escala de Desespero)
-Cenário: SADI não encontra nenhum elemento funcional, ou o Triage detecta um bloqueio visual (CAPTCHA/Login) que o robô não sabe resolver.
-Ação: O robô entra em estado de PAUSE_FOR_INTERVENTION, emite um sinal sonoro/visual no Dashboard e aguarda o toque humano.
-8.3. Mecanismo de Telepresença e Assunção de Controle
-Quando o humano intervém via Dashboard, o protocolo de transição deve ser rigoroso:
-Handover Seguro: O robô libera os controles de mouse e teclado virtuais, mas mantém a sessão do Puppeteer aberta e o streaming de vídeo/logs ativo.
-Modo Observador: Enquanto o humano opera o navegador, o robô entra em modo de "Escuta Passiva", monitorando quais elementos o humano está clicando.
-Retomada de Leme: O humano clica em "Retomar Autonomia" no Dashboard. O robô realiza um novo stabilizer.waitForStability() antes de voltar a agir.
-8.4. Aprendizado por Correção (Feedback Loop)
-A intervenção humana não deve ser apenas um "conserto", mas uma aula para o robô.
-Captura de Intenção: Se o humano clicar em um botão que o robô não encontrou, o SADI deve capturar o seletor daquele elemento clicado manualmente.
-Refinamento de DNA: O robô pergunta (ou assume via lógica): "Este elemento que você clicou é o [Botão de Envio]?". Se sim, o seletor manual é promovido ao topo do dynamic_rules.json com o metadado source: human_intervention.
-Validação Semântica: O i18n.js deve aprender novos termos de erro que o humano identificou e rotulou durante a intervenção.
+O sistema deve monitorar seu prï¿½prio nï¿½vel de incerteza e acionar o Dashboard seguindo estes nï¿½veis:
+8.2.1. Nï¿½vel 1: Incerteza Tï¿½tica (Auto-Correï¿½ï¿½o)
+Cenï¿½rio: Seletor falhou, mas o SADI encontrou um candidato com confidence_score > 80%.
+Aï¿½ï¿½o: O robï¿½ tenta a correï¿½ï¿½o sozinho, registra no log e segue o fluxo.
+8.2.2. Nï¿½vel 2: Divergï¿½ncia de Interface (Alerta Amarelo)
+Cenï¿½rio: SADI encontra mï¿½ltiplos candidatos ou o confidence_score estï¿½ entre 50% e 80%.
+Aï¿½ï¿½o: O robï¿½ tenta a aï¿½ï¿½o, mas marca a tarefa com a flag UNCERTAIN_EXECUTION e solicita que o usuï¿½rio valide o resultado no Dashboard posteriormente.
+8.2.3. Nï¿½vel 3: Colapso de Percepï¿½ï¿½o (Escala de Desespero)
+Cenï¿½rio: SADI nï¿½o encontra nenhum elemento funcional, ou o Triage detecta um bloqueio visual (CAPTCHA/Login) que o robï¿½ nï¿½o sabe resolver.
+Aï¿½ï¿½o: O robï¿½ entra em estado de PAUSE_FOR_INTERVENTION, emite um sinal sonoro/visual no Dashboard e aguarda o toque humano.
+8.3. Mecanismo de Telepresenï¿½a e Assunï¿½ï¿½o de Controle
+Quando o humano intervï¿½m via Dashboard, o protocolo de transiï¿½ï¿½o deve ser rigoroso:
+Handover Seguro: O robï¿½ libera os controles de mouse e teclado virtuais, mas mantï¿½m a sessï¿½o do Puppeteer aberta e o streaming de vï¿½deo/logs ativo.
+Modo Observador: Enquanto o humano opera o navegador, o robï¿½ entra em modo de "Escuta Passiva", monitorando quais elementos o humano estï¿½ clicando.
+Retomada de Leme: O humano clica em "Retomar Autonomia" no Dashboard. O robï¿½ realiza um novo stabilizer.waitForStability() antes de voltar a agir.
+8.4. Aprendizado por Correï¿½ï¿½o (Feedback Loop)
+A intervenï¿½ï¿½o humana nï¿½o deve ser apenas um "conserto", mas uma aula para o robï¿½.
+Captura de Intenï¿½ï¿½o: Se o humano clicar em um botï¿½o que o robï¿½ nï¿½o encontrou, o SADI deve capturar o seletor daquele elemento clicado manualmente.
+Refinamento de DNA: O robï¿½ pergunta (ou assume via lï¿½gica): "Este elemento que vocï¿½ clicou ï¿½ o [Botï¿½o de Envio]?". Se sim, o seletor manual ï¿½ promovido ao topo do dynamic_rules.json com o metadado source: human_intervention.
+Validaï¿½ï¿½o Semï¿½ntica: O i18n.js deve aprender novos termos de erro que o humano identificou e rotulou durante a intervenï¿½ï¿½o.
 8.5. Interface de Socorro (Mission Control Integration)
-O Dashboard deve fornecer ferramentas de diagnóstico imediato para o humano:
-Visualizador Forense: Mostrar o screenshot e o dump do DOM no momento exato em que o robô "pediu ajuda".
-Console de Injeção: Permitir que o humano envie um comando de texto ou um clique coordenado sem precisar abrir o navegador fisicamente.
-Bypass de CAPTCHA: Interface dedicada para que o humano resolva desafios de segurança e devolva o controle ao robô.
-8.6. Regras de Etiqueta de Intervenção
-Não-Interferência Destrutiva: O robô nunca deve tentar retomar o controle enquanto o Dashboard sinalizar que um humano está operando a aba.
-Persistência de Contexto: Após uma intervenção, o robô deve ler a área de resposta novamente para garantir que sua "memória de curto prazo" está sincronizada com o que aconteceu durante a pausa humana.
-Relatório de Aprendizado: Toda intervenção deve gerar um log especial: "Tarefa X concluída com ajuda humana. Aprendi 2 novos seletores e 1 termo de erro".
+O Dashboard deve fornecer ferramentas de diagnï¿½stico imediato para o humano:
+Visualizador Forense: Mostrar o screenshot e o dump do DOM no momento exato em que o robï¿½ "pediu ajuda".
+Console de Injeï¿½ï¿½o: Permitir que o humano envie um comando de texto ou um clique coordenado sem precisar abrir o navegador fisicamente.
+Bypass de CAPTCHA: Interface dedicada para que o humano resolva desafios de seguranï¿½a e devolva o controle ao robï¿½.
+8.6. Regras de Etiqueta de Intervenï¿½ï¿½o
+Nï¿½o-Interferï¿½ncia Destrutiva: O robï¿½ nunca deve tentar retomar o controle enquanto o Dashboard sinalizar que um humano estï¿½ operando a aba.
+Persistï¿½ncia de Contexto: Apï¿½s uma intervenï¿½ï¿½o, o robï¿½ deve ler a ï¿½rea de resposta novamente para garantir que sua "memï¿½ria de curto prazo" estï¿½ sincronizada com o que aconteceu durante a pausa humana.
+Relatï¿½rio de Aprendizado: Toda intervenï¿½ï¿½o deve gerar um log especial: "Tarefa X concluï¿½da com ajuda humana. Aprendi 2 novos seletores e 1 termo de erro".
 
 
-Versão: 1.0 — The Singularity Standard
-Audit Level: 50 — Architectural Purity & Global Agnosticism
-9.1. Filosofia da Onipresença Técnica
-O Agente Universal não é uma ferramenta para o ChatGPT; ele é um Sistema Operacional de Interação com Inteligências. O objetivo deste protocolo é garantir que a base de código permaneça pura e agnóstica. Se uma funcionalidade for implementada de forma que só funcione para um provedor específico ou em um único idioma, ela viola a "Constituição" do projeto e deve ser refatorada.
+Versï¿½o: 1.0 ï¿½ The Singularity Standard
+Audit Level: 50 ï¿½ Architectural Purity & Global Agnosticism
+9.1. Filosofia da Onipresenï¿½a Tï¿½cnica
+O Agente Universal nï¿½o ï¿½ uma ferramenta para o ChatGPT; ele ï¿½ um Sistema Operacional de Interaï¿½ï¿½o com Inteligï¿½ncias. O objetivo deste protocolo ï¿½ garantir que a base de cï¿½digo permaneï¿½a pura e agnï¿½stica. Se uma funcionalidade for implementada de forma que sï¿½ funcione para um provedor especï¿½fico ou em um ï¿½nico idioma, ela viola a "Constituiï¿½ï¿½o" do projeto e deve ser refatorada.
 9.2. Agnosticismo de Provedor (Provider Neutrality)
-O sistema deve tratar cada IA alvo apenas como um "Endpoint de Intenção".
-9.2.1. Abstração Total de Interface
-Proibição de Hardcoding: É terminantemente proibido o uso de strings, IDs ou classes CSS específicas de qualquer provedor no core, logic ou infra.
-Injeção de Driver: Toda e qualquer especificidade de um provedor deve ser encapsulada exclusivamente dentro de seu respectivo arquivo em src/driver/targets/.
-Contrato de Interface: Se um novo LLM for lançado amanhã, o sistema deve ser capaz de operá-lo apenas criando um novo Driver que respeite o contrato da BaseDriver.js.
-9.3. Universalismo Linguístico e Semântico
-A linguagem humana é tratada pelo sistema como uma variável dinâmica, nunca como uma constante.
-9.3.1. Independência de Locale
-Percepção Poliglota: O robô deve ser capaz de identificar botões de "Enviar" ou campos de "Mensagem" em qualquer idioma, utilizando o motor de aprendizado do i18n.js e o SADI.
-Normalização de Output: O sistema deve garantir que o processamento de resultados (validação, resumo, extração) funcione com a mesma precisão em Português, Inglês, Mandarim ou linguagens de programação.
+O sistema deve tratar cada IA alvo apenas como um "Endpoint de Intenï¿½ï¿½o".
+9.2.1. Abstraï¿½ï¿½o Total de Interface
+Proibiï¿½ï¿½o de Hardcoding: ï¿½ terminantemente proibido o uso de strings, IDs ou classes CSS especï¿½ficas de qualquer provedor no core, logic ou infra.
+Injeï¿½ï¿½o de Driver: Toda e qualquer especificidade de um provedor deve ser encapsulada exclusivamente dentro de seu respectivo arquivo em src/driver/targets/.
+Contrato de Interface: Se um novo LLM for lanï¿½ado amanhï¿½, o sistema deve ser capaz de operï¿½-lo apenas criando um novo Driver que respeite o contrato da BaseDriver.js.
+9.3. Universalismo Linguï¿½stico e Semï¿½ntico
+A linguagem humana ï¿½ tratada pelo sistema como uma variï¿½vel dinï¿½mica, nunca como uma constante.
+9.3.1. Independï¿½ncia de Locale
+Percepï¿½ï¿½o Poliglota: O robï¿½ deve ser capaz de identificar botï¿½es de "Enviar" ou campos de "Mensagem" em qualquer idioma, utilizando o motor de aprendizado do i18n.js e o SADI.
+Normalizaï¿½ï¿½o de Output: O sistema deve garantir que o processamento de resultados (validaï¿½ï¿½o, resumo, extraï¿½ï¿½o) funcione com a mesma precisï¿½o em Portuguï¿½s, Inglï¿½s, Mandarim ou linguagens de programaï¿½ï¿½o.
 9.4. Neutralidade de Infraestrutura (Environment Agnosticism)
 O organismo digital deve ser cego ao hardware e ao sistema operacional onde reside.
-9.4.1. Abstração de Execução
-Protocolo de Conexão Único: O robô deve interagir com o navegador exclusivamente via Chrome DevTools Protocol (CDP), garantindo que a lógica funcione igual em Windows Nativo, Docker, WSL ou Servidores Remotos.
+9.4.1. Abstraï¿½ï¿½o de Execuï¿½ï¿½o
+Protocolo de Conexï¿½o ï¿½nico: O robï¿½ deve interagir com o navegador exclusivamente via Chrome DevTools Protocol (CDP), garantindo que a lï¿½gica funcione igual em Windows Nativo, Docker, WSL ou Servidores Remotos.
 Agnosticismo de Caminho: O uso de caminhos de arquivos deve ser sempre relativo e mediado pelo path.join(), garantindo compatibilidade entre sistemas de arquivos Windows (NTFS) e Linux (Ext4).
-9.5. Padronização da Unidade Atômica (The Gold Standard)
-O Universalismo exige que a comunicação interna seja feita através de um protocolo imutável.
-Schema V4 Gold como Esperanto: O objeto Task definido no schemas.js é a única linguagem que o sistema fala internamente. Nenhuma parte do código pode criar "dialetos" ou propriedades customizadas que não estejam previstas no Genoma Digital.
-Persistência Agnóstica: O formato de armazenamento (JSON) e a estrutura de pastas (fila/, respostas/) devem ser preservados como o padrão universal de troca de dados entre instâncias do enxame.
-9.6. Regras de Não-Exclusividade (Checklist de Desenvolvimento)
-Ao propor qualquer upgrade ou correção, o programador deve responder "SIM" a estas três perguntas:
-Escalabilidade de Alvo: "Esta solução funcionaria no Gemini ou Claude com o mesmo esforço que funciona no ChatGPT?"
-Independência de Idioma: "Se a interface da IA mudar para Japonês, o robô ainda conseguiria operar esta função?"
-Mobilidade de Ambiente: "Este código rodaria sem alterações dentro de um container Docker em um servidor na nuvem?"
+9.5. Padronizaï¿½ï¿½o da Unidade Atï¿½mica (The Gold Standard)
+O Universalismo exige que a comunicaï¿½ï¿½o interna seja feita atravï¿½s de um protocolo imutï¿½vel.
+Schema V4 Gold como Esperanto: O objeto Task definido no schemas.js ï¿½ a ï¿½nica linguagem que o sistema fala internamente. Nenhuma parte do cï¿½digo pode criar "dialetos" ou propriedades customizadas que nï¿½o estejam previstas no Genoma Digital.
+Persistï¿½ncia Agnï¿½stica: O formato de armazenamento (JSON) e a estrutura de pastas (fila/, respostas/) devem ser preservados como o padrï¿½o universal de troca de dados entre instï¿½ncias do enxame.
+9.6. Regras de Nï¿½o-Exclusividade (Checklist de Desenvolvimento)
+Ao propor qualquer upgrade ou correï¿½ï¿½o, o programador deve responder "SIM" a estas trï¿½s perguntas:
+Escalabilidade de Alvo: "Esta soluï¿½ï¿½o funcionaria no Gemini ou Claude com o mesmo esforï¿½o que funciona no ChatGPT?"
+Independï¿½ncia de Idioma: "Se a interface da IA mudar para Japonï¿½s, o robï¿½ ainda conseguiria operar esta funï¿½ï¿½o?"
+Mobilidade de Ambiente: "Este cï¿½digo rodaria sem alteraï¿½ï¿½es dentro de um container Docker em um servidor na nuvem?"
 9.7. A Singularidade como Meta
-O Universalismo Absoluto é o caminho para a Singularidade. Quando o sistema atinge o estado onde ele pode aprender qualquer interface e processar qualquer linguagem em qualquer lugar, ele deixa de ser um software e passa a ser uma entidade de inteligência autônoma.
-Evolução Constante: O sistema deve buscar reduzir continuamente o código específico e aumentar a lógica heurística e adaptativa.
-Simplicidade Profunda: A complexidade deve ser movida para o DNA (dados), mantendo o motor (código) simples, genérico e indestrutível.
+O Universalismo Absoluto ï¿½ o caminho para a Singularidade. Quando o sistema atinge o estado onde ele pode aprender qualquer interface e processar qualquer linguagem em qualquer lugar, ele deixa de ser um software e passa a ser uma entidade de inteligï¿½ncia autï¿½noma.
+Evoluï¿½ï¿½o Constante: O sistema deve buscar reduzir continuamente o cï¿½digo especï¿½fico e aumentar a lï¿½gica heurï¿½stica e adaptativa.
+Simplicidade Profunda: A complexidade deve ser movida para o DNA (dados), mantendo o motor (cï¿½digo) simples, genï¿½rico e indestrutï¿½vel.
 
 
 
 Quadro Geral: Anatomia do Agente Universal (V11)
 1. O Sistema de Comando (Camada Root)
-Responsabilidade: Orquestração de alto nível, ciclo de vida e ponto de entrada.
-Arquivo	Função Principal	Conexão com o Todo
-index.js	O Maestro	O loop principal. Coordena o fluxo: Ingestão ? Contexto ? Execução ? Validação.
+Responsabilidade: Orquestraï¿½ï¿½o de alto nï¿½vel, ciclo de vida e ponto de entrada.
+Arquivo	Funï¿½ï¿½o Principal	Conexï¿½o com o Todo
+index.js	O Maestro	O loop principal. Coordena o fluxo: Ingestï¿½o ? Contexto ? Execuï¿½ï¿½o ? Validaï¿½ï¿½o.
 server.js	O Nexus	Backend do Dashboard. Gerencia APIs, streaming de logs e barramento de eventos PM2.
-ecosystem.config.js	Suporte de Vida	Configuração do PM2. Garante resiliência, auto-restart e Garbage Collection.
-config.json	Personalidade	Parâmetros de comportamento (timeouts, limites, modelos padrão).
-dynamic_rules.json	DNA de Interface	Onde o robô guarda os seletores que aprendeu via SADI.
-vocabulary.json	DNA Linguístico	Dicionário de termos de interface e indicadores de erro aprendidos.
+ecosystem.config.js	Suporte de Vida	Configuraï¿½ï¿½o do PM2. Garante resiliï¿½ncia, auto-restart e Garbage Collection.
+config.json	Personalidade	Parï¿½metros de comportamento (timeouts, limites, modelos padrï¿½o).
+dynamic_rules.json	DNA de Interface	Onde o robï¿½ guarda os seletores que aprendeu via SADI.
+vocabulary.json	DNA Linguï¿½stico	Dicionï¿½rio de termos de interface e indicadores de erro aprendidos.
 Dockerfile	Encapsulamento	Define o ambiente isolado (Worker) para rodar em qualquer infraestrutura.
-2. O Cérebro (/src/core)
-Responsabilidade: Identidade, memória, saúde e processamento cognitivo.
-Arquivo	Função Principal	Importância Estratégica
-memory.js	Processador Cognitivo	Resolve tags {{REF:...}}. Faz o RAG local e a extração cirúrgica de JSON.
+2. O Cï¿½rebro (/src/core)
+Responsabilidade: Identidade, memï¿½ria, saï¿½de e processamento cognitivo.
+Arquivo	Funï¿½ï¿½o Principal	Importï¿½ncia Estratï¿½gica
+memory.js	Processador Cognitivo	Resolve tags {{REF:...}}. Faz o RAG local e a extraï¿½ï¿½o cirï¿½rgica de JSON.
 schemas.js	Genoma Digital	Define os contratos Zod. Garante que nenhum dado corrompido entre no sistema.
-doctor.js	Sistema Imunológico	Faz o diagnóstico preditivo de hardware, rede e integridade do DNA.
-i18n.js	Motor Linguístico	Permite que o robô seja poliglota e aprenda termos de interface organicamente.
-forensics.js	Caixa Preta	Captura evidências (screenshots/DOM) no momento exato de uma falha crítica.
-config.js	Homeostase	Gerencia o Hot-Reload das configurações sem precisar reiniciar o robô.
-logger.js	Telemetria	Centraliza logs e métricas. Gerencia a rotação de arquivos para não lotar o disco.
-3. Os Músculos e Sentidos (/src/driver)
-Responsabilidade: Execução física e percepção do ambiente web.
-Arquivo	Função Principal	Conexão com o Todo
-factory.js	Fábrica de Drivers	Decide qual driver (ChatGPT, Gemini, etc) usar e mantém instâncias em cache.
-BaseDriver.js	Protótipo de Ação	Lógica comum a todos os drivers: Keep-alive, limpeza de input e foco.
-analyzer.js	SADI (Visão)	O coração da auto-reprogramação. Descobre elementos via geometria e SVG.
-human.js	Biomecânica	Simula movimentos de mouse (Bézier) e digitação humana (com erros e pausas).
-stabilizer.js	Paciência Tática	Garante que a página parou de carregar e o DOM está estável antes de agir.
-triage.js	Diagnóstico de Interface	Identifica a causa de paradas: IA pensando, Rate Limit ou Erro Visual.
-targets/*.js	Especialistas	Implementações específicas para cada IA (ex: ChatGPTDriver.js).
+doctor.js	Sistema Imunolï¿½gico	Faz o diagnï¿½stico preditivo de hardware, rede e integridade do DNA.
+i18n.js	Motor Linguï¿½stico	Permite que o robï¿½ seja poliglota e aprenda termos de interface organicamente.
+forensics.js	Caixa Preta	Captura evidï¿½ncias (screenshots/DOM) no momento exato de uma falha crï¿½tica.
+config.js	Homeostase	Gerencia o Hot-Reload das configuraï¿½ï¿½es sem precisar reiniciar o robï¿½.
+logger.js	Telemetria	Centraliza logs e mï¿½tricas. Gerencia a rotaï¿½ï¿½o de arquivos para nï¿½o lotar o disco.
+3. Os Mï¿½sculos e Sentidos (/src/driver)
+Responsabilidade: Execuï¿½ï¿½o fï¿½sica e percepï¿½ï¿½o do ambiente web.
+Arquivo	Funï¿½ï¿½o Principal	Conexï¿½o com o Todo
+factory.js	Fï¿½brica de Drivers	Decide qual driver (ChatGPT, Gemini, etc) usar e mantï¿½m instï¿½ncias em cache.
+BaseDriver.js	Protï¿½tipo de Aï¿½ï¿½o	Lï¿½gica comum a todos os drivers: Keep-alive, limpeza de input e foco.
+analyzer.js	SADI (Visï¿½o)	O coraï¿½ï¿½o da auto-reprogramaï¿½ï¿½o. Descobre elementos via geometria e SVG.
+human.js	Biomecï¿½nica	Simula movimentos de mouse (Bï¿½zier) e digitaï¿½ï¿½o humana (com erros e pausas).
+stabilizer.js	Paciï¿½ncia Tï¿½tica	Garante que a pï¿½gina parou de carregar e o DOM estï¿½ estï¿½vel antes de agir.
+triage.js	Diagnï¿½stico de Interface	Identifica a causa de paradas: IA pensando, Rate Limit ou Erro Visual.
+targets/*.js	Especialistas	Implementaï¿½ï¿½es especï¿½ficas para cada IA (ex: ChatGPTDriver.js).
 4. O Sistema Nervoso (/src/infra)
-Responsabilidade: Conectividade e persistência blindada.
-Arquivo	Função Principal	Importância Estratégica
-io.js	Gestor Transacional	Garante escrita atômica (Shadow Paging). Impede corrupção de arquivos JSON.
-connection_orchestrator.js	Ponte de Conexão	Gerencia o acoplamento ao Chrome (Docker vs Native) e recupera quedas.
-system.js	Kill Switch	Controle de processos do SO. Mata árvores de processos zumbis do Chrome.
-5. A Razão (/src/logic)
-Responsabilidade: Discernimento estatístico e auditoria de qualidade.
-Arquivo	Função Principal	Conexão com o Todo
-adaptive.js	Motor Preditivo	Calcula timeouts dinâmicos usando 6-Sigma e Alpha estatístico.
-validator.js	Quality Gate	Audita o resultado final em disco. Verifica formato, tamanho e semântica.
-6. Motores de Serviço (/scripts)
-Responsabilidade: Operações em lote, manutenção e automação de workflow.
-Arquivo	Função Principal	Função dentro do Projeto
-flow_manager.js	Orquestrador de Fluxo	Processa Blueprints YAML. Cria cadeias de tarefas com dependências.
-gerador_tarefa.js	CLI Wizard	Interface de terminal para criar tarefas rápidas com metadados.
-importar_prompts.js	Bulk Loader	Importa centenas de prompts de arquivos TXT/JSONL com deduplicação.
-visualizar_fila.js	Topologia	Gera o mapa visual (Grafo) de dependências entre as tarefas.
+Responsabilidade: Conectividade e persistï¿½ncia blindada.
+Arquivo	Funï¿½ï¿½o Principal	Importï¿½ncia Estratï¿½gica
+io.js	Gestor Transacional	Garante escrita atï¿½mica (Shadow Paging). Impede corrupï¿½ï¿½o de arquivos JSON.
+connection_orchestrator.js	Ponte de Conexï¿½o	Gerencia o acoplamento ao Chrome (Docker vs Native) e recupera quedas.
+system.js	Kill Switch	Controle de processos do SO. Mata ï¿½rvores de processos zumbis do Chrome.
+5. A Razï¿½o (/src/logic)
+Responsabilidade: Discernimento estatï¿½stico e auditoria de qualidade.
+Arquivo	Funï¿½ï¿½o Principal	Conexï¿½o com o Todo
+adaptive.js	Motor Preditivo	Calcula timeouts dinï¿½micos usando 6-Sigma e Alpha estatï¿½stico.
+validator.js	Quality Gate	Audita o resultado final em disco. Verifica formato, tamanho e semï¿½ntica.
+6. Motores de Serviï¿½o (/scripts)
+Responsabilidade: Operaï¿½ï¿½es em lote, manutenï¿½ï¿½o e automaï¿½ï¿½o de workflow.
+Arquivo	Funï¿½ï¿½o Principal	Funï¿½ï¿½o dentro do Projeto
+flow_manager.js	Orquestrador de Fluxo	Processa Blueprints YAML. Cria cadeias de tarefas com dependï¿½ncias.
+gerador_tarefa.js	CLI Wizard	Interface de terminal para criar tarefas rï¿½pidas com metadados.
+importar_prompts.js	Bulk Loader	Importa centenas de prompts de arquivos TXT/JSONL com deduplicaï¿½ï¿½o.
+visualizar_fila.js	Topologia	Gera o mapa visual (Grafo) de dependï¿½ncias entre as tarefas.
 ??? Como os Sistemas se Conectam (O Fluxo de Dados)
 Entrada: O Dashboard (server.js) ou um Blueprint (flow_manager.js) envia uma tarefa para o IO (io.js).
-Validação: O Schema (schemas.js) valida a tarefa e a coloca na Fila (fila/).
-Despertar: O Maestro (index.js) encontra a tarefa e pede ao Orchestrator (connection_orchestrator.js) uma conexão com o Chrome.
-Preparação: O Cérebro (memory.js) resolve as memórias passadas e injeta no prompt.
-Ação: A Factory entrega a tarefa ao Driver específico. O Driver usa o SADI (analyzer.js) para "enxergar", o Human (human.js) para "digitar" e o Stabilizer para "esperar".
-Vigilância: Durante a execução, o Adaptive mede a latência e o Triage monitora erros.
-Conclusão: O Validator audita o arquivo gerado em respostas/.
+Validaï¿½ï¿½o: O Schema (schemas.js) valida a tarefa e a coloca na Fila (fila/).
+Despertar: O Maestro (index.js) encontra a tarefa e pede ao Orchestrator (connection_orchestrator.js) uma conexï¿½o com o Chrome.
+Preparaï¿½ï¿½o: O Cï¿½rebro (memory.js) resolve as memï¿½rias passadas e injeta no prompt.
+Aï¿½ï¿½o: A Factory entrega a tarefa ao Driver especï¿½fico. O Driver usa o SADI (analyzer.js) para "enxergar", o Human (human.js) para "digitar" e o Stabilizer para "esperar".
+Vigilï¿½ncia: Durante a execuï¿½ï¿½o, o Adaptive mede a latï¿½ncia e o Triage monitora erros.
+Conclusï¿½o: O Validator audita o arquivo gerado em respostas/.
 Feedback: O Dashboard recebe o status em tempo real via Socket.io e exibe o resultado final.
-Este mapa agora é a sua Referência Mestra. Ele garante que saibamos exatamente onde atuar para evoluir qualquer parte do organismo.
+Este mapa agora ï¿½ a sua Referï¿½ncia Mestra. Ele garante que saibamos exatamente onde atuar para evoluir qualquer parte do organismo.
 
-Observação: ao longo do projeto novos arquivos serão incluídos, e, ocasionalmente, embora improvável algum pode ser excluído.
+Observaï¿½ï¿½o: ao longo do projeto novos arquivos serï¿½o incluï¿½dos, e, ocasionalmente, embora improvï¿½vel algum pode ser excluï¿½do.
 
 
-Protocolo 11: Auditoria de Consolidação
-Versão: 1.0 — The Zero-Bug Tolerance Standard
-Audit Level: 100 — Industrial Hardening
-11.1. Filosofia: Estabilidade sobre Evolução
-A Auditoria de Consolidação assume que a arquitetura atual é a correta. O foco não é "o que o código poderia ser", mas sim "o que o código é agora e por que ele não está perfeito". É uma fase de blindagem técnica onde o programador atua como um inspetor de controle de qualidade de uma linha de montagem de alta precisão.
-11.2. Os 7 Vetores de Inspeção Exaustiva
+Protocolo 11: Auditoria de Consolidaï¿½ï¿½o
+Versï¿½o: 1.0 ï¿½ The Zero-Bug Tolerance Standard
+Audit Level: 100 ï¿½ Industrial Hardening
+11.1. Filosofia: Estabilidade sobre Evoluï¿½ï¿½o
+A Auditoria de Consolidaï¿½ï¿½o assume que a arquitetura atual ï¿½ a correta. O foco nï¿½o ï¿½ "o que o cï¿½digo poderia ser", mas sim "o que o cï¿½digo ï¿½ agora e por que ele nï¿½o estï¿½ perfeito". ï¿½ uma fase de blindagem tï¿½cnica onde o programador atua como um inspetor de controle de qualidade de uma linha de montagem de alta precisï¿½o.
+11.2. Os 7 Vetores de Inspeï¿½ï¿½o Exaustiva
 1. Erros Banais (Coding & Syntax)
-Typos: Identificar variáveis mal escritas, erros em strings de log e comentários obsoletos.
-Sintaxe Silenciosa: Localizar pontos onde a falta de um ;, uma vírgula sobrando em objetos ou o uso de == em vez de === pode causar comportamento errático.
-Shadowing: Verificar se variáveis locais estão "escondendo" variáveis de escopo superior indevidamente.
-2. Integridade de Lógica (Flow Control)
-Promessas Pendentes: Garantir que todo async tenha seu await e que não existam floating promises que possam causar unhandled rejections.
-Condicionais Incompletas: Checar se todos os blocos if/else tratam o caso "else" ou se o fluxo pode ficar "preso" em um estado não previsto.
-Loops Infinitos: Validar as condições de saída de todos os while(true) e garantir que existam safety-breaks baseados em tempo ou tentativas.
-3. Gestão de Recursos (Memory & Handles)
-Pilha de Handles: Verificar se cada evaluateHandle, page ou fileDescriptor gerado possui um comando de destruição (dispose, close) correspondente no bloco finally.
-Event Listeners: Identificar se listeners (page.on, socket.on) estão sendo removidos adequadamente para evitar vazamento de memória em execuções de longa duração.
+Typos: Identificar variï¿½veis mal escritas, erros em strings de log e comentï¿½rios obsoletos.
+Sintaxe Silenciosa: Localizar pontos onde a falta de um ;, uma vï¿½rgula sobrando em objetos ou o uso de == em vez de === pode causar comportamento errï¿½tico.
+Shadowing: Verificar se variï¿½veis locais estï¿½o "escondendo" variï¿½veis de escopo superior indevidamente.
+2. Integridade de Lï¿½gica (Flow Control)
+Promessas Pendentes: Garantir que todo async tenha seu await e que nï¿½o existam floating promises que possam causar unhandled rejections.
+Condicionais Incompletas: Checar se todos os blocos if/else tratam o caso "else" ou se o fluxo pode ficar "preso" em um estado nï¿½o previsto.
+Loops Infinitos: Validar as condiï¿½ï¿½es de saï¿½da de todos os while(true) e garantir que existam safety-breaks baseados em tempo ou tentativas.
+3. Gestï¿½o de Recursos (Memory & Handles)
+Pilha de Handles: Verificar se cada evaluateHandle, page ou fileDescriptor gerado possui um comando de destruiï¿½ï¿½o (dispose, close) correspondente no bloco finally.
+Event Listeners: Identificar se listeners (page.on, socket.on) estï¿½o sendo removidos adequadamente para evitar vazamento de memï¿½ria em execuï¿½ï¿½es de longa duraï¿½ï¿½o.
 4. Incompatibilidades de Contexto (Cross-Environment)
-Agnosticismo de SO: Verificar se caminhos de arquivos usam path.join e se comandos de sistema consideram a diferença entre Windows e Linux/Docker.
-Sincronia de Tempo: Identificar dependências de Date.now() ou performance.now() que possam divergir entre o Node.js e o Browser.
+Agnosticismo de SO: Verificar se caminhos de arquivos usam path.join e se comandos de sistema consideram a diferenï¿½a entre Windows e Linux/Docker.
+Sincronia de Tempo: Identificar dependï¿½ncias de Date.now() ou performance.now() que possam divergir entre o Node.js e o Browser.
 5. Conformidade de Contrato (Schema & Protocol)
-Data Integrity: Garantir que o objeto que sai de um módulo é exatamente o que o próximo módulo espera, sem propriedades "fantasmas" ou tipos ambíguos.
-Protocolo SADI: Verificar se o Driver está consumindo os objetos de protocolo estruturado corretamente, sem tentar fazer "parsers manuais" de strings.
-6. Tratamento de Exceção (Error Handling)
-Contexto de Erro: Garantir que cada catch adicione informação útil ao log (TaskId, Função, Parâmetros) antes de tratar ou propagar o erro.
-Resiliência de Limpeza: Verificar se o código de limpeza (no finally) é à prova de falhas (não lança novas exceções que escondem o erro original).
-7. Casos Limítrofes (Edge Cases)
-Inputs Vazios/Gigantes: Testar mentalmente como o código reage a strings vazias, nulas ou com 1 milhão de caracteres.
-Interrupções Súbitas: Avaliar o estado do sistema se a conexão cair exatamente entre duas linhas de código críticas.
-11.3. O Relatório de Consolidação
-O resultado desta auditoria deve ser um relatório técnico seco e direto, focado exclusivamente em fatos e correções:
-Lista de Inconsistências: "Variável X no arquivo Y está com nome incorreto", "Handle Z não é liberado no erro W".
-Pontos de Fragilidade: "A função A falha se o IFrame demorar mais de X ms para carregar".
-Ações de Blindagem: Proposta de pequenos ajustes para fechar os buracos identificados.
-IMPORTANTE: Neste protocolo, sugestões de "Grandes Upgrades" ou "Mudanças de Arquitetura" são proibidas. O foco é a perfeição do estado atual.
+Data Integrity: Garantir que o objeto que sai de um mï¿½dulo ï¿½ exatamente o que o prï¿½ximo mï¿½dulo espera, sem propriedades "fantasmas" ou tipos ambï¿½guos.
+Protocolo SADI: Verificar se o Driver estï¿½ consumindo os objetos de protocolo estruturado corretamente, sem tentar fazer "parsers manuais" de strings.
+6. Tratamento de Exceï¿½ï¿½o (Error Handling)
+Contexto de Erro: Garantir que cada catch adicione informaï¿½ï¿½o ï¿½til ao log (TaskId, Funï¿½ï¿½o, Parï¿½metros) antes de tratar ou propagar o erro.
+Resiliï¿½ncia de Limpeza: Verificar se o cï¿½digo de limpeza (no finally) ï¿½ ï¿½ prova de falhas (nï¿½o lanï¿½a novas exceï¿½ï¿½es que escondem o erro original).
+7. Casos Limï¿½trofes (Edge Cases)
+Inputs Vazios/Gigantes: Testar mentalmente como o cï¿½digo reage a strings vazias, nulas ou com 1 milhï¿½o de caracteres.
+Interrupï¿½ï¿½es Sï¿½bitas: Avaliar o estado do sistema se a conexï¿½o cair exatamente entre duas linhas de cï¿½digo crï¿½ticas.
+11.3. O Relatï¿½rio de Consolidaï¿½ï¿½o
+O resultado desta auditoria deve ser um relatï¿½rio tï¿½cnico seco e direto, focado exclusivamente em fatos e correï¿½ï¿½es:
+Lista de Inconsistï¿½ncias: "Variï¿½vel X no arquivo Y estï¿½ com nome incorreto", "Handle Z nï¿½o ï¿½ liberado no erro W".
+Pontos de Fragilidade: "A funï¿½ï¿½o A falha se o IFrame demorar mais de X ms para carregar".
+Aï¿½ï¿½es de Blindagem: Proposta de pequenos ajustes para fechar os buracos identificados.
+IMPORTANTE: Neste protocolo, sugestï¿½es de "Grandes Upgrades" ou "Mudanï¿½as de Arquitetura" sï¿½o proibidas. O foco ï¿½ a perfeiï¿½ï¿½o do estado atual.

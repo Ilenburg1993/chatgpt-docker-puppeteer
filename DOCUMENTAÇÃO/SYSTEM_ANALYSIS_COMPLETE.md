@@ -538,7 +538,7 @@ SERVER
 │   ├── Router injection
 │   ├── PM2 bridge
 │   ├── Watchers (fs, logs)
-│   └── State persistence (estado.json)
+│   └── State persistence (estado.json) — DEPRECATED: usar NERV `SERVER_READY` (ver DOCUMENTAÇÃO/DEPRECATIONS/estado-json-deprecated.md)
 │
 ├── Engine
 │   ├── server.js (Express HTTP)
@@ -642,7 +642,7 @@ Clientes conectados (Dashboard)
 - ✅ Schema validation (Zod)
 - ✅ Error boundary (error_handler)
 - ✅ Comunicação via NERV (ServerNERVAdapter)
-- ✅ State persistence (estado.json para IPC discovery)
+- ✅ State persistence (estado.json para IPC discovery) — DEPRECATED: usar NERV `SERVER_READY` (ver DOCUMENTAÇÃO/DEPRECATIONS/estado-json-deprecated.md)
 - ⚠️ Dashboard UI (arquivos em `public/`)
 
 ---

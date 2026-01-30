@@ -41,35 +41,15 @@
 -------------------------------------------------------------------------- */
 require('module-alias/register');
 
-const fs = require('fs');
-
 const { log } = require('@core/logger');
-const PATHS = require('@infra/fs/paths');
+const CONFIG = require('@core/config');
 const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('@shared/nerv/constants');
 const { CONNECTION_MODES } = require('@core/constants/browser.js');
-const { createEnvelope } = require('@shared/nerv/envelope');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+const Authority = require('@core/authority');
+const Discovery = require('@nerv/discovery');
 
-// ==========================================================================
-// SERVER AUTHORITY — CANONICAL RESOLUTION
-// ==========================================================================
-const SERVER_AUTHORITIES = Object.freeze({
-   STANDALONE: 'standalone',
-   DELEGATED: 'delegated'
-});
-
-function resolveServerAuthority(explicitAuthority = null) {
-    const raw = explicitAuthority ?? process.env.SERVER_AUTHORITY ?? SERVER_AUTHORITIES.STANDALONE;
-    const authority = String(raw).toLowerCase().trim();
-
-    if (!Object.values(SERVER_AUTHORITIES).includes(authority)) {
-        const msg = `[BOOT] SERVER_AUTHORITY inválido: "${raw}"`;
-        log('FATAL', msg);
-        throw new Error(msg);
-    }
-
-    log('INFO', `[BOOT] Server authority: ${authority}`);
-    return authority;
-}
+// Authority helper loaded from src/core/authority.js
 
 /* --------------------------------------------------------------------------
    ENGINE LAYER — fundações físicas
@@ -125,10 +105,14 @@ const NERV = require('@nerv/nerv');
  *
  * @param {number} port Porta efetivamente bound pelo HTTP engine
  */
-function persistServerState(port, authority = SERVER_AUTHORITIES.STANDALONE) {
-    const state = {
+function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
+    // Legacy compatibility hook: discovery is now canonical via NERV (SERVER_READY).
+    // We delegate to the discovery helper which prefers NERV and only falls back
+    // to file-based persistence if explicitly enabled via `ENABLE_STATE_FILE=true`.
+    const payload = {
+        port,
         server_port: port,
-        server_pid: process.pid,
+        pid: process.pid,
         server_started_at: new Date().toISOString(),
         protocol: PROTOCOL_VERSION || '2.0.0',
         mode: CONNECTION_MODES.SINGULARITY,
@@ -136,21 +120,11 @@ function persistServerState(port, authority = SERVER_AUTHORITIES.STANDALONE) {
         authority
     };
 
-    const tmp = `${PATHS.STATE}.tmp`;
-
     try {
-        fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
-
-        if (fs.existsSync(PATHS.STATE)) {
-            fs.unlinkSync(PATHS.STATE);
-        }
-
-        fs.renameSync(tmp, PATHS.STATE);
-
-        log('DEBUG', `[BOOT] Estado IPC persistido (porta=${port})`);
+        Discovery.publishServerReady(null, payload);
+        log('DEBUG', '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)');
     } catch (err) {
-        log('FATAL', `[BOOT] Falha ao persistir estado IPC: ${err.message}`);
-        throw err;
+        log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);
     }
 }
 
@@ -178,7 +152,7 @@ function persistServerState(port, authority = SERVER_AUTHORITIES.STANDALONE) {
  * @returns {Promise<object>} Contexto operacional mínimo do server
  */
 async function bootstrap(options = {}) {
-    const authority = resolveServerAuthority(options.authority);
+    const authority = Authority.resolveAuthority(options.authority);
 
     try {
         log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
@@ -187,7 +161,7 @@ async function bootstrap(options = {}) {
          FASE 1 — Lifecycle / Signal Handling
          Deve subir antes de qualquer recurso externo.
       -------------------------------------------------------------- */
-        if (authority === SERVER_AUTHORITIES.STANDALONE) {
+        if (Authority.isStandalone(authority)) {
             lifecycle.listenToSignals();
             log('DEBUG', '[BOOT] Lifecycle signals ativos (standalone)');
         } else {
@@ -202,7 +176,7 @@ async function bootstrap(options = {}) {
            FASE 2 — Fundação HTTP
            Único ponto de bind de rede.
         -------------------------------------------------------------- */
-        const basePort = process.env.SERVER_PORT || process.env.PORT || 9224;
+        const basePort = process.env.SERVER_PORT || process.env.PORT || CONFIG.SERVER_PORT || 3008;
         const { server: httpServer, port } = await serverEngine.start(basePort);
 
         /* --------------------------------------------------------------
@@ -211,7 +185,7 @@ async function bootstrap(options = {}) {
          Em modo delegated, evitamos escrita do arquivo de discovery
          pois o Maestro é responsável pela descoberta/coordenação.
       -------------------------------------------------------------- */
-        if (authority === SERVER_AUTHORITIES.STANDALONE) {
+        if (Authority.isStandalone(authority)) {
             persistServerState(port, authority);
         } else {
             log('DEBUG', '[BOOT] persistServerState skip (delegated)');
@@ -269,7 +243,7 @@ async function bootstrap(options = {}) {
         let nerv = options.nerv ?? null;
 
         if (!nerv) {
-            if (authority === SERVER_AUTHORITIES.DELEGATED) {
+            if (Authority.isDelegated(authority)) {
                 log('FATAL', '[BOOT] NERV não injetado em modo delegated');
                 // Em modo delegated não finalizamos o processo localmente; propaga erro para o chamador
                 throw new Error('NERV must be injected in delegated mode');
@@ -289,7 +263,7 @@ async function bootstrap(options = {}) {
         }
 
         // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)
-        if (authority === SERVER_AUTHORITIES.STANDALONE) {
+        if (Authority.isStandalone(authority)) {
             try {
                 const payload = {
                     port,
@@ -302,16 +276,11 @@ async function bootstrap(options = {}) {
                     httpAuthority: Boolean(port)
                 };
 
-                const env = createEnvelope({
-                    actor: ActorRole.SERVER,
-                    messageType: MessageType.EVENT,
-                    actionCode: ActionCode.SERVER_READY,
-                    payload
-                });
-
-                if (typeof nerv.emitEvent === 'function') {
-                    nerv.emitEvent(env);
+                try {
+                    HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
                     log('DEBUG', '[BOOT] Evento NERV SERVER_READY publicado (standalone)');
+                } catch (err) {
+                    log('WARN', `[BOOT] Falha ao publicar SERVER_READY via HighLevelNERV: ${err.message}`);
                 }
             } catch (err) {
                 log('WARN', `[BOOT] Não foi possível publicar SERVER_READY via NERV: ${err.message}`);
@@ -358,7 +327,7 @@ async function bootstrap(options = {}) {
         };
     } catch (err) {
         log('FATAL', `[BOOT] Falha crítica de bootstrap: ${err.message}`);
-        if (typeof authority !== 'undefined' && authority === SERVER_AUTHORITIES.STANDALONE) {
+        if (typeof authority !== 'undefined' && Authority.isStandalone(authority)) {
             process.exit(1);
         }
         throw err;

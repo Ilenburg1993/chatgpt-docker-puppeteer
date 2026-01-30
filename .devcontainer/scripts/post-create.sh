@@ -85,9 +85,18 @@ readonly HOME_DIR="${HOME}"
 readonly DEVCONTAINER_DIR="${PROJECT_ROOT}/.devcontainer"
 readonly STATE_FILE="${DEVCONTAINER_DIR}/.initialized"
 
+# Flag de compatibilidade: escrita/leitura do arquivo de estado é opt-in.
+# Por padrão esta feature está DESATIVADA para forçar a descoberta via NERV.
+if [[ "${ENABLE_STATE_FILE:-}" != "true" ]]; then
+    log "ENABLE_STATE_FILE não habilitado — leituras/escritas de estado estrutural desativadas."
+    SKIP_STATE_FILE=true
+else
+    SKIP_STATE_FILE=false
+fi
+
 # --- Verificação de Idempotência (Gatekeeper) ---
 # Impede a execução duplicada em rebuilds se o estado já estiver consolidado.
-if [[ -f "${STATE_FILE}" ]]; then
+if [[ "${SKIP_STATE_FILE}" != "true" && -f "${STATE_FILE}" ]]; then
     log "Estado detectado (${STATE_FILE}) — Simbiose já ativa."
     log "Abortando inicialização estrutural para preservar integridade."
     exit 0
@@ -447,9 +456,11 @@ log "Consolidando manifesto de estado atômico (Visão Geral)..."
 STATE_SWAP="${STATE_FILE}.tmp"
 mkdir -p "$(dirname "${STATE_FILE}")"
 
-
 # Geração do Manifesto (Machine-Readable para o KERNEL)
-cat > "${STATE_SWAP}" <<EOF
+if [[ "${SKIP_STATE_FILE}" == "true" ]]; then
+    log "Persistência de estado desativada por configuração (ENABLE_STATE_FILE != true). Pulando escrita de manifesto."
+else
+    cat > "${STATE_SWAP}" <<EOF
 # Simbiose State Manifesto (v${SCRIPT_VERSION})
 initialized_at=$(date -Is)
 script_name=${SCRIPT_NAME}
@@ -481,10 +492,11 @@ integrity=canonical
 EOF
 
 # Swap Atômico: O arquivo final só passa a existir quando a escrita termina.
-mv "${STATE_SWAP}" "${STATE_FILE}"
-chmod 444 "${STATE_FILE}" 2>/dev/null || true
+    mv "${STATE_SWAP}" "${STATE_FILE}"
+    chmod 444 "${STATE_FILE}" 2>/dev/null || true
 
-log "✅ Estado persistido com sucesso em ${STATE_FILE}"
+    log "✅ Estado persistido com sucesso em ${STATE_FILE}"
+fi
 
 # =============================================================================
 # SECTION 11 — ENCERRAMENTO CANÔNICO (HANDOFF)

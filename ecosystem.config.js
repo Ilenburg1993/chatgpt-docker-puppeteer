@@ -15,6 +15,18 @@
    • Nenhum fallback silencioso
 ============================================================================ */
 
+/* --------------------------------------------------------------------------
+    DEPRECATION NOTICE: 'estado.json'
+
+    The legacy local state file `estado.json` is deprecated. Service discovery
+    and runtime coordination should use the canonical NERV event
+    `ActionCode.SERVER_READY` (see `src/nerv/discovery.js`).
+
+    During migration, legacy file behaviour can be temporarily re-enabled by
+    setting the environment variable `ENABLE_STATE_FILE=true`. Prefer the NERV
+    discovery for new code and automation.
+-------------------------------------------------------------------------- */
+
 const NODE_ARGS_BASE = [
     '--expose-gc',                 // GC manual controlado (processos long-lived)
     '--unhandled-rejections=strict',// Promises não tratadas derrubam o processo
@@ -48,6 +60,7 @@ module.exports = {
                 'respostas',
                 'tmp',
                 '*.lock',
+                // deprecated: prefer NERV SERVER_READY. Use ENABLE_STATE_FILE=true
                 'estado.json',
                 'src/infra/storage/robot_identity.json'
             ],
@@ -102,6 +115,7 @@ module.exports = {
             ignore_watch: [
                 'node_modules',
                 'logs',
+                // deprecated: prefer NERV SERVER_READY. Use ENABLE_STATE_FILE=true
                 'estado.json',
                 'src/infra/storage/robot_identity.json'
             ],

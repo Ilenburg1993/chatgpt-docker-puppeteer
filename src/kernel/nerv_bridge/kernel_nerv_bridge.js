@@ -22,7 +22,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
-const { createEnvelope } = require('@shared/nerv/envelope');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 /* ===========================
    Utilitários internos
@@ -262,38 +262,24 @@ class KernelNERVBridge {
         if (!this.started) {
             throw new Error('KernelNERVBridge não iniciada');
         }
-
-        const msgId = uuidv4();
-
-        const envelope = {
-            header: {
-                version: 1,
-                timestamp: Date.now(),
-                source: ActorRole.KERNEL.toLowerCase(),
-                target
-            },
-            ids: {
-                msg_id: msgId,
-                correlation_id: correlationId
-            },
-            kind: MessageType.COMMAND,
-            payload
-        };
+        // Extract actionCode from payload if present
+        const actionCode = (payload && payload.actionCode) || ActionCode.KERNEL_INTERNAL_ERROR;
+        const targetRole = target ? (ActorRole[target.toUpperCase()] || null) : null;
 
         try {
-            this.nerv.emitCommand(envelope);
+            const envelope = HighLevelNERV.sendCommand(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole);
+            const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_command_emitted', {
                 msgId,
                 correlationId,
-                target,
+                target: target ?? 'unknown',
                 at: Date.now()
             });
         } catch (error) {
             this.telemetry.critical('nerv_bridge_command_emission_failed', {
-                msgId,
-                correlationId,
                 error: error.message,
+                correlationId,
                 at: Date.now()
             });
 
@@ -321,21 +307,11 @@ class KernelNERVBridge {
 
         // Extrair actionCode do payload (ou usar genérico)
         const actionCode = payload.actionCode || ActionCode.KERNEL_TELEMETRY;
-
-        // Criar envelope canônico usando factory
-        const envelope = createEnvelope({
-            actor: ActorRole.KERNEL,
-            target: target ? ActorRole[target.toUpperCase()] : null,
-            messageType: MessageType.EVENT,
-            actionCode: actionCode,
-            payload: payload,
-            correlationId: correlationId
-        });
-
-        const msgId = envelope.causality.msg_id;
+        const targetRole = target ? (ActorRole[target.toUpperCase()] || null) : null;
 
         try {
-            this.nerv.emitEvent(envelope);
+            const envelope = HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole);
+            const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_event_emitted', {
                 msgId,
@@ -345,9 +321,8 @@ class KernelNERVBridge {
             });
         } catch (error) {
             this.telemetry.critical('nerv_bridge_event_emission_failed', {
-                msgId,
-                correlationId,
                 error: error.message,
+                correlationId,
                 at: Date.now()
             });
 

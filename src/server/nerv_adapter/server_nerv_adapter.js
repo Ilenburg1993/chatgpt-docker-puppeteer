@@ -41,6 +41,7 @@
 
 const { log } = require('@core/logger');
 const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 /* ==========================================================================
    CONSTANTES DE SEGURANÇA
@@ -315,12 +316,11 @@ class ServerNERVAdapter {
     }
 
     _emitCommand(actionCode, payload, correlationId) {
-        this.nerv.emitCommand({
-            actor: ActorRole.SERVER,
-            actionCode,
-            payload,
-            correlationId
-        });
+        try {
+            HighLevelNERV.sendCommand(this.nerv, ActorRole.SERVER, actionCode, payload, correlationId);
+        } catch (err) {
+            log('ERROR', `[ServerNERVAdapter] Falha ao emitir comando: ${err.message}`, correlationId);
+        }
     }
 
 

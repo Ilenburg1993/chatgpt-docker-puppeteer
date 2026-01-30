@@ -428,7 +428,7 @@ if ([80, 443, 8080].includes(port)) {
 1. src/main.js → Lê process.env.PORT || CONFIG.SERVER_PORT || 3008
 2. server.start(port) → Port hunting se necessário
 3. ServerNERVAdapter attach → Socket.io em mesma porta
-4. persistServerState(port) → Salva porta final em estado.json
+4. persistServerState(port) → Salva porta final em estado.json (DEPRECATED — usar NERV SERVER_READY)
 5. Log final: "Mission Control online na porta ${port}"
 ```
 
@@ -601,8 +601,10 @@ describe('Docker Port Mapping', () => {
    ```javascript
    // scripts/healthcheck.js
    async function discoverPort() {
-       // Lê estado.json para porta atual
-       const state = JSON.parse(fs.readFileSync('estado.json'));
+    // Lê estado.json para porta atual (LEGADO — DEPRECATED: use NERV `SERVER_READY` para descoberta)
+    // LEGADO: leitura direta de arquivo. DEPRECATED — use NERV `SERVER_READY`.
+    // Ex: waitForServerReady(nerv, { timeoutMs })
+    // const state = JSON.parse(fs.readFileSync('estado.json'));
        return state.server_port || 3008;
    }
    ```
@@ -684,7 +686,7 @@ describe('Docker Port Mapping', () => {
    - Porta ocupada: Port hunting ou erro
    - Chrome não conecta: Verificar 9224
    - Docker não acessa: Check port mapping
-   - Logs inconsistentes: Ver estado.json
+    - Logs inconsistentes: Ver estado.json (DEPRECATED — use NERV `SERVER_READY` para descoberta de porta)
 
 ---
 

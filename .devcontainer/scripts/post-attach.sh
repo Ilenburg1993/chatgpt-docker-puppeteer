@@ -254,6 +254,14 @@ echo ""
 
 INIT_MARKER=".devcontainer/.initialized"
 
+# Flag de compatibilidade: leitura do arquivo de estado é opt-in.
+# Por padrão esta feature está DESATIVADA para forçar a descoberta via NERV.
+if [ "${ENABLE_STATE_FILE:-}" != "true" ]; then
+    SKIP_STATE_FILE=true
+else
+    SKIP_STATE_FILE=false
+fi
+
 # ---------------------------------------------------------------------------
 # Presença e legibilidade do manifesto estrutural
 #
@@ -261,46 +269,53 @@ INIT_MARKER=".devcontainer/.initialized"
 # - A ausência do arquivo NÃO é tratada como erro
 # - A presença parcial é tratada de forma tolerante
 # ---------------------------------------------------------------------------
-if [ -r "${INIT_MARKER}" ]; then
-    ok "DevContainer inicializado (post-create confirmado)"
-
-    # -----------------------------------------------------------------------
-    # Extração defensiva de metadados conhecidos
-    #
-    # Regras:
-    # - Cada campo é opcional
-    # - Apenas a primeira ocorrência é considerada
-    # - Falhas de parsing são silenciosas
-    # -----------------------------------------------------------------------
-    INIT_AT="$(
-        grep -E '^initialized_at=' "${INIT_MARKER}" 2>/dev/null \
-        | head -n1 \
-        | cut -d= -f2
-    )"
-
-    INIT_VERSION="$(
-        grep -E '^script_version=' "${INIT_MARKER}" 2>/dev/null \
-        | head -n1 \
-        | cut -d= -f2
-    )"
-
-    INIT_PROJECT="$(
-        grep -E '^project=' "${INIT_MARKER}" 2>/dev/null \
-        | head -n1 \
-        | cut -d= -f2
-    )"
-
-    # -----------------------------------------------------------------------
-    # Emissão humana dos metadados (somente se presentes)
-    # -----------------------------------------------------------------------
-    [ -n "${INIT_AT}" ] && info "→ Inicializado em: ${INIT_AT}"
-    [ -n "${INIT_VERSION}" ] && info "→ post-create versão: ${INIT_VERSION}"
-    [ -n "${INIT_PROJECT}" ] && info "→ Projeto registrado: ${INIT_PROJECT}"
-
+if [ "${SKIP_STATE_FILE}" = "true" ]; then
+    warn "Leitura de estado estrutural desativada (ENABLE_STATE_FILE != true)."
+    warn "→ Para habilitar a persistência legada: export ENABLE_STATE_FILE=true"
+    warn "→ Considerando DevContainer NÃO inicializado (comportamento passivo)."
+    warn "→ Se algo parecer inconsistente: Rebuild Container ou habilite ENABLE_STATE_FILE."
 else
-    warn "DevContainer NÃO inicializado ou estado estrutural indisponível"
-    warn "→ O post-create pode não ter sido executado"
-    warn "→ Se algo parecer inconsistente: Rebuild Container"
+    if [ -r "${INIT_MARKER}" ]; then
+        ok "DevContainer inicializado (post-create confirmado)"
+
+        # -----------------------------------------------------------------------
+        # Extração defensiva de metadados conhecidos
+        #
+        # Regras:
+        # - Cada campo é opcional
+        # - Apenas a primeira ocorrência é considerada
+        # - Falhas de parsing são silenciosas
+        # -----------------------------------------------------------------------
+        INIT_AT="$ (
+            grep -E '^initialized_at=' "${INIT_MARKER}" 2>/dev/null \
+            | head -n1 \
+            | cut -d= -f2
+        )"
+
+        INIT_VERSION="$ (
+            grep -E '^script_version=' "${INIT_MARKER}" 2>/dev/null \
+            | head -n1 \
+            | cut -d= -f2
+        )"
+
+        INIT_PROJECT="$ (
+            grep -E '^project=' "${INIT_MARKER}" 2>/dev/null \
+            | head -n1 \
+            | cut -d= -f2
+        )"
+
+        # -----------------------------------------------------------------------
+        # Emissão humana dos metadados (somente se presentes)
+        # -----------------------------------------------------------------------
+        [ -n "${INIT_AT}" ] && info "→ Inicializado em: ${INIT_AT}"
+        [ -n "${INIT_VERSION}" ] && info "→ post-create versão: ${INIT_VERSION}"
+        [ -n "${INIT_PROJECT}" ] && info "→ Projeto registrado: ${INIT_PROJECT}"
+
+    else
+        warn "DevContainer NÃO inicializado ou estado estrutural indisponível"
+        warn "→ O post-create pode não ter sido executado"
+        warn "→ Se algo parecer inconsistente: Rebuild Container"
+    fi
 fi
 
 echo ""

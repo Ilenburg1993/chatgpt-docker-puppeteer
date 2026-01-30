@@ -76,6 +76,37 @@ const SERVER_MODES = Object.freeze({
 });
 
 /**
+ * Resolve autoridade do processo (standalone|delegated).
+ *
+ * Precedência:
+ *  1) argumento CLI `--authority=...` ou `--server-authority=...`
+ *  2) variável de ambiente `SERVER_AUTHORITY`
+ *  3) fallback: `standalone`
+ */
+function resolveAuthority() {
+    const ALLOWED = ['standalone', 'delegated'];
+
+    // CLI override (ex: --authority=delegated)
+    const arg = process.argv.slice(2).find(a => a.startsWith('--authority=') || a.startsWith('--server-authority='));
+    const rawFromArg = arg ? arg.split('=')[1] : undefined;
+
+    const raw = rawFromArg ?? process.env.SERVER_AUTHORITY ?? 'standalone';
+    const authority = String(raw).toLowerCase().trim();
+
+    if (!ALLOWED.includes(authority)) {
+        log('FATAL', `[CONFIG] SERVER_AUTHORITY inválido: "${raw}"`);
+        log('FATAL', `[CONFIG] Valores válidos: ${ALLOWED.join(', ')}`);
+        process.exit(1);
+    }
+
+    log('INFO', `[CONFIG] SERVER_AUTHORITY resolvido: ${authority}`);
+    return authority;
+}
+
+// Resolve autoridade do processo (invoca validação e logging)
+resolveAuthority();
+
+/**
  * Resolve modo operacional do server de forma canônica e validada.
  *
  * Fonte de verdade:

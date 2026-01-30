@@ -25,6 +25,7 @@ const {
 
 const { log } = require('@core/logger');
 const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 class DriverNERVAdapter {
     /**
@@ -118,7 +119,8 @@ class DriverNERVAdapter {
                     taskId: payload?.taskId,
                     error: 'Sistema em modo degradado - Browser Pool não disponível',
                     reason: 'DEGRADED_MODE',
-                    suggestion: 'Configure o browserEndpoint/proxy com remote debugging exposto ao container (porta 9224) e reinicie o sistema'
+                    suggestion:
+                        'Configure o browserEndpoint/proxy com remote debugging exposto ao container (ver CONFIG.DEBUG_PORT ou CHROME_WS_ENDPOINT) e reinicie o sistema'
                 },
                 correlationId
             );
@@ -339,14 +341,12 @@ class DriverNERVAdapter {
      * Wrapper para padronizar emissões do adapter.
      */
     _emitEvent(actionCode, payload, correlationId) {
-        this.nerv.emitEvent({
-            actor: ActorRole.DRIVER,
-            actionCode,
-            payload,
-            correlationId
-        });
-
-        log('DEBUG', `[DriverNERVAdapter] Evento emitido: ${actionCode}`, correlationId);
+        try {
+            HighLevelNERV.sendEvent(this.nerv, ActorRole.DRIVER, actionCode, payload, correlationId);
+            log('DEBUG', `[DriverNERVAdapter] Evento emitido: ${actionCode}`, correlationId);
+        } catch (err) {
+            log('ERROR', `[DriverNERVAdapter] Falha ao emitir evento: ${err.message}`, correlationId);
+        }
     }
 
     /**

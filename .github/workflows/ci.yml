@@ -40,6 +40,9 @@ jobs:
             exit 1
           }
 
+      - name: Forbidden patterns check
+        run: npm run check:forbidden
+
       - name: Validate module-alias configuration
         run: |
           echo "✓ Validating module-alias setup..."

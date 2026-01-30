@@ -19,6 +19,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { log } = require('@core/logger');
+const CONFIG = require('@core/config');
 
 // Importa HELPERS compartilhados de .puppeteerrc.cjs (isDocker, findChrome, getCacheDirectory)
 const puppeteerConfig = require('../../.puppeteerrc.cjs');
@@ -76,7 +77,20 @@ const DEFAULTS = {
 
     // Configurações de conexão (para modo connect/wsEndpoint)
     // IMPORTANTE: Ordem de prioridade reflete Chrome Proxy primeiro (9224), depois conexões diretas (detalhe operacional)
-    ports: [9224, 9223], // ✅ MUDANÇA: Porta proxy (9224) PRIMEIRO
+    ports: [
+        Number(
+            process.env.CHROME_PROXY_PORT ||
+                (function () {
+                    try {
+                        const debugUrl = CONFIG.DEBUG_PORT || 'http://localhost:9224';
+                        return new URL(debugUrl).port || 9224;
+                    } catch (e) {
+                        return 9224;
+                    }
+                })()
+        ),
+        Number(process.env.CHROME_ALT_PORT || 9223)
+    ], // ✅ MUDANÇA: Porta proxy (config/ENV) PRIMEIRO
     hosts: [
         '192.168.0.2', // ✅ MUDANÇA CRÍTICA: IP público Windows (proxy) PRIMEIRO
         'host.docker.internal', // Docker DNS para Windows host (funciona com proxy e direto)
@@ -724,8 +738,27 @@ class ConnectionOrchestrator {
             },
 
             health: {
-                chromeDebugUrl: 'http://localhost:9224/json/version',
-                chromeDevtoolsUrl: 'http://localhost:9224',
+                // Resolve dynamic debug base (env > config > default)
+                chromeDebugUrl: (() => {
+                    const debugBase =
+                        process.env.CHROME_WS_ENDPOINT ||
+                        CONFIG.DEBUG_PORT ||
+                        process.env.DEBUG_PORT ||
+                        'http://localhost:9224';
+                    try {
+                        return `${debugBase.replace(/\/$/, '')}/json/version`;
+                    } catch (e) {
+                        return `${debugBase}/json/version`;
+                    }
+                })(),
+                chromeDevtoolsUrl: (() => {
+                    const debugBase =
+                        process.env.CHROME_WS_ENDPOINT ||
+                        CONFIG.DEBUG_PORT ||
+                        process.env.DEBUG_PORT ||
+                        'http://localhost:9224';
+                    return debugBase.replace(/\/$/, '');
+                })(),
                 expectedPorts: DEFAULTS.ports
             },
 
@@ -740,10 +773,10 @@ class ConnectionOrchestrator {
                       }
                     : {
                           startChrome: detectedChromePath
-                              ? `"${detectedChromePath}" --remote-debugging-port=9224 --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
+                              ? `"${detectedChromePath}" --remote-debugging-port=${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224} --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
                               : null,
-                          checkChrome: 'lsof -i :9224 || netstat -an | grep :9224',
-                          killChrome: 'pkill -f "chrome.*remote-debugging-port=9224"'
+                          checkChrome: `lsof -i :${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224} || netstat -an | grep :${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224}`,
+                          killChrome: `pkill -f "chrome.*remote-debugging-port=${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224}"`
                       },
 
             usage: {

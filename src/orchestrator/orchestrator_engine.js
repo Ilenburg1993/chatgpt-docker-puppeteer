@@ -17,6 +17,8 @@
 const { ValidationService } = require('./validation/validation_service');
 const { ContextManager } = require('./context_manager');
 const logger = require('@core/logger');
+const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 /**
  * OrchestratorEngine - Motor de orquestração de missões.
@@ -463,7 +465,11 @@ class OrchestratorEngine {
      */
     _emitNervEvent(actionCode, payload) {
         if (this.nerv) {
-            this.nerv.emit(actionCode, payload);
+            try {
+                HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, actionCode, payload);
+            } catch (e) {
+                logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', e.message);
+            }
         }
     }
 

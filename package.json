@@ -90,6 +90,7 @@
         "prepare": "node -e \"try{require('husky')}catch(e){}\"",
         "validate": "node scripts/validate_config.js",
         "validate:all": "npm run lint:quiet && npm run format:check && npm test",
+        "check:forbidden": "node scripts/check_forbidden_patterns.js",
         "check": "npm run validate:all",
         "summarize-code": "python3 agents/code_explainer/generate_summary.py"
     },

@@ -10,7 +10,7 @@
 const system = require('@infra/system');
 const { log, audit } = require('./logger');
 const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const { createEnvelope } = require('@shared/nerv/envelope');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 // NERV instance will be injected via setNERV()
 let nervInstance = null;
@@ -89,20 +89,28 @@ class InfraFailurePolicy {
     async _executeManeuver(type, pid, correlationId, ctx, forceKill = false) {
         // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura via NERV (ONDA 2 - Migrado)
         if (nervInstance) {
-            const envelope = createEnvelope({
-                actor: ActorRole.INFRA,
-                messageType: MessageType.EVENT,
-                actionCode: ActionCode.INFRA_EMERGENCY,
-                payload: {
-                    type: type,
-                    pid: pid,
-                    action: forceKill ? 'PROCESS_KILL' : 'CLEANUP',
-                    severity: 'CRITICAL'
-                },
-                correlationId: correlationId
-            });
-            nervInstance.emit(envelope);
-            log('WARN', `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`, correlationId);
+            try {
+                HighLevelNERV.sendEvent(
+                    nervInstance,
+                    ActorRole.INFRA,
+                    ActionCode.INFRA_EMERGENCY,
+                    {
+                        type: type,
+                        pid: pid,
+                        action: forceKill ? 'PROCESS_KILL' : 'CLEANUP',
+                        severity: 'CRITICAL'
+                    },
+                    correlationId
+                );
+
+                log(
+                    'WARN',
+                    `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`,
+                    correlationId
+                );
+            } catch (e) {
+                log('ERROR', `[POLICY] Falha ao notificar infra escalation via NERV: ${e.message}`, correlationId);
+            }
         } else {
             log(
                 'WARN',

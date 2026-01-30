@@ -7,8 +7,7 @@
    Sincronizado com: main.js V51, server.js V100, socket.js V600.
 ========================================================================== */
 
-const fs = require('fs');
-const path = require('path');
+// filesystem access delegated to @nerv/discovery
 const server = require('./server');
 const socketHub = require('./socket');
 const pm2Bridge = require('../realtime/bus/pm2_bridge');
@@ -19,12 +18,12 @@ const fsWatcher = require('../watchers/fs_watcher');
 const logWatcher = require('../watchers/log_watcher');
 const { log } = require('@core/logger');
 const CONFIG = require('@core/config');
-const { ROOT } = require('@infra/fs/fs_utils');
+const Discovery = require('@nerv/discovery');
 
 /**
- * Localização do arquivo de descoberta para limpeza no shutdown.
+ * Legacy: file-based discovery handled by `@nerv/discovery`.
+ * We avoid direct filesystem operations here and delegate cleanup to Discovery.
  */
-const STATE_FILE = path.join(ROOT, 'estado.json');
 
 /**
  * Flag de estado para evitar reentrância em desligamentos simultâneos.
@@ -105,15 +104,24 @@ async function gracefulShutdown(signal) {
             await socketHub.stop();
         }
 
-        // 4. LIMPEZA DO ARQUIVO DE ESTADO (IPC Discovery)
-        // Remove o sinalizador de porta para evitar tentativas de conexão órfãs.
-        log('DEBUG', '[LIFECYCLE] Removendo arquivo de descoberta estado.json...');
+        // 4. LIMPEZA DO ARQUIVO DE ESTADO (LEGACY: IPC Discovery)
+        // Delega a limpeza ao helper de discovery; ele decide se remove o arquivo
+        // legacy (apenas quando ENABLE_STATE_FILE=true) ou não.
         try {
-            if (fs.existsSync(STATE_FILE)) {
-                fs.unlinkSync(STATE_FILE);
+            const removed = Discovery.unpublishServerReady();
+            if (removed) {
+                log('DEBUG', '[LIFECYCLE] arquivo de estado legado removido via Discovery');
+            } else {
+                log(
+                    'DEBUG',
+                    '[LIFECYCLE] Pulando limpeza do arquivo de estado legado (não habilitado ou não presente)'
+                );
             }
         } catch (cleanupErr) {
-            log('WARN', `[LIFECYCLE] Falha ao remover estado.json: ${cleanupErr.message}`);
+            log(
+                'WARN',
+                `[LIFECYCLE] Falha ao tentar unpublish arquivo de estado legado via Discovery: ${cleanupErr.message}`
+            );
         }
 
         // 5. DESATIVAÇÃO DA FUNDAÇÃO HTTP

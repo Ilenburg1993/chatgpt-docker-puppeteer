@@ -113,10 +113,10 @@ class PolicyEngine {
 
     _createRejectionEnvelope(originalObs, reason) {
         // Cria um envelope virtual para ser enviado pelo NERV
-        const { createEnvelope } = require('@shared/nerv/envelope');
+        const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
         const { ActorRole } = require('@shared/nerv/constants');
 
-        return createEnvelope({
+        return HighLevelNERV.makeEnvelope({
             actor: ActorRole.MAESTRO,
             target: originalObs.source || ActorRole.SERVER,
             messageType: MessageType.EVENT,
@@ -127,10 +127,10 @@ class PolicyEngine {
     }
 
     _createTaskFailedEnvelope(task, reason) {
-        const { createEnvelope } = require('@shared/nerv/envelope');
+        const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
         const { ActorRole } = require('@shared/nerv/constants');
 
-        return createEnvelope({
+        return HighLevelNERV.makeEnvelope({
             actor: ActorRole.MAESTRO,
             target: ActorRole.SERVER,
             messageType: MessageType.EVENT,

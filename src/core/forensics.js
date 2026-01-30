@@ -16,7 +16,7 @@ const PATHS = require('@infra/fs/paths');
 const io = require('@infra/io');
 const identityManager = require('./identity_manager');
 const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const { createEnvelope } = require('@shared/nerv/envelope');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 // NERV instance will be injected via setNERV()
 let nervInstance = null;
@@ -89,20 +89,24 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         // 4. NOTIFICAÇÃO IPC 2.0 via NERV (ONDA 2 - Migrado)
         // Evita enviar stack traces gigantescas pelo barramento Socket.io
         if (nervInstance) {
-            const envelope = createEnvelope({
-                actor: ActorRole.INFRA,
-                messageType: MessageType.EVENT,
-                actionCode: ActionCode.FORENSICS_DUMP_CREATED,
-                payload: {
-                    dump_id: dumpId,
-                    error_summary: error.message.substring(0, 255), // Truncamento de segurança
-                    path: folder,
-                    severity: 'CRITICAL'
-                },
-                correlationId: correlationId
-            });
-            nervInstance.emit(envelope);
-            log('INFO', `[FORENSICS] Dump criado e notificado via NERV: ${dumpId}`, correlationId);
+            try {
+                HighLevelNERV.sendEvent(
+                    nervInstance,
+                    ActorRole.INFRA,
+                    ActionCode.FORENSICS_DUMP_CREATED,
+                    {
+                        dump_id: dumpId,
+                        error_summary: error.message.substring(0, 255),
+                        path: folder,
+                        severity: 'CRITICAL'
+                    },
+                    correlationId
+                );
+
+                log('INFO', `[FORENSICS] Dump criado e notificado via NERV: ${dumpId}`, correlationId);
+            } catch (e) {
+                log('WARN', `[FORENSICS] Falha ao notificar dump via NERV: ${e.message}`, correlationId);
+            }
         } else {
             log('WARN', `[FORENSICS] Dump criado mas NERV não disponível: ${dumpId}`, correlationId);
         }

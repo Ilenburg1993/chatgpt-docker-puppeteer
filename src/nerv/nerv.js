@@ -20,7 +20,7 @@
 =========================== */
 
 // Protocolo universal NERV
-const { createEnvelope } = require('@shared/nerv/envelope');
+const envelopesModule = require('@shared/nerv/envelope');
 
 const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
 
@@ -200,9 +200,9 @@ async function createNERV(config = {}) {
 
     /* 3. Envelopes */
     const envelopes = {
-        createEnvelope,
-        normalize: createEnvelope,
-        validate: env => env
+        createEnvelope: envelopesModule.createEnvelope,
+        normalize: envelopesModule.normalize,
+        assertValid: envelopesModule.assertValid
     };
 
     /* 4. Correlação */

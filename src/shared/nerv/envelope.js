@@ -141,3 +141,78 @@ function deepFreeze(obj) {
 module.exports = {
     createEnvelope
 };
+
+// Normalization helper: accepts either a canonical envelope or a flattened
+// envelope ({ actor, messageType, actionCode, payload, correlationId, target })
+// and returns a canonical, validated envelope.
+function normalize(envelope) {
+    if (!envelope || typeof envelope !== 'object') {
+        throw new Error('Envelope must be an object');
+    }
+    // If already canonical (has protocol/identity/type/causality), return as-is
+    if (envelope.protocol && envelope.identity && envelope.type && envelope.causality) {
+        return envelope;
+    }
+
+    // Legacy shape support: header/ids/kind/payload
+    // Example legacy fields: envelope.header.source, envelope.ids.correlation_id, envelope.kind, envelope.payload
+    if (envelope.header && envelope.ids && (envelope.kind || envelope.type)) {
+        const headerSource = envelope.header.source || envelope.header?.source;
+        const actorKey = headerSource ? String(headerSource).toUpperCase() : null;
+        const actor = actorKey && ActorRole[actorKey] ? ActorRole[actorKey] : null;
+
+        const headerTarget = envelope.header.target || null;
+        const targetKey = headerTarget ? String(headerTarget).toUpperCase() : null;
+        const target = targetKey && ActorRole[targetKey] ? ActorRole[targetKey] : null;
+
+        const messageType = envelope.kind || (envelope.type && envelope.type.message_type);
+        const actionCode = (envelope.payload && envelope.payload.actionCode) || envelope.actionCode || (envelope.type && envelope.type.action_code) || null;
+        const payload = envelope.payload || envelope.data || {};
+        const correlationId = envelope.ids && (envelope.ids.correlation_id || envelope.ids.correlationId) ? (envelope.ids.correlation_id || envelope.ids.correlationId) : null;
+
+        return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });
+    }
+
+    // Otherwise attempt to construct via createEnvelope (will validate)
+    const actor = envelope.actor || (envelope.identity && envelope.identity.actor);
+    const messageType = envelope.messageType || (envelope.type && envelope.type.message_type);
+    const actionCode = envelope.actionCode || (envelope.type && envelope.type.action_code);
+    const payload = envelope.payload || envelope.data || {};
+    const correlationId = envelope.correlationId || (envelope.causality && envelope.causality.correlation_id) || null;
+    const target = envelope.target || (envelope.identity && envelope.identity.target) || null;
+
+    return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });
+}
+
+function assertValid(envelope) {
+    if (!envelope || typeof envelope !== 'object') {
+        throw new Error('Envelope must be an object');
+    }
+
+    // If canonical shape, perform lightweight checks
+    if (envelope.protocol && envelope.identity && envelope.type && envelope.causality) {
+        if (!envelope.protocol.version) throw new Error('protocol.version missing');
+        if (!envelope.identity.actor) throw new Error('identity.actor missing');
+        if (!envelope.type.message_type || !envelope.type.action_code) throw new Error('type fields missing');
+        return true;
+    }
+
+    // Fallback: try to create envelope (will throw on invalid)
+    createEnvelope({
+        actor: envelope.actor,
+        messageType: envelope.messageType,
+        actionCode: envelope.actionCode,
+        payload: envelope.payload || envelope.data || {},
+        correlationId: envelope.correlationId || null,
+        target: envelope.target || null
+    });
+
+    return true;
+}
+
+// Augment exports
+module.exports = {
+    createEnvelope,
+    normalize,
+    assertValid
+};

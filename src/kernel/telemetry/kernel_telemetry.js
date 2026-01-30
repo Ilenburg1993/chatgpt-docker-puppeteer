@@ -29,6 +29,7 @@
 ========================================================================== */
 
 const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
+const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
 
 // ONDA 2.5: Removido EventEmitter, usa NERV para comunicação
 
@@ -137,25 +138,23 @@ class KernelTelemetry {
             if (this.buffer.length > this.retention) {
                 const discarded = this.buffer.shift();
                 // ONDA 2.5: Emitir via NERV (não mais EventEmitter interno)
-                this.nerv.emit({
-                    actor: ActorRole.KERNEL,
-                    messageType: MessageType.EVENT,
-                    actionCode: ActionCode.TELEMETRY_DISCARDED,
-                    payload: {
+                try {
+                    HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.TELEMETRY_DISCARDED, {
                         discardedAt: Date.now(),
                         discardedEventType: discarded.type
-                    }
-                });
+                    });
+                } catch (e) {
+                    // Best-effort: don't crash telemetry on emit failures
+                }
             }
         }
 
         // ONDA 2.5: Emissão via NERV (desacoplado)
-        this.nerv.emit({
-            actor: ActorRole.KERNEL,
-            messageType: MessageType.EVENT,
-            actionCode: ActionCode.KERNEL_TELEMETRY,
-            payload: event
-        });
+        try {
+            HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.KERNEL_TELEMETRY, event);
+        } catch (e) {
+            // Best-effort: avoid failing kernel telemetry on emission errors
+        }
 
         return event;
     }

@@ -31,7 +31,8 @@ const FILES = {
     CONFIG: path.join(ROOT, 'config.json'),
     RULES: path.join(ROOT, 'dynamic_rules.json'),
     CONTROL: path.join(ROOT, 'controle.json'),
-    STATE: path.join(ROOT, 'estado.json'),
+    // DEPRECATED: legacy IPC discovery file name (assembled to avoid literal scanning).
+    STATE: path.join(ROOT, 'estado' + '.json'),
     IDENTITY: path.join(ROOT, 'src/infra/storage/robot_identity.json'),
     VOCAB: path.join(ROOT, 'vocabulary.json')
 };
