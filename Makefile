@@ -295,3 +295,8 @@ t: test
 i: info
 v: vscode-info
 g: git-changed
+
+# Check bindings (0.0.0.0) - runs static + runtime checks
+check-bindings:
+	@echo "Running bindings verification..."
+	@bash ./scripts/check-all-bindings.sh

@@ -49,8 +49,34 @@ class ChromeProxyService {
         if (!this.config.PUBLIC_IP) {
             this.config.PUBLIC_IP = this._detectPublicIP();
         }
-    }
 
+        // Create a websocket/http proxy for robust upgrade handling
+        try {
+            const httpProxy = require('http-proxy');
+            this.wsProxy = httpProxy.createProxyServer({
+                target: `http://${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`,
+                ws: true,
+                changeOrigin: true
+            });
+
+            this.wsProxy.on('error', (err, req, res) => {
+                this.stats.errors++;
+                this.log('error', 'Proxy error', { error: err && err.message ? err.message : String(err) });
+                try {
+                    if (res && !res.finished) {
+                        res.writeHead(502, { 'Content-Type': 'text/plain' });
+                        res.end('Proxy error');
+                    }
+                } catch (_e) {
+                    // ignore
+                }
+            });
+        } catch (_e) {
+            // Fallback: if http-proxy not available, will use raw socket proxy earlier implementation
+            this.wsProxy = null;
+            this.log('warn', 'http-proxy unavailable, falling back to raw socket method');
+        }
+    }
     /**
      * Auto-detect public IP address from network interfaces
      */
@@ -103,32 +129,43 @@ class ChromeProxyService {
         try {
             const json = JSON.parse(data);
 
+            const rewriteIfPresent = val => {
+                if (!val) return val;
+                try {
+                    return this._rewriteURL(val);
+                } catch (_e) {
+                    return String(val).replace(
+                        new RegExp(
+                            `(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`,
+                            'g'
+                        ),
+                        `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`
+                    );
+                }
+            };
+
             // Rewrite single webSocketDebuggerUrl (for /json/version)
             if (json.webSocketDebuggerUrl) {
                 const original = json.webSocketDebuggerUrl;
-                json.webSocketDebuggerUrl = this._rewriteURL(original);
-
-                this.log('debug', 'URL rewritten', {
-                    original,
-                    rewritten: json.webSocketDebuggerUrl
-                });
+                json.webSocketDebuggerUrl = rewriteIfPresent(original);
+                this.log('debug', 'URL rewritten', { original, rewritten: json.webSocketDebuggerUrl });
             }
 
             // Rewrite array of targets/pages (for /json and /json/list)
             if (Array.isArray(json)) {
                 json.forEach(item => {
                     if (item.webSocketDebuggerUrl) {
-                        item.webSocketDebuggerUrl = this._rewriteURL(item.webSocketDebuggerUrl);
+                        item.webSocketDebuggerUrl = rewriteIfPresent(item.webSocketDebuggerUrl);
                     }
                     if (item.devtoolsFrontendUrl) {
-                        item.devtoolsFrontendUrl = this._rewriteURL(item.devtoolsFrontendUrl);
+                        item.devtoolsFrontendUrl = rewriteIfPresent(item.devtoolsFrontendUrl);
                     }
                 });
             }
 
             return JSON.stringify(json);
-        } catch (e) {
-            this.log('error', 'JSON parse/rewrite failed', { error: e.message });
+        } catch (err) {
+            this.log('error', 'JSON parse/rewrite failed', { error: err && err.message ? err.message : String(err) });
             return data;
         }
     }
@@ -137,12 +174,30 @@ class ChromeProxyService {
      * Helper: Rewrite a single URL
      */
     _rewriteURL(url) {
-        return url
-            .replace(
-                `${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`,
+        try {
+            // If url doesn't look absolute, fallback to string replacement
+            if (!/^https?:\/\//i.test(url) && !/^wss?:\/\//i.test(url)) {
+                return String(url).replace(
+                    new RegExp(
+                        `(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`,
+                        'g'
+                    ),
+                    `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`
+                );
+            }
+
+            const u = new URL(url);
+            if (u.hostname === this.config.CHROME_HOST || u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
+                u.hostname = this.config.PUBLIC_IP;
+                u.port = String(this.config.PROXY_PORT);
+            }
+            return u.toString();
+        } catch (_e) {
+            return String(url).replace(
+                new RegExp(`(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`, 'g'),
                 `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`
-            )
-            .replace(`localhost:${this.config.CHROME_PORT}`, `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`);
+            );
+        }
     }
 
     /**
@@ -154,8 +209,17 @@ class ChromeProxyService {
         const clientIP = req.socket.remoteAddress;
         this.log('info', `HTTP ${req.method} ${req.url}`, { from: clientIP });
 
+        // Health endpoint
+        if (req.url === '/health' || req.url === '/healthz') {
+            const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
+            const body = JSON.stringify({ status: 'ok', uptime, httpRequests: this.stats.httpRequests, wsUpgrades: this.stats.wsUpgrades });
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'Access-Control-Allow-Origin': '*' });
+            res.end(body);
+            return;
+        }
+
         // Determine if this endpoint needs URL rewriting
-        const needsRewrite = req.url.startsWith('/json');
+        const needsRewrite = req.url && req.url.startsWith('/json');
 
         // Proxy request to Chrome
         const options = {
@@ -216,7 +280,27 @@ class ChromeProxyService {
         const clientIP = socket.remoteAddress;
         this.log('info', `WebSocket upgrade: ${req.url}`, { from: clientIP });
 
-        // Connect to Chrome
+        // Prefer http-proxy if available for robust websocket handling
+        if (this.wsProxy) {
+            try {
+                // Track active socket manually (cleanup on close)
+                this.activeConnections.add(socket);
+                socket.on('close', () => {
+                    this.log('debug', 'WebSocket closed');
+                    this.activeConnections.delete(socket);
+                });
+
+                this.wsProxy.ws(req, socket, head);
+                return;
+            } catch (err) {
+                this.stats.errors++;
+                this.log('error', 'WS proxy (http-proxy) failed', { error: err && err.message ? err.message : String(err) });
+                try { socket.destroy(); } catch (_) {}
+                return;
+            }
+        }
+
+        // Fallback: raw socket proxy to Chrome
         const proxySocket = net.connect(this.config.CHROME_PORT, this.config.CHROME_HOST, () => {
             this.log('debug', 'Chrome WebSocket connected');
 
@@ -355,12 +439,32 @@ class ChromeProxyService {
    CLI ENTRY POINT
 ========================================================================== */
 if (require.main === module) {
-    const publicIP = process.argv[2];
-    const logLevel = process.argv[3];
+    // CLI parsing: supports positional `PUBLIC_IP LOG_LEVEL` or flags `--public-ip/-p` and `--log-level/-l`
+    let publicIP = null;
+    let logLevel = null;
+    for (let i = 2; i < process.argv.length; i++) {
+        const a = process.argv[i];
+        if ((a === '--public-ip' || a === '-p') && i + 1 < process.argv.length) {
+            publicIP = process.argv[++i];
+            continue;
+        }
+        if ((a === '--log-level' || a === '-l') && i + 1 < process.argv.length) {
+            logLevel = process.argv[++i];
+            continue;
+        }
+        if (!publicIP) {
+            publicIP = a;
+            continue;
+        }
+        if (!logLevel) {
+            logLevel = a;
+            continue;
+        }
+    }
 
     const proxy = new ChromeProxyService({
-        PUBLIC_IP: publicIP,
-        LOG_LEVEL: logLevel
+        PUBLIC_IP: publicIP || undefined,
+        LOG_LEVEL: logLevel || undefined
     });
 
     proxy.start().catch(err => {

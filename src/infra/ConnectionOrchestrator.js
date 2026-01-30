@@ -95,7 +95,7 @@ const DEFAULTS = {
         '192.168.0.2', // ✅ MUDANÇA CRÍTICA: IP público Windows (proxy) PRIMEIRO
         'host.docker.internal', // Docker DNS para Windows host (funciona com proxy e direto)
         '172.17.0.1', // Docker bridge (Linux)
-        '127.0.0.1' // Localhost (container, geralmente não funciona para Chrome externo)
+        '0.0.0.0' // Localhost (container, geralmente não funciona para Chrome externo)
     ],
     connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
 

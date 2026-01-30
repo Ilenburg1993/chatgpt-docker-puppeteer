@@ -1,0 +1,29 @@
+Bindings check report - 2026-01-30T18:17:44-03:00
+
+[STEP] Static scan: src/server
+[OK] No explicit localhost bindings found under ./src/server
+[OK] Static scan (server) finished with no issues.
+
+[STEP] Static scan: src/infra
+[OK] No explicit localhost bindings found under ./src/infra
+[OK] Static scan (infra) finished with no issues.
+
+[STEP] Codemod: fix-bindings.js
+[INFO] Dry-run: running fix-bindings.js (no --apply)
+[INFO] Report written to /workspaces/chatgpt-docker-puppeteer/diagnostics/fix-bindings-report.json
+[INFO] Detected binding occurrences:
+ - src/infra/ConnectionOrchestrator.js (1 change(s))
+
+[DRY RUN] No files modified. Re-run with --apply to apply changes.
+[WARN] Codemod dry-run detected occurrences. Re-run with --apply to apply.
+
+[STEP] Runtime binding checks (ss/netstat)
+[FAIL] Port 3000: not listening
+[FAIL] Port 3001: not listening
+[FAIL] Port 3002: not listening
+[FAIL] Port 3008: not listening
+[FAIL] Port 9100: not listening
+[FAIL] Port 9224: not listening
+[FAIL] Runtime check detected issues.
+
+[END] Report generated: diagnostics/bindings_report.txt
