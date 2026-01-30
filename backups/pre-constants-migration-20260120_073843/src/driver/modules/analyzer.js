@@ -1,4 +1,4 @@
-/* eslint-disable linebreak-style */
+ 
 /* ==========================================================================
    src/driver/modules/analyzer.js
    Audit Level: 500 — Instrumented SADI Fortress (IPC 2.0)
@@ -235,7 +235,7 @@ async function findChatInputSelector(page, langCode = 'en') {
     return page.evaluate(
         async (terms, svgSigs, logicFnStr) => {
             // FIXME: Refatorar para evitar new Function() - risco de segurança
-            // eslint-disable-next-line no-new-func
+             
             const SADI = new Function(`return (${logicFnStr})`)()(terms, svgSigs);
             const candidates = [
                 ...new Set(SADI.query('textarea, div[contenteditable="true"], [role="textbox"]'))
@@ -284,7 +284,7 @@ async function findSendButtonSelector(page, inputProtocol) {
     return page.evaluate(
         async (proto, svgSigs, logicFnStr) => {
             // FIXME: Refatorar para evitar new Function() - risco de segurança
-            // eslint-disable-next-line no-new-func
+             
             const SADI = new Function(`return (${logicFnStr})`)()([], svgSigs);
             const input = SADI.query(proto.selector)[0];
             if (!input) {
@@ -342,7 +342,7 @@ async function findSendButtonSelector(page, inputProtocol) {
 async function findResponseArea(page) {
     return page.evaluate(async logicFnStr => {
         // FIXME: Refatorar para evitar new Function() - risco de segurança
-        // eslint-disable-next-line no-new-func
+         
         const SADI = new Function(`return (${logicFnStr})`)()([], []);
         const containers = SADI.query('div, article, section, pre').filter(c => c.innerText.length > 5);
         const snapshot = containers.map(c => ({ el: c, len: c.innerText.length }));
@@ -382,7 +382,7 @@ async function validateCandidateInteractivity(page, protocol) {
         return page.evaluate(
             (proto, logicFnStr) => {
                 // FIXME: Refatorar para evitar new Function() - risco de segurança
-                // eslint-disable-next-line no-new-func
+                 
                 const SADI = new Function(`return (${logicFnStr})`)()([], []);
                 const el = SADI.query(proto.selector)[0];
                 if (!el) {

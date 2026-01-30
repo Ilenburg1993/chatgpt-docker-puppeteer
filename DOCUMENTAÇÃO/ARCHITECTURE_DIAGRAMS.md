@@ -10,7 +10,7 @@ C4Context
 
     Person(user, "Usuário/Desenvolvedor", "Cria tarefas e monitora execução")
     System(agent, "Agent System", "Sistema autônomo de controle de LLMs via browser automation")
-    System_Ext(chrome, "Chrome Browser", "Navegador com remote debugging (porta 9222)")
+    System_Ext(chrome, "Chrome Browser", "Navegador com remote debugging (porta 9224)")
     System_Ext(llm, "LLM Services", "ChatGPT, Gemini, etc")
 
     Rel(user, agent, "Envia tarefas, monitora", "HTTP/WebSocket")
@@ -302,7 +302,7 @@ erDiagram
 ```mermaid
 graph TB
     subgraph "Host Machine"
-        Chrome[Chrome :9222<br/>Remote Debug]
+        Chrome[Chrome :9224<br/>Remote Debug]
 
         subgraph "PM2 Ecosystem"
             Agent[Agent Process<br/>index.js]

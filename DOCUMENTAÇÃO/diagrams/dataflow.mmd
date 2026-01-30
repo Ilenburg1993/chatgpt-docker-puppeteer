@@ -1,0 +1,21 @@
+%% Diagrama de Fluxo de Dados — Exemplo: processamento de tarefa
+flowchart TD
+  TaskQueue[Task Queue (fila/)]
+  Kernel[Kernel\nDecision Engine]
+  DriverAdapter[DriverNERVAdapter]
+  BrowserPool[Browser Pool]
+  Browser[Chromium Instance]
+  Execute[Executa ação no browser]
+  ResponseStore[Response Store (respostas/)]
+  Server[Server Socket.io]
+  Forensics[Forensics / Logging]
+
+  TaskQueue --> Kernel
+  Kernel --> DriverAdapter
+  DriverAdapter --> BrowserPool
+  BrowserPool --> Browser
+  Browser --> Execute
+  Execute --> ResponseStore
+  ResponseStore --> Server
+  DriverAdapter --> Forensics
+  Kernel --> Forensics

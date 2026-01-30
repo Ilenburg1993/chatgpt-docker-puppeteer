@@ -96,7 +96,7 @@ NODE_ENV=development
 
 # Browser (external mode for debugging)
 BROWSER_MODE=external
-EXTERNAL_BROWSER_PORT=9222
+EXTERNAL_BROWSER_PORT=9224
 
 # Kernel
 MAX_WORKERS=1
@@ -120,14 +120,14 @@ DASHBOARD_PORT=3008
 ```bash
 # Windows (cmd)
 "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
-  --remote-debugging-port=9222 ^
+  --remote-debugging-port=9224 ^
   --user-data-dir="%USERPROFILE%\chrome-debug" ^
   --no-first-run ^
   --no-default-browser-check
 
 # Linux/macOS (bash)
 google-chrome \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir=$HOME/chrome-debug \
   --no-first-run \
   --no-default-browser-check &
@@ -135,7 +135,7 @@ google-chrome \
 
 **Verificar conexão**:
 ```bash
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version  # container-facing endpoint (proxy)
 # {"Browser":"Chrome/120.0.6099.109", ...}
 ```
 
@@ -369,10 +369,10 @@ make quick CMD=status
 ### 2. Chrome DevTools (Browser Debugging)
 
 **Connect**:
-1. Browser aberto com `--remote-debugging-port=9222`
+1. Browser aberto com `--remote-debugging-port=9224`
 2. Abra Chrome: `chrome://inspect`
 3. Click "Open dedicated DevTools for Node"
-4. Navigate to `localhost:9222`
+4. Navigate to `localhost:9224`
 
 **Debugging**:
 - **Console**: Execute JavaScript no contexto da page

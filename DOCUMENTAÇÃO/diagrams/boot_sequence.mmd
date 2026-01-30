@@ -1,0 +1,18 @@
+%% Diagrama de Sequência de Boot
+sequenceDiagram
+  participant Main as main.js
+  participant Config as Config/Identity
+  participant NERV as NERV
+  participant BrowserPool as BrowserPool
+  participant Kernel as Kernel
+  participant Driver as DriverNERVAdapter
+  participant Server as ServerNERVAdapter
+
+  Main->>Config: CONFIG.reload()\nidentity.initialize()
+  Main->>NERV: createNERV({...})
+  Main->>BrowserPool: new BrowserPoolManager().initialize()
+  Main->>Kernel: createKernel({ nerv })
+  Main->>Driver: new DriverNERVAdapter(nerv, browserPool, CONFIG)
+  Main->>Server: setup HTTP + Socket.io -> new ServerNERVAdapter
+  Server->>Main: httpServer.listen(PORT)
+  Main->>Main: boot complete (all subsystems online)

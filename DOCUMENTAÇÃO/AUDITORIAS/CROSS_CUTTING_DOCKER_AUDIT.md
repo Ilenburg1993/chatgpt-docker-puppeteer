@@ -49,7 +49,7 @@ Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt
 
 1. **Isolamento**: Ambiente reproduzível independente do host
 2. **Portabilidade**: Windows, Linux, macOS via Docker Desktop
-3. **Chrome Externo**: Conecta-se a Chrome no host via remote debugging (9222)
+3. **Chrome Externo**: Conecta-se a Chrome no host via remote debugging (9224)
 4. **PM2 Runtime**: Executa agente + dashboard usando pm2-runtime
 5. **Hot Reload**: Desenvolvimento com nodemon + volumes montados
 6. **Produção**: Multi-stage build, Alpine, non-root user, health checks
@@ -82,11 +82,11 @@ Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │  Chrome Browser                                        │ │
-│  │  --remote-debugging-port=9222                          │ │
-│  │  Escuta: localhost:9222 (CDP - Chrome DevTools)       │ │
+│  │  --remote-debugging-port=9224                          │ │
+│  │  Escuta: localhost:9224 (CDP - Chrome DevTools)       │ │
 │  └─────────────────────┬──────────────────────────────────┘ │
 │                        │                                     │
-│                        │ TCP 9222 (Chrome DevTools Protocol)│
+│                        │ TCP 9224 (Chrome DevTools Protocol)│
 │                        ↓                                     │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │  Docker Container: chatgpt-agent                       │ │
@@ -96,7 +96,7 @@ Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt
 │  │  │                                                   │  │ │
 │  │  │  App 1: agente-gpt (./index.js)                  │  │ │
 │  │  │    └─> Puppeteer connects to ws://host.docker... │  │ │
-│  │  │        .internal:9222                             │  │ │
+│  │  │        .internal:9224                             │  │ │
 │  │  │                                                   │  │ │
 │  │  │  App 2: dashboard-web (./src/server/main.js)     │  │ │
 │  │  │    └─> Express :3008 + Socket.io                 │  │ │
@@ -185,7 +185,7 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NODE_ENV=production \
     TZ=UTC \
-    CHROME_REMOTE_DEBUGGING_PORT=9222
+    CHROME_REMOTE_DEBUGGING_PORT=9224
 
 COPY --from=deps /app/node_modules ./node_modules
 
@@ -225,7 +225,7 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 - `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true`: Não baixa Chrome
 - `NODE_ENV=production`: Otimizações Node.js
 - `TZ=UTC`: Timezone consistente (⚠️ ver P4.1)
-- `CHROME_REMOTE_DEBUGGING_PORT=9222`: Porta esperada
+- `CHROME_REMOTE_DEBUGGING_PORT=9224`: Porta esperada
 
 **✅ Copy Order** (linhas 38-48):
 - Deps primeiro (raramente muda)
@@ -309,7 +309,7 @@ agent:
   environment:
     - NODE_ENV=production
     - TZ=America/Sao_Paulo
-    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
   volumes:
     - ./fila:/app/fila
@@ -409,7 +409,7 @@ agent-dev:
   environment:
     - NODE_ENV=development
     - TZ=America/Sao_Paulo
-    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
   volumes:
     - .:/app
@@ -894,11 +894,11 @@ volumes:
 ┌─────────────────────────────────────────────────────┐
 │  HOST (Windows/Linux/macOS)                         │
 │                                                     │
-│  Chrome --remote-debugging-port=9222                │
-│    └─> Escuta: localhost:9222 (CDP)                │
+│  Chrome --remote-debugging-port=9224                │
+│    └─> Escuta: localhost:9224 (CDP)                │
 │    └─> Accept: 127.0.0.1, ::1, host.docker.internal│
 └────────────────┬────────────────────────────────────┘
-                 │ TCP 9222
+                 │ TCP 9224
                  ↓
 ┌─────────────────────────────────────────────────────┐
 │  CONTAINER                                          │
@@ -907,7 +907,7 @@ volumes:
 │    browserWSEndpoint: CHROME_WS_ENDPOINT            │
 │  })                                                 │
 │                                                     │
-│  CHROME_WS_ENDPOINT = ws://host.docker.internal:9222│
+│  CHROME_WS_ENDPOINT = ws://host.docker.internal:9224│
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -928,9 +928,9 @@ volumes:
 
 ```javascript
 const MULTI_HOST_DISCOVERY = [
-    'ws://localhost:9222',              // Dev local (host = container)
-    'ws://host.docker.internal:9222',   // Docker Desktop (Win/Mac)
-    'ws://172.17.0.1:9222'              // Linux bridge network
+    'ws://localhost:9224',              // Dev local (host = container)
+    'ws://host.docker.internal:9224',   // Docker Desktop (Win/Mac)
+    'ws://172.17.0.1:9224'              // Linux bridge network
 ];
 ```
 
@@ -945,21 +945,21 @@ const MULTI_HOST_DISCOVERY = [
 **Windows** (PowerShell):
 ```powershell
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" `
-  --remote-debugging-port=9222 `
+  --remote-debugging-port=9224 `
   --user-data-dir="C:\chrome-automation-profile"
 ```
 
 **Linux**:
 ```bash
 google-chrome \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir="$HOME/chrome-automation-profile"
 ```
 
 **macOS**:
 ```bash
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir="$HOME/chrome-automation-profile"
 ```
 
@@ -967,13 +967,13 @@ google-chrome \
 
 **Teste 1**: Chrome rodando?
 ```bash
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version
 # Deve retornar JSON com versão do Chrome
 ```
 
 **Teste 2**: Container acessa?
 ```bash
-docker exec chatgpt-agent curl http://host.docker.internal:9222/json/version
+docker exec chatgpt-agent curl http://host.docker.internal:9224/json/version
 # Deve retornar mesmo JSON
 ```
 
@@ -996,7 +996,7 @@ docker exec chatgpt-agent curl http://host.docker.internal:9222/json/version
 | Porta | Serviço                | Usado por           | Externo?   |
 | ----- | ---------------------- | ------------------- | ---------- |
 | 3008  | Dashboard HTTP         | Express + Socket.io | ✅ Host     |
-| 9222  | Chrome CDP             | Puppeteer → Chrome  | ❌ Interno  |
+| 9224  | Chrome CDP             | Puppeteer → Chrome  | ❌ Interno  |
 | 9229  | Node.js debugger       | Chrome DevTools     | ✅ Dev only |
 | 9230  | Node.js debugger alt   | Chrome DevTools     | ✅ Dev only |
 | 2998  | Dashboard API (antigo) | Descontinuado?      | ⚠️ P4.8     |
@@ -1028,14 +1028,14 @@ networks:
 network_mode: host
 ```
 
-**Prós**: Chrome em `localhost:9222` acessível diretamente
+**Prós**: Chrome em `localhost:9224` acessível diretamente
 **Contras**: Perde isolamento de rede, conflito de portas
 **Recomendação**: ❌ Não usar, `extra_hosts` é melhor
 
 ### 9.3 Firewall Considerations
 
 **Host Firewall**:
-- Porta 9222 deve estar acessível para container
+- Porta 9224 deve estar acessível para container
 - Windows Defender: Pode bloquear primeira vez (permitir)
 - Linux iptables: Geralmente OK com Docker
 
@@ -1333,7 +1333,7 @@ snyk container test chatgpt-agent:latest
 
 **Análise**:
 - ✅ Bridge network dedicada
-- ✅ Container não expõe 9222 (Chrome)
+- ✅ Container não expõe 9224 (Chrome)
 - ✅ Apenas 3008 público
 
 ### 12.6 Resource Limits
@@ -1618,9 +1618,9 @@ chmod +x scripts/setup-devcontainer.sh
 **Problema**:
 ```javascript
 const MULTI_HOST_DISCOVERY = [
-    'ws://localhost:9222',
-    'ws://host.docker.internal:9222',
-    'ws://172.17.0.1:9222'  // ← Hardcoded (pode variar)
+    'ws://localhost:9224',
+    'ws://host.docker.internal:9224',
+    'ws://172.17.0.1:9224'  // ← Hardcoded (pode variar)
 ];
 ```
 
@@ -1634,9 +1634,9 @@ const MULTI_HOST_DISCOVERY = [
 const gateway = process.env.DOCKER_GATEWAY || '172.17.0.1';
 
 const MULTI_HOST_DISCOVERY = [
-    'ws://localhost:9222',
-    'ws://host.docker.internal:9222',
-    `ws://${gateway}:9222`
+    'ws://localhost:9224',
+    'ws://host.docker.internal:9224',
+    `ws://${gateway}:9224`
 ];
 ```
 
@@ -1683,7 +1683,7 @@ const MULTI_HOST_DISCOVERY = [
 **Localização**: Documentação faltante
 
 **Problema**:
-- Primeira vez rodando Docker no Windows, firewall pode bloquear 9222
+- Primeira vez rodando Docker no Windows, firewall pode bloquear 9224
 - Usuário não sabe permitir acesso
 
 **Impacto**: 🟡 Médio (experiência do usuário)
@@ -1692,7 +1692,7 @@ const MULTI_HOST_DISCOVERY = [
 ```markdown
 ### Firewall Windows (Primeira Execução)
 
-Windows Defender pode bloquear Chrome na porta 9222:
+Windows Defender pode bloquear Chrome na porta 9224:
 
 1. Popup "Windows Defender Firewall" aparece
 2. Marcar "Redes privadas"
@@ -1701,7 +1701,7 @@ Windows Defender pode bloquear Chrome na porta 9222:
 Alternativa (manual):
 - Painel de Controle → Firewall → Permitir app
 - Adicionar Chrome: `C:\Program Files\Google\Chrome\Application\chrome.exe`
-- Permitir porta: 9222 (TCP entrada)
+- Permitir porta: 9224 (TCP entrada)
 ```
 
 **Tempo**: 5 minutos
@@ -1778,7 +1778,7 @@ router.get('/api/health', async (req, res) => {
 **Correção**: Criar `.env.example`
 ```bash
 # Chrome Remote Debugging
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
 # Server
 PORT=3008

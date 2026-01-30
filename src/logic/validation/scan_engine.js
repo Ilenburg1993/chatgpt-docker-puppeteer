@@ -25,7 +25,7 @@ const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/f
  * @param {AbortSignal} signal - Sinal para interrupção imediata.
  * @returns {Promise<object>} { ok: boolean, reason: string|null }
  */
-// eslint-disable-next-line complexity -- Validation scanning requires comprehensive checks
+ 
 async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = null) {
     let fileStream = null;
 

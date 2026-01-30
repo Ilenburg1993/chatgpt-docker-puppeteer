@@ -15,7 +15,7 @@
     "uptime": 3600,
     "chrome": {
         "connected": true,
-        "endpoint": "http://host.docker.internal:9222",
+        "endpoint": "http://host.docker.internal:9224",
         "version": "Chrome/120.0.0.0",
         "latency_ms": 15
     },
@@ -39,18 +39,11 @@
     "uptime": 3600,
     "chrome": {
         "connected": false,
-        "endpoint": "http://host.docker.internal:9222",
+        "endpoint": "http://host.docker.internal:9224",
         "version": null,
         "latency_ms": 0
     },
-    "queue": {
-        "pending": 5,
-        "running": 0
-    },
-    "memory": {
-        "usage_mb": 245,
-        "total_mb": 512
-    }
+    "total_mb": 512
 }
 ```
 
@@ -107,17 +100,15 @@
             "disk_info_raw": "Filesystem /dev/sda1 78G 45G 30G 61%"
         },
         "dna": {
-            "ok": true,
-            "version": 42
-        },
-        "chrome": {
+            "chrome": {
             "connected": true,
-            "endpoint": "http://host.docker.internal:9222",
+            "endpoint": "http://host.docker.internal:9224",
             "version": "Chrome/120.0.0.0",
             "protocol": "1.3",
             "user_agent": "Mozilla/5.0...",
-            "ws_endpoint": "ws://host.docker.internal:9222/devtools/browser/...",
+            "ws_endpoint": "ws://host.docker.internal:9224/devtools/browser/...",
             "latency_ms": 15
+        },
         },
         "queue": {
             "pending": 5,
@@ -211,7 +202,7 @@
 
 ```bash
 # Start Chrome
-chrome --remote-debugging-port=9222
+chrome --remote-debugging-port=9224
 
 # Start agent
 npm run dev
@@ -321,10 +312,10 @@ healthcheck:
 
 1. Verify Chrome is running:
     ```bash
-    curl http://localhost:9222/json/version
+    curl http://localhost:9224/json/version
     ```
 2. Check `CHROME_WS_ENDPOINT` in `.env`
-3. Verify firewall allows port 9222
+3. Verify firewall allows port 9224
 4. For Docker: ensure `host.docker.internal` resolves
 
 ### High Memory Usage

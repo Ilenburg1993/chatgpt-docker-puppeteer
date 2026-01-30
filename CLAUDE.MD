@@ -43,7 +43,7 @@ src/
 ```
 1. Config & Identity    → Load config.json, establish robot_id
 2. NERV Initialization  → Event bus (local + Socket.io hybrid)
-3. Browser Pool Setup   → Connect to 3x Chrome instances (port 9222)
+3. Browser Pool Setup   → Connect to 3x Chrome instances (port 9224)
 4. Kernel Startup       → 20Hz execution loop, policy engine
 5. Adapter Init         → Driver↔NERV & Server↔NERV bridges
 6. Web Server Startup   → Express + Socket.io on port 3008
@@ -175,7 +175,7 @@ make logs            # View logs
 - **Browser Mode**: headless/headful (config.json → puppeteer.headless)
 - **Pool Size**: Chrome instance count (config.json → browser.poolSize, default: 3)
 - **Server Port**: API/dashboard port (config.json → server.port, default: 3008)
-- **Chrome Port**: Remote debugging port (default: 9222)
+- **Chrome Port**: Remote debugging port (default: 9224)
 - **Kernel Loop**: Execution frequency (20Hz = 50ms interval)
 
 ---
@@ -347,7 +347,7 @@ git push -u origin claude/feature-name
 ## Troubleshooting Common Issues
 
 ### Browser Connection Issues
-- Check Chrome is running on port 9222: `curl http://localhost:9222/json/version`
+- Check Chrome is running on port 9224: `curl http://localhost:9224/json/version`
 - Verify `chrome-config.json` settings
 - Check logs in `logs/` directory
 

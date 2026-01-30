@@ -12,7 +12,6 @@ const EventEmitter = require('events');
 const { log } = require('./logger');
 const PATHS = require('@infra/fs/paths');
 const { safeReadJSON } = require('@infra/fs/safe_read');
-
 /* --------------------------------------------------------------------------
    ENV VALIDATION (P8.5)
 -------------------------------------------------------------------------- */
@@ -46,7 +45,7 @@ const ConfigSchema = z
     .object({
         // --- Infraestrutura Base ---
         BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher'),
-        DEBUG_PORT: z.string().url().default('http://localhost:9222'),
+        DEBUG_PORT: z.string().url().default('http://localhost:9224'),
         IDLE_SLEEP: z.number().min(500).default(3000),
 
         // --- Engine Rhythm (Ritmo do Motor) ---
@@ -243,6 +242,16 @@ class ConfigurationManager extends EventEmitter {
     }
     get ADAPTIVE_COOLDOWN_MS() {
         return this.currentConfig.ADAPTIVE_COOLDOWN_MS;
+    }
+
+    /**
+     * Generic getter method for accessing config values with default fallback
+     * @param {string} key - Configuration key
+     * @param {*} defaultValue - Default value if key not found
+     * @returns {*} Configuration value or default
+     */
+    get(key, defaultValue) {
+        return this.currentConfig[key] !== undefined ? this.currentConfig[key] : defaultValue;
     }
 }
 

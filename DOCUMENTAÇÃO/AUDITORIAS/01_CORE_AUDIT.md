@@ -110,7 +110,7 @@ src/core/
 **Schema Validado**:
 ```javascript
 ConfigSchema = z.object({
-    DEBUG_PORT: z.string().url().default('http://localhost:9222'),
+    DEBUG_PORT: z.string().url().default('http://localhost:9224'),
     IDLE_SLEEP: z.number().min(500).default(3000),
     CYCLE_DELAY: z.number().min(0).default(2000),
     TASK_TIMEOUT_MS: z.number().default(1800000),

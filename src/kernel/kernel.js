@@ -27,6 +27,8 @@ const { PolicyEngine } = require('./policy_engine/policy_engine');
 const { ExecutionEngine } = require('./execution_engine/execution_engine');
 const { KernelTelemetry } = require('./telemetry/kernel_telemetry');
 const { KernelNERVBridge } = require('./nerv_bridge/kernel_nerv_bridge');
+const { OrchestratorEngine } = require('../orchestrator/orchestrator_engine');
+const { TaskExecutionOrchestrator } = require('./task_execution_orchestrator');
 
 /* ===========================
    Fábrica do Kernel
@@ -63,6 +65,7 @@ const { KernelNERVBridge } = require('./nerv_bridge/kernel_nerv_bridge');
  */
 function createKernel({
     nerv,
+    contextManager = null,
     telemetry: telemetryOptions = {},
     policy: policyLimits = {},
     loop: loopOptions = {}
@@ -117,7 +120,16 @@ function createKernel({
     });
 
     /* =========================================================
-     5. EXECUTION ENGINE — Motor semântico de decisão
+     5. ORCHESTRATOR ENGINE — Estratégias de execução (V2.0)
+  ========================================================= */
+
+    const orchestrator = new OrchestratorEngine({
+        nerv,
+        contextManager // V2.0: Compartilha ContextManager com MissionManager
+    });
+
+    /* =========================================================
+     6. EXECUTION ENGINE — Motor semântico de decisão
   ========================================================= */
 
     const executionEngine = new ExecutionEngine({
@@ -128,18 +140,28 @@ function createKernel({
     });
 
     /* =========================================================
-     6. NERV BRIDGE — Ponte de integração KERNEL↔NERV
+     7. NERV BRIDGE — Ponte de integração KERNEL↔NERV
   ========================================================= */
 
     const nervBridge = new KernelNERVBridge({
         nerv,
         taskRuntime,
         observationStore,
-        telemetry
+        telemetry,
+        orchestrator  // V2.0: Injeta orchestrator para interceptar execuções
     });
 
     /* =========================================================
-     7. KERNEL LOOP — Tempo soberano e ciclo executivo
+     8. TASK EXECUTION ORCHESTRATOR — Orquestração V5 (V2.0)
+  ========================================================= */
+
+    const taskExecutor = new TaskExecutionOrchestrator({
+        nerv,
+        nervBridge
+    });
+
+    /* =========================================================
+     9. KERNEL LOOP — Tempo soberano e ciclo executivo
   ========================================================= */
 
     const kernelLoop = new KernelLoop({
@@ -156,8 +178,10 @@ function createKernel({
             'TaskRuntime',
             'ObservationStore',
             'PolicyEngine',
+            'OrchestratorEngine',          // V2.0: Estratégias de execução
             'ExecutionEngine',
             'KernelNERVBridge',
+            'TaskExecutionOrchestrator',   // V2.0: Orquestração V5
             'KernelLoop'
         ],
         at: Date.now()
@@ -244,6 +268,18 @@ function createKernel({
         },
 
         /**
+         * Executa uma task V5 (NOVO em V2.0).
+         * Integra com OrchestratorEngine para suportar strategies (ITERATIVE, MULTI_STEP, etc).
+         *
+         * @param {Object} task - Task V5
+         * @param {string} correlationId - ID de correlação NERV
+         * @returns {Promise<void>}
+         */
+        async executeTask(task, correlationId) {
+            return taskExecutor.executeTask(task, correlationId);
+        },
+
+        /**
          * Shutdown gracioso do KERNEL.
          * Para o loop de execução e limpa recursos.
          */
@@ -252,6 +288,10 @@ function createKernel({
 
             if (kernelLoop && typeof kernelLoop.stop === 'function') {
                 kernelLoop.stop();
+            }
+
+            if (taskExecutor && typeof taskExecutor.cleanup === 'function') {
+                taskExecutor.cleanup();
             }
 
             telemetry.info('kernel_shutdown_complete', { at: Date.now() });

@@ -1,0 +1,427 @@
+{
+  "id": "mission-3fd5c2c7-5cde-4983-a1e7-c32bf81fa2f9",
+  "title": "Test Mission",
+  "description": "Test",
+  "status": "pending",
+  "created_at": "2026-01-29T06:35:47.446Z",
+  "updated_at": "2026-01-29T06:35:47.446Z",
+  "workflow": {
+    "id": "workflow-1769668547382",
+    "template_id": "book_writing",
+    "template_version": "1.0",
+    "created_at": "2026-01-29T06:35:47.382Z",
+    "params": {
+      "topic": "Injection Testing",
+      "num_chapters": 5,
+      "target_pages": 300,
+      "target_audience": "intermediate developers",
+      "quality_threshold": 75,
+      "max_iterations_per_chapter": 3
+    },
+    "steps": [
+      {
+        "id": "step-1-outline",
+        "name": "Generate Book Outline",
+        "description": "Gera outline estruturado do livro com 5 capítulos",
+        "execution": {
+          "strategy": "SINGLE_SHOT"
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "schema",
+              "config": {
+                "schema_type": "json",
+                "required_fields": [
+                  "chapters",
+                  "total_pages_estimate"
+                ]
+              }
+            },
+            {
+              "type": "length",
+              "config": {
+                "min_length": 500,
+                "max_length": 5000
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are a technical book author specializing in Injection Testing.\n\nGenerate a detailed book outline with 5 chapters for a 300-page book.\nTarget audience: intermediate developers\n\nReturn a JSON with this structure:\n{\n  \"title\": \"Book Title\",\n  \"chapters\": [\n    {\n      \"number\": 1,\n      \"title\": \"Chapter Title\",\n      \"topics\": [\"topic1\", \"topic2\"],\n      \"estimated_pages\": 20\n    }\n  ],\n  \"total_pages_estimate\": 300\n}\n\nEnsure:\n- Each chapter is cohesive and builds on previous ones\n- Chapters are balanced in complexity\n- Total estimated pages ≈ 300\n- Include practical examples and code snippets in each chapter"
+      },
+      {
+        "id": "step-2-chapter-1",
+        "name": "Write Chapter 1: Chapter 1",
+        "description": "Escreve capítulo 1 com validação iterativa",
+        "execution": {
+          "strategy": "ITERATIVE",
+          "iterative_config": {
+            "max_iterations": "3",
+            "validation_criteria": {
+              "min_quality_score": "75"
+            }
+          }
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "length",
+              "config": {
+                "min_length": 3000,
+                "max_length": 15000,
+                "unit": "characters"
+              }
+            },
+            {
+              "type": "llm_judge",
+              "config": {
+                "criteria": {
+                  "technical_accuracy": {
+                    "weight": 0.35,
+                    "description": "Precisão técnica e correção de conceitos"
+                  },
+                  "code_quality": {
+                    "weight": 0.25,
+                    "description": "Qualidade dos exemplos de código"
+                  },
+                  "clarity": {
+                    "weight": 0.2,
+                    "description": "Clareza de explicações"
+                  },
+                  "practical_value": {
+                    "weight": 0.2,
+                    "description": "Valor prático e aplicabilidade"
+                  }
+                },
+                "min_overall_score": "75",
+                "judge_prompt_template": "Evaluate this technical book chapter on Injection Testing for intermediate developers.\n\nChapter 1: Chapter 1\n\n---\n{{chapter_content}}\n---\n\nEvaluate on these criteria (0-100 each):\n1. Technical Accuracy (35%): Correctness of concepts and explanations\n2. Code Quality (25%): Quality, correctness, and clarity of code examples\n3. Clarity (20%): How well ideas are explained\n4. Practical Value (20%): Usefulness and applicability\n\nReturn JSON:\n{\n  \"scores\": {\n    \"technical_accuracy\": 85,\n    \"code_quality\": 80,\n    \"clarity\": 90,\n    \"practical_value\": 75\n  },\n  \"overall_score\": 82,\n  \"strengths\": [\"Clear explanations\", \"Good examples\"],\n  \"weaknesses\": [\"Missing edge cases\"],\n  \"suggestions\": [\"Add more error handling examples\"]\n}"
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are writing Chapter 1 of a technical book on Injection Testing.\n\nBook Outline:\n{{outline_json}}\n\nPrevious Chapter Context:\n{{previous_chapter_summary}}\n\nChapter 1: Chapter 1\nTopics to cover: {{chapter_topics}}\nTarget pages: {{chapter_estimated_pages}}\nTarget audience: intermediate developers\n\nWrite this chapter with:\n- Clear introduction linking to previous chapter\n- Detailed explanations with practical examples\n- Multiple code snippets demonstrating concepts\n- Real-world use cases\n- Summary and transition to next chapter\n\nEstimated length: ~{{chapter_estimated_words}} words\n\nIMPORTANT: Focus on intermediate developers level. Include executable code examples."
+      },
+      {
+        "id": "step-2-chapter-2",
+        "name": "Write Chapter 2: Chapter 2",
+        "description": "Escreve capítulo 2 com validação iterativa",
+        "execution": {
+          "strategy": "ITERATIVE",
+          "iterative_config": {
+            "max_iterations": "3",
+            "validation_criteria": {
+              "min_quality_score": "75"
+            }
+          }
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "length",
+              "config": {
+                "min_length": 3000,
+                "max_length": 15000,
+                "unit": "characters"
+              }
+            },
+            {
+              "type": "llm_judge",
+              "config": {
+                "criteria": {
+                  "technical_accuracy": {
+                    "weight": 0.35,
+                    "description": "Precisão técnica e correção de conceitos"
+                  },
+                  "code_quality": {
+                    "weight": 0.25,
+                    "description": "Qualidade dos exemplos de código"
+                  },
+                  "clarity": {
+                    "weight": 0.2,
+                    "description": "Clareza de explicações"
+                  },
+                  "practical_value": {
+                    "weight": 0.2,
+                    "description": "Valor prático e aplicabilidade"
+                  }
+                },
+                "min_overall_score": "75",
+                "judge_prompt_template": "Evaluate this technical book chapter on Injection Testing for intermediate developers.\n\nChapter 2: Chapter 2\n\n---\n{{chapter_content}}\n---\n\nEvaluate on these criteria (0-100 each):\n1. Technical Accuracy (35%): Correctness of concepts and explanations\n2. Code Quality (25%): Quality, correctness, and clarity of code examples\n3. Clarity (20%): How well ideas are explained\n4. Practical Value (20%): Usefulness and applicability\n\nReturn JSON:\n{\n  \"scores\": {\n    \"technical_accuracy\": 85,\n    \"code_quality\": 80,\n    \"clarity\": 90,\n    \"practical_value\": 75\n  },\n  \"overall_score\": 82,\n  \"strengths\": [\"Clear explanations\", \"Good examples\"],\n  \"weaknesses\": [\"Missing edge cases\"],\n  \"suggestions\": [\"Add more error handling examples\"]\n}"
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are writing Chapter 2 of a technical book on Injection Testing.\n\nBook Outline:\n{{outline_json}}\n\nPrevious Chapter Context:\n{{previous_chapter_summary}}\n\nChapter 2: Chapter 2\nTopics to cover: {{chapter_topics}}\nTarget pages: {{chapter_estimated_pages}}\nTarget audience: intermediate developers\n\nWrite this chapter with:\n- Clear introduction linking to previous chapter\n- Detailed explanations with practical examples\n- Multiple code snippets demonstrating concepts\n- Real-world use cases\n- Summary and transition to next chapter\n\nEstimated length: ~{{chapter_estimated_words}} words\n\nIMPORTANT: Focus on intermediate developers level. Include executable code examples."
+      },
+      {
+        "id": "step-2-chapter-3",
+        "name": "Write Chapter 3: Chapter 3",
+        "description": "Escreve capítulo 3 com validação iterativa",
+        "execution": {
+          "strategy": "ITERATIVE",
+          "iterative_config": {
+            "max_iterations": "3",
+            "validation_criteria": {
+              "min_quality_score": "75"
+            }
+          }
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "length",
+              "config": {
+                "min_length": 3000,
+                "max_length": 15000,
+                "unit": "characters"
+              }
+            },
+            {
+              "type": "llm_judge",
+              "config": {
+                "criteria": {
+                  "technical_accuracy": {
+                    "weight": 0.35,
+                    "description": "Precisão técnica e correção de conceitos"
+                  },
+                  "code_quality": {
+                    "weight": 0.25,
+                    "description": "Qualidade dos exemplos de código"
+                  },
+                  "clarity": {
+                    "weight": 0.2,
+                    "description": "Clareza de explicações"
+                  },
+                  "practical_value": {
+                    "weight": 0.2,
+                    "description": "Valor prático e aplicabilidade"
+                  }
+                },
+                "min_overall_score": "75",
+                "judge_prompt_template": "Evaluate this technical book chapter on Injection Testing for intermediate developers.\n\nChapter 3: Chapter 3\n\n---\n{{chapter_content}}\n---\n\nEvaluate on these criteria (0-100 each):\n1. Technical Accuracy (35%): Correctness of concepts and explanations\n2. Code Quality (25%): Quality, correctness, and clarity of code examples\n3. Clarity (20%): How well ideas are explained\n4. Practical Value (20%): Usefulness and applicability\n\nReturn JSON:\n{\n  \"scores\": {\n    \"technical_accuracy\": 85,\n    \"code_quality\": 80,\n    \"clarity\": 90,\n    \"practical_value\": 75\n  },\n  \"overall_score\": 82,\n  \"strengths\": [\"Clear explanations\", \"Good examples\"],\n  \"weaknesses\": [\"Missing edge cases\"],\n  \"suggestions\": [\"Add more error handling examples\"]\n}"
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are writing Chapter 3 of a technical book on Injection Testing.\n\nBook Outline:\n{{outline_json}}\n\nPrevious Chapter Context:\n{{previous_chapter_summary}}\n\nChapter 3: Chapter 3\nTopics to cover: {{chapter_topics}}\nTarget pages: {{chapter_estimated_pages}}\nTarget audience: intermediate developers\n\nWrite this chapter with:\n- Clear introduction linking to previous chapter\n- Detailed explanations with practical examples\n- Multiple code snippets demonstrating concepts\n- Real-world use cases\n- Summary and transition to next chapter\n\nEstimated length: ~{{chapter_estimated_words}} words\n\nIMPORTANT: Focus on intermediate developers level. Include executable code examples."
+      },
+      {
+        "id": "step-2-chapter-4",
+        "name": "Write Chapter 4: Chapter 4",
+        "description": "Escreve capítulo 4 com validação iterativa",
+        "execution": {
+          "strategy": "ITERATIVE",
+          "iterative_config": {
+            "max_iterations": "3",
+            "validation_criteria": {
+              "min_quality_score": "75"
+            }
+          }
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "length",
+              "config": {
+                "min_length": 3000,
+                "max_length": 15000,
+                "unit": "characters"
+              }
+            },
+            {
+              "type": "llm_judge",
+              "config": {
+                "criteria": {
+                  "technical_accuracy": {
+                    "weight": 0.35,
+                    "description": "Precisão técnica e correção de conceitos"
+                  },
+                  "code_quality": {
+                    "weight": 0.25,
+                    "description": "Qualidade dos exemplos de código"
+                  },
+                  "clarity": {
+                    "weight": 0.2,
+                    "description": "Clareza de explicações"
+                  },
+                  "practical_value": {
+                    "weight": 0.2,
+                    "description": "Valor prático e aplicabilidade"
+                  }
+                },
+                "min_overall_score": "75",
+                "judge_prompt_template": "Evaluate this technical book chapter on Injection Testing for intermediate developers.\n\nChapter 4: Chapter 4\n\n---\n{{chapter_content}}\n---\n\nEvaluate on these criteria (0-100 each):\n1. Technical Accuracy (35%): Correctness of concepts and explanations\n2. Code Quality (25%): Quality, correctness, and clarity of code examples\n3. Clarity (20%): How well ideas are explained\n4. Practical Value (20%): Usefulness and applicability\n\nReturn JSON:\n{\n  \"scores\": {\n    \"technical_accuracy\": 85,\n    \"code_quality\": 80,\n    \"clarity\": 90,\n    \"practical_value\": 75\n  },\n  \"overall_score\": 82,\n  \"strengths\": [\"Clear explanations\", \"Good examples\"],\n  \"weaknesses\": [\"Missing edge cases\"],\n  \"suggestions\": [\"Add more error handling examples\"]\n}"
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are writing Chapter 4 of a technical book on Injection Testing.\n\nBook Outline:\n{{outline_json}}\n\nPrevious Chapter Context:\n{{previous_chapter_summary}}\n\nChapter 4: Chapter 4\nTopics to cover: {{chapter_topics}}\nTarget pages: {{chapter_estimated_pages}}\nTarget audience: intermediate developers\n\nWrite this chapter with:\n- Clear introduction linking to previous chapter\n- Detailed explanations with practical examples\n- Multiple code snippets demonstrating concepts\n- Real-world use cases\n- Summary and transition to next chapter\n\nEstimated length: ~{{chapter_estimated_words}} words\n\nIMPORTANT: Focus on intermediate developers level. Include executable code examples."
+      },
+      {
+        "id": "step-2-chapter-5",
+        "name": "Write Chapter 5: Chapter 5",
+        "description": "Escreve capítulo 5 com validação iterativa",
+        "execution": {
+          "strategy": "ITERATIVE",
+          "iterative_config": {
+            "max_iterations": "3",
+            "validation_criteria": {
+              "min_quality_score": "75"
+            }
+          }
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "length",
+              "config": {
+                "min_length": 3000,
+                "max_length": 15000,
+                "unit": "characters"
+              }
+            },
+            {
+              "type": "llm_judge",
+              "config": {
+                "criteria": {
+                  "technical_accuracy": {
+                    "weight": 0.35,
+                    "description": "Precisão técnica e correção de conceitos"
+                  },
+                  "code_quality": {
+                    "weight": 0.25,
+                    "description": "Qualidade dos exemplos de código"
+                  },
+                  "clarity": {
+                    "weight": 0.2,
+                    "description": "Clareza de explicações"
+                  },
+                  "practical_value": {
+                    "weight": 0.2,
+                    "description": "Valor prático e aplicabilidade"
+                  }
+                },
+                "min_overall_score": "75",
+                "judge_prompt_template": "Evaluate this technical book chapter on Injection Testing for intermediate developers.\n\nChapter 5: Chapter 5\n\n---\n{{chapter_content}}\n---\n\nEvaluate on these criteria (0-100 each):\n1. Technical Accuracy (35%): Correctness of concepts and explanations\n2. Code Quality (25%): Quality, correctness, and clarity of code examples\n3. Clarity (20%): How well ideas are explained\n4. Practical Value (20%): Usefulness and applicability\n\nReturn JSON:\n{\n  \"scores\": {\n    \"technical_accuracy\": 85,\n    \"code_quality\": 80,\n    \"clarity\": 90,\n    \"practical_value\": 75\n  },\n  \"overall_score\": 82,\n  \"strengths\": [\"Clear explanations\", \"Good examples\"],\n  \"weaknesses\": [\"Missing edge cases\"],\n  \"suggestions\": [\"Add more error handling examples\"]\n}"
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are writing Chapter 5 of a technical book on Injection Testing.\n\nBook Outline:\n{{outline_json}}\n\nPrevious Chapter Context:\n{{previous_chapter_summary}}\n\nChapter 5: Chapter 5\nTopics to cover: {{chapter_topics}}\nTarget pages: {{chapter_estimated_pages}}\nTarget audience: intermediate developers\n\nWrite this chapter with:\n- Clear introduction linking to previous chapter\n- Detailed explanations with practical examples\n- Multiple code snippets demonstrating concepts\n- Real-world use cases\n- Summary and transition to next chapter\n\nEstimated length: ~{{chapter_estimated_words}} words\n\nIMPORTANT: Focus on intermediate developers level. Include executable code examples."
+      },
+      {
+        "id": "step-final-consistency",
+        "name": "Consistency Check & Final Review",
+        "description": "Valida consistência entre capítulos e gera relatório final",
+        "execution": {
+          "strategy": "SINGLE_SHOT"
+        },
+        "validation": {
+          "validators": [
+            {
+              "type": "schema",
+              "config": {
+                "schema_type": "json",
+                "required_fields": [
+                  "consistency_score",
+                  "issues",
+                  "recommendations"
+                ]
+              }
+            }
+          ]
+        },
+        "prompt_template": "You are reviewing a complete 5-chapter technical book on Injection Testing.\n\nBook Outline:\n{{outline_json}}\n\nAll Chapters:\n{{all_chapters_text}}\n\nPerform a consistency check:\n1. Verify concepts are introduced in logical order\n2. Check for contradictions between chapters\n3. Ensure code examples are compatible\n4. Validate terminology consistency\n5. Check completeness of coverage\n\nReturn JSON:\n{\n  \"consistency_score\": 85,\n  \"issues\": [\n    {\n      \"type\": \"contradiction\",\n      \"chapters\": [3, 7],\n      \"description\": \"Different error handling patterns\",\n      \"severity\": \"medium\"\n    }\n  ],\n  \"recommendations\": [\n    \"Standardize error handling in chapters 3 and 7\",\n    \"Add cross-references between chapters 5 and 9\"\n  ],\n  \"strengths\": [\n    \"Excellent progression of concepts\",\n    \"Consistent code style\"\n  ],\n  \"overall_assessment\": \"Book is well-structured and ready for publication with minor revisions.\"\n}"
+      }
+    ],
+    "metadata": {
+      "total_steps": 7,
+      "estimated_cost": {
+        "description": "Estimativa de custo para missão completa",
+        "assumptions": {
+          "avg_tokens_per_chapter": 8000,
+          "iterations_per_chapter": 2,
+          "judge_tokens_per_validation": 2000
+        },
+        "calculation": {
+          "outline_tokens": 4000,
+          "chapter_writing": "{{num_chapters}} * {{avg_tokens_per_chapter}} * {{iterations_per_chapter}}",
+          "validation_tokens": "{{num_chapters}} * {{judge_tokens_per_validation}} * {{iterations_per_chapter}}",
+          "consistency_check": 10000,
+          "total_tokens_estimate": "~250000 for 15 chapters with 2 iterations each"
+        },
+        "cost_usd_estimate": {
+          "chatgpt_4": "~$5-8",
+          "chatgpt_35_turbo": "~$0.50-1.00",
+          "gemini_pro": "~$0.30-0.60"
+        }
+      },
+      "estimated_time": {
+        "description": "Estimativa de tempo de execução",
+        "steps": {
+          "outline": "2-5 min",
+          "per_chapter": "3-8 min (depending on iterations)",
+          "consistency_check": "5-10 min"
+        },
+        "total_time": {
+          "optimistic": "1-2 hours (15 chapters, 1 iteration each)",
+          "realistic": "4-6 hours (15 chapters, 2 iterations average)",
+          "pessimistic": "12-24 hours (15 chapters, 3 iterations each)"
+        }
+      },
+      "success_criteria": {
+        "all_chapters_written": true,
+        "all_validations_passed": true,
+        "consistency_score_min": 80,
+        "quality_threshold_met": true,
+        "total_pages_within_range": {
+          "min": "{{target_pages}} * 0.9",
+          "max": "{{target_pages}} * 1.1"
+        }
+      }
+    }
+  },
+  "progress": {
+    "current_step": 0,
+    "total_steps": 7,
+    "completed_tasks": 0,
+    "total_tasks": 7,
+    "percent": 0
+  },
+  "config": {
+    "template": "book_writing",
+    "params": {
+      "topic": "Injection Testing",
+      "num_chapters": 5
+    }
+  },
+  "feedback": [
+    {
+      "ts": "2026-01-29T06:35:47.605Z",
+      "content": "Add more code examples",
+      "metadata": {
+        "processed_id": "feedback-1769668547544-r19lcqrdm",
+        "category": "CONTENT",
+        "action_items": [
+          "Add more code examples"
+        ],
+        "patterns": [
+          "Add: code examples"
+        ]
+      }
+    }
+  ],
+  "checkpoints": [],
+  "history": [
+    {
+      "ts": "2026-01-29T06:35:47.446Z",
+      "event": "MISSION_CREATED",
+      "msg": "Missão criada"
+    },
+    {
+      "ts": "2026-01-29T06:35:47.605Z",
+      "event": "FEEDBACK_ADDED",
+      "msg": "Feedback: Add more code examples (CONTENT)..."
+    }
+  ]
+}

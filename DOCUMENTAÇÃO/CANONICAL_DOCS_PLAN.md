@@ -641,7 +641,7 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 ## Installation & Setup
 
-Q: Chrome não conecta na porta 9222
+Q: Chrome não conecta na porta 9224
 Q: Erro "Cannot find module"
 Q: Permissões de arquivo no Docker
 
@@ -718,13 +718,13 @@ npm install
 **Windows:**
 
 ```cmd
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation"
 ```
 
 **Linux/macOS:**
 
 ```bash
-google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation"
+google-chrome --remote-debugging-port=9224 --user-data-dir="~/chrome-automation"
 ```
 
 ### Step 4: Configure (Optional)
@@ -743,7 +743,7 @@ npm run dev
 ## Verification
 
 - Dashboard: http://localhost:3008
-- Chrome DevTools: http://localhost:9222
+- Chrome DevTools: http://localhost:9224
 
 ## Creating Your First Task
 

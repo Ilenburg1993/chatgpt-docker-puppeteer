@@ -551,12 +551,12 @@ chmod +x .husky/pre-commit
 
 **Sintoma**: Timeout ao conectar browser externo
 
-**Causa**: Browser externo não iniciado ou port 9222 ocupado
+**Causa**: Browser externo não iniciado ou porta 9224 (container-facing) ocupada
 
 **Workaround**:
 ```bash
-# Start external browser BEFORE test
-chrome --remote-debugging-port=9222 &
+# Start external browser BEFORE test (usar porta container-facing 9224)
+chrome --remote-debugging-port=9224 &
 
 # Run test
 node tests/test_integration_complete.js

@@ -90,7 +90,7 @@ async initialize() {
 ```
 
 **Ponto de Atenção**:
-- Pool usa mesma conexão com contextos isolados (não múltiplas portas 9222/9223/9224)
+- Pool usa mesma conexão com contextos isolados (não múltiplas portas 9224/9223/9224)
 - Health checks detectam crashes mas não degradação sutil
 
 ---
@@ -125,8 +125,8 @@ LAUNCHER → BROWSER_URL → WS_ENDPOINT → EXECUTABLE_PATH → FAIL
 **Cache Structure**:
 ```json
 {
-  "wsEndpoint": "ws://127.0.0.1:9222/devtools/browser/...",
-  "browserURL": "http://localhost:9222",
+  "wsEndpoint": "ws://127.0.0.1:9224/devtools/browser/...",
+  "browserURL": "http://localhost:9224",
   "timestamp": 1706789123456,
   "env": "docker|wsl|linux"
 }
@@ -407,7 +407,7 @@ for (let i = 0; i < poolSize; i++) {
 // IDEAL:
 for (let i = 0; i < poolSize; i++) {
   const browser = await orchestrator.connect({
-    browserURL: `http://localhost:${9222 + i}` // Portas diferentes
+    browserURL: `http://localhost:${9224 + i}` // Portas diferentes
   });
   // ...
 }
@@ -731,7 +731,7 @@ As seguintes melhorias foram identificadas mas **não são prioritárias**:
 #### 4. Browser Pool Multi-Port Isolation
 
 **Problema**: Pool usa mesma conexão com contextos isolados
-**Solução**: Múltiplas portas (9222, 9223, 9224)
+**Solução**: Múltiplas portas (9224, 9223, 9224)
 **Tempo**: 3 horas
 **Status**: Funciona atualmente, mas não é isolamento real
 

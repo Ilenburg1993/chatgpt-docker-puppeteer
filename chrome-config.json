@@ -1,22 +1,21 @@
 {
-  "exportedAt": "2026-01-21T16:53:07.641Z",
-  "version": "3.0",
-  "source": "ConnectionOrchestrator + .puppeteerrc.cjs helpers",
+  "exportedAt": "2026-01-30T01:15:00.000Z",
+  "version": "3.1",
+  "source": "ConnectionOrchestrator + .puppeteerrc.cjs helpers + Chrome Proxy Integration",
   "environment": "linux",
   "isDocker": false,
   "connection": {
-    "mode": "launcher",
+    "mode": "wsEndpoint",
     "autoFallback": true,
     "ports": [
-      9222,
-      9223,
-      9224
+      9224,
+      9223
     ],
     "hosts": [
-      "127.0.0.1",
-      "localhost",
+      "192.168.0.2",
       "host.docker.internal",
-      "172.17.0.1"
+      "172.17.0.1",
+      "127.0.0.1"
     ],
     "connectionStrategies": [
       "BROWSER_URL",
@@ -70,25 +69,36 @@
     ]
   },
   "health": {
-    "chromeDebugUrl": "http://localhost:9222/json/version",
-    "chromeDevtoolsUrl": "http://localhost:9222",
+    "chromeDebugUrl": "http://192.168.0.2:9224/json/version",
+    "chromeDevtoolsUrl": "http://192.168.0.2:9224",
+    "chromeProxyUrl": "http://192.168.0.2:9224",
+    "chromeDirectUrl": "http://192.168.0.2",
     "expectedPorts": [
-      9222,
-      9223,
-      9224
+      9224,
+      9223
     ]
   },
+    "chromeProxy": {
+      "enabled": true,
+      "proxyHost": "192.168.0.2",
+      "proxyPort": 9224,
+      "chromeDirectPort": 9224,
+      "documentation": "DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md"
+    },
   "commands": {
-    "startChrome": "\"/usr/bin/chromium\" --remote-debugging-port=9222 --user-data-dir=~/chrome-automation --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --disable-web-security --disable-features=IsolateOrigins,site-per-process --disable-blink-features=AutomationControlled --disable-background-networking --disable-default-apps --disable-extensions --disable-sync --metrics-recording-only --mute-audio --no-first-run --safebrowsing-disable-auto-update",
-    "checkChrome": "lsof -i :9222 || netstat -an | grep :9222",
-    "killChrome": "pkill -f \"chrome.*remote-debugging-port=9222\""
+    "startChrome": "\"/usr/bin/chromium\" --remote-debugging-port=9224 --user-data-dir=~/chrome-automation --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --disable-web-security --disable-features=IsolateOrigins,site-per-process --disable-blink-features=AutomationControlled --disable-background-networking --disable-default-apps --disable-extensions --disable-sync --metrics-recording-only --mute-audio --no-first-run --safebrowsing-disable-auto-update",
+    "checkChrome": "lsof -i :9224 || netstat -an | grep :9224",
+    "killChrome": "pkill -f \"chrome.*remote-debugging-port=9224\"",
+    "startProxy": "node scripts/chrome-proxy-service.js 192.168.0.2 info",
+    "checkProxy": "curl http://192.168.0.2:9224/json/version"
   },
   "usage": {
-    "description": "Configuração exportada do ConnectionOrchestrator",
+    "description": "Configuração exportada do ConnectionOrchestrator com Chrome Proxy Integration",
     "helpers": "Helpers compartilhados (.puppeteerrc.cjs): isDocker, findChrome, getCacheDirectory",
     "config": "Config específica (ConnectionOrchestrator.js): DEFAULTS inline",
-    "launcher": "Use connection.mode para decidir como iniciar Chrome (launcher/connect/auto)",
-    "healthCheck": "Teste health.chromeDebugUrl para validar que Chrome está respondendo",
-    "fallback": "Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente"
+    "launcher": "Use connection.mode='wsEndpoint' para conectar via Chrome Proxy",
+    "healthCheck": "Teste health.chromeProxyUrl para validar que proxy está respondendo",
+    "fallback": "Se connection.autoFallback=true, o sistema tentará todos os modos automaticamente",
+    "proxy": "Chrome Proxy Service permite container Docker acessar Chrome no Windows Host"
   }
 }

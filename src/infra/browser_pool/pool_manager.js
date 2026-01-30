@@ -4,24 +4,21 @@
    Audit Level: 800 — Critical Resource Manager (Singularity Edition)
 
    Responsabilidade:
-   - Gerenciar pool de 3 instâncias Chrome remotas (--remote-debugging-port)
+    - Gerenciar pool de 3 instâncias Chrome remotas (acessadas via proxy quando aplicável)
    - Alocar páginas (tabs) para tasks com estratégias: round-robin, least-loaded, target-affinity
    - Health checks periódicos (heartbeat, crash detection)
    - Auto-restart de instâncias crashed
    - Isolamento entre tasks (diferentes contexts quando necessário)
 
-   Princípios:
-   - NÃO cria processos Chrome (assume Chrome já rodando em --remote-debugging-port=9222)
+    Princípios:
+     - NÃO cria processos Chrome (assume browsers disponíveis via `browserEndpoint`; este processo não inicia/gerencia browsers).
+     - Conexões do container geralmente passam por um **Chrome Proxy** exposto na porta `9224` (container-facing); detalhes de reencaminhamento no mundo externo são responsabilidade operacional.
    - NÃO decide lógica de negócio (apenas aloca/libera recursos)
    - Pool size configurável (padrão: 3 instâncias)
    - Graceful degradation: se 1 instância falhar, pool continua com 2
 ========================================================================== */
 
-const _puppeteer = require('puppeteer');
-
 const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
-
-const _puppeteerCore = require('puppeteer-core');
 const { log } = require('@core/logger');
 const { ConnectionOrchestrator } = require('../ConnectionOrchestrator');
 
@@ -31,14 +28,15 @@ class BrowserPoolManager {
      * @param {number} config.poolSize - Número de instâncias no pool (padrão: 3)
      * @param {string} config.allocationStrategy - round-robin | least-loaded | target-affinity (padrão: round-robin)
      * @param {number} config.healthCheckInterval - Intervalo de health check em ms (padrão: 30000)
-     * @param {Object} config.chromium - Configurações de conexão Chrome
+     * @param {Object} config.browserEndpoint - Configuração canônica do browser externo (url, optional wsEndpoint)
      */
     constructor(config = {}) {
         this.config = {
             poolSize: config.poolSize || 3,
             allocationStrategy: config.allocationStrategy || 'round-robin',
             healthCheckInterval: config.healthCheckInterval || 30000,
-            chromium: config.chromium || {}
+            // Force uso explícito de `browserEndpoint` — não há fallback para 'chromium'
+            browserEndpoint: config.browserEndpoint || {}
         };
 
         // Pool de instâncias: Array de { browser, pages, health, stats }
@@ -104,10 +102,17 @@ class BrowserPoolManager {
     async _doInitialize() {
         log('INFO', `[BrowserPool] Inicializando pool com ${this.config.poolSize} instâncias...`);
 
-        const orchestrator = new ConnectionOrchestrator(this.config.chromium);
+        // Arquitetura de conexão: exige browserEndpoint.url
+        if (!this.config.browserEndpoint || !this.config.browserEndpoint.url) {
+            throw new Error(
+                '[ARCHITECTURE ERROR] browserEndpoint.url é obrigatório. Este sistema não suporta launch de browsers.'
+            );
+        }
+
+        const orchestrator = new ConnectionOrchestrator({ browserEndpoint: this.config.browserEndpoint });
 
         // Conecta a múltiplas instâncias Chrome
-        // Em produção, cada instância pode estar em uma porta diferente (9222, 9223, 9224)
+        // Em produção, cada instância pode estar em uma porta diferente (ex.: 9224 container-facing proxy, 9223)
         // Por enquanto, usaremos a mesma conexão com contextos isolados
 
         for (let i = 0; i < this.config.poolSize; i++) {

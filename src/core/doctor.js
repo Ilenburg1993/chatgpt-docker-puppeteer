@@ -28,7 +28,7 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
  * @returns {Promise<object>} Status da conexão com Chrome.
  */
 async function probeChromeConnection() {
-    const endpoint = process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || 'http://localhost:9222';
+    const endpoint = process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || 'http://localhost:9224';
     const httpEndpoint = endpoint.replace('ws://', 'http://').replace('wss://', 'https://');
 
     try {

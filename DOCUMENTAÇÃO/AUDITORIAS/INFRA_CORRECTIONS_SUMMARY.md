@@ -272,7 +272,7 @@ As seguintes melhorias foram identificadas mas **NÃO são críticas**:
 
 1. **Browser Pool Multi-Port Isolation** (4h)
    - Pool atual usa mesma conexão com contextos isolados
-   - Ideal: Múltiplas portas (9222, 9223, 9224)
+   - Ideal: Múltiplas portas (9224, 9223, 9224)
    - Status: Funciona atualmente, mas não é isolamento real
 
 2. **Task Loader LRU Cache** (2h)

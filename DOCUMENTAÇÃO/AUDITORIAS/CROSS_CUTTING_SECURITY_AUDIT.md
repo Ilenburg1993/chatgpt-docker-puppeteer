@@ -419,7 +419,7 @@ SERVER_PORT=2998
 DASHBOARD_PORT=3008
 
 # Chrome remote debugging
-CHROME_REMOTE_DEBUGGING_PORT=9222
+CHROME_REMOTE_DEBUGGING_PORT=9224
 CHROME_REMOTE_DEBUGGING_ADDRESS=127.0.0.1
 
 # PM2 settings
@@ -624,7 +624,7 @@ const launchOptions = {
         '--no-sandbox',  // ← Necessário no Docker
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        `--remote-debugging-port=${config.CHROME_REMOTE_DEBUGGING_PORT || 9222}`,
+        `--remote-debugging-port=${config.CHROME_REMOTE_DEBUGGING_PORT || 9224}`,
         `--remote-debugging-address=${config.CHROME_REMOTE_DEBUGGING_ADDRESS || '127.0.0.1'}`
     ]
 };

@@ -92,7 +92,67 @@ const ActionCode = Object.freeze({
     SECURITY_VIOLATION: 'SECURITY_VIOLATION',
 
     // ---- TELEMETRY ----
-    TELEMETRY_DISCARDED: 'TELEMETRY_DISCARDED'
+    TELEMETRY_DISCARDED: 'TELEMETRY_DISCARDED',
+
+    // ---- ORCHESTRATION (Mission Orchestration) ----
+    ORCHESTRATION_STARTED: 'ORCHESTRATION_STARTED', // Orchestration engine started processing
+    ORCHESTRATION_COMPLETED: 'ORCHESTRATION_COMPLETED', // Orchestration completed successfully
+    ORCHESTRATION_FAILED: 'ORCHESTRATION_FAILED', // Orchestration failed
+    ORCHESTRATION_PAUSED: 'ORCHESTRATION_PAUSED', // Orchestration paused by user
+    ORCHESTRATION_RESUMED: 'ORCHESTRATION_RESUMED', // Orchestration resumed after pause
+
+    // ---- SYSTEM (Server / Process) ----
+    SERVER_READY: 'SERVER_READY', // Server process ready (published via NERV)
+
+    // ---- ITERATION (Iterative Execution) ----
+    ITERATION_STARTED: 'ITERATION_STARTED', // Iteration attempt started
+    ITERATION_COMPLETED: 'ITERATION_COMPLETED', // Iteration completed successfully
+    ITERATION_FAILED: 'ITERATION_FAILED', // Iteration failed
+    ITERATION_MAX_REACHED: 'ITERATION_MAX_REACHED', // Max iterations reached without success
+
+    // ---- WORKFLOW (Multi-Step Workflows) ----
+    WORKFLOW_STARTED: 'WORKFLOW_STARTED', // Workflow execution started
+    WORKFLOW_COMPLETED: 'WORKFLOW_COMPLETED', // Workflow completed successfully
+    WORKFLOW_FAILED: 'WORKFLOW_FAILED', // Workflow failed
+    WORKFLOW_STEP_STARTED: 'WORKFLOW_STEP_STARTED', // Workflow step started
+    WORKFLOW_STEP_COMPLETED: 'WORKFLOW_STEP_COMPLETED', // Workflow step completed
+    WORKFLOW_STEP_FAILED: 'WORKFLOW_STEP_FAILED', // Workflow step failed
+    WORKFLOW_STEP_RETRY: 'WORKFLOW_STEP_RETRY', // Workflow step retry triggered
+
+    // ---- VALIDATION (Output Validation) ----
+    VALIDATION_STARTED: 'VALIDATION_STARTED', // Validation process started
+    VALIDATION_COMPLETED: 'VALIDATION_COMPLETED', // Validation completed
+    VALIDATION_FAILED: 'VALIDATION_FAILED', // Validation failed (technical error)
+    VALIDATION_PASSED: 'VALIDATION_PASSED', // Validation passed (score >= threshold)
+    VALIDATION_SCORE_LOW: 'VALIDATION_SCORE_LOW', // Validation score below threshold
+
+    // ---- CONTEXT (Context Management) ----
+    CONTEXT_INITIALIZED: 'CONTEXT_INITIALIZED', // Context initialized for workflow
+    CONTEXT_OVERFLOW: 'CONTEXT_OVERFLOW', // Context exceeded limits, triggering chunking/summarization
+    CONTEXT_SUMMARIZED: 'CONTEXT_SUMMARIZED', // Context summarized to reduce size
+    CONTEXT_CLEARED: 'CONTEXT_CLEARED', // Context cleared (workflow completed)
+    CONTEXT_PATTERN_ADDED: 'CONTEXT_PATTERN_ADDED', // Pattern added to memory store
+
+    // ---- CHECKPOINT (Checkpoint Recovery) ----
+    CHECKPOINT_SAVED: 'CHECKPOINT_SAVED', // Checkpoint saved for mission
+    CHECKPOINT_LOADED: 'CHECKPOINT_LOADED', // Checkpoint loaded for recovery
+    CHECKPOINT_DELETED: 'CHECKPOINT_DELETED', // Checkpoint deleted
+    CHECKPOINT_RECOVERY_STARTED: 'CHECKPOINT_RECOVERY_STARTED', // Crash recovery started
+    CHECKPOINT_RECOVERY_COMPLETED: 'CHECKPOINT_RECOVERY_COMPLETED', // Crash recovery completed
+
+    // ---- FEEDBACK (User Feedback) ----
+    FEEDBACK_RECEIVED: 'FEEDBACK_RECEIVED', // User feedback received
+    FEEDBACK_PROCESSED: 'FEEDBACK_PROCESSED', // Feedback processed and categorized
+    FEEDBACK_INJECTED: 'FEEDBACK_INJECTED', // Feedback injected into task prompt
+
+    // ---- MISSION (Mission Management) ----
+    MISSION_CREATED: 'MISSION_CREATED', // Mission created
+    MISSION_STARTED: 'MISSION_STARTED', // Mission execution started
+    MISSION_COMPLETED: 'MISSION_COMPLETED', // Mission completed successfully
+    MISSION_FAILED: 'MISSION_FAILED', // Mission failed
+    MISSION_PAUSED: 'MISSION_PAUSED', // Mission paused
+    MISSION_RESUMED: 'MISSION_RESUMED', // Mission resumed
+    MISSION_CANCELLED: 'MISSION_CANCELLED' // Mission cancelled by user
 });
 
 /**

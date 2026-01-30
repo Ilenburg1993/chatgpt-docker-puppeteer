@@ -155,7 +155,7 @@ HEALTHCHECK CMD node scripts/healthcheck.js
 
 No changes required to `docker-compose.yml`:
 
-- Remote Chrome debugging via `host.docker.internal:9222` works
+- Remote Chrome debugging via `host.docker.internal:9224` works
 - All volume mounts compatible
 - Environment variables preserved
 - Health check uses same port (3008)

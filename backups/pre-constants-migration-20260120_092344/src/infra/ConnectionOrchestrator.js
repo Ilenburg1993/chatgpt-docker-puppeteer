@@ -1,4 +1,4 @@
-/* eslint-disable linebreak-style */
+ 
 /* ==========================================================================
    src/infra/connection_orchestrator.js
    Audit Level: 21 — Hardened Infrastructure State Machine (Leak Proof)

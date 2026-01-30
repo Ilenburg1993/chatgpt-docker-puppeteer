@@ -4,7 +4,7 @@ Objetivo:
   Verificar que, com 2 abas do ChatGPT abertas, o agente aborta com erro MULTI_TAB_DETECTED.
 
 Procedimento:
-1) Abra o Chrome com remote debugging (porta 9222) e abra 2 abas no ChatGPT (duas conversas diferentes).
+1) Abra o Chrome com remote debugging (porta 9224) e abra 2 abas no ChatGPT (duas conversas diferentes).
 2) Inicie o agente manualmente (no root do projeto):
      node index.js
 3) Observe o console/arquivo de log 'logs/agente_*.log'.

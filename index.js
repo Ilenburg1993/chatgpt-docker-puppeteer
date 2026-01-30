@@ -13,5 +13,6 @@
 // Activate module aliases (MUST be first)
 require('module-alias/register');
 
-// Delegate to actual entry point
-require('./src/main');
+// Delegate to actual entry point and execute main()
+const { main } = require('./src/main');
+main();

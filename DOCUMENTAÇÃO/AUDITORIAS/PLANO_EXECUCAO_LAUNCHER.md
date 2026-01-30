@@ -64,7 +64,7 @@ Transformar `INICIAR_TUDO.BAT` rudimentar em **Super Launcher NASA-Grade** usand
 **Endpoints**:
 ```javascript
 GET /health              // Agregador (todos subsistemas)
-GET /health/chrome       // Valida porta 9222
+GET /health/chrome       // Valida porta 9224
 GET /health/pm2          // Status processos PM2
 GET /health/kernel       // Estado Kernel via NERV
 GET /health/disk         // Espaço logs/disk

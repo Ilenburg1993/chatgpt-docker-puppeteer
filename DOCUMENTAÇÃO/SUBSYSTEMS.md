@@ -104,7 +104,7 @@ Total: **37 componentes** em **13 módulos** (~15k LOC)
 module.exports = {
     // Browser settings
     BROWSER_MODE: process.env.BROWSER_MODE || 'launcher',
-    EXTERNAL_BROWSER_PORT: parseInt(process.env.EXTERNAL_BROWSER_PORT) || 9222,
+    EXTERNAL_BROWSER_PORT: parseInt(process.env.EXTERNAL_BROWSER_PORT) || 9224,
 
     // Kernel settings (P9.9 - Configurável)
     MAX_WORKERS: parseInt(process.env.MAX_WORKERS) || 3,

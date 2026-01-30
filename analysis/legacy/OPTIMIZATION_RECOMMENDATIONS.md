@@ -38,7 +38,7 @@ cp .env.example .env
 
 ```env
 # Chrome connection
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
 # API Key (se necessário)
 API_KEY=your-secret-key-here

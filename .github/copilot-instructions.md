@@ -551,7 +551,7 @@ const puppeteerConfig = require('../../.puppeteerrc.cjs');
 // DEFAULTS inline (config própria do ConnectionOrchestrator)
 const DEFAULTS = {
     mode: process.env.BROWSER_MODE || 'launcher',
-    ports: [9222, 9223, 9224],
+    ports: [9224, 9223, 9224],
     hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
     connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
 
@@ -586,12 +586,12 @@ const DEFAULTS = {
   "source": "ConnectionOrchestrator + .puppeteerrc.cjs helpers",
   "isDocker": false,
   "detectedChromePath": "/usr/bin/chromium",
-  "connection": { "mode": "launcher", "ports": [9222, 9223, 9224], ... },
+  "connection": { "mode": "launcher", "ports": [9224, 9223, 9224], ... },
   "launcher": { "executablePath": "/usr/bin/chromium", "cacheDirectory": "...", ... },
   "commands": {
-    "startChrome": "\"/usr/bin/chromium\" --remote-debugging-port=9222 ...",
-    "checkChrome": "lsof -i :9222 || netstat -an | grep :9222",
-    "killChrome": "pkill -f \"chrome.*remote-debugging-port=9222\""
+    "startChrome": "\"/usr/bin/chromium\" --remote-debugging-port=9224 ...",
+    "checkChrome": "lsof -i :9224 || netstat -an | grep :9224",
+    "killChrome": "pkill -f \"chrome.*remote-debugging-port=9224\""
   },
   "usage": {
     "helpers": "Helpers compartilhados (.puppeteerrc.cjs): isDocker, findChrome, getCacheDirectory",

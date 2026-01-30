@@ -48,7 +48,7 @@ if [ ! -f "config.json" ]; then
     echo -e "${YELLOW}⚠️  config.json não encontrado, criando padrão...${NC}"
     cat > config.json << 'EOF'
 {
-  "chromePath": "http://localhost:9222",
+  "chromePath": "http://localhost:9224",
   "maxRetries": 3,
   "backoff": {
     "baseDelay": 5000,
@@ -110,22 +110,22 @@ echo ""
 echo "🌐 Verificando Chrome/Chromium..."
 CHROME_FOUND=false
 
-# Check if Chrome is running on 9222
-if curl -s http://localhost:9222/json/version &> /dev/null; then
-    echo -e "${GREEN}✅ Chrome com remote debugging detectado na porta 9222${NC}"
-    CHROME_INFO=$(curl -s http://localhost:9222/json/version)
-    CHROME_VERSION=$(echo $CHROME_INFO | grep -oP '"Browser":\s*"\K[^"]+')
+# Check if Chrome (or proxy) is running on 9224 (container-facing)
+if curl -s http://localhost:9224/json/version &> /dev/null; then
+  echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta 9224${NC}"
+  CHROME_INFO=$(curl -s http://localhost:9224/json/version)
+  CHROME_VERSION=$(echo $CHROME_INFO | grep -oP '"Browser":\s*"\K[^"]+')
     echo "   Versão: $CHROME_VERSION"
     CHROME_FOUND=true
 else
-    echo -e "${YELLOW}⚠️  Chrome não detectado na porta 9222${NC}"
+  echo -e "${YELLOW}⚠️  Chrome/Proxy não detectado na porta 9224${NC}"
     echo ""
     echo "Para iniciar o Chrome com remote debugging:"
     echo ""
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "  google-chrome --remote-debugging-port=9222 --user-data-dir=\"\$HOME/chrome-automation-profile\""
+    echo "  google-chrome --remote-debugging-port=9224 --user-data-dir=\"\$HOME/chrome-automation-profile\""
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222 --user-data-dir=\"\$HOME/chrome-automation-profile\""
+    echo "  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9224 --user-data-dir=\"\$HOME/chrome-automation-profile\""
     fi
     echo ""
 fi

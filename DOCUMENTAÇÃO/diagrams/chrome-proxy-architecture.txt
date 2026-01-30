@@ -1,0 +1,296 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    CHROME PROXY ARCHITECTURE DIAGRAM                         ║
+║                          Version 3.0 (2026-01-30)                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           WINDOWS HOST                                       │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐     │
+│  │  LAUNCHER: start-chrome-proxy.bat                                  │     │
+│  │  • Auto-detecta IP público (192.168.0.2)                           │     │
+│  │  • Valida config.json                                              │     │
+│  │  • Inicia Chrome + Proxy                                           │     │
+│  │  • Health checks                                                   │     │
+│  └────────────────────────────────────────────────────────────────────┘     │
+│                                 │                                            │
+│                                 ├─────────────────┐                          │
+│                                 ▼                 ▼                          │
+│  ┌──────────────────────────┐       ┌───────────────────────────────────┐  │
+│  │  Google Chrome           │       │  Chrome Proxy Service             │  │
+│  │                          │       │  (Node.js - scripts/)             │  │
+│  │  Port: 9224              │◄──────│                                   │  │
+│  │  Binding: 127.0.0.1      │       │  • HTTP Request Handler           │  │
+│  │                          │       │    - Intercepts /json/* endpoints │  │
+│  │  Remote Debugging:       │       │    - Rewrites webSocketDebuggerUrl│  │
+│  │  --remote-debugging-port │       │      (localhost → 192.168.0.2)    │  │
+│  │                          │       │                                   │  │
+│  │  Returns:                │       │  • WebSocket Upgrade Handler      │  │
+│  │  ws://127.0.0.1:9224/... │       │    - Pipes TCP transparently      │  │
+│  │                          │       │    - No payload modification      │  │
+│  └──────────────────────────┘       │                                   │  │
+│                                     │  Port: 9224                       │  │
+│                                     │  Binding: 0.0.0.0                 │  │
+│                                     │                                   │  │
+│                                     │  Exposed to Network:              │  │
+│                                     │  http://192.168.0.2:9224          │  │
+│                                     │  ws://192.168.0.2:9224/devtools/  │  │
+│                                     └───────────────────────────────────┘  │
+│                                                 │                           │
+│                                                 │ Network Accessible        │
+└─────────────────────────────────────────────────┼─────────────────────────┘
+                                                  │
+                                                  │ Docker Bridge / NAT
+                                                  │
+┌─────────────────────────────────────────────────┼─────────────────────────┐
+│                        DOCKER CONTAINER (Linux)                            │
+│                                                 │                          │
+│  ┌──────────────────────────────────────────────┼───────────────────────┐ │
+│  │                 ConnectionOrchestrator                               │ │
+│  │                 (src/infra/ConnectionOrchestrator.js)                │ │
+│  │                                                                       │ │
+│  │  DEFAULTS.hosts = [                                                  │ │
+│  │    '192.168.0.2',           // ← FIRST PRIORITY (IP público)        │ │
+│  │    'host.docker.internal',  // Docker DNS → Windows host            │ │
+│  │    '172.17.0.1',           // Docker bridge gateway                 │ │
+│  │    '127.0.0.1'              // Container localhost (não funciona)    │ │
+│  │  ]                                                                   │ │
+│  │                                                                       │ │
+│  │  DEFAULTS.ports = [                                                  │ │
+│  │    9224,  // ← FIRST PRIORITY (Proxy port)                          │ │
+│  │    9224,  // Chrome direct port (fallback)                          │ │
+│  │    9223   // Reserved port (não usado)                              │ │
+│  │  ]                                                                   │ │
+│  │                                                                       │ │
+│  │  DEFAULTS.mode = 'wsEndpoint'  // ← CANÔNICO                        │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                   │                                        │
+│                                   ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Fallback Strategy (Automatic)                                        │ │
+│  │                                                                        │ │
+│  │  1️⃣  TRY: http://192.168.0.2:9224/json/version                        │ │
+│  │      └─► GET webSocketDebuggerUrl                                     │ │
+│  │      └─► EXPECT: ws://192.168.0.2:9224/devtools/browser/...           │ │
+│  │      └─► ✅ SUCCESS → Connect via Proxy (IDEAL)                       │ │
+│  │                                                                        │ │
+│  │  2️⃣  FALLBACK: http://host.docker.internal:9224/json/version          │ │
+│  │      └─► Same as above, but via Docker DNS                            │ │
+│  │                                                                        │ │
+│  │  3️⃣  FALLBACK: http://192.168.0.2:9224/json/version                   │ │
+│  │      └─► Direct to Chrome (no proxy)                                  │ │
+│  │      └─► PROBLEM: Returns ws://127.0.0.1:9224/... (não acessível!)    │ │
+│  │      └─► ⚠️  May fail on WebSocket connection                         │ │
+│  │                                                                        │ │
+│  │  4️⃣  FALLBACK: http://host.docker.internal:9224/json/version          │ │
+│  │      └─► Same problem as above                                        │ │
+│  │                                                                        │ │
+│  │  5️⃣  ... other combinations ...                                       │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                   │                                        │
+│                                   ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Puppeteer Core                                                        │ │
+│  │                                                                        │ │
+│  │  puppeteerCore.connect({                                              │ │
+│  │    browserWSEndpoint: "ws://192.168.0.2:9224/devtools/browser/..."    │ │
+│  │  })                                                                    │ │
+│  │                                                                        │ │
+│  │  ├─► WebSocket handshake                                              │ │
+│  │  ├─► Proxy forwards to Chrome                                         │ │
+│  │  ├─► Bidirectional pipe established                                   │ │
+│  │  └─► ✅ Chrome DevTools Protocol (CDP) commands                       │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                   │                                        │
+│                                   ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Browser Automation (Driver)                                          │ │
+│  │  • Page navigation                                                    │ │
+│  │  • Element interaction                                                │ │
+│  │  • Screenshot capture                                                 │ │
+│  │  • JavaScript execution                                               │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                          CONFIGURATION FLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+config.json                       ConnectionOrchestrator.js
+┌──────────────────────┐          ┌───────────────────────────┐
+│ BROWSER_MODE:        │          │ DEFAULTS.mode             │
+│   "wsEndpoint"       │─────────►│   = "wsEndpoint"          │
+│                      │          │                           │
+│ DEBUG_PORT:          │          │ DEFAULTS.ports            │
+│   "http://192...9224"│─────────►│   = [9224, 9224, 9223]    │
+│                      │          │                           │
+│ CHROME_PROXY_ENABLED:│          │ DEFAULTS.hosts            │
+│   true               │─────────►│   = ['192.168.0.2', ...]  │
+│                      │          │                           │
+│ CHROME_PROXY_PORT:   │          │ tryConnectWSEndpoint()    │
+│   9224               │─────────►│   • Loop hosts            │
+│                      │          │   • Loop ports            │
+│ ALLOW_BROWSER_       │          │   • Fetch /json/version   │
+│   FALLBACK: true     │─────────►│   • Auto fallback         │
+└──────────────────────┘          └───────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         URL REWRITING EXAMPLE
+═══════════════════════════════════════════════════════════════════════════════
+
+WITHOUT PROXY (Broken):
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Container → http://192.168.0.2:9224/json/version → Chrome                │
+│                                                                           │
+│ Chrome Returns:                                                           │
+│ {                                                                         │
+│   "webSocketDebuggerUrl": "ws://127.0.0.1:9224/devtools/browser/abc123"  │
+│ }                                                                         │
+│                                                                           │
+│ Container → ws://127.0.0.1:9224/devtools/browser/abc123                  │
+│          └─► ❌ FAIL: 127.0.0.1 is container's localhost, not Windows!   │
+└──────────────────────────────────────────────────────────────────────────┘
+
+WITH PROXY (Working):
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Container → http://192.168.0.2:9224/json/version → Proxy → Chrome        │
+│                                                                           │
+│ Chrome Returns (to Proxy):                                               │
+│ {                                                                         │
+│   "webSocketDebuggerUrl": "ws://127.0.0.1:9224/devtools/browser/abc123"  │
+│ }                                                                         │
+│                                                                           │
+│ Proxy Rewrites:                                                          │
+│ {                                                                         │
+│   "webSocketDebuggerUrl": "ws://192.168.0.2:9224/devtools/browser/abc123"│
+│ }                         └──────────┬──────────┘                        │
+│                                      │                                   │
+│ Container Receives Rewritten URL ◄───┘                                   │
+│                                                                           │
+│ Container → ws://192.168.0.2:9224/devtools/browser/abc123                │
+│          └─► Proxy pipes to → Chrome 127.0.0.1:9224                      │
+│          └─► ✅ SUCCESS: Bidirectional WebSocket established!            │
+└──────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         HEALTH CHECK FLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+start-chrome-proxy.bat execution:
+
+[ETAPA 1] Validação de Ambiente
+    ├─► Check Node.js     ✅
+    ├─► Check Chrome      ✅
+    ├─► Check Proxy Script ✅
+    └─► Detect Public IP  → 192.168.0.2
+
+[ETAPA 2] Validação de Configuração
+    ├─► config.json exists        ✅
+    ├─► BROWSER_MODE=wsEndpoint   ✅
+    ├─► DEBUG_PORT points to 9224 ✅
+    ├─► CHROME_PROXY_ENABLED=true ✅
+    └─► CHROME_PROXY_PORT=9224    ✅
+
+[ETAPA 3] Inicializar Chrome
+    ├─► Check if running → curl localhost:9224
+    ├─► If not: start Chrome with --remote-debugging-port=9224
+    └─► Wait up to 15s → ✅ Chrome ready
+
+[ETAPA 4] Inicializar Proxy
+    ├─► Check if running → curl localhost:9224
+    ├─► If not: start node scripts/chrome-proxy-service.js 192.168.0.2 info
+    └─► Wait up to 15s → ✅ Proxy ready
+
+[ETAPA 5] Health Checks
+    ├─► Test Chrome direct     → curl localhost:9224/json/version      ✅
+    ├─► Test Proxy local       → curl localhost:9224/json/version      ✅
+    ├─► Test Proxy remote      → curl 192.168.0.2:9224/json/version    ✅
+    └─► Validate URL rewriting → Check if response contains 192.168.0.2:9224 ✅
+
+[RESULTADO]
+    └─► ✅ SISTEMA INICIALIZADO COM SUCESSO!
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         TROUBLESHOOTING DECISION TREE
+═══════════════════════════════════════════════════════════════════════════════
+
+Container can't connect to Chrome?
+│
+├─► Run: verify-chrome-setup.bat
+│   │
+│   ├─► ❌ Config invalid?
+│   │   └─► Fix config.json
+│   │       └─► Set BROWSER_MODE="wsEndpoint"
+│   │       └─► Set DEBUG_PORT="http://192.168.0.2:9224"
+│   │       └─► Set CHROME_PROXY_ENABLED=true
+│   │
+│   └─► ✅ Config valid
+│       └─► Continue below
+│
+├─► Run: start-chrome-proxy.bat
+│   │
+│   ├─► ❌ Chrome won't start?
+│   │   ├─► Check if port 9224 occupied: netstat -ano | findstr :9224
+│   │   ├─► Kill existing Chrome: taskkill /IM chrome.exe /F
+│   │   └─► Retry
+│   │
+│   ├─► ❌ Proxy won't start?
+│   │   ├─► Check if port 9224 occupied: netstat -ano | findstr :9224
+│   │   ├─► Kill process: taskkill /PID <PID> /F
+│   │   ├─► Check proxy script exists: dir scripts\chrome-proxy-service.js
+│   │   └─► Test manually: node scripts\chrome-proxy-service.js 192.168.0.2 debug
+│   │
+│   └─► ✅ Both started
+│       └─► Continue below
+│
+├─► From container, test: curl http://192.168.0.2:9224/json/version
+│   │
+│   ├─► ❌ Connection refused?
+│   │   ├─► Check Windows Firewall
+│   │   │   └─► netsh advfirewall firewall add rule name="Chrome Proxy 9224" dir=in action=allow protocol=TCP localport=9224
+│   │   ├─► Check IP is correct
+│   │   │   └─► ipconfig (Windows) → Get actual IPv4
+│   │   └─► Retry
+│   │
+│   ├─► ❌ Response has ws://localhost:9224 (not rewritten)?
+│   │   ├─► Proxy not rewriting URLs correctly
+│   │   ├─► Check proxy logs in "Chrome Proxy Service" window
+│   │   └─► Restart proxy with correct PUBLIC_IP
+│   │
+│   └─► ✅ Response has ws://192.168.0.2:9224/devtools/browser/...
+│       └─► Perfect! Proxy working correctly
+│
+└─► Start system: npm start
+    │
+    ├─► Check logs for:
+    │   ├─► "[ORCH] [PROXY] Tentando WS endpoint: http://192.168.0.2:9224"
+    │   └─► "[ORCH] ✅ Conectado via Chrome Proxy Service"
+    │
+    ├─► ✅ Connected via proxy?
+    │   └─► System operational!
+    │
+    └─► ❌ Still failing?
+        └─► Check DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md for advanced troubleshooting
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              PORT SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+Port    Service                 Binding         Accessible From
+────────────────────────────────────────────────────────────────────────────────
+9224    Chrome Remote Debugging 127.0.0.1       Windows localhost only
+9224    Chrome Proxy Service    0.0.0.0         Network (Windows + Container)
+9223    Reserved                -               Not used (legacy)
+3008    Express Server          0.0.0.0         Network (API + Dashboard)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+Last Updated: 2026-01-30
+Version: 3.0
+Documentation: DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md
+═══════════════════════════════════════════════════════════════════════════════

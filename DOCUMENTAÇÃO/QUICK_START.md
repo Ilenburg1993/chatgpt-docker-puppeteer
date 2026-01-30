@@ -35,16 +35,16 @@ cp .env.example .env
 
 ```powershell
 # Windows
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile"
 
 # macOS
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir="~/chrome-automation-profile"
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9224 --user-data-dir="~/chrome-automation-profile"
 
 # Linux
-google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation-profile"
+google-chrome --remote-debugging-port=9224 --user-data-dir="~/chrome-automation-profile"
 ```
 
-Verify Chrome is ready: http://localhost:9222/json/version
+Verify Chrome/Proxy is ready: http://localhost:9224/json/version
 
 ---
 
@@ -213,7 +213,7 @@ Runtime-adjustable validation and processing rules.
 
 ```bash
 NODE_ENV=production
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 LOG_LEVEL=info
 PORT=3008
 ```
@@ -226,11 +226,11 @@ PORT=3008
 
 ```bash
 # Check Chrome is running with remote debugging
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version
 
 # Restart Chrome
 taskkill /F /IM chrome.exe  # Windows
-chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\profile"
+chrome.exe --remote-debugging-port=9224 --user-data-dir="C:\profile"
 ```
 
 ### Port Already in Use

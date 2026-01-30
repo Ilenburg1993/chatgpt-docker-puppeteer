@@ -1,4 +1,4 @@
-/* eslint-disable linebreak-style */
+ 
 /* ==========================================================================
    src/infra/transport/socket_io_adapter.js
    Audit Level: 590 — Physical Transport Layer (Socket.io Implementation)

@@ -88,7 +88,7 @@ docker-compose logs -f
 **Start**:
 ```bash
 # 1. Start external Chrome (optional, if using external mode)
-google-chrome --remote-debugging-port=9222 &
+google-chrome --remote-debugging-port=9224 &
 
 # 2. Start container
 docker-compose -f docker-compose.dev.yml up
@@ -393,10 +393,10 @@ docker-compose logs agente-gpt
 
 ```bash
 # Verify Chrome is running
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version
 
 # Check CHROME_WS_ENDPOINT in .env
-# Windows/Mac Docker Desktop: ws://host.docker.internal:9222
+# Windows/Mac Docker Desktop: ws://host.docker.internal:9224
 # Linux: Add extra_hosts in docker-compose.yml
 
 # Or use launcher mode

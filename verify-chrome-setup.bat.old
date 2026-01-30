@@ -1,0 +1,243 @@
+@echo off
+REM ============================================================================
+REM  CHROME PROXY SETUP VERIFIER
+REM  Version: 1.0 (2026-01-30)
+REM
+REM  Purpose: Diagnostica e valida configuração Chrome Proxy sem iniciar serviços
+REM ============================================================================
+
+setlocal enabledelayedexpansion
+
+set SCRIPT_DIR=%~dp0
+set CONFIG_FILE=%SCRIPT_DIR%config.json
+set CHROME_CONFIG_FILE=%SCRIPT_DIR%chrome-config.json
+set PROXY_SCRIPT=%SCRIPT_DIR%scripts\chrome-proxy-service.js
+
+echo.
+echo ════════════════════════════════════════════════════════════════════════════
+echo   CHROME PROXY SETUP VERIFIER
+echo ════════════════════════════════════════════════════════════════════════════
+echo.
+
+REM ============================================================================
+REM  1. ARQUIVOS DE CONFIGURAÇÃO
+REM ============================================================================
+echo [1] Verificando arquivos de configuração...
+echo.
+
+set FILES_OK=1
+
+if exist "%CONFIG_FILE%" (
+    echo [OK] config.json encontrado
+) else (
+    echo [ERRO] config.json NÃO encontrado: %CONFIG_FILE%
+    set FILES_OK=0
+)
+
+if exist "%CHROME_CONFIG_FILE%" (
+    echo [OK] chrome-config.json encontrado
+) else (
+    echo [WARN] chrome-config.json NÃO encontrado: %CHROME_CONFIG_FILE%
+    echo [INFO] Arquivo opcional, mas recomendado
+)
+
+if exist "%PROXY_SCRIPT%" (
+    echo [OK] chrome-proxy-service.js encontrado
+) else (
+    echo [ERRO] chrome-proxy-service.js NÃO encontrado: %PROXY_SCRIPT%
+    set FILES_OK=0
+)
+
+if %FILES_OK% equ 0 (
+    echo.
+    echo [ERRO] Arquivos críticos faltando! Sistema não funcionará.
+    goto :END_FAIL
+    pause
+)
+
+REM ============================================================================
+REM  2. VALIDAÇÃO DE config.json
+REM ============================================================================
+echo.
+echo [2] Validando config.json...
+echo.
+
+REM Auto-detectar IP público
+set PUBLIC_IP=
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4"') do (
+    for /f "tokens=1" %%b in ("%%a") do (
+        set PUBLIC_IP=%%b
+        goto :IP_FOUND
+    )
+)
+:IP_FOUND
+if "!PUBLIC_IP!"=="" set PUBLIC_IP=192.168.0.2
+echo [INFO] IP público detectado: !PUBLIC_IP!
+echo.
+
+set CONFIG_OK=1
+
+REM Verificar BROWSER_MODE
+findstr /C:"\"BROWSER_MODE\": \"wsEndpoint\"" "%CONFIG_FILE%" >nul
+if %errorlevel% equ 0 (
+    echo [OK] BROWSER_MODE: "wsEndpoint"
+) else (
+    echo [ERRO] BROWSER_MODE não é "wsEndpoint"
+    echo [INFO] Esperado: "BROWSER_MODE": "wsEndpoint"
+    set CONFIG_OK=0
+)
+
+REM Verificar DEBUG_PORT
+findstr /C:"\"DEBUG_PORT\"" "%CONFIG_FILE%" >nul
+if %errorlevel% equ 0 (
+    findstr /C:"\"DEBUG_PORT\": \"http://!PUBLIC_IP!:9224\"" "%CONFIG_FILE%" >nul
+    if %errorlevel% equ 0 (
+        echo [OK] DEBUG_PORT: "http://!PUBLIC_IP!:9224"
+    ) else (
+        echo [WARN] DEBUG_PORT pode não apontar para !PUBLIC_IP!:9224
+        for /f "delims=" %%i in ('findstr /C:"\"DEBUG_PORT\"" "%CONFIG_FILE%"') do echo [INFO] Atual: %%i
+        set CONFIG_OK=0
+    )
+) else (
+    echo [ERRO] DEBUG_PORT não encontrado em config.json
+    set CONFIG_OK=0
+)
+
+REM Verificar CHROME_PROXY_ENABLED
+findstr /C:"\"CHROME_PROXY_ENABLED\": true" "%CONFIG_FILE%" >nul
+if %errorlevel% equ 0 (
+    echo [OK] CHROME_PROXY_ENABLED: true
+) else (
+    echo [ERRO] CHROME_PROXY_ENABLED não está habilitado
+    echo [INFO] Esperado: "CHROME_PROXY_ENABLED": true
+    set CONFIG_OK=0
+)
+
+REM Verificar CHROME_PROXY_PORT
+findstr /C:"\"CHROME_PROXY_PORT\": 9224" "%CONFIG_FILE%" >nul
+if %errorlevel% equ 0 (
+    echo [OK] CHROME_PROXY_PORT: 9224
+) else (
+    echo [ERRO] CHROME_PROXY_PORT não é 9224
+    echo [INFO] Esperado: "CHROME_PROXY_PORT": 9224
+    set CONFIG_OK=0
+)
+
+REM Verificar ALLOW_BROWSER_FALLBACK
+findstr /C:"\"ALLOW_BROWSER_FALLBACK\": true" "%CONFIG_FILE%" >nul
+if %errorlevel% equ 0 (
+    echo [OK] ALLOW_BROWSER_FALLBACK: true
+) else (
+    echo [WARN] ALLOW_BROWSER_FALLBACK não está habilitado
+    echo [INFO] Recomendado: "ALLOW_BROWSER_FALLBACK": true
+)
+
+if %CONFIG_OK% equ 0 (
+    echo.
+    echo [ERRO] config.json tem configurações incorretas!
+    echo [INFO] Edite manualmente ou regenere com scripts corretos
+    goto :END_FAIL
+    pause
+)
+
+REM ============================================================================
+REM  3. VALIDAÇÃO DE chrome-config.json (OPCIONAL)
+REM ============================================================================
+if exist "%CHROME_CONFIG_FILE%" (
+    echo.
+    echo [3] Validando chrome-config.json...
+    echo.
+
+    findstr /C:"\"mode\": \"wsEndpoint\"" "%CHROME_CONFIG_FILE%" >nul
+    if %errorlevel% equ 0 (
+        echo [OK] connection.mode: "wsEndpoint"
+    ) else (
+        echo [WARN] connection.mode não é "wsEndpoint"
+    )
+
+    findstr /C:"\"enabled\": true" "%CHROME_CONFIG_FILE%" >nul
+    if %errorlevel% equ 0 (
+        echo [OK] chromeProxy.enabled: true
+    ) else (
+        echo [WARN] chromeProxy.enabled não é true
+    )
+)
+
+REM ============================================================================
+REM  4. PORTAS E SERVIÇOS
+REM ============================================================================
+echo.
+echo [4] Verificando portas e serviços...
+echo.
+
+REM Verificar Browser externo (detalhe operacional remoto)
+REM (Não mencionar porta 9224 no contrato; use o endpoint proxy container-facing 9224)
+
+REM Verificar Proxy (9224)
+netstat -ano | findstr ":9224" >nul
+if %errorlevel% equ 0 (
+    echo [OK] Porta 9224 (Proxy) está em uso
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":9224" ^| findstr "LISTENING"') do (
+        echo [INFO] PID: %%a
+    )
+) else (
+    echo [INFO] Porta 9224 (Proxy) livre - Proxy não está rodando
+)
+
+REM ============================================================================
+REM  5. TESTE DE CONECTIVIDADE (SE SERVIÇOS ESTIVEREM RODANDO)
+REM ============================================================================
+echo.
+echo [5] Testando conectividade (se serviços estiverem ativos)...
+echo.
+
+REM (Verificações operacionais do browser devem usar o endpoint proxy 9224 quando aplicável)
+
+curl -s --connect-timeout 2 "http://localhost:9224/json/version" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [OK] Proxy respondendo em http://localhost:9224
+
+    REM Verificar URL rewriting
+    for /f "delims=" %%i in ('curl -s "http://localhost:9224/json/version"') do set PROXY_RESPONSE=%%i
+    echo !PROXY_RESPONSE! | findstr /C:"!PUBLIC_IP!:9224" >nul
+    if %errorlevel% equ 0 (
+        echo [OK] URL rewriting funcionando (localhost → !PUBLIC_IP!)
+    ) else (
+        echo [WARN] URL rewriting pode não estar funcionando
+    )
+) else (
+    echo [INFO] Proxy não está respondendo (normal se não iniciado)
+)
+
+REM ============================================================================
+REM  RESULTADO FINAL
+REM ============================================================================
+echo.
+echo ════════════════════════════════════════════════════════════════════════════
+echo   RESULTADO DA VERIFICAÇÃO
+echo ════════════════════════════════════════════════════════════════════════════
+echo.
+
+if %FILES_OK% equ 1 if %CONFIG_OK% equ 1 (
+    echo [✅] CONFIGURAÇÃO VÁLIDA!
+    echo.
+    echo Próximos passos:
+    echo   1. Inicie os serviços:  start-chrome-proxy.bat
+    echo   2. Teste do container:  curl http://!PUBLIC_IP!:9224/json/version
+    echo   3. Inicie o sistema:    npm start
+    echo.
+    pause
+    exit /b 0
+) else (
+    echo [❌] CONFIGURAÇÃO INVÁLIDA!
+    echo.
+    echo Corrija os erros acima antes de iniciar o sistema.
+    echo.
+    echo Documentação: DOCUMENTAÇÃO\CHROME_PROXY_SETUP.md
+    echo.
+    goto :END_FAIL
+)
+
+:END_FAIL
+pause
+exit /b 1

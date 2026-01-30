@@ -9,7 +9,7 @@
 # CASO DE USO:
 # • Host primário: Debian (programação via VS Code + DevContainer)
 # • Host secundário: Windows/WSL2 (desenvolvimento alternativo)
-# • Puppeteer: Controla LLM via Chrome externo (host:9222)
+# • Puppeteer: Controla LLM via Chrome externo (host:9224)
 # • Chromium local: Apenas compatibilidade técnica
 #
 # EXIT CODES:
@@ -44,7 +44,7 @@ set -euo pipefail
 # =============================================================================
 
 readonly CHROME_REMOTE_HOST="${CHROME_REMOTE_HOST:-host.docker.internal}"
-readonly CHROME_REMOTE_PORT="${CHROME_REMOTE_PORT:-9222}"
+readonly CHROME_REMOTE_PORT="${CHROME_REMOTE_PORT:-9224}"
 readonly CHROMIUM_PATH="/usr/bin/chromium"
 
 # Exit codes
@@ -89,12 +89,12 @@ check_node() {
         log_error "Node.js não encontrado"
         return 1
     fi
-    
+
     if ! node --version >/dev/null 2>&1; then
         log_error "Node.js não funcional"
         return 1
     fi
-    
+
     local node_version
     node_version=$(node --version)
     log_ok "Node.js $node_version"
@@ -106,7 +106,7 @@ check_vscode_server() {
         log_info "VS Code Server não instalado (esperado em primeiro boot)"
         return 0  # Não-bloqueante
     fi
-    
+
     log_ok "VS Code Server instalado"
     return 0
 }
@@ -116,22 +116,22 @@ check_chrome_remote() {
         log_info "curl ausente, ignorando check de Chrome remoto"
         return 0
     fi
-    
+
     if curl -sf --connect-timeout 2 "http://${CHROME_REMOTE_HOST}:${CHROME_REMOTE_PORT}/json/version" >/dev/null 2>&1; then
         log_ok "Chrome remoto acessível (${CHROME_REMOTE_HOST}:${CHROME_REMOTE_PORT})"
         return 0
     else
         log_warn "Chrome remoto indisponível (operacional, não-bloqueante)"
-        
+
         # Instruções específicas por OS
         if [ "$HOST_OS" = "debian" ]; then
-            log_info "Para iniciar: google-chrome --remote-debugging-port=9222"
+            log_info "Para iniciar: google-chrome --remote-debugging-port=9224"
         elif [ "$HOST_OS" = "wsl2" ]; then
-            log_info "Para iniciar no Windows: chrome.exe --remote-debugging-port=9222"
+                log_info "Para iniciar no Windows: chrome.exe --remote-debugging-port=9224"
         else
-            log_info "Para iniciar Chrome remoto: --remote-debugging-port=9222"
+                log_info "Para iniciar Chrome remoto: --remote-debugging-port=9224"
         fi
-        
+
         return 0  # Não-bloqueante
     fi
 }
@@ -141,12 +141,12 @@ check_chromium_local() {
         log_warn "Chromium local não encontrado"
         return 0  # Não-bloqueante
     fi
-    
+
     if ! "$CHROMIUM_PATH" --version >/dev/null 2>&1; then
         log_warn "Chromium local não funcional"
         return 0  # Não-bloqueante
     fi
-    
+
     log_ok "Chromium local funcional"
     return 0
 }
@@ -157,26 +157,26 @@ check_chromium_local() {
 
 main() {
     local exit_code=$EXIT_HEALTHY
-    
+
     log_info "Iniciando health check..."
     [ -n "$HOST_OS" ] && [ "$HOST_OS" != "unknown" ] && log_info "Host OS: $HOST_OS"
-    
+
     # Check crítico: Node.js
     if ! check_node; then
         exit_code=$EXIT_UNHEALTHY
     fi
-    
+
     # Checks não-bloqueantes (apenas informativos)
     check_vscode_server
     check_chrome_remote
     check_chromium_local
-    
+
     if [ $exit_code -eq $EXIT_HEALTHY ]; then
         log_ok "Container healthy"
     else
         log_error "Container unhealthy (Node.js ausente)"
     fi
-    
+
     return $exit_code
 }
 

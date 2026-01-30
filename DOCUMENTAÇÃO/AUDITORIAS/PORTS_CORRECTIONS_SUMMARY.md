@@ -74,7 +74,7 @@ MAX_PORT_ATTEMPTS=5
 # Chrome connection configuration
 CHROME_CONNECTION_TIMEOUT=5000
 CHROME_CONNECTION_RETRIES=3
-CHROME_FALLBACK_PORTS=9222,9223,9224
+CHROME_FALLBACK_PORTS=9224,9223,9224
 ```
 
 **Impacto**:
@@ -94,7 +94,7 @@ CHROME_FALLBACK_PORTS=9222,9223,9224
 **Arquivo**: `DOCUMENTAÇÃO/NETWORKING.md`
 
 **Conteúdo criado**:
-1. **Visão Geral**: 3 portas do sistema (3008, 9222, 9229)
+1. **Visão Geral**: 3 portas do sistema (3008, 9224, 9229)
 2. **Port Hunting Algorithm**: Como funciona, vantagens, desvantagens
 3. **Configuração**: Variáveis de ambiente, validação
 4. **Docker**: Port mapping, host.docker.internal

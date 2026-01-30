@@ -1,0 +1,17 @@
+# ===========================
+# ShellCheck — Project Policy
+# ===========================
+
+# Linguagem alvo
+shell=bash
+
+# Severidade mínima reportada
+severity=warning
+
+# Estilo e ruído controlado
+disable=SC1091       # source de arquivos dinâmicos (DevContainer)
+disable=SC2164       # cd sem checagem explícita (usado conscientemente)
+disable=SC2317       # funções declaradas para leitura/contrato
+
+# Não seguir includes fora do projeto
+external-sources=false

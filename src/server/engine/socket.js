@@ -10,6 +10,7 @@
 
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
+const EventEmitter = require('events');
 const { log } = require('@core/logger');
 const { validateRobotIdentity, validateIPCEnvelope } = require('@shared/nerv/schemas');
 const { PROTOCOL_VERSION, ActorRole } = require('@shared/nerv/constants');
@@ -18,6 +19,12 @@ const { PROTOCOL_VERSION, ActorRole } = require('@shared/nerv/constants');
  * Instância única do barramento (Singleton).
  */
 let ioInstance = null;
+
+/**
+ * Internal EventEmitter for bridging Socket.io events to other parts of the system.
+ * Allows ServerNERVAdapter and other components to listen to dashboard events.
+ */
+const internalEmitter = new EventEmitter();
 
 /**
  * Registry de Agentes Vivos (In-Memory).
@@ -104,6 +111,20 @@ function init(httpServer) {
             // Terminais de visualização (Dashboard) entram na sala de broadcast de telemetria
             socket.join('dashboards');
             log('DEBUG', `[HUB] Terminal Dashboard conectado: ${socket.id}`);
+
+            // Emit internal event for ServerNERVAdapter
+            internalEmitter.emit('client:connected', socket.id);
+
+            // Setup dashboard command listeners
+            socket.on('dashboard:command', data => {
+                log('DEBUG', `[HUB] Dashboard command received: ${JSON.stringify(data)}`);
+                internalEmitter.emit('dashboard:command', data);
+            });
+
+            socket.on('dashboard:status_request', data => {
+                log('DEBUG', `[HUB] Dashboard status request received`);
+                internalEmitter.emit('dashboard:status_request', data);
+            });
         }
 
         socket.on('disconnect', reason => {
@@ -113,6 +134,10 @@ function init(httpServer) {
 
                 // Notifica os terminais sobre a queda do agente para atualização de UI
                 ioInstance.to('dashboards').emit('hub:agent_offline', { robot_id: socket.robot_id });
+            } else {
+                // Dashboard disconnection
+                log('DEBUG', `[HUB] Terminal Dashboard desconectado: ${socket.id}`);
+                internalEmitter.emit('client:disconnected', socket.id);
             }
         });
     });
@@ -323,5 +348,10 @@ module.exports = {
     stop,
     broadcastTaskUpdate,
     getRegistry: () => Array.from(agentRegistry.values()),
-    getIO: () => ioInstance
+    getIO: () => ioInstance,
+    // Expose EventEmitter methods for ServerNERVAdapter
+    on: (...args) => internalEmitter.on(...args),
+    once: (...args) => internalEmitter.once(...args),
+    off: (...args) => internalEmitter.off(...args),
+    emit: (...args) => internalEmitter.emit(...args)
 };

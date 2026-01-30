@@ -9,8 +9,10 @@
 const shared = require('./shared_types');
 const { DnaSchema, SelectorProtocolSchema } = require('./dna_schema');
 const { TaskSchema } = require('./task_schema');
+const { TaskSchemaV5 } = require('./task_schema_v5');
 const { healTask } = require('./task_healer');
 const { BootstrapStateSchema } = require('./bootstrap_state_schema');
+const migrator = require('./migrator_v4_to_v5');
 
 module.exports = {
     // 1. Tipos Primitivos e Utilitários
@@ -27,14 +29,23 @@ module.exports = {
     SelectorProtocolSchema,
 
     // 3. Contratos de Missão (Tasks)
-    TaskSchema,
+    TaskSchema, // V4 (legacy)
+    TaskSchemaV5, // V5 (mission orchestration)
 
     // 4. Contratos de Bootstrap / Infra
     BootstrapStateSchema,
 
+    // 5. Migration Tools
+    migrator,
+
     /**
      * parseTask: O ponto de entrada oficial para novas tarefas.
      * Utiliza o motor de cura para garantir compatibilidade e integridade.
+     * Automaticamente migra tasks V4 → V5 se necessário.
      */
-    parseTask: raw => healTask(raw)
+    parseTask: raw => {
+        const healed = healTask(raw);
+        // Auto-migração transparente V4 → V5
+        return migrator.autoMigrateTask(healed);
+    }
 };

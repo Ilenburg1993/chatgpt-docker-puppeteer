@@ -12,92 +12,96 @@
 Este documento descreve a estratégia de gerenciamento de portas e networking do chatgpt-docker-puppeteer, incluindo:
 - Portas utilizadas pelo sistema
 - Algoritmo de port hunting
-- Configuração de ambiente
-- Troubleshooting de conflitos
-
----
-
-## 🔌 Portas do Sistema
+# Resposta esperada:
+# {
+#   "Browser": "Chrome/120.0.6099.109",
+#   "Protocol-Version": "1.3",
+#   "webSocketDebuggerUrl": "ws://localhost:9224/devtools/..."
+# }
 
 ### Porta 3008 - Dashboard Web (HTTP/WebSocket)
 
-**Propósito**: Interface web do Mission Control + API REST + Socket.io
+CHROME_FALLBACK_PORTS=9224,9223,9224
 
 **Configuração**:
 ```bash
 # Variável de ambiente
 PORT=3008
 
-# Fallback em código
-process.env.PORT || CONFIG.SERVER_PORT || 3008
+    environment:
+      - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 ```
-
+### Problema: Chrome não conecta (porta 9224)
 **Componentes que usam**:
 - **Express Server**: HTTP endpoints
 - **Socket.io**: Real-time communication
-- **Dashboard**: Interface web estática
+[ERROR] Tentativas em portas: [9224, 9223, 9224] - todas falharam
 - **API REST**: `/api/health`, `/api/tasks`, `/api/queue`, etc.
 
-**Como acessar**:
-```bash
+# Verificar se CDP está acessível via proxy (container-facing)
+curl http://localhost:9224/json/version
 # Dashboard
 http://localhost:3008
-
-# Health check
-curl http://localhost:3008/api/health
-
-# WebSocket (Socket.io)
-ws://localhost:3008
-```
-
----
-
-### Porta 9222 - Chrome Remote Debugging (CDP)
-
-**Propósito**: Chrome DevTools Protocol para automação com Puppeteer
-
-**Configuração**:
-```bash
-# Iniciar Chrome com remote debugging
-# Windows
+# 2. Iniciar Chrome com remote debugging
+# Windows (usar porta container-facing canônica)
 "C:\Program Files\Google\Chrome\Application\chrome.exe" \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir="C:\chrome-automation-profile"
 
 # Linux/Mac
 google-chrome \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
+  --user-data-dir="~/chrome-automation-profile"
+
+# 3. Verificar novamente (container-facing)
+curl http://localhost:9224/json/version
+
+-- `config.json` - DEBUG_PORT: http://localhost:9224
+
+**Configuração**:
+# Chrome multi-instance
+# exemplos (evitar usar 9224 como padrão; 9224 é o canal container-facing canônico)
+chrome --remote-debugging-port=9223 --user-data-dir="~/profile1"
+chrome --remote-debugging-port=9224 --user-data-dir="~/profile2"
+# Windows
+"C:\Program Files\Google\Chrome\Application\chrome.exe" \
+  --remote-debugging-port=9224 \
+  --user-data-dir="C:\chrome-automation-profile"
+
+# Linux/Mac
+google-chrome \
+  --remote-debugging-port=9224 \
   --user-data-dir="~/chrome-automation-profile"
 ```
 
 **Variáveis de ambiente**:
 ```bash
-CHROME_REMOTE_DEBUGGING_PORT=9222
-CHROME_WS_ENDPOINT=ws://localhost:9222
-DEBUG_PORT=http://localhost:9222  # Em config.json
+CHROME_REMOTE_DEBUGGING_PORT=9224  # Porta canônica container-facing (proxy)
+CHROME_WS_ENDPOINT=ws://localhost:9224  # Endpoint container-facing (proxy)
+DEBUG_PORT=http://localhost:9224  # Em config.json (container-facing)
 ```
 
 **Estratégia Multi-Port** (Browser Pool):
 ```javascript
-// ConnectionOrchestrator tenta múltiplas portas
-const DEFAULT_PORTS = [9222, 9223, 9224];
+// ConnectionOrchestrator tenta múltiplas portas (proxy-first)
+const DEFAULT_PORTS = [9224, 9223, 9224];
 
 // Suporta múltiplas instâncias Chrome
-chrome1: --remote-debugging-port=9222
+chrome1: --remote-debugging-port=9224
 chrome2: --remote-debugging-port=9223
 chrome3: --remote-debugging-port=9224
 ```
 
 **Como verificar**:
 ```bash
-# Verificar se Chrome está com CDP ativo
-curl http://localhost:9222/json/version
+# Verificar se CDP está acessível via proxy (container-facing)
+curl http://localhost:9224/json/version
 
 # Resposta esperada:
 # {
 #   "Browser": "Chrome/120.0.6099.109",
 #   "Protocol-Version": "1.3",
-#   "webSocketDebuggerUrl": "ws://localhost:9222/devtools/..."
+#   "webSocketDebuggerUrl": "ws://localhost:9224/devtools/..."
 # }
 ```
 
@@ -240,7 +244,7 @@ MAX_PORT_ATTEMPTS=5
 # Chrome connection configuration
 CHROME_CONNECTION_TIMEOUT=5000
 CHROME_CONNECTION_RETRIES=3
-CHROME_FALLBACK_PORTS=9222,9223,9224
+CHROME_FALLBACK_PORTS=9224,9223,9224
 ```
 
 ### Validação de Porta
@@ -295,7 +299,7 @@ services:
 services:
   agent:
     environment:
-      - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+      - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
     extra_hosts:
       - "host.docker.internal:host-gateway"  # Linux only
 ```
@@ -341,18 +345,18 @@ PORT=4000 npm start
 
 ---
 
-### Problema: Chrome não conecta (porta 9222)
+### Problema: Chrome não conecta (porta 9224)
 
 **Sintomas**:
 ```
 [ERROR] CHROME_UNAVAILABLE: Não foi possível conectar ao Chrome
-[ERROR] Tentativas em portas: [9222, 9223, 9224] - todas falharam
+[ERROR] Tentativas em portas: [9224, 9223, 9224] - todas falharam
 ```
 
 **Diagnóstico**:
 ```bash
 # Verificar se Chrome está rodando com CDP
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version
 
 # Se falhar, Chrome não está com --remote-debugging-port
 ```
@@ -366,16 +370,16 @@ taskkill /IM chrome.exe /F  # Windows
 # 2. Iniciar Chrome com remote debugging
 # Windows
 "C:\Program Files\Google\Chrome\Application\chrome.exe" \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir="C:\chrome-automation-profile"
 
 # Linux/Mac
 google-chrome \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir="~/chrome-automation-profile"
 
 # 3. Verificar novamente
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version
 ```
 
 ---
@@ -459,7 +463,7 @@ MAX_PORT_ATTEMPTS=5  # Tenta apenas 3008-3012
 - `ecosystem.config.js` - PM2 config (PORT: 3008)
 - `docker-compose.yml` - Port mapping (3008:3008)
 - `.env.example` - Template de variáveis
-- `config.json` - DEBUG_PORT: http://localhost:9222
+- `config.json` - DEBUG_PORT: http://localhost:9224
 
 ### Código-fonte
 - `src/server/engine/server.js` - Port hunting implementation
@@ -481,7 +485,7 @@ PORT=3008 npm run dev  # Dev 1
 PORT=4008 npm run dev  # Dev 2
 
 # Chrome multi-instance
-chrome --remote-debugging-port=9222 --user-data-dir="~/profile1"
+chrome --remote-debugging-port=9224 --user-data-dir="~/profile1"
 chrome --remote-debugging-port=9223 --user-data-dir="~/profile2"
 ```
 
@@ -495,7 +499,7 @@ ENABLE_PORT_HUNTING=false
 PORT=3008
 
 # Chrome via host.docker.internal
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 ```
 
 ### ✅ Produção

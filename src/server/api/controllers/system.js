@@ -169,6 +169,15 @@ router.get('/status', async (req, res) => {
 router.post('/control/:action', async (req, res) => {
     const { action } = req.params;
     try {
+        // Proteção: em modo delegated, o server não deve executar comandos de lifecycle
+        const authority = req.app?.locals?.authority || process.env.SERVER_AUTHORITY || 'standalone';
+        if (String(authority).toLowerCase() === 'delegated') {
+            return res.status(403).json({
+                success: false,
+                error: 'Operation not permitted: server running in delegated mode',
+                request_id: req.id
+            });
+        }
         await audit('PROCESS_CONTROL', { action, source: 'API', request_id: req.id });
         const result = await system.controlAgent(action);
         res.json({

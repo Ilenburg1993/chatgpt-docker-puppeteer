@@ -21,7 +21,7 @@ Health check endpoint for monitoring.
     "uptime": 3600,
     "chrome": {
         "connected": true,
-        "endpoint": "ws://host.docker.internal:9222"
+        "endpoint": "ws://host.docker.internal:9224"
     },
     "queue": {
         "pending": 5,
@@ -238,7 +238,7 @@ Get current configuration.
     "timeout": 30000,
     "logLevel": "info",
     "chrome": {
-        "endpoint": "ws://host.docker.internal:9222"
+        "endpoint": "ws://host.docker.internal:9224"
     }
 }
 ```

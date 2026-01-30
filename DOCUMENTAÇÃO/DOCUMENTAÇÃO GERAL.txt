@@ -281,7 +281,7 @@ O Orquestrador opera uma máquina de estados rigorosa (INIT ? WAITING_FOR_BROWSER
 * Auto-Regeneração (Self-Healing): Ao detectar que uma aba foi fechada pelo usuário, o orquestrador limpa os listeners antigos (cleanup) para evitar vazamento de memória e busca uma nova aba válida nos domínios permitidos.
 5.1.2. Conexão Universal (Agnosticismo de Ambiente)
 O sistema suporta múltiplas estratégias de acoplamento:
-* Native/Host: Conecta via browserURL (localhost:9222).
+* Native/Host: Conecta via browserURL (localhost:9224).
 * Docker Bridge: Resolve a conexão através do túnel host.docker.internal, permitindo que o robô rode isolado enquanto o navegador roda no SO hospedeiro.
 * WS Endpoint: Capaz de capturar o webSocketDebuggerUrl via handshake JSON, permitindo o controle de navegadores em clusters remotos.
 

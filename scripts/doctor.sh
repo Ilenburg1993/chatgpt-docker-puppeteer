@@ -23,7 +23,7 @@ check() {
     local name=$1
     local command=$2
     local type=${3:-error}  # error or warning
-    
+
     echo -n "[$name] "
     if eval "$command" &> /dev/null; then
         echo -e "${GREEN}✅ OK${NC}"
@@ -92,7 +92,7 @@ echo "-------------------------------------------"
 
 if [ -f "config.json" ]; then
     check "config.json válido (JSON)" "node -e 'JSON.parse(require(\"fs\").readFileSync(\"config.json\"))'"
-    
+
     CHROME_PATH=$(node -e "console.log(require('./config.json').chromePath || '')")
     echo "   Chrome Path: $CHROME_PATH"
 else
@@ -112,28 +112,28 @@ echo ""
 echo -e "${BLUE}🌐 Chrome Remote Debugging${NC}"
 echo "-------------------------------------------"
 
-CHROME_PORT=9222
-check "Porta 9222 acessível" "curl -s http://localhost:$CHROME_PORT/json/version"
+CHROME_PORT=9224
+check "Porta 9224 acessível" "curl -s http://localhost:$CHROME_PORT/json/version"
 
 if curl -s http://localhost:$CHROME_PORT/json/version &> /dev/null; then
     CHROME_INFO=$(curl -s http://localhost:$CHROME_PORT/json/version)
     BROWSER=$(echo $CHROME_INFO | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).Browser || 'Unknown')")
     WS_URL=$(echo $CHROME_INFO | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).webSocketDebuggerUrl || 'N/A')")
-    
+
     echo "   Browser: $BROWSER"
     echo "   WebSocket: ${WS_URL:0:50}..."
-    
+
     # Check if pages are available
     PAGES=$(curl -s http://localhost:$CHROME_PORT/json/list | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).length || 0)")
     echo "   Páginas abertas: $PAGES"
 else
-    echo -e "${RED}   Chrome não está rodando com --remote-debugging-port=9222${NC}"
+    echo -e "${RED}   Chrome/Proxy não está acessível no endpoint configurado (porta 9224)${NC}"
     echo ""
     echo "   Para iniciar:"
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "   google-chrome --remote-debugging-port=9222 --user-data-dir=\"\$HOME/chrome-automation-profile\""
+        echo "   google-chrome --remote-debugging-port=9224 --user-data-dir=\"\$HOME/chrome-automation-profile\""
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222"
+        echo "   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9224"
     fi
 fi
 echo ""
@@ -168,11 +168,11 @@ if [ -d "fila" ]; then
     PENDING=$(find fila -maxdepth 1 -name "*.json" -not -name "*.tmp.*" | wc -l)
     LOCKED=$(find fila -maxdepth 1 -name "*.tmp.*" | wc -l)
     CORRUPTED=$(find fila/corrupted -name "*.json" 2>/dev/null | wc -l)
-    
+
     echo "   Pendentes: $PENDING"
     echo "   Travadas: $LOCKED"
     echo "   Corrompidas: $CORRUPTED"
-    
+
     if [ $LOCKED -gt 0 ]; then
         echo ""
         echo "   Tarefas travadas:"
@@ -224,7 +224,7 @@ echo "-------------------------------------------"
 if [ -d "logs/crash_reports" ]; then
     CRASH_COUNT=$(find logs/crash_reports -name "*.json" -mtime -7 | wc -l)
     echo "   Crashes (últimos 7 dias): $CRASH_COUNT"
-    
+
     if [ $CRASH_COUNT -gt 0 ]; then
         echo "   Crashes mais recentes:"
         find logs/crash_reports -name "*.json" -mtime -1 -exec basename {} \; | head -3 | while read crash; do

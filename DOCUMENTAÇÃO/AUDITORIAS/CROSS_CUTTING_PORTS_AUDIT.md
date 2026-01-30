@@ -11,7 +11,7 @@
 
 ### Status Geral: ⚠️ **PRECISA CORREÇÕES**
 
-O sistema utiliza **2 portas principais** (3008 e 9222) mas apresenta **inconsistências de configuração** e **falta de documentação centralizada**.
+O sistema utiliza **2 portas principais** (3008 e 9224) mas apresenta **inconsistências de configuração** e **falta de documentação centralizada**.
 
 ### Métricas:
 - **Portas em uso**: 2 principais + 1 desenvolvimento
@@ -35,7 +35,7 @@ O sistema utiliza **2 portas principais** (3008 e 9222) mas apresenta **inconsis
 | Porta | Propósito | Componente | Configurável | Status |
 |-------|-----------|------------|--------------|--------|
 | **3008** | Dashboard Web (HTTP) | Server/Express | ✅ Sim (PORT env) | ✅ PRODUÇÃO |
-| **9222** | Chrome Remote Debugging | Chrome/CDP | ✅ Sim (CHROME_REMOTE_DEBUGGING_PORT) | ✅ PRODUÇÃO |
+| **9224** | Chrome Remote Debugging | Chrome/CDP | ✅ Sim (CHROME_REMOTE_DEBUGGING_PORT) | ✅ PRODUÇÃO |
 | **9229** | Node.js Inspector (Dev) | Node Debug | ✅ Sim (--inspect) | 🟡 DEV ONLY |
 | **3000** | Fallback Server (Legacy) | Server/Express | ❌ Hardcoded em testes | ⚠️ INCONSISTENTE |
 
@@ -122,34 +122,34 @@ function start(port) {
 
 ---
 
-### 2.2. Porta 9222 - Chrome Remote Debugging Protocol (CDP)
+### 2.2. Porta 9224 - Chrome Remote Debugging Protocol (CDP)
 
 #### Configuração Atual:
 ```bash
 # Windows
 "C:\Program Files\Google\Chrome\Application\chrome.exe" \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir="C:\chrome-automation-profile"
 
 # Linux/Mac
-google-chrome --remote-debugging-port=9222 \
+google-chrome --remote-debugging-port=9224 \
   --user-data-dir="~/chrome-automation-profile"
 ```
 
 #### Variáveis de Ambiente:
 ```dotenv
 # .env.example
-CHROME_REMOTE_DEBUGGING_PORT=9222
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+CHROME_REMOTE_DEBUGGING_PORT=9224
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
 # config.json
-DEBUG_PORT: "http://localhost:9222"
+DEBUG_PORT: "http://localhost:9224"
 ```
 
 #### Uso no Código:
 ```javascript
 // src/infra/ConnectionOrchestrator.js
-const DEFAULT_PORTS = [9222, 9223, 9224]; // Multi-instance support
+const DEFAULT_PORTS = [9224, 9223, 9224]; // Multi-instance support
 
 // Tenta conectar em múltiplas portas para suportar pool
 for (const port of this.config.ports) {
@@ -158,19 +158,19 @@ for (const port of this.config.ports) {
 }
 ```
 
-**Estratégia Multi-Port**: Sistema suporta múltiplas instâncias Chrome em portas sequenciais (9222, 9223, 9224) para browser pool.
+**Estratégia Multi-Port**: Sistema suporta múltiplas instâncias Chrome em portas sequenciais (9224, 9223, 9224) para browser pool.
 
-#### Arquivos Referenciando 9222:
+#### Arquivos Referenciando 9224:
 ✅ **Corretos** (30+ arquivos):
 - `README.md` - Instruções de inicialização
-- `INICIAR_TUDO.BAT` - Lança Chrome com 9222
+- `INICIAR_TUDO.BAT` - Lança Chrome com 9224
 - `scripts/setup.sh` - Setup automático
 - `scripts/doctor.sh` - Diagnóstico
 - `CHROME_EXTERNAL_SETUP.md` - Guia detalhado
 - `src/infra/ConnectionOrchestrator.js` - Connection manager
 - `tests/manual/test_chrome_connection.js` - Teste de conexão
 
-⚠️ **Dependência Externa**: Sistema **NÃO** lança Chrome automaticamente, assume Chrome já rodando com `--remote-debugging-port=9222`.
+⚠️ **Dependência Externa**: Sistema **NÃO** lança Chrome automaticamente, assume Chrome já rodando com `--remote-debugging-port=9224`.
 
 ---
 
@@ -318,8 +318,8 @@ if (error.code === 'EADDRINUSE' && ENABLE_PORT_HUNTING) {
 ```dotenv
 # .env.example (completo)
 PORT=3008
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
-CHROME_REMOTE_DEBUGGING_PORT=9222
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
+CHROME_REMOTE_DEBUGGING_PORT=9224
 ```
 
 #### ⚠️ **Faltando**:
@@ -415,9 +415,9 @@ if ([80, 443, 8080].includes(port)) {
 |------------|------------------|----------|----------|
 | **SERVER** | 3008 (HTTP) | Express.listen() | ✅ SIM |
 | **DASHBOARD** | 3008 (HTTP) | Socket.io attach | ✅ SIM |
-| **INFRA** | 9222 (CDP) | Puppeteer.connect() | ✅ SIM |
+| **INFRA** | 9224 (CDP) | Puppeteer.connect() | ✅ SIM |
 | **KERNEL** | - | Não usa diretamente | ❌ NÃO |
-| **DRIVER** | 9222 (CDP) | Via ConnectionOrchestrator | ✅ SIM |
+| **DRIVER** | 9224 (CDP) | Via ConnectionOrchestrator | ✅ SIM |
 | **CORE** | - | Não usa diretamente | ❌ NÃO |
 | **NERV** | 3008 (WS) | Via ServerNERVAdapter | ✅ SIM |
 
@@ -435,7 +435,7 @@ if ([80, 443, 8080].includes(port)) {
 #### Fluxo 2: Chrome Connection
 ```
 1. ConnectionOrchestrator → Lê config.DEBUG_PORT ou env.CHROME_WS_ENDPOINT
-2. Tenta portas em ordem: [9222, 9223, 9224]
+2. Tenta portas em ordem: [9224, 9223, 9224]
 3. Para cada porta: GET http://localhost:{port}/json/version
 4. Se sucesso: puppeteer.connect({ browserWSEndpoint })
 5. Se falha todas: Throw 'CHROME_UNAVAILABLE'
@@ -450,7 +450,7 @@ if ([80, 443, 8080].includes(port)) {
 #### ✅ **Testes de Porta Funcionais**:
 
 1. **tests/manual/test_chrome_connection.js**:
-   - Verifica conexão Chrome em 9222
+   - Verifica conexão Chrome em 9224
    - Testa fallback para portas alternativas
    - Status: ✅ FUNCIONAL
 
@@ -553,7 +553,7 @@ describe('Docker Port Mapping', () => {
    # Chrome connection configuration
    CHROME_CONNECTION_TIMEOUT=5000
    CHROME_CONNECTION_RETRIES=3
-   CHROME_FALLBACK_PORTS=9222,9223,9224
+   CHROME_FALLBACK_PORTS=9224,9223,9224
    ```
 
 3. **✅ DOCUMENTAR Estratégia de Port Hunting**:
@@ -659,7 +659,7 @@ describe('Docker Port Mapping', () => {
 
 1. **Port Allocation Strategy**:
    - Porta padrão: 3008 (Dashboard HTTP/WebSocket)
-   - Porta Chrome: 9222 (CDP - Chrome DevTools Protocol)
+   - Porta Chrome: 9224 (CDP - Chrome DevTools Protocol)
    - Porta Dev: 9229 (Node Inspector)
    - Port hunting: Escalonamento automático se ocupada
 
@@ -669,20 +669,20 @@ describe('Docker Port Mapping', () => {
    - Desabilitar port hunting em containers
 
 3. **Chrome Connection**:
-   - Estratégia multi-port: [9222, 9223, 9224]
+   - Estratégia multi-port: [9224, 9223, 9224]
    - Suporte a browser pool
    - Fallback automático
 
 4. **Environment Variables**:
    - `PORT`: Dashboard port (default: 3008)
-   - `CHROME_REMOTE_DEBUGGING_PORT`: CDP port (default: 9222)
+   - `CHROME_REMOTE_DEBUGGING_PORT`: CDP port (default: 9224)
    - `CHROME_WS_ENDPOINT`: Full WebSocket URL
    - `ENABLE_PORT_HUNTING`: true/false
    - `MAX_PORT_ATTEMPTS`: Retry limit
 
 5. **Troubleshooting**:
    - Porta ocupada: Port hunting ou erro
-   - Chrome não conecta: Verificar 9222
+   - Chrome não conecta: Verificar 9224
    - Docker não acessa: Check port mapping
    - Logs inconsistentes: Ver estado.json
 

@@ -16,6 +16,7 @@
 
 - **[Architecture Guide](ARCHITECTURE.md)** ⭐ - Visão técnica detalhada
 - **[Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md)** ✨ **NOVO** - 11 diagramas visuais
+- **[Mission Orchestration Plan](MISSION_ORCHESTRATION_PLAN.md)** 🚀 **v2.0** - Plano de orquestração autônoma
 - **[Roadmap](ROADMAP.md)** ✨ **NOVO** - Planejamento até v1.0
 - **[Gap Analysis](GAP_ANALYSIS.md)** ✨ **NOVO** - Análise crítica e plano de ação
 
@@ -50,8 +51,9 @@
 
 1. [Architecture Guide](ARCHITECTURE.md) - Visão técnica
 2. [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - Diagramas C4, fluxos
-3. [Roadmap](ROADMAP.md) - Planejamento estratégico
-4. [Gap Analysis](GAP_ANALYSIS.md) - Issues e próximos passos
+3. [Mission Orchestration Plan](MISSION_ORCHESTRATION_PLAN.md) - Plano v2.0 (missões autônomas)
+4. [Roadmap](ROADMAP.md) - Planejamento estratégico
+5. [Gap Analysis](GAP_ANALYSIS.md) - Issues e próximos passos
 
 ### 🚀 DevOps / SRE
 
@@ -71,18 +73,19 @@
 
 ## 📊 Estado da Documentação
 
-| Documento             | Status      | Última Atualização | Cobertura |
-| --------------------- | ----------- | ------------------ | --------- |
-| Quick Start           | ✅ Completo | Jan 2026           | 100%      |
-| Architecture          | ✅ Completo | Jan 2026           | 95%       |
-| Architecture Diagrams | ✨ Novo     | 19 Jan 2026        | 100%      |
-| Roadmap               | ✨ Novo     | 19 Jan 2026        | 100%      |
-| Gap Analysis          | ✨ Novo     | 19 Jan 2026        | 100%      |
-| Summary               | ✨ Novo     | 19 Jan 2026        | 100%      |
-| API                   | ✅ Completo | Jan 2026           | 90%       |
-| Configuration         | ✅ Completo | Jan 2026           | 100%      |
-| Deployment            | ✅ Completo | Jan 2026           | 85%       |
-| Security              | ✅ Completo | Jan 2026           | 80%       |
+| Documento                  | Status      | Última Atualização | Cobertura |
+| -------------------------- | ----------- | ------------------ | --------- |
+| Quick Start                | ✅ Completo | Jan 2026           | 100%      |
+| Architecture               | ✅ Completo | 28 Jan 2026        | 95%       |
+| Architecture Diagrams      | ✨ Novo     | 19 Jan 2026        | 100%      |
+| Mission Orchestration Plan | 🚀 v2.0     | 28 Jan 2026        | 100%      |
+| Roadmap                    | ✨ Novo     | 19 Jan 2026        | 100%      |
+| Gap Analysis               | ✨ Novo     | 19 Jan 2026        | 100%      |
+| Summary                    | ✨ Novo     | 19 Jan 2026        | 100%      |
+| API                        | ✅ Completo | Jan 2026           | 90%       |
+| Configuration              | ✅ Completo | Jan 2026           | 100%      |
+| Deployment                 | ✅ Completo | Jan 2026           | 85%       |
+| Security                   | ✅ Completo | Jan 2026           | 80%       |
 
 ---
 
@@ -180,6 +183,6 @@ A: Leia [CONTRIBUTING.md](../CONTRIBUTING.md) e escolha uma issue para trabalhar
 
 ---
 
-**Última atualização**: 19 de Janeiro de 2026  
-**Mantido por**: Equipe de Desenvolvimento  
+**Última atualização**: 28 de Janeiro de 2026
+**Mantido por**: Equipe de Desenvolvimento
 **Licença**: MIT

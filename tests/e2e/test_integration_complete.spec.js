@@ -23,14 +23,13 @@ console.log('🔬 Teste de Integração Completo\n');
     console.log('  Profiles limpos:', cleanedBefore);
     console.log();
 
-    // FASE 3: BrowserPool com modo launcher
+    // FASE 3: BrowserPool usando `browserEndpoint` (Chrome externo)
     console.log('FASE 3: BrowserPoolManager (2 instâncias)');
     const pool = new BrowserPoolManager({
         poolSize: 2,
-        chromium: {
-            mode: 'launcher',
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        browserEndpoint: {
+            // Ajuste o endpoint para o Chrome que está rodando externamente
+            url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
         }
     });
 

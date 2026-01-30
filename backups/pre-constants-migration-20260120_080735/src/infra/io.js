@@ -61,12 +61,12 @@ module.exports = {
 
         for (const dir of targetDirs) {
             try {
-                // eslint-disable-next-line no-await-in-loop
+                 
                 const files = await fs.readdir(dir);
                 const tmpFiles = files.filter(f => f.includes('.tmp'));
 
                 for (const file of tmpFiles) {
-                    // eslint-disable-next-line no-await-in-loop
+                     
                     await fs.unlink(path.join(dir, file)).catch(() => {});
                     totalCleaned++;
                 }

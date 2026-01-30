@@ -1,0 +1,109 @@
+PARTE 2: SISTEMA DE ORQUESTRAÇÃO AUTÔNOMA
+19. VISÃO GERAL DA ORQUESTRAÇÃO
+19.1 Objetivos da Orquestração
+O sistema deve ser capaz de executar tarefas complexas de forma autônoma:
+
+Exemplo 1: Escrever um Livro Técnico
+
+
+Input do usuário:
+- Tópico: "Advanced Rust Programming"
+- Público-alvo: "Desenvolvedores experientes"
+- Tamanho: "300 páginas, 15 capítulos"
+- Estilo: "Técnico, com exemplos de código"
+
+Execução autônoma:
+1. Gerar outline (títulos de capítulos, tópicos)
+2. Para cada capítulo (sequencial):
+   a. Fase de pesquisa (query knowledge, code examples)
+   b. Fase de escrita (gerar draft)
+   c. Fase de revisão (LLM-as-judge avalia coerência, precisão)
+   d. Fase de revisão (incorporar feedback, melhorar)
+   e. Validação de código (se aplicável)
+3. Checagem de consistência entre capítulos
+4. Revisão final e compilação
+
+Dashboard mostra:
+- Progresso: 7/15 capítulos completados
+- Quality scores por capítulo (0-100)
+- Token usage, custo total ($)
+- Tempo estimado para conclusão
+- Botões: Pausar, Continuar, Revisar Capítulo X
+Exemplo 2: Escrever Projeto de Software
+
+
+Input do usuário:
+- Projeto: "REST API para gerenciamento de tarefas"
+- Tech stack: "Node.js, Express, PostgreSQL"
+- Features: [autenticação, CRUD de tasks, filtros, export]
+
+Execução autônoma:
+1. Gerar estrutura do projeto
+2. Para cada arquivo (paralelo com concurrency: 3):
+   a. Gerar código
+   b. Rodar linter (check syntax)
+   c. Gerar testes
+   d. Rodar testes
+   e. Se testes falham: analisar erros → regenerar → retry
+   f. Repetir até testes passarem (max 3 iterações)
+3. Testes de integração
+4. Geração de documentação
+
+Dashboard mostra:
+- Árvore de arquivos com status (✓ done, ⚠ in progress, ✗ failed)
+- Resultados de testes em tempo real
+- Métricas de qualidade de código (coverage, complexity)
+- Retry count por arquivo
+- Logs de erros e correções
+Exemplo 3: Projeto de Pesquisa
+
+
+Input do usuário:
+- Tópico: "Impacto da IA na saúde"
+- Fontes: [lista de URLs, papers, APIs]
+- Output: "Relatório de 20 páginas com citações"
+
+Execução autônoma:
+1. Fetch e parse de fontes (paralelo)
+2. Extrair informações relevantes por fonte
+3. Sintetizar achados (identificar temas, padrões)
+4. Gerar outline do relatório
+5. Escrever seções com citações
+6. Fact-check (cross-reference entre fontes)
+7. Formatar e compilar
+
+Dashboard mostra:
+- Fontes processadas (12/20)
+- Key findings extraídos (lista)
+- Seções completadas (3/7)
+- Contagem de citações (45)
+- Confidence score por finding
+19.2 Estratégias de Execução
+SINGLE_SHOT (Execução única):
+
+Tarefa simples, resposta direta
+Ex: "Resuma este artigo"
+Sem iteração, sem validação
+ITERATIVE (Iteração até critério):
+
+Executa → Valida → Se falha, refina → Repeat
+Ex: "Escreva código que passe nestes testes"
+Max 3-5 iterações
+Validação: testes passam? quality_score > threshold?
+MULTI_STEP (Workflow sequencial):
+
+Lista de steps definidos pelo usuário ou sistema
+Cada step pode ser SINGLE_SHOT ou ITERATIVE
+Context acumula entre steps
+Ex: Outline → Write Chapter 1 → Write Chapter 2 → ...
+TREE_OF_THOUGHT (Exploração de múltiplas alternativas):
+
+Gera N soluções alternativas
+Avalia cada uma
+Escolhe melhor ou combina
+Ex: "Gere 3 abordagens para este problema, escolha a melhor"
+CHAIN_OF_THOUGHT (Raciocínio passo-a-passo):
+
+LLM explicita raciocínio antes de responder
+Melhora qualidade para problemas complexos
+Ex: "Resolva este problema matemático, mostrando cada passo"

@@ -19,7 +19,7 @@ const { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondit
         console.log('> Agente online.');
 
         // Conecta ao browser para sabotagem
-        const browser = await puppeteer.connect({ browserURL: 'http://localhost:9222' });
+        const browser = await puppeteer.connect({ browserURL: 'http://localhost:9224' });
         const pages = await browser.pages();
         const page = pages.find(p => p.url().includes('chatgpt.com'));
 

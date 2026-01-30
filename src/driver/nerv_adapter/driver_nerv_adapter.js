@@ -36,13 +36,18 @@ class DriverNERVAdapter {
         if (!nerv) {
             throw new Error('[DriverNERVAdapter] NERV instance required');
         }
+
+        // browserPool pode ser null em modo degradado
+        // Quando null, comandos de execução serão rejeitados com mensagem clara
         if (!browserPool) {
-            throw new Error('[DriverNERVAdapter] BrowserPool required');
+            log('WARN', '[DriverNERVAdapter] Inicializando em MODO DEGRADADO (browserPool = null)');
+            log('WARN', '[DriverNERVAdapter] Comandos de execução serão rejeitados até Browser Pool ser configurado');
         }
 
         this.nerv = nerv;
-        this.browserPool = browserPool;
+        this.browserPool = browserPool; // Pode ser null
         this.config = config;
+        this.degradedMode = !browserPool; // Flag para modo degradado
 
         // Mapa de drivers ativos: taskId -> DriverLifecycleManager
         this.activeDrivers = new Map();
@@ -102,6 +107,23 @@ class DriverNERVAdapter {
         const { actionCode, payload, correlationId } = envelope;
 
         log('DEBUG', `[DriverNERVAdapter] Recebido comando: ${actionCode}`, correlationId);
+
+        // Em modo degradado, rejeita comandos de execução
+        if (this.degradedMode && actionCode === ActionCode.DRIVER_EXECUTE_TASK) {
+            log('WARN', `[DriverNERVAdapter] REJEITADO: Sistema em modo degradado (Browser Pool não disponível)`, correlationId);
+
+            this._emitEvent(
+                ActionCode.DRIVER_ERROR,
+                {
+                    taskId: payload?.taskId,
+                    error: 'Sistema em modo degradado - Browser Pool não disponível',
+                    reason: 'DEGRADED_MODE',
+                    suggestion: 'Configure o browserEndpoint/proxy com remote debugging exposto ao container (porta 9224) e reinicie o sistema'
+                },
+                correlationId
+            );
+            return;
+        }
 
         switch (actionCode) {
             case ActionCode.DRIVER_EXECUTE_TASK:

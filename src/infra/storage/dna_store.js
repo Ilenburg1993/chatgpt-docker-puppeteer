@@ -53,7 +53,7 @@ async function getDna() {
     if (!rawDna) {
         log('WARN', '[DNA_STORE] dynamic_rules.json ausente. Inicializando estrutura V4 Gold.');
         await saveDna(DEFAULT_DNA, 'system_init');
-        // eslint-disable-next-line require-atomic-updates -- Protected by write lock in caller
+         
         cachedDna = DEFAULT_DNA;
         return cachedDna;
     }

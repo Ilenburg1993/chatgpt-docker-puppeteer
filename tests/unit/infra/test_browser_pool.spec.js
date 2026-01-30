@@ -5,8 +5,9 @@ const BrowserPoolManager = require('../../../src/infra/browser_pool/pool_manager
 
     const config = {
         poolSize: 2,
-        chromium: {
-            mode: 'launcher' // Puppeteer inicia Chrome automaticamente
+        browserEndpoint: {
+            // Endpoint HTTP do Chrome/Chromium externo em execução
+            url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
         }
     };
 

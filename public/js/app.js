@@ -1,6 +1,6 @@
 /* public/js/app.js (Audit 9 - Wizard) */
 /* global io */
-/* eslint-disable no-alert */ // Dashboard de admin - alerts aceitáveis
+  // Dashboard de admin - alerts aceitáveis
 const socket = io();
 let currentTasks = [];
 let selectedTaskId = null;

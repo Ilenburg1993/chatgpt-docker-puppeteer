@@ -35,7 +35,7 @@ const {
     const agentB = startAgent(15000);
 
     try {
-        // Aguarda prontidão (pode falhar se um deles detectar erro de porta 9222 ocupada, mas o código deve tratar isso)
+        // Aguarda prontidão (pode falhar se um deles detectar erro de porta 9224 ocupada, mas o código deve tratar isso)
         // Nota: Puppeteer connect permite múltiplas conexões, então ambos devem subir.
         await Promise.allSettled([agentA.ready, agentB.ready]);
         console.log('> Ambos processos iniciados.');

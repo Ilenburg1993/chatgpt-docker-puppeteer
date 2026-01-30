@@ -1,4 +1,4 @@
-/* eslint-disable linebreak-style */
+ 
 /* ==========================================================================
    src/driver/modules/stabilizer.js
    Audit Level: 500 — Instrumented System Stabilizer (IPC 2.0)

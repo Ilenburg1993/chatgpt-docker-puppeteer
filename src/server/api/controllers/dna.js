@@ -14,6 +14,7 @@ const path = require('path');
 const io = require('@infra/io');
 const { audit, log } = require('@core/logger');
 const { ROOT } = require('@infra/fs/fs_utils');
+const denyIfDelegated = require('../../middleware/deny_if_delegated');
 
 // Caminho físico absoluto para o arquivo de configuração mestre
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -49,7 +50,7 @@ router.get('/', async (req, res) => {
  * PUT /
  * Sobrescreve as preferências globais via escrita atômica resiliente.
  */
-router.put('/', async (req, res) => {
+router.put('/', denyIfDelegated, async (req, res) => {
     try {
         if (!req.body || typeof req.body !== 'object') {
             return res.status(400).json({
@@ -118,7 +119,7 @@ router.get('/dna', async (req, res) => {
  * PUT /dna
  * Evolui o genoma com validação nativa de integridade (Audit 410).
  */
-router.put('/dna', async (req, res) => {
+router.put('/dna', denyIfDelegated, async (req, res) => {
     try {
         await audit('UPDATE_DNA', {
             user: 'GUI',

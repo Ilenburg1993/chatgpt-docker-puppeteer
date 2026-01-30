@@ -53,7 +53,7 @@ Sistema **autônomo** para automação de Large Language Models via browser:
               │             │             │
          (Fila JSON)  (Puppeteer)   (Socket.io)
                             ↓
-                     Chrome :9222 (Host)
+                     Chrome :9224 (Host)
                             ↓
                     ChatGPT / Gemini
 ```

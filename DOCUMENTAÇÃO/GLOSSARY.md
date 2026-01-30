@@ -167,12 +167,12 @@ HEALTHY → SHUTDOWN       (manual close)
 **Categoria**: Browser Automation
 **Definição**: Protocolo usado pelo Chrome/Edge para controle remoto via WebSocket.
 
-**Porta padrão**: 9222
-**URL exemplo**: `ws://localhost:9222/devtools/browser/...`
+**Porta padrão (container-facing)**: 9224 (proxy)
+**URL exemplo**: `ws://localhost:9224/devtools/browser/...`
 
 **Contexto**:
 - Puppeteer usa CDP internamente
-- Modo `external` conecta a browser via CDP (porta 9222)
+- Modo `external` conecta ao browser via o endpoint container-facing (porta 9224), que normalmente é reencaminhado para 9224 no host
 - Permite debug, profiling, network interception
 
 **Comandos comuns**:
@@ -414,7 +414,7 @@ nerv.on('TASK_ALLOCATED', ({ taskId }) => {
 ### External Browser
 
 **Categoria**: Configuração
-**Definição**: Modo de operação onde sistema **conecta a browser já executando** (via CDP porta 9222), ao invés de lançar instância própria.
+**Definição**: Modo de operação onde sistema **conecta a browser já executando** (via CDP exposto ao container, geralmente na porta 9224), ao invés de lançar instância própria.
 
 **Vantagens**:
 - -70% uso de recursos (CPU, memória)
@@ -429,7 +429,7 @@ nerv.on('TASK_ALLOCATED', ({ taskId }) => {
 ```json
 {
     "browserMode": "external",
-    "externalBrowserPort": 9222
+    "externalBrowserPort": 9224
 }
 ```
 

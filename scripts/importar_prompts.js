@@ -14,7 +14,7 @@ function sanitizePrompt(text) {
         return '';
     }
     // Remove caracteres de controle ASCII que podem confundir o Puppeteer
-    // eslint-disable-next-line no-control-regex -- required to strip control chars
+     
     return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
 }
 

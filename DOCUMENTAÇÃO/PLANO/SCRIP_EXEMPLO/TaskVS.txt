@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "id": "task-book-001",
+    "project_id": "rust-book",
+    "workflow_id": "workflow-rust-book",
+    "version": "5.0",
+    "created_at": "2026-01-27T10:00:00Z",
+    "priority": 80,
+    "tags": ["book", "rust", "long-running"]
+  },
+  "spec": {
+    "target": "chatgpt",
+    "model": "gpt-4o",
+    "execution": {
+      "strategy": "MULTI_STEP",
+      "workflow_config": {
+        "steps": [
+          {
+            "id": "step-outline",
+            "name": "Generate Outline",
+            "action": "execute_prompt",
+            "config": {
+              "prompt": "Generate outline for book: Advanced Rust Programming, 15 chapters"
+            }
+          },
+          {
+            "id": "step-chapter-1",
+            "name": "Write Chapter 1",
+            "action": "execute_prompt",
+            "config": {
+              "prompt": "Write Chapter 1 based on outline. Context: {outline}",
+              "iterative": true,
+              "max_iterations": 3,
+              "validation": { "type": "llm_judge", "criteria": "coherence, accuracy, code examples" }
+            },
+            "dependencies": ["step-outline"]
+          },
+          // ... mais 13 chapters
+          {
+            "id": "step-consistency",
+            "name": "Cross-Chapter Consistency Check",
+            "action": "execute_prompt",
+            "config": {
+              "prompt": "Review all chapters for consistency",
+              "context": "all_chapters"
+            },
+            "dependencies": ["step-chapter-1", "step-chapter-2", /*...*/]
+          }
+        ],
+        "max_subtasks": 20,
+        "subtask_concurrency": 1  // Sequential chapters
+      }
+    },
+    "validation": {
+      "validators": [
+        { "type": "llm_judge", "config": { "criteria": ["coherence", "accuracy", "readability"], "min_score": 75 } }
+      ]
+    },
+    "context_config": {
+      "inject_previous_results": true,
+      "context_window_strategy": "chunked",
+      "max_context_tokens": 8000
+    }
+  },
+  "policy": {
+    "max_attempts": 1,
+    "workflow_policy": {
+      "max_execution_time_ms": 36000000,  // 10 hours
+      "budget_limit_usd": 50,
+      "quality_threshold": 75
+    }
+  },
+  "state": {
+    "status": "RUNNING",
+    "workflow_state": {
+      "current_step_index": 8,
+      "completed_steps": ["step-outline", "step-chapter-1", /*...*/, "step-chapter-7"],
+      "accumulated_context": {
+        "outline": "...",
+        "chapters": {
+          "1": "...",
+          "2": "...",
+          // ...
+          "7": "..."
+        }
+      }
+    },
+    "quality_metrics": {
+      "overall_score": 82,
+      "chapters_scores": [85, 78, 90, /*...*/]
+    },
+    "cost_tracking": {
+      "total_tokens": 450000,
+      "cost_usd": 12.50
+    }
+  },
+  "result": {
+    "file_path": "respostas/rust-book.md",
+    "subtask_results": [
+      { "subtask_id": "step-chapter-1", "status": "DONE", "quality_score": 85 },
+      // ...
+    ]
+  }
+}

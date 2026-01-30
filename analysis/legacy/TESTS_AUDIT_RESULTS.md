@@ -71,7 +71,7 @@
    - **Solução**: Criar `test_watchdog_unit.js` com mock de timers
 
 5. `test_chrome_connection.js` - Chrome externo manual
-   - **Problema**: Requer Chrome rodando em `host.docker.internal:9222`
+   - **Problema**: Requer Chrome rodando em `host.docker.internal:9224`
    - **Solução**: Manter como teste manual (documentar em README)
 
 ---

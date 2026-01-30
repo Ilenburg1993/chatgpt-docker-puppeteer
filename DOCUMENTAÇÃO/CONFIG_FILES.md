@@ -15,7 +15,7 @@ This project uses two main configuration files:
 
 ```json
 {
-    "DEBUG_PORT": "http://localhost:9222",
+    "DEBUG_PORT": "http://localhost:9224",
     "IDLE_SLEEP": 3000,
     "CYCLE_DELAY": 2000,
     "TASK_TIMEOUT_MS": 1800000,
@@ -29,7 +29,7 @@ All parameters are validated using Zod schema in [src/core/config.js](../src/cor
 
 ```javascript
 const ConfigSchema = z.object({
-    DEBUG_PORT: z.string().url().default('http://localhost:9222'),
+    DEBUG_PORT: z.string().url().default('http://localhost:9224'),
     IDLE_SLEEP: z.number().min(500).default(3000),
     CYCLE_DELAY: z.number().min(0).default(2000)
     // ... more fields
@@ -42,8 +42,8 @@ const ConfigSchema = z.object({
 
 - **DEBUG_PORT**: Chrome remote debugging URL
     - Type: `string (URL)`
-    - Default: `http://localhost:9222`
-    - Example: `http://host.docker.internal:9222`
+    - Default: `http://localhost:9224`
+    - Example: `http://host.docker.internal:9224`
 
 #### Engine Rhythm
 
@@ -289,7 +289,7 @@ Some settings can be overridden via environment variables:
 
 ```bash
 # .env
-CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 MAX_WORKERS=5
 TASK_TIMEOUT=60000
 ```

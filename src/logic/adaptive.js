@@ -120,7 +120,7 @@ async function persist() {
     } catch (e) {
         log('ERROR', `[ADAPTIVE] Falha de escrita: ${e.message}`);
     } finally {
-        // eslint-disable-next-line require-atomic-updates -- Single-threaded execution, no race condition
+         
         persistLock = false;
         if (pendingPersist) {
             pendingPersist = false;

@@ -165,13 +165,13 @@ make restart
 **Sintomas**:
 ```
 [ERROR] [INFRA] Failed to connect to browser
-Error: connect ECONNREFUSED 127.0.0.1:9222
+Error: connect ECONNREFUSED 127.0.0.1:9224
 ```
 
 **Diagnóstico**:
 ```bash
-# Check external browser
-curl http://localhost:9222/json/version
+# Check external browser (container-facing proxy)
+curl http://localhost:9224/json/version
 
 # If connection refused:
 # - Browser not running
@@ -181,7 +181,7 @@ curl http://localhost:9222/json/version
 
 **Causas**:
 1. ❌ External browser não iniciado (mode: external)
-2. ❌ Porta incorreta (config: 9222, browser: 9223)
+2. ❌ Porta incorreta (config: 9224, browser: 9223)
 3. ❌ Browser crashou durante execução
 
 **Solução**:
@@ -190,16 +190,16 @@ curl http://localhost:9222/json/version
 ```bash
 # Windows
 "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
-  --remote-debugging-port=9222 ^
+  --remote-debugging-port=9224 ^
   --user-data-dir="%USERPROFILE%\chrome-debug"
 
 # Linux/Mac
 google-chrome \
-  --remote-debugging-port=9222 \
+  --remote-debugging-port=9224 \
   --user-data-dir=$HOME/chrome-debug &
 
-# Verify connection
-curl http://localhost:9222/json/version
+# Verify connection (proxy/container-facing)
+curl http://localhost:9224/json/version
 ```
 
 **Opção B: Switch to launcher mode**:

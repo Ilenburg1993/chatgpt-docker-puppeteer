@@ -1,7 +1,7 @@
 # 🏗️ Arquitetura do Sistema
 
 **Versão**: 2.0
-**Última Atualização**: 21/01/2026
+**Última Atualização**: 28/01/2026
 **Público-Alvo**: Desenvolvedores (intermediário a avançado)
 **Tempo de Leitura**: ~25 min
 
@@ -69,7 +69,7 @@ Ao ler este documento, você aprenderá:
       ┌──────────────┐        ┌──────────────┐        ┌──────────────┐
       │   Usuário    │        │   Chrome     │        │     LLMs     │
       │   (Manual)   │        │  (Externo)   │        │ (ChatGPT/    │
-      │              │        │  Port 9222   │        │  Gemini)     │
+      │              │        │  Port 9224   │        │  Gemini)     │
       └───────┬──────┘        └───────┬──────┘        └───────┬──────┘
               │                       │                       │
               │ HTTP/WebSocket        │ CDP Protocol          │ HTTPS
@@ -100,7 +100,7 @@ Ao ler este documento, você aprenderá:
    - Visualiza respostas coletadas
 
 2. **Chrome Externo**
-   - Instância externa rodando com `--remote-debugging-port=9222`
+   - Instância externa rodando com `--remote-debugging-port=9224`
    - Agente conecta via Chrome DevTools Protocol (CDP)
    - Compartilhado entre múltiplas tasks
    - Gerenciado por ConnectionOrchestrator
@@ -799,6 +799,315 @@ Kernel                    NERV                    Infra
 **Trade-off**: Setup inicial mais complexo, mas -70% resource usage
 
 **Decisão**: ConnectionOrchestrator oferece ambos (flexibilidade)
+
+---
+
+## 🚀 Evolução Planejada: v2.0 - Plataforma de Missões Autônomas
+
+### Visão Geral v2.0
+
+A **versão 2.0** transformará o sistema de um executor de tasks simples em uma **plataforma de orquestração autônoma** capaz de executar missões complexas de longa duração com mínima intervenção humana.
+
+**Foco Principal**: AUTONOMIA > CONCORRÊNCIA
+- Não se trata de executar 100 tasks simultaneamente
+- Trata-se de executar **UMA MISSÃO INTEIRA** (ex: livro de 300 páginas) do início ao fim automaticamente
+
+### Nova Hierarquia: Missão → Workflow → Tasks
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ MISSÃO: "Escrever livro técnico de 300 páginas"         │
+│ Objetivo de alto nível com critérios de qualidade        │
+├──────────────────────────────────────────────────────────┤
+│   ↓                                                      │
+│ WORKFLOW: Plano estruturado (17 steps)                  │
+│   Step 1: Generate Outline (1 task)                     │
+│   Step 2-16: Write 15 Chapters (45 tasks)               │
+│   Step 17: Consistency Check (1 task)                   │
+├──────────────────────────────────────────────────────────┤
+│   ↓                                                      │
+│ TASKS: Execuções individuais (~87 tasks geradas)        │
+│   - Cada task pode iterar até 3× (auto-refinamento)     │
+│   - Validação automática (LLM-as-judge)                 │
+│   - Context flow (output N → input N+1)                 │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Novos Componentes (v2.0)
+
+#### 1. OrchestratorEngine - Motor de Execução
+
+**Localização**: `src/orchestrator/orchestrator_engine.js`
+
+**Responsabilidade**: Executar tasks com estratégias avançadas
+
+**Estratégias Suportadas**:
+- **SINGLE_SHOT** (atual): Execute once
+- **ITERATIVE** (novo): Execute → Validate → (se < 75/100) → Retry com feedback
+- **MULTI_STEP** (novo): Workflow de N steps sequenciais com dependências
+- **TREE_OF_THOUGHT** (futuro): Gera múltiplas soluções, escolhe melhor
+- **CHAIN_OF_THOUGHT** (futuro): Reasoning step-by-step explícito
+
+**Integração via NERV**:
+```
+OrchestratorEngine → NERV → Driver
+                  ← NERV ← Driver (result)
+                  → NERV → ValidationService
+                  ← NERV ← ValidationService (quality_score)
+```
+
+#### 2. ValidationService - Validação Automática
+
+**Localização**: `src/orchestrator/validation/validation_service.js`
+
+**Responsabilidade**: Avaliar qualidade de outputs via múltiplos validadores
+
+**Validadores**:
+- **RegexValidator**: Padrões regex
+- **SchemaValidator**: JSON schema validation
+- **LengthValidator**: Word count, character limits
+- **LLMJudgeValidator**: **LLM-as-Judge** (uma LLM avalia output de outra)
+
+**LLM-as-Judge Pattern**:
+```javascript
+// Uma LLM (judge) avalia qualidade do output de outra LLM (worker)
+judgePrompt = `
+Avalie este capítulo nos critérios:
+- Coerência (0-100)
+- Precisão técnica (0-100)
+- Exemplos de código (0-100)
+
+Capítulo: ${output}
+
+Retorne JSON: { overall_score, strengths[], weaknesses[], suggestions[] }
+`
+evaluation = await ChatGPT.execute(judgePrompt)  // Via NERV!
+// { overall_score: 82, suggestions: ["Adicione mais exemplos"] }
+```
+
+**Trade-off**: +50% custo, +30s latência, mas +40% qualidade final
+
+#### 3. MissionManager - Gerenciamento de Missões
+
+**Localização**: `src/missions/mission_manager.js`
+
+**Responsabilidade**: CRUD de missões, persistência de estado, feedback
+
+**API**:
+- `createMission(params)` → Gera workflow, inicia execução
+- `pauseMission(id)` → Pausa temporariamente
+- `resumeMission(id)` → Retoma de checkpoint
+- `feedbackMission(id, text)` → Injeta feedback humano
+- `getMissionProgress(id)` → Status em tempo real
+
+**Persistência** (filesystem):
+```
+missions/
+├── mission-001/
+│   ├── state.json           (metadata + workflow + progress)
+│   ├── outputs/
+│   │   ├── step-1-outline.txt
+│   │   ├── step-2-chapter-1.txt
+│   │   └── ...
+│   ├── checkpoints/
+│   │   ├── checkpoint-latest.json
+│   │   └── checkpoint-1643000000.json
+│   └── logs/
+│       └── execution.log
+```
+
+#### 4. ContextManager - Gestão de Contexto
+
+**Localização**: `src/orchestrator/context_manager.js`
+
+**Responsabilidade**: Acumular resultados, chunking, summarization
+
+**Features**:
+- **Accumulation**: Output step N alimenta step N+1
+- **Chunking**: Split contexto grande (> token limit)
+- **Summarization**: Comprimir contexto mantendo info crítica
+- **Memory**: Aprender patterns durante execução
+
+**Exemplo Context Flow**:
+```
+Step 1: Outline → output: { chapters: [ch1, ch2, ch3, ...] }
+Step 2: Chapter 1 → input: outline + (contexto vazio)
+                    output: "Chapter 1: ..."
+Step 3: Chapter 2 → input: outline + chapter 1
+                    output: "Chapter 2: ..."
+Step 4: Chapter 3 → input: outline + chapter 1 + chapter 2
+                    output: "Chapter 3: ..."
+```
+
+#### 5. CheckpointManager - Crash Recovery
+
+**Localização**: `src/orchestrator/checkpoint_manager.js`
+
+**Responsabilidade**: Save/load checkpoints, recovery automático
+
+**Checkpoints salvos**:
+- A cada step completado
+- Antes de operações críticas (iteração, validação)
+- Periodicamente (a cada 5 minutos)
+
+**Recovery**: Se crash, retoma do último checkpoint (<5min atrás)
+
+### Fluxo de Execução (Missão Completa)
+
+```
+1. Usuário cria missão via Dashboard
+   ↓
+2. MissionManager gera workflow (via template ou LLM)
+   ↓
+3. Para cada step do workflow:
+   a. OrchestratorEngine cria task
+   b. Task executada via NERV → Driver
+   c. Resultado coletado
+   d. ValidationService valida (LLM-as-judge se necessário)
+   e. Se score < threshold: retry com feedback
+   f. Se score >= threshold: próximo step
+   g. CheckpointManager salva estado
+   h. ContextManager acumula resultado
+   ↓
+4. Todos steps completos → MISSION_COMPLETED
+   ↓
+5. Usuário notificado via Dashboard (Socket.io)
+```
+
+### Eventos NERV Novos (30+)
+
+**Orquestração**:
+- `ORCHESTRATION_STARTED`, `ORCHESTRATION_COMPLETED`, `ORCHESTRATION_FAILED`
+
+**Iteração**:
+- `ITERATION_STARTED`, `ITERATION_COMPLETED`, `ITERATION_CONVERGED`
+
+**Validação**:
+- `VALIDATION_PASSED`, `VALIDATION_FAILED`, `VALIDATION_RETRY`
+
+**Qualidade**:
+- `QUALITY_ASSESSED`, `QUALITY_IMPROVED`, `QUALITY_THRESHOLD_MET`
+
+**Missões**:
+- `MISSION_CREATED`, `MISSION_STARTED`, `MISSION_PAUSED`, `MISSION_RESUMED`, `MISSION_COMPLETED`
+
+**Workflow**:
+- `WORKFLOW_STEP_STARTED`, `WORKFLOW_STEP_COMPLETED`, `WORKFLOW_STEP_FAILED`
+
+**Custo**:
+- `TOKEN_USAGE_RECORDED`, `COST_CALCULATED`, `BUDGET_WARNING`, `BUDGET_EXCEEDED`
+
+### Dashboard v2.0 - Novas Views
+
+**Mission Control Dashboard**:
+- **MissionList.vue**: Lista todas missões (ativas, pausadas, completas)
+- **MissionCreate.vue**: Criar nova missão (templates ou custom)
+- **MissionMonitor.vue**: Progresso em tempo real (Step 12/17, 65%)
+- **MissionDetail.vue**: Histórico completo de execução
+- **WorkflowEditor.vue**: Editor visual de workflows (DAG com Cytoscape.js)
+
+**Quality & Cost Dashboards**:
+- **QualityDashboard.vue**: Quality scores, validation pass rate, iteration stats
+- **CostDashboard.vue**: Cost tracking, budget alerts, projeções
+
+**Real-time Updates** (Socket.io):
+```javascript
+socket.on('mission:progress', ({ missionId, step, progress }) => {
+  // Atualizar UI em tempo real
+})
+
+socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
+  // Notificar usuário
+})
+```
+
+### Exemplo Concreto: Missão "Escrever Livro"
+
+**Entrada**:
+```json
+{
+  "mission_type": "book_writing",
+  "parameters": {
+    "topic": "Advanced Rust Programming",
+    "num_chapters": 15,
+    "target_pages": 300,
+    "quality_threshold": 75
+  }
+}
+```
+
+**Workflow Gerado (17 steps)**:
+1. Generate Outline → 1 task
+2-16. Write 15 Chapters → 15 tasks (cada um até 3 iterações)
+17. Consistency Check → 1 task
+
+**Execução** (~25 horas):
+- 87 tasks executadas (45 iterações de chapters + outros steps)
+- 12 retries (quality < 75, então retry com feedback)
+- 1 feedback humano no meio (opcional)
+- Custo: ~$42 (de $50 budget)
+
+**Resultado**: `missions/mission-001/rust-advanced-book.pdf` (312 páginas)
+
+### Métricas de Sucesso v2.0
+
+**Launch Criteria**:
+- [ ] Missão "Escrever Livro" (15 cap) executa do início ao fim automaticamente
+- [ ] Iteração automática funciona (até 3 retries)
+- [ ] LLM-as-judge scoring consistente (±5 pontos)
+- [ ] Context flow preserva info entre steps
+- [ ] Checkpoint recovery < 5min
+- [ ] Cost tracking com precisão 99%+
+- [ ] Dashboard mostra progresso em tempo real
+- [ ] 10+ missões simultâneas sem degradação
+
+### Timeline de Implementação
+
+**Fase 1** (Semanas 1-2): Schema V5 + OrchestratorEngine + ValidationService
+**Fase 2** (Semanas 3-4): MissionManager + ContextManager + CheckpointManager
+**Fase 3** (Semanas 5-6): Frontend (Mission views, stores, real-time)
+**Fase 4** (Semanas 7-8): Features avançadas (Workflow Editor, Quality/Cost dashboards)
+**Fase 5** (Semanas 9-10): Polish + Testing + Deploy
+
+**Total**: 8-10 semanas para v2.0 production-ready
+
+### Princípios Arquiteturais Mantidos
+
+✅ **Event-Driven**: Todos os novos componentes comunicam via NERV (zero coupling)
+✅ **Domain-Driven**: Novos módulos claramente separados (missions/, orchestrator/)
+✅ **Observable**: Todos eventos emitidos, telemetria completa
+✅ **Resilient**: Checkpoint recovery, fallback strategies
+✅ **Configurable**: Comportamento via config.json
+
+**Padrão NERV-Centric**:
+```javascript
+// Exemplo: OrchestratorEngine nunca chama Driver diretamente
+// Sempre via NERV:
+
+orchestrator.execute(task) {
+  // Emite comando via NERV
+  nerv.emit({
+    actionCode: 'ORCHESTRATION_EXECUTE_TASK',
+    payload: { task }
+  })
+
+  // Aguarda resultado via NERV
+  return new Promise(resolve => {
+    nerv.once('DRIVER_RESULT', envelope => {
+      resolve(envelope.payload)
+    })
+  })
+}
+```
+
+### Documentação Adicional
+
+Para detalhes completos do plano v2.0, consulte:
+- **PLANO/01-MISSION_ARCHITECTURE.md** - Arquitetura de missões
+- **PLANO/02-AUTONOMOUS_EXECUTION.md** - Execução autônoma
+- **PLANO/03-FEEDBACK_LOOPS.md** - Loops de feedback
+- **PLANO/04-MISSION_EXAMPLES.md** - 5 exemplos práticos completos
+- **PLANO/05-IMPLEMENTATION_ROADMAP.md** - Roadmap de 17 semanas
 
 ---
 

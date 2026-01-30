@@ -31,8 +31,8 @@ console.log('🚀 Testando sequência de boot...\n');
     const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
     const pool = new BrowserPoolManager({
         poolSize: 1,
-        chromium: {
-            mode: config.BROWSER_MODE || 'launcher'
+        browserEndpoint: {
+            url: process.env.CHROME_WS_ENDPOINT || config.BROWSER_URL || 'http://localhost:9224'
         }
     });
     await pool.initialize();

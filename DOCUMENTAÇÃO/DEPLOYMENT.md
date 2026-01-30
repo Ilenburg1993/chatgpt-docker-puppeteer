@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
     ports:
       - "3008:3008"
-      - "9222:9222"  # Chrome DevTools
+      - "9224:9224"  # Chrome DevTools
     environment:
       - NODE_ENV=development
       - MAX_WORKERS=1

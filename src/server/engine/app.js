@@ -1,118 +1,189 @@
 /* ==========================================================================
    src/server/engine/app.js
-   Audit Level: 100 — Sovereign Express Engine (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Configurar a fábrica de processamento HTTP, gerenciar
-                     middlewares de infraestrutura e prover recursos estáticos.
-   Sincronizado com: request_id.js V50, router.js V610, main.js V51.
+   Audit Level: 300 — Sovereign Express Engine (Production-Grade)
+   Status: HARDENED / OBSERVABLE / FUTURE-PROOF
+
+   Papel:
+   Fundação HTTP do sistema.
+   Pipeline Express puro, determinístico e auditável.
 ========================================================================== */
 
 const express = require('express');
 const path = require('path');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const { ROOT, LOG_DIR } = require('@infra/fs/fs_utils');
-
-// [P8.3] SECURITY: CORS policy
 const cors = require('cors');
+const helmet = require('helmet');
 
-// Middlewares de Soberania e Rastreabilidade
+const { ROOT, LOG_DIR } = require('@infra/fs/fs_utils');
 const requestId = require('../middleware/request_id');
+const hardware = require('@core/hardware');
 
-/**
- * Rate Limiter para proteção contra flood/DoS.
- * Limita cada IP a 100 requests por minuto na API.
- */
-const apiLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minuto
-    max: 100, // Limite de 100 requests por janela
-    message: 'Too many requests from this IP, please try again later.',
-    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
-    legacyHeaders: false // Disable `X-RateLimit-*` headers
-});
+/* --------------------------------------------------------------------------
+   0. INSTÂNCIA SOBERANA
+-------------------------------------------------------------------------- */
 
-/**
- * Instância do Express Prime.
- * Atua como o pipeline de execução para todas as requisições REST do sistema.
- */
 const app = express();
 
 /* --------------------------------------------------------------------------
-   1. CAMADA DE SOBERANIA (TRACEABILITY)
-   Garante que cada transação HTTP possua um ID único (UUID) desde o início,
-   permitindo a correlação de logs entre Dashboard e Server.
+   0.5 PROXY AWARENESS (OBRIGATÓRIO EM CONTAINER / LB)
+-------------------------------------------------------------------------- */
+app.set('trust proxy', true);
+
+/* --------------------------------------------------------------------------
+   1. TRACEABILITY ABSOLUTA
 -------------------------------------------------------------------------- */
 app.use(requestId);
 
 /* --------------------------------------------------------------------------
-   1.5. CAMADA DE SEGURANÇA (P8.3 - CORS POLICY)
-   Restringe origens permitidas para prevenir CSRF e access não autorizado.
+   1.1 RESPONSE TIMING (OBSERVABILIDADE)
+-------------------------------------------------------------------------- */
+app.use((req, res, next) => {
+    const start = process.hrtime.bigint();
+
+    res.on('finish', () => {
+        const durationMs =
+            Number(process.hrtime.bigint() - start) / 1_000_000;
+
+        res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
+    });
+
+    next();
+});
+
+/* --------------------------------------------------------------------------
+   2. HARDENING DE HEADERS HTTP
 -------------------------------------------------------------------------- */
 app.use(
-    cors({
-        origin: [
-            'http://localhost:3008',
-            'http://127.0.0.1:3008',
-            process.env.DASHBOARD_ORIGIN || 'http://localhost:3008'
-        ],
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
+    helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+        frameguard: { action: 'deny' },
+        referrerPolicy: { policy: 'no-referrer' }
     })
 );
 
 /* --------------------------------------------------------------------------
-   2. CAMADA DE PERFORMANCE E INTEGRIDADE DE DADOS
+   3. CORS DINÂMICO COM FALHA EXPLÍCITA
 -------------------------------------------------------------------------- */
 
-// Compactação de dados para otimizar o streaming de telemetria massiva
-app.use(compression());
+const allowedOrigins = new Set(
+    [
+        'http://localhost:3008',
+        'http://127.0.0.1:3008',
+        process.env.DASHBOARD_ORIGIN
+    ].filter(Boolean)
+);
 
-// Parsing de JSON com limite de segurança (10MB) para evitar Out-of-Memory (OOM)
-// Essencial para suportar injeções de contexto e payloads complexos do IPC 2.0
-app.use(express.json({ limit: '10mb' }));
+app.use(
+    cors({
+        origin(origin, callback) {
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.has(origin)) {
+                return callback(null, true);
+            }
+
+            const err = new Error(`CORS blocked for origin: ${origin}`);
+            err.status = 403;
+            callback(err);
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+        maxAge: 600
+    })
+);
 
 /* --------------------------------------------------------------------------
-   3. CAMADA DE RECURSOS FÍSICOS (ESTÁTICOS)
+   4. RATE LIMITER (EXPORTÁVEL)
+-------------------------------------------------------------------------- */
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+/* --------------------------------------------------------------------------
+   5. BODY PARSING DEFENSIVO
 -------------------------------------------------------------------------- */
 
-/**
- * Mission Control Dashboard
- * Interface principal de comando e controle servida a partir da pasta /public.
- */
+app.use(compression());
+
+app.use((req, res, next) => {
+    if (
+        req.method !== 'GET' &&
+        req.headers['content-type'] &&
+        !req.headers['content-type'].includes('application/json')
+    ) {
+        return res.status(415).json({
+            error: 'Unsupported Media Type',
+            request_id: req.id
+        });
+    }
+    next();
+});
+
+app.use(express.json({ limit: '10mb', strict: true }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+/* --------------------------------------------------------------------------
+   6. STATIC ASSETS
+-------------------------------------------------------------------------- */
+
 app.use(express.static(path.join(ROOT, 'public')));
 
-/**
- * Galeria Forense (Crash Dumps)
- * Disponibiliza as evidências visuais (screenshots e snapshots do DOM)
- * capturadas pelo Driver em caso de falha catastrófica.
- */
+const dashboardV2Path = path.join(ROOT, 'src', 'dashboard-ui', 'dist');
+app.use('/dashboard', express.static(dashboardV2Path));
+
+app.get(/^\/dashboard($|\/.*)/, (req, res) => {
+    res.sendFile(path.join(dashboardV2Path, 'index.html'));
+});
+
 const crashReportsPath = path.join(LOG_DIR, 'crash_reports');
 app.use('/crash_reports', express.static(crashReportsPath));
 
 /* --------------------------------------------------------------------------
-   4. CAMADA DE OBSERVABILIDADE (P9.1)
+   7. OBSERVABILIDADE CANÔNICA
 -------------------------------------------------------------------------- */
-const hardware = require('@core/hardware');
 
-// Health endpoint com heap monitoring
-app.get('/api/health-metrics', (req, res) => {
-    const metrics = hardware.getAllMetrics();
+// Liveness
+app.get('/health', (req, res) => {
+    res.json({ status: 'alive', ts: Date.now() });
+});
+
+// Readiness
+app.get('/ready', (req, res) => {
     res.json({
-        status: 'ok',
-        ...metrics
+        status: 'ready',
+        ...hardware.getAllMetrics()
     });
 });
 
 /* --------------------------------------------------------------------------
-   NOTAS DE ARQUITETURA
+   8. FALLBACK CONTROLADO
 -------------------------------------------------------------------------- */
-/**
- * IMPORTANTE: A injeção das rotas dinâmicas (/api/*) e do manipulador global
- * de erros (Error Boundary) NÃO ocorre aqui. Ela é realizada pelo gateway
- * central (router.js) durante a fase de bootstrap no main.js.
- * Isso garante que a fundação (app.js) esteja sólida antes da lógica ser exposta.
- */
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.status(404).json({ error: 'Not found', request_id: req.id });
+});
+
+/* --------------------------------------------------------------------------
+   9. ERROR BOUNDARY GLOBAL
+-------------------------------------------------------------------------- */
+app.use((err, req, res, _next) => {
+    const status = err.status || 500;
+
+    res.status(status).json({
+        error: err.message || 'Internal server error',
+        request_id: req.id || null
+    });
+});
+
+/* --------------------------------------------------------------------------
+   EXPORTS
+-------------------------------------------------------------------------- */
 
 module.exports = app;
 module.exports.apiLimiter = apiLimiter;

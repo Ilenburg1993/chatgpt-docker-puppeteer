@@ -23,7 +23,7 @@ const { log } = require('@core/logger');
  * @param {string|null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
  * @returns {Promise<object|null>}
  */
-// eslint-disable-next-line complexity -- Task loading with corruption handling requires branching
+ 
 async function loadNextTask(targetFilter = null) {
     // 1. Aquisição de Snapshot Estável (RAM)
     const allTasks = await cache.getQueue();

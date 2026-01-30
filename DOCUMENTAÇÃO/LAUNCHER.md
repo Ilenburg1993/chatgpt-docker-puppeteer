@@ -693,7 +693,7 @@ npx live-server --port=8000
 {
   "status": "healthy",
   "connected": true,
-  "endpoint": "http://localhost:9222",
+  "endpoint": "http://localhost:9224",
   "version": "Chrome/120.0.0.0",
   "latency_ms": 12
 }
@@ -1009,24 +1009,24 @@ pm2 logs dashboard-web --lines 50
 
 **Causas possíveis:**
 - Chrome não está rodando em modo debug
-- Porta 9222 ocupada
+-- Porta 9224 ocupada
 - Configuração incorreta
 
 **Solução:**
 ```bash
 # 1. Verificar chrome-config.json
 cat chrome-config.json
-# Deve conter: "ports": [9222, 9223, 9224]
+# Deve conter: "ports": [9224, 9223, 9224]
 
 # 2. Iniciar Chrome em modo debug manualmente
 # Windows:
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224
 
 # Linux:
-google-chrome --remote-debugging-port=9222
+google-chrome --remote-debugging-port=9224
 
 # 3. Testar conexão
-curl http://localhost:9222/json/version
+curl http://localhost:9224/json/version
 ```
 
 #### 5. Crash loop detected
@@ -1257,11 +1257,12 @@ curl http://localhost:2998/api/health/chrome
 # Output: {"status":"unhealthy","connected":false,"error":"ECONNREFUSED"}
 
 # 4. Verificar Chrome debug port
-netstat -an | grep 9222
+# Verificar container-facing proxy/porta canônica
+netstat -an | grep 9224
 # Saída vazia = Chrome não está rodando
 
 # 5. Iniciar Chrome manualmente
-google-chrome --remote-debugging-port=9222 &
+google-chrome --remote-debugging-port=9224 &
 
 # 6. Verificar novamente
 ./scripts/quick-ops.sh health

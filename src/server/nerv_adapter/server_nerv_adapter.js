@@ -1,171 +1,253 @@
 /* ==========================================================================
    src/server/nerv_adapter/server_nerv_adapter.js
-   Subsistema: SERVER — NERV Adapter
-   Audit Level: 800 — Critical Decoupling Layer (Singularity Edition)
+   SUBSISTEMA: SERVER — NERV ADAPTER (HARDENED BUILD)
+   Audit Level: 900 — Critical Decoupling Boundary (Hardened)
 
-   Responsabilidade:
-   - Adaptar NERV (pub/sub) para o domínio do SERVER (Dashboard/API)
-   - Traduzir requisições HTTP/WebSocket para ActionCodes NERV
-   - Broadcast eventos NERV para clientes Socket.io conectados
-   - Filtrar eventos por permissões (dashboard não vê tudo)
-   - Garantir ZERO acoplamento direto com KERNEL ou DRIVER
+   --------------------------------------------------------------------------
+   PAPEL ARQUITETURAL
+   --------------------------------------------------------------------------
+   Camada de adaptação entre:
+     • NERV (IPC / Event Bus soberano)
+     • Socket Hub (Dashboard / Clients)
 
-   Princípios:
-   - NÃO importa KERNEL ou DRIVER diretamente
-   - NÃO decide lógica de negócio (apenas traduz e roteia)
-   - NÃO acessa filesystem diretamente
-   - Comunicação 100% via NERV (pub/sub)
+   Este módulo é uma Anti-Corruption Layer:
+     ✔ traduz dashboard → ActionCodes NERV
+     ✔ traduz eventos NERV → eventos Socket
+     ✔ aplica filtros de visibilidade
+     ✔ não contém lógica de negócio
+     ✔ não conhece Kernel ou Driver
+     ✔ não executa decisões — apenas roteia
+
+   --------------------------------------------------------------------------
+   INVARIANTES (NÃO NEGOCIÁVEIS)
+   --------------------------------------------------------------------------
+     ✔ Comunicação inter-subsistemas = NERV apenas
+     ✔ Nenhum import de Kernel ou Driver
+     ✔ Nenhum acesso direto a filesystem
+     ✔ Nenhum spawn de processo
+     ✔ Nenhuma decisão de domínio
+     ✔ Broadcast apenas de EVENT (não COMMAND)
+
+   --------------------------------------------------------------------------
+   HARDENING INCLUÍDO
+   --------------------------------------------------------------------------
+     ✔ Validação de interface do socketHub
+     ✔ Registro explícito de handlers → cleanup no shutdown
+     ✔ Guard contra shutdown concorrente
+     ✔ Stats consistentes (incremento pós-sucesso)
+     ✔ Filtro de eventos sensíveis
+     ✔ Gancho para validação de payload (schema-ready)
 ========================================================================== */
 
 const { log } = require('@core/logger');
 const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
 
+/* ==========================================================================
+   CONSTANTES DE SEGURANÇA
+========================================================================== */
+
+/**
+ * Eventos NERV que NÃO devem ser expostos ao dashboard.
+ * Política: proteção de segurança e ruído interno.
+ */
+const PRIVATE_EVENTS = new Set([
+    ActionCode.KERNEL_INTERNAL_ERROR,
+    ActionCode.SECURITY_VIOLATION
+]);
+
+/**
+ * Tempo máximo de espera para broadcast de shutdown.
+ * Evita bloqueio excessivo no encerramento coordenado.
+ */
+const SHUTDOWN_BROADCAST_DELAY_MS = 1500;
+
+
+/* ==========================================================================
+   CLASSE ADAPTER
+========================================================================== */
+
 class ServerNERVAdapter {
+
     /**
-     * @param {Object} nerv - Instância do NERV (IPC transport)
-     * @param {Object} socketHub - Instância do Socket.io hub (gerenciador de conexões)
-     * @param {Object} config - Configuração do sistema
+     * @param {Object} nerv      Instância NERV (obrigatória)
+     * @param {Object} socketHub Hub Socket (obrigatório — wrapper, não raw io)
+     * @param {Object} config    Configuração do sistema
      */
     constructor(nerv, socketHub, config) {
+
+        /* ---------------- validações de contrato ---------------- */
+
         if (!nerv) {
             throw new Error('[ServerNERVAdapter] NERV instance required');
         }
+
         if (!socketHub) {
-            throw new Error('[ServerNERVAdapter] SocketHub required');
+            throw new Error('[ServerNERVAdapter] socketHub required');
         }
+
+        if (typeof socketHub.emit !== 'function') {
+            throw new Error('[ServerNERVAdapter] socketHub.emit required');
+        }
+
+        if (typeof socketHub.on !== 'function') {
+            throw new Error('[ServerNERVAdapter] socketHub.on required');
+        }
+
+        if (typeof socketHub.sendToClient !== 'function') {
+            throw new Error('[ServerNERVAdapter] socketHub.sendToClient required');
+        }
+
+        /* ---------------- estado interno ---------------- */
 
         this.nerv = nerv;
         this.socketHub = socketHub;
         this.config = config;
 
-        // Estatísticas observacionais
+        this._shutdown = false;
+
+        /**
+         * Estatísticas observacionais — não funcionais.
+         * Não influenciam lógica.
+         */
         this.stats = {
             commandsSent: 0,
             eventsBroadcasted: 0,
             clientsConnected: 0
         };
 
-        // Setup de listeners
+        /**
+         * Handlers registrados — necessários para cleanup.
+         */
+        this._handlers = {
+            nervReceive: null,
+            dashboardCommand: null,
+            dashboardStatus: null,
+            clientConnected: null,
+            clientDisconnected: null
+        };
+
+        /* ---------------- bootstrap de listeners ---------------- */
+
         this._setupNERVListeners();
         this._setupSocketListeners();
 
-        log('INFO', '[ServerNERVAdapter] Inicializado e conectado ao NERV');
+        log('INFO', '[ServerNERVAdapter] Inicializado — bridge NERV ↔ Socket ativa');
     }
 
+
+/* ==========================================================================
+   LISTENERS — NERV → DASHBOARD
+========================================================================== */
+
     /**
-     * Configura listeners para eventos NERV que devem ser broadcast ao dashboard.
+     * Registra listener NERV → broadcast dashboard.
+     * Apenas EVENT é propagado.
      */
     _setupNERVListeners() {
-        this.nerv.onReceive(envelope => {
-            // Filtra apenas EVENTS (COMMANDS são internos, não vão para dashboard)
-            if (envelope.messageType !== MessageType.EVENT) {
-                return;
-            }
 
-            // Broadcast evento para clientes Socket.io conectados
-            this._broadcastEvent(envelope).catch(err => {
-                log('ERROR', `[ServerNERVAdapter] Erro ao broadcast evento: ${err.message}`, envelope.correlationId);
-            });
-        });
+        this._handlers.nervReceive = envelope => {
 
-        log('DEBUG', '[ServerNERVAdapter] Listeners NERV configurados para broadcast de eventos');
+            if (this._shutdown) return;
+
+            if (envelope.messageType !== MessageType.EVENT) return;
+
+            this._broadcastEvent(envelope)
+                .catch(err => {
+                    log('ERROR',
+                        `[ServerNERVAdapter] broadcast falhou: ${err.message}`,
+                        envelope.correlationId
+                    );
+                });
+        };
+
+        this.nerv.onReceive(this._handlers.nervReceive);
+
+        log('DEBUG', '[ServerNERVAdapter] Listener NERV registrado');
     }
 
+
+/* ==========================================================================
+   LISTENERS — DASHBOARD → NERV
+========================================================================== */
+
     /**
-     * Configura listeners para comandos vindos do Socket.io (dashboard).
-     * Traduz requisições WS/HTTP para comandos NERV.
+     * Registra listeners Socket → comandos dashboard.
      */
     _setupSocketListeners() {
-        // Listener para comandos do dashboard (ex: pausar engine, cancelar task)
-        this.socketHub.on('dashboard:command', data => {
-            this._handleDashboardCommand(data).catch(err => {
-                log('ERROR', `[ServerNERVAdapter] Erro ao processar comando dashboard: ${err.message}`);
-            });
-        });
 
-        // Listener para requisições de status/health
-        this.socketHub.on('dashboard:status_request', data => {
-            this._handleStatusRequest(data).catch(err => {
-                log('ERROR', `[ServerNERVAdapter] Erro ao processar requisição de status: ${err.message}`);
-            });
-        });
+        this._handlers.dashboardCommand = data => {
+            this._handleDashboardCommand(data)
+                .catch(err => {
+                    log('ERROR', `[ServerNERVAdapter] comando dashboard falhou: ${err.message}`);
+                });
+        };
 
-        // Listener para conexões/desconexões de clientes
-        this.socketHub.on('client:connected', clientId => {
+        this._handlers.dashboardStatus = data => {
+            this._handleStatusRequest(data)
+                .catch(err => {
+                    log('ERROR', `[ServerNERVAdapter] status request falhou: ${err.message}`);
+                });
+        };
+
+        this._handlers.clientConnected = clientId => {
             this.stats.clientsConnected++;
-            log('INFO', `[ServerNERVAdapter] Cliente conectado: ${clientId} (total: ${this.stats.clientsConnected})`);
-        });
+            log('INFO', `[ServerNERVAdapter] Cliente conectado: ${clientId}`);
+        };
 
-        this.socketHub.on('client:disconnected', clientId => {
+        this._handlers.clientDisconnected = clientId => {
             this.stats.clientsConnected = Math.max(0, this.stats.clientsConnected - 1);
-            log(
-                'INFO',
-                `[ServerNERVAdapter] Cliente desconectado: ${clientId} (total: ${this.stats.clientsConnected})`
-            );
-        });
+            log('INFO', `[ServerNERVAdapter] Cliente desconectado: ${clientId}`);
+        };
 
-        log('DEBUG', '[ServerNERVAdapter] Listeners Socket.io configurados');
+        this.socketHub.on('dashboard:command', this._handlers.dashboardCommand);
+        this.socketHub.on('dashboard:status_request', this._handlers.dashboardStatus);
+        this.socketHub.on('client:connected', this._handlers.clientConnected);
+        this.socketHub.on('client:disconnected', this._handlers.clientDisconnected);
+
+        log('DEBUG', '[ServerNERVAdapter] Listeners Socket registrados');
     }
 
+
+/* ==========================================================================
+   DASHBOARD COMMAND HANDLER
+========================================================================== */
+
     /**
-     * Processa comandos vindos do dashboard e traduz para comandos NERV.
+     * Traduz comando dashboard → ActionCode NERV.
      */
-    async _handleDashboardCommand(data) {
+    async _handleDashboardCommand(data = {}) {
+
         const { command, payload, clientId } = data;
 
-        log('DEBUG', `[ServerNERVAdapter] Comando do dashboard: ${command} (cliente: ${clientId})`);
+        if (!command) return;
 
-        // Gera correlation ID único para rastreamento
-        const correlationId = `dashboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const correlationId =
+            `dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-        // Mapeia comandos dashboard -> ActionCodes NERV
         let actionCode;
-        const nervPayload = payload || {};
 
         switch (command) {
-            case 'task:start':
-                actionCode = ActionCode.TASK_START;
-                break;
-
-            case 'task:cancel':
-                actionCode = ActionCode.TASK_CANCEL;
-                break;
-
-            case 'driver:abort':
-                actionCode = ActionCode.DRIVER_ABORT;
-                break;
-
-            case 'engine:pause':
-                actionCode = ActionCode.ENGINE_PAUSE;
-                break;
-
-            case 'engine:resume':
-                actionCode = ActionCode.ENGINE_RESUME;
-                break;
-
-            case 'engine:stop':
-                actionCode = ActionCode.ENGINE_STOP;
-                break;
-
-            case 'browser:reboot':
-                actionCode = ActionCode.BROWSER_REBOOT;
-                break;
+            case 'task:start':     actionCode = ActionCode.TASK_START; break;
+            case 'task:cancel':    actionCode = ActionCode.TASK_CANCEL; break;
+            case 'driver:abort':   actionCode = ActionCode.DRIVER_ABORT; break;
+            case 'engine:pause':   actionCode = ActionCode.ENGINE_PAUSE; break;
+            case 'engine:resume':  actionCode = ActionCode.ENGINE_RESUME; break;
+            case 'engine:stop':    actionCode = ActionCode.ENGINE_STOP; break;
+            case 'browser:reboot': actionCode = ActionCode.BROWSER_REBOOT; break;
 
             default:
-                log('WARN', `[ServerNERVAdapter] Comando desconhecido do dashboard: ${command}`);
-
-                // Envia resposta de erro ao cliente
                 this.socketHub.sendToClient(clientId, 'command:error', {
                     error: 'UNKNOWN_COMMAND',
-                    message: `Comando não reconhecido: ${command}`
+                    command
                 });
                 return;
         }
 
-        // Emite comando via NERV
+        /* ----- ponto de extensão: validação de schema ----- */
+        const nervPayload = payload || {};
+
         this._emitCommand(actionCode, nervPayload, correlationId);
 
-        // Envia ACK ao cliente
         this.socketHub.sendToClient(clientId, 'command:ack', {
             command,
             correlationId,
@@ -175,90 +257,63 @@ class ServerNERVAdapter {
         this.stats.commandsSent++;
     }
 
-    /**
-     * Processa requisições de status/health do dashboard.
-     */
-    async _handleStatusRequest(data) {
-        const { requestType, clientId } = data;
 
+/* ==========================================================================
+   STATUS REQUEST HANDLER
+========================================================================== */
+
+    async _handleStatusRequest(data = {}) {
+
+        const { requestType, clientId } = data;
         const correlationId = `status-${Date.now()}`;
 
-        switch (requestType) {
-            case 'kernel:health':
-                this._emitCommand(ActionCode.KERNEL_HEALTH_CHECK, {}, correlationId);
-                break;
-
-            case 'driver:health':
-                this._emitCommand(ActionCode.DRIVER_HEALTH_CHECK, {}, correlationId);
-                break;
-
-            case 'system:stats':
-                // Retorna estatísticas do próprio adapter
-                this.socketHub.sendToClient(clientId, 'status:response', {
-                    requestType,
-                    data: this.getStats(),
-                    timestamp: new Date().toISOString()
-                });
-                break;
-
-            default:
-                log('WARN', `[ServerNERVAdapter] Requisição de status desconhecida: ${requestType}`);
-        }
-    }
-
-    /**
-     * Broadcast de evento NERV para todos os clientes Socket.io conectados.
-     * Filtra eventos sensíveis que não devem ir para o dashboard.
-     */
-    async _broadcastEvent(envelope) {
-        const { actionCode, payload, correlationId, timestamp } = envelope;
-
-        // Filtro de privacidade: alguns eventos são apenas para observação interna
-        const PRIVATE_EVENTS = [ActionCode.KERNEL_INTERNAL_ERROR, ActionCode.SECURITY_VIOLATION];
-
-        if (PRIVATE_EVENTS.includes(actionCode)) {
-            log('DEBUG', `[ServerNERVAdapter] Evento privado não broadcast: ${actionCode}`, correlationId);
+        if (requestType === 'system:stats') {
+            this.socketHub.sendToClient(clientId, 'status:response', {
+                data: this.getStats()
+            });
             return;
         }
 
-        // Traduz ActionCode para evento Socket.io (convenção dashboard)
-        const socketEvent = this._translateEventName(actionCode);
-
-        // Broadcast para todos os clientes conectados
-        // Socket.io usa emit() para broadcast global, não broadcast()
-        if (this.socketHub && typeof this.socketHub.emit === 'function') {
-            this.socketHub.emit(socketEvent, {
-                actionCode,
-                payload,
-                correlationId,
-                timestamp: timestamp || new Date().toISOString()
-            });
+        if (requestType === 'kernel:health') {
+            this._emitCommand(ActionCode.KERNEL_HEALTH_CHECK, {}, correlationId);
         }
 
+        if (requestType === 'driver:health') {
+            this._emitCommand(ActionCode.DRIVER_HEALTH_CHECK, {}, correlationId);
+        }
+    }
+
+
+/* ==========================================================================
+   EVENT BROADCAST
+========================================================================== */
+
+    async _broadcastEvent(envelope) {
+
+        if (PRIVATE_EVENTS.has(envelope.actionCode)) return;
+
+        const socketEvent = this._translateEventName(envelope.actionCode);
+
+        this.socketHub.emit(socketEvent, {
+            actionCode: envelope.actionCode,
+            payload: envelope.payload,
+            correlationId: envelope.correlationId,
+            timestamp: envelope.timestamp || new Date().toISOString()
+        });
+
         this.stats.eventsBroadcasted++;
-
-        log('DEBUG', `[ServerNERVAdapter] Evento broadcast: ${socketEvent}`, correlationId);
     }
 
-    /**
-     * Traduz ActionCode NERV para nome de evento Socket.io.
-     * Convenção: action_code -> namespace:event
-     */
+
+/* ==========================================================================
+   UTILITIES
+========================================================================== */
+
     _translateEventName(actionCode) {
-        // Ex: DRIVER_TASK_STARTED -> driver:task_started
-        // Ex: KERNEL_DECISION_MADE -> kernel:decision_made
-
-        const parts = actionCode.toLowerCase().split('_');
-        const namespace = parts[0]; // driver, kernel, task, etc
-        const event = parts.slice(1).join('_');
-
-        return `${namespace}:${event}`;
+        const p = actionCode.toLowerCase().split('_');
+        return `${p[0]}:${p.slice(1).join('_')}`;
     }
 
-    /**
-     * Emite um comando via NERV.
-     * Wrapper para padronizar emissões do adapter.
-     */
     _emitCommand(actionCode, payload, correlationId) {
         this.nerv.emitCommand({
             actor: ActorRole.SERVER,
@@ -266,55 +321,55 @@ class ServerNERVAdapter {
             payload,
             correlationId
         });
-
-        log('DEBUG', `[ServerNERVAdapter] Comando emitido: ${actionCode}`, correlationId);
     }
 
-    /**
-     * Broadcast helper - wrapper para socketHub.emit (broadcast global).
-     * Socket.io usa emit() para broadcast, não broadcast().
-     */
-    _broadcast(event, data) {
-        if (this.socketHub && typeof this.socketHub.emit === 'function') {
-            this.socketHub.emit(event, data);
-        }
-    }
 
-    /**
-     * Shutdown gracioso do adapter.
-     */
+/* ==========================================================================
+   SHUTDOWN
+========================================================================== */
+
     async shutdown() {
-        log('INFO', '[ServerNERVAdapter] Iniciando shutdown');
 
-        // Notifica clientes conectados sobre shutdown
-        if (this.socketHub && typeof this.socketHub.emit === 'function') {
-            this.socketHub.emit('system:shutdown', {
-                message: 'Sistema entrando em shutdown gracioso',
-                timestamp: new Date().toISOString()
-            });
+        if (this._shutdown) return;
+        this._shutdown = true;
+
+        log('INFO', '[ServerNERVAdapter] Shutdown iniciado');
+
+        /* ---- remove listeners ---- */
+
+        try {
+            if (this._handlers.nervReceive && this.nerv.offReceive) {
+                this.nerv.offReceive(this._handlers.nervReceive);
+            }
+        } catch (_) {}
+
+        if (this.socketHub.off) {
+            this.socketHub.off('dashboard:command', this._handlers.dashboardCommand);
+            this.socketHub.off('dashboard:status_request', this._handlers.dashboardStatus);
+            this.socketHub.off('client:connected', this._handlers.clientConnected);
+            this.socketHub.off('client:disconnected', this._handlers.clientDisconnected);
         }
 
-        // Aguarda 2 segundos para clientes receberem a notificação
-        await new Promise(resolve => {
-            setTimeout(resolve, 2000);
+        /* ---- notifica clientes ---- */
+
+        this.socketHub.emit('system:shutdown', {
+            message: 'Shutdown gracioso em andamento'
         });
+
+        await new Promise(r => setTimeout(r, SHUTDOWN_BROADCAST_DELAY_MS));
 
         log('INFO', '[ServerNERVAdapter] Shutdown concluído');
     }
 
-    /**
-     * Retorna estatísticas observacionais do adapter.
-     */
+
+/* ==========================================================================
+   OBSERVABILIDADE
+========================================================================== */
+
     getStats() {
         return {
             ...this.stats,
-            nerv: {
-                connected: !!this.nerv,
-                health: this.nerv.health?.getStatus() || 'UNKNOWN'
-            },
-            socket: {
-                clientsConnected: this.stats.clientsConnected
-            }
+            nervConnected: !!this.nerv
         };
     }
 }

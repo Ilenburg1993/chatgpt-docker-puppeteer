@@ -64,7 +64,7 @@ async function applyTransform(content, transform, targetTask) {
  * @param {number} depth - Nível atual de recursão.
  * @param {BudgetManager} budget - Gestor de volume de injeção.
  */
-// eslint-disable-next-line complexity -- Context resolution orchestrator inherently complex
+ 
 async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {
     // 1. GUARDRAILS: Validação de segurança e aborto
     if (signal?.aborted) {

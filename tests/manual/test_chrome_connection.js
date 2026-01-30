@@ -4,7 +4,7 @@
 
    Uso:
    1. Iniciar Chrome no Windows:
-      chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
+    chrome.exe --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile"
 
    2. Executar teste:
       node tests/test_chrome_connection.js
@@ -12,7 +12,7 @@
 
 const puppeteer = require('puppeteer-core');
 
-const CHROME_URL = process.env.CHROME_REMOTE_URL || 'http://host.docker.internal:9222';
+const CHROME_URL = process.env.CHROME_REMOTE_URL || 'http://host.docker.internal:9224';
 
 async function testChromeConnection() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -142,17 +142,17 @@ async function testChromeConnection() {
             console.error('');
             console.error('1. Windows Host - Iniciar Chrome:');
             console.error('   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^');
-            console.error('     --remote-debugging-port=9222 ^');
+            console.error('     --remote-debugging-port=9224 ^');
             console.error('     --user-data-dir="C:\\chrome-automation-profile"');
             console.error('');
             console.error('2. Verificar porta está aberta:');
-            console.error('   netstat -ano | findstr :9222');
+            console.error('   netstat -ano | findstr :9224');
             console.error('');
             console.error('3. Testar conexão:');
-            console.error('   curl http://localhost:9222/json/version');
+            console.error('   curl http://localhost:9224/json/version');
             console.error('');
             console.error('4. Se Docker em Linux, ajustar URL:');
-            console.error('   export CHROME_REMOTE_URL="http://172.17.0.1:9222"');
+            console.error('   export CHROME_REMOTE_URL="http://172.17.0.1:9224"');
             console.error('');
         } else if (error.message.includes('Target closed')) {
             console.error('🔍 DIAGNÓSTICO:');

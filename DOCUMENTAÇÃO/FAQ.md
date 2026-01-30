@@ -73,7 +73,7 @@ Ver [DEVELOPMENT.md](DEVELOPMENT.md) seção "Adicionar Novo LLM Target".
 | Mode         | Browser                                   | Quando usar                  |
 | ------------ | ----------------------------------------- | ---------------------------- |
 | **launcher** | Agent inicia browser automaticamente      | Production, Docker, PM2      |
-| **external** | Conecta a browser já rodando (porta 9222) | Development (debug DevTools) |
+| **external** | Conecta a browser já rodando (porta container-facing 9224) | Development (debug DevTools) |
 | **hybrid**   | Tenta external, fallback launcher         | Versatilidade (dev/prod)     |
 
 **Config**:
@@ -131,13 +131,17 @@ cp .env.example .env
 nano .env  # Editar parâmetros
 
 # 5. Start external browser (se mode: external)
-google-chrome --remote-debugging-port=9222 &
+google-chrome --remote-debugging-port=9224 &
+
+# 5.1 Start Chrome Proxy (expor endpoint container-facing)
+cd scripts
+node chrome-proxy-service.js 192.168.0.2 info
 
 # 6. Start system
 make start  # ou npm run daemon:start
 
-# 7. Verify health
-make health
+# 7. Verify health (container-facing)
+curl http://localhost:9224/json/version || make health
 
 # 8. Test task
 make queue-add
@@ -375,14 +379,17 @@ make restart
 
 ---
 
-### Q16: Browser não conecta (ECONNREFUSED 9222)
+### Q16: Browser não conecta (ECONNREFUSED 9224)
 
 **A**: Ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md) seção "Browser connection failed".
 
 **Quick fix**:
 ```bash
-# Option 1: Start external browser
-google-chrome --remote-debugging-port=9222 &
+# Option 1: Start external browser (host) + proxy (container-facing)
+google-chrome --remote-debugging-port=9224 &
+cd scripts
+node chrome-proxy-service.js 192.168.0.2 info
+curl http://localhost:9224/json/version
 
 # Option 2: Switch to launcher mode
 # config.json: "browserMode": "launcher"

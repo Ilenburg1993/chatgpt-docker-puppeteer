@@ -263,7 +263,7 @@ Uma **auditoria transversal** cobre aspectos que:
 - **Escopo**: Todas as portas usadas no sistema
 - **Componentes Afetados**:
   - Porta 3008: SERVER, DASHBOARD, NERV (Socket.io)
-  - Porta 9222: INFRA, DRIVER (Chrome CDP)
+  - Porta 9224: INFRA, DRIVER (Chrome CDP)
   - Porta 9229: Desenvolvimento (Node Inspector)
 - **Problemas Encontrados**: 3 inconsistências (3000 vs 3008)
 - **Correções Necessárias**: 6 P1 + 3 P2
@@ -288,7 +288,7 @@ Uma **auditoria transversal** cobre aspectos que:
 - **Aspectos-chave**:
   - Quando usar launcher vs external?
   - Como configurar Chrome externo?
-  - Multi-instance support (9222, 9223, 9224)
+  - Multi-instance support (9224, 9223, 9224)
   - Stealth fingerprinting
   - Troubleshooting connection issues
 

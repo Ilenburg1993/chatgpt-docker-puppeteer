@@ -390,7 +390,7 @@ src/main.js (boot sequence - 200 LOC)
 2. Criar `.env.example` com:
    ```bash
    # Chrome Remote Debugging
-   CHROME_WS_ENDPOINT=ws://localhost:9222
+   CHROME_WS_ENDPOINT=ws://localhost:9224
 
    # Server
    PORT=3008
@@ -628,9 +628,9 @@ start http://localhost:3008
 2. **Opção B (Atualizar)**: Tornar wrapper de PM2 com verificações Windows-specific:
    ```bat
    REM Verificar Chrome
-   curl http://localhost:9222/json/version >nul 2>&1
+   curl http://localhost:9224/json/version >nul 2>&1
    if errorlevel 1 (
-       echo [ERROR] Chrome not running on port 9222
+       echo [ERROR] Chrome not running on port 9224
        exit /b 1
    )
 
@@ -659,7 +659,7 @@ start http://localhost:3008
 
 # --- Chrome Remote Debugging ---
 # URL WebSocket do Chrome (se não usar launcher mode)
-CHROME_WS_ENDPOINT=ws://localhost:9222
+CHROME_WS_ENDPOINT=ws://localhost:9224
 
 # Modo de conexão browser (launcher | external | auto)
 BROWSER_MODE=launcher
@@ -932,7 +932,7 @@ nano .env  # Ajuste CHROME_WS_ENDPOINT se necessário
 npm install
 
 # 4. Inicie Chrome
-google-chrome --remote-debugging-port=9222 --user-data-dir="~/chrome-automation"
+google-chrome --remote-debugging-port=9224 --user-data-dir="~/chrome-automation"
 
 # 5. Inicie agente
 npm run daemon:start

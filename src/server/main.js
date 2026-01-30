@@ -1,149 +1,375 @@
 /* ==========================================================================
    src/server/main.js
-   Audit Level: 750 — Mission Control Prime Bootstrapper (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar o boot sequencial de todos os subsistemas do
-                     servidor e persistir o estado para descoberta IPC.
-   Sincronizado com: lifecycle.js V600, server.js V100, socket.js V600,
-                     router.js V700, supervisor/reconciler.js V700.
+   SERVER PROCESS — CANONICAL BOOTSTRAP (HARDENED & DOCUMENTED)
+
+   Papel Arquitetural:
+   Processo dedicado do subsistema SERVER. Responsável por prover a camada
+   de interface externa (HTTP + Socket + API + Telemetria) desacoplada do
+   KERNEL e DRIVER, comunicando-se com o restante do sistema via NERV.
+
+   Escopo:
+     ✔ Fundação HTTP container-safe
+     ✔ Hub Socket.io
+     ✔ API Gateway (router)
+     ✔ Telemetria e streams
+     ✔ Watchers de infraestrutura
+     ✔ Instância NERV local do processo
+     ✔ ServerNERVAdapter (ponte NERV ⇄ Socket)
+     ✔ Persistência de estado para descoberta IPC
+     ✔ Supervisor/Reconciler
+
+   Invariantes Operacionais:
+     ✔ Bind HTTP ocorre SOMENTE via engine/server
+     ✔ Socket hub só inicializa após bind
+     ✔ Router nunca inicia servidor
+     ✔ NERV é criado antes do ServerNERVAdapter
+     ✔ Adapter nunca cria NERV — apenas recebe
+     ✔ Reconciler sobe por último
+     ✔ Falha de boot aborta processo
+     ✔ Ordem de boot é determinística
+
+   Propriedades de Segurança:
+     — Nenhum subsistema crítico inicia fora do bootstrap()
+     — Persistência IPC é atômica
+     — Sem bind implícito
+     — Sem dupla inicialização de engines
 ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   MODULE RESOLUTION GUARD — deve ser o PRIMEIRO require do processo
+   Garante funcionamento de aliases (@core, @infra, etc.)
+-------------------------------------------------------------------------- */
+require('module-alias/register');
 
 const fs = require('fs');
 
-const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
+const { log } = require('@core/logger');
+const PATHS = require('@infra/fs/paths');
+const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('@shared/nerv/constants');
+const { CONNECTION_MODES } = require('@core/constants/browser.js');
+const { createEnvelope } = require('@shared/nerv/envelope');
 
-const _path = require('path');
+// ==========================================================================
+// SERVER AUTHORITY — CANONICAL RESOLUTION
+// ==========================================================================
+const SERVER_AUTHORITIES = Object.freeze({
+   STANDALONE: 'standalone',
+   DELEGATED: 'delegated'
+});
 
-// 1. Motores Centrais (Engine)
-const server = require('./engine/server');
-const socketHub = require('./engine/socket');
-const lifecycle = require('./engine/lifecycle');
-const app = require('./engine/app');
+function resolveServerAuthority(explicitAuthority = null) {
+    const raw = explicitAuthority ?? process.env.SERVER_AUTHORITY ?? SERVER_AUTHORITIES.STANDALONE;
+    const authority = String(raw).toLowerCase().trim();
 
-// 2. Camada de Comunicação (API Gateway)
+    if (!Object.values(SERVER_AUTHORITIES).includes(authority)) {
+        const msg = `[BOOT] SERVER_AUTHORITY inválido: "${raw}"`;
+        log('FATAL', msg);
+        throw new Error(msg);
+    }
+
+    log('INFO', `[BOOT] Server authority: ${authority}`);
+    return authority;
+}
+
+/* --------------------------------------------------------------------------
+   ENGINE LAYER — fundações físicas
+-------------------------------------------------------------------------- */
+const serverEngine = require('./engine/server');   // HTTP singleton engine
+const socketHub = require('./engine/socket');      // Socket.io hub
+const lifecycle = require('./engine/lifecycle');   // signal/shutdown manager
+const app = require('./engine/app');               // Express app configurada
+
+/* --------------------------------------------------------------------------
+   API GATEWAY
+-------------------------------------------------------------------------- */
 const router = require('./api/router');
 
-// 3. Sentidos e Telemetria (Realtime)
+/* --------------------------------------------------------------------------
+   TELEMETRIA & STREAMING
+-------------------------------------------------------------------------- */
 const pm2Bridge = require('./realtime/bus/pm2_bridge');
 const logTail = require('./realtime/streams/log_tail');
 const hardwareTelemetry = require('./realtime/telemetry/hardware');
 
-// 4. Inteligência de Controle (Supervisor / Reconciler)
-const reconciler = require('./supervisor/reconciler');
-
-// 5. Observadores de Infraestrutura (Watchers)
+/* --------------------------------------------------------------------------
+   WATCHERS DE INFRA
+-------------------------------------------------------------------------- */
 const fsWatcher = require('./watchers/fs_watcher');
 const logWatcher = require('./watchers/log_watcher');
 
-// 6. Adaptador NERV (Comunicação com Barramento)
-const ServerNERVAdapter = require('./nerv_adapter/server_nerv_adapter');
-const NERV = require('@shared/nerv/nerv');
+/* --------------------------------------------------------------------------
+   SUPERVISOR / AUTOCURA
+-------------------------------------------------------------------------- */
+const reconciler = require('./supervisor/reconcilier');
 
-// 7. Utilidades de Core e Infra
-const { log } = require('@core/logger');
-const PATHS = require('@infra/fs/paths');
-const { PROTOCOL_VERSION } = require('@shared/nerv/constants');
+/* --------------------------------------------------------------------------
+   NERV + ADAPTER
+-------------------------------------------------------------------------- */
+const ServerNERVAdapter = require('./nerv_adapter/server_nerv_adapter');
+const NERV = require('@nerv/nerv');
+
+
+/* ==========================================================================
+   IPC DISCOVERY STATE — PERSISTÊNCIA CANÔNICA
+========================================================================== */
 
 /**
- * === BOOTSTRAP ANCHOR ===
- * Persiste o estado do servidor para descoberta dinâmica pelo Maestro.
- * Executado após a definição da porta física e antes da lógica interativa.
+ * Persiste estado mínimo do processo SERVER para descoberta por outros
+ * processos (ex: Maestro).
  *
- * @param {number} port - Porta final alocada pelo algoritmo de Port Hunting.
+ * Propriedades:
+ *   ✔ Escrita síncrona deliberada (barreira de boot)
+ *   ✔ Commit atômico via arquivo temporário
+ *   ✔ Nunca retorna estado parcialmente gravado
+ *
+ * @param {number} port Porta efetivamente bound pelo HTTP engine
  */
-function persistServerState(port) {
-    const serverState = {
+function persistServerState(port, authority = SERVER_AUTHORITIES.STANDALONE) {
+    const state = {
         server_port: port,
         server_pid: process.pid,
         server_started_at: new Date().toISOString(),
-        server_version: 'V750',
         protocol: PROTOCOL_VERSION || '2.0.0',
-        mode: CONNECTION_MODES.SINGULARITY
+        mode: CONNECTION_MODES.SINGULARITY,
+        role: 'server',
+        authority
     };
 
+    const tmp = `${PATHS.STATE}.tmp`;
+
     try {
-        const tmpFile = `${PATHS.STATE}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
 
-        // Escrita síncrona deliberada: barreira determinística de boot
-        fs.writeFileSync(tmpFile, JSON.stringify(serverState, null, 2), 'utf-8');
-
-        // Commit atômico para garantir integridade na leitura pelo Maestro
         if (fs.existsSync(PATHS.STATE)) {
             fs.unlinkSync(PATHS.STATE);
         }
-        fs.renameSync(tmpFile, PATHS.STATE);
 
-        log('DEBUG', `[BOOT] Descoberta persistida em estado.json (Porta: ${port})`);
+        fs.renameSync(tmp, PATHS.STATE);
+
+        log('DEBUG', `[BOOT] Estado IPC persistido (porta=${port})`);
     } catch (err) {
-        log('ERROR', `[BOOT] Falha crítica ao registrar estado de descoberta: ${err.message}`);
+        log('FATAL', `[BOOT] Falha ao persistir estado IPC: ${err.message}`);
         throw err;
     }
 }
 
+
+/* ==========================================================================
+   BOOTSTRAP — SEQUÊNCIA SOBERANA DE INICIALIZAÇÃO
+========================================================================== */
+
 /**
- * Função de Inicialização (Main Sequence).
- * Segue o rigor do Protocolo 11 para garantir estabilidade operacional.
+ * Executa boot completo do processo SERVER.
+ *
+ * Ordem é contratual e não deve ser alterada sem auditoria:
+ *
+ *   1. lifecycle (signals)
+ *   2. HTTP engine bind
+ *   3. persistência IPC
+ *   4. socket hub
+ *   5. router / API
+ *   6. telemetria
+ *   7. watchers
+ *   8. NERV local
+ *   9. ServerNERVAdapter
+ *  10. reconciler
+ *
+ * @returns {Promise<object>} Contexto operacional mínimo do server
  */
-async function bootstrap() {
+async function bootstrap(options = {}) {
+    const authority = resolveServerAuthority(options.authority);
+
     try {
-        log('INFO', '🚀 >>> Iniciando Mission Control Prime V750 <<<');
+        log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
 
-        // PASSO 1: Ativar escuta de sinais vitais do SO (SIGINT / SIGTERM)
-        lifecycle.listenToSignals();
-        log('DEBUG', '[BOOT] Gestor de ciclo de vida e sinais ativo.');
+        /* --------------------------------------------------------------
+         FASE 1 — Lifecycle / Signal Handling
+         Deve subir antes de qualquer recurso externo.
+      -------------------------------------------------------------- */
+        if (authority === SERVER_AUTHORITIES.STANDALONE) {
+            lifecycle.listenToSignals();
+            log('DEBUG', '[BOOT] Lifecycle signals ativos (standalone)');
+        } else {
+            // Em delegated, suprimimos exits e não registramos handlers de sinal
+            if (typeof lifecycle.setAllowProcessExit === 'function') {
+                lifecycle.setAllowProcessExit(false);
+            }
+            log('DEBUG', '[BOOT] Lifecycle signals skip (delegated); process exit suprimido');
+        }
 
-        // PASSO 2: Iniciar Servidor HTTP (Fundação física com Port Hunting)
-        const instance = await server.start(process.env.PORT || 3000);
+        /* --------------------------------------------------------------
+           FASE 2 — Fundação HTTP
+           Único ponto de bind de rede.
+        -------------------------------------------------------------- */
+        const basePort = process.env.SERVER_PORT || process.env.PORT || 9224;
+        const { server: httpServer, port } = await serverEngine.start(basePort);
 
-        // PASSO 3: Persistir Estado para IPC Discovery
-        persistServerState(instance.port);
+        /* --------------------------------------------------------------
+         FASE 3 — Estado IPC
+         Só após porta real conhecida.
+         Em modo delegated, evitamos escrita do arquivo de discovery
+         pois o Maestro é responsável pela descoberta/coordenação.
+      -------------------------------------------------------------- */
+        if (authority === SERVER_AUTHORITIES.STANDALONE) {
+            persistServerState(port, authority);
+        } else {
+            log('DEBUG', '[BOOT] persistServerState skip (delegated)');
+        }
 
-        // PASSO 4: Inicializar Barramento de Eventos Soberano (Socket.io)
-        socketHub.init(instance.server);
-        log('DEBUG', '[BOOT] Hub IPC 2.0 acoplado à fundação HTTP.');
+        /* --------------------------------------------------------------
+           FASE 4 — Socket Hub
+           Acoplado sobre servidor já bound.
+        -------------------------------------------------------------- */
+        socketHub.init(httpServer);
+        log('DEBUG', '[BOOT] Socket hub acoplado');
 
-        // PASSO 5: Injetar Malha de Rotas e Gateway de API
+        /* --------------------------------------------------------------
+         FASE 5 — API Gateway
+         Router injeta rotas — não cria servidor.
+      -------------------------------------------------------------- */
+        // Expõe autoridade no app para que controllers possam atuar de forma
+        // conservadora (ex.: negar operações de lifecycle quando delegated)
+        try {
+            app.locals = app.locals || {};
+            app.locals.authority = authority;
+        } catch (e) {
+            /* noop */
+        }
+
         router.applyRoutes(app);
-        log('DEBUG', '[BOOT] Gateway de API e Error Boundary consolidados.');
+        log('DEBUG', '[BOOT] Rotas HTTP consolidadas');
 
-        // PASSO 6: Ligar Motores de Telemetria e Streaming
+        /* --------------------------------------------------------------
+           FASE 6 — Telemetria
+        -------------------------------------------------------------- */
         pm2Bridge.init();
         logTail.init();
         hardwareTelemetry.init();
-        log('INFO', '[BOOT] Motores de telemetria e streaming operacionais.');
+        log('DEBUG', '[BOOT] Telemetria online');
 
-        // PASSO 7: Ativar Observadores de Infraestrutura (Watchers)
+        /* --------------------------------------------------------------
+           FASE 7 — Watchers
+        -------------------------------------------------------------- */
         fsWatcher.init();
         logWatcher.init();
-        log('DEBUG', '[BOOT] Vigilância de sistema de arquivos ativa.');
+        log('DEBUG', '[BOOT] Watchers ativos');
 
-        // PASSO 8: Inicializar ServerNERVAdapter (Comunicação NERV ↔ Socket.io)
-        const nervInstance = NERV.getInstance();
-        const serverAdapter = new ServerNERVAdapter(nervInstance, socketHub);
-        log('INFO', '[BOOT] ServerNERVAdapter conectado ao NERV.');
+        /* --------------------------------------------------------------
+         FASE 8 — NERV local do processo SERVER (criação ou injeção)
+      -------------------------------------------------------------- */
+        let nerv = options.nerv ?? null;
 
-        // PASSO 9: Ativar o Reconciliador (Autocura)
-        // O Reconciler é o último a subir para garantir que os barramentos estejam prontos
-        if (reconciler && typeof reconciler.start === 'function') {
-            reconciler.start();
-            log('INFO', '[BOOT] Reconciliador de Estado em prontidão.');
+        if (!nerv) {
+            if (authority === SERVER_AUTHORITIES.DELEGATED) {
+                log('FATAL', '[BOOT] NERV não injetado em modo delegated');
+                // Em modo delegated não finalizamos o processo localmente; propaga erro para o chamador
+                throw new Error('NERV must be injected in delegated mode');
+            }
+
+            const { createNERV } = NERV;
+            nerv = await createNERV({
+                mode: 'hybrid',
+                correlation: true,
+                bufferSize: 1000,
+                telemetry: true
+            });
+
+            log('DEBUG', '[BOOT] NERV local criado (standalone)');
+        } else {
+            log('DEBUG', '[BOOT] NERV injetado (delegated)');
         }
 
-        log('INFO', `[BOOT] Mission Control Prime V750 totalmente operacional na porta ${instance.port}`);
+        // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)
+        if (authority === SERVER_AUTHORITIES.STANDALONE) {
+            try {
+                const payload = {
+                    port,
+                    server_port: port,
+                    pid: process.pid,
+                    server_started_at: new Date().toISOString(),
+                    protocol: PROTOCOL_VERSION || 'unknown',
+                    mode: CONNECTION_MODES.SINGULARITY,
+                    role: 'server',
+                    httpAuthority: Boolean(port)
+                };
 
-        return instance;
-    } catch (e) {
-        log('FATAL', `[BOOT] Falha catastrófica na ignição do servidor: ${e.message}`);
-        // Em caso de falha no boot, encerramos o processo para evitar estado inconsistente
-        process.exit(1);
+                const env = createEnvelope({
+                    actor: ActorRole.SERVER,
+                    messageType: MessageType.EVENT,
+                    actionCode: ActionCode.SERVER_READY,
+                    payload
+                });
+
+                if (typeof nerv.emitEvent === 'function') {
+                    nerv.emitEvent(env);
+                    log('DEBUG', '[BOOT] Evento NERV SERVER_READY publicado (standalone)');
+                }
+            } catch (err) {
+                log('WARN', `[BOOT] Não foi possível publicar SERVER_READY via NERV: ${err.message}`);
+            }
+        } else {
+            log('DEBUG', '[BOOT] SERVER_READY skip (delegated) — Maestro é responsável pela publicação');
+        }
+
+        /* --------------------------------------------------------------
+         FASE 9 — Adapter NERV ⇄ Socket
+      -------------------------------------------------------------- */
+        const serverAdapter = new ServerNERVAdapter(nerv, socketHub);
+        log('INFO', '[BOOT] ServerNERVAdapter ativo');
+
+        // Injeção opcional de MissionManager passada via options (delegated ou embed)
+        try {
+            if (options.missionManager) {
+                const missionsController = require('./api/controllers/missions');
+                if (typeof missionsController.setMissionManager === 'function') {
+                    missionsController.setMissionManager(options.missionManager);
+                    log('DEBUG', '[BOOT] MissionManager injetado via options.missionManager');
+                }
+            }
+        } catch (e) {
+            log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${e.message}`);
+        }
+
+        /* --------------------------------------------------------------
+           FASE 10 — Reconciler (último)
+        -------------------------------------------------------------- */
+        if (typeof reconciler?.start === 'function') {
+            reconciler.start();
+            log('INFO', '[BOOT] Reconciler ativo');
+        }
+
+        log('INFO', `[BOOT] Server pronto na porta ${port}`);
+
+        return {
+            port,
+            httpServer,
+            nerv,
+            serverAdapter,
+            authority
+        };
+    } catch (err) {
+        log('FATAL', `[BOOT] Falha crítica de bootstrap: ${err.message}`);
+        if (typeof authority !== 'undefined' && authority === SERVER_AUTHORITIES.STANDALONE) {
+            process.exit(1);
+        }
+        throw err;
     }
 }
 
-/**
- * Execução Automática (Independência de Módulo)
- */
+
+/* ==========================================================================
+   ENTRYPOINT CONTROL
+========================================================================== */
+
 if (require.main === module) {
-    bootstrap();
+   (async () => {
+       try {
+           await bootstrap();
+       } catch (err) {
+           log('FATAL', `[BOOT] Entrypoint bootstrap falhou: ${err.message}`);
+           process.exit(1);
+       }
+   })();
 }
 
 module.exports = bootstrap;

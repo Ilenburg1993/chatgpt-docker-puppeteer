@@ -217,7 +217,7 @@ extra_hosts:
     - 'host.docker.internal:host-gateway'
 
 environment:
-    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 ```
 
 ### Logging (Produção)

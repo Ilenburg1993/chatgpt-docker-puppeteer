@@ -15,7 +15,7 @@ const PATHS = require('./paths');
  * Protege o sistema de arquivos e o Puppeteer contra caracteres de controle
  * que podem causar quebras de protocolo ou falhas de injeção.
  */
-// eslint-disable-next-line no-control-regex -- required to strip control chars
+ 
 const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 
 /* ==========================================================================

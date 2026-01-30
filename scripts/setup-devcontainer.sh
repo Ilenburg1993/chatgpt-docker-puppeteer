@@ -513,7 +513,7 @@ echo ""
 if [ "$HOST_OS" = "debian" ]; then
     echo "  🐧 Debian detectado (host primário)"
     echo "  • Performance de I/O otimizada"
-    echo "  • Chrome remoto: google-chrome --remote-debugging-port=9222"
+    echo "  • Chrome remoto: google-chrome --remote-debugging-port=9224"
 elif [ "$HOST_OS" = "wsl2" ]; then
     echo "  🪟 Windows/WSL2 detectado"
     echo "  • Verifique que projeto está em ~/workspace (não /mnt/c/)"

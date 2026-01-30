@@ -124,7 +124,7 @@ This release represents a complete restart and professional setup of the project
 ### Changed
 
 - **Architecture**: Switched from bundled Chromium to remote Chrome debugging protocol
-    - Connects to Chrome on host via WebSocket (port 9222)
+    - Connects to Chrome on host via WebSocket (port 9224)
     - Reduces Docker image size by ~250MB
     - Improves development visibility
     - Documented in DOCKER_SETUP.md

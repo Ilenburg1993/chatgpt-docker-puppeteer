@@ -233,10 +233,10 @@ async function findFrameByPath(page, framePath) {
 async function findChatInputSelector(page, langCode = 'en') {
     const keywords = await i18n.getTerms('input_placeholders', langCode);
     return page.evaluate(
-        async (terms, svgSigs, logicFnStr) => {
-            // FIXME: Refatorar para evitar new Function() - risco de segurança
-            // eslint-disable-next-line no-new-func
-            const SADI = new Function(`return (${logicFnStr})`)()(terms, svgSigs);
+        async (terms, svgSigs, sadiLogicFn) => {
+            // FIXED: Usando função serializada diretamente (sem new Function)
+             
+            const SADI = sadiLogicFn(terms, svgSigs);
             const candidates = [
                 ...new Set(SADI.query('textarea, div[contenteditable="true"], [role="textbox"]'))
             ].filter(el => !SADI.isOccluded(el));
@@ -273,7 +273,7 @@ async function findChatInputSelector(page, langCode = 'en') {
         },
         keywords,
         SVG_SIGNATURES,
-        sadiLogic.toString()
+        sadiLogic
     );
 }
 
@@ -282,10 +282,9 @@ async function findChatInputSelector(page, langCode = 'en') {
  */
 async function findSendButtonSelector(page, inputProtocol) {
     return page.evaluate(
-        async (proto, svgSigs, logicFnStr) => {
-            // FIXME: Refatorar para evitar new Function() - risco de segurança
-            // eslint-disable-next-line no-new-func
-            const SADI = new Function(`return (${logicFnStr})`)()([], svgSigs);
+        async (proto, svgSigs, sadiLogicFn) => {
+            // FIXED: Usando função serializada diretamente (sem new Function)
+            const SADI = sadiLogicFn([], svgSigs);
             const input = SADI.query(proto.selector)[0];
             if (!input) {
                 return null;
@@ -332,7 +331,7 @@ async function findSendButtonSelector(page, inputProtocol) {
         },
         inputProtocol,
         SVG_SIGNATURES,
-        sadiLogic.toString()
+        sadiLogic
     );
 }
 
@@ -340,10 +339,9 @@ async function findSendButtonSelector(page, inputProtocol) {
  * Monitora a área de resposta para detectar atividade da IA.
  */
 async function findResponseArea(page) {
-    return page.evaluate(async logicFnStr => {
-        // FIXME: Refatorar para evitar new Function() - risco de segurança
-        // eslint-disable-next-line no-new-func
-        const SADI = new Function(`return (${logicFnStr})`)()([], []);
+    return page.evaluate(async sadiLogicFn => {
+        // FIXED: Usando função serializada diretamente (sem new Function)
+        const SADI = sadiLogicFn([], []);
         const containers = SADI.query('div, article, section, pre').filter(c => c.innerText.length > 5);
         const snapshot = containers.map(c => ({ el: c, len: c.innerText.length }));
 
@@ -374,16 +372,15 @@ async function findResponseArea(page) {
                 growth_delta: maxDelta
             }
             : null;
-    }, sadiLogic.toString());
+    }, sadiLogic);
 }
 
 async function validateCandidateInteractivity(page, protocol) {
     try {
         return page.evaluate(
-            (proto, logicFnStr) => {
-                // FIXME: Refatorar para evitar new Function() - risco de segurança
-                // eslint-disable-next-line no-new-func
-                const SADI = new Function(`return (${logicFnStr})`)()([], []);
+            (proto, sadiLogicFn) => {
+                // FIXED: Usando função serializada diretamente (sem new Function)
+                const SADI = sadiLogicFn([], []);
                 const el = SADI.query(proto.selector)[0];
                 if (!el) {
                     return false;
@@ -397,7 +394,7 @@ async function validateCandidateInteractivity(page, protocol) {
                 return active === el || el.contains(active);
             },
             protocol,
-            sadiLogic.toString()
+            sadiLogic
         );
     } catch (_e) {
         return false;

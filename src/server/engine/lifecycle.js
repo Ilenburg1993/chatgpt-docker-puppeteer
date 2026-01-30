@@ -29,6 +29,15 @@ const STATE_FILE = path.join(ROOT, 'estado.json');
  * Flag de estado para evitar reentrância em desligamentos simultâneos.
  */
 let isShuttingDown = false;
+/**
+ * Controle se o lifecycle deve chamar `process.exit()` ao final.
+ * Em modo 'delegated' o processo chamador (Maestro) deve controlar o exit.
+ */
+let allowProcessExit = true;
+
+function setAllowProcessExit(flag) {
+    allowProcessExit = !!flag;
+}
 
 /**
  * Realiza o encerramento gracioso de todos os módulos do Mission Control.
@@ -47,8 +56,13 @@ async function gracefulShutdown(signal) {
     // 0. WATCHDOG DE SEGURANÇA: Impede que o processo fique "pendurado" no SO.
     const shutdownTimeoutMs = CONFIG.get('SERVER_SHUTDOWN_TIMEOUT_MS', 5000);
     const forceExitTimeout = setTimeout(() => {
-        log('FATAL', `[LIFECYCLE] Shutdown excedeu o tempo limite de ${shutdownTimeoutMs}ms. Forçando saída.`);
-        process.exit(1);
+        log('FATAL', `[LIFECYCLE] Shutdown excedeu o tempo limite de ${shutdownTimeoutMs}ms.`);
+        if (allowProcessExit) {
+            log('FATAL', '[LIFECYCLE] Forçando saída do processo.');
+            process.exit(1);
+        } else {
+            log('ERROR', '[LIFECYCLE] Shutdown timeout — saída suprimida por allowProcessExit=false');
+        }
     }, shutdownTimeoutMs);
 
     try {
@@ -103,10 +117,18 @@ async function gracefulShutdown(signal) {
         clearTimeout(forceExitTimeout);
 
         // Encerramento do processo com código de sucesso.
-        process.exit(0);
+        if (allowProcessExit) {
+            process.exit(0);
+        } else {
+            log('INFO', '[LIFECYCLE] Encerramento concluído (exit suprimido por allowProcessExit=false)');
+        }
     } catch (e) {
         log('ERROR', `[LIFECYCLE] Colapso durante a sequência de encerramento: ${e.message}`);
-        process.exit(1);
+        if (allowProcessExit) {
+            process.exit(1);
+        } else {
+            log('ERROR', '[LIFECYCLE] Falha no shutdown (exit suprimido por allowProcessExit=false)');
+        }
     }
 }
 
@@ -133,5 +155,6 @@ function listenToSignals() {
 
 module.exports = {
     gracefulShutdown,
-    listenToSignals
+    listenToSignals,
+    setAllowProcessExit
 };

@@ -255,8 +255,8 @@ launcher/                           # Novo diretório raiz
 │     └─ Lê: chrome-config.json (exportado por        │
 │        ConnectionOrchestrator.js)                    │
 │     └─ Modo: launcher | connect | auto              │
-│     └─ Args: --remote-debugging-port=9222, etc       │
-│     └─ Health: http://localhost:9222/json/version    │
+│     └─ Args: --remote-debugging-port=9224, etc       │
+│     └─ Health: http://localhost:9224/json/version    │
 │                                                      │
 │  2. [PM2 Daemon] (opcional)                          │
 │     └─ Depende: [nada]                               │
@@ -292,7 +292,7 @@ launcher/                           # Novo diretório raiz
 │                                                      │
 │  Components:                                         │
 │  ┌────────────────────────────────────────────────┐ │
-│  │ [●] Chrome       Port 9222    Uptime: 00:02:15│ │
+│  │ [●] Chrome       Port 9224    Uptime: 00:02:15│ │
 │  │     Mode: launcher | PID: 5678                 │ │
 │  │                                                │ │
 │  │ [●] PM2          PID: 1234    Uptime: 00:02:18│ │
@@ -382,7 +382,7 @@ router.get('/health', (req, res) => {
 
 router.get('/health/chrome', async (req, res) => {
     try {
-        const response = await fetch('http://localhost:9222/json/version');
+        const response = await fetch('http://localhost:9224/json/version');
         const data = await response.json();
         res.json({ status: 'ok', version: data });
     } catch (error) {

@@ -90,7 +90,7 @@ class FrameNavigator {
 
                             // Acumula o deslocamento físico (Bounding Box)
                             const box = await element.boundingBox();
-                            // eslint-disable-next-line max-depth -- Recursive frame navigation requires deep nesting
+                             
                             if (box) {
                                 result.offsetX += box.x;
                                 result.offsetY += box.y;

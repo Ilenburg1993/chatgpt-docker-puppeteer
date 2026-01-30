@@ -72,11 +72,17 @@ const USER_AGENTS = [
 ======================================================================== */
 const DEFAULTS = {
     // Modo de operação: 'launcher' | 'connect' | 'wsEndpoint' | 'executablePath' | 'auto'
-    mode: process.env.BROWSER_MODE || 'launcher',
+    mode: process.env.BROWSER_MODE || 'wsEndpoint', // ✅ MUDANÇA: wsEndpoint como padrão (usa proxy)
 
     // Configurações de conexão (para modo connect/wsEndpoint)
-    ports: [9222, 9223, 9224],
-    hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
+    // IMPORTANTE: Ordem de prioridade reflete Chrome Proxy primeiro (9224), depois conexões diretas (detalhe operacional)
+    ports: [9224, 9223], // ✅ MUDANÇA: Porta proxy (9224) PRIMEIRO
+    hosts: [
+        '192.168.0.2', // ✅ MUDANÇA CRÍTICA: IP público Windows (proxy) PRIMEIRO
+        'host.docker.internal', // Docker DNS para Windows host (funciona com proxy e direto)
+        '172.17.0.1', // Docker bridge (Linux)
+        '127.0.0.1' // Localhost (container, geralmente não funciona para Chrome externo)
+    ],
     connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
 
     // Configurações de launcher
@@ -220,28 +226,9 @@ class ConnectionOrchestrator {
      * Mais confiável, funciona em qualquer ambiente
      */
     async tryLauncher() {
-        const launchOptions = {
-            headless: this.config.headless,
-            args: this.config.args,
-            defaultViewport: null,
-            ignoreHTTPSErrors: true,
-            timeout: this.config.connectionTimeout
-        };
-
-        // Configura executablePath se fornecido
-        if (this.config.executablePath) {
-            launchOptions.executablePath = this.config.executablePath;
-        }
-
-        // Configura userDataDir se fornecido
-        if (this.config.userDataDir) {
-            launchOptions.userDataDir = this.config.userDataDir;
-        }
-
-        // Usa puppeteer (bundle) ou puppeteer-core (sem bundle)
-        const lib = this.config.executablePath ? puppeteerCore : puppeteer;
-
-        return lib.launch(launchOptions);
+        throw new Error(
+            '[ARCHITECTURE ERROR] Launcher mode is not supported. This process only connects to external browsers via browserEndpoint.'
+        );
     }
 
     /**
@@ -251,6 +238,19 @@ class ConnectionOrchestrator {
     async tryConnectBrowserURL() {
         const errors = [];
 
+        // Se browserEndpoint.url estiver definido, conecta diretamente a ele
+        if (this.config.browserEndpoint && this.config.browserEndpoint.url) {
+            try {
+                log('DEBUG', `[ORCH] Tentando browserURL (direct): ${this.config.browserEndpoint.url}`);
+                return await puppeteerCore.connect({
+                    browserURL: this.config.browserEndpoint.url,
+                    defaultViewport: null,
+                    timeout: 5000
+                });
+            } catch (e) {
+                errors.push(`direct:${this.config.browserEndpoint.url} - ${e.message}`);
+            }
+        }
         for (const host of this.config.hosts) {
             for (const port of this.config.ports) {
                 try {
@@ -278,11 +278,29 @@ class ConnectionOrchestrator {
     async tryConnectWSEndpoint() {
         const errors = [];
 
+        // Se browserEndpoint.wsEndpoint estiver definido, conecta diretamente a ele
+        if (this.config.browserEndpoint && this.config.browserEndpoint.wsEndpoint) {
+            try {
+                log('DEBUG', `[ORCH] Tentando WS endpoint (direct): ${this.config.browserEndpoint.wsEndpoint}`);
+                return await puppeteerCore.connect({
+                    browserWSEndpoint: this.config.browserEndpoint.wsEndpoint,
+                    defaultViewport: null,
+                    timeout: 10000
+                });
+            } catch (e) {
+                errors.push(`direct-ws:${this.config.browserEndpoint.wsEndpoint} - ${e.message}`);
+            }
+        }
         for (const host of this.config.hosts) {
             for (const port of this.config.ports) {
                 try {
                     const url = `http://${host}:${port}/json/version`;
-                    log('DEBUG', `[ORCH] Tentando WS endpoint: ${url}`);
+
+                    // ✅ TELEMETRIA: Detecta se está tentando via Chrome Proxy (porta canônica 9224)
+                    const isProxyAttempt = port === 9224 || (host === '192.168.0.2' && port === 9224);
+                    const attemptType = isProxyAttempt ? '[PROXY]' : '[DIRECT]';
+
+                    log('DEBUG', `[ORCH] ${attemptType} Tentando WS endpoint: ${url}`);
 
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -297,6 +315,14 @@ class ConnectionOrchestrator {
 
                     const json = await res.json();
                     if (json.webSocketDebuggerUrl) {
+                        // ✅ LOG DE SUCESSO: Indica claramente se conectou via proxy
+                        if (isProxyAttempt && port === 9224) {
+                            log('INFO', `[ORCH] ✅ Conectado via Chrome Proxy Service (${host}:${port})`);
+                            log('INFO', `[ORCH]    WebSocket URL: ${json.webSocketDebuggerUrl}`);
+                        } else {
+                            log('INFO', `[ORCH] ✅ Conectado diretamente ao Chrome (${host}:${port})`);
+                        }
+
                         return await puppeteerCore.connect({
                             browserWSEndpoint: json.webSocketDebuggerUrl,
                             defaultViewport: null,
@@ -318,15 +344,9 @@ class ConnectionOrchestrator {
      * Para usar Chrome instalado (não Chromium do Puppeteer)
      */
     async tryExecutablePath() {
-        if (!this.config.executablePath) {
-            throw new Error('executablePath não configurado');
-        }
-
-        if (!fs.existsSync(this.config.executablePath)) {
-            throw new Error(`Chrome não encontrado: ${this.config.executablePath}`);
-        }
-
-        return this.tryLauncher(); // Usa launcher com executablePath
+        throw new Error(
+            '[ARCHITECTURE ERROR] executablePath mode is not supported. This process only connects to external browsers via browserEndpoint.'
+        );
     }
 
     async ensureBrowser() {
@@ -344,8 +364,29 @@ class ConnectionOrchestrator {
         const mode = this.config.mode;
         const autoFallback = this.config.autoFallback;
 
-        // Ordem de prioridade para modo 'auto'
-        const fallbackOrder = ['launcher', 'wsEndpoint', 'connect', 'executablePath'];
+        // =====================================================================
+        // CHROME PROXY INTEGRATION - Estratégia de Fallback Automático
+        // =====================================================================
+        // Quando mode = 'wsEndpoint' (padrão), tryConnectWSEndpoint() tentará:
+        //
+        // 1. 192.168.0.2:9224 (Chrome Proxy - PREFERENCIAL)
+        //    → Proxy reescreve webSocketDebuggerUrl (localhost → IP público)
+        //    → Container consegue conectar via ws://192.168.0.2:9224/...
+        //
+        // 2. host.docker.internal:9224 (Chrome Proxy via Docker DNS)
+        //    → Funciona se Docker resolver host.docker.internal corretamente
+        //
+        // 3. host.docker.internal (Conexão direta ao Chrome)
+        //    → Fallback se proxy falhar; porta é detalhe operacional do ambiente externo
+        //
+        // 4. Outras combinações (172.17.0.1:9224, etc)
+        //    → Fallbacks adicionais para robustez
+        //
+        // Documentação: DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md
+        // =====================================================================
+
+        // Ordem de prioridade para modo 'auto' (apenas modos de conexão; launcher/executablePath NÃO são suportados)
+        const fallbackOrder = ['wsEndpoint', 'connect'];
         const modesToTry = mode === 'auto' ? fallbackOrder : [mode];
 
         let lastError = null;
@@ -683,8 +724,8 @@ class ConnectionOrchestrator {
             },
 
             health: {
-                chromeDebugUrl: 'http://localhost:9222/json/version',
-                chromeDevtoolsUrl: 'http://localhost:9222',
+                chromeDebugUrl: 'http://localhost:9224/json/version',
+                chromeDevtoolsUrl: 'http://localhost:9224',
                 expectedPorts: DEFAULTS.ports
             },
 
@@ -692,17 +733,17 @@ class ConnectionOrchestrator {
                 env === 'windows'
                     ? {
                           startChrome: detectedChromePath
-                              ? `"${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\\chrome-automation" ${DEFAULTS.args.join(' ')}`
+                              ? `"${detectedChromePath}" --remote-debugging-port=9224 --user-data-dir="%USERPROFILE%\\chrome-automation" ${DEFAULTS.args.join(' ')}`
                               : null,
-                          checkChrome: 'netstat -ano | findstr ":9222"',
+                          checkChrome: 'netstat -ano | findstr ":9224"',
                           killChrome: 'taskkill /F /IM chrome.exe'
                       }
                     : {
                           startChrome: detectedChromePath
-                              ? `"${detectedChromePath}" --remote-debugging-port=9222 --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
+                              ? `"${detectedChromePath}" --remote-debugging-port=9224 --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
                               : null,
-                          checkChrome: 'lsof -i :9222 || netstat -an | grep :9222',
-                          killChrome: 'pkill -f "chrome.*remote-debugging-port=9222"'
+                          checkChrome: 'lsof -i :9224 || netstat -an | grep :9224',
+                          killChrome: 'pkill -f "chrome.*remote-debugging-port=9224"'
                       },
 
             usage: {

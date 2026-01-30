@@ -1,0 +1,114 @@
+@echo off
+REM ============================================================================
+REM  CHROME LAUNCHER - Windows Native Version
+REM  Version: 1.0 (2026-01-29)
+REM  Audit Level: Infrastructure Automation
+REM ============================================================================
+
+setlocal enabledelayedexpansion
+
+REM ============================================================================
+REM  CONFIGURAÇÕES
+REM ============================================================================
+set CHROME_DEBUG_PORT=9224
+set CHROME_USER_DATA_DIR=%USERPROFILE%\.chrome-debug-profile
+set HEALTH_CHECK_URL=http://localhost:%CHROME_DEBUG_PORT%/json/version
+set MAX_WAIT_SECONDS=10
+
+REM ============================================================================
+REM  CORES (Windows 10+)
+REM ============================================================================
+REM Enable ANSI colors
+for /F "tokens=1,2 delims=#" %%a in ('"prompt #$H#$E# & echo on & for %%b in (1) do rem"') do (
+  set ESC=%%b
+)
+
+REM ============================================================================
+REM  DETECÇÃO DE CHROME
+REM ============================================================================
+echo.
+echo [96m════════════════════════════════════════════════════════════[0m
+echo [96m  CHROME LAUNCHER v1.0 - Windows Native[0m
+echo [96m════════════════════════════════════════════════════════════[0m
+echo.
+
+REM Procura Chrome nos caminhos comuns
+set CHROME_PATH=
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+    set CHROME_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
+) else if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
+    set CHROME_PATH=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
+) else if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
+    set CHROME_PATH=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe
+)
+
+if not defined CHROME_PATH (
+    echo [91m✗ Chrome nao encontrado![0m
+    echo.
+    echo Por favor, instale o Google Chrome:
+    echo   ^-^> https://www.google.com/chrome/
+    exit /b 1
+)
+
+echo [96mℹ️  Chrome encontrado: %CHROME_PATH%[0m
+
+REM ============================================================================
+REM  VERIFICAÇÃO SE JÁ ESTÁ RODANDO
+REM ============================================================================
+echo [96mℹ️  Verificando se Chrome ja esta rodando...[0m
+
+curl -s --connect-timeout 2 "%HEALTH_CHECK_URL%" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [92m✓ Chrome ja esta rodando com remote debugging na porta %CHROME_DEBUG_PORT%[0m
+    echo.
+    echo [92m✓ Sistema pronto para conectar ao Chrome![0m
+    exit /b 0
+)
+
+REM ============================================================================
+REM  INICIALIZAÇÃO DO CHROME
+REM ============================================================================
+echo [93m⚠️  Chrome nao esta rodando. Iniciando automaticamente...[0m
+
+REM Cria diretório de user data se não existir
+if not exist "%CHROME_USER_DATA_DIR%" mkdir "%CHROME_USER_DATA_DIR%"
+
+echo [96mℹ️  Iniciando Chrome com remote debugging na porta %CHROME_DEBUG_PORT%...[0m
+
+REM Inicia Chrome em background
+start "" "%CHROME_PATH%" ^
+    --remote-debugging-port=%CHROME_DEBUG_PORT% ^
+    --user-data-dir="%CHROME_USER_DATA_DIR%" ^
+    --no-first-run ^
+    --no-default-browser-check ^
+    --disable-features=TranslateUI
+
+REM ============================================================================
+REM  AGUARDA CHROME INICIAR
+REM ============================================================================
+echo [96mℹ️  Aguardando Chrome iniciar (max %MAX_WAIT_SECONDS%s)...[0m
+
+set WAITED=0
+:WAIT_LOOP
+curl -s --connect-timeout 1 "%HEALTH_CHECK_URL%" >nul 2>&1
+if %errorlevel% equ 0 goto CHROME_READY
+
+set /a WAITED+=1
+if %WAITED% geq %MAX_WAIT_SECONDS% (
+    echo [91m✗ Timeout: Chrome nao iniciou em %MAX_WAIT_SECONDS%s[0m
+    exit /b 1
+)
+
+timeout /t 1 /nobreak >nul
+goto WAIT_LOOP
+
+:CHROME_READY
+echo [92m✓ Chrome iniciado com sucesso![0m
+echo.
+echo [92m════════════════════════════════════════════════════════════[0m
+echo [92m  Chrome iniciado com sucesso![0m
+echo [92m  Remote debugging port: %CHROME_DEBUG_PORT%[0m
+echo [92m  Health check: %HEALTH_CHECK_URL%[0m
+echo [92m════════════════════════════════════════════════════════════[0m
+
+exit /b 0

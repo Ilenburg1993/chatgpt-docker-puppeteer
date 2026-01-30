@@ -9,12 +9,63 @@
 set -euo pipefail
 
 # ============================================================================
+#  UTF-8 ENCODING DETECTION & AUTO-FALLBACK
+# ============================================================================
+# Force UTF-8 locale (best effort)
+export LC_ALL="${LC_ALL:-pt_BR.UTF-8}"
+export LANG="${LANG:-pt_BR.UTF-8}"
+
+# Detect if terminal supports UTF-8
+if ! locale charmap 2>/dev/null | grep -qi 'utf-8'; then
+    echo "⚠️  AVISO: Terminal não configurado para UTF-8"
+    echo ""
+    echo "Seu terminal está usando: $(locale charmap 2>/dev/null || echo 'encoding desconhecido')"
+    echo ""
+    echo "Opções:"
+    echo "  1) Usar launcher ASCII (sem acentos)"
+    echo "  2) Continuar mesmo assim (pode mostrar caracteres estranhos)"
+    echo "  3) Sair e configurar terminal para UTF-8"
+    echo ""
+    read -p "Escolha (1-3): " choice
+
+    case "$choice" in
+        1)
+            if [[ -f "launcher-ascii.sh" ]]; then
+                echo "✓ Executando launcher-ascii.sh..."
+                exec bash launcher-ascii.sh
+            else
+                echo "❌ launcher-ascii.sh não encontrado!"
+                exit 1
+            fi
+            ;;
+        2)
+            echo "⚠️ Continuando com encoding atual..."
+            ;;
+        3)
+            echo ""
+            echo "Para configurar UTF-8 no Windows Terminal:"
+            echo "  1. Abra as configurações (Ctrl+,)"
+            echo "  2. Vá em 'Defaults' ou perfil específico"
+            echo "  3. Em 'Command line', adicione: chcp 65001 &&"
+            echo ""
+            echo "Ou execute antes de usar o launcher:"
+            echo "  chcp 65001"
+            exit 0
+            ;;
+        *)
+            echo "Opção inválida. Saindo..."
+            exit 1
+            ;;
+    esac
+fi
+
+# ============================================================================
 #  CONFIGURAÇÕES GLOBAIS
 # ============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-SERVER_PORT=2998
+SERVER_PORT=3008
 HEALTH_URL="http://localhost:${SERVER_PORT}/api/health"
 CHROME_CONFIG="chrome-config.json"
 BACKUP_DIR="backups/launcher-$(date +%Y%m%d-%H%M%S)"
@@ -172,6 +223,33 @@ start_system() {
     cp controle.json "backups/$BACKUP_NAME/" 2>/dev/null || true
     cp dynamic_rules.json "backups/$BACKUP_NAME/" 2>/dev/null || true
     echo -e "        ${COLOR_GREEN}✓${COLOR_RESET} Backup: backups/$BACKUP_NAME"
+    echo ""
+
+    # --- Verificação/Inicialização do Chrome ---
+    print_section "CHROME REMOTE DEBUGGING"
+    echo ""
+
+    echo -e "${COLOR_YELLOW}Verificando Chrome com remote debugging...${COLOR_RESET}"
+
+    # Chama o script de inicialização do Chrome
+    if bash scripts/start-chrome.sh; then
+        echo -e "${COLOR_GREEN}✓ Chrome pronto!${COLOR_RESET}"
+    else
+        echo ""
+        echo -e "${COLOR_RED}[ERRO] Falha ao iniciar Chrome${COLOR_RESET}"
+        echo ""
+        echo "O sistema necessita do Chrome com remote debugging na porta 9224."
+        echo ""
+        read -p "Deseja continuar mesmo assim? (s/N): " continue_choice
+
+        if [[ ! "$continue_choice" =~ ^[sS]$ ]]; then
+            echo "Abortando inicialização..."
+            return 1
+        fi
+
+        echo -e "${COLOR_YELLOW}⚠️ Continuando sem Chrome (sistema pode falhar)${COLOR_RESET}"
+    fi
+
     echo ""
 
     # --- Inicialização PM2 ---

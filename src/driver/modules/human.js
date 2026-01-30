@@ -94,7 +94,7 @@ async function wakeUpMove(page) {
  * Realiza um clique humano com variância gaussiana.
  * @param {object} onPulse - [V500] Callback para reportar coordenadas ao IPC.
  */
-// eslint-disable-next-line max-params -- Human simulation requires all 7 parameters for realistic interaction
+ 
 async function humanClick(page, ctx, selector, offsetX = 0, offsetY = 0, signal = null, onPulse = null) {
     if (signal?.aborted || page.isClosed()) {
         return;

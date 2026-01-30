@@ -27,7 +27,7 @@ class RecoverySystem {
      * @param {number} attempt - O índice da tentativa atual (0-3).
      * @param {string} taskId - ID da tarefa ativa.
      */
-    // eslint-disable-next-line complexity -- Recovery tier logic requires complex branching
+     
     async applyTier(recoveryErr, attempt, taskId) {
         const msg = String(recoveryErr?.message || '').toUpperCase();
         const correlationId = this.driver.correlationId;

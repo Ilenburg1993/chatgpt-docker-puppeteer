@@ -70,7 +70,7 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
     {
       mode: 'connect',
       hosts: ['127.0.0.1', 'host.docker.internal'],
-      ports: [9222, 9223, 9224]
+      ports: [9224, 9223, 9224]
     }
     ```
 
@@ -84,7 +84,7 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
     {
       mode: 'wsEndpoint',
       hosts: ['localhost', 'host.docker.internal'],
-      ports: [9222]
+      ports: [9224]
     }
     ```
 
@@ -122,7 +122,7 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 **Melhorias de Configuração:**
 
 - Múltiplos hosts: `['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1']`
-- Múltiplas portas: `[9222, 9223, 9224]`
+- Múltiplas portas: `[9224, 9223, 9224]`
 - Timeout configurável: `connectionTimeout: 30000`
 - Max tentativas: `maxConnectionAttempts: 5`
 - Backoff exponencial: `retryDelayMs` até `maxRetryDelayMs`
@@ -203,14 +203,12 @@ const status = orch.getStatus();
 **Solução Implementada:**
 
 ```javascript
-// BrowserPoolManager agora usa ConnectionOrchestrator
+// BrowserPoolManager agora usa ConnectionOrchestrator (connect-only)
 const pool = new BrowserPoolManager({
-  poolSize: 3,
-  chromium: {
-    mode: 'launcher',        // Qualquer modo suportado
-    headless: 'new',
-    args: [...]
-  }
+    poolSize: 3,
+    browserEndpoint: {
+        url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
+    }
 });
 ```
 
@@ -324,7 +322,7 @@ const browser = await orch.connect();
 const orch = new ConnectionOrchestrator({
     mode: 'wsEndpoint',
     hosts: ['host.docker.internal'],
-    ports: [9222]
+    ports: [9224]
 });
 ```
 

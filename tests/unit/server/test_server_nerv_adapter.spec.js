@@ -238,7 +238,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
 
             assert.ok(!('_internal' in sanitized));
             // __proto__ existe em todos os objetos, mas não deve ter a propriedade polluted
-            // eslint-disable-next-line no-proto
+             
             assert.ok(!sanitized.__proto__ || !sanitized.__proto__.polluted);
         });
     });

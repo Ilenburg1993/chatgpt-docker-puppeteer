@@ -116,7 +116,7 @@ async tryLauncher() {
 ```javascript
 async tryConnect() {
     const hosts = this.config.hosts; // ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1']
-    const ports = this.config.ports; // [9222, 9223, 9224]
+    const ports = this.config.ports; // [9224, 9223, 9224]
 
     for (const host of hosts) {
         for (const port of ports) {
@@ -144,7 +144,7 @@ async tryConnect() {
 
 **Características**:
 - ✅ Multi-host support (localhost, host.docker.internal, bridge IP)
-- ✅ Multi-port scanning (9222, 9223, 9224)
+- ✅ Multi-port scanning (9224, 9223, 9224)
 - ✅ Retry automático (12 tentativas = 4 hosts × 3 portas)
 - ✅ Usado em Docker → Windows host
 
@@ -634,7 +634,7 @@ _pushStateHistory(state, meta) {
 ```json
 {
     "BROWSER_MODE": "launcher",
-    "DEBUG_PORT": "http://localhost:9222",
+    "DEBUG_PORT": "http://localhost:9224",
     "IDLE_SLEEP": 3000
 }
 ```
@@ -654,7 +654,7 @@ _pushStateHistory(state, meta) {
 ```javascript
 const DEFAULTS = {
     mode: 'launcher',
-    ports: [9222, 9223, 9224],
+    ports: [9224, 9223, 9224],
     hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
     connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
     headless: 'new',
@@ -779,7 +779,7 @@ launcher → connect → wsEndpoint → executablePath
 
 ```javascript
 hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1']
-ports: [9222, 9223, 9224]
+ports: [9224, 9223, 9224]
 // Total: 12 tentativas (4 hosts × 3 portas)
 ```
 
@@ -1008,7 +1008,7 @@ if (require.main === module) {
 
 ✅ Launcher mode (Puppeteer.launch)
 ✅ Connect mode (Chrome externo)
-✅ Multi-port scanning (9222, 9223, 9224)
+✅ Multi-port scanning (9224, 9223, 9224)
 ✅ Multi-host (localhost, host.docker.internal)
 ✅ Profile cleanup (temporários deletados)
 ✅ Health checks (timing + crash detection)

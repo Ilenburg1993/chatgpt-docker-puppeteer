@@ -69,7 +69,7 @@ npm run analyze:deps:graph   # Gerar grafo visual
 
 3. **Chrome Não Configurado** (OPERACIONAL)
     ```
-    Chrome não detectado na porta 9222
+    Chrome não detectado na porta 9224
     ```
     **Ação**: Ver comando no output do `npm run doctor`
 
@@ -305,10 +305,10 @@ rm fila/*.tmp.*
 
 ```bash
 # Linux
-google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-automation-profile"
+google-chrome --remote-debugging-port=9224 --user-data-dir="$HOME/chrome-automation-profile"
 
 # macOS
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-automation-profile"
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9224 --user-data-dir="$HOME/chrome-automation-profile"
 ```
 
 ### 4. Validar Setup

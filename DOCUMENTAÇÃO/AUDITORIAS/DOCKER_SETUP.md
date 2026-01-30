@@ -8,18 +8,18 @@ Before running the Docker container, start Chrome with remote debugging enabled:
 
 ```powershell
 # Windows Command
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile"
 ```
 
 **Important:**
 
 - Chrome must be running BEFORE starting the container
-- Port 9222 must be accessible from Docker
+- Port 9224 must be accessible from Docker
 - User data directory ensures isolated browser profile
 
 ### 2. Verify Chrome is Ready
 
-Open browser and check: http://localhost:9222/json/version
+Open browser and check: http://localhost:9224/json/version
 
 You should see Chrome DevTools metadata.
 
@@ -31,7 +31,7 @@ You should see Chrome DevTools metadata.
 
 ```bash
 # 1. Start Chrome (in separate terminal)
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile"
 
 # 2. Build and start container
 make build
@@ -45,7 +45,7 @@ http://localhost:3008
 
 ```bash
 # 1. Start Chrome
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile"
 
 # 2. Start dev container (with hot reload)
 make start-dev
@@ -63,12 +63,12 @@ http://localhost:3008
 │   Windows Host      │
 │                     │
 │  Chrome.exe         │
-│  Port: 9222         │
+│  Port: 9224         │
 │  (Remote Debugging) │
 └──────────┬──────────┘
            │
            │ WebSocket
-           │ ws://host.docker.internal:9222
+           │ ws://host.docker.internal:9224
            │
 ┌──────────▼──────────┐
 │  Docker Container   │
@@ -96,7 +96,7 @@ Configure in `docker-compose.yml`:
 ```yaml
 environment:
     # Chrome WebSocket endpoint
-    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9222
+    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
     # Timezone
     - TZ=America/Sao_Paulo
@@ -115,8 +115,8 @@ environment:
 
 **Solutions:**
 
-1. Verify Chrome is running with `--remote-debugging-port=9222`
-2. Check: http://localhost:9222/json/version
+1. Verify Chrome is running with `--remote-debugging-port=9224`
+2. Check: http://localhost:9224/json/version
 3. Windows Firewall may block connection
 4. Try restarting Docker Desktop
 
@@ -129,7 +129,7 @@ extra_hosts:
     - 'host.docker.internal:host-gateway'
 ```
 
-### Port 9222 already in use
+### Port 9224 already in use
 
 **Solution:** Kill existing Chrome instances:
 
@@ -147,15 +147,15 @@ Edit your code to use environment variable:
 
 ```javascript
 const browser = await puppeteer.connect({
-    browserWSEndpoint: process.env.CHROME_WS_ENDPOINT || 'ws://host.docker.internal:9222'
+    browserWSEndpoint: process.env.CHROME_WS_ENDPOINT || 'ws://host.docker.internal:9224'
 });
 ```
 
 ### Multiple Chrome Profiles
 
 ```bash
-# Profile 1 (port 9222)
-chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\profile1"
+# Profile 1 (port 9224)
+chrome.exe --remote-debugging-port=9224 --user-data-dir="C:\profile1"
 
 # Profile 2 (port 9223)
 chrome.exe --remote-debugging-port=9223 --user-data-dir="C:\profile2"
@@ -167,8 +167,8 @@ Create `start-chrome.bat`:
 
 ```batch
 @echo off
-start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile"
-echo Chrome started with remote debugging on port 9222
+start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile"
+echo Chrome started with remote debugging on port 9224
 ```
 
 ---
@@ -178,7 +178,7 @@ echo Chrome started with remote debugging on port 9222
 ⚠️ **Remote debugging exposes Chrome control:**
 
 - Only use on trusted networks
-- Firewall port 9222 from external access
+- Firewall port 9224 from external access
 - Use different profile from personal browsing
 - Don't expose to internet without authentication
 

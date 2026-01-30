@@ -47,7 +47,7 @@ async function diagnoseStall(page, langCode = 'en') {
                     /**
                      * Varredura Consolidada em passagem única (Single-Pass Scan).
                      */
-                    // eslint-disable-next-line complexity -- Page scanning requires complex state management
+                     
                     scan: (
                         root = document,
                         acc = { textParts: [], nodeCount: 0, hasPassword: false, spinners: [], buttons: [] },

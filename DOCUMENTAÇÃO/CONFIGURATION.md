@@ -22,7 +22,7 @@ Este documento detalha **todos os parâmetros de configuração** do sistema `ch
 ```json
 {
   "browserMode": "launcher",
-  "externalBrowserPort": 9222,
+  "externalBrowserPort": 9224,
   "maxWorkers": 3,
   "kernelCycleMs": 50,
   "queueDir": "./fila",
@@ -52,7 +52,7 @@ Este documento detalha **todos os parâmetros de configuração** do sistema `ch
 | Parâmetro                     | Tipo         | Padrão        | Descrição                            | Range Válido                     |
 | ----------------------------- | ------------ | ------------- | ------------------------------------ | -------------------------------- |
 | **browserMode**               | string       | `launcher`    | Modo de conexão do browser           | `launcher`, `external`, `hybrid` |
-| **externalBrowserPort**       | number       | `9222`        | Porta do Chrome remote debugging     | 1024-65535                       |
+| **externalBrowserPort**       | number       | `9224`        | Porta do Chrome remote debugging     | 1024-65535                       |
 | **maxWorkers**                | number       | `3`           | Max workers simultâneos (P9.9)       | 1-20                             |
 | **kernelCycleMs**             | number       | `50`          | Ciclo do kernel loop (20Hz)          | 20-200                           |
 | **queueDir**                  | string       | `./fila`      | Diretório da fila de tasks           | Path absoluto/relativo           |
@@ -120,7 +120,7 @@ const validatedConfig = configSchema.parse(rawConfig);
 # BROWSER CONFIGURATION
 # ========================================
 BROWSER_MODE=launcher
-EXTERNAL_BROWSER_PORT=9222
+EXTERNAL_BROWSER_PORT=9224
 BROWSER_POOL_SIZE=3
 LAUNCH_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
 USER_AGENT_ROTATION=true
@@ -201,7 +201,7 @@ DASHBOARD_PORT=3008
 | Variável                | Tipo    | Padrão             | Descrição                                                                                                        |
 | ----------------------- | ------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | `BROWSER_MODE`          | string  | `launcher`         | Modo de conexão: launcher (PM2 inicia), external (conecta existente), hybrid (tenta external, fallback launcher) |
-| `EXTERNAL_BROWSER_PORT` | number  | `9222`             | Porta do Chrome remote debugging protocol                                                                        |
+| `EXTERNAL_BROWSER_PORT` | number  | `9224`             | Porta do Chrome remote debugging protocol                                                                        |
 | `BROWSER_POOL_SIZE`     | number  | `3`                | Quantos browsers manter no pool (P9.2 circuit breaker)                                                           |
 | `LAUNCH_ARGS`           | string  | `--no-sandbox,...` | Args do Chrome (separados por vírgula)                                                                           |
 | `USER_AGENT_ROTATION`   | boolean | `true`             | Rotacionar User-Agent a cada sessão                                                                              |

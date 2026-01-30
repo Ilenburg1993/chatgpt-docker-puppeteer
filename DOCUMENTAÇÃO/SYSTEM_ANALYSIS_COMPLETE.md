@@ -662,8 +662,8 @@ Clientes conectados (Dashboard)
 
 ```javascript
 {
-  // Infraestrutura Base
-  DEBUG_PORT: "http://localhost:9222",
+    // Infraestrutura Base
+    DEBUG_PORT: "http://localhost:9224",
   IDLE_SLEEP: 3000,
 
   // Engine Rhythm

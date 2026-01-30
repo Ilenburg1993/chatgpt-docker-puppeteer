@@ -40,7 +40,7 @@ function getNextEligible(allTasks, targetFilter = null) {
     }
 
     // 3. FILTRAGEM DE ELEGIBILIDADE
-    // eslint-disable-next-line complexity -- Task scheduling requires complex priority logic
+     
     const eligible = allTasks.filter(t => {
         // Validação de Integridade Mínima (Schema V4 Guard)
         if (!t?.state || !t?.meta || !t?.policy) {

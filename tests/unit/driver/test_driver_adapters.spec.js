@@ -110,7 +110,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve sanitizar prompt', () => {
             const promptBruto = 'Texto com\nquebras\re\u0000caracteres\u0001especiais';
 
-            // eslint-disable-next-line no-control-regex
+             
             const sanitizado = promptBruto.replace(/[\x00-\x1F\x7F]/g, ' ').trim();
 
             assert.ok(!sanitizado.includes('\u0000'));

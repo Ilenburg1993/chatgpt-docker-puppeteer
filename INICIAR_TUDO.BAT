@@ -16,7 +16,7 @@ echo [2/3] Verificando Chrome...
 if not exist "C:\chrome-automation-profile" mkdir "C:\chrome-automation-profile"
 
 REM Tenta abrir. Se ja estiver aberto, o Windows apenas foca na janela.
-start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation-profile" --no-first-run --no-default-browser-check
+start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9224 --user-data-dir="C:\chrome-automation-profile" --no-first-run --no-default-browser-check
 
 echo [WAIT] Aguardando 5 segundos para o Chrome carregar...
 timeout /t 5 >nul
