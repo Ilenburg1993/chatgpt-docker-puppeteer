@@ -97,6 +97,7 @@
     "dependencies": {
         "compression": "^1.8.1",
         "express": "^5.2.1",
+        "helmet": "^6.0.1",
         "express-rate-limit": "8.2.1",
         "ghost-cursor": "^1.4.2",
         "http-proxy": "^1.18.1",
@@ -113,6 +114,8 @@
         "tree-kill": "^1.2.2",
         "user-agents": "^1.1.669",
         "uuid": "^13.0.0",
+        "pino": "^8.20.0",
+        "prom-client": "^14.1.0",
         "ws": "^8.19.0",
         "zod": "^4.3.6"
     },

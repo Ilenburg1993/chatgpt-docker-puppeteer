@@ -19,6 +19,15 @@ const http = require('http');
 const net = require('net');
 const os = require('os');
 
+// Optional operational libraries
+const express = require('express');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const pino = require('pino');
+const { AsyncLocalStorage } = require('async_hooks');
+const { v4: uuidv4 } = require('uuid');
+const promClient = require('prom-client');
+
 /* ==========================================================================
    CONFIGURATION
 ========================================================================== */
@@ -37,12 +46,34 @@ class ChromeProxyService {
     constructor(config = {}) {
         this.config = { ...CONFIG, ...config };
         this.server = null;
+        this.app = null;
         this.activeConnections = new Set();
         this.stats = {
             httpRequests: 0,
             wsUpgrades: 0,
             errors: 0,
             startTime: Date.now()
+        };
+
+        // Logger
+        this.logger = pino({ level: this.config.LOG_LEVEL || 'info' });
+
+        // AsyncLocalStorage for request correlation
+        this.asyncLocalStorage = new AsyncLocalStorage();
+
+        // Prometheus metrics (register defaults)
+        try {
+            promClient.collectDefaultMetrics({ timeout: 5000 });
+        } catch (_e) {
+            // ignore if collectDefaultMetrics fails
+        }
+
+        this.metrics = {
+            httpRequests: new promClient.Counter({ name: 'chrome_proxy_http_requests_total', help: 'Total HTTP requests' }),
+            wsUpgrades: new promClient.Counter({ name: 'chrome_proxy_ws_upgrades_total', help: 'Total WebSocket upgrades' }),
+            proxyErrors: new promClient.Counter({ name: 'chrome_proxy_errors_total', help: 'Total proxy errors' }),
+            activeConnections: new promClient.Gauge({ name: 'chrome_proxy_active_connections', help: 'Active connections' }),
+            requestDuration: new promClient.Histogram({ name: 'chrome_proxy_request_duration_seconds', help: 'Request duration seconds', buckets: [0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5] })
         };
 
         // Auto-detect public IP if not provided
@@ -76,6 +107,10 @@ class ChromeProxyService {
             this.wsProxy = null;
             this.log('warn', 'http-proxy unavailable, falling back to raw socket method');
         }
+
+        // Idle connection checker (cleanup stale sockets)
+        this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '60000', 10);
+        this._idleCheckInterval = setInterval(() => this._cleanupIdleConnections(), Math.max(10000, this._idleTimeoutMs / 2));
     }
     /**
      * Auto-detect public IP address from network interfaces
@@ -111,12 +146,18 @@ class ChromeProxyService {
      * Logging with level filtering
      */
     log(level, message, meta = {}) {
-        const levels = { debug: 0, info: 1, warn: 2, error: 3 };
-        const currentLevel = levels[this.config.LOG_LEVEL] || 1;
+        const store = this.asyncLocalStorage.getStore();
+        const requestId = store && store.requestId ? store.requestId : undefined;
+        const logMeta = { ...meta };
+        if (requestId) logMeta.requestId = requestId;
 
-        if (levels[level] >= currentLevel) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](logMeta, message);
+        } else if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info(logMeta, message);
+        } else {
             const timestamp = new Date().toISOString();
-            const metaStr = Object.keys(meta).length > 0 ? JSON.stringify(meta) : '';
+            const metaStr = Object.keys(logMeta).length > 0 ? JSON.stringify(logMeta) : '';
             console.log(`[${timestamp}] [${level.toUpperCase().padEnd(5)}] ${message} ${metaStr}`);
         }
     }
@@ -164,8 +205,8 @@ class ChromeProxyService {
             }
 
             return JSON.stringify(json);
-        } catch (err) {
-            this.log('error', 'JSON parse/rewrite failed', { error: err && err.message ? err.message : String(err) });
+        } catch (_err) {
+            this.log('error', 'JSON parse/rewrite failed', { error: _err && _err.message ? _err.message : String(_err) });
             return data;
         }
     }
@@ -201,13 +242,36 @@ class ChromeProxyService {
     }
 
     /**
+     * Cleanup idle connections that have been inactive over the configured timeout
+     */
+    _cleanupIdleConnections() {
+        const now = Date.now();
+        for (const socket of Array.from(this.activeConnections)) {
+            try {
+                const last = socket && socket.__lastActivity ? socket.__lastActivity : 0;
+                if (last && now - last > this._idleTimeoutMs) {
+                    this.log('warn', 'Closing idle websocket', { idleMs: now - last });
+                    try { socket.destroy(); } catch (_e) {}
+                    this.activeConnections.delete(socket);
+                    try { this.metrics.activeConnections.set(this.activeConnections.size); } catch (_e) {}
+                }
+            } catch (_e) {
+                // ignore per-socket cleanup errors
+            }
+        }
+    }
+
+    /**
      * Handle HTTP requests (with URL rewriting for /json endpoints)
      */
     handleHTTPRequest(req, res) {
         this.stats.httpRequests++;
+        try { this.metrics.httpRequests.inc(); } catch (_e) {}
 
         const clientIP = req.socket.remoteAddress;
         this.log('info', `HTTP ${req.method} ${req.url}`, { from: clientIP });
+
+        const start = process.hrtime();
 
         // Health endpoint
         if (req.url === '/health' || req.url === '/healthz') {
@@ -259,6 +323,7 @@ class ChromeProxyService {
 
         proxyReq.on('error', err => {
             this.stats.errors++;
+            try { this.metrics.proxyErrors.inc(); } catch (_e) {}
             this.log('error', 'Chrome unreachable', { error: err.message });
 
             res.writeHead(502, { 'Content-Type': 'text/plain' });
@@ -269,6 +334,15 @@ class ChromeProxyService {
 
         // Forward request body
         req.pipe(proxyReq);
+
+        // When response finishes, observe duration
+        res.on('finish', () => {
+            try {
+                const diff = process.hrtime(start);
+                const duration = diff[0] + diff[1] / 1e9;
+                this.metrics.requestDuration.observe(duration);
+            } catch (_e) {}
+        });
     }
 
     /**
@@ -276,25 +350,40 @@ class ChromeProxyService {
      */
     handleWebSocketUpgrade(req, socket, head) {
         this.stats.wsUpgrades++;
+        try { this.metrics.wsUpgrades.inc(); } catch (_e) {}
 
         const clientIP = socket.remoteAddress;
         this.log('info', `WebSocket upgrade: ${req.url}`, { from: clientIP });
 
+        // Track and attach activity timestamp
+        const markActive = s => {
+            try {
+                s.__lastActivity = Date.now();
+            } catch (_) {}
+        };
+
+        markActive(socket);
+        socket.on('data', () => markActive(socket));
+
         // Prefer http-proxy if available for robust websocket handling
         if (this.wsProxy) {
             try {
-                // Track active socket manually (cleanup on close)
                 this.activeConnections.add(socket);
                 socket.on('close', () => {
                     this.log('debug', 'WebSocket closed');
                     this.activeConnections.delete(socket);
+                    try { this.metrics.activeConnections.set(this.activeConnections.size); } catch (_e) {}
                 });
 
+                // Proxy the websocket upgrade
                 this.wsProxy.ws(req, socket, head);
+
+                try { this.metrics.activeConnections.set(this.activeConnections.size); } catch (_e) {}
                 return;
-            } catch (err) {
+            } catch (_err) {
                 this.stats.errors++;
-                this.log('error', 'WS proxy (http-proxy) failed', { error: err && err.message ? err.message : String(err) });
+                try { this.metrics.proxyErrors.inc(); } catch (_e) {}
+                this.log('error', 'WS proxy (http-proxy) failed', { error: _err && _err.message ? _err.message : String(_err) });
                 try { socket.destroy(); } catch (_) {}
                 return;
             }
@@ -326,23 +415,27 @@ class ChromeProxyService {
 
         // Track active connections
         this.activeConnections.add(socket);
+        try { this.metrics.activeConnections.set(this.activeConnections.size); } catch (_e) {}
 
         // Cleanup on close
         socket.on('close', () => {
             this.log('debug', 'WebSocket closed');
             this.activeConnections.delete(socket);
             proxySocket.destroy();
+            try { this.metrics.activeConnections.set(this.activeConnections.size); } catch (_e) {}
         });
 
         // Error handling
         proxySocket.on('error', err => {
             this.stats.errors++;
+            try { this.metrics.proxyErrors.inc(); } catch (_e) {}
             this.log('error', 'Proxy socket error', { error: err.message });
             socket.destroy();
         });
 
         socket.on('error', err => {
             this.stats.errors++;
+            try { this.metrics.proxyErrors.inc(); } catch (_e) {}
             this.log('error', 'Client socket error', { error: err.message });
             proxySocket.destroy();
         });
@@ -353,8 +446,41 @@ class ChromeProxyService {
      */
     async start() {
         return new Promise((resolve, reject) => {
-            // Create HTTP server
-            this.server = http.createServer(this.handleHTTPRequest.bind(this));
+            // Create Express app to add middleware (helmet, rate-limit) and metrics endpoints
+            this.app = express();
+
+            // Basic security hardening
+            try { this.app.use(helmet()); } catch (_e) { /* ignore if helmet missing */ }
+
+            // Rate limiter (basic)
+            try {
+                const limiter = rateLimit({ windowMs: 60 * 1000, max: 400, standardHeaders: true, legacyHeaders: false });
+                this.app.use(limiter);
+            } catch (_e) { /* ignore if rate-limit missing */ }
+
+            // Request ID + ALS middleware
+            this.app.use((req, res, next) => {
+                const id = req.headers['x-request-id'] || uuidv4();
+                res.setHeader('X-Request-Id', id);
+                this.asyncLocalStorage.run({ requestId: id }, () => next());
+            });
+
+            // Metrics endpoint
+            this.app.get('/metrics', async (req, res) => {
+                try {
+                    res.setHeader('Content-Type', promClient.register.contentType || 'text/plain; version=0.0.4');
+                    res.end(await promClient.register.metrics());
+                } catch (_err) {
+                    res.statusCode = 500;
+                    res.end('metrics error');
+                }
+            });
+
+            // Health handled by existing logic; route to handleHTTPRequest for everything else
+            this.app.use((req, res) => this.handleHTTPRequest(req, res));
+
+            // Create HTTP server from Express app
+            this.server = http.createServer(this.app);
 
             // Handle WebSocket upgrades
             this.server.on('upgrade', this.handleWebSocketUpgrade.bind(this));
