@@ -28,10 +28,11 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { v4: uuidv4 } = require('uuid');
 const promClient = require('prom-client');
 
-// NERV integration (optional)
-const { createNERV } = require('../src/nerv/nerv');
-const HighLevelNERV = require('../src/nerv/adapters/high_level_adapter');
-const { ActionCode, ActorRole } = require('../src/shared/nerv/constants');
+// NERV integration (optional) - loaded lazily to avoid module-alias issues
+let createNERV = null;
+let HighLevelNERV = null;
+let ActionCode = null;
+let ActorRole = null;
 const { CONNECTION_MODES } = require('../src/core/constants/browser');
 /* ==========================================================================
    CONFIGURATION
@@ -601,15 +602,39 @@ class ChromeProxyService {
     async start() {
         // initialize NERV integration if enabled (non-fatal)
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
-        if (nervEnabled && typeof createNERV === 'function') {
+        if (nervEnabled) {
             try {
-                this.nerv = await createNERV();
-                this.log('info', 'NERV initialized for proxy service');
+                // Ensure module aliasing is registered so @shared/@core paths resolve
+                try {
+                    require('module-alias/register');
+                } catch (_e) {
+                    /* optional */
+                }
+
+                // lazy-require NERV modules (may fail if project not bootstrapped)
+                const nervModule = require('../src/nerv/nerv');
+                createNERV = nervModule && nervModule.createNERV ? nervModule.createNERV : null;
+                HighLevelNERV = require('../src/nerv/adapters/high_level_adapter');
+                const nervConsts = require('../src/shared/nerv/constants');
+                ActionCode = nervConsts && nervConsts.ActionCode ? nervConsts.ActionCode : nervConsts;
+                ActorRole = nervConsts && nervConsts.ActorRole ? nervConsts.ActorRole : {};
+
+                if (typeof createNERV === 'function') {
+                    this.nerv = await createNERV();
+                    this.log('info', 'NERV initialized for proxy service');
+                } else {
+                    this.log('info', 'NERV createNERV not available, skipping NERV integration');
+                    this.nerv = null;
+                }
             } catch (err) {
-                this.log('warn', 'NERV initialization failed, continuing without NERV', {
+                this.log('warn', 'NERV initialization failed or not available, continuing without NERV', {
                     error: err && err.message ? err.message : String(err)
                 });
                 this.nerv = null;
+                createNERV = null;
+                HighLevelNERV = null;
+                ActionCode = null;
+                ActorRole = null;
             }
         }
 
