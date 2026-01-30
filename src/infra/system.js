@@ -11,6 +11,14 @@ const treeKill = require('tree-kill');
 const path = require('path');
 const { log } = require('@core/logger');
 
+// Optional: prefer `execa` for promise-based subprocess control; fallback to `exec` when unavailable.
+let execa = null;
+try {
+    execa = require('execa');
+} catch (err) {
+    execa = null;
+}
+
 const AGENTE_NAME = 'agente-gpt';
 
 // Importa a configuração oficial do PM2 (elimina duplicação - P3.1)
@@ -146,7 +154,24 @@ async function controlAgent(action) {
                 await pm2p.restart(AGENTE_NAME);
                 break;
 
-            case 'kill_daemon':
+            case 'kill_daemon': {
+                // Prefer execa if available for structured subprocess control
+                if (execa) {
+                    try {
+                        await execa('pm2', ['kill']);
+                        return { success: true };
+                    } catch (err) {
+                        try {
+                            await execa('npx', ['pm2', 'kill']);
+                            return { success: true };
+                        } catch (err2) {
+                            log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err2.message}`);
+                            return { success: false };
+                        }
+                    }
+                }
+
+                // Fallback to original exec behavior
                 return new Promise(res => {
                     exec('npx pm2 kill', err => {
                         if (err) {
@@ -155,6 +180,7 @@ async function controlAgent(action) {
                         res({ success: !err });
                     });
                 });
+            }
 
             default:
                 throw new Error(`Ação de controle inválida: ${action}`);
@@ -173,24 +199,53 @@ async function controlAgent(action) {
 /**
  * Mata um processo específico e sua árvore de filhos com SIGKILL.
  */
-function killProcess(pid) {
-    return new Promise(resolve => {
-        if (!pid) {
-            log('WARN', 'Tentativa de matar processo sem PID.');
-            resolve();
+async function killProcess(pid) {
+    if (!pid) {
+        log('WARN', 'Tentativa de matar processo sem PID.');
+        return;
+    }
+
+    log('FATAL', `Executando Kill Switch no PID ${pid}...`);
+
+    // Try platform-native recursive kill via execa if available
+    if (execa) {
+        try {
+            if (process.platform === 'win32') {
+                await execa('taskkill', ['/PID', String(pid), '/T', '/F']);
+            } else {
+                // attempt to kill child processes first, then parent
+                try {
+                    await execa('pkill', ['-P', String(pid)]);
+                } catch (err) {
+                    void err;
+                }
+                try {
+                    process.kill(pid, 'SIGKILL');
+                } catch (err) {
+                    void err;
+                }
+            }
+            log('INFO', `Processo ${pid} e filhos encerrados.`);
             return;
+        } catch (err) {
+            log(
+                'ERROR',
+                `Falha ao matar PID ${pid}: ${err && err.message ? err.message : String(err)} — usando fallback tree-kill`
+            );
         }
+    }
 
-        log('FATAL', `Executando Kill Switch no PID ${pid}...`);
-
+    // Fallback to tree-kill (legacy behavior)
+    await new Promise(resolve => {
         treeKill(pid, 'SIGKILL', err => {
             if (err) {
-                log('ERROR', `Falha ao matar PID ${pid}: ${err.message}`);
-                killChromeGlobal();
+                log('ERROR', `Falha ao matar PID ${pid} com tree-kill: ${err.message}`);
+                // As a last resort, attempt a global Chrome kill
+                killChromeGlobal().then(() => resolve());
             } else {
-                log('INFO', `Processo ${pid} e filhos encerrados.`);
+                log('INFO', `Processo ${pid} e filhos encerrados via tree-kill.`);
+                resolve();
             }
-            resolve();
         });
     });
 }
@@ -198,11 +253,26 @@ function killProcess(pid) {
 /**
  * Mata TODOS os processos do Chrome (Fallback Nuclear).
  */
-function killChromeGlobal() {
-    return new Promise(resolve => {
-        log('WARN', 'Executando Kill Global no Chrome (Fallback)...');
-        const cmd = process.platform === 'win32' ? 'taskkill /F /IM chrome.exe /T' : 'pkill -9 chrome';
+async function killChromeGlobal() {
+    log('WARN', 'Executando Kill Global no Chrome (Fallback)...');
+    const isWin = process.platform === 'win32';
+    if (execa) {
+        try {
+            if (isWin) {
+                await execa('taskkill', ['/F', '/IM', 'chrome.exe', '/T']);
+            } else {
+                await execa('pkill', ['-9', 'chrome']);
+            }
+            log('INFO', 'Todos os Chromes encerrados.');
+            return;
+        } catch (err) {
+            log('WARN', `Falha no Kill Global (execa): ${err && err.message ? err.message : String(err)}`);
+        }
+    }
 
+    // Fallback to exec
+    return new Promise(resolve => {
+        const cmd = isWin ? 'taskkill /F /IM chrome.exe /T' : 'pkill -9 chrome';
         exec(cmd, err => {
             if (err) {
                 log('WARN', `Falha no Kill Global: ${err.message}`);

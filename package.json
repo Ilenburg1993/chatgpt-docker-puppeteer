@@ -106,6 +106,7 @@
         "openai": "^6.16.0",
         "p-limit": "^3.1.0",
         "pm2": "^6.0.14",
+        "execa": "^6.1.0",
         "puppeteer": "^24.36.0",
         "puppeteer-extra": "^3.3.6",
         "puppeteer-extra-plugin-stealth": "^2.11.2",
