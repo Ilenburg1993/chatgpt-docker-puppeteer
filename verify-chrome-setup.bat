@@ -16,6 +16,13 @@ set CONFIG_FILE=%SCRIPT_DIR%config.json
 set CHROME_CONFIG_FILE=%SCRIPT_DIR%chrome-config.json
 set PROXY_SCRIPT=%SCRIPT_DIR%scripts\chrome-proxy-service.js
 
+REM Definir PROXY_PORT a partir da variável de ambiente CHROME_PROXY_PORT quando presente
+if defined CHROME_PROXY_PORT (
+    set PROXY_PORT=%CHROME_PROXY_PORT%
+) else (
+    set PROXY_PORT=9224
+)
+
 echo.
 echo ════════════════════════════════════════════════════════════════════════════
 echo   CHROME PROXY SETUP VERIFIER
@@ -94,11 +101,11 @@ if %errorlevel% equ 0 (
 REM Verificar DEBUG_PORT
 findstr /C:"\"DEBUG_PORT\"" "%CONFIG_FILE%" >nul 2>&1
 if %errorlevel% equ 0 (
-    findstr /C:"\"DEBUG_PORT\": \"http://!PUBLIC_IP!:9224\"" "%CONFIG_FILE%" >nul 2>&1
+    findstr /C:"\"DEBUG_PORT\": \"http://!PUBLIC_IP!:%PROXY_PORT%\"" "%CONFIG_FILE%" >nul 2>&1
     if !errorlevel! equ 0 (
-        echo [OK] DEBUG_PORT: "http://!PUBLIC_IP!:9224"
+        echo [OK] DEBUG_PORT: "http://!PUBLIC_IP!:%PROXY_PORT%"
     ) else (
-        echo [WARN] DEBUG_PORT pode nao apontar para !PUBLIC_IP!:9224
+        echo [WARN] DEBUG_PORT pode nao apontar para !PUBLIC_IP!:%PROXY_PORT%
         set CONFIG_OK=0
     )
 ) else (
@@ -117,12 +124,12 @@ if %errorlevel% equ 0 (
 )
 
 REM Verificar CHROME_PROXY_PORT
-findstr /C:"\"CHROME_PROXY_PORT\": 9224" "%CONFIG_FILE%" >nul 2>&1
+findstr /C:"\"CHROME_PROXY_PORT\": %PROXY_PORT%" "%CONFIG_FILE%" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [OK] CHROME_PROXY_PORT: 9224
+    echo [OK] CHROME_PROXY_PORT: %PROXY_PORT%
 ) else (
-    echo [ERRO] CHROME_PROXY_PORT nao e 9224
-    echo [INFO] Esperado: "CHROME_PROXY_PORT": 9224
+    echo [ERRO] CHROME_PROXY_PORT nao e %PROXY_PORT%
+    echo [INFO] Esperado: "CHROME_PROXY_PORT": %PROXY_PORT%
     set CONFIG_OK=0
 )
 
@@ -178,11 +185,11 @@ REM Verificar Browser externo (detalhe operacional remoto)
 REM (Não mencionar porta 9224 no contrato; sistema usa endpoint container-facing 9224)
 
 REM Verificar Proxy (9224)
-netstat -ano | findstr ":9224" >nul 2>&1
+netstat -ano | findstr ":%PROXY_PORT%" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [OK] Porta 9224 Proxy em uso
+    echo [OK] Porta %PROXY_PORT% Proxy em uso
 ) else (
-    echo [INFO] Porta 9224 Proxy livre - Proxy nao esta rodando
+    echo [INFO] Porta %PROXY_PORT% Proxy livre - Proxy nao esta rodando
 )
 
 REM ============================================================================
@@ -194,14 +201,14 @@ echo.
 
 REM (Verificações operacionais do browser devem usar o endpoint proxy 9224 quando aplicável)
 
-curl -s --connect-timeout 2 "http://localhost:9224/json/version" >nul 2>&1
+curl -s --connect-timeout 2 "http://localhost:%PROXY_PORT%/json/version" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [OK] Proxy respondendo em http://localhost:9224
+    echo [OK] Proxy respondendo em http://localhost:%PROXY_PORT%
 
     REM Verificar URL rewriting
-    for /f "delims=" %%i in ('curl -s "http://localhost:9224/json/version" 2^>nul') do set PROXY_RESPONSE=%%i
+    for /f "delims=" %%i in ('curl -s "http://localhost:%PROXY_PORT%/json/version" 2^>nul') do set PROXY_RESPONSE=%%i
     if defined PROXY_RESPONSE (
-        echo !PROXY_RESPONSE! | findstr /C:"!PUBLIC_IP!:9224" >nul 2>&1
+        echo !PROXY_RESPONSE! | findstr /C:"!PUBLIC_IP!:%PROXY_PORT%" >nul 2>&1
         if !errorlevel! equ 0 (
             echo [OK] URL rewriting funcionando localhost para !PUBLIC_IP!
         ) else (
@@ -226,7 +233,7 @@ if %FILES_OK% equ 1 if %CONFIG_OK% equ 1 (
     echo.
     echo Proximos passos:
     echo   1. Inicie os servicos:  start-chrome-proxy.bat
-    echo   2. Teste do container:  curl http://!PUBLIC_IP!:9224/json/version
+    echo   2. Teste do container:  curl http://!PUBLIC_IP!:%PROXY_PORT%/json/version
     echo   3. Inicie o sistema:    npm start
     echo.
 ) else (

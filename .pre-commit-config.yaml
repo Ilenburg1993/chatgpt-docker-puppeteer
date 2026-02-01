@@ -1,4 +1,27 @@
+# =============================================================================
+# .pre-commit-config.yaml
+# Local developer hygiene (NOT CI authority)
+# Version: 3.0 – Aligned with EditorConfig + GitAttributes + CI
+# =============================================================================
+
+# Exclusões globais (performance + coerência com o projeto)
+exclude: >
+  ^(
+    local-login
+    |node_modules
+    |node-modules
+    |dist
+    |build
+    |coverage
+    |profile
+    |\.cache
+    |\.vscode
+  )(/|$)
+
 repos:
+  # ---------------------------------------------------------------------------
+  # Core hygiene hooks (rápidos, seguros, determinísticos)
+  # ---------------------------------------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
@@ -7,21 +30,20 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
 
+  # ---------------------------------------------------------------------------
+  # Secret detection (baseline-driven, non-blocking by default)
+  # ---------------------------------------------------------------------------
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
--exclude: '^local-login/'
-exclude: '^(?:local-login|node_modules|profile)(/|$)'
-repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.6.0
-  hooks:
-    - id: trailing-whitespace
-    - id: end-of-file-fixer
-    - id: check-added-large-files
-- repo: https://github.com/psf/black
-  rev: 23.12.0
-  hooks:
-    - id: black
+
+  # ---------------------------------------------------------------------------
+  # Python formatting (only if Python exists in the repo)
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/psf/black
+    rev: 23.12.0
+    hooks:
+      - id: black
+        language_version: python3

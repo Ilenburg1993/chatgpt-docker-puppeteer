@@ -229,7 +229,7 @@ netstat -ano | findstr :9224
 taskkill /PID <PID> /F
 
 # OU usar porta diferente
-$env:CHROME_PROXY_PORT=9225
+$env:CHROME_PROXY_PORT=9224
 node chrome-proxy-service.js
 ```
 
@@ -451,7 +451,7 @@ chrome.exe --remote-debugging-port=9223 --user-data-dir=profile2
 node chrome-proxy-service.js 192.168.0.2 info  # porta 9224 → 9224
 
 # Proxy 2
-CHROME_PROXY_PORT=9225 CHROME_PORT=9223 node chrome-proxy-service.js
+CHROME_PROXY_PORT=9224 CHROME_PORT=9223 node chrome-proxy-service.js
 ```
 
 ### Como debugar problemas de conexão?
