@@ -31,7 +31,9 @@ const NODE_ARGS_BASE = [
     '--expose-gc',                 // GC manual controlado (processos long-lived)
     '--unhandled-rejections=strict',// Promises não tratadas derrubam o processo
     '--enable-source-maps',         // Stack traces corretos em produção
-    '--trace-warnings'              // Avisos nunca silenciosos
+    '--trace-warnings',             // Avisos nunca silenciosos
+    '--max-old-space-size=6144',    // Limite de memória heap (6 GB)
+    '--trace-gc-ignored-scavenger', // Diagnóstico de GC (memória longa duração)
 ];
 
 module.exports = {
@@ -66,7 +68,7 @@ module.exports = {
             ],
 
             // Limites e resiliência
-            max_memory_restart: '1G',
+            max_memory_restart: '3G',
             exp_backoff_restart_delay: 100,
 
             // Shutdown determinístico
@@ -121,7 +123,7 @@ module.exports = {
             ],
 
             // Limites
-            max_memory_restart: '2G',
+            max_memory_restart: '3G',
 
             // Shutdown previsível
             kill_timeout: 8000,

@@ -30,7 +30,7 @@
   "// [A.1] CHROME PROXY CONFIGURATION": "",
   "// =====================================================================": "",
   "// Proxy WebSocket que permite container acessar Chrome no Windows Host": "",
-  "// Arquitetura: Container → Proxy (0.0.0.0:9224) → Chrome (127.0.0.1:9224)": "",
+  "// Arquitetura: Container → Proxy (0.0.0.0:9224) → Chrome (127.0.0.1:9225)": "",
   "// Scripts:": "",
   "//   • Windows: start-chrome-proxy.bat (launcher automatizado)": "",
   "//   • Proxy:   scripts/chrome-proxy-service.js (Node.js puro)": "",
@@ -38,7 +38,7 @@
   "CHROME_PROXY_ENABLED": true,
   "CHROME_PROXY_HOST": "192.168.0.2",
   "CHROME_PROXY_PORT": 9224,
-  "CHROME_DIRECT_PORT": 9224,
+  "CHROME_PORT": 9225,
 
   "// Fallback Strategy (gerenciado pelo ConnectionOrchestrator):": "",
   "// 1. Tenta 192.168.0.2:9224 (proxy via IP público) - PREFERENCIAL": "",
