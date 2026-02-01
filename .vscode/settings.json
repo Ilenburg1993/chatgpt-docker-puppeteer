@@ -358,7 +358,7 @@
   // ============================================================
   // 15. WORKBENCH / WINDOW / TELEMETRIA
   // ============================================================
-  "workbench.colorTheme": "Default Dark+",
+"workbench.colorTheme": "Default Dark Modern",
   "workbench.iconTheme": "material-icon-theme",
   "workbench.startupEditor": "none",
   "workbench.editor.enablePreview": true,
@@ -386,4 +386,24 @@
 "[powershell]": {
   "files.encoding": "utf8bom"
 },
+"chat.renderRelatedFiles": true,
+"chat.useAgentSkills": true,
+"chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+"chat.tools.terminal.autoReplyToPrompts": true,
+"github.copilot.chat.anthropic.thinking.budgetTokens": 32000,
+"github.copilot.chat.anthropic.tools.websearch.enabled": true,
+"github.copilot.chat.codesearch.enabled": true,
+"github.copilot.chat.customAgents.showOrganizationAndEnterpriseAgents": true,
+"github.copilot.chat.githubMcpServer.enabled": true,
+"github.copilot.chat.generateTests.codeLens": true,
+"github.copilot.chat.languageContext.fix.typescript.enabled": true,
+"github.copilot.chat.languageContext.inline.typescript.enabled": true,
+"github.copilot.chat.languageContext.typescript.enabled": true,
+"github.copilot.chat.languageContext.typescript.includeDocumentation": true,
+"github.copilot.chat.newWorkspace.useContext7": true,
+"github.copilot.chat.responsesApiReasoningEffort": "high",
+"github.copilot.chat.tools.memory.enabled": true,
+"github.copilot.chat.virtualTools.threshold": 128,
+"github.copilot.selectedCompletionModel": "Gpt-5 mini",
+"githubIssues.assignWhenWorking": true,
 }

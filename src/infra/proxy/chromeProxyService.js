@@ -12,7 +12,7 @@ const os = require('os');
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const pino = require('pino');
+const logger = require('@core/logger');  // Use system logger
 const { AsyncLocalStorage } = require('async_hooks');
 const { v4: uuidv4 } = require('uuid');
 const promClient = require('prom-client');
@@ -40,7 +40,7 @@ class ChromeProxyService {
         this.activeConnections = new Set();
         this.stats = { httpRequests: 0, wsUpgrades: 0, errors: 0, startTime: Date.now() };
 
-        this.logger = pino({ level: this.config.LOG_LEVEL || 'info' });
+        this.logger = logger; // Use system logger
         this.asyncLocalStorage = new AsyncLocalStorage();
 
         try {
@@ -123,15 +123,21 @@ class ChromeProxyService {
     log(level, message, meta = {}) {
         const store = this.asyncLocalStorage.getStore();
         const requestId = store && store.requestId ? store.requestId : undefined;
-        const logMeta = { ...meta };
-        if (requestId) logMeta.requestId = requestId;
-        if (this.logger && typeof this.logger[level] === 'function') this.logger[level](logMeta, message);
-        else if (this.logger && typeof this.logger.info === 'function') this.logger.info(logMeta, message);
-        else {
+        const metaStr = requestId ? ` [${requestId}]` : '';
+        const metaJson = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
+        const formattedMessage = `[CHROME_PROXY]${metaStr} ${message}${metaJson}`;
+
+        if (this.logger && typeof this.logger.log === 'function') {
+            this.logger.log(level.toUpperCase(), formattedMessage);
+        } else {
             const timestamp = new Date().toISOString();
-            const metaStr = Object.keys(logMeta).length > 0 ? JSON.stringify(logMeta) : '';
-            console.log(`[${timestamp}] [${level.toUpperCase().padEnd(5)}] ${message} ${metaStr}`);
+            console.log(`[${timestamp}] [${level.toUpperCase().padEnd(5)}] ${formattedMessage}`);
         }
+    }
+
+    setNERV(nerv) {
+        this._nerv = nerv;
+        this.log('info', 'NERV integration enabled');
     }
 
     // Accept an optional host fallback (e.g., req.headers.host) to make

@@ -1,14 +1,18 @@
-<#
+﻿<#
 .SYNOPSIS
   Inicia o Google Chrome no Windows com `--remote-debugging-port` de forma robusta.
+  Versão: 2.0 (2026-02-01) - Otimizado para integração com Chrome Proxy Service
 
 .DESCRIPTION
-  Script cuidadoso para localizar `chrome.exe`, opcionalmente encerrar instâncias existentes,
+  Script robusto para localizar `chrome.exe`, opcionalmente encerrar instâncias existentes,
   iniciar Chrome com um diretório de perfil temporário e verificar o endpoint DevTools.
-  Redireciona logs para a pasta temporária e retorna código de saída claro.
+
+  Arquitetura: Chrome (localhost:9225) ← Proxy (0.0.0.0:9224) ← Container
+
+  Configurações padrão otimizadas para uso com Chrome Proxy Service.
 
 .PARAMETER Port
-    Porta para `--remote-debugging-port` (padrão: 9225).
+    Porta para `--remote-debugging-port` (padrão: 9225 - otimizado para proxy).
 
 .PARAMETER Headless
   Inicia em modo headless (opcional).
@@ -19,9 +23,26 @@
 .PARAMETER ChromePath
   Caminho explícito para `chrome.exe` (opcional).
 
+.PARAMETER RemoteAddress
+  Endereço de bind do DevTools (padrão: 127.0.0.1 - host local apenas).
+  Use 0.0.0.0 para expor em todas interfaces (ATENÇÃO: risco de segurança!).
+
+.EXAMPLE
+    .\start-chrome-windows.ps1
+    # Inicia Chrome na porta 9225 (padrão para proxy)
+
 .EXAMPLE
     .\start-chrome-windows.ps1 -Port 9225 -ForceKill
+    # Força reinício do Chrome na porta 9225
+
+.EXAMPLE
     .\start-chrome-windows.ps1 -Port 9225 -Headless
+    # Modo headless (sem interface gráfica)
+
+.NOTES
+    Após iniciar Chrome, execute:
+    1. node scripts\chrome-proxy-service.js (Terminal 2)
+    2. npm run daemon:start (Terminal 3)
 #>
 
 param(
@@ -189,6 +210,38 @@ try {
     if ($resp) {
         Write-Log "DevTools OK: $($resp.webSocketDebuggerUrl)"
         Write-Log "PID: $($proc.Id) | user-data-dir: $userDataDir"
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Green
+        Write-Host "  ✅ CHROME INICIADO COM SUCESSO" -ForegroundColor Green
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Configuração:"
+        Write-Host "  Porta DevTools:    $Port"
+        Write-Host "  PID:               $($proc.Id)"
+        Write-Host "  Profile:           $userDataDir"
+        Write-Host "  WebSocket:         $($resp.webSocketDebuggerUrl)"
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host "  PRÓXIMOS PASSOS" -ForegroundColor Cyan
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "1. Validar Chrome manualmente:"
+        Write-Host "   curl http://localhost:$Port/json/version"
+        Write-Host ""
+        Write-Host "2. Iniciar Chrome Proxy Service (Terminal 2):"
+        Write-Host "   node scripts\chrome-proxy-service.js"
+        Write-Host ""
+        Write-Host "3. Validar Proxy (após iniciar):"
+        Write-Host "   curl http://192.168.0.2:9224/health"
+        Write-Host ""
+        Write-Host "4. Iniciar sistema (após proxy online):"
+        Write-Host "   npm run daemon:start"
+        Write-Host ""
+        Write-Host "5. Validar sistema completo:"
+        Write-Host "   make health"
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host ""
         Write-Host "{""pid"":$($proc.Id),""devtools"":""$($resp.webSocketDebuggerUrl)""}"
         exit 0
     } else {

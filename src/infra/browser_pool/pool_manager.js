@@ -109,6 +109,12 @@ class BrowserPoolManager {
             );
         }
 
+        // ✅ Bug #3: Validar proxy ANTES de tentar conectar
+        const CONFIG = require('@core/config');
+        if (CONFIG.CHROME_PROXY_ENABLED !== false) {
+            await this._validateProxyAvailability();
+        }
+
         const orchestrator = new ConnectionOrchestrator({ browserEndpoint: this.config.browserEndpoint });
 
         // Conecta a múltiplas instâncias Chrome
@@ -117,7 +123,8 @@ class BrowserPoolManager {
 
         for (let i = 0; i < this.config.poolSize; i++) {
             try {
-                const browser = await orchestrator.connect();
+                // ✅ Bug #2: Corrigido .connect() → .ensureBrowser()
+                const browser = await orchestrator.ensureBrowser();
 
                 const poolEntry = {
                     id: `browser-${i}`,
@@ -405,6 +412,54 @@ class BrowserPoolManager {
             crashed: crashedCount,
             stats: { ...this.stats }
         };
+    }
+
+    /**
+     * Valida disponibilidade do Chrome Proxy Service antes de tentar conectar.
+     * Fail-fast com mensagens claras.
+     *
+     * @throws {Error} Se proxy não estiver disponível ou unhealthy
+     */
+    async _validateProxyAvailability() {
+        const CONFIG = require('@core/config');
+        const host = CONFIG.CHROME_PROXY_HOST || '192.168.0.2';
+        const port = CONFIG.CHROME_PROXY_PORT || 9224;
+        const url = `http://${host}:${port}/health`;
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status !== 'ok' && data.status !== 'healthy') {
+                throw new Error(`Proxy status: ${data.status}`);
+            }
+
+            log('INFO', `[BrowserPool] ✅ Chrome Proxy validado e disponível (${host}:${port})`);
+        } catch (error) {
+            const errorMsg = error.name === 'AbortError' ? 'timeout (3s)' : error.message;
+
+            log('ERROR', `[BrowserPool] ❌ Chrome Proxy indisponível: ${url}`);
+            log('ERROR', `[BrowserPool] Erro: ${errorMsg}`);
+            log('ERROR', '[BrowserPool]');
+            log('ERROR', '[BrowserPool] SOLUÇÃO:');
+            log('ERROR', '[BrowserPool] 1. Inicie o Chrome Proxy Service:');
+            log('ERROR', '[BrowserPool]    node scripts/chrome-proxy-service.js');
+            log('ERROR', '[BrowserPool]');
+            log('ERROR', '[BrowserPool] 2. Valide que proxy está online:');
+            log('ERROR', `[BrowserPool]    curl http://${host}:${port}/health`);
+            log('ERROR', '[BrowserPool]');
+
+            throw new Error(`Chrome Proxy Service não está disponível em ${host}:${port} - ${errorMsg}`);
+        }
     }
 
     /**

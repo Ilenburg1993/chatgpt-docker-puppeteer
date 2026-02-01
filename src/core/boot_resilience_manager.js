@@ -155,9 +155,12 @@ async function tryStartChrome() {
  */
 function getChromeInstructions(errorMessage) {
     const cfg = require('./config');
-    const chromePortHint = process.env.CHROME_PORT || cfg.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225;
+    const chromePort = process.env.CHROME_PORT || cfg.CHROME_PORT || 9225;
+    const proxyEnabled = cfg.CHROME_PROXY_ENABLED !== false;
+    const proxyPort = cfg.CHROME_PROXY_PORT || 9224;
+    const proxyHost = cfg.CHROME_PROXY_HOST || '192.168.0.2';
 
-    return [
+    const lines = [
         '',
         '═══════════════════════════════════════════════════════════',
         '  ⚠️  CHROME REMOTE DEBUGGING NÃO ESTÁ ACESSÍVEL',
@@ -166,24 +169,56 @@ function getChromeInstructions(errorMessage) {
         'O sistema necessita do Chrome com remote debugging ativo.',
         '',
         `Erro detectado: ${errorMessage}`,
-        '',
-        'SOLUÇÃO RÁPIDA (Execute em outro terminal):',
-        '',
-        '  Windows:',
-        '    scripts\\start-chrome.bat',
-        '',
-        '  Linux/WSL/Mac:',
-        '    bash scripts/start-chrome.sh',
-        '',
-        'OU manualmente:',
-        `  chrome --remote-debugging-port=${chromePortHint} \\`,
-        '    --user-data-dir=<perfil-dedicado>',
-        '',
+        ''
+    ];
+
+    if (proxyEnabled) {
+        lines.push(
+            'SOLUÇÃO COMPLETA (Execute em DOIS terminais):',
+            '',
+            '  Terminal 1 - Inicie o Chrome:',
+            '    Windows:',
+            '      scripts\\start-chrome.bat',
+            '    Linux/WSL/Mac:',
+            '      bash scripts/start-chrome.sh',
+            '',
+            '  Terminal 2 - Inicie o Chrome Proxy Service:',
+            '    node scripts/chrome-proxy-service.js',
+            '',
+            '  ⚠️  O PROXY É OBRIGATÓRIO para comunicação Docker ↔ Host',
+            `  ⚠️  Proxy escuta em: ${proxyHost}:${proxyPort}`,
+            `  ⚠️  Chrome escuta em: localhost:${chromePort}`,
+            '',
+            'Validação:',
+            `  curl http://${proxyHost}:${proxyPort}/health  # Proxy OK`,
+            `  curl http://localhost:${chromePort}/json/version  # Chrome OK`,
+            ''
+        );
+    } else {
+        lines.push(
+            'SOLUÇÃO RÁPIDA (Execute em outro terminal):',
+            '',
+            '  Windows:',
+            '    scripts\\start-chrome.bat',
+            '',
+            '  Linux/WSL/Mac:',
+            '    bash scripts/start-chrome.sh',
+            '',
+            'OU manualmente:',
+            `  chrome --remote-debugging-port=${chromePort} \\`,
+            '    --user-data-dir=<perfil-dedicado>',
+            ''
+        );
+    }
+
+    lines.push(
         '⚠️ IMPORTANTE:',
         'Este sistema NÃO inicia browsers.',
         'O Chrome deve estar em execução ANTES do boot.',
         ''
-    ];
+    );
+
+    return lines;
 }
 
 /**

@@ -205,6 +205,64 @@ async function boot() {
         // Nota: não instanciamos InfraFailurePolicy aqui (evita side-effects desnecessários)
         log('DEBUG', '[BOOT] NERV injetado em forensics e infra_failure_policy');
 
+        // ===== FASE 2.5: CHROME PROXY SERVICE (NOVO - Bug #1 e #4) =====
+        let chromeProxy = null;
+        if (CONFIG.CHROME_PROXY_ENABLED !== false) {
+            log('INFO', '[BOOT] Fase 2.5/6: Inicializando Chrome Proxy Service');
+
+            try {
+                const ChromeProxyService = require('./infra/proxy/chromeProxyService');
+                const { sendEvent } = require('@nerv/adapters/high_level_adapter');
+                const { ActionCode, ActorRole } = require('@shared/nerv/constants');
+
+                chromeProxy = new ChromeProxyService({
+                    PUBLIC_IP: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
+                    CHROME_PORT: CONFIG.CHROME_PORT || 9225,
+                    PROXY_PORT: CONFIG.CHROME_PROXY_PORT || 9224,
+                    LOG_LEVEL: CONFIG.LOG_LEVEL || 'INFO'
+                });
+
+                // Injeta NERV no proxy para telemetria
+                chromeProxy.setNERV(nerv);
+
+                // Inicia proxy
+                await chromeProxy.start();
+
+                // Armazena globalmente para shutdown
+                global.chromeProxy = chromeProxy;
+
+                log('INFO', `[BOOT] ✅ Chrome Proxy Service online (porta ${CONFIG.CHROME_PROXY_PORT || 9224})`);
+
+                // ✅ Emite evento NERV: Proxy iniciado
+                sendEvent(
+                    nerv,
+                    ActorRole.INFRA,
+                    ActionCode.INFRA_READY,
+                    {
+                        component: 'ChromeProxyService',
+                        port: CONFIG.CHROME_PROXY_PORT || 9224,
+                        host: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
+                        timestamp: Date.now()
+                    },
+                    null, // correlationId
+                    null // target (broadcast)
+                );
+            } catch (error) {
+                log('ERROR', `[BOOT] ❌ Falha ao iniciar Chrome Proxy Service: ${error.message}`);
+                log('ERROR', '[BOOT]');
+                log('ERROR', '[BOOT] TROUBLESHOOTING:');
+                log('ERROR', '[BOOT] 1. Verifique se porta está disponível:');
+                log('ERROR', `[BOOT]    lsof -i :${CONFIG.CHROME_PROXY_PORT || 9224}`);
+                log('ERROR', '[BOOT] 2. Verifique se Chrome está rodando:');
+                log('ERROR', `[BOOT]    curl http://localhost:${CONFIG.CHROME_PORT || 9225}/json/version`);
+                log('ERROR', '[BOOT]');
+                throw error; // Falha crítica - aborta boot
+            }
+        } else {
+            log('WARN', '[BOOT] ⚠️  Chrome Proxy Service desabilitado (CONFIG.CHROME_PROXY_ENABLED=false)');
+            log('WARN', '[BOOT] ⚠️  Conexões diretas ao Chrome podem falhar em ambientes containerizados');
+        }
+
         // NERV-based server discovery (non-blocking): escuta evento SERVER_READY
         let discoveredServerInfo = null;
         try {
@@ -720,7 +778,10 @@ async function shutdown(context) {
                         try {
                             await reconciler.stop();
                         } catch (err) {
-                            log('WARN', `[SHUTDOWN] reconciler.stop threw: ${err && err.message ? err.message : String(err)}`);
+                            log(
+                                'WARN',
+                                `[SHUTDOWN] reconciler.stop threw: ${err && err.message ? err.message : String(err)}`
+                            );
                         }
                     }
                 } catch (e) {
@@ -733,11 +794,48 @@ async function shutdown(context) {
                         try {
                             await hardwareTelemetry.stop();
                         } catch (err) {
-                            log('WARN', `[SHUTDOWN] hardwareTelemetry.stop threw: ${err && err.message ? err.message : String(err)}`);
+                            log(
+                                'WARN',
+                                `[SHUTDOWN] hardwareTelemetry.stop threw: ${err && err.message ? err.message : String(err)}`
+                            );
                         }
                     }
                 } catch (e) {
                     log('WARN', `[SHUTDOWN] hardwareTelemetry.stop falhou: ${e.message}`);
+                }
+            }
+        },
+
+        /* -----------------------------------------------------------
+           CHROME PROXY SERVICE — fecha proxy WebSocket antes do pool
+        ----------------------------------------------------------- */
+        {
+            name: 'ChromeProxyService',
+            fn: async () => {
+                if (global.chromeProxy && typeof global.chromeProxy.stop === 'function') {
+                    try {
+                        await global.chromeProxy.stop();
+                        log('INFO', '[SHUTDOWN] Chrome Proxy Service parado');
+
+                        // ✅ Emite evento NERV: Proxy encerrado
+                        if (nerv && typeof nerv.emitEvent === 'function') {
+                            const { sendEvent } = require('@nerv/adapters/high_level_adapter');
+                            const { ActionCode, ActorRole } = require('@shared/nerv/constants');
+
+                            sendEvent(
+                                nerv,
+                                ActorRole.INFRA,
+                                ActionCode.INFRA_SHUTDOWN,
+                                { component: 'ChromeProxyService', timestamp: Date.now() },
+                                null,
+                                null
+                            );
+                        }
+                    } catch (err) {
+                        log('WARN', `[SHUTDOWN] Erro ao parar Chrome Proxy: ${err.message}`);
+                    }
+                } else {
+                    log('DEBUG', '[SHUTDOWN] Chrome Proxy Service não estava ativo');
                 }
             }
         },

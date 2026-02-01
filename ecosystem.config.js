@@ -32,8 +32,8 @@ const NODE_ARGS_BASE = [
     '--unhandled-rejections=strict',// Promises não tratadas derrubam o processo
     '--enable-source-maps',         // Stack traces corretos em produção
     '--trace-warnings',             // Avisos nunca silenciosos
-    '--max-old-space-size=6144',    // Limite de memória heap (6 GB)
-    '--trace-gc-ignored-scavenger', // Diagnóstico de GC (memória longa duração)
+    '--max-old-space-size=6144'     // Limite de memória heap (6 GB)
+    // Removed: --trace-gc-ignored-scavenger (not supported in Node.js 20)
 ];
 
 module.exports = {
@@ -148,6 +148,52 @@ module.exports = {
                 NODE_ENV: 'production',
                 DAEMON_MODE: 'true'
             }
+        },
+
+        // Process 3: Chrome Proxy Service
+        // Purpose: Transparent proxy between Puppeteer and Chrome DevTools Protocol
+        // Architecture: Docker Desktop (Container → host.docker.internal:9225 → Windows Chrome)
+        {
+            name: 'chrome-proxy',
+            script: './scripts/chrome-proxy-service.js',
+            instances: 1,
+            autorestart: true,
+            watch: false,
+            max_memory_restart: '500M',
+
+            // Node arguments (minimal to avoid NODE_OPTIONS conflicts)
+            node_args: [
+                '--expose-gc',
+                '--unhandled-rejections=strict'
+            ],
+
+            // Environment variables
+            env: {
+                NODE_ENV: 'development',
+                CHROME_HOST: 'host.docker.internal',  // Docker Desktop → Windows
+                CHROME_PORT: '9225',                  // Chrome debugging port
+                CHROME_PROXY_PORT: '9224',            // Proxy listen port
+                LOG_LEVEL: 'info'
+            },
+
+            env_production: {
+                NODE_ENV: 'production',
+                CHROME_HOST: 'host.docker.internal',
+                CHROME_PORT: '9225',
+                CHROME_PROXY_PORT: '9224',
+                LOG_LEVEL: 'warn'
+            },
+
+            // Logging
+            error_file: './logs/chrome-proxy-error.log',
+            out_file: './logs/chrome-proxy-out.log',
+            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+            combine_logs: true,
+
+            // Timing
+            min_uptime: '10s',
+            listen_timeout: 8000,
+            kill_timeout: 5000
         }
     ]
 };

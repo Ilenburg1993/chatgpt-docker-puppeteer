@@ -158,6 +158,7 @@ RUN apt-get update \
     # -------------------------------------------------------------------------
     openssl \
     ca-certificates \
+    libnss-wrapper \
     \
     && rm -rf /var/lib/apt/lists/*
 
@@ -246,6 +247,10 @@ RUN apt-get update \
     libvulkan1 \
     mesa-utils \
     \
+    # Memory & perf analysis
+    gdb \
+    heaptrack \
+    \
     # -------------------------------------------------------------------------
     # Fonts & text rendering (PDF, emojis, i18n)
     # -------------------------------------------------------------------------
@@ -258,6 +263,8 @@ RUN apt-get update \
     xdg-utils \
     \
     && rm -rf /var/lib/apt/lists/*
+
+
 
 # Chromium é FALLBACK TÉCNICO
 # Chrome CANÔNICO é externo (host)
@@ -413,7 +420,18 @@ RUN apt-get update \
     ripgrep \
     fd-find \
     fzf \
-    \
+    sqlite3 \
+    redis-tools \
+    shellcheck \
+    yamllint \
+    gnupg \
+    pass \
+    age \
+    graphviz \
+    yq \
+    moreutils \
+    watchman \
+    hyperfine \
     && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
@@ -848,8 +866,12 @@ NSS_BASE_DIR="/tmp/devcontainer-nss"
 PASSWD_FILE="${NSS_BASE_DIR}/passwd"
 GROUP_FILE="${NSS_BASE_DIR}/group"
 
+# Localização típica da lib (Debian / Ubuntu)
+NSS_SO_PATH="/usr/lib/$(uname -m)-linux-gnu/libnss_wrapper.so"
+
 # Ativação defensiva
-if [ -f "${PASSWD_FILE}" ] && ldconfig -p 2>/dev/null | grep -q libnss_wrapper.so; then
+if [ -f "${PASSWD_FILE}" ] \
+   && { [ -f "${NSS_SO_PATH}" ] || ldconfig -p 2>/dev/null | grep -q libnss_wrapper.so; }; then
     export NSS_WRAPPER_PASSWD="${PASSWD_FILE}"
     export NSS_WRAPPER_GROUP="${GROUP_FILE}"
     export LD_PRELOAD="libnss_wrapper.so"

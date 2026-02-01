@@ -444,14 +444,23 @@
         // TELEMETRY & NOISE REDUCTION
         // ========================================================
         "telemetry.telemetryLevel": "off",
+        // ========================================================
+        // GITHUB COPILOT — CONFIGURAÇÕES OTIMIZADAS
+        // ========================================================
         "github.copilot.enable": {
           "*": true,
           "markdown": true,
-          "plaintext": false
+        "plaintext": true,
+        "yaml": true,
+        "jsonc": true
         },
         "github.copilot.advanced": {
-          "debug.overrideEngine": "stable"
-        }
+        "debug.overrideEngine": "stable",
+        "inlineSuggestCount": 3,
+        "listCount": 10
+      },
+      "github.copilot.editor.enableAutoCompletions": true,
+      "github.copilot.editor.iterativeFixing": true
       }
     }
   },
@@ -539,19 +548,9 @@
     // =========================================================
     // SSH AGENT FORWARDING — CANÔNICO (WSL / WINDOWS / LINUX)
     // ---------------------------------------------------------
-    // Estratégia correta:
-    // • O SSH Agent roda no HOST ou no WSL
-    // • No WSL, ele expõe um *socket UNIX real*
-    // • Criamos um symlink estável (/tmp/ssh-agent.sock)
-    // • O Docker bind-mounta APENAS esse socket UNIX
-    //
-    // Benefícios:
-    // • Funciona no Windows, WSL e Linux nativo
-    // • Evita Named Pipes (incompatíveis com Docker)
-    // • Nenhuma chave privada entra no container
-    // • Compatível com Git, GitHub, Copilot, CI e IA
     // =========================================================
-    // "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+    // =========================================================
     // GnuPG keyring (persistente, mas isolado)
     "source=devcontainer-gpg-cache,target=/home/node/.gnupg,type=volume",
     // =====================================================================
@@ -592,18 +591,18 @@
     "APP_ROLE": "agent",
     "APP_NAME": "chatgpt-docker-puppeteer",
     // ------------------------------------------------------------
-    // DYNAMIC PATHS (O Fim do Hardcode)
+    // DYNAMIC PATHS (Caminhos Canônicos)
     // ------------------------------------------------------------
-    // Usamos ${containerUserHome} para herdar o caminho real da home.
-    // Isso sincroniza com o Dockerfile e os Mounts automaticamente.
-    "HOME_DIR": "${containerUserHome}",
-    "PM2_HOME": "${containerUserHome}/.pm2",
-    "NPM_CONFIG_CACHE": "${containerUserHome}/.npm",
-    "NPM_CONFIG_PREFIX": "${containerUserHome}/.npm-global",
+    // Nota: DevContainers não expande ${containerUserHome} em containerEnv.
+    // Valores literais garantem compatibilidade com todos os scripts.
+    "HOME_DIR": "/home/node",
+    "PM2_HOME": "/home/node/.pm2",
+    "NPM_CONFIG_CACHE": "/home/node/.npm",
+    "NPM_CONFIG_PREFIX": "/home/node/.npm-global",
     // XDG Enforcement (Garante que ferramentas CLI obedeçam)
-    "XDG_CONFIG_HOME": "${containerUserHome}/.config",
-    "XDG_CACHE_HOME": "${containerUserHome}/.cache",
-    "PUPPETEER_CACHE_DIR": "${containerUserHome}/.cache/puppeteer",
+    "XDG_CONFIG_HOME": "/home/node/.config",
+    "XDG_CACHE_HOME": "/home/node/.cache",
+    "PUPPETEER_CACHE_DIR": "/home/node/.cache/puppeteer",
     // ------------------------------------------------------------
     // PUPPETEER & CHROME (Host Integration)
     // ------------------------------------------------------------
@@ -616,8 +615,9 @@
     // ------------------------------------------------------------
     // RUNTIME TUNING (Performance & Noise)
     // ------------------------------------------------------------
-    "NODE_OPTIONS": "--max-old-space-size=6144",
-    // --trace-gc-ignored-scavenger não é permitido em .DevContainer
+    // NOTA: NODE_OPTIONS removido - cada configuração de launch
+    // define seu próprio --max-old-space-size em runtimeArgs
+    // para evitar duplicação e conflitos com o debugger
     "NPM_CONFIG_LOGLEVEL": "warn",
     "NPM_CONFIG_AUDIT": "false",
     "NPM_CONFIG_FUND": "false",
@@ -641,8 +641,8 @@
     "TZ": "America/Sao_Paulo",
     "LANG": "pt_BR.UTF-8",
     "DOCKER_BUILDKIT": "1",
-    "DEVCONTAINER_DOCKER_ENABLED": "true"
-    //"SSH_AUTH_SOCK": "/ssh-agent"
+    "DEVCONTAINER_DOCKER_ENABLED": "true",
+    "SSH_AUTH_SOCK": "/ssh-agent"
   },
   // ============================================================
   // SECURITY & USER CONFIGURATION
