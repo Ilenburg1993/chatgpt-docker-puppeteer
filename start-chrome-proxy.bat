@@ -11,8 +11,8 @@ REM    Inicializa Chrome + Proxy corretamente para ConnectionOrchestrator
 REM
 REM  Architecture:
 REM    Windows Host:
-REM      - Chrome (127.0.0.1:9224) - Remote debugging
-REM      - Proxy (0.0.0.0:9224) - WebSocket proxy with URL rewriting
+REM      - Chrome (127.0.0.1:9225) - Remote debugging (host-facing)
+REM      - Proxy (0.0.0.0:9224) - WebSocket proxy with URL rewriting (container-facing)
 REM
 REM    Docker Container:
 REM      - ConnectionOrchestrator → http://192.168.0.2:9224
@@ -26,7 +26,12 @@ setlocal enabledelayedexpansion
 REM ============================================================================
 REM  CONFIGURAÇÕES
 REM ============================================================================
-set CHROME_DEBUG_PORT=9224
+REM CHROME_PORT pode ser definida externamente (host-facing). Padrão: 9225
+if defined CHROME_PORT (
+    set CHROME_DEBUG_PORT=%CHROME_PORT%
+) else (
+    set CHROME_DEBUG_PORT=9225
+)
 set PROXY_PORT=9224
 set CHROME_USER_DATA_DIR=%USERPROFILE%\.chrome-debug-profile
 set MAX_WAIT_SECONDS=15

@@ -112,8 +112,10 @@ echo ""
 echo -e "${BLUE}🌐 Chrome Remote Debugging${NC}"
 echo "-------------------------------------------"
 
-CHROME_PORT=9224
-check "Porta 9224 acessível" "curl -s http://localhost:$CHROME_PORT/json/version"
+# Prefer CHROME_PROXY_PORT (container-facing proxy) then CHROME_PORT then default 9224
+CHROME_PORT="${CHROME_PROXY_PORT:-${CHROME_PORT:-9224}}"
+echo "   Usando porta do Chrome (proxy): $CHROME_PORT"
+check "Porta $CHROME_PORT acessível" "curl -s http://localhost:$CHROME_PORT/json/version"
 
 if curl -s http://localhost:$CHROME_PORT/json/version &> /dev/null; then
     CHROME_INFO=$(curl -s http://localhost:$CHROME_PORT/json/version)
@@ -127,13 +129,13 @@ if curl -s http://localhost:$CHROME_PORT/json/version &> /dev/null; then
     PAGES=$(curl -s http://localhost:$CHROME_PORT/json/list | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).length || 0)")
     echo "   Páginas abertas: $PAGES"
 else
-    echo -e "${RED}   Chrome/Proxy não está acessível no endpoint configurado (porta 9224)${NC}"
+    echo -e "${RED}   Chrome/Proxy não está acessível no endpoint configurado (porta ${CHROME_PORT})${NC}"
     echo ""
     echo "   Para iniciar:"
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "   google-chrome --remote-debugging-port=9224 --user-data-dir=\"\$HOME/chrome-automation-profile\""
+        echo "   google-chrome --remote-debugging-port=${CHROME_PORT} --user-data-dir=\"$HOME/chrome-automation-profile\""
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9224"
+        echo "   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=${CHROME_PORT}"
     fi
 fi
 echo ""

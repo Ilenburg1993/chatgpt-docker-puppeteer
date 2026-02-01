@@ -41,14 +41,17 @@ mkdir -p local-login/profile
 mkdir -p tmp
 echo -e "${GREEN}✅ Diretórios criados${NC}"
 
+# Determine proxy port (container-facing) if provided
+PROXY_PORT=${CHROME_PROXY_PORT:-9224}
+
 # Check if config.json exists
 echo ""
 echo "⚙️ Verificando configurações..."
 if [ ! -f "config.json" ]; then
     echo -e "${YELLOW}⚠️  config.json não encontrado, criando padrão...${NC}"
-    cat > config.json << 'EOF'
+    cat > config.json << EOF
 {
-  "chromePath": "http://localhost:9224",
+  "chromePath": "http://localhost:${PROXY_PORT}",
   "maxRetries": 3,
   "backoff": {
     "baseDelay": 5000,
@@ -110,22 +113,22 @@ echo ""
 echo "🌐 Verificando Chrome/Chromium..."
 CHROME_FOUND=false
 
-# Check if Chrome (or proxy) is running on 9224 (container-facing)
-if curl -s http://localhost:9224/json/version &> /dev/null; then
-  echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta 9224${NC}"
-  CHROME_INFO=$(curl -s http://localhost:9224/json/version)
+# Check if Chrome (or proxy) is running on PROXY_PORT (container-facing)
+if curl -s http://localhost:${PROXY_PORT}/json/version &> /dev/null; then
+  echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta ${PROXY_PORT}${NC}"
+  CHROME_INFO=$(curl -s http://localhost:${PROXY_PORT}/json/version)
   CHROME_VERSION=$(echo $CHROME_INFO | grep -oP '"Browser":\s*"\K[^"]+')
     echo "   Versão: $CHROME_VERSION"
     CHROME_FOUND=true
 else
-  echo -e "${YELLOW}⚠️  Chrome/Proxy não detectado na porta 9224${NC}"
+  echo -e "${YELLOW}⚠️  Chrome/Proxy não detectado na porta ${PROXY_PORT}${NC}"
     echo ""
     echo "Para iniciar o Chrome com remote debugging:"
     echo ""
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "  google-chrome --remote-debugging-port=9224 --user-data-dir=\"\$HOME/chrome-automation-profile\""
+    echo "  google-chrome --remote-debugging-port=${PROXY_PORT} --user-data-dir=\"\$HOME/chrome-automation-profile\""
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9224 --user-data-dir=\"\$HOME/chrome-automation-profile\""
+    echo "  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=${PROXY_PORT} --user-data-dir=\"\$HOME/chrome-automation-profile\""
     fi
     echo ""
 fi

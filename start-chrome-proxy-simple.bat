@@ -2,7 +2,12 @@
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
-set CHROME_DEBUG_PORT=9224
+REM CHROME_PORT pode ser definida externamente (host-facing). Padrão: 9225
+if defined CHROME_PORT (
+    set CHROME_DEBUG_PORT=%CHROME_PORT%
+) else (
+    set CHROME_DEBUG_PORT=9225
+)
 set PROXY_PORT=9224
 set CHROME_USER_DATA_DIR=%USERPROFILE%\.chrome-debug-profile
 set SCRIPT_DIR=%~dp0

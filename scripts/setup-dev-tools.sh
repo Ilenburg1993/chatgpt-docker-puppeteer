@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+P#!/usr/bin/env bash
 set -euo pipefail
 
 # Helper script to show / attempt installation commands for dev utilities

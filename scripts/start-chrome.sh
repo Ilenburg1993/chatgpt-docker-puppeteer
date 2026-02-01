@@ -18,8 +18,10 @@ set -euo pipefail
 # ============================================================================
 #  CONFIGURAÇÕES
 # ============================================================================
-CHROME_DEBUG_PORT=9224
-CHROME_USER_DATA_DIR="$HOME/.chrome-debug-profile"
+# Porta do Chrome no host (use CHROME_PORT para sobrescrever). Padrão: 9225
+CHROME_PORT="${CHROME_PORT:-9225}"
+CHROME_DEBUG_PORT="${CHROME_PORT}"
+CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-$HOME/.chrome-debug-profile}"
 HEALTH_CHECK_URL="http://localhost:${CHROME_DEBUG_PORT}/json/version"
 MAX_WAIT_SECONDS=10
 

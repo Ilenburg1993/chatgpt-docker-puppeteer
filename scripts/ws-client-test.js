@@ -3,7 +3,11 @@
 
 const WebSocket = require('ws');
 
-const endpoint = process.argv[2] || 'ws://127.0.0.1:9224/devtools/page/1';
+const endpoint =
+    process.argv[2] ||
+    process.env.CHROME_WSE ||
+    process.env.CHROME_WS_ENDPOINT ||
+    `ws://127.0.0.1:${process.env.CHROME_PROXY_PORT || 9224}/devtools/page/1`;
 const ws = new WebSocket(endpoint);
 
 ws.on('open', () => {
