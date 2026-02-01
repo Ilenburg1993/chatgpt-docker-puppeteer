@@ -1,25 +1,16 @@
 # =============================================================================
-# .editorconfig - LLM-AUTO Cross-editor consistency
-# Version: 5.0 FINAL (23/01/2026)
+# .editorconfig — LLM-AUTO Cross-editor consistency
+# Version: 5.1 FINAL (31/01/2026)
 # =============================================================================
 # OBJETIVO:
-# • Padronizar edicao de arquivos no editor
-# • Evitar CRLF em ambientes Windows (critico para WSL2)
-# • Manter consistencia entre devs e ferramentas
+# • Padronizar edição de arquivos no editor
+# • Garantir UTF-8 correto em Windows / WSL / Docker / PowerShell
+# • Evitar bugs de BOM em shell / Dockerfile
 #
-# SCOPE:
-# • Atua no EDITOR (antes do Git)
-# • Complementa .gitattributes (fonte canonica)
-# • Sincronizado com devcontainer.json (editor.tabSize: 4 para JS)
-#
-# CHANGELOG v5.0:
-# • Consolidado versao atual + v4.0 anterior
-# • JavaScript/TypeScript: 4 espacos (padrao do projeto, sync devcontainer)
-# • Dockerfile: 4 espacos (sync com Dockerfile v4.0)
-# • Shell scripts: 2 espacos (mantido)
-# • Makefile: TAB obrigatorio (adicionado)
-# • Organizacao hierarquica (tier system)
-#
+# REGRA DE OURO (ENCODING):
+# • PowerShell        → UTF-8 COM BOM
+# • Shell / Docker    → UTF-8 SEM BOM
+# • Node / JSON / Web → UTF-8 SEM BOM
 # =============================================================================
 
 root = true
@@ -37,311 +28,206 @@ indent_size = 4
 max_line_length = 120
 
 # =============================================================================
-# TIER 2: LINGUAGENS DE PROGRAMACAO
+# TIER 2: WINDOWS / POWERSHELL (ENCODING CRÍTICO)
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# JAVASCRIPT / TYPESCRIPT: 4 espacos (padrao do projeto)
-# -----------------------------------------------------------------------------
-[*.{js,mjs,cjs,jsx,ts,tsx}]
-indent_size = 4
-max_line_length = 120
-quote_type = single
-
-# -----------------------------------------------------------------------------
-# PYTHON: 4 espacos (PEP 8)
-# -----------------------------------------------------------------------------
-[*.py]
-indent_size = 4
-max_line_length = 120
-
-# -----------------------------------------------------------------------------
-# SHELL SCRIPTS: 2 espacos (padrao Unix/Linux)
-# -----------------------------------------------------------------------------
-[*.{sh,bash,zsh}]
+# ---------------------------------------------------------------------------
+# PowerShell — UTF-8 COM BOM (obrigatório no Windows PowerShell)
+# ---------------------------------------------------------------------------
+[*.{ps1,psm1,psd1}]
+charset = utf-8-bom
 indent_size = 2
 end_of_line = lf
 
-# Windows batch files: CRLF obrigatorio
+# ---------------------------------------------------------------------------
+# Windows Batch — UTF-8 SEM BOM + CRLF
+# (compatível com chcp 65001)
+# ---------------------------------------------------------------------------
 [*.{bat,cmd}]
+charset = utf-8
 indent_size = 2
 end_of_line = crlf
 
-# PowerShell: LF (funciona no WSL2)
-[*.ps1]
+# =============================================================================
+# TIER 3: LINGUAGENS DE PROGRAMAÇÃO
+# =============================================================================
+
+# JavaScript / TypeScript — 4 espaços
+[*.{js,mjs,cjs,jsx,ts,tsx}]
+indent_size = 4
+quote_type = single
+
+# Python — PEP 8
+[*.py]
+indent_size = 4
+
+# Shell scripts — UTF-8 SEM BOM (BOM PROIBIDO)
+[*.{sh,bash,zsh}]
+charset = utf-8
 indent_size = 2
 end_of_line = lf
 
 # =============================================================================
-# TIER 3: CONFIGURACAO E DADOS
+# TIER 4: CONFIGURAÇÃO & DADOS
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# JSON: 2 espacos (padrao web)
-# -----------------------------------------------------------------------------
 [*.{json,jsonc,json5}]
 indent_size = 2
-max_line_length = 120
 
-# -----------------------------------------------------------------------------
-# YAML: 2 espacos (obrigatorio pela spec)
-# -----------------------------------------------------------------------------
 [*.{yml,yaml}]
 indent_size = 2
 max_line_length = 100
 
-# -----------------------------------------------------------------------------
-# TOML: 2 espacos
-# -----------------------------------------------------------------------------
 [*.toml]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# XML: 2 espacos
-# -----------------------------------------------------------------------------
 [*.xml]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# SQL: 2 espacos
-# -----------------------------------------------------------------------------
 [*.sql]
 indent_size = 2
 
 # =============================================================================
-# TIER 4: WEB ASSETS
+# TIER 5: WEB ASSETS
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# HTML: 2 espacos
-# -----------------------------------------------------------------------------
 [*.{html,htm}]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# CSS / SASS / LESS: 2 espacos
-# -----------------------------------------------------------------------------
 [*.{css,scss,sass,less}]
 indent_size = 2
 
 # =============================================================================
-# TIER 5: DOCUMENTACAO
+# TIER 6: DOCUMENTAÇÃO
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# MARKDOWN: 2 espacos, preserva trailing whitespace (quebras de linha)
-# -----------------------------------------------------------------------------
 [*.md]
 indent_size = 2
 trim_trailing_whitespace = false
 max_line_length = 100
 
-# -----------------------------------------------------------------------------
-# PLAIN TEXT: 2 espacos
-# -----------------------------------------------------------------------------
 [*.txt]
 indent_size = 2
 max_line_length = 100
 
 # =============================================================================
-# TIER 6: BUILD & TOOLING
+# TIER 7: BUILD & TOOLING
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# MAKEFILE: TAB obrigatorio (Make requirement)
-# -----------------------------------------------------------------------------
+# Makefile — TAB obrigatório
 [{Makefile,GNUmakefile,makefile,*.mk}]
 indent_style = tab
 indent_size = 4
 
-# -----------------------------------------------------------------------------
-# DOCKERFILE: 4 espacos (sincronizado com Dockerfile v4.0)
-# -----------------------------------------------------------------------------
+# Dockerfile — UTF-8 SEM BOM
 [Dockerfile*]
+charset = utf-8
 indent_size = 4
+end_of_line = lf
 
-# -----------------------------------------------------------------------------
-# DOCKER COMPOSE: 2 espacos (padrao YAML)
-# -----------------------------------------------------------------------------
 [docker-compose*.{yml,yaml}]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# IGNORE FILES: 2 espacos
-# -----------------------------------------------------------------------------
 [{.dockerignore,.gitignore,.npmignore,.prettierignore}]
 indent_size = 2
 
 # =============================================================================
-# TIER 7: DEVCONTAINER (configs especificas)
+# TIER 8: DEVCONTAINER
 # =============================================================================
 
-# DevContainer JSON config
 [.devcontainer/devcontainer.json]
 indent_size = 2
 
-# DevContainer scripts (shell)
 [.devcontainer/scripts/*.sh]
 indent_size = 2
+charset = utf-8
 end_of_line = lf
 
-# DevContainer Dockerfile (ja coberto por Dockerfile*)
-
 # =============================================================================
-# TIER 8: ENVIRONMENT & SECRETS
+# TIER 9: ENVIRONMENT & SECRETS
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# .ENV: 2 espacos, sem trailing whitespace
-# -----------------------------------------------------------------------------
 [{.env,.env.*,.env.example}]
 indent_size = 2
 trim_trailing_whitespace = true
 
 # =============================================================================
-# TIER 9: GIT CONFIGURATION
+# TIER 10: GIT
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# .gitignore / .gitattributes: 2 espacos
-# -----------------------------------------------------------------------------
 [{.gitattributes,.gitmodules}]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# .gitconfig: TAB (Git's native format)
-# -----------------------------------------------------------------------------
 [*.gitconfig]
 indent_style = tab
 indent_size = 4
 
 # =============================================================================
-# TIER 10: IDE / EDITOR CONFIGS
+# TIER 11: IDE / EDITOR
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# VS CODE: 2 espacos
-# -----------------------------------------------------------------------------
 [.vscode/*.json]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# PRETTIER / ESLINT: 2 espacos
-# -----------------------------------------------------------------------------
 [{.prettierrc,.prettierrc.json,.eslintrc,.eslintrc.json,.babelrc,.babelrc.json}]
 indent_size = 2
 
-# ESLint flat config (v9+): 4 espacos (codigo JS)
 [eslint.config.{js,mjs,cjs}]
 indent_size = 4
 
 # =============================================================================
-# TIER 11: CI/CD & AUTOMATION
+# TIER 12: CI/CD
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# GITHUB ACTIONS: 2 espacos
-# -----------------------------------------------------------------------------
 [.github/**/*.{yml,yaml}]
 indent_size = 2
 
 [.github/**/*.md]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# PRE-COMMIT: 2 espacos
-# -----------------------------------------------------------------------------
 [.pre-commit-config.yaml]
 indent_size = 2
 
 # =============================================================================
-# TIER 12: PROJECT SPECIFIC
+# TIER 13: PROJECT-SPECIFIC
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# PACKAGE MANAGERS: 2 espacos
-# -----------------------------------------------------------------------------
 [{package.json,package-lock.json,yarn.lock,pnpm-lock.yaml}]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# TYPESCRIPT / JAVASCRIPT CONFIGS: 2 espacos
-# -----------------------------------------------------------------------------
 [{tsconfig*.json,jsconfig.json}]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# NODE.JS CONFIG FILES: 4 espacos (sao codigo JS)
-# -----------------------------------------------------------------------------
 [{ecosystem.config.js,.puppeteerrc.cjs}]
 indent_size = 4
 
-# -----------------------------------------------------------------------------
-# PROJECT ROOT CONFIGS: 2 espacos
-# -----------------------------------------------------------------------------
-[{config.json,dynamic_rules.json,controle.json,chrome-config.json}]
-indent_size = 2
-
-# -----------------------------------------------------------------------------
-# PROJECT LAUNCHERS: 2 espacos
-# -----------------------------------------------------------------------------
-[{launcher.sh,LAUNCHER.bat,INICIAR_TUDO.BAT}]
-indent_size = 2
-
 # =============================================================================
-# TIER 13: TESTS
+# TIER 14: TESTS
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# TEST FILES: 4 espacos (como codigo fonte)
-# -----------------------------------------------------------------------------
 [{test_*.js,*_test.js,*.test.js,*.spec.js}]
 indent_size = 4
 
 [tests/**/*.js]
 indent_size = 4
 
-# -----------------------------------------------------------------------------
-# TEST FIXTURES: 2 espacos
-# -----------------------------------------------------------------------------
 [tests/fixtures/**/*.{json,txt}]
 indent_size = 2
 
 # =============================================================================
-# TIER 14: TOOLS & ANALYSIS
+# TIER 15: TEMP / GENERATED
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# PYTHON TOOLS: 4 espacos
-# -----------------------------------------------------------------------------
-[{colect.py,tools/**/*.py,analysis/**/*.py}]
-indent_size = 4
-
-# -----------------------------------------------------------------------------
-# JAVASCRIPT TOOLS: 4 espacos
-# -----------------------------------------------------------------------------
-[{tools/**/*.js,analysis/**/*.js}]
-indent_size = 4
-
-# =============================================================================
-# TIER 15: TEMPORARY & GENERATED
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# LOCK FILES: 2 espacos
-# -----------------------------------------------------------------------------
 [*.lock]
 indent_size = 2
 
-# -----------------------------------------------------------------------------
-# TEMP FILES: 2 espacos
-# -----------------------------------------------------------------------------
 [temp_*.json]
 indent_size = 2
 
 # =============================================================================
-# TIER 16: BINARY FILES (nao modificar)
+# TIER 16: BINARY FILES (DO NOT TOUCH)
 # =============================================================================
+
 [*.{png,jpg,jpeg,gif,ico,bmp,svg,webp}]
 end_of_line = unset
 insert_final_newline = unset
@@ -365,21 +251,3 @@ end_of_line = unset
 insert_final_newline = unset
 trim_trailing_whitespace = unset
 charset = unset
-
-# =============================================================================
-# VALIDATION MATRIX
-# =============================================================================
-# File Type          | Indent | Line End | Max Length | Trailing WS
-# -------------------|--------|----------|------------|------------
-# *.js (source)      | 4 sp   | LF       | 120        | trim
-# *.json             | 2 sp   | LF       | 120        | trim
-# *.yml              | 2 sp   | LF       | 100        | trim
-# *.sh               | 2 sp   | LF       | 120        | trim
-# *.bat              | 2 sp   | CRLF     | 120        | trim
-# *.md               | 2 sp   | LF       | 100        | keep
-# Makefile           | TAB    | LF       | 120        | trim
-# Dockerfile         | 4 sp   | LF       | 120        | trim
-# .gitconfig         | TAB    | LF       | 120        | trim
-# .env               | 2 sp   | LF       | 120        | trim
-# binary files       | unset  | unset    | unset      | unset
-# =============================================================================

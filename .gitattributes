@@ -1,8 +1,10 @@
 # =============================================================================
 # .gitattributes — Normalização de Quebras de Linha (Line Endings)
-# Version: 2.3 (Node + Puppeteer + DevContainer + CI + VS)
+# Version: 2.4 (Node + Puppeteer + DevContainer + CI + VS)
 # Objetivo: garantir consistência LF para desenvolvimento em WSL/Containers/CI,
 #           compatibilidade com VS Code, e segurança para artefatos binários.
+# Nota: O Git normaliza EOL; BOM não é controlado por .gitattributes.
+#       Para BOM (PowerShell) use hook / editor config / CI.
 # =============================================================================
 
 # Regra global: detectar texto automaticamente e forçar LF no repositório
@@ -11,10 +13,18 @@
 # -----------------------------
 # Scripts e executáveis (sensitive to EOL)
 # -----------------------------
+# Shell scripts — MUST be LF (BOM forbidden)
 *.sh        text eol=lf
 *.bash      text eol=lf
 *.zsh       text eol=lf
+
+# PowerShell — treat as text with LF in repo/worktree; BOM must be enforced by editor/hook.
+# (We keep eol=lf: PowerShell on Windows tolerates LF; BOM policy handled separately.)
 *.ps1       text eol=lf
+*.psm1      text eol=lf
+*.psd1      text eol=lf
+
+# Code
 *.js        text eol=lf
 *.cjs       text eol=lf
 *.mjs       text eol=lf
@@ -37,9 +47,9 @@ pnpm-lock.yaml          text eol=lf
 .editorconfig           text eol=lf
 
 # -----------------------------
-# Puppeteer / Chromium local artifacts (se NÃO for ignorado)
+# Puppeteer / Chromium local artifacts (if accidentally versioned)
+# Mark as binary to avoid normalization attempts
 # -----------------------------
-# Marcar como binário evita tentativa de normalização caso alguém versione artefatos locais.
 .local-chromium/**      binary
 chrome-linux/**         binary
 chrome-win/**           binary
@@ -148,14 +158,3 @@ coverage/**              binary
 node_modules/**          binary
 
 # EOF
-
-# ============================================================================
-# Windows Batch Files - MUST use CRLF line endings
-# ============================================================================
-*.bat text eol=crlf
-
-# ============================================================================
-# Shell Scripts - MUST use LF line endings
-# ============================================================================
-*.sh text eol=lf
-

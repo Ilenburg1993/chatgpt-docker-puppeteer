@@ -66,29 +66,29 @@
   "editor.foldingMaximumRegions": 5000,
   "editor.gotoLocation.multipleDefinitions": "goto",
   "editor.gotoLocation.multipleReferences": "goto",
-  "editor.selectionHighlight": true,
-  "editor.occurrencesHighlight": "multiFile",
-  "editor.showUnused": true,
-  "editor.showDeprecated": true,
-  "breadcrumbs.enabled": true,
+  "editor.selectionHighlight": false,
+  "editor.occurrencesHighlight": "off",
+  "editor.showUnused": false,
+  "editor.showDeprecated": false,
+  "breadcrumbs.enabled": false,
   "breadcrumbs.filePath": "on",
   "breadcrumbs.symbolPath": "on",
   "outline.showFiles": true,
-  "outline.showModules": true,
+  "outline.showModules": false,
   "outline.showFunctions": true,
-  "outline.showVariables": true,
+  "outline.showVariables": false,
   // ============================================================
   // 5. EDITOR — MINIMAP, STICKY SCROLL, SEMANTIC
   // ============================================================
-  "editor.minimap.enabled": true,
+  "editor.minimap.enabled": false,
   "editor.minimap.maxColumn": 120,
   "editor.minimap.renderCharacters": false,
   "editor.minimap.showSlider": "always",
-  "editor.stickyScroll.enabled": true,
+  "editor.stickyScroll.enabled": false,
   "editor.stickyScroll.maxLineCount": 5,
   "editor.stickyScroll.defaultModel": "outlineModel",
   "editor.linkedEditing": true,
-  "editor.semanticHighlighting.enabled": true,
+  "editor.semanticHighlighting.enabled": "configuredByTheme",
   "editor.semanticTokenColorCustomizations": {
     "enabled": true
   },
@@ -96,18 +96,18 @@
   // 6. SUGGESTIONS, INLINE, INTELLISENSE
   // ============================================================
   "editor.inlineSuggest.enabled": true,
-  "editor.inlineSuggest.suppressSuggestions": false,
+  "editor.inlineSuggest.suppressSuggestions": true,
   "editor.quickSuggestions": {
     "other": "on",
-    "comments": "on",
-    "strings": "on"
+    "comments": "off",
+    "strings": "off"
   },
-  "editor.quickSuggestionsDelay": 10,
+  "editor.quickSuggestionsDelay": 50,
   "editor.suggestSelection": "first",
-  "editor.acceptSuggestionOnEnter": "smart",
+  "editor.acceptSuggestionOnEnter": "off",
   "editor.acceptSuggestionOnCommitCharacter": true,
-  "editor.suggest.preview": true,
-  "editor.suggest.showInlineDetails": true,
+  "editor.suggest.preview": false,
+  "editor.suggest.showInlineDetails": false,
   "editor.suggest.showSnippets": true,
   "editor.snippetSuggestions": "top",
   "editor.suggest.localityBonus": true,
@@ -117,8 +117,8 @@
   "editor.suggest.matchOnWordStartOnly": false,
   "editor.suggest.showStatusBar": true,
   "editor.tabCompletion": "on",
-  "editor.wordBasedSuggestions": "matchingDocuments",
-  "editor.wordBasedSuggestionsMode": "matchingDocuments",
+  "editor.wordBasedSuggestions": "off",
+  "editor.wordBasedSuggestionsMode": "currentDocument",
   // ============================================================
   // 7. LINGUAGENS — JAVASCRIPT / TYPESCRIPT / JSON
   // ============================================================
@@ -133,18 +133,23 @@
   "javascript.updateImportsOnFileMove.enabled": "always",
   "javascript.preferences.quoteStyle": "single",
   "javascript.preferences.importModuleSpecifier": "shortest",
-  "javascript.referencesCodeLens.enabled": true,
+  "editor.codeLens": false,
+  "javascript.referencesCodeLens.enabled": false,
   "javascript.referencesCodeLens.showOnAllFunctions": false,
   "javascript.inlayHints.parameterNames.enabled": "literals",
-  "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "javascript.inlayHints.functionLikeReturnTypes.enabled": false,
   "javascript.inlayHints.variableTypes.enabled": false,
   "typescript.validate.enable": false,
-  "typescript.disableAutomaticTypeAcquisition": false,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.tsserver.watchOptions": {
+    "watchFile": "useFsEvents",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "priorityPollingInterval"
+  },
   "typescript.preferences.importModuleSpecifier": "relative",
   "typescript.reportStyleChecksAsWarnings": false,
   "typescript.tsserver.maxTsServerMemory": 4096,
   "typescript.tsserver.useSeparateSyntaxServer": false,
-  "typescript.tsserver.watchOptions": {},
   "typescript.inlayHints.parameterNames.enabled": "literals",
   "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
   "typescript.inlayHints.variableTypes.enabled": false,
@@ -173,10 +178,6 @@
   },
   "[jsonc]": {
     "editor.defaultFormatter": "vscode.json-language-features"
-  },
-  "[markdown]": {
-    "editor.defaultFormatter": "yzhang.markdown-all-in-one",
-    "editor.wordWrap": "on"
   },
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-containers"
@@ -248,7 +249,7 @@
   // ============================================================
   "git.enableSmartCommit": true,
   "git.ignoreLimitWarning": true,
-  "git.autofetch": true,
+  "git.autofetch": false,
   "git.confirmSync": false,
   "git.fetchOnPull": true,
   "git.pruneOnFetch": true,
@@ -311,7 +312,7 @@
   "files.trimTrailingWhitespace": true,
   "files.trimFinalNewlines": true,
   "files.insertFinalNewline": true,
-  "files.autoSave": "afterDelay",
+  "files.autoSave": "onFocusChange",
   "files.autoSaveDelay": 1000,
   "files.associations": { /* intact */},
   "files.watcherExclude": { /* intact */},
@@ -320,10 +321,19 @@
   "search.searchOnType": true,
   "search.searchOnTypeDebouncePeriod": 300,
   "search.globalFindClipboard": true,
+  "files.simpleDialog.enable": true,
+  "files.saveConflictResolution": "overwriteFileOnDisk",
+
   // ============================================================
   // 14. IA / COPILOT / MCP
   // ============================================================
-  "github.copilot.enable": { /* intact */},
+  "github.copilot.enable": {
+    "*": true,
+    "javascript": true,
+    "json": true,
+    "markdown": true,
+    "plaintext": false
+  },
   "github.copilot.inlineSuggest.enable": true,
   "github.copilot.editor.enableAutoCompletions": true,
   "github.copilot.nextEditSuggestions.enabled": true,
@@ -332,6 +342,19 @@
   "github.copilot.advanced": { /* intact */},
   "chat.mcp.serverSampling": { /* intact */},
   "claudeCodeChat.permissions.yoloMode": false,
+  "[markdown]": {
+    "editor.defaultFormatter": "yzhang.markdown-all-in-one",
+    "editor.wordWrap": "on",
+    "editor.inlineSuggest.enabled": true,
+    "editor.quickSuggestions": {
+      "other": "off",
+      "comments": "off",
+      "strings": "off"
+    },
+    "editor.wordBasedSuggestions": "off",
+    "editor.suggest.preview": false,
+    "editor.suggest.showInlineDetails": false
+  },
   // ============================================================
   // 15. WORKBENCH / WINDOW / TELEMETRIA
   // ============================================================
@@ -351,5 +374,16 @@
   "window.openFilesInNewWindow": "off",
   "telemetry.telemetryLevel": "off",
   "redhat.telemetry.enabled": false,
-  "cSpell.language": "en,pt-BR"
+"cSpell.language": "en,pt-BR",
+"inlineChat.notebookAgent": false,
+"inlineChat.enableV2": true,
+"chat.mcp.gallery.enabled": true,
+"chat.edits2.enabled": true,
+"chat.editing.autoAcceptDelay": 3,
+"chat.customAgentInSubagent.enabled": true,
+"chat.checkpoints.showFileChanges": true,
+"chat.agent.maxRequests": 250,
+"[powershell]": {
+  "files.encoding": "utf8bom"
+},
 }

@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.0
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -29,542 +29,639 @@
 //
 // ============================================================================
 {
-    "name": "ChatGPT Docker Puppeteer - Dev Container",
-    // Workspace dinâmico: herda o nome da pasta no seu Windows/Host
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-    // ============================================================
-    // BUILD CONFIGURATION (v3.4 - Simbiose Ativada)
-    // ============================================================
-    "build": {
-        "context": "..",
-        "dockerfile": "Dockerfile",
-        "args": {
-            // --- O APERTO DE MÃO (Identidade) ---
-            // Injeta o 'node' (ou quem estiver em remoteUser) no Dockerfile
-            "REMOTE_USER": "${containerUser}",
-            "PROJECT_NAME": "${localWorkspaceFolderBasename}",
-            // --- METADATA & VERSIONING ---
-            "VERSION": "3.4.0",
-            "BUILD_DATE": "${localEnv:BUILD_DATE}",
-            "VCS_REF": "${localEnv:GIT_COMMIT}",
-            "IMAGE_NAME": "chatgpt-docker-puppeteer",
-            "IMAGE_VENDOR": "Yuri",
-            "BUILD_ENV": "dev",
-            // 🔐 SINCRONIZAÇÃO DOCKER
-            "DOCKER_GID": "${localEnv:DOCKER_GID}"
-        }
+  "name": "ChatGPT Docker Puppeteer - Dev Container",
+  // Workspace dinâmico: herda o nome da pasta no seu Windows/Host
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  // ============================================================
+  // BUILD CONFIGURATION (v3.4 - Simbiose Ativada)
+  // ============================================================
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile",
+    "args": {
+      // --- O APERTO DE MÃO (Identidade) ---
+      // Injeta o 'node' (ou quem estiver em remoteUser) no Dockerfile
+      "REMOTE_USER": "${containerUser}",
+      "PROJECT_NAME": "${localWorkspaceFolderBasename}",
+      // --- METADATA & VERSIONING ---
+      "VERSION": "3.4.0",
+      "BUILD_DATE": "${localEnv:BUILD_DATE}",
+      "VCS_REF": "${localEnv:GIT_COMMIT}",
+      "IMAGE_NAME": "chatgpt-docker-puppeteer",
+      "IMAGE_VENDOR": "Yuri",
+      "BUILD_ENV": "dev",
+      // 🔐 SINCRONIZAÇÃO DOCKER
+      "DOCKER_GID": "${localEnv:DOCKER_GID}"
+    }
+  },
+  // ============================================================
+  // FEATURES - Auto-install tools and utilities
+  // ============================================================
+  "features": {
+    // Common utilities (bash, git, curl, wget, etc)
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "installOhMyZsh": false,
+      "upgradePackages": false,
+      "username": "node",
+      "userUid": "automatic",
+      "userGid": "automatic"
     },
-    // ============================================================
-    // FEATURES - Auto-install tools and utilities
-    // ============================================================
-    "features": {
-        // Common utilities (bash, git, curl, wget, etc)
-        "ghcr.io/devcontainers/features/common-utils:2": {
-            "installZsh": false,
-            "installOhMyZsh": false,
-            "upgradePackages": false,
-            "username": "node",
-            "userUid": "automatic",
-            "userGid": "automatic"
-        },
-        // GitHub CLI
-        "ghcr.io/devcontainers/features/github-cli:1": {
-            "version": "2.83.2"
-        },
-        "ghcr.io/devcontainers/features/shellcheck:1": {}
+    // GitHub CLI
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "2.83.2"
+    }
+  },
+  // ===========================================================
+  // PORT FORWARDING — CONTRATO FINAL (DENY BY DEFAULT)
+  // ===========================================================
+  //
+  // Arquitetura por planos funcionais:
+  //
+  // ┌──────────────────────────────────────────────────────┐
+  // │ UI HUMANA                                             │
+  // │  - 3000 → Dashboard Principal (Mission Control)       │
+  // │  - 3001 → Dashboard DEV / Playground                  │
+  // │  - 3002 → Dashboard Secundário (Ops / Observabilidade)│
+  // └──────────────────────────────────────────────────────┘
+  //
+  // ┌──────────────────────────────────────────────────────┐
+  // │ API / EXECUÇÃO                                        │
+  // │  - 3008 → API / Socket.io / Execução                  │
+  // └──────────────────────────────────────────────────────┘
+  //
+  // ┌──────────────────────────────────────────────────────┐
+  // │ OBSERVABILIDADE                                       │
+  // │  - 9100 → Métricas / Health / Diagnóstico             │
+  // └──────────────────────────────────────────────────────┘
+  //
+  // ┌──────────────────────────────────────────────────────┐
+  // │ DEBUG (OPT-IN, NÃO EXPOSTO POR PADRÃO)                │
+  // │  - 9229 → Node.js Debug (Primary)                     │
+  // │  - 9230 → Node.js Debug (Fallback)                    │
+  // └──────────────────────────────────────────────────────┘
+  //
+  // ┌──────────────────────────────────────────────────────┐
+  // │ CONTROLE / INFRAESTRUTURA (RESTRITO)                  │
+  // │  - 9221–9223 → Chrome DevTools diretos (PROIBIDOS)    │
+  // │  - 9224 → Chrome Proxy Service                        │
+  // │            (FRONTEIRA LÓGICA — SEM AUTO-FORWARD)      │
+  // └──────────────────────────────────────────────────────┘
+  //
+  // Notas normativas:
+  // - Política global: deny-by-default
+  // - Nenhuma porta é exposta sem intenção explícita
+  // - Portas de controle NÃO são interfaces humanas
+  // - 9224 é uma fronteira lógica de contrato, não uma UI
+  //
+  // ===========================================================
+  "forwardPorts": [
+    3000, // Dashboard Principal — Mission Control
+    3001, // Dashboard DEV / Playground (uso interno)
+    3002, // Dashboard Secundário — Operações / Observabilidade
+    3008, // API / Socket.io / Execução
+    9100, // Métricas / Healthcheck
+    9229, // Node.js Debug — Primary (--inspect)
+    9230 // Node.js Debug — Fallback (--inspect)
+  ],
+  "portsAttributes": {
+    // ----------------------------------------------------------
+    // Política padrão: IGNORAR tudo que não for explicitamente permitido
+    // ----------------------------------------------------------
+    "*": {
+      "onAutoForward": "ignore"
     },
-    // ===========================================================
-    // PORT FORWARDING — CONTRATO FINAL (DENY BY DEFAULT)
-    // ===========================================================
+    // ------------------ UI HUMANA -----------------------------
+    "3000": {
+      "label": "Dashboard Principal — Mission Control",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    "3001": {
+      "label": "Dashboard DEV / Playground (uso interno)",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    "3002": {
+      "label": "Dashboard Secundário — Operações / Observabilidade",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    // ------------------ API -----------------------------------
+    "3008": {
+      "label": "Servidor da Aplicação — API / Socket.io",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    // ------------------ OBSERVABILIDADE ------------------------
+    "9100": {
+      "label": "Métricas / Health Endpoint",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    },
+    // ------------------ DEBUG (OPT-IN) -------------------------
+    "9229": {
+      "label": "Node.js Debug — Primary (--inspect)",
+      "onAutoForward": "silent"
+    },
+    "9230": {
+      "label": "Node.js Debug — Fallback (--inspect)",
+      "onAutoForward": "silent"
+    },
+    // ------------------ CONTROLE / INFRAESTRUTURA --------------
+    "9221": {
+      "label": "Chrome DevTools Variant (PROIBIDO)",
+      "onAutoForward": "ignore"
+    },
+    "9223": {
+      "label": "Chrome DevTools Fallback (PROIBIDO)",
+      "onAutoForward": "ignore"
+    },
+    // Porta canônica de contrato (NÃO auto-forward)
     //
-    // Arquitetura por planos funcionais:
+    // Observação:
+    // - Esta porta representa a FRONTEIRA LÓGICA do browser
+    // - Não é UI, não é debug humano
+    // - Pode ser manualmente encaminhada se necessário
+    // - O sistema NÃO depende de auto-forward para funcionar
     //
-    // ┌──────────────────────────────────────────────────────┐
-    // │ UI HUMANA                                             │
-    // │  - 3000 → Dashboard Principal (Mission Control)       │
-    // │  - 3001 → Dashboard DEV / Playground                  │
-    // │  - 3002 → Dashboard Secundário (Ops / Observabilidade)│
-    // └──────────────────────────────────────────────────────┘
-    //
-    // ┌──────────────────────────────────────────────────────┐
-    // │ API / EXECUÇÃO                                        │
-    // │  - 3008 → API / Socket.io / Execução                  │
-    // └──────────────────────────────────────────────────────┘
-    //
-    // ┌──────────────────────────────────────────────────────┐
-    // │ OBSERVABILIDADE                                       │
-    // │  - 9100 → Métricas / Health / Diagnóstico             │
-    // └──────────────────────────────────────────────────────┘
-    //
-    // ┌──────────────────────────────────────────────────────┐
-    // │ DEBUG (OPT-IN, NÃO EXPOSTO POR PADRÃO)                │
-    // │  - 9229 → Node.js Debug (Primary)                     │
-    // │  - 9230 → Node.js Debug (Fallback)                    │
-    // └──────────────────────────────────────────────────────┘
-    //
-    // ┌──────────────────────────────────────────────────────┐
-    // │ CONTROLE / INFRAESTRUTURA (RESTRITO)                  │
-    // │  - 9221–9223 → Chrome DevTools diretos (PROIBIDOS)    │
-    // │  - 9224 → Chrome Proxy Service                        │
-    // │            (FRONTEIRA LÓGICA — SEM AUTO-FORWARD)      │
-    // └──────────────────────────────────────────────────────┘
-    //
-    // Notas normativas:
-    // - Política global: deny-by-default
-    // - Nenhuma porta é exposta sem intenção explícita
-    // - Portas de controle NÃO são interfaces humanas
-    // - 9224 é uma fronteira lógica de contrato, não uma UI
-    //
-    // ===========================================================
-    "forwardPorts": [
-        3000, // Dashboard Principal — Mission Control
-        3001, // Dashboard DEV / Playground (uso interno)
-        3002, // Dashboard Secundário — Operações / Observabilidade
-        3008, // API / Socket.io / Execução
-        9100, // Métricas / Healthcheck
-        9229, // Node.js Debug — Primary (--inspect)
-        9230 // Node.js Debug — Fallback (--inspect)
-    ],
-    "portsAttributes": {
-        // ----------------------------------------------------------
-        // Política padrão: IGNORAR tudo que não for explicitamente permitido
-        // ----------------------------------------------------------
-        "*": {
-            "onAutoForward": "ignore"
-        },
-        // ------------------ UI HUMANA -----------------------------
-        "3000": {
-            "label": "Dashboard Principal — Mission Control",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
-        "3001": {
-            "label": "Dashboard DEV / Playground (uso interno)",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
-        "3002": {
-            "label": "Dashboard Secundário — Operações / Observabilidade",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
-        // ------------------ API -----------------------------------
-        "3008": {
-            "label": "Servidor da Aplicação — API / Socket.io",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
-        // ------------------ OBSERVABILIDADE ------------------------
-        "9100": {
-            "label": "Métricas / Health Endpoint",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
-        // ------------------ DEBUG (OPT-IN) -------------------------
-        "9229": {
-            "label": "Node.js Debug — Primary (--inspect)",
-            "onAutoForward": "silent"
-        },
-        "9230": {
-            "label": "Node.js Debug — Fallback (--inspect)",
-            "onAutoForward": "silent"
-        },
-        // ------------------ CONTROLE / INFRAESTRUTURA --------------
-        "9221": {
-            "label": "Chrome DevTools Variant (PROIBIDO)",
-            "onAutoForward": "ignore"
-        },
-        "9223": {
-            "label": "Chrome DevTools Fallback (PROIBIDO)",
-            "onAutoForward": "ignore"
-        },
-        // Porta canônica de contrato (NÃO auto-forward)
+    "9224": {
+      "label": "Chrome Proxy Service — Fronteira Arquitetural",
+      "onAutoForward": "ignore"
+    }
+  },
+  // ============================================================
+  // RUNTIME ARGS - Docker runtime configuration
+  // ============================================================
+  // ============================================================
+  // RUNTIME ARGS - Docker runtime configuration (v3.4)
+  // ============================================================
+  "runArgs": [
+    // NETWORKING: Acesso ao Chrome do Windows (Host) via CDP
+    "--add-host=host.docker.internal:host-gateway",
+    // PERFORMANCE: Essencial para Puppeteer não "crashar" em sites pesados
+    "--shm-size=4g",
+    // STABILITY: Evita erro de "Too many open files" no VS Code/Node
+    "--ulimit",
+    "nofile=65536:65536",
+    // IDENTITY: Permite que o usuário dinâmico use o Docker CLI do Host
+    "--group-add=docker", //Isso equivale a root no host.
+    // METADATA: Sincronizado com a Section 0 do Dockerfile
+    "--label",
+    "project=chatgpt-docker-puppeteer",
+    "--label",
+    "role=devcontainer",
+    "--label",
+    "version=3.4.0"
+  ],
+  // ============================================================
+  // LIFECYCLE HOOKS - Sincronia de Inicialização
+  // ============================================================
+  // O postCreateCommand agora assume a responsabilidade de linkar o
+  // histórico imortal e preparar o Claude/Puppeteer.
+  "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
+  // Roda toda vez que o container sobe (Validação técnica)
+  "postStartCommand": "make info",
+  // Roda quando você "entra" no terminal (Feedback visual humano)
+  "postAttachCommand": "bash .devcontainer/scripts/post-attach.sh",
+  // ============================================================
+  // VS CODE CUSTOMIZATIONS
+  // ============================================================
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // ========================================================
+        // EXTENSIONS AUTO-INSTALL — RATIONALE-DRIVEN SELECTION
+        // ========================================================
+        // Objetivo:
+        // - Não duplicar funcionalidades nativas do VS Code
+        // - Não competir com GitHub Copilot
+        // - Cobrir lacunas reais: infraestrutura, testes, scripts e observabilidade
+        // - Favorecer um fluxo Makefile-first + DevContainer-first
         //
-        // Observação:
-        // - Esta porta representa a FRONTEIRA LÓGICA do browser
-        // - Não é UI, não é debug humano
-        // - Pode ser manualmente encaminhada se necessário
-        // - O sistema NÃO depende de auto-forward para funcionar
+        // Critério de inclusão:
+        // ✔ VS Code não faz isso nativamente (ou faz pior)
+        // ✔ Copilot não substitui essa funcionalidade
+        // ✔ Melhora confiabilidade, legibilidade ou diagnóstico
         //
-        "9224": {
-            "label": "Chrome Proxy Service — Fronteira Arquitetural",
-            "onAutoForward": "ignore"
+        // Funcionalidades NATIVAS do VS Code (não requerem extensões):
+        // - Auto Close/Rename Tags
+        // - Bracket Pair Colorization
+        // - Indent Guides
+        // - NPM Scripts Explorer
+        // - Node.js Debugger
+        // ========================================================
+        // === CORE ESSENTIALS (Execution, Automation, AI) ===
+        "dbaeumer.vscode-eslint", // Linting JS/Node (depende de node_modules)
+        "esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
+        "ms-azuretools.vscode-docker", // Docker / DevContainer DX
+        "GitHub.copilot", // Assistente IA
+        "GitHub.copilot-chat", // Chat contextual com IA
+        "ms-vscode.makefile-tools", // Makefile como árbitro do sistema
+        // === GIT & VERSION CONTROL (Insight, not operations) ===
+        "eamodio.gitlens", // Histórico avançado, blame, graph
+        // === CODE QUALITY & STRUCTURE ===
+        "usernamehw.errorlens", // Erros e warnings inline
+        "christian-kohler.path-intellisense", // Autocomplete de paths
+        "christian-kohler.npm-intellisense", // Autocomplete de módulos npm
+        "aaron-bond.better-comments", // TODO / FIXME estruturados
+        "EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
+        "redhat.vscode-yaml", // YAML com schema e validação
+        "eriklynd.json-tools", // Manipulação e validação JSON
+        // === PRODUCTIVITY & OPERATIONS ===
+        "gruntfuggly.todo-tree", // Visão global de TODOs
+        "humao.rest-client", // Testes de API dentro do editor
+        "yzhang.markdown-all-in-one", // Documentação Markdown viva
+        "pflannery.vscode-versionlens", // Visibilidade de versões de deps
+        "hbenl.vscode-test-explorer", // UI unificada para testes (Makefile-friendly)
+        // === NAVIGATION & COMPREHENSION ===
+        // === VISUAL & UX (Low noise, high clarity) ===
+        "PKief.material-icon-theme", // Ícones de arquivos
+        "streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
+        "streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
+        "oderwat.indent-rainbow", // Indentação visual por nível
+        "ms-vscode.powershell" //
+      ],
+      "settings": {
+        // ========================================================
+        // TERMINAL (UX & Performance)
+        // Bash = canônico | PowerShell = instrumental / IA-friendly
+        // ========================================================
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          // ----------------------------------------------------
+          // Bash — SHELL CANÔNICO (infra, automação, build)
+          // ----------------------------------------------------
+          "bash": {
+            "path": "/bin/bash",
+            "icon": "terminal-bash",
+            "args": []
+          },
+          // ----------------------------------------------------
+          // PowerShell — INSTRUMENTAL / SEMÂNTICO / IA-FRIENDLY
+          //
+          // • Não é default
+          // • Não governa automação
+          // • Carrega contrato global automaticamente
+          // ----------------------------------------------------
+          "pwsh": {
+            "path": "/usr/bin/pwsh",
+            "icon": "terminal-powershell",
+            "args": [
+              "-NoLogo"
+            ]
+          }
+        },
+        // --------------------------------------------------------
+        // COMPORTAMENTO GERAL DO TERMINAL
+        // --------------------------------------------------------
+        "terminal.integrated.persistentSessionReviveProcess": "onExit",
+        "terminal.integrated.scrollback": 20000,
+        "terminal.integrated.cursorBlinking": true,
+        "terminal.integrated.enableMultiLinePasteWarning": "never",
+        "terminal.integrated.copyOnSelection": true,
+        "terminal.integrated.drawBoldTextInInvertedColors": true,
+        "terminal.integrated.gpuAcceleration": "auto",
+        "terminal.integrated.inheritEnv": true,
+        "terminal.integrated.detectLocale": "off",
+        // ========================================================
+        // FILE SYSTEM & SEARCH (A Blindagem)
+        // ========================================================
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/logs/**": true,
+          "**/.git/objects/**": true,
+          "**/profile/**": true,
+          "**/respostas/**": true,
+          "**/.claude/**": true, // NOVO: Evita indexar estados pesados da IA
+          "**/.cache/**": true, // NOVO: Protege contra cache do Puppeteer/NPM
+          "**/node-history/**": true // NOVO: O histórico é para o shell, não para o editor
+        },
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/logs": true,
+          "**/profile": true,
+          "**/respostas": true,
+          "**/.claude": true,
+          "**/.cache": true
+        },
+        "files.autoSave": "onFocusChange",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "files.associations": {
+          "*.env*": "dotenv",
+          "Makefile": "makefile"
+        },
+        // ========================================================
+        // EDITOR UX (Acessibilidade do Código)
+        // ========================================================
+        "editor.stickyScroll.enabled": true, // Facilita navegar em classes longas do KERNEL
+        "editor.minimap.maxColumn": 80,
+        // ========================================================
+        // GIT (fluxo profissional, baixo atrito)
+        // ========================================================
+        "git.autofetch": true,
+        "git.confirmSync": false,
+        "git.enableSmartCommit": true,
+        "git.decorations.enabled": true,
+        // ========================================================
+        // EDITOR & FORMATTING (controle humano explícito)
+        // ========================================================
+        "editor.formatOnSave": true,
+        //"editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit",
+          "source.organizeImports": "explicit"
+        },
+        "editor.bracketPairColorization.enabled": true,
+        "editor.guides.indentation": true,
+        "editor.renderWhitespace": "boundary",
+        "editor.minimap.enabled": true,
+        "editor.minimap.renderCharacters": false,
+        "editor.smoothScrolling": true,
+        // ========================================================
+        // JAVASCRIPT / NODE.JS (infra + backend)
+        // ========================================================
+        "javascript.preferences.importModuleSpecifier": "relative",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "debug.javascript.autoAttachFilter": "onlyWithFlag",
+        //"[javascript]": {
+        //   "editor.defaultFormatter": "esbenp.prettier-vscode"
+        //},
+        // ========================================================
+        // ESLINT (fonte de verdade para qualidade)
+        // ========================================================
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact"
+        ],
+        "eslint.workingDirectories": [
+          {
+            "mode": "auto"
+          }
+        ],
+        "eslint.alwaysShowStatus": true,
+        // ========================================================
+        // PRETTIER (somente com configuração explícita)
+        // ========================================================
+        // "prettier.requireConfig": true,
+        // ========================================================
+        // TESTING (Jest + Test Explorer)
+        // ========================================================
+        "testExplorer.useNativeTesting": false,
+        "jest.runMode": "on-demand",
+        "jest.autoRun": "off",
+        // ========================================================
+        // YAML / JSON / SHELL (infra, contratos, scripts)
+        // ========================================================
+        "yaml.validate": true,
+        "json.validate.enable": true,
+        "shellcheck.enable": true,
+        // ========================================================
+        // MARKDOWN & DOCUMENTATION
+        // ========================================================
+        "markdown.preview.breaks": true,
+        "markdown.preview.scrollPreviewWithEditor": true,
+        // ========================================================
+        // SPELL CHECKER (EN + PT-BR)
+        // ========================================================
+        "cSpell.language": "pt-BR,en",
+        "cSpell.enabledFileTypes": {
+          "javascript": true,
+          "markdown": true,
+          "json": true,
+          "yaml": true
+        },
+        // ========================================================
+        // REFERENCES & NAVIGATION
+        // ========================================================
+        "references.preferredLocation": "peek",
+        // ========================================================
+        // WORKSPACE TRUST & SECURITY
+        // ========================================================
+        "security.workspace.trust.enabled": true,
+        // ========================================================
+        // TELEMETRY & NOISE REDUCTION
+        // ========================================================
+        "telemetry.telemetryLevel": "off",
+        "github.copilot.enable": {
+          "*": true,
+          "markdown": true,
+          "plaintext": false
+        },
+        "github.copilot.advanced": {
+          "debug.overrideEngine": "stable"
         }
-    },
+      }
+    }
+  },
+  "mounts": [
+    // ============================================================================
+    // NOTA NORMATIVA — MOUNTS VS VARIÁVEIS (CONTRATO DE FASE)
+    // ----------------------------------------------------------------------------
+    // Esta seção opera no PLANO INFRAESTRUTURAL do Docker.
+    //
+    // Regras não negociáveis:
+    // • O Docker resolve mounts ANTES da inicialização do container
+    // • O campo `target=` DEVE ser um caminho absoluto e literal
+    // • Variáveis (ex.: ${containerUserHome}) NÃO são expandidas em mounts
+    //
+    // Implicação arquitetural:
+    // • `mounts` materializam decisões já tomadas (infraestrutura concreta)
+    // • `containerEnv` expressa semântica dinâmica (comportamento do sistema)
+    //
+    // Portanto:
+    // • Nunca usar variáveis em `target=` de mounts
+    // • Usar caminhos literais coerentes com `remoteUser`
+    // • Centralizar abstrações dinâmicas exclusivamente em `containerEnv`
+    //
+    // Violação deste contrato resulta em erro fatal no `docker run`.
+    // ============================================================================
+    // =====================================================================
+    // CORE — CACHE & PERFORMANCE (XDG_CACHE_HOME)
+    // ---------------------------------------------------------------------
+    // • Cache genérico de ferramentas, linguagens e utilitários
+    // • Acelera rebuilds e reduz reindexação
+    // • Seguro para purge eventual
+    // =====================================================================
+    "source=devcontainer-cache,target=/home/node/.cache,type=volume",
+    // Cache específico e pesado do Puppeteer (isolado por motivo técnico)
+    // • Evita downloads repetidos
+    // • Não deve ser compartilhado com outros caches
+    "source=devcontainer-puppeteer-cache,target=/home/node/.cache/puppeteer,type=volume",
+    // Cache dedicado do TypeScript / JavaScript Language Server
+    // • Melhora IntelliSense e Copilot em projetos grandes
+    // • Reduz reindexação após rebuild
+    "source=devcontainer-ts-cache,target=/home/node/.cache/typescript,type=volume",
+    // =====================================================================
+    // NODE / PACKAGE ECOSYSTEM
+    // ---------------------------------------------------------------------
+    // • Persistência correta do ecossistema Node
+    // • NÃO persiste node_modules (por design)
+    // =====================================================================
+    // npm cache (respeita NPM_CONFIG_CACHE)
+    "source=devcontainer-npm-cache,target=/home/node/.npm,type=volume",
+    // npm-global (bins globais, se utilizados)
+    "source=devcontainer-npm-global,target=/home/node/.npm-global,type=volume",
+    // =====================================================================
+    // PROCESS & RUNTIME STATE
+    // ---------------------------------------------------------------------
+    // • Estado de processos gerenciados (PM2)
+    // • Logs, dumps e PIDs
+    // =====================================================================
+    "source=devcontainer-pm2-state,target=/home/node/.pm2,type=volume",
+    // =====================================================================
+    // USER CONFIGURATION (XDG — CONFIG / SHARE / STATE)
+    // ---------------------------------------------------------------------
+    // • Fonte de verdade para preferências do usuário
+    // • Inclui GitHub Copilot, Copilot Chat e extensões
+    // =====================================================================
+    // XDG_CONFIG_HOME
+    "source=devcontainer-user-config,target=/home/node/.config,type=volume",
+    // XDG_DATA_HOME
+    "source=devcontainer-local-share,target=/home/node/.local/share,type=volume",
+    // XDG_STATE_HOME
+    // • Estado transitório de ferramentas, incluindo Copilot Chat
+    "source=devcontainer-local-state,target=/home/node/.local/state,type=volume",
+    // =====================================================================
+    // AI / AGENT STATE
+    // ---------------------------------------------------------------------
+    // • Estado persistente de agentes locais (Claude, etc.)
+    // • NÃO inclui memória semântica remota (server-side)
+    // =====================================================================
+    "source=devcontainer-claude-state,target=/home/node/.claude,type=volume",
+    // =====================================================================
+    // IDENTITY & SECRETS (STRICT, NÃO COPIAR)
+    // ---------------------------------------------------------------------
+    // • Chaves NUNCA são persistidas como volume
+    // • Apenas forwarding seguro via agent
+    // =====================================================================
+    // =========================================================
+    // SSH AGENT FORWARDING — CANÔNICO (WSL / WINDOWS / LINUX)
+    // ---------------------------------------------------------
+    // Estratégia correta:
+    // • O SSH Agent roda no HOST ou no WSL
+    // • No WSL, ele expõe um *socket UNIX real*
+    // • Criamos um symlink estável (/tmp/ssh-agent.sock)
+    // • O Docker bind-mounta APENAS esse socket UNIX
+    //
+    // Benefícios:
+    // • Funciona no Windows, WSL e Linux nativo
+    // • Evita Named Pipes (incompatíveis com Docker)
+    // • Nenhuma chave privada entra no container
+    // • Compatível com Git, GitHub, Copilot, CI e IA
+    // =========================================================
+    // "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+    // GnuPG keyring (persistente, mas isolado)
+    "source=devcontainer-gpg-cache,target=/home/node/.gnupg,type=volume",
+    // =====================================================================
+    // VS CODE SERVER (PERFORMANCE CRÍTICO)
+    // ---------------------------------------------------------------------
+    // • Binário do VS Code Server
+    // • Extensões (incluindo Copilot)
+    // • Estado de autenticação e UX
+    //
+    // ⚠️ Volume sensível — purge apenas se necessário
+    // =====================================================================
+    "source=devcontainer-vscode-server,target=/home/node/.vscode-server,type=volume",
+    // =====================================================================
+    // UX — HISTÓRICO DE SHELL (FORA DO $HOME POR DESIGN)
+    // ---------------------------------------------------------------------
+    // • Histórico persistente entre rebuilds
+    // • Não polui o $HOME
+    // =====================================================================
+    "source=devcontainer-bash-history,target=/home/node-history,type=volume",
+    // =====================================================================
+    // INFRASTRUCTURE (DEV ONLY — ALTO PRIVILÉGIO)
+    // ---------------------------------------------------------------------
+    // • Docker CLI usa o socket do host
+    // • Equivale a root no host
+    // • NUNCA usar em produção
+    // =====================================================================
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  // ============================================================
+  // CONTAINER ENVIRONMENT VARIABLES (Simbiose v3.4)
+  // ============================================================
+  "containerEnv": {
+    // ------------------------------------------------------------
+    // APP IDENTITY
+    // ------------------------------------------------------------
+    "NODE_ENV": "development",
+    "APP_ENV": "dev",
+    "APP_ROLE": "agent",
+    "APP_NAME": "chatgpt-docker-puppeteer",
+    // ------------------------------------------------------------
+    // DYNAMIC PATHS (O Fim do Hardcode)
+    // ------------------------------------------------------------
+    // Usamos ${containerUserHome} para herdar o caminho real da home.
+    // Isso sincroniza com o Dockerfile e os Mounts automaticamente.
+    "HOME_DIR": "${containerUserHome}",
+    "PM2_HOME": "${containerUserHome}/.pm2",
+    "NPM_CONFIG_CACHE": "${containerUserHome}/.npm",
+    "NPM_CONFIG_PREFIX": "${containerUserHome}/.npm-global",
+    // XDG Enforcement (Garante que ferramentas CLI obedeçam)
+    "XDG_CONFIG_HOME": "${containerUserHome}/.config",
+    "XDG_CACHE_HOME": "${containerUserHome}/.cache",
+    "PUPPETEER_CACHE_DIR": "${containerUserHome}/.cache/puppeteer",
+    // ------------------------------------------------------------
+    // PUPPETEER & CHROME (Host Integration)
+    // ------------------------------------------------------------
+    "PUPPETEER_MODE": "connect",
+    //"PUPPETEER_WS_ENDPOINT": "http://host.docker.internal:9224",
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+    "PUPPETEER_CONNECT_TIMEOUT": "30000",
+    "PUPPETEER_LOCAL_LAUNCH_DISABLED": "true",
+    "PUPPETEER_ARCHITECTURE": "external-browser-via-proxy",
+    // ------------------------------------------------------------
+    // RUNTIME TUNING (Performance & Noise)
+    // ------------------------------------------------------------
+    "NODE_OPTIONS": "--max-old-space-size=6144",
+    // --trace-gc-ignored-scavenger não é permitido em .DevContainer
+    "NPM_CONFIG_LOGLEVEL": "warn",
+    "NPM_CONFIG_AUDIT": "false",
+    "NPM_CONFIG_FUND": "false",
+    "LOG_LEVEL": "debug",
+    "DEBUG": "puppeteer:*,agent:*",
+    "FORCE_COLOR": "1",
     // ============================================================
-    // RUNTIME ARGS - Docker runtime configuration
+    // FILE WATCHING & VS CODE INTERNALS
     // ============================================================
+    // Mantido para garantir que o hot-reload funcione no Windows/Docker
+    "WATCHPACK_POLLING": "true",
+    "CHOKIDAR_USEPOLLING": "true",
+    "CHOKIDAR_INTERVAL": "1000",
+    // Variáveis de instrumentação (estabilidade de telemetria do servidor)
+    "VSCODE_INSTRUMENTATION": "true",
+    "VSCODE_SERVER_ROLE": "instrumentation",
+    "VSCODE_SERVER_EXPECTED": "true",
     // ============================================================
-    // RUNTIME ARGS - Docker runtime configuration (v3.4)
+    // LOCALE & DOCKER ENGINE
     // ============================================================
-    "runArgs": [
-        // NETWORKING: Acesso ao Chrome do Windows (Host) via CDP
-        "--add-host=host.docker.internal:host-gateway",
-        // PERFORMANCE: Essencial para Puppeteer não "crashar" em sites pesados
-        "--shm-size=4g",
-        // STABILITY: Evita erro de "Too many open files" no VS Code/Node
-        "--ulimit",
-        "nofile=65536:65536",
-        // IDENTITY: Permite que o usuário dinâmico use o Docker CLI do Host
-        "--group-add=docker",
-        // METADATA: Sincronizado com a Section 0 do Dockerfile
-        "--label",
-        "project=chatgpt-docker-puppeteer",
-        "--label",
-        "role=devcontainer",
-        "--label",
-        "version=3.4.0"
-    ],
-    // ============================================================
-    // LIFECYCLE HOOKS - Sincronia de Inicialização
-    // ============================================================
-    // O postCreateCommand agora assume a responsabilidade de linkar o
-    // histórico imortal e preparar o Claude/Puppeteer.
-    "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
-    // Roda toda vez que o container sobe (Validação técnica)
-    "postStartCommand": "make info",
-    // Roda quando você "entra" no terminal (Feedback visual humano)
-    "postAttachCommand": "bash .devcontainer/scripts/post-attach.sh",
-    // ============================================================
-    // VS CODE CUSTOMIZATIONS
-    // ============================================================
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                // ========================================================
-                // EXTENSIONS AUTO-INSTALL — RATIONALE-DRIVEN SELECTION
-                // ========================================================
-                // Objetivo:
-                // - Não duplicar funcionalidades nativas do VS Code
-                // - Não competir com GitHub Copilot
-                // - Cobrir lacunas reais: infraestrutura, testes, scripts e observabilidade
-                // - Favorecer um fluxo Makefile-first + DevContainer-first
-                //
-                // Critério de inclusão:
-                // ✔ VS Code não faz isso nativamente (ou faz pior)
-                // ✔ Copilot não substitui essa funcionalidade
-                // ✔ Melhora confiabilidade, legibilidade ou diagnóstico
-                //
-                // Funcionalidades NATIVAS do VS Code (não requerem extensões):
-                // - Auto Close/Rename Tags
-                // - Bracket Pair Colorization
-                // - Indent Guides
-                // - NPM Scripts Explorer
-                // - Node.js Debugger
-                // ========================================================
-                // === CORE ESSENTIALS (Execution, Automation, AI) ===
-                "dbaeumer.vscode-eslint", // Linting JS/Node (depende de node_modules)
-                "esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
-                "ms-azuretools.vscode-docker", // Docker / DevContainer DX
-                "GitHub.copilot", // Assistente IA
-                "GitHub.copilot-chat", // Chat contextual com IA
-                "ms-vscode.makefile-tools", // Makefile como árbitro do sistema
-                // === GIT & VERSION CONTROL (Insight, not operations) ===
-                "eamodio.gitlens", // Histórico avançado, blame, graph
-                // === CODE QUALITY & STRUCTURE ===
-                "usernamehw.errorlens", // Erros e warnings inline
-                "christian-kohler.path-intellisense", // Autocomplete de paths
-                "christian-kohler.npm-intellisense", // Autocomplete de módulos npm
-                "aaron-bond.better-comments", // TODO / FIXME estruturados
-                "EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
-                "timonwong.shellcheck", // Análise estática de scripts .sh
-                "redhat.vscode-yaml", // YAML com schema e validação
-                "eriklynd.json-tools", // Manipulação e validação JSON
-                // === PRODUCTIVITY & OPERATIONS ===
-                "gruntfuggly.todo-tree", // Visão global de TODOs
-                "humao.rest-client", // Testes de API dentro do editor
-                "yzhang.markdown-all-in-one", // Documentação Markdown viva
-                "pflannery.vscode-versionlens", // Visibilidade de versões de deps
-                "hbenl.vscode-test-explorer", // UI unificada para testes (Makefile-friendly)
-                // === NAVIGATION & COMPREHENSION ===
-                // === VISUAL & UX (Low noise, high clarity) ===
-                "PKief.material-icon-theme", // Ícones de arquivos
-                "streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
-                "streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
-                "oderwat.indent-rainbow" // Indentação visual por nível
-            ],
-            "settings": {
-                // ========================================================
-                // TERMINAL (UX & Performance)
-                // ========================================================
-                "terminal.integrated.defaultProfile.linux": "bash",
-                "terminal.integrated.profiles.linux": {
-                    "bash": {
-                        "path": "/bin/bash",
-                        "icon": "terminal-bash"
-                    }
-                },
-                "terminal.integrated.persistentSessionReviveProcess": "onExit",
-                "terminal.integrated.scrollback": 20000,
-                "terminal.integrated.cursorBlinking": true,
-                "terminal.integrated.enableMultiLinePasteWarning": "never",
-                "terminal.integrated.copyOnSelection": true, // Agiliza cópia de logs/tokens
-                "terminal.integrated.drawBoldTextInInvertedColors": true,
-                "terminal.integrated.gpuAcceleration": "auto", // Melhora a fluidez no Windows/WSL
-                "terminal.integrated.inheritEnv": true,
-                "terminal.integrated.detectLocale": "off",
-                // ========================================================
-                // FILE SYSTEM & SEARCH (A Blindagem)
-                // ========================================================
-                "files.watcherExclude": {
-                    "**/node_modules/**": true,
-                    "**/logs/**": true,
-                    "**/.git/objects/**": true,
-                    "**/profile/**": true,
-                    "**/respostas/**": true,
-                    "**/.claude/**": true, // NOVO: Evita indexar estados pesados da IA
-                    "**/.cache/**": true, // NOVO: Protege contra cache do Puppeteer/NPM
-                    "**/node-history/**": true // NOVO: O histórico é para o shell, não para o editor
-                },
-                "search.exclude": {
-                    "**/node_modules": true,
-                    "**/logs": true,
-                    "**/profile": true,
-                    "**/respostas": true,
-                    "**/.claude": true,
-                    "**/.cache": true
-                },
-                "files.autoSave": "onFocusChange",
-                "files.trimTrailingWhitespace": true,
-                "files.insertFinalNewline": true,
-                "files.associations": {
-                    "*.env*": "dotenv",
-                    "Makefile": "makefile"
-                },
-                // ========================================================
-                // EDITOR UX (Acessibilidade do Código)
-                // ========================================================
-                "editor.stickyScroll.enabled": true, // Facilita navegar em classes longas do KERNEL
-                "editor.minimap.maxColumn": 80,
-                // ========================================================
-                // GIT (fluxo profissional, baixo atrito)
-                // ========================================================
-                "git.autofetch": true,
-                "git.confirmSync": false,
-                "git.enableSmartCommit": true,
-                "git.decorations.enabled": true,
-                // ========================================================
-                // EDITOR & FORMATTING (controle humano explícito)
-                // ========================================================
-                "editor.formatOnSave": true,
-                //"editor.defaultFormatter": "esbenp.prettier-vscode",
-                "editor.codeActionsOnSave": {
-                    "source.fixAll.eslint": "explicit",
-                    "source.organizeImports": "explicit"
-                },
-                "editor.bracketPairColorization.enabled": true,
-                "editor.guides.indentation": true,
-                "editor.renderWhitespace": "boundary",
-                "editor.minimap.enabled": true,
-                "editor.minimap.renderCharacters": false,
-                "editor.smoothScrolling": true,
-                // ========================================================
-                // JAVASCRIPT / NODE.JS (infra + backend)
-                // ========================================================
-                "javascript.preferences.importModuleSpecifier": "relative",
-                "javascript.updateImportsOnFileMove.enabled": "always",
-                "debug.javascript.autoAttachFilter": "onlyWithFlag",
-                //"[javascript]": {
-                //   "editor.defaultFormatter": "esbenp.prettier-vscode"
-                //},
-                // ========================================================
-                // ESLINT (fonte de verdade para qualidade)
-                // ========================================================
-                "eslint.validate": [
-                    "javascript",
-                    "javascriptreact"
-                ],
-                "eslint.workingDirectories": [
-                    {
-                        "mode": "auto"
-                    }
-                ],
-                "eslint.alwaysShowStatus": true,
-                // ========================================================
-                // PRETTIER (somente com configuração explícita)
-                // ========================================================
-                "prettier.requireConfig": true,
-                // ========================================================
-                // TESTING (Jest + Test Explorer)
-                // ========================================================
-                "testExplorer.useNativeTesting": false,
-                "jest.runMode": "on-demand",
-                "jest.autoRun": "off",
-                // ========================================================
-                // YAML / JSON / SHELL (infra, contratos, scripts)
-                // ========================================================
-                "yaml.validate": true,
-                "json.validate.enable": true,
-                "shellcheck.enable": true,
-                // ========================================================
-                // MARKDOWN & DOCUMENTATION
-                // ========================================================
-                "markdown.preview.breaks": true,
-                "markdown.preview.scrollPreviewWithEditor": true,
-                // ========================================================
-                // SPELL CHECKER (EN + PT-BR)
-                // ========================================================
-                "cSpell.language": "pt-BR,en",
-                "cSpell.enabledFileTypes": {
-                    "javascript": true,
-                    "markdown": true,
-                    "json": true,
-                    "yaml": true
-                },
-                // ========================================================
-                // REFERENCES & NAVIGATION
-                // ========================================================
-                "references.preferredLocation": "peek",
-                // ========================================================
-                // WORKSPACE TRUST & SECURITY
-                // ========================================================
-                "security.workspace.trust.enabled": true,
-                // ========================================================
-                // TELEMETRY & NOISE REDUCTION
-                // ========================================================
-                "telemetry.telemetryLevel": "off",
-                "github.copilot.enable": {
-                    "*": true,
-                    "markdown": true,
-                    "plaintext": false
-                },
-                "github.copilot.advanced": {
-                    "debug.overrideEngine": "stable"
-                }
-            }
-        }
-    },
-    "mounts": [
-        // =========================================================
-        // CORE: CACHE & PERFORMANCE (XDG-CACHE)
-        // =========================================================
-        // Cache geral (npm, ferramentas, libs transitórias)
-        "source=devcontainer-cache,target=${containerUserHome}/.cache,type=volume",
-        // Cache específico e pesado do Puppeteer (isolado por motivo técnico)
-        "source=devcontainer-puppeteer-cache,target=${containerUserHome}/.cache/puppeteer,type=volume",
-        // =========================================================
-        // NODE / PACKAGE ECOSYSTEM
-        // =========================================================
-        // npm cache (respeita NPM_CONFIG_CACHE)
-        "source=devcontainer-npm-cache,target=${containerUserHome}/.npm,type=volume",
-        // npm-global (bins globais, se usados)
-        "source=devcontainer-npm-global,target=${containerUserHome}/.npm-global,type=volume",
-        // =========================================================
-        // PROCESS & RUNTIME STATE
-        // =========================================================
-        // PM2 runtime state (logs, pids, dumps)
-        "source=devcontainer-pm2-state,target=${containerUserHome}/.pm2,type=volume",
-        // =========================================================
-        // USER CONFIGURATION (XDG)
-        // =========================================================
-        "source=devcontainer-user-config,target=${containerUserHome}/.config,type=volume",
-        "source=devcontainer-local-share,target=${containerUserHome}/.local/share,type=volume",
-        "source=devcontainer-local-state,target=${containerUserHome}/.local/state,type=volume",
-        // =========================================================
-        // AI / AGENT STATE
-        // =========================================================
-        // Estado persistente de agentes (Claude, etc.)
-        "source=devcontainer-claude-state,target=${containerUserHome}/.claude,type=volume",
-        // =========================================================
-        // IDENTITY & SECRETS (STRICT)
-        // =========================================================
-        //"source=devcontainer-ssh-cache,target=${containerUserHome}/.ssh,type=volume",
-        "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
-        "source=devcontainer-gpg-cache,target=${containerUserHome}/.gnupg,type=volume",
-        // =========================================================
-        // VS CODE SERVER (PERFORMANCE CRÍTICO)
-        // =========================================================
-        // Atenção: volume sensível — pode exigir purge ocasional
-        "source=devcontainer-vscode-server,target=${containerUserHome}/.vscode-server,type=volume",
-        // =========================================================
-        // UX: HISTÓRICO DE SHELL (FORA DO $HOME)
-        // =========================================================
-        "source=devcontainer-bash-history,target=/home/${containerUser}-history,type=volume",
-        // ⚠️ DEV ONLY:
-        // Docker CLI usa o socket do host.
-        // Isso equivale a root no host. Nunca usar em produção.
-        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-    ],
-    // ============================================================
-    // CONTAINER ENVIRONMENT VARIABLES (Simbiose v3.4)
-    // ============================================================
-    "containerEnv": {
-        // ------------------------------------------------------------
-        // APP IDENTITY
-        // ------------------------------------------------------------
-        "NODE_ENV": "development",
-        "APP_ENV": "dev",
-        "APP_ROLE": "agent",
-        "APP_NAME": "chatgpt-docker-puppeteer",
-        // ------------------------------------------------------------
-        // DYNAMIC PATHS (O Fim do Hardcode)
-        // ------------------------------------------------------------
-        // Usamos ${containerUserHome} para herdar o caminho real da home.
-        // Isso sincroniza com o Dockerfile e os Mounts automaticamente.
-        "HOME_DIR": "${containerUserHome}",
-        "PM2_HOME": "${containerUserHome}/.pm2",
-        "NPM_CONFIG_CACHE": "${containerUserHome}/.npm",
-        "NPM_CONFIG_PREFIX": "${containerUserHome}/.npm-global",
-        // XDG Enforcement (Garante que ferramentas CLI obedeçam)
-        "XDG_CONFIG_HOME": "${containerUserHome}/.config",
-        "XDG_CACHE_HOME": "${containerUserHome}/.cache",
-        "PUPPETEER_CACHE_DIR": "${containerUserHome}/.cache/puppeteer",
-        // ------------------------------------------------------------
-        // PUPPETEER & CHROME (Host Integration)
-        // ------------------------------------------------------------
-        "PUPPETEER_MODE": "connect",
-        //"PUPPETEER_WS_ENDPOINT": "http://host.docker.internal:9224",
-        "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-        "PUPPETEER_CONNECT_TIMEOUT": "30000",
-        "PUPPETEER_LOCAL_LAUNCH_DISABLED": "true",
-        "PUPPETEER_ARCHITECTURE": "external-browser-via-proxy",
-        // ------------------------------------------------------------
-        // RUNTIME TUNING (Performance & Noise)
-        // ------------------------------------------------------------
-        "NODE_OPTIONS": "--max-old-space-size=4096",
-        "NPM_CONFIG_LOGLEVEL": "warn",
-        "NPM_CONFIG_AUDIT": "false",
-        "NPM_CONFIG_FUND": "false",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "puppeteer:*,agent:*",
-        "FORCE_COLOR": "1",
-        // ============================================================
-        // FILE WATCHING & VS CODE INTERNALS
-        // ============================================================
-        // Mantido para garantir que o hot-reload funcione no Windows/Docker
-        "WATCHPACK_POLLING": "true",
-        // Variáveis de instrumentação (estabilidade de telemetria do servidor)
-        "VSCODE_INSTRUMENTATION": "true",
-        "VSCODE_SERVER_ROLE": "instrumentation",
-        "VSCODE_SERVER_EXPECTED": "true",
-        // ============================================================
-        // LOCALE & DOCKER ENGINE
-        // ============================================================
-        "TZ": "America/Sao_Paulo",
-        "LANG": "pt_BR.UTF-8",
-        "LC_ALL": "pt_BR.UTF-8",
-        "DOCKER_BUILDKIT": "1",
-        "DEVCONTAINER_DOCKER_ENABLED": "true",
-        "SSH_AUTH_SOCK": "/ssh-agent"
-    },
-    // ============================================================
-    // SECURITY & USER CONFIGURATION
-    // ============================================================
-    // "node" é o valor que alimenta a variável ${containerUser}
-    "remoteUser": "node",
-    "updateRemoteUserUID": false,
-    "privileged": false,
-    // ============================================================
-    // RESOURCE LIMITS (Proteção do Host)
-    // ============================================================
-    "hostRequirements": {
-        "cpus": 4,
-        "memory": "4gb",
-        "storage": "32gb"
-    },
-    // ============================================================
-    // LIFECYCLE FINALIZATION
-    // ============================================================
-    "shutdownAction": "stopContainer",
-    "waitFor": "postStartCommand"
+    "TZ": "America/Sao_Paulo",
+    "LANG": "pt_BR.UTF-8",
+    "DOCKER_BUILDKIT": "1",
+    "DEVCONTAINER_DOCKER_ENABLED": "true"
+    //"SSH_AUTH_SOCK": "/ssh-agent"
+  },
+  // ============================================================
+  // SECURITY & USER CONFIGURATION
+  // ============================================================
+  // "node" é o valor que alimenta a variável ${containerUser}
+  "remoteUser": "node",
+  "updateRemoteUserUID": false,
+  "privileged": false,
+  // ============================================================
+  // RESOURCE LIMITS (Proteção do Host)
+  // ============================================================
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "40gb"
+  },
+  // ============================================================
+  // LIFECYCLE FINALIZATION
+  // ============================================================
+  "shutdownAction": "stopContainer",
+  "waitFor": "postStartCommand"
 }

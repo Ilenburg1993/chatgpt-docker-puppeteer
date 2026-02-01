@@ -140,6 +140,16 @@ fi
 log "Validando integridade estrutural dos volumes (Sincronia Total)..."
 
 # ---------------------------------------------------------------------------
+# FASE WINDOWS (NO-SSH)
+# Se SSH_AUTH_SOCK não foi injetado deliberadamente, toda a lógica SSH é suspensa
+# ---------------------------------------------------------------------------
+if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
+    SSH_PHASE_DISABLED=true
+else
+    SSH_PHASE_DISABLED=false
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Lista canônica de volumes (sincronizada com devcontainer.json)
 # ---------------------------------------------------------------------------
 readonly VOLUME_DIRS=(
@@ -155,6 +165,7 @@ readonly VOLUME_DIRS=(
     "${HOME_DIR}/.ssh"
     "${HOME_DIR}/.gnupg"
     "${HOME_DIR}/.vscode-server"
+    "${HOME_DIR}/.cache/typescript"
     "/home/${CURRENT_USER}-history"
 )
 
@@ -208,15 +219,17 @@ done
 # • A ausência NÃO é erro fatal (apenas desativa Git/SSH autenticado)
 # • Este script NUNCA tenta iniciar ssh-agent
 # ---------------------------------------------------------------------------
-if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
-    warn "SSH Agent: SSH_AUTH_SOCK não definido — agent forwarding INATIVO."
-    warn "→ Git/SSH autenticado pode falhar (esperado se não configurado)."
-elif [[ ! -S "${SSH_AUTH_SOCK}" ]]; then
-    warn "SSH Agent: SSH_AUTH_SOCK definido, mas socket inválido: ${SSH_AUTH_SOCK}"
-    warn "→ Verifique mount do socket e ssh-agent no host."
+if [[ "${SSH_PHASE_DISABLED}" == "true" ]]; then
+    log "SSH: Contrato desativado nesta fase (Windows / No-SSH)."
 else
-    log "SSH Agent: Forwarding ativo (${SSH_AUTH_SOCK})"
+    if [[ ! -S "${SSH_AUTH_SOCK}" ]]; then
+        warn "SSH Agent: socket inválido: ${SSH_AUTH_SOCK}"
+        warn "→ Verifique mount do socket e ssh-agent no host."
+    else
+        log "SSH Agent: Forwarding ativo (${SSH_AUTH_SOCK})"
+    fi
 fi
+
 
 # ---------------------------------------------------------------------------
 # 4. SSH — Estrutura mínima e compatibilidade OpenSSH
@@ -227,7 +240,7 @@ fi
 #   • Permissões estritas (700 / 600)
 #   • Nenhuma chave é criada ou tocada
 # ---------------------------------------------------------------------------
-if [[ -d "${HOME_DIR}/.ssh" ]]; then
+if [[ "${SSH_PHASE_DISABLED}" != "true" && -d "${HOME_DIR}/.ssh" ]]; then
     # Criação defensiva do config (necessário para alguns clientes)
     if [[ ! -f "${HOME_DIR}/.ssh/config" ]]; then
         log "Audit: Inicializando ~/.ssh/config (defensivo)"
