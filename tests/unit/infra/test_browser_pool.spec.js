@@ -6,8 +6,11 @@ const BrowserPoolManager = require('../../../src/infra/browser_pool/pool_manager
     const config = {
         poolSize: 2,
         browserEndpoint: {
-            // Endpoint HTTP do Chrome/Chromium externo em execução
-            url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
+            // Endpoint HTTP do Chrome/Chromium externo em execução (prefer proxy)
+            url:
+                process.env.CHROME_WS_ENDPOINT ||
+                process.env.CHROME_URL ||
+                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`
         }
     };
 

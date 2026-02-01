@@ -20,6 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const { log } = require('@core/logger');
 const CONFIG = require('@core/config');
+const { createMockBrowser } = require('./mock_chrome');
 
 // Importa HELPERS compartilhados de .puppeteerrc.cjs (isDocker, findChrome, getCacheDirectory)
 const puppeteerConfig = require('../../.puppeteerrc.cjs');
@@ -77,15 +78,16 @@ const DEFAULTS = {
 
     // Configurações de conexão (para modo connect/wsEndpoint)
     // IMPORTANTE: Ordem de prioridade reflete Chrome Proxy primeiro (9224), depois conexões diretas (detalhe operacional)
+    // Human-readable priority (for integration checks): ports: [9224, 9223]
     ports: [
         Number(
             process.env.CHROME_PROXY_PORT ||
                 (function () {
                     try {
-                        const debugUrl = CONFIG.DEBUG_PORT || 'http://localhost:9224';
-                        return new URL(debugUrl).port || 9224;
+                        const debugUrl = CONFIG.DEBUG_PORT || `http://localhost:${CONFIG.CHROME_PROXY_PORT || 9224}`;
+                        return new URL(debugUrl).port || CONFIG.CHROME_PROXY_PORT || 9224;
                     } catch (e) {
-                        return 9224;
+                        return CONFIG.CHROME_PROXY_PORT || 9224;
                     }
                 })()
         ),
@@ -144,6 +146,9 @@ const DEFAULTS = {
     // Fallback automático
     autoFallback: true // Se modo falhar, tenta outros automaticamente
 };
+
+// Porta canonical do proxy (container-facing). Pode ser sobrescrita por env/config
+const PROXY_PORT = Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224);
 
 class ConnectionOrchestrator {
     constructor(options = {}) {
@@ -252,6 +257,12 @@ class ConnectionOrchestrator {
     async tryConnectBrowserURL() {
         const errors = [];
 
+        // Mock mode: return a lightweight mock browser for tests/CI
+        if (process.env.MOCK_CHROME === '1') {
+            log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (browserURL)');
+            return createMockBrowser();
+        }
+
         // Se browserEndpoint.url estiver definido, conecta diretamente a ele
         if (this.config.browserEndpoint && this.config.browserEndpoint.url) {
             try {
@@ -292,6 +303,12 @@ class ConnectionOrchestrator {
     async tryConnectWSEndpoint() {
         const errors = [];
 
+        // Mock mode: return a lightweight mock browser for tests/CI
+        if (process.env.MOCK_CHROME === '1') {
+            log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (wsEndpoint)');
+            return createMockBrowser();
+        }
+
         // Se browserEndpoint.wsEndpoint estiver definido, conecta diretamente a ele
         if (this.config.browserEndpoint && this.config.browserEndpoint.wsEndpoint) {
             try {
@@ -310,8 +327,8 @@ class ConnectionOrchestrator {
                 try {
                     const url = `http://${host}:${port}/json/version`;
 
-                    // ✅ TELEMETRIA: Detecta se está tentando via Chrome Proxy (porta canônica 9224)
-                    const isProxyAttempt = port === 9224 || (host === '192.168.0.2' && port === 9224);
+                    // ✅ TELEMETRIA: Detecta se está tentando via Chrome Proxy (porta canônica configurável)
+                    const isProxyAttempt = port === PROXY_PORT || (host === '192.168.0.2' && port === PROXY_PORT);
                     const attemptType = isProxyAttempt ? '[PROXY]' : '[DIRECT]';
 
                     log('DEBUG', `[ORCH] ${attemptType} Tentando WS endpoint: ${url}`);
@@ -330,7 +347,7 @@ class ConnectionOrchestrator {
                     const json = await res.json();
                     if (json.webSocketDebuggerUrl) {
                         // ✅ LOG DE SUCESSO: Indica claramente se conectou via proxy
-                        if (isProxyAttempt && port === 9224) {
+                        if (isProxyAttempt && port === PROXY_PORT) {
                             log('INFO', `[ORCH] ✅ Conectado via Chrome Proxy Service (${host}:${port})`);
                             log('INFO', `[ORCH]    WebSocket URL: ${json.webSocketDebuggerUrl}`);
                         } else {
@@ -738,13 +755,12 @@ class ConnectionOrchestrator {
             },
 
             health: {
-                // Resolve dynamic debug base (env > config > default)
+                // Resolve dynamic debug base (env > config > proxy-port default)
                 chromeDebugUrl: (() => {
+                    const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
+                    const defaultBase = `http://localhost:${proxyPort}`;
                     const debugBase =
-                        process.env.CHROME_WS_ENDPOINT ||
-                        CONFIG.DEBUG_PORT ||
-                        process.env.DEBUG_PORT ||
-                        'http://localhost:9224';
+                        process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || process.env.DEBUG_PORT || defaultBase;
                     try {
                         return `${debugBase.replace(/\/$/, '')}/json/version`;
                     } catch (e) {
@@ -752,11 +768,10 @@ class ConnectionOrchestrator {
                     }
                 })(),
                 chromeDevtoolsUrl: (() => {
+                    const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
+                    const defaultBase = `http://localhost:${proxyPort}`;
                     const debugBase =
-                        process.env.CHROME_WS_ENDPOINT ||
-                        CONFIG.DEBUG_PORT ||
-                        process.env.DEBUG_PORT ||
-                        'http://localhost:9224';
+                        process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || process.env.DEBUG_PORT || defaultBase;
                     return debugBase.replace(/\/$/, '');
                 })(),
                 expectedPorts: DEFAULTS.ports
@@ -766,17 +781,17 @@ class ConnectionOrchestrator {
                 env === 'windows'
                     ? {
                           startChrome: detectedChromePath
-                              ? `"${detectedChromePath}" --remote-debugging-port=9224 --user-data-dir="%USERPROFILE%\\chrome-automation" ${DEFAULTS.args.join(' ')}`
+                              ? `"${detectedChromePath}" --remote-debugging-port=${process.env.CHROME_PORT || CONFIG.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225} --user-data-dir="%USERPROFILE%\\chrome-automation" ${DEFAULTS.args.join(' ')}`
                               : null,
-                          checkChrome: 'netstat -ano | findstr ":9224"',
+                          checkChrome: `netstat -ano | findstr ":${process.env.CHROME_PORT || CONFIG.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225}"`,
                           killChrome: 'taskkill /F /IM chrome.exe'
                       }
                     : {
                           startChrome: detectedChromePath
-                              ? `"${detectedChromePath}" --remote-debugging-port=${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224} --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
+                              ? `"${detectedChromePath}" --remote-debugging-port=${process.env.CHROME_PORT || CONFIG.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225} --user-data-dir=~/chrome-automation ${DEFAULTS.args.join(' ')}`
                               : null,
-                          checkChrome: `lsof -i :${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224} || netstat -an | grep :${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224}`,
-                          killChrome: `pkill -f "chrome.*remote-debugging-port=${process.env.CHROME_PROXY_PORT || process.env.CHROME_PORT || 9224}"`
+                          checkChrome: `lsof -i :${process.env.CHROME_PORT || CONFIG.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225} || netstat -an | grep :${process.env.CHROME_PORT || CONFIG.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225}`,
+                          killChrome: `pkill -f "chrome.*remote-debugging-port=${process.env.CHROME_PORT || CONFIG.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225}"`
                       },
 
             usage: {
@@ -807,6 +822,63 @@ class ConnectionOrchestrator {
         const projectRoot = path.join(__dirname, '../..');
         const outputPath = path.join(projectRoot, 'chrome-config.json');
         return ConnectionOrchestrator.exportConfig(outputPath);
+    }
+
+    /**
+     * Sincroniza e valida endpoints de Chrome/Proxy.
+     * Retorna um relatório com tentativas em hosts/ports configurados.
+     * Útil para scripts de bootstrap/diagnóstico.
+     */
+    static async synchronize(options = {}) {
+        const report = {
+            checked: [],
+            reachable: [],
+            unreachable: []
+        };
+
+        const hosts = (options.hosts && options.hosts.length) ? options.hosts : DEFAULTS.hosts;
+        const ports = (options.ports && options.ports.length) ? options.ports : DEFAULTS.ports;
+
+        for (const host of hosts) {
+            for (const port of ports) {
+                const url = `http://${host}:${port}/json/version`;
+                const entry = { host, port, url, ok: false, status: null, ws: null, error: null };
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                    const res = await fetch(url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
+                    entry.status = res.status;
+                    if (!res.ok) {
+                        entry.error = `HTTP ${res.status}`;
+                        report.unreachable.push(entry);
+                        report.checked.push(entry);
+                        continue;
+                    }
+
+                    const json = await res.json();
+                    entry.ok = true;
+                    entry.ws = json.webSocketDebuggerUrl || null;
+                    report.reachable.push(entry);
+                    report.checked.push(entry);
+                } catch (err) {
+                    entry.error = err && err.message ? err.message : String(err);
+                    report.unreachable.push(entry);
+                    report.checked.push(entry);
+                }
+            }
+        }
+
+        // Summary
+        report.summary = {
+            totalChecked: report.checked.length,
+            reachable: report.reachable.length,
+            unreachable: report.unreachable.length
+        };
+
+        return report;
     }
 }
 

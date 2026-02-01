@@ -32,7 +32,10 @@ console.log('🚀 Testando sequência de boot...\n');
     const pool = new BrowserPoolManager({
         poolSize: 1,
         browserEndpoint: {
-            url: process.env.CHROME_WS_ENDPOINT || config.BROWSER_URL || 'http://localhost:9224'
+            url:
+                process.env.CHROME_WS_ENDPOINT ||
+                config.BROWSER_URL ||
+                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`
         }
     });
     await pool.initialize();

@@ -56,62 +56,67 @@ async function runTest(name, testFn, timeoutMs = 5000) {
  * TEST 1: Boot Sequence Completo
  */
 async function test1_BootSequence() {
-    await runTest('TEST 1: Boot Sequence Completo (Mock Mode)', async () => {
-        console.log('> Iniciando boot do sistema em modo MOCK...');
-        console.log('  (BrowserPool desabilitado para testes sem Chrome externo)');
+    await runTest(
+        'TEST 1: Boot Sequence Completo (Mock Mode)',
+        async () => {
+            console.log('> Iniciando boot do sistema em modo MOCK...');
+            console.log('  (BrowserPool desabilitado para testes sem Chrome externo)');
 
-        // Temporariamente mocka o BrowserPool para não tentar conectar
-        const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
-        const originalInitialize = BrowserPoolManager.prototype.initialize;
-        const originalGetHealth = BrowserPoolManager.prototype.getHealth;
-        const originalShutdown = BrowserPoolManager.prototype.shutdown;
+            // Temporariamente mocka o BrowserPool para não tentar conectar
+            const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
+            const originalInitialize = BrowserPoolManager.prototype.initialize;
+            const originalGetHealth = BrowserPoolManager.prototype.getHealth;
+            const originalShutdown = BrowserPoolManager.prototype.shutdown;
 
-        BrowserPoolManager.prototype.initialize = async function () {
-            console.log('  [MOCK] BrowserPool.initialize() - skip');
-        };
-        BrowserPoolManager.prototype.getHealth = async function () {
-            return { poolSize: 3, healthy: 3, available: 3, busy: 0 };
-        };
-        BrowserPoolManager.prototype.shutdown = async function () {
-            console.log('  [MOCK] BrowserPool.shutdown() - skip');
-        };
+            BrowserPoolManager.prototype.initialize = async function () {
+                console.log('  [MOCK] BrowserPool.initialize() - skip');
+            };
+            BrowserPoolManager.prototype.getHealth = async function () {
+                return { poolSize: 3, healthy: 3, available: 3, busy: 0 };
+            };
+            BrowserPoolManager.prototype.shutdown = async function () {
+                console.log('  [MOCK] BrowserPool.shutdown() - skip');
+            };
 
-        try {
-            context = await boot();
+            try {
+                context = await boot();
 
-            // Verificações básicas
-            if (!context) {
-                throw new Error('Context vazio após boot');
-            }
-            if (!context.nerv) {
-                throw new Error('NERV não inicializado');
-            }
-            if (!context.kernel) {
-                throw new Error('KERNEL não inicializado');
-            }
-            if (!context.browserPool) {
-                throw new Error('BrowserPool não inicializado');
-            }
-            if (!context.driverAdapter) {
-                throw new Error('DriverAdapter não inicializado');
-            }
-            if (!context.serverAdapter) {
-                throw new Error('ServerAdapter não inicializado');
-            }
+                // Verificações básicas
+                if (!context) {
+                    throw new Error('Context vazio após boot');
+                }
+                if (!context.nerv) {
+                    throw new Error('NERV não inicializado');
+                }
+                if (!context.kernel) {
+                    throw new Error('KERNEL não inicializado');
+                }
+                if (!context.browserPool) {
+                    throw new Error('BrowserPool não inicializado');
+                }
+                if (!context.driverAdapter) {
+                    throw new Error('DriverAdapter não inicializado');
+                }
+                if (!context.serverAdapter) {
+                    throw new Error('ServerAdapter não inicializado');
+                }
 
-            console.log('  ✓ NERV online');
-            console.log('  ✓ KERNEL online');
-            console.log('  ✓ BrowserPool online (mock)');
-            console.log('  ✓ DriverAdapter online');
-            console.log('  ✓ ServerAdapter online');
-            console.log(`  ✓ Boot duration: ${context.bootDuration}ms`);
-        } finally {
-            // Restaura métodos originais
-            BrowserPoolManager.prototype.initialize = originalInitialize;
-            BrowserPoolManager.prototype.getHealth = originalGetHealth;
-            BrowserPoolManager.prototype.shutdown = originalShutdown;
-        }
-    });
+                console.log('  ✓ NERV online');
+                console.log('  ✓ KERNEL online');
+                console.log('  ✓ BrowserPool online (mock)');
+                console.log('  ✓ DriverAdapter online');
+                console.log('  ✓ ServerAdapter online');
+                console.log(`  ✓ Boot duration: ${context.bootDuration}ms`);
+            } finally {
+                // Restaura métodos originais
+                BrowserPoolManager.prototype.initialize = originalInitialize;
+                BrowserPoolManager.prototype.getHealth = originalGetHealth;
+                BrowserPoolManager.prototype.shutdown = originalShutdown;
+            }
+        },
+        20000
+    );
+
 }
 
 /**

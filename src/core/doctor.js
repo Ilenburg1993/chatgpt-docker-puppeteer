@@ -18,6 +18,7 @@ const https = require('https');
 const http = require('http');
 const { exec } = require('child_process');
 const CONFIG = require('./config');
+const { ConnectionOrchestrator } = require('../infra/ConnectionOrchestrator');
 
 const ROOT = path.resolve(__dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
@@ -28,7 +29,9 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
  * @returns {Promise<object>} Status da conexão com Chrome.
  */
 async function probeChromeConnection() {
-    const endpoint = process.env.CHROME_WS_ENDPOINT || CONFIG.DEBUG_PORT || 'http://localhost:9224';
+    const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
+    const defaultEndpoint = `http://localhost:${proxyPort}`;
+    const endpoint = process.env.CHROME_WS_ENDPOINT || process.env.CHROME_URL || CONFIG.DEBUG_PORT || defaultEndpoint;
     const httpEndpoint = endpoint.replace('ws://', 'http://').replace('wss://', 'https://');
 
     try {
@@ -236,6 +239,14 @@ async function runFullCheck() {
         probeChromeConnection()
     ]);
 
+    // Additional probe: check configured proxy/hosts via ConnectionOrchestrator
+    let proxyReport = null;
+    try {
+        proxyReport = await ConnectionOrchestrator.synchronize();
+    } catch (err) {
+        proxyReport = { error: err && err.message ? err.message : String(err) };
+    }
+
     // Estatísticas da fila
     let queueStats = { pending: 0, running: 0, total: 0 };
     try {
@@ -297,7 +308,7 @@ async function runFullCheck() {
             network: targets.map((url, i) => ({ url, ...networkResults[i] })),
             storage: storage,
             dna: dna,
-            chrome: chrome,
+            chrome: Object.assign({}, chrome, { proxyReport }),
             queue: queueStats,
             system: {
                 ...metrics,

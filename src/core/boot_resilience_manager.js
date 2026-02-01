@@ -37,7 +37,7 @@ const http = require('http');
  * Ordem de precedência:
  * 1. process.env.CHROME_WS_ENDPOINT
  * 2. CONFIG.BROWSER_URL
- * 3. Fallback local (localhost:9224)
+ * 3. Fallback local (localhost:CHROME_PROXY_PORT e.g., 9224)
  *
  * ⚠️ Não inicia Chrome.
  * ⚠️ Não valida conectividade.
@@ -46,8 +46,10 @@ const http = require('http');
  */
 function resolveChromeEndpoint() {
     const CONFIG = require('./config');
+    const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
+    const defaultBase = `http://localhost:${proxyPort}`;
 
-    return process.env.CHROME_WS_ENDPOINT || CONFIG.BROWSER_URL || 'http://localhost:9224';
+    return process.env.CHROME_WS_ENDPOINT || CONFIG.BROWSER_URL || defaultBase;
 }
 
 /**
@@ -152,6 +154,9 @@ async function tryStartChrome() {
  * @returns {string[]}
  */
 function getChromeInstructions(errorMessage) {
+    const cfg = require('./config');
+    const chromePortHint = process.env.CHROME_PORT || cfg.CHROME_PORT || process.env.CHROME_PROXY_PORT || 9225;
+
     return [
         '',
         '═══════════════════════════════════════════════════════════',
@@ -171,7 +176,7 @@ function getChromeInstructions(errorMessage) {
         '    bash scripts/start-chrome.sh',
         '',
         'OU manualmente:',
-        '  chrome --remote-debugging-port=9224 \\',
+        `  chrome --remote-debugging-port=${chromePortHint} \\`,
         '    --user-data-dir=<perfil-dedicado>',
         '',
         '⚠️ IMPORTANTE:',
@@ -261,9 +266,20 @@ async function handleBrowserPoolFailure(error, options = {}) {
         console.log('  3) Abortar - Sair do sistema');
         console.log('');
 
-        // Em ambiente não-interativo (PM2, Docker), usa default
+        // Em ambiente não-interativo (PM2, Docker), aplica comportamento seguro por padrão:
+        // - Se allowDegradedMode=true, inicia em modo degradado automaticamente (sem prompt)
+        // - Caso contrário, aborta
         if (!process.stdin.isTTY) {
-            log('WARN', '[RESILIENCE] Ambiente não-interativo, abortando...');
+            if (allowDegradedMode) {
+                log('WARN', '[RESILIENCE] Ambiente não-interativo — ativando modo degradado por padrão');
+                return {
+                    success: true,
+                    mode: 'degraded',
+                    browserPool: null
+                };
+            }
+
+            log('WARN', '[RESILIENCE] Ambiente não-interativo e modo degradado não permitido, abortando...');
             return { success: false, mode: 'abort' };
         }
 
@@ -384,5 +400,6 @@ module.exports = {
     tryStartChrome,
     getChromeInstructions,
     handleBrowserPoolFailure,
-    initializeBrowserPoolResilient
+    initializeBrowserPoolResilient,
+    resolveChromeEndpoint
 };

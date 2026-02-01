@@ -52,7 +52,7 @@ function criarBrowserMock() {
         close: sinon.stub().resolves(),
         isConnected: sinon.stub().returns(true),
         version: sinon.stub().resolves('Chrome/120.0.0.0'),
-        wsEndpoint: sinon.stub().returns('ws://localhost:9224'),
+        wsEndpoint: sinon.stub().returns(`ws://localhost:${process.env.CHROME_PROXY_PORT || 9224}`),
 
         // Referência à página para asserções
         _pagina: pagina,

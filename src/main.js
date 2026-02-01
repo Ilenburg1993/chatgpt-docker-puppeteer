@@ -210,19 +210,24 @@ async function boot() {
         try {
             const discoveryTimeoutMs = Number(process.env.SERVER_DISCOVERY_TIMEOUT ?? 5000);
 
-            const unsub = typeof nerv.onEvent === 'function'
-                ? nerv.onEvent(envelope => {
-                      try {
-                          if (!envelope || !envelope.type || envelope.type.action_code !== ActionCode.SERVER_READY) return;
-                          if (envelope.identity && envelope.identity.actor !== ActorRole.SERVER) return;
-                          discoveredServerInfo = envelope.payload || null;
-                          log('INFO', `[BOOT] Descoberto servidor via NERV: ${JSON.stringify(discoveredServerInfo)}`);
-                          if (typeof unsub === 'function') unsub();
-                      } catch (e) {
-                          /* ignore */
-                      }
-                  })
-                : null;
+            const unsub =
+                typeof nerv.onEvent === 'function'
+                    ? nerv.onEvent(envelope => {
+                          try {
+                              if (!envelope || !envelope.type || envelope.type.action_code !== ActionCode.SERVER_READY)
+                                  return;
+                              if (envelope.identity && envelope.identity.actor !== ActorRole.SERVER) return;
+                              discoveredServerInfo = envelope.payload || null;
+                              log(
+                                  'INFO',
+                                  `[BOOT] Descoberto servidor via NERV: ${JSON.stringify(discoveredServerInfo)}`
+                              );
+                              if (typeof unsub === 'function') unsub();
+                          } catch (e) {
+                              /* ignore */
+                          }
+                      })
+                    : null;
 
             if (discoveryTimeoutMs > 0) {
                 setTimeout(() => {
@@ -375,7 +380,11 @@ async function boot() {
         // SPLIT MODE — conecta em server externo já conhecido
         // ----------------------------------------------------------------------
         if (SERVER_MODE === 'split') {
-            const externalPortRaw = process.env.SERVER_PORT ?? CONFIG.SERVER_PORT ?? (discoveredServerInfo && (discoveredServerInfo.server_port || discoveredServerInfo.port)) ?? 3008;
+            const externalPortRaw =
+                process.env.SERVER_PORT ??
+                CONFIG.SERVER_PORT ??
+                (discoveredServerInfo && (discoveredServerInfo.server_port || discoveredServerInfo.port)) ??
+                3008;
             const externalPort = Number.parseInt(String(externalPortRaw), 10);
 
             if (!Number.isInteger(externalPort) || externalPort < 1 || externalPort > 65535) {
@@ -597,6 +606,36 @@ async function boot() {
 
         log('INFO', '[BOOT] Sistema pronto. Aguardando comandos via NERV.');
 
+        // Se existir um servidor HTTP local (modo integrado), atualiza o app
+        // com um objeto `runtimeReadiness` que será consumido pelo endpoint
+        // `/ready` para indicar se subsistemas críticos estão disponíveis.
+        try {
+            if (httpServer) {
+                try {
+                    const serverApp = require('./server/engine/app');
+                    serverApp.locals = serverApp.locals || {};
+                    serverApp.locals.runtimeReadiness = {
+                        nerv: Boolean(nerv),
+                        kernel: Boolean(kernel),
+                        browserPool: systemMode === 'degraded' ? false : Boolean(browserPool),
+                        serverAdapter: Boolean(serverAdapter),
+                        missionManager: Boolean(missionManager)
+                    };
+                    // Campos minimamente exigidos para considerar o processo pronto
+                    serverApp.locals.requiredReadiness = serverApp.locals.requiredReadiness || ['nerv', 'kernel'];
+                    log('DEBUG', '[BOOT] runtimeReadiness definido no app HTTP');
+                } catch (err) {
+                    log(
+                        'WARN',
+                        `[BOOT] Não foi possível setar runtimeReadiness no app: ${err && err.message ? err.message : String(err)}`
+                    );
+                }
+            }
+        } catch (err) {
+            // não bloqueante — apenas registra
+            log('DEBUG', `[BOOT] runtimeReadiness skip: ${err && err.message ? err.message : String(err)}`);
+        }
+
         /**
          * Contexto canônico de runtime — contrato estrutural do processo.
          *
@@ -678,7 +717,11 @@ async function shutdown(context) {
                 try {
                     const reconciler = require('./server/supervisor/reconcilier');
                     if (typeof reconciler?.stop === 'function') {
-                        reconciler.stop();
+                        try {
+                            await reconciler.stop();
+                        } catch (err) {
+                            log('WARN', `[SHUTDOWN] reconciler.stop threw: ${err && err.message ? err.message : String(err)}`);
+                        }
                     }
                 } catch (e) {
                     log('WARN', `[SHUTDOWN] reconciler.stop falhou: ${e.message}`);
@@ -687,7 +730,11 @@ async function shutdown(context) {
                 try {
                     const hardwareTelemetry = require('./server/realtime/telemetry/hardware');
                     if (typeof hardwareTelemetry?.stop === 'function') {
-                        hardwareTelemetry.stop();
+                        try {
+                            await hardwareTelemetry.stop();
+                        } catch (err) {
+                            log('WARN', `[SHUTDOWN] hardwareTelemetry.stop threw: ${err && err.message ? err.message : String(err)}`);
+                        }
                     }
                 } catch (e) {
                     log('WARN', `[SHUTDOWN] hardwareTelemetry.stop falhou: ${e.message}`);

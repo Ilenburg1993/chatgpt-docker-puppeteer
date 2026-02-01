@@ -1,14 +1,19 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 (async () => {
-    console.log('🚀 Iniciando Puppeteer (modo launcher)...');
+    console.log('🚀 Teste rápido: connect-only (puppeteer-core)...');
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    const browserURL =
+        process.env.CHROME_WS_ENDPOINT ||
+        process.env.CHROME_URL ||
+        `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`;
+    const browser = await puppeteer.connect({
+        browserURL,
+        defaultViewport: { width: 1280, height: 800 },
+        ignoreHTTPSErrors: true
     });
 
-    console.log('✅ Browser iniciado!');
+    console.log('✅ Puppeteer conectado (connect-only)');
     console.log('   Versão:', await browser.version());
 
     const page = await browser.newPage();
@@ -20,12 +25,10 @@ const puppeteer = require('puppeteer');
     const title = await page.title();
     console.log('✅ Título:', title);
 
-    await browser.close();
-    console.log('✅ Browser fechado');
+    await page.close();
+    await browser.disconnect();
+    console.log('✅ Desconectado (não encerra o Chrome remoto)');
 
-    console.log('\n🎉 Puppeteer funcional! Use modo launcher no código.');
-
-    // Força encerramento do processo
     process.exit(0);
 })().catch(err => {
     console.error('❌ Erro no teste:', err);

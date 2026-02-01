@@ -26,7 +26,8 @@ let ActorRole = null;
 const CONFIG = {
     PROXY_PORT: parseInt(process.env.CHROME_PROXY_PORT || '9224'),
     CHROME_HOST: process.env.CHROME_HOST || '127.0.0.1',
-    CHROME_PORT: parseInt(process.env.CHROME_PORT || '9224'),
+    CHROME_PORT: parseInt(process.env.CHROME_PORT || '9225'),
+    PROXY_BIND: process.env.CHROME_PROXY_BIND || '0.0.0.0',
     PUBLIC_IP: process.env.PUBLIC_IP || null,
     LOG_LEVEL: process.env.LOG_LEVEL || 'info'
 };
@@ -133,21 +134,25 @@ class ChromeProxyService {
         }
     }
 
-    rewriteWebSocketURL(data) {
+    // Accept an optional host fallback (e.g., req.headers.host) to make
+    // rewrites reliable when PUBLIC_IP is not configured.
+    rewriteWebSocketURL(data, hostFallback) {
         try {
             const json = JSON.parse(data);
+            const publicHost = this.config.PUBLIC_IP || (hostFallback ? String(hostFallback).split(':')[0] : null);
             const rewriteIfPresent = val => {
                 if (!val) return val;
                 try {
                     return this._rewriteURL(val);
                 } catch (err) {
                     void err;
+                    const replacementHost = publicHost || this.config.PUBLIC_IP || this.config.CHROME_HOST;
                     return String(val).replace(
                         new RegExp(
                             `(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`,
                             'g'
                         ),
-                        `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`
+                        `${replacementHost}:${this.config.PROXY_PORT}`
                     );
                 }
             };
@@ -172,28 +177,30 @@ class ChromeProxyService {
         }
     }
 
-    _rewriteURL(url) {
+    _rewriteURL(url, publicHost) {
         try {
+            const replacementHost = publicHost || this.config.PUBLIC_IP || this.config.CHROME_HOST;
             if (!/^https?:\/\//i.test(url) && !/^wss?:\/\//i.test(url)) {
                 return String(url).replace(
                     new RegExp(
                         `(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`,
                         'g'
                     ),
-                    `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`
+                    `${replacementHost}:${this.config.PROXY_PORT}`
                 );
             }
             const u = new URL(url);
             if (u.hostname === this.config.CHROME_HOST || u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
-                u.hostname = this.config.PUBLIC_IP;
+                u.hostname = replacementHost;
                 u.port = String(this.config.PROXY_PORT);
             }
             return u.toString();
         } catch (err) {
             void err;
+            const replacementHost = publicHost || this.config.PUBLIC_IP || this.config.CHROME_HOST;
             return String(url).replace(
                 new RegExp(`(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`, 'g'),
-                `${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`
+                `${replacementHost}:${this.config.PROXY_PORT}`
             );
         }
     }
@@ -274,7 +281,10 @@ class ChromeProxyService {
                 data += chunk;
             });
             proxyRes.on('end', () => {
-                const finalData = needsRewrite ? this.rewriteWebSocketURL(data) : data;
+                    // Pass req.headers.host as fallback for PUBLIC_IP so rewriting
+                    // can use the Host header when PUBLIC_IP is not configured.
+                    const hostFallback = (req && req.headers && req.headers.host) ? req.headers.host : null;
+                    const finalData = needsRewrite ? this.rewriteWebSocketURL(data, hostFallback) : data;
                 res.writeHead(proxyRes.statusCode, {
                     ...proxyRes.headers,
                     'Content-Length': Buffer.byteLength(finalData),
@@ -579,9 +589,9 @@ class ChromeProxyService {
             this.app.use((req, res) => this.handleHTTPRequest(req, res));
             this.server = http.createServer(this.app);
             this.server.on('upgrade', this.handleWebSocketUpgrade.bind(this));
-            this.server.listen(this.config.PROXY_PORT, '0.0.0.0', () => {
+            this.server.listen(this.config.PROXY_PORT, this.config.PROXY_BIND, () => {
                 this.log('info', '✅ Chrome Proxy Service started');
-                this.log('info', `   Listening: 0.0.0.0:${this.config.PROXY_PORT}`);
+                this.log('info', `   Listening: ${this.config.PROXY_BIND}:${this.config.PROXY_PORT}`);
                 this.log('info', `   Forwarding to: ${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`);
                 this.log('info', `   Public URL: http://${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`);
                 resolve();

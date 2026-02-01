@@ -29,7 +29,10 @@ console.log('🔬 Teste de Integração Completo\n');
         poolSize: 2,
         browserEndpoint: {
             // Ajuste o endpoint para o Chrome que está rodando externamente
-            url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
+            url:
+                process.env.CHROME_WS_ENDPOINT ||
+                process.env.CHROME_URL ||
+                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`
         }
     });
 

@@ -44,8 +44,16 @@ validateEnvFile();
 const ConfigSchema = z
     .object({
         // --- Infraestrutura Base ---
-        BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher'),
-        DEBUG_PORT: z.string().url().default('http://localhost:9224'),
+        // Nota: inclui modos usados pelo ConnectionOrchestrator (wsEndpoint, connect)
+        BROWSER_MODE: z
+            .enum(['launcher', 'connect', 'wsEndpoint', 'executablePath', 'auto', 'external'])
+            .default('wsEndpoint'),
+        DEBUG_PORT: z
+            .string()
+            .url()
+            .default(`http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`),
+        CHROME_PORT: z.number().int().min(1024).max(65535).default(9225),
+        CHROME_PROXY_PORT: z.number().int().min(1024).max(65535).default(9224),
         IDLE_SLEEP: z.number().min(500).default(3000),
 
         // --- Engine Rhythm (Ritmo do Motor) ---
@@ -185,6 +193,10 @@ class ConfigurationManager extends EventEmitter {
     // --- Getters Adicionais (Novos Parâmetros) ---
     get BROWSER_MODE() {
         return this.currentConfig.BROWSER_MODE;
+    }
+    // Compatibilidade: retorna BROWSER_URL se definido, senão utiliza DEBUG_PORT
+    get BROWSER_URL() {
+        return this.currentConfig.BROWSER_URL || this.currentConfig.DEBUG_PORT || this.currentConfig.DEBUG_URL || null;
     }
     get DEFAULT_MODEL_ID() {
         return this.currentConfig.DEFAULT_MODEL_ID;

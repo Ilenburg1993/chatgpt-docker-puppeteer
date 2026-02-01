@@ -25,6 +25,11 @@ const log = {
     section: msg => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`)
 };
 
+// Global config derived for tests (evita hardcodes de porta)
+const GLOBAL_CONFIG = require('/workspaces/chatgpt-docker-puppeteer/config.json');
+const PROXY_PORT = GLOBAL_CONFIG.CHROME_PROXY_PORT || 9224;
+const CHROME_PORT = GLOBAL_CONFIG.CHROME_PORT || 9225;
+
 let passedTests = 0;
 let failedTests = 0;
 
@@ -65,13 +70,19 @@ function testConfigFiles() {
 
     // 1.3 - Valores corretos
     assert(config.BROWSER_MODE === 'wsEndpoint', `BROWSER_MODE é 'wsEndpoint' (atual: ${config.BROWSER_MODE})`);
-    assert(config.DEBUG_PORT.includes('192.168.0.2:9224'), `DEBUG_PORT usa proxy (${config.DEBUG_PORT})`);
+    assert(
+        config.DEBUG_PORT.includes(`${config.CHROME_PROXY_HOST}:${config.CHROME_PROXY_PORT}`),
+        `DEBUG_PORT usa proxy (${config.DEBUG_PORT})`
+    );
     assert(config.CHROME_PROXY_ENABLED === true, 'CHROME_PROXY_ENABLED é true');
     assert(
         config.CHROME_PROXY_HOST === '192.168.0.2',
         `CHROME_PROXY_HOST é '192.168.0.2' (atual: ${config.CHROME_PROXY_HOST})`
     );
-    assert(config.CHROME_PROXY_PORT === 9224, `CHROME_PROXY_PORT é 9224 (atual: ${config.CHROME_PROXY_PORT})`);
+    assert(
+        config.CHROME_PROXY_PORT === PROXY_PORT,
+        `CHROME_PROXY_PORT é ${PROXY_PORT} (atual: ${config.CHROME_PROXY_PORT})`
+    );
 
     // 1.4 - chrome-config.json existe e é JSON válido
     let chromeConfig;
@@ -94,8 +105,8 @@ function testConfigFiles() {
         `chrome-config mode é 'wsEndpoint' (atual: ${chromeConfig.connection.mode})`
     );
     assert(
-        chromeConfig.connection.ports[0] === 9224,
-        `Primeira porta é 9224 (atual: ${chromeConfig.connection.ports[0]})`
+        chromeConfig.connection.ports[0] === PROXY_PORT,
+        `Primeira porta é ${PROXY_PORT} (atual: ${chromeConfig.connection.ports[0]})`
     );
     assert(
         chromeConfig.connection.hosts[0] === '192.168.0.2',
@@ -103,8 +114,8 @@ function testConfigFiles() {
     );
     assert(chromeConfig.chromeProxy.enabled === true, 'chromeProxy.enabled é true');
     assert(
-        chromeConfig.chromeProxy.proxyPort === 9224,
-        `chromeProxy.proxyPort é 9224 (atual: ${chromeConfig.chromeProxy.proxyPort})`
+        chromeConfig.chromeProxy.proxyPort === PROXY_PORT,
+        `chromeProxy.proxyPort é ${PROXY_PORT} (atual: ${chromeConfig.chromeProxy.proxyPort})`
     );
 
     // 1.7 - Consistência entre config.json e chrome-config.json
@@ -152,8 +163,13 @@ function testScriptFiles() {
     // 2.4 - start-chrome-with-proxy.bat tem conteúdo válido
     try {
         const content = fs.readFileSync(launcherPath, 'utf8');
-        assert(content.includes('CHROME_DEBUG_PORT=9224'), 'Launcher configura porta Chrome 9224');
-        assert(content.includes('PROXY_PORT=9224'), 'Launcher configura porta Proxy 9224');
+        const cfg = require('/workspaces/chatgpt-docker-puppeteer/config.json');
+        const expectedChromePort = cfg.CHROME_PORT || cfg.CHROME_DIRECT_PORT || 9225;
+        assert(
+            content.includes(`CHROME_DEBUG_PORT=${expectedChromePort}`),
+            `Launcher configura porta Chrome ${expectedChromePort}`
+        );
+        assert(content.includes('PROXY_PORT=' + PROXY_PORT), `Launcher configura porta Proxy ${PROXY_PORT}`);
         assert(content.includes('chrome-proxy-service.js'), 'Launcher referencia chrome-proxy-service.js');
     } catch (e) {
         assert(false, `Erro ao ler start-chrome-with-proxy.bat: ${e.message}`);
@@ -166,7 +182,10 @@ function testScriptFiles() {
     // 2.6 - ConnectionOrchestrator.js tem código atualizado
     try {
         const content = fs.readFileSync(orchestratorPath, 'utf8');
-        assert(content.includes('ports: [9224, 9223]'), 'ConnectionOrchestrator prioriza porta 9224');
+        assert(
+            content.includes('ports: [' + PROXY_PORT + ', 9223]'),
+            `ConnectionOrchestrator prioriza porta ${PROXY_PORT}`
+        );
         assert(content.includes("'192.168.0.2'"), 'ConnectionOrchestrator tem IP público');
         assert(content.includes('CHROME PROXY INTEGRATION'), 'ConnectionOrchestrator tem comentários da integração');
         assert(content.includes('isProxyAttempt'), 'ConnectionOrchestrator detecta tentativa de proxy');
@@ -193,7 +212,7 @@ function testPrioritizationLogic() {
 
     // 3.1 - Ordem de portas está correta
     const ports = chromeConfig.connection.ports;
-    assert(ports[0] === 9224, `Primeira porta é 9224 (proxy) - atual: ${ports[0]}`);
+    assert(ports[0] === PROXY_PORT, `Primeira porta é ${PROXY_PORT} (proxy) - atual: ${ports[0]}`);
     assert(ports[1] === 9223, `Segunda porta é 9223 (direto/fallback) - atual: ${ports[1]}`);
     assert(
         ports[2] === undefined || ports[2] === 9223,
@@ -221,8 +240,8 @@ function testPrioritizationLogic() {
     };
 
     assert(
-        firstAttempt.host === '192.168.0.2' && firstAttempt.port === 9224,
-        `Primeira tentativa é 192.168.0.2:9224 (proxy) - atual: ${firstAttempt.url}`
+        firstAttempt.host === '192.168.0.2' && firstAttempt.port === PROXY_PORT,
+        `Primeira tentativa é 192.168.0.2:${PROXY_PORT} (proxy) - atual: ${firstAttempt.url}`
     );
 
     log.info(`Sequência de tentativas: ${hosts[0]}:${ports[0]}, ${hosts[0]}:${ports[1]}, ${hosts[0]}:${ports[2]}, ...`);
@@ -243,14 +262,14 @@ function testURLRewriting() {
         'User-Agent': 'Mozilla/5.0...',
         'V8-Version': '12.4.254.20',
         'WebKit-Version': '537.36 (@...)',
-        webSocketDebuggerUrl: 'ws://localhost:9224/devtools/browser/12345678-1234-1234-1234-123456789012'
+        webSocketDebuggerUrl: `ws://localhost:${PROXY_PORT}/devtools/browser/12345678-1234-1234-1234-123456789012`
     };
 
     // 4.2 - Simular rewrite do proxy (localhost → IP público)
     const rewriteURL = (url, publicIP, proxyPort) => {
         return url
-            .replace('localhost:9224', `${publicIP}:${proxyPort}`)
-            .replace('127.0.0.1:9224', `${publicIP}:${proxyPort}`);
+            .replace(`localhost:${proxyPort}`, `${publicIP}:${proxyPort}`)
+            .replace(`127.0.0.1:${proxyPort}`, `${publicIP}:${proxyPort}`);
     };
 
     const rewrittenUrl = rewriteURL(
@@ -260,7 +279,10 @@ function testURLRewriting() {
     );
 
     // 4.3 - Validar que rewrite funciona
-    assert(rewrittenUrl.includes('192.168.0.2:9224'), `URL reescrita contém IP público e porta proxy: ${rewrittenUrl}`);
+    assert(
+        rewrittenUrl.includes(`${config.CHROME_PROXY_HOST}:${config.CHROME_PROXY_PORT}`),
+        `URL reescrita contém IP público e porta proxy: ${rewrittenUrl}`
+    );
     assert(!rewrittenUrl.includes('localhost'), `URL reescrita NÃO contém localhost: ${rewrittenUrl}`);
     assert(!rewrittenUrl.includes('127.0.0.1'), `URL reescrita NÃO contém 127.0.0.1: ${rewrittenUrl}`);
 
@@ -269,13 +291,13 @@ function testURLRewriting() {
 
     // 4.4 - Simular detecção de proxy attempt
     const isProxyAttempt = (host, port) => {
-        return port === 9224 || (host === '192.168.0.2' && port === 9224);
+        return port === PROXY_PORT || (host === '192.168.0.2' && port === PROXY_PORT);
     };
 
-    assert(isProxyAttempt('192.168.0.2', 9224) === true, 'Detecta proxy: 192.168.0.2:9224');
+    assert(isProxyAttempt('192.168.0.2', PROXY_PORT) === true, `Detecta proxy: 192.168.0.2:${PROXY_PORT}`);
     assert(
-        isProxyAttempt('host.docker.internal', 9224) === true,
-        'Detecta proxy pela porta: host.docker.internal:9224'
+        isProxyAttempt('host.docker.internal', PROXY_PORT) === true,
+        `Detecta proxy pela porta: host.docker.internal:${PROXY_PORT}`
     );
     assert(isProxyAttempt('127.0.0.1', 9223) === false, 'Não detecta como proxy: 127.0.0.1:9223');
 }
@@ -295,11 +317,11 @@ function testHealthEndpoints() {
 
     // 5.2 - Health URLs estão corretos
     assert(
-        chromeConfig.health.chromeDebugUrl === 'http://192.168.0.2:9224/json/version',
+        chromeConfig.health.chromeDebugUrl === `http://${GLOBAL_CONFIG.CHROME_PROXY_HOST}:${PROXY_PORT}/json/version`,
         `chromeDebugUrl aponta para proxy: ${chromeConfig.health.chromeDebugUrl}`
     );
     assert(
-        chromeConfig.health.chromeProxyUrl === 'http://192.168.0.2:9224',
+        chromeConfig.health.chromeProxyUrl === `http://${GLOBAL_CONFIG.CHROME_PROXY_HOST}:${PROXY_PORT}`,
         `chromeProxyUrl está correto: ${chromeConfig.health.chromeProxyUrl}`
     );
     assert(
@@ -313,7 +335,7 @@ function testHealthEndpoints() {
 
     // 5.4 - Comandos de verificação estão corretos
     assert(
-        chromeConfig.commands.checkProxy.includes('192.168.0.2:9224'),
+        chromeConfig.commands.checkProxy.includes(`${GLOBAL_CONFIG.CHROME_PROXY_HOST}:${PROXY_PORT}`),
         `checkProxy usa endpoint correto: ${chromeConfig.commands.checkProxy}`
     );
     assert(
@@ -353,7 +375,7 @@ function testDocumentation() {
 
     // 6.3 - Documentação tem exemplos de comandos
     assert(content.includes('curl'), 'Documentação tem exemplos de curl');
-    assert(content.includes('9224'), 'Documentação menciona porta 9224');
+    assert(content.includes(String(PROXY_PORT)), `Documentação menciona porta ${PROXY_PORT}`);
     assert(content.includes('192.168.0.2'), 'Documentação menciona IP público');
 
     log.info(`Documentação tem ${content.split('\n').length} linhas`);

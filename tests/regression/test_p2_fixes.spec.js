@@ -345,8 +345,12 @@ async function testCodeValidation() {
             return false;
         }
 
-        if (!mainCode.includes('try-catch isolado')) {
-            console.error('❌ main.js não contém comentário sobre try-catch isolado');
+        // Verifica que o loop de shutdown trata cada fase individualmente com try/catch
+        // Procura por padrão: for (... shutdownPhases ...) { ... try { await phase.fn( ... )
+        const shutdownLoopRegex =
+            /for\s*\(\s*let\s+i\s*=\s*0\s*;\s*i\s*<\s*shutdownPhases\.length\s*;\s*i\+\+\s*\)\s*\{[\s\S]*?try\s*\{[\s\S]*?await\s*phase\.fn\s*\(/m;
+        if (!shutdownLoopRegex.test(mainCode)) {
+            console.error('❌ main.js não envolve cada fase com try/catch ao executar phase.fn()');
             return false;
         }
 

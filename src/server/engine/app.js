@@ -155,10 +155,27 @@ app.get('/health', (req, res) => {
 
 // Readiness
 app.get('/ready', (req, res) => {
-    res.json({
-        status: 'ready',
-        ...hardware.getAllMetrics()
-    });
+    try {
+        const runtime = app.locals && app.locals.runtimeReadiness ? app.locals.runtimeReadiness : null;
+        const hardwareMetrics = typeof hardware.getAllMetrics === 'function' ? hardware.getAllMetrics() : {};
+
+        let status = 'ready';
+
+        if (runtime) {
+            const requiredKeys = app.locals && Array.isArray(app.locals.requiredReadiness)
+                ? app.locals.requiredReadiness
+                : Object.keys(runtime);
+
+            const allReady = requiredKeys.length > 0 ? requiredKeys.every(k => runtime[k] === true) : true;
+
+            status = allReady ? 'ready' : 'not-ready';
+        }
+
+        const payload = Object.assign({ status, ts: Date.now(), runtime }, hardwareMetrics || {});
+        res.json(payload);
+    } catch (err) {
+        res.status(500).json({ status: 'unknown', error: err && err.message ? err.message : String(err) });
+    }
 });
 
 /* --------------------------------------------------------------------------

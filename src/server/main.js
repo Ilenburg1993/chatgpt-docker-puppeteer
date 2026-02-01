@@ -318,6 +318,28 @@ async function bootstrap(options = {}) {
 
         log('INFO', `[BOOT] Server pronto na porta ${port}`);
 
+        // Atualiza readiness do app HTTP para consumo do endpoint /ready
+        try {
+            try {
+                const app = require('./engine/app');
+                app.locals = app.locals || {};
+                app.locals.runtimeReadiness = {
+                    nerv: Boolean(nerv),
+                    serverAdapter: Boolean(serverAdapter),
+                    httpServer: Boolean(httpServer)
+                };
+                app.locals.requiredReadiness = app.locals.requiredReadiness || ['nerv'];
+                log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
+            } catch (err) {
+                log(
+                    'WARN',
+                    `[BOOT] Não foi possível definir runtimeReadiness no app: ${err && err.message ? err.message : String(err)}`
+                );
+            }
+        } catch (err) {
+            /* noop */
+        }
+
         return {
             port,
             httpServer,
