@@ -4,6 +4,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json.tmp
+src/dashboard-ui/node_modules/
+src/dashboard-ui/node_modules/**
 
 # Environment variables
 .env
@@ -110,3 +112,18 @@ tests/**/*.log
 .secrets.baseline
 trufflehog_output.json
 src/dashboard-ui/node_modules/
+
+# Devcontainer ephemeral state
+.devcontainer/.first-attach
+.devcontainer/.initialized
+.devcontainer/state/
+
+# Mission runtime state
+missions/**/state.json
+missions-test-boot/**/checkpoints/
+missions-test-boot/**/state.json
+
+# Local / personal
+.claude/
+.npm/_update-notifier-last-checked
+${containerUserHome}/
