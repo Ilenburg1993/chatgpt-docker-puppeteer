@@ -41,6 +41,7 @@ local-login/profile/
 *.tmp.*
 .tmp.driveupload/
 .tmp.drivedownload/
+ .tmp.driveupdate/
 tests/tmp/
 
 # Build outputs
@@ -78,6 +79,8 @@ Desktop.ini
 *.bak
 *.backup
 *-Copia*.js
+backups/
+old/
 
 # Analysis and scans (may contain sensitive data)
 analysis/outputs/
