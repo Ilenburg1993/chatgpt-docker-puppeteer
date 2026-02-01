@@ -155,6 +155,7 @@ dist/**                  binary
 build/**                 binary
 coverage/**              binary
 .cache/**                binary
-node_modules/**          binary
 
+# `node_modules` is intentionally ignored in `.gitignore` and should not be
+# tracked or marked here; keeping it in .gitattributes may cause confusion.
 # EOF
