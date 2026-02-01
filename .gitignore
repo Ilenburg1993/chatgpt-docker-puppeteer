@@ -41,7 +41,7 @@ local-login/profile/
 *.tmp.*
 .tmp.driveupload/
 .tmp.drivedownload/
- .tmp.driveupdate/
+.tmp.driveupdate/
 tests/tmp/
 
 # Build outputs
