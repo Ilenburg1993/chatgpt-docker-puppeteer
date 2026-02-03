@@ -2,9 +2,157 @@
    src/core/config.js
    Audit Level: 740 — Sovereign Reactive Configuration (Singularity Edition)
    Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
+
+   🏗️ ARQUITETURA: Data/Logic Separation Pattern - CAMADA DE LÓGICA
+   ==========================================================================
+
    Responsabilidade: Centralizar, validar e prover acesso reativo aos parâmetros
                      de ritmo e comportamento do sistema (config.json).
+
    Sincronizado com: io.js V730, execution_engine.js V1.6.0, paths.js V700.
+
+   📋 PAPEL DESTE ARQUIVO NA ARQUITETURA:
+   ---------------------------------------
+
+   Este módulo implementa a CAMADA DE LÓGICA (Smart Accessor Layer) da
+   arquitetura de configuração. Ele NÃO duplica o config.json, mas sim o
+   complementa com:
+
+   • VALIDAÇÃO: Zod schema garante type safety em runtime
+   • CACHING: Mantém configuração em RAM para acesso rápido
+   • HOT-RELOAD: Permite atualização sem reiniciar o sistema
+   • REATIVIDADE: EventEmitter notifica módulos sobre mudanças
+   • ABSTRAÇÃO: Isola consumidores do formato físico do arquivo
+
+   📁 FLUXO DE DADOS:
+   ------------------
+
+   1. Boot: main.js chama CONFIG.reload('sys-boot')
+   2. Leitura: safeReadJSON() lê /config.json do disco
+   3. Validação: Zod schema verifica integridade dos dados
+   4. Cache: Dados validados armazenados em this.currentConfig (RAM)
+   5. Acesso: Módulos usam getters síncronos (ex: CONFIG.BROWSER_MODE)
+   6. Update: API chama CONFIG.reload() → emite evento 'updated'
+   7. Reactivity: Módulos subscrevem eventos para reagir a mudanças
+
+   🎯 PADRÕES DE USO CORRETOS:
+   ---------------------------
+
+   ✅ IMPORT RECOMENDADO:
+   ```javascript
+   const CONFIG = require('@core/config');
+
+   // Acesso síncrono (cache RAM)
+   const mode = CONFIG.BROWSER_MODE;
+   const timeout = CONFIG.TASK_TIMEOUT_MS;
+
+   // Acesso a objeto completo
+   const allConfig = CONFIG.all;
+
+   // Acesso com default fallback
+   const customParam = CONFIG.get('CUSTOM_PARAM', 'default-value');
+   ```
+
+   ✅ REACTIVE USAGE:
+   ```javascript
+   const CONFIG = require('@core/config');
+
+   // Subscribe to config changes
+   CONFIG.on('updated', ({ new: newConfig, old: oldConfig }) => {
+       console.log('Config changed:', newConfig.BROWSER_MODE);
+       // React to changes (ex: reconnect browser, update timeouts)
+   });
+   ```
+
+   ✅ HOT-RELOAD:
+   ```javascript
+   // Trigger manual reload (ex: after API update)
+   await CONFIG.reload('api-trigger');
+   ```
+
+   ❌ ANTI-PATTERNS (NÃO FAZER):
+   ------------------------------
+
+   ❌ Importar JSON diretamente:
+   ```javascript
+   // ERRADO - bypassa validação, cache e reatividade
+   const config = require('../../config.json');
+   ```
+
+   ❌ Escrever no JSON sem validação:
+   ```javascript
+   // ERRADO - corrompe dados, sem type safety
+   fs.writeFileSync('config.json', JSON.stringify(data));
+   ```
+
+   ❌ Modificar this.currentConfig diretamente:
+   ```javascript
+   // ERRADO - quebra imutabilidade, sem validação
+   CONFIG.currentConfig.BROWSER_MODE = 'invalid';
+   ```
+
+   🔍 BENEFÍCIOS DA SEPARAÇÃO DATA/LOGIC:
+   ---------------------------------------
+
+   1. Type Safety: Zod schema previne configurações inválidas
+   2. Performance: Cache RAM evita I/O repetido (critical path)
+   3. Zero Downtime: Hot-reload sem restart (production-ready)
+   4. Reactive System: EventEmitter permite pub/sub pattern
+   5. Maintainability: Lógica isolada do formato físico
+   6. Testability: Mocking fácil (inject config mock)
+   7. Extensibility: Adicionar computed properties sem tocar no JSON
+   8. Auditability: Logs de mudanças com correlationId
+
+   📊 ESTATÍSTICAS DE USO:
+   -----------------------
+
+   • Consumidores: 9+ módulos production
+   • Getters: 40+ propriedades expostas
+   • Validação: 20+ campos com constraints Zod
+   • Eventos: 'updated' (emitido em reload)
+   • Defaults: Fallbacks para todos os parâmetros
+
+   🧪 TESTING:
+   -----------
+
+   ```javascript
+   // Unit test example
+   const CONFIG = require('@core/config');
+
+   test('should validate BROWSER_MODE enum', async () => {
+       // Valid value
+       await CONFIG.reload('test');
+       expect(CONFIG.BROWSER_MODE).toBe('wsEndpoint');
+
+       // Invalid value (Zod rejects)
+       // ... test error handling
+   });
+   ```
+
+   📚 REFERÊNCIAS ARQUITETURAIS:
+   ------------------------------
+
+   • Padrão Similar: TypeORM (ormconfig.json + DataSource class)
+   • Padrão Similar: Next.js (next.config.js + .env)
+   • Padrão Similar: NestJS (ConfigModule + .env)
+   • Design Pattern: Strategy Pattern (BROWSER_MODE)
+   • Design Pattern: Singleton Pattern (ConfigurationManager instance)
+   • Design Pattern: Observer Pattern (EventEmitter)
+
+   ⚠️ POR QUE NÃO UNIFICAR COM CONFIG.JSON?
+   ------------------------------------------
+
+   Unificar config.json (dados) + config.js (lógica) quebraria:
+
+   1. ❌ Editability: Código não é human-friendly como JSON
+   2. ❌ Persistence: In-memory data vs disk-persisted data
+   3. ❌ API Writes: Unsafe reescrever código em runtime
+   4. ❌ Version Control: Diffs confusos (data + logic misturados)
+   5. ❌ External Tools: Scripts esperam JSON parseable
+   6. ❌ Separation of Concerns: Viola princípio SOLID
+
+   A arquitetura atual é OPTIMAL e segue best practices da indústria.
+
 ========================================================================== */
 
 const { z } = require('zod');

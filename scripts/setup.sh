@@ -117,7 +117,7 @@ CHROME_FOUND=false
 if curl -s http://localhost:${PROXY_PORT}/json/version &> /dev/null; then
   echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta ${PROXY_PORT}${NC}"
   CHROME_INFO=$(curl -s http://localhost:${PROXY_PORT}/json/version)
-  CHROME_VERSION=$(echo $CHROME_INFO | grep -oP '"Browser":\s*"\K[^"]+')
+  CHROME_VERSION=$(echo "$CHROME_INFO" | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p')
     echo "   Versão: $CHROME_VERSION"
     CHROME_FOUND=true
 else

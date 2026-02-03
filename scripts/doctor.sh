@@ -179,7 +179,7 @@ if [ -d "fila" ]; then
         echo ""
         echo "   Tarefas travadas:"
         find fila -maxdepth 1 -name "*.tmp.*" -exec basename {} \; | while read lock; do
-            PID=$(echo $lock | grep -oP 'tmp\.\K[0-9]+')
+            PID=$(echo "$lock" | sed -n 's/.*tmp\.\([0-9][0-9]*\).*/\1/p')
             if ps -p $PID > /dev/null 2>&1; then
                 echo "      - $lock (PID $PID ativo)"
             else
@@ -195,8 +195,8 @@ echo ""
 echo -e "${BLUE}💾 Espaço em Disco${NC}"
 echo "-------------------------------------------"
 
-DISK_USAGE=$(df -h . | awk 'NR==2 {print $5}' | sed 's/%//')
-DISK_AVAIL=$(df -h . | awk 'NR==2 {print $4}')
+DISK_USAGE=$(df -h . 2>/dev/null | awk 'END {print $5}' | sed 's/%//')
+DISK_AVAIL=$(df -h . 2>/dev/null | awk 'END {print $4}')
 
 echo "   Uso: $DISK_USAGE% | Disponível: $DISK_AVAIL"
 

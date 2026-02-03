@@ -9,6 +9,9 @@
   "files.hotExit": "onExitAndWindowClose",
   "files.restoreUndoStack": true,
   "files.refactoring.autoSave": true,
+  "remote.SSH.enableAgentForwarding": true,
+  "remote.SSH.useLocalServer": true,
+  "remote.SSH.loglevel": "info",
   // ============================================================
   // 2. DEV CONTAINERS / REMOTE
   // ============================================================

@@ -94,6 +94,8 @@ help:
 	@echo "  $(CYAN)make pm2-startup$(NC)       Startup seguro"
 	@echo "  $(CYAN)make validate$(NC)          Validar config.json"
 	@echo "  $(CYAN)make validate-all$(NC)      Validação completa (lint+test)"
+	@echo "  $(CYAN)make validate-env$(NC)      Validar arquivos .env"
+	@echo "  $(CYAN)make validate-git$(NC)      Validar configurações Git"
 	@echo ""
 	@echo "$(BLUE)$(BOLD)📊 Análise & Code Quality:$(NC)"
 	@echo "  $(CYAN)make analyze-deps$(NC)      Dependências circulares"
@@ -517,12 +519,27 @@ rebuild: clean workspace-clean start
 	@echo "$(GREEN)✅ Rebuild completo concluído$(NC)"
 
 # --- Git Validation ---
+.PHONY: validate-git validate-powershell-bom validate-env
+
 validate-git:
 	@echo "$(CYAN)🔍 Validando configurações Git$(NC)"
 	@git check-attr -a .gitattributes >/dev/null 2>&1 && echo "$(GREEN)✅ .gitattributes OK$(NC)" || echo "$(RED)❌ .gitattributes inválido$(NC)"
 	@git config --list --show-origin | grep -q '.devcontainer/config/.gitconfig' && echo "$(GREEN)✅ .gitconfig carregado$(NC)" || echo "$(YELLOW)⚠️  .gitconfig não carregado$(NC)"
 	@git config user.name >/dev/null 2>&1 && echo "$(GREEN)✅ Git user.name configurado$(NC)" || echo "$(YELLOW)⚠️  Git user.name não configurado$(NC)"
 	@git config user.email >/dev/null 2>&1 && echo "$(GREEN)✅ Git user.email configurado$(NC)" || echo "$(YELLOW)⚠️  Git user.email não configurado$(NC)"
+
+validate-env:
+	@echo "$(CYAN)🔍 Validando arquivos .env contra .env.schema.json$(NC)"
+	@if [ ! -f scripts/validate-env.js ]; then \
+		echo "$(RED)❌ scripts/validate-env.js não encontrado$(NC)"; \
+		exit 1; \
+	fi
+	@if [ ! -f .env.schema.json ]; then \
+		echo "$(RED)❌ .env.schema.json não encontrado$(NC)"; \
+		exit 1; \
+	fi
+	@$(NODE) scripts/validate-env.js --all || (echo "$(RED)❌ Validação ENV falhou$(NC)" && exit 1)
+	@echo "$(GREEN)✅ Validação ENV concluída$(NC)"
 
 validate-powershell-bom:
 	@echo "$(CYAN)🔍 Validando BOM em scripts PowerShell$(NC)"
