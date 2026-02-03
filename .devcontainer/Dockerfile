@@ -89,10 +89,14 @@ RUN echo "" \
 ARG PROJECT_NAME=chatgpt-docker-puppeteer
 
 # ---------------------------------------------------------------------------
-# Identidade fixa (alinhada à imagem base e ao devcontainer.json)
+# Identidade dinâmica (sincronizada com devcontainer.json via REMOTE_USER)
 # ---------------------------------------------------------------------------
-ENV USER_NAME=node \
-    HOME_DIR=/home/node \
+# ARG REMOTE_USER é passado do devcontainer.json (build.args.REMOTE_USER: "node")
+# Permite que a imagem seja reutilizável com diferentes usuários
+ARG REMOTE_USER=node
+
+ENV USER_NAME=${REMOTE_USER} \
+    HOME_DIR=/home/${REMOTE_USER} \
     APP_DIR=/workspaces/${PROJECT_NAME}
 
 # ---------------------------------------------------------------------------
@@ -110,7 +114,7 @@ ENV XDG_CONFIG_HOME=${HOME_DIR}/.config \
 #   • Ownership explícito e local (sem chown -R)
 # ---------------------------------------------------------------------------
 RUN mkdir -p ${APP_DIR} \
-    && chown node:node ${APP_DIR}
+    && chown ${USER_NAME}:${USER_NAME} ${APP_DIR}
 
 # -----------------------------------------------------------------------------
 # SSH Agent Anchor (FILE, NOT DIRECTORY)
@@ -125,8 +129,8 @@ RUN mkdir -p ${APP_DIR} \
 # • /ssh-agent é um *ponto de ancoragem de arquivo*
 # • O socket real é sempre fornecido pelo runtime (bind mount)
 # -----------------------------------------------------------------------------
-RUN touch /ssh-agent \
-    && chmod 666 /ssh-agent
+##RUN touch /ssh-agent \
+##    && chmod 666 /ssh-agent
 
 # =============================================================================
 # SECTION 2 — LOCALE / TIMEZONE / SYSTEM (VS CODE SAFE)
@@ -222,8 +226,8 @@ ENV NPM_CONFIG_AUDIT=false \
 #   • Garantir estabilidade máxima do Puppeteer (connect / launch)
 #
 # Princípios:
-#   • Chrome externo é PRIMÁRIO
-#   • Chromium local é FALLBACK técnico
+#   • Chrome externo é PRIMÁRIO e NECESSÁRIO para operações Puppeteer
+#   • Chromium local existe apenas como camada de compatibilidade runtime
 #   • Nenhum download automático de browser
 #   • Nenhuma UI gráfica iniciada
 # =============================================================================
@@ -496,7 +500,6 @@ RUN apt-get update \
     # • Fast code statistics (Rust-based)
     # =====================================================================
     cloc \
-    tokei \
     \
     # =====================================================================
     # JSON/YAML/TOML TOOLING (v5.1)
@@ -504,8 +507,6 @@ RUN apt-get update \
     # • JSON diff visual
     # • Query unificado (JSON/YAML/TOML)
     # =====================================================================
-    jd \
-    dasel \
     \
     # =====================================================================
     # CONTAINER TOOLING (v5.1)
@@ -514,7 +515,6 @@ RUN apt-get update \
     # • BuildKit avançado
     # =====================================================================
     docker-compose \
-    docker-buildx \
     \
     # =====================================================================
     # BUILD OPTIMIZATION (v5.1)
@@ -935,39 +935,56 @@ RUN mkdir -p \
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# DEFAULTS SEGUROS (Development)
+# DEFAULTS SEGUROS (Development) v6.0
 # Sobrescritos por devcontainer.json ou .env files
 # ---------------------------------------------------------------------------
+
+# STRUCTURAL (identidade do sistema)
 ENV NODE_ENV=development \
     SERVER_MODE=split \
     SERVER_AUTHORITY=standalone \
-    \
-    SERVER_PORT=3008 \
-    PORT=3008 \
+    BROWSER_MODE=wsEndpoint
+
+# INFRASTRUCTURE (conectividade essencial)
+ENV SERVER_PORT=3008 \
     CHROME_PROXY_PORT=9224 \
     CHROME_PORT=9225 \
     CHROME_HOST=host.docker.internal \
-    \
-    BROWSER_MODE=wsEndpoint \
-    PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
-    MOCK_CHROME=0 \
-    \
-    BROWSER_POOL_SIZE=3 \
+    CHROME_PROXY_BIND=0.0.0.0 \
+    HOST=0.0.0.0
+
+# OPERATIONAL (comportamento runtime)
+ENV BROWSER_POOL_SIZE=3 \
     ALLOCATION_STRATEGY=round-robin \
-    \
+    HEALTH_CHECK_INTERVAL=30000 \
+    ALLOW_DEGRADED_MODE=true \
+    AUTO_RETRY_CHROME=true \
+    MAX_AUTO_RETRIES=2 \
+    MAX_CONNECTION_ATTEMPTS=5 \
+    CONNECTION_TIMEOUT=30000 \
     LOG_LEVEL=info \
+    NERV_BUFFER_SIZE=1000 \
     NERV_TELEMETRY=true \
-    \
-    ENABLE_STATE_FILE=true \
+    NERV_INTEGRATION=true \
+    KERNEL_CYCLE_INTERVAL=50 \
+    CONTEXT_STRATEGY=sliding_window \
+    CONTEXT_MAX_TOKENS=100000 \
+    SUMMARIZATION_POLICY=on_overflow \
     MISSIONS_DIR=missions \
-    FACTORY_DEFAULT_TARGET=chatgpt
+    CHECKPOINT_KEEP_LAST=10 \
+    FACTORY_DEFAULT_TARGET=chatgpt \
+    FACTORY_VALIDATE_BOOT=false
+
+# FEATURE FLAGS
+ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
+    MOCK_CHROME=0 \
+    ENABLE_STATE_FILE=true
 
 # ---------------------------------------------------------------------------
 # CHROME PROXY SERVICE v2.0 (Variáveis específicas)
 # ---------------------------------------------------------------------------
 ENV WS_IDLE_TIMEOUT_MS=300000 \
-    ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008" \
-    NERV_INTEGRATION=true
+    ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
 # ---------------------------------------------------------------------------
 # NOTA IMPORTANTE:
@@ -1077,7 +1094,7 @@ if [ -f "${PASSWD_FILE}" ] \
    && { [ -f "${NSS_SO_PATH}" ] || ldconfig -p 2>/dev/null | grep -q libnss_wrapper.so; }; then
     export NSS_WRAPPER_PASSWD="${PASSWD_FILE}"
     export NSS_WRAPPER_GROUP="${GROUP_FILE}"
-    export LD_PRELOAD="libnss_wrapper.so"
+    export LD_PRELOAD="libnss_wrapper.so${LD_PRELOAD:+:$LD_PRELOAD}"
 fi
 EOF
 
@@ -1113,9 +1130,12 @@ RUN cat <<'EOF' > /etc/profile.d/20-devcontainer-ux.sh
 # Prompt helpers (namespaced)
 # -------------------------------------------------------------------------
 __dc_parse_git_branch() {
-  git branch 2>/dev/null | sed -e "/^[^*]/d" -e "s/* \(.*\)/ (\1)/"
-}
+  command -v git >/dev/null 2>&1 || return 0
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
+  git branch 2>/dev/null \
+    | sed -n 's/^\* \(.*\)$/ (\1)/p'
+}
 # -------------------------------------------------------------------------
 # Prompt visual informativo
 # -------------------------------------------------------------------------
@@ -1147,21 +1167,6 @@ RUN chmod 444 /etc/profile.d/20-devcontainer-ux.sh
 # [E] SHELL SEGURO PARA BUILDS FUTUROS
 # -----------------------------------------------------------------------------
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# =============================================================================
-# HEALTHCHECK — CONTAINER OBSERVABILITY
-# =============================================================================
-# Verifica se o sistema está responsível (dashboard na porta 3008)
-# Intervalo: 30s | Timeout: 5s | Start period: 60s | Retries: 3
-#
-# Nota:
-# - Start period de 60s permite que PM2 inicialize completamente
-# - Endpoint /health deve retornar status 200
-# - Falhas consecutivas (3x) marcam container como unhealthy
-# =============================================================================
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3008/health 2>/dev/null || exit 1
-
 
 # -----------------------------------------------------------------------------
 # [F] HANDOFF FINAL (Transição para Runtime)

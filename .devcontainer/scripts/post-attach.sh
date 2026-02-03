@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
 # CANONICAL v5.2.0
@@ -23,19 +24,35 @@ trap - ERR EXIT INT TERM 2>/dev/null || true
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
 # CANONICAL v5.2.0
+#
+# Finalidade:
+#   • Prover API mínima e estável de mensagens humanas
+#   • Isolar detalhes de cor / terminal
+#   • Garantir comportamento seguro sob set -euo pipefail
+#
+# Propriedades:
+#   • Nenhuma lógica de negócio
+#   • Nenhuma leitura de estado
+#   • Nenhuma escrita
 # =============================================================================
 
-# Versão canônica do script (fonte única da verdade)
-SCRIPT_VERSION="5.2.0"
+# Versão canônica do hook (fonte única da verdade)
+readonly SCRIPT_NAME="post-attach"
+readonly SCRIPT_VERSION="5.2.0"
 
-# Detecta suporte a cores (fallback silencioso)
-if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
+# ---------------------------------------------------------------------------
+# Detecção defensiva de terminal e suporte a cores
+# ---------------------------------------------------------------------------
+COLOR_ENABLED=false
+
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
     COLOR_ENABLED=true
-else
-    COLOR_ENABLED=false
 fi
 
-if [ "${COLOR_ENABLED}" = true ]; then
+# ---------------------------------------------------------------------------
+# Paleta semântica (fallback silencioso)
+# ---------------------------------------------------------------------------
+if [[ "${COLOR_ENABLED}" == "true" ]]; then
     GREEN="$(tput setaf 2)"
     YELLOW="$(tput setaf 3)"
     BLUE="$(tput setaf 4)"
@@ -52,30 +69,29 @@ fi
 # ---------------------------------------------------------------------------
 # API de mensagens humanas
 #
-# Política:
-# - Não existe "erro" operacional no attach
-# - Apenas info / ok / warn
+# Política canônica:
+#   • post-attach NÃO falha
+#   • NÃO existe "erro" operacional aqui
+#   • Apenas: info / ok / warn
 # ---------------------------------------------------------------------------
 info() { printf "%b\n" "${CYAN}ℹ️  $*${NC}"; }
 ok()   { printf "%b\n" "${GREEN}✅ $*${NC}"; }
 warn() { printf "%b\n" "${YELLOW}⚠️  $*${NC}"; }
-
-#error() { printf "%b\n" "${RED}❌ $*${NC}"; }
 
 # =============================================================================
 # PHASE 2 — BANNER DE ATTACH (IDENTIDADE HUMANA — INICIAL)
 # CANONICAL v5.2.0
 #
 # Finalidade:
-# - Sinalizar visualmente o evento de attach
-# - Comunicar identidade do projeto e do hook
-# - Expor versão do post-attach em execução
+#   • Sinalizar visualmente o evento de attach
+#   • Comunicar identidade do projeto
+#   • Comunicar identidade e versão do hook
 #
-# PROIBIÇÕES:
-# - Nenhuma lógica condicional
-# - Nenhuma inferência (primeiro / recorrente)
-# - Nenhuma dependência de estado
-# - Nenhum diagnóstico
+# Proibições (INVIOLÁVEIS):
+#   • Nenhuma lógica condicional
+#   • Nenhuma inferência temporal (primeiro / recorrente)
+#   • Nenhuma dependência de estado persistente
+#   • Nenhum diagnóstico
 # =============================================================================
 
 echo ""
@@ -83,7 +99,7 @@ echo ""
 printf "%b\n" "${BLUE}══════════════════════════════════════════════════════════════${NC}"
 printf "%b\n" "${BLUE}🔗 VS Code anexado ao DevContainer${NC}"
 printf "%b\n" "${BLUE}📦 Projeto: ChatGPT Docker Puppeteer${NC}"
-printf "%b\n" "${BLUE}🧩 Hook: post-attach  |  v${SCRIPT_VERSION}${NC}"
+printf "%b\n" "${BLUE}🧩 Hook: ${SCRIPT_NAME}  |  v${SCRIPT_VERSION}${NC}"
 printf "%b\n" "${BLUE}══════════════════════════════════════════════════════════════${NC}"
 
 echo ""
@@ -92,41 +108,49 @@ echo ""
 # CANONICAL v5.2.0
 #
 # CONTRATO (NORMATIVO):
-# - Este namespace armazena APENAS estado HUMANO / UX
-# - Nada aqui é estrutural, técnico ou decisório
-# - Falha, ausência ou corrupção NÃO podem quebrar o sistema
-# - Escritas são:
-#     • defensivas
-#     • best-effort
-#     • silenciosas em caso de erro
+#   • Este namespace armazena APENAS estado HUMANO / UX
+#   • Nada aqui é estrutural, técnico ou decisório
+#   • Falha, ausência ou corrupção NÃO podem quebrar o attach
+#   • Escritas são:
+#       - defensivas
+#       - best-effort
+#       - silenciosas em caso de erro
+#
+# SEPARAÇÃO CRÍTICA (INVIOLÁVEL):
+#   • Estado UX (attach):     .devcontainer/state/*
+#   • Estado Estrutural:      .devcontainer/.initialized
+#
+# Observação:
+#   • O KERNEL NUNCA lê este namespace
+#   • Apenas humanos e UX helpers consomem estes dados
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Diretório canônico de estado UX
+# Diretório canônico de estado UX (relativo ao projeto)
 # ---------------------------------------------------------------------------
-STATE_DIR=".devcontainer/state"
+readonly UX_STATE_DIR=".devcontainer/state"
 
-FIRST_ATTACH_MARKER="${STATE_DIR}/first-attach"
-LAST_ATTACH_MARKER="${STATE_DIR}/last-attach"
-ATTACH_COUNT_FILE="${STATE_DIR}/attach-count"
-LAST_ATTACH_AT_FILE="${STATE_DIR}/last-attach-at"
+readonly FIRST_ATTACH_MARKER="${UX_STATE_DIR}/first-attach"
+readonly LAST_ATTACH_MARKER="${UX_STATE_DIR}/last-attach"
+readonly ATTACH_COUNT_FILE="${UX_STATE_DIR}/attach-count"
+readonly LAST_ATTACH_AT_FILE="${UX_STATE_DIR}/last-attach-at"
 
-# Flag interna: estado UX gravável
+# Flag interna: namespace UX utilizável
 UX_STATE_WRITABLE=true
 
 # ---------------------------------------------------------------------------
 # Preparação defensiva do namespace
 # ---------------------------------------------------------------------------
-if ! mkdir -p "${STATE_DIR}" 2>/dev/null; then
+if ! mkdir -p "${UX_STATE_DIR}" 2>/dev/null; then
     UX_STATE_WRITABLE=false
 fi
 
 # ---------------------------------------------------------------------------
-# Determinação semântica do tipo de attach
+# Determinação semântica do tipo de attach (HUMANO)
 # ---------------------------------------------------------------------------
 IS_FIRST_ATTACH=false
 
-if [ "${UX_STATE_WRITABLE}" = true ] && [ ! -f "${FIRST_ATTACH_MARKER}" ]; then
+if [[ "${UX_STATE_WRITABLE}" == "true" && ! -f "${FIRST_ATTACH_MARKER}" ]]; then
     IS_FIRST_ATTACH=true
     touch "${FIRST_ATTACH_MARKER}" 2>/dev/null || true
 fi
@@ -136,36 +160,35 @@ fi
 # ---------------------------------------------------------------------------
 ATTACH_COUNT=0
 
-if [ "${UX_STATE_WRITABLE}" = true ] && [ -f "${ATTACH_COUNT_FILE}" ]; then
+if [[ "${UX_STATE_WRITABLE}" == "true" && -f "${ATTACH_COUNT_FILE}" ]]; then
     ATTACH_COUNT="$(cat "${ATTACH_COUNT_FILE}" 2>/dev/null || echo 0)"
 fi
 
 ATTACH_COUNT=$((ATTACH_COUNT + 1))
 
-if [ "${UX_STATE_WRITABLE}" = true ]; then
-    printf "%s\n" "${ATTACH_COUNT}" > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null && \
-    mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
+if [[ "${UX_STATE_WRITABLE}" == "true" ]]; then
+    printf '%s\n' "${ATTACH_COUNT}" > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null \
+        && mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
 
-    date -Is > "${LAST_ATTACH_AT_FILE}.tmp" 2>/dev/null && \
-    mv "${LAST_ATTACH_AT_FILE}.tmp" "${LAST_ATTACH_AT_FILE}" 2>/dev/null || true
+    date -Is > "${LAST_ATTACH_AT_FILE}.tmp" 2>/dev/null \
+        && mv "${LAST_ATTACH_AT_FILE}.tmp" "${LAST_ATTACH_AT_FILE}" 2>/dev/null || true
 
     touch "${LAST_ATTACH_MARKER}" 2>/dev/null || true
 fi
 
-
 # =============================================================================
 # PHASE 4 — CONTEXTO BÁSICO DO AMBIENTE (DIAGNÓSTICO HUMANO)
-# CANONICAL v3.6
+# CANONICAL v5.2.0
 #
 # CONTRATO:
-# - Diagnóstico exclusivamente informativo
-# - Nenhuma inferência operacional
-# - Nenhuma correção automática
-# - Falhas são aceitáveis e silenciosas
+#   • Diagnóstico exclusivamente informativo
+#   • Nenhuma inferência operacional
+#   • Nenhuma correção automática
+#   • Falhas são aceitáveis e silenciosas
 #
 # OBJETIVO:
-# - Fornecer ao operador humano um retrato fiel do contexto atual
-# - Tornar explícitas heurísticas e suas limitações
+#   • Oferecer ao operador humano um retrato fiel do contexto atual
+#   • Tornar EXPLÍCITAS as heurísticas e suas limitações
 # =============================================================================
 
 info "Contexto do ambiente:"
@@ -176,38 +199,42 @@ info "Contexto do ambiente:"
 CURRENT_USER="$(whoami 2>/dev/null || echo 'desconhecido')"
 WORKSPACE_DIR="${PWD:-indefinido}"
 
+# Âncora canônica de HOME (não normativa)
+USER_HOME="${HOME:-/home/${CURRENT_USER}}"
+
 # ---------------------------------------------------------------------------
-# Contexto de execução (heurístico e explicitamente declarado)
+# Contexto de execução (HEURÍSTICO, NÃO NORMATIVO)
 #
-# Observação:
-# - A classificação é indicativa, não normativa.
-# - Ambientes híbridos (WSL, SSH, CI) podem escapar à heurística.
+# Observações:
+#   • Classificação indicativa
+#   • Pode falhar em WSL, SSH, CI ou setups híbridos
+#   • REMOTE_CONTAINERS é variável interna do VS Code (não API estável)
 # ---------------------------------------------------------------------------
 EXECUTION_CONTEXT="host (heurístico)"
 
-if [ -n "${REMOTE_CONTAINERS:-}" ]; then
+if [[ -n "${REMOTE_CONTAINERS:-}" ]]; then
     EXECUTION_CONTEXT="DevContainer (VS Code)"
-elif [ -f "/.dockerenv" ]; then
+elif [[ -f "/.dockerenv" ]]; then
     EXECUTION_CONTEXT="container Docker"
 fi
 
 # ---------------------------------------------------------------------------
-# Raiz lógica do projeto (heurística declarada)
+# Raiz lógica do projeto (HEURÍSTICA DECLARADA)
 #
 # Limitações conhecidas:
-# - Monorepos profundos
-# - Workspaces multi-root do VS Code
-# - Execução fora do root lógico
+#   • Monorepos profundos
+#   • Workspaces multi-root
+#   • Execução fora do root lógico
 # ---------------------------------------------------------------------------
 PROJECT_ROOT="indefinido (heurístico)"
 
-if [ -n "${WORKSPACE_DIR}" ]; then
-    if [ -f "${WORKSPACE_DIR}/Makefile" ] || [ -d "${WORKSPACE_DIR}/.git" ]; then
+if [[ -n "${WORKSPACE_DIR}" ]]; then
+    if [[ -f "${WORKSPACE_DIR}/Makefile" || -d "${WORKSPACE_DIR}/.git" ]]; then
         PROJECT_ROOT="${WORKSPACE_DIR}"
     else
         PARENT_DIR="$(cd "${WORKSPACE_DIR}/.." 2>/dev/null && pwd || true)"
-        if [ -n "${PARENT_DIR}" ] && \
-           { [ -f "${PARENT_DIR}/Makefile" ] || [ -d "${PARENT_DIR}/.git" ]; }; then
+        if [[ -n "${PARENT_DIR}" ]] \
+           && { [[ -f "${PARENT_DIR}/Makefile" ]] || [[ -d "${PARENT_DIR}/.git" ]]; }; then
             PROJECT_ROOT="${PARENT_DIR}"
         fi
     fi
@@ -217,7 +244,7 @@ fi
 # Runtime Node.js (diagnóstico passivo)
 #
 # Observação:
-# - A ausência de Node.js não é tratada como erro.
+#   • Ausência de Node NÃO é erro
 # ---------------------------------------------------------------------------
 NODE_VERSION="$(node --version 2>/dev/null || echo 'não disponível')"
 NPM_VERSION="$(npm --version 2>/dev/null || echo 'não disponível')"
@@ -237,97 +264,126 @@ printf "  • %-22s %s\n" "Node path:"           "${NODE_PATH}"
 echo ""
 
 
+
 # =============================================================================
-# PHASE 5 — ESTADO ESTRUTURAL (STATE MANIFESTO | DIAGNÓSTICO PASSIVO)
-# CANONICAL v3.7
+# PHASE 5 — ESTADO ESTRUTURAL
+# (STATE MANIFESTO | DIAGNÓSTICO PASSIVO)
+# CANONICAL v5.2.1
 #
-# CONTRATO:
-# - Leitura estritamente PASSIVA do estado estrutural
-# - Nunca escreve, corrige ou recria estado
-# - Nunca falha se o estado estiver ausente, parcial ou corrompido
+# CONTRATO (INVIOLÁVEL):
+#   • Leitura ESTRITAMENTE PASSIVA
+#   • Nunca escreve, corrige ou recria estado
+#   • Nunca falha se o estado estiver ausente, parcial ou corrompido
 #
-# FONTE DE VERDADE (prioridade):
-# 1. State Manifesto canônico (Section 10 / post-create)
-# 2. Marker legado (.devcontainer/.initialized) — compatibilidade
+# FONTE DE VERDADE (ORDEM DE PRECEDÊNCIA):
+#   1. Manifesto estrutural canônico (post-create / Section 10)
+#   2. Marcador legado (.initialized) — compatibilidade histórica
 #
 # OBJETIVO:
-# - Informar se o post-create foi executado
-# - Expor vereditos estruturais consolidados
-# - Eliminar inferência ambígua quando há fonte canônica
+#   • Informar SE e QUANDO o post-create foi executado
+#   • Expor vereditos estruturais já consolidados
+#   • Eliminar inferência ambígua no attach
+#
+# ESCOPO:
+#   • HUMANO / UX apenas
+#   • KERNEL já decidiu — aqui apenas se OBSERVA
 # =============================================================================
 
-STATE_MANIFEST=".devcontainer/state/manifest.env"
-LEGACY_INIT_MARKER=".devcontainer/.initialized"
+# ---------------------------------------------------------------------------
+# Caminho canônico do manifesto estrutural
+# (alinhado ao post-create v5.2.x)
+# ---------------------------------------------------------------------------
+readonly STATE_MANIFEST=".devcontainer/.initialized"
 
-# Feature flag explícita (ENV-driven com fallback)
+# ---------------------------------------------------------------------------
+# Política de leitura do estado estrutural
+# (espelhada do post-create; attach nunca decide)
+# ---------------------------------------------------------------------------
 ENABLE_STATE_FILE_VAL="${ENABLE_STATE_FILE:-true}"
 
-if [ "${ENABLE_STATE_FILE_VAL}" != "true" ]; then
-    SKIP_STATE_FILE=true
-else
+if [[ "${ENABLE_STATE_FILE_VAL}" == "true" ]]; then
     SKIP_STATE_FILE=false
+else
+    SKIP_STATE_FILE=true
 fi
 
 info "Estado estrutural do DevContainer:"
 
 # ---------------------------------------------------------------------------
-# 1. Manifesto canônico (preferencial)
+# Helper interno — leitura PASSIVA de chave (best-effort)
 # ---------------------------------------------------------------------------
-if [ "${SKIP_STATE_FILE}" = "false" ] && [ -r "${STATE_MANIFEST}" ]; then
+__dc_read_manifest_key() {
+    # $1 = arquivo
+    # $2 = chave
+    grep -E "^${2}=" "$1" 2>/dev/null | head -n1 | cut -d= -f2 || true
+}
+
+# ---------------------------------------------------------------------------
+# 1. Manifesto estrutural CANÔNICO (preferencial)
+# ---------------------------------------------------------------------------
+if [[ "${SKIP_STATE_FILE}" == "false" && -r "${STATE_MANIFEST}" ]]; then
     ok "Manifesto estrutural detectado (fonte canônica)"
 
-    # Extração passiva (best-effort, linha única)
-    MANIFEST_STATUS="$(grep -E '^status=' "${STATE_MANIFEST}" 2>/dev/null | head -n1 | cut -d= -f2)"
-    MANIFEST_INTEGRITY="$(grep -E '^integrity=' "${STATE_MANIFEST}" 2>/dev/null | head -n1 | cut -d= -f2)"
-    MANIFEST_INIT_AT="$(grep -E '^initialized_at=' "${STATE_MANIFEST}" 2>/dev/null | head -n1 | cut -d= -f2)"
-    MANIFEST_SCRIPT_VERSION="$(grep -E '^script_version=' "${STATE_MANIFEST}" 2>/dev/null | head -n1 | cut -d= -f2)"
+    MANIFEST_INIT_AT="$(__dc_read_manifest_key "${STATE_MANIFEST}" "initialized_at")"
+    MANIFEST_SCRIPT_VERSION="$(__dc_read_manifest_key "${STATE_MANIFEST}" "script_version")"
+    MANIFEST_STATUS="$(__dc_read_manifest_key "${STATE_MANIFEST}" "status")"
+    MANIFEST_INTEGRITY="$(__dc_read_manifest_key "${STATE_MANIFEST}" "integrity")"
 
-    [ -n "${MANIFEST_INIT_AT}" ]        && info "→ Inicializado em: ${MANIFEST_INIT_AT}"
-    [ -n "${MANIFEST_SCRIPT_VERSION}" ] && info "→ post-create versão: ${MANIFEST_SCRIPT_VERSION}"
-    [ -n "${MANIFEST_STATUS}" ]         && info "→ Status: ${MANIFEST_STATUS}"
-    [ -n "${MANIFEST_INTEGRITY}" ]      && info "→ Integridade: ${MANIFEST_INTEGRITY}"
+    [[ -n "${MANIFEST_INIT_AT}" ]] && \
+        info "→ Último post-create em: ${MANIFEST_INIT_AT}"
+
+    [[ -n "${MANIFEST_SCRIPT_VERSION}" ]] && \
+        info "→ post-create versão: ${MANIFEST_SCRIPT_VERSION}"
+
+    [[ -n "${MANIFEST_STATUS}" ]] && \
+        info "→ Status estrutural: ${MANIFEST_STATUS}"
+
+    [[ -n "${MANIFEST_INTEGRITY}" ]] && \
+        info "→ Integridade: ${MANIFEST_INTEGRITY}"
 
 # ---------------------------------------------------------------------------
-# 2. Fallback legado (.initialized)
+# 2. Fallback LEGADO (compatibilidade histórica)
 # ---------------------------------------------------------------------------
-elif [ -r "${LEGACY_INIT_MARKER}" ]; then
-    warn "Manifesto canônico ausente — usando marcador legado"
+elif [[ -r "${STATE_MANIFEST}" ]]; then
+    warn "Manifesto canônico indisponível — usando marcador legado"
     ok   "DevContainer inicializado (post-create confirmado)"
 
-    LEGACY_INIT_AT="$(grep -E '^initialized_at=' "${LEGACY_INIT_MARKER}" 2>/dev/null | head -n1 | cut -d= -f2)"
-    LEGACY_VERSION="$(grep -E '^script_version=' "${LEGACY_INIT_MARKER}" 2>/dev/null | head -n1 | cut -d= -f2)"
+    LEGACY_INIT_AT="$(__dc_read_manifest_key "${STATE_MANIFEST}" "initialized_at")"
+    LEGACY_VERSION="$(__dc_read_manifest_key "${STATE_MANIFEST}" "script_version")"
 
-    [ -n "${LEGACY_INIT_AT}" ] && info "→ Inicializado em: ${LEGACY_INIT_AT}"
-    [ -n "${LEGACY_VERSION}" ] && info "→ post-create versão: ${LEGACY_VERSION}"
+    [[ -n "${LEGACY_INIT_AT}" ]] && \
+        info "→ Inicializado em: ${LEGACY_INIT_AT}"
+
+    [[ -n "${LEGACY_VERSION}" ]] && \
+        info "→ post-create versão: ${LEGACY_VERSION}"
 
 # ---------------------------------------------------------------------------
-# 3. Estado desconhecido / não inicializado
+# 3. Estado estrutural ausente / desconhecido
 # ---------------------------------------------------------------------------
 else
     warn "Estado estrutural indisponível"
-    warn "→ post-create pode não ter sido executado"
+    warn "→ post-create pode não ter sido executado ainda"
     warn "→ Se algo parecer inconsistente: Rebuild Container"
 fi
 
 echo ""
 
-
 # =============================================================================
 # PHASE 6 — ESTADO DE SAÚDE & CAPACIDADES CRÍTICAS (PASSIVO)
-# CANONICAL v3.8
+# CANONICAL v5.2.1
 #
-# CONTRATO:
-# - Diagnóstico estritamente PASSIVO
-# - Nunca executa checks
-# - Nunca infere causa de falha
-# - Nunca corrige estado
-# - Nunca bloqueia o attach
+# CONTRATO (INVIOLÁVEL):
+#   • Diagnóstico estritamente PASSIVO
+#   • Nunca executa checks
+#   • Nunca infere causa de falha
+#   • Nunca corrige estado
+#   • Nunca bloqueia o attach
 #
 # OBJETIVO:
-# - Informar o último estado de saúde conhecido
-# - Expor capacidades críticas observáveis (ex.: SSH)
-# - Direcionar o operador humano para ação MANUAL
+#   • Informar o último estado de saúde conhecido
+#   • Expor capacidades críticas observáveis (runtime)
 # =============================================================================
+
 
 # ---------------------------------------------------------------------------
 # 6.1 — Healthcheck (snapshot passivo)
@@ -336,21 +392,22 @@ HEALTH_STATUS_FILE="/tmp/devcontainer-health.status"
 
 info "Estado conhecido do sistema:"
 
-if [ -r "${HEALTH_STATUS_FILE}" ]; then
+if [[ -r "${HEALTH_STATUS_FILE}" ]]; then
     HEALTH_STATUS="$(cat "${HEALTH_STATUS_FILE}" 2>/dev/null || echo unknown)"
 
-    if [ "${HEALTH_STATUS}" = "ok" ]; then
+    if [[ "${HEALTH_STATUS}" == "ok" ]]; then
         ok "Último healthcheck registrado: OK"
     else
-        warn "Último healthcheck registrado: FALHA"
-        warn "→ Execute manualmente quando desejar: make health"
+        warn "Último healthcheck registrado: NÃO OK"
+        warn "→ Healthcheck pode ser executado manualmente (make health)"
     fi
 else
     warn "Nenhum healthcheck registrado ainda"
-    warn "→ Execute quando desejar: make health"
+    info "→ Healthcheck ainda não foi executado neste ambiente"
 fi
 
 echo ""
+
 
 # ---------------------------------------------------------------------------
 # 6.2 — SSH (Capacidade Crítica | Observação Passiva)
@@ -361,417 +418,361 @@ info "SSH (capacidade crítica):"
 # - NÃO valida conectividade externa
 # - NÃO executa ssh-add
 # - NÃO tenta iniciar agent
-# - Apenas descreve o estado visível
+# - Apenas descreve o estado VISÍVEL
 
-if [ -z "${SSH_AUTH_SOCK:-}" ]; then
+if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
     warn "SSH indisponível (SSH_AUTH_SOCK ausente)"
-    warn "→ Git via SSH não estará funcional neste attach"
 
-elif [ -S "${SSH_AUTH_SOCK}" ]; then
+elif [[ -S "${SSH_AUTH_SOCK}" ]]; then
     ok "SSH agent detectado"
-    info "→ Socket: ${SSH_AUTH_SOCK}"
-
-    if command -v ssh-add >/dev/null 2>&1; then
-        if ssh-add -l >/dev/null 2>&1; then
-            ok "Chaves SSH carregadas no agent"
-        else
-            warn "SSH agent ativo, mas sem chaves carregadas"
-            warn "→ Git via SSH pode falhar"
-        fi
-    else
-        warn "ssh-add indisponível — incapaz de inspecionar chaves"
-    fi
+    info "→ Socket visível: ${SSH_AUTH_SOCK}"
 
 else
     warn "SSH_AUTH_SOCK definido, mas não é um socket válido"
-    warn "→ Caminho: ${SSH_AUTH_SOCK}"
+    warn "→ Caminho observado: ${SSH_AUTH_SOCK}"
 fi
 
 echo ""
 
-# =============================================================================
-# PHASE 6.3 — ENV CONFIGURATION STATUS (DIAGNOSTIC DISPLAY) v1.0
-#
-# CONTRATO:
-# - Display estritamente PASSIVO
-# - Nunca modifica configuração
-# - Nunca falha
-#
-# OBJETIVO:
-# - Exibir estado da configuração ENV
-# - Guiar usuário para .env.example se necessário
-# - Validar vars críticas visualmente
-# =============================================================================
-
-info "Configuração de ambiente:"
 
 # ---------------------------------------------------------------------------
-# 6.3.1 — Detectar arquivo .env ativo
+# 6.3 — ENV (Resumo Passivo - Arquitetura remoteEnv)
 # ---------------------------------------------------------------------------
-if [ -f ".env" ]; then
-    ok "Arquivo .env detectado e ativo"
+# Nota arquitetural:
+#   Sistema usa remoteEnv (devcontainer.json) + runArgs (--env-file)
+#   Arquivo .env físico NÃO é obrigatório (vars injetadas pelo Docker/VS Code)
+# ---------------------------------------------------------------------------
+info "Configuração de ambiente (arquitetura remoteEnv):"
 
-    # Contar variáveis definidas (não comentadas)
-    DEFINED_COUNT=$(grep -cE '^[A-Z_]+=' .env 2>/dev/null || echo 0)
-    info "→ ${DEFINED_COUNT} variáveis definidas"
+# Validar vars críticas injetadas (4 estruturais mínimas)
+CRITICAL_VARS_INJECTED=("NODE_ENV" "SERVER_MODE" "BROWSER_MODE" "SERVER_PORT")
+MISSING_COUNT=0
 
-    # Validar vars críticas (display apenas)
-    CRITICAL_VARS=("NODE_ENV" "SERVER_PORT" "CHROME_HOST" "CHROME_PORT")
+for var in "${CRITICAL_VARS_INJECTED[@]}"; do
+    if [[ -z "${!var:-}" ]]; then
+        ((MISSING_COUNT++))
+    fi
+done
 
-    for var in "${CRITICAL_VARS[@]}"; do
-        if grep -q "^${var}=" .env 2>/dev/null; then
-            VAL=$(grep "^${var}=" .env | cut -d= -f2 | head -n1)
-            printf "  • %-22s %s\n" "${var}:" "${VAL}"
-        else
-            warn "  • ${var}: NÃO DEFINIDO em .env"
-        fi
-    done
+if [[ ${MISSING_COUNT} -eq 0 ]]; then
+    ok "Variáveis críticas injetadas (remoteEnv ativo)"
+    info "→ NODE_ENV=${NODE_ENV:-<unset>}"
+    info "→ BROWSER_MODE=${BROWSER_MODE:-<unset>}"
 
-elif [ -f ".env.development" ]; then
-    warn "Arquivo .env ausente"
-    ok   "Template encontrado: .env.development"
-    info "→ Copie e personalize: cp .env.development .env"
-    info "→ Ou use defaults: ln -s .env.development .env"
-
-elif [ -f ".env.example" ]; then
-    warn "Arquivo .env ausente"
-    ok   "Template encontrado: .env.example"
-    info "→ Copie e configure: cp .env.example .env"
-    info "→ Consulte: DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md"
-
+    # Mostrar se .env físico existe (informativo, não obrigatório)
+    if [[ -f ".env" ]]; then
+        info "→ Arquivo .env físico detectado (suplementar)"
+    else
+        info "→ Arquivo .env físico ausente (normal - usa remoteEnv)"
+    fi
 else
-    warn "Sistema ENV não configurado"
-    warn "→ Usando defaults do código (pode não ser ideal)"
-    info "→ Crie arquivo .env para configuração personalizada"
+    warn "${MISSING_COUNT} variáveis críticas ausentes"
+    warn "→ Verifique devcontainer.json (remoteEnv)"
 fi
 
 echo ""
 
+
 # =============================================================================
-# PHASE 7.5 — QUICK START GUIDE (FIRST ATTACH ONLY) v1.0
+# PHASE 7 — QUICK START GUIDE (FIRST ATTACH ONLY)
+# CANONICAL v5.2.1
 #
 # CONTRATO:
-# - Exibido APENAS no primeiro attach
-# - Informativo, nunca executável
-# - Guia visual de 5 passos
+#   • Exibido APENAS no primeiro attach
+#   • Informativo (humano), nunca executável
+#   • Nenhuma inferência técnica
+#   • Nenhuma validação ou diagnóstico
 #
 # OBJETIVO:
-# - Acelerar onboarding
-# - Reduzir fricção inicial
-# - Documentação viva no terminal
+#   • Orientar o operador humano no primeiro contato
+#   • Reduzir fricção inicial
+#   • Apresentar o fluxo mental do projeto
 # =============================================================================
 
 if [ "${IS_FIRST_ATTACH}" = true ]; then
     echo ""
     printf "%b\n" "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    printf "%b\n" "${GREEN}🚀 QUICK START GUIDE - Primeiros Passos${NC}"
+    printf "%b\n" "${GREEN}🚀 QUICK START — Primeiros Passos${NC}"
     printf "%b\n" "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo ""
-    echo "📋 Workflow completo para iniciar o sistema:"
+
+    echo "📦 Visão geral:"
+    echo "Este DevContainer fornece um ambiente isolado para desenvolvimento,"
+    echo "com automação baseada em Node.js + Puppeteer + Chrome externo."
     echo ""
-    echo "1️⃣  Configurar ambiente (escolha uma opção):"
-    echo "   → Desenvolvimento: cp .env.development .env"
-    echo "   → Produção:        cp .env.production .env"
-    echo "   → Ou editar:       code .env.example"
+
+    echo "🧩 Etapas conceituais (ordem flexível):"
     echo ""
-    echo "2️⃣  Iniciar Chrome no Windows (host):"
-    echo "   → Execute: START-CHROME-SIMPLE.bat"
-    echo "   → Porta: 9225 (Remote Debugging)"
+
+    echo "1️⃣  Configuração de ambiente"
+    echo "   • O projeto utiliza variáveis ENV via arquivo .env"
+    echo "   • Templates estão disponíveis (.env.example, .env.development, etc.)"
     echo ""
-    echo "3️⃣  Iniciar sistema (PM2):"
-    echo "   → make start"
-    echo "   → Ou: pm2 start ecosystem.config.js"
+
+    echo "2️⃣  Dependência externa: Chrome (Windows host)"
+    echo "   • Um Chrome REAL roda fora do container"
+    echo "   • Ele é acessado indiretamente via proxy interno"
+    echo "   • Estado normal no início: Chrome NÃO estar rodando"
     echo ""
-    echo "4️⃣  Validar saúde do sistema:"
-    echo "   → make health"
-    echo "   → Deve retornar: 4 endpoints OK"
+
+    echo "3️⃣  Inicialização do sistema"
+    echo "   • O sistema é iniciado manualmente quando fizer sentido"
+    echo "   • Tipicamente via Makefile ou PM2"
     echo ""
-    echo "5️⃣  Abrir Dashboard (qualquer browser):"
-    echo "   → http://localhost:3008"
-    echo "   → Mission Control + Logs + Metrics"
+
+    echo "4️⃣  Observabilidade e controle"
+    echo "   • Dashboard web"
+    echo "   • Logs em tempo real"
+    echo "   • Healthcheck sob demanda"
     echo ""
-    echo "📚 Documentação:"
-    echo "   → Quick Reference:    README.md"
-    echo "   → Guia ENV:           DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md"
-    echo "   → Arquitetura:        DOCUMENTAÇÃO/ARCHITECTURE.md"
-    echo "   → Chrome Proxy v2.0:  DOCUMENTAÇÃO/CHROME_PROXY_V2_IMPLEMENTATION.md"
+
+    echo "📚 Documentação principal:"
+    echo "   • README.md"
+    echo "   • DOCUMENTAÇÃO/ARCHITECTURE.md"
+    echo "   • DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md"
     echo ""
-    echo "🆘 Troubleshooting:"
-    echo "   → Logs:               make logs-follow"
-    echo "   → PM2 status:         make pm2-status"
-    echo "   → Diagnostics:        make diagnose"
+
+    echo "💡 Dica:"
+    echo "Este ambiente NÃO executa nada automaticamente no attach."
+    echo "Todas as ações são explícitas e sob seu controle."
     echo ""
+
     printf "%b\n" "${GREEN}════════════════════════════════════════════════════════════════${NC}"
     echo ""
 fi
 
 # =============================================================================
-# PHASE 7 — PM2 (OBSERVAÇÃO PASSIVA E CONTEXTUAL)
-# CANONICAL v3.5
+# PHASE 8 — PM2 (OBSERVAÇÃO PASSIVA)
+# CANONICAL v5.2.1
 #
 # CONTRATO:
-# - Observação estritamente passiva
-# - Nenhum start / restart / reload
-# - Nenhuma inferência operacional
-# - Timeout curto para não bloquear UX
+#   • Observação estritamente PASSIVA
+#   • Nunca inicia, reinicia ou modifica processos
+#   • Nunca presume que PM2 deva estar ativo
+#   • Nunca bloqueia o attach
 #
 # OBJETIVO:
-# - Informar se o PM2 está disponível
-# - Indicar se há processos conhecidos
-# - Nunca assumir que PM2 deva estar ativo
+#   • Informar se o PM2 está disponível no ambiente
+#   • Indicar se há processos registrados
 # =============================================================================
 
 info "PM2 (observação passiva):"
 
-PM2_BIN=""
-PM2_TIMEOUT_SECONDS=5  # Aumentado para 5s (v5.2) - acomoda sistemas lentos
+PM2_CMD=""
 
 # ---------------------------------------------------------------------------
-# Detecção do binário PM2 (ordem semântica de preferência)
+# Detecção do binário PM2 (ordem semântica)
 # ---------------------------------------------------------------------------
 if command -v pm2 >/dev/null 2>&1; then
-    PM2_BIN="pm2 (global)"
+    PM2_CMD="pm2"
 elif [ -x "node_modules/.bin/pm2" ]; then
-    PM2_BIN="node_modules/.bin/pm2 (local)"
+    PM2_CMD="node_modules/.bin/pm2"
 fi
 
 # ---------------------------------------------------------------------------
-# Diagnóstico passivo
+# Diagnóstico observacional
 # ---------------------------------------------------------------------------
-if [ -n "${PM2_BIN}" ]; then
-    PM2_CMD="${PM2_BIN%% *}"
-
+if [ -n "${PM2_CMD}" ]; then
     PM2_VERSION="$(${PM2_CMD} --version 2>/dev/null || echo 'desconhecida')"
-    ok "PM2 disponível — ${PM2_BIN}, versão: ${PM2_VERSION}"
+    ok "PM2 disponível — versão ${PM2_VERSION}"
 
-    # -----------------------------------------------------------------------
-    # Observação do estado (com timeout defensivo, se disponível)
-    # -----------------------------------------------------------------------
+    # Consulta passiva de processos (sem detalhamento)
     if command -v timeout >/dev/null 2>&1; then
-        PM2_JLIST_OUTPUT="$(timeout "${PM2_TIMEOUT_SECONDS}" "${PM2_CMD}" jlist 2>/dev/null || echo '[]')"
+        PM2_JLIST="$(
+            timeout 3 "${PM2_CMD}" jlist 2>/dev/null || echo '[]'
+        )"
     else
-        PM2_JLIST_OUTPUT="$("${PM2_CMD}" jlist 2>/dev/null || echo '[]')"
+        PM2_JLIST="$("${PM2_CMD}" jlist 2>/dev/null || echo '[]')"
     fi
 
-    # Parse com jq se disponível
     if command -v jq >/dev/null 2>&1; then
-        PROC_COUNT="$(echo "${PM2_JLIST_OUTPUT}" | jq -r '. | length' 2>/dev/null || echo 0)"
-
-        if [ "${PROC_COUNT}" -gt 0 ]; then
-            ok "PM2 respondeu — ${PROC_COUNT} processo(s) registrado(s)"
-            echo ""
-            echo "  Processos:"
-            echo "${PM2_JLIST_OUTPUT}" | jq -r '.[] | "  • \(.name): \(.pm2_env.status) (uptime: \(.pm2_env.pm_uptime / 1000 | round)s, mem: \(.monit.memory / 1048576 | round)MB)"' 2>/dev/null || echo "  (detalhes indisponíveis)"
-        else
-            warn "PM2 disponível mas sem processos registrados"
-        fi
+        PROC_COUNT="$(echo "${PM2_JLIST}" | jq '. | length' 2>/dev/null || echo 0)"
     else
-        # Fallback sem jq
-        if echo "${PM2_JLIST_OUTPUT}" | grep -qiE "online|stopped|errored"; then
-            ok "PM2 respondeu — processos conhecidos detectados"
-        else
-            warn "PM2 disponível, mas nenhum processo reconhecível foi detectado"
-        fi
+        PROC_COUNT="$(echo "${PM2_JLIST}" | grep -c '"name"' 2>/dev/null || echo 0)"
     fi
 
+    if [ "${PROC_COUNT}" -gt 0 ]; then
+        ok "PM2 respondeu — ${PROC_COUNT} processo(s) registrado(s)"
+        info "→ Use 'pm2 status' ou 'make pm2-status' para detalhes"
+    else
+        warn "PM2 disponível, mas nenhum processo registrado"
+        info "→ Normal antes de iniciar o sistema"
+    fi
 else
-    warn "PM2 não detectado"
+    warn "PM2 não detectado no ambiente"
     info "→ Normal se o sistema ainda não foi iniciado ou não utiliza PM2"
 fi
 
 echo ""
 
-# --- Git User Identity Check ---
-if ! git config --global user.name >/dev/null 2>&1; then
-    warn "Git user.name não configurado"
-    info "  → Configure: git config --global user.name 'Seu Nome'"
-    info "  → Configure: git config --global user.email 'seu@email.com'"
-    echo ""
-fi
 
 
 # =============================================================================
-# PHASE 8 — CHROME EXTERNO (CDP | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.2.0
+# PHASE 9 — CHROME EXTERNO (CDP | DIAGNÓSTICO PASSIVO)
+# CANONICAL v5.2.1
 #
 # MODELO FÍSICO (NÃO NEGOCIÁVEL):
 #
 #   Windows Host
 #   ────────────
-#   • Chrome REAL
-#   • Porta: 9225 (bind 0.0.0.0)
+#   • Chrome REAL (browser efetivo)
+#   • Porta: 9225 (remote debugging, bind 0.0.0.0)
 #   • ÚNICO ponto onde o browser realmente existe
-#   • Acessível via: host.docker.internal:9225
-#   • ESTADO NORMAL: NÃO ESTAR RODANDO (inicia sob demanda)
+#   • Estado NORMAL: NÃO estar rodando (inicia sob demanda)
 #
 #   DevContainer (Docker)
 #   ─────────────────────
-#   • Chrome Proxy Service (PM2)
-#   • Porta: 9224 (bind 0.0.0.0)
-#   • Frontend: localhost:9224 (Puppeteer conecta aqui)
-#   • Backend: host.docker.internal:9225 (encaminha para Chrome)
-#   • Funções:
-#     - Reescreve Host: headers
-#     - Reescreve WebSocket URLs
-#     - Gerenciado por PM2 (mesmo container)
+#   • Chrome Proxy Service (Node.js / PM2)
+#   • Porta: 9224
+#   • Frontend: localhost:9224  (Puppeteer conecta aqui)
+#   • Backend: host.docker.internal:9225 (encaminhamento)
 #
 #   Puppeteer (Node.js no container)
 #   ─────────────────────────────────
-#   • Conecta: localhost:9224 (proxy no mesmo container)
-#   • NUNCA acessa 9225 diretamente
-#   • NÃO conhece o Windows Host
+#   • Conecta EXCLUSIVAMENTE ao proxy (localhost:9224)
+#   • Nunca acessa o Chrome Windows diretamente
+#   • Não conhece topologia externa
 #
 # CONTRATO DESTA FASE:
-# - Diagnóstico ESTRITAMENTE PASSIVO
-# - Nunca inicia Chrome, proxy ou serviços
-# - Nunca bloqueia o attach
-# - Nunca presume que Chrome esteja ativo
-# - Ausência de Chrome é ESTADO VÁLIDO E ESPERADO
+#   • Diagnóstico estritamente PASSIVO
+#   • Nunca inicia Chrome, proxy ou serviços
+#   • Nunca bloqueia o attach
+#   • Nunca presume que Chrome esteja ativo
 #
 # OBJETIVO:
-# - Verificar se o proxy (localhost:9224) responde
-# - NÃO verificar o Chrome do Windows diretamente
-# - Documentar topologia completa para usuário
+#   • Informar a arquitetura ao operador humano
+#   • Observar, de forma best-effort, o endpoint LOCAL do proxy
 # =============================================================================
 
 info "Chrome externo (arquitetura proxy — diagnóstico passivo):"
 echo ""
-echo "  Topologia:"
+echo "  Arquitetura efetiva:"
 echo "    Puppeteer → localhost:9224 (proxy no container)"
 echo "             → host.docker.internal:9225 (Chrome no Windows)"
 echo ""
-echo "  ⚠️  IMPORTANTE: Chrome externo é FUNDAMENTAL"
-echo "      • Necessário para: Operações LLM (ChatGPT, Gemini via Puppeteer)"
-echo "      • Estado normal agora (attach/boot): NÃO estar rodando"
-echo "      • Será iniciado sob demanda quando necessário"
-echo "      • Comando manual: START-CHROME-SIMPLE.bat (Windows host)"
+echo "  ℹ️  Nota operacional:"
+echo "      • Chrome Windows é FUNDAMENTAL para operações LLM"
+echo "      • Estado normal durante attach/boot: NÃO estar rodando"
+echo "      • Chrome será iniciado sob demanda quando necessário"
+echo "      • Comando manual (Windows host): START-CHROME-SIMPLE.bat"
 echo ""
-#   • Backend: host.docker.internal:9225 (encaminha para Chrome)
-#   • Funções:
-#     - Reescreve Host: headers
-#     - Reescreve WebSocket URLs
-#     - Gerenciado por PM2 (mesmo container)
-#
-#   Puppeteer (Node.js no container)
-#   ─────────────────────────────────
-#   • Conecta: localhost:9224 (proxy no mesmo container)
-#   • NUNCA acessa 9225 diretamente
-#   • NÃO conhece o Windows Host
-#
-# CONTRATO DESTA FASE:
-# - Diagnóstico ESTRITAMENTE PASSIVO
-# - Nunca inicia Chrome, proxy ou serviços
-# - Nunca bloqueia o attach
-# - Nunca presume que Chrome esteja ativo
-# - Ausência de Chrome é ESTADO VÁLIDO
-#
-# OBJETIVO:
-# - Verificar se o proxy (localhost:9224) responde
-# - NÃO verificar o Chrome do Windows diretamente
-# =============================================================================
-
-info "Chrome externo (CDP — via proxy local, diagnóstico passivo):"
 
 # ---------------------------------------------------------------------------
-# Endpoint CANÔNICO visível ao container
-#
+# Observação passiva do Chrome Proxy (endpoint local do Puppeteer)
+# ---------------------------------------------------------------------------
+info "Chrome Proxy (endpoint local — observação passiva):"
+
+# Endpoint canônico do proxy
 # • Derivado de PUPPETEER_WS_ENDPOINT
-# • Fallback seguro: localhost:9224 (proxy no mesmo container)
-# • Este endpoint é o PROXY, não o Chrome real
-# ---------------------------------------------------------------------------
+# • Fallback seguro: http://localhost:9224
 CHROME_PROXY_ENDPOINT="${PUPPETEER_WS_ENDPOINT:-http://localhost:9224}"
 CHROME_CDP_PATH="/json/version"
-
-# Timeout curto por design:
-# • UX > diagnóstico profundo
-# • Evita atrasos no attach
 CHROME_CDP_TIMEOUT_SECONDS=2
 
-# ---------------------------------------------------------------------------
-# Diagnóstico observacional (proxy-facing ONLY)
-# ---------------------------------------------------------------------------
 if command -v curl >/dev/null 2>&1; then
     CDP_RESPONSE="$(
         curl \
-            --max-time "${CHROME_CDP_TIMEOUT_SECONDS}" \
-            --connect-timeout "${CHROME_CDP_TIMEOUT_SECONDS}" \
             --silent \
             --fail \
-            "${CHROME_PROXY_ENDPOINT}${CHROME_CDP_PATH}" 2>/dev/null || echo ""
+            --max-time "${CHROME_CDP_TIMEOUT_SECONDS}" \
+            --connect-timeout "${CHROME_CDP_TIMEOUT_SECONDS}" \
+            "${CHROME_PROXY_ENDPOINT}${CHROME_CDP_PATH}" \
+            2>/dev/null || echo ""
     )"
 
     if [ -n "${CDP_RESPONSE}" ]; then
-        # Proxy respondeu - Chrome pode ou não estar ativo
-        CHROME_VERSION="$(echo "${CDP_RESPONSE}" | grep -oP '\"Browser\":\s*\"\K[^\"]+' || echo 'desconhecida')"
-        ok "Chrome Proxy (container:9224): ✅ respondendo"
-        info "  └─ Chrome backend: ${CHROME_VERSION}"
-        info "  └─ Topologia completa: Puppeteer → 9224 (proxy) → 9225 (Chrome)"
+        # Proxy respondeu — SEM inferir estado do Chrome Windows
+        CHROME_VERSION="$(
+            echo "${CDP_RESPONSE}" \
+            | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p'
+        )"
+
+        ok "Chrome Proxy (container:9224): respondendo"
+        [ -n "${CHROME_VERSION}" ] && info "  └─ Backend reportado: ${CHROME_VERSION}"
+        info "  └─ Proxy ativo ≠ Chrome Windows ativo (pode estar aguardando)"
+
     else
-        # Proxy não respondeu - estado NORMAL durante attach
-        warn "Chrome Proxy (container:9224): ⏸️  não acessível"
-        info "  └─ Normal durante attach/boot (sistema não iniciado)"
-        info "  └─ Chrome É FUNDAMENTAL mas inicia sob demanda"
-        info "  └─ Comando: make start (inicia sistema + proxy)"
+        warn "Chrome Proxy (container:9224): não acessível"
+        info "  └─ Estado normal durante attach (sistema não iniciado)"
+        info "  └─ Proxy será iniciado via: make start"
     fi
 else
-    warn "curl indisponível — diagnóstico de Chrome proxy ignorado."
+    warn "curl indisponível — observação do Chrome Proxy ignorada"
 fi
 
 echo ""
 
 
 # =============================================================================
-# PHASE 8.5 — VOLUMES & CACHE STATUS (DIAGNOSTIC) v5.2.0
+# PHASE 10 — VOLUMES & CACHE (OBSERVAÇÃO PASSIVA)
+# CANONICAL v5.2.1
 #
-# CONTRATO:
-# - Display estritamente PASSIVO
-# - Nunca modifica volumes
-# - Nunca falha
+# CONTRATO (INVIOLÁVEL):
+#   • Display estritamente PASSIVO
+#   • Nunca cria, corrige ou modifica volumes
+#   • Nunca falha
 #
 # OBJETIVO:
-# - Exibir status de volumes persistentes
-# - Identificar problemas de cache/state
-# - Mostrar disk usage
+#   • Expor presença de volumes persistentes esperados
+#   • Indicar capacidade de cache / estado entre sessões
+#   • Fornecer snapshot de uso de disco (host/container)
 # =============================================================================
 
-info "Volumes persistentes (status):"
+info "Volumes persistentes (observação passiva):"
 
+# ---------------------------------------------------------------------------
+# Volumes esperados (contrato lógico, não garantia física)
+#
+# Nota:
+# • Ausência NÃO é erro
+# • Alguns volumes só existem após uso efetivo
+# ---------------------------------------------------------------------------
 VOLUMES_TO_CHECK=(
-    "${HOME}/.cache:Cache (Puppeteer, npm, etc)"
-    "${HOME}/.npm:npm packages"
-    "${HOME}/.pm2:PM2 runtime state"
-    "${HOME}/.config:User configuration"
-    "${HOME}/.vscode-server:VS Code Server"
-    "/home/${USER}-history:Shell history"
+    "${USER_HOME}/.cache:Cache geral (Puppeteer, npm, etc.)"
+    "${USER_HOME}/.npm:npm packages"
+    "${USER_HOME}/.pm2:PM2 runtime state"
+    "${USER_HOME}/.config:Configuração do usuário"
+    "${USER_HOME}/.vscode-server:VS Code Server"
+    "${USER_HOME}-history:Histórico de shell"
 )
+
+# Salvaguarda defensiva
+[ "${#VOLUMES_TO_CHECK[@]}" -gt 0 ] || VOLUMES_TO_CHECK=()
 
 for vol_entry in "${VOLUMES_TO_CHECK[@]}"; do
     IFS=':' read -r vol_path vol_desc <<< "${vol_entry}"
 
     if [ -d "${vol_path}" ]; then
         vol_size="$(du -sh "${vol_path}" 2>/dev/null | cut -f1 || echo '?')"
-        printf "  ✅ %-30s %10s\n" "${vol_desc}" "${vol_size}"
+        printf "  ✅ %-32s %10s\n" "${vol_desc}" "${vol_size}"
     else
-        printf "  ❌ %-30s %10s\n" "${vol_desc}" "(ausente)"
+        printf "  ⚠️  %-32s %10s\n" "${vol_desc}" "(ausente)"
     fi
 done
 
 echo ""
 
 # =============================================================================
-# PHASE 8.6 — DISK USAGE WARNING v5.2.0
+# PHASE 10.1 — DISK USAGE (SNAPSHOT PASSIVO)
+# CANONICAL v5.2.1
+#
+# CONTRATO:
+#   • Apenas leitura
+#   • Sem inferência causal
+#   • Sem correção automática
 # =============================================================================
 
-info "Espaço em disco:"
+info "Espaço em disco (snapshot):"
 
-DISK_USAGE="$(df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo '?%')"
-DISK_AVAIL="$(df -h / 2>/dev/null | awk 'NR==2 {print $4}' || echo '?')"
+# Usa última linha para evitar variações de locale/header
+DISK_USAGE="$(df -h / 2>/dev/null | awk 'END {print $5}' || echo '?%')"
+DISK_AVAIL="$(df -h / 2>/dev/null | awk 'END {print $4}' || echo '?')"
 
 DISK_USAGE_NUM="${DISK_USAGE%\%}"
 
 if [ "${DISK_USAGE_NUM}" -gt 90 ] 2>/dev/null; then
-    warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — CRÍTICO!"
-    warn "→ Considere: make clean (limpa logs/cache)"
+    warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — CRÍTICO"
+    warn "→ Ação manual sugerida: make clean (logs/cache)"
 elif [ "${DISK_USAGE_NUM}" -gt 80 ] 2>/dev/null; then
     warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — ALTO"
 else
@@ -781,115 +782,84 @@ fi
 echo ""
 
 
-
 # =============================================================================
-# PHASE 9 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
-# CANONICAL v5.2.0
+# PHASE 11 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
+# CANONICAL v5.2.1
 #
-# PRINCÍPIO:
-# - Este bloco documenta CONTRATOS DE ENDEREÇAMENTO
-# - NÃO documenta estado
-# - NÃO testa conectividade
+# CONTRATO (INVIOLÁVEL):
+#   • Documentação PURA (read-only)
+#   • NÃO documenta estado
+#   • NÃO testa conectividade
+#   • NÃO executa lógica
 #
-# TOPOLOGIA REAL:
-#   Puppeteer → localhost:9224 (Proxy no container) → host.docker.internal:9225 (Chrome no Windows)
+# FINALIDADE:
+#   • Tornar explícitos os contratos de endereçamento
+#   • Fixar fronteiras entre container, host e debug
+#   • Eliminar ambiguidade topológica para humanos e agentes
 #
-# FRONTEIRAS CRÍTICAS:
-# - 9224: Chrome Proxy Service (DevContainer, PM2)
-# - 9225: Chrome Real (Windows Host, remote debugging)
-# - Containers conectam em localhost:9224 (proxy local)
-# - Proxy encaminha para host.docker.internal:9225 (Chrome remoto)
-# =============================================================================
-
-info "Mapa de portas (contratos arquiteturais):"
-echo ""
-echo "  UI Humana:"
-echo "    3008  → Dashboard Principal (HTTP + Socket.io + API)"
-echo ""
-echo "  Infraestrutura:"
-echo "    9224  → Chrome Proxy (container → Windows host)"
-echo "    9225  → Chrome Real (Windows host, remote debugging)"
-echo "             └─ FUNDAMENTAL: inicie com START-CHROME-SIMPLE.bat quando necessário"
-echo ""
-echo "  Debug (opt-in):"
-echo "    9229  → Node.js Debug (agente-gpt --inspect)"
-echo "    9230  → Node.js Debug (dashboard-web --inspect)"
-echo ""
-echo "  Para detalhes: devcontainer.json (forwardPorts section)"
-echo ""
-
-# =============================================================================
-# PHASE 10 — QUICK TIPS (ALWAYS) v5.2.0
-# =============================================================================
-
-if [ "${IS_FIRST_ATTACH}" = true ]; then
-        info "→ Pode significar:"
-        info "   • Chrome Proxy Service não foi iniciado (PM2)"
-        info "   • Chrome no Windows não está ativo"
-        info "   • Chrome externo não está sendo usado agora"
-        info "→ Para iniciar proxy: pm2 start ecosystem.config.js --only chrome-proxy"
-
-    elif echo "${CDP_RESPONSE}" | grep -q '"Browser"'; then
-        ok "Proxy CDP ativo (localhost:9224)"
-        ok "→ Chrome real no Windows (9225) está acessível INDIRETAMENTE."
-        ok "→ Capacidade adicional disponível para Puppeteer."
-
-    else
-        warn "Proxy respondeu, mas não com payload CDP válido."
-        warn "→ Endpoint: ${CHROME_ENDPOINT}"
-        warn "→ Diagnóstico informativo apenas (sem impacto funcional)."
-    fi
-else
-    warn "curl indisponível — diagnóstico de Chrome externo ignorado."
-fi
-
-echo ""
-
-
-# =============================================================================
-# PHASE 9 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
-# CANONICAL v3.8
-#
-# PRINCÍPIO:
-# - Este bloco documenta CONTRATOS DE ENDEREÇAMENTO
-# - NÃO documenta estado
-# - NÃO testa conectividade
-#
-# TOPOLOGIA REAL:
-#   Puppeteer → localhost:9224 (Proxy no container) → host.docker.internal:9225 (Chrome no Windows)
-#
-# FRONTEIRAS CRÍTICAS:
-# - 9224: Chrome Proxy Service (DevContainer, PM2)
-# - 9225: Chrome Real (Windows Host, remote debugging)
-# - Containers conectam em localhost:9224 (proxy local)
-# - Proxy encaminha para host.docker.internal:9225 (Chrome remoto)
+# TOPOLOGIA CANÔNICA (RESUMO):
+#   Puppeteer → localhost:9224 (Proxy no container)
+#              → host.docker.internal:9225 (Chrome no Windows)
 # =============================================================================
 
 info "Mapa de portas (contratos arquiteturais):"
 echo ""
+
+# ---------------------------------------------------------------------------
+# Interface Humana
+# ---------------------------------------------------------------------------
 echo "  UI Humana:"
 echo "    3008  → Dashboard Principal (HTTP + Socket.io + API)"
 echo ""
+
+# ---------------------------------------------------------------------------
+# Infraestrutura Crítica
+#
+# Nota:
+# • Containers NUNCA acessam 9225 diretamente
+# • 9224 é a ÚNICA ponte autorizada
+# ---------------------------------------------------------------------------
 echo "  Infraestrutura:"
-echo "    9224  → Chrome Proxy (container → Windows host)"
-echo "    9225  → Chrome Real (Windows host, remote debugging)"
-echo "             └─ FUNDAMENTAL: inicie com START-CHROME-SIMPLE.bat quando necessário"
+echo "    9224  → Chrome Proxy Service (container)"
+echo "             └─ Frontend do Puppeteer"
+echo "             └─ Encaminha para Chrome Windows"
 echo ""
+echo "    9225  → Chrome Real (Windows host)"
+echo "             └─ Remote Debugging (CDP)"
+echo "             └─ FUNDAMENTAL para operações LLM"
+echo "             └─ Inicialização manual: START-CHROME-SIMPLE.bat"
+echo ""
+
+# ---------------------------------------------------------------------------
+# Debug (Opt-in, não produtivo)
+# ---------------------------------------------------------------------------
 echo "  Debug (opt-in):"
 echo "    9229  → Node.js Debug (agente-gpt --inspect)"
 echo "    9230  → Node.js Debug (dashboard-web --inspect)"
 echo ""
-echo "  Para detalhes: devcontainer.json (forwardPorts section)"
+
+# ---------------------------------------------------------------------------
+# Fonte de Verdade
+# ---------------------------------------------------------------------------
+echo "  Fonte de verdade:"
+echo "    devcontainer.json → forwardPorts"
 echo ""
 
 # =============================================================================
-# PHASE 10 — QUICK TIPS (ALWAYS) v5.2.0
+# PHASE 12 — QUICK TIPS (ALWAYS)
+# CANONICAL v5.2.1
 #
-# CONTRATO:
-# - Quick Start Guide completo no PRIMEIRO attach
-# - Quick Tips resumidos em TODOS os attaches subsequentes
-# - Nunca bloqueia
-# - Puramente informativo
+# CONTRATO (INVIOLÁVEL):
+#   • Quick Start Guide COMPLETO apenas no PRIMEIRO attach (PHASE 7)
+#   • Quick Tips RESUMIDOS em todos os attaches subsequentes
+#   • Nunca executa comandos
+#   • Nunca bloqueia
+#   • Estritamente informativo (UX)
+#
+# OBJETIVO:
+#   • Reorientar rapidamente o operador
+#   • Reduzir fricção cognitiva
+#   • Evitar leitura desnecessária de documentação
 # =============================================================================
 
 if [ "${IS_FIRST_ATTACH}" = true ]; then
@@ -910,14 +880,14 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
     printf "  • %-14s → %s\n" "make help"   "listar comandos disponíveis no projeto"
     printf "  • %-14s → %s\n" "make info"   "exibir informações detalhadas do ambiente"
     printf "  • %-14s → %s\n" "make health" "executar verificações de saúde"
-    printf "  • %-14s → %s\n" "make start"  "iniciar o sistema (quando fizer sentido)"
+    printf "  • %-14s → %s\n" "make start"  "iniciar o sistema quando fizer sentido"
     echo ""
 
     info "Documentação:"
     echo "  • Arquitetura: ARCHITECTURE.md"
     echo "  • Chrome Proxy: DOCUMENTAÇÃO/CONNECTION_ARCHITECTURE/"
     echo "  • Onboarding: .github/copilot-instructions.md"
-    echo "  • Makefile: make help"
+    echo "  • Comandos: make help"
     echo ""
 else
     # Quick tips resumidos (attaches subsequentes)
@@ -931,24 +901,25 @@ else
 fi
 
 # =============================================================================
-# FINAL BANNER v5.2.0
+# FINAL BANNER
+# CANONICAL v5.2.1
 # =============================================================================
 
 echo ""
-echo "╔════════════════════════════════════════════════════════════╗"
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  ✅ DevContainer Pronto (v${SCRIPT_VERSION})                        ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "💡 Importante sobre Chrome:"
-echo "   • Chrome externo É FUNDAMENTAL para operações LLM"
-echo "   • Mas NÃO precisa estar rodando durante attach/boot"
+echo "   • Chrome externo (Windows) é FUNDAMENTAL para operações LLM"
+echo "   • NÃO precisa estar rodando durante attach ou boot"
 echo "   • Será iniciado sob demanda quando necessário"
-echo "   • Comando: START-CHROME-SIMPLE.bat (Windows host)"
+echo "   • Comando manual: START-CHROME-SIMPLE.bat (Windows host)"
 echo ""
 
 # =============================================================================
-# FINAL — ENCERRAMENTO SEMÂNTICO (ATTACH COMPLETO) v5.2.0
+# ENCERRAMENTO SEMÂNTICO — ATTACH COMPLETO
+# CANONICAL v5.2.1
 # =============================================================================
 
 printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
@@ -960,5 +931,5 @@ printf "%b\n" "${BLUE}───────────────────�
 echo ""
 
 # =============================================================================
-# FIM DO post-attach.sh — v5.2.0
+# FIM DO post-attach.sh
 # =============================================================================

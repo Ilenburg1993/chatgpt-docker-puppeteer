@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.2
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.3
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -28,6 +28,21 @@
 //   BLOQUEADAS no DevContainer. O acesso a essas superfícies é decidido
 //   exclusivamente pelo runtime da aplicação.
 //
+// CHANGELOG v5.3 (2026-02-03):
+// 🔧 SSH FORWARDING MIGRATION (BREAKING CHANGE - FIX CRÍTICO)
+// ❌ REMOVIDO: Mount manual de SSH socket (causava erro fatal)
+// ❌ REMOVIDO: SSH_AUTH_SOCK hardcoded em remoteEnv
+// ❌ REMOVIDO: DEVCONTAINER_SECRET_SURFACE_SSH (redundante)
+// ❌ REMOVIDO: DEVCONTAINER_SSH_AGENT_ALLOWED (containerEnv)
+// ✅ ADICIONADO: VS Code native SSH forwarding (automático)
+// ✅ ADICIONADO: Documentação completa da migração
+// ✅ RESOLVIDO: Container agora inicia COM ou SEM SSH agent
+//
+// REFERÊNCIAS:
+// • .devcontainer/MIGRATION_SSH_V5.3.md (documentação completa)
+// • .devcontainer/TROUBLESHOOTING_SSH.md (guia de debug)
+// • DEVCONTAINER_BUILD_ANALYSIS.md (análise técnica)
+//
 // CHANGELOG v5.2 (2026-02-02):
 // ✅ Sincronização de versão (3.4 → 5.2)
 // ✅ Features consolidadas (removidas duplicações)
@@ -48,8 +63,11 @@
     "dockerfile": "Dockerfile",
     "args": {
       // --- O APERTO DE MÃO (Identidade) ---
-      // Injeta o 'node' (ou quem estiver em remoteUser) no Dockerfile
-      "REMOTE_USER": "${containerUser}",
+      // REMOTE_USER: Sincroniza remoteUser com Dockerfile (torna imagem dinâmica)
+      // Dockerfile usa: ENV USER_NAME=${REMOTE_USER}
+      // NOTA: ${containerUser} NÃO existe como variável built-in do DevContainers.
+      // Usar valor literal que corresponde ao remoteUser (linha ~998)
+      "REMOTE_USER": "node",
       "PROJECT_NAME": "${localWorkspaceFolderBasename}",
       // --- METADATA & VERSIONING ---
       "VERSION": "5.2.0",
@@ -76,25 +94,56 @@
   //
   // Documentação: DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md
   // ===========================================================
-  "remoteEnv": {
-    // Ambiente
-    "NODE_ENV": "${localEnv:NODE_ENV:development}",
-    "SERVER_MODE": "split",
-    "SERVER_AUTHORITY": "standalone",
-    // Portas
-    "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
-    "PORT": "${localEnv:PORT:3008}",
-    "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
-    "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
-    "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
-    // Browser
-    "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
-    "PUPPETEER_LOCAL_LAUNCH_DISABLED": "true",
-    // Logging
-    "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
-    // State Management
-    "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}"
-  },
+"remoteEnv": {
+  // Ambiente
+  "NODE_ENV": "${localEnv:NODE_ENV:development}",
+  "SERVER_MODE": "split",
+  "SERVER_AUTHORITY": "standalone",
+// Portas (fonte única: SERVER_PORT)
+"SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
+  // PORT deprecated v6.0: Use apenas SERVER_PORT
+  "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
+  "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
+  "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
+// Browser (contrato estrutural)
+"BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
+// Logging
+"LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
+// State & lifecycle
+"ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
+"REEXECUTE_POST_CREATE": "${localEnv:REEXECUTE_POST_CREATE:false}"
+// ============================================================
+// SSH AGENT FORWARDING
+// ============================================================
+// NOTA v5.3: SSH forwarding agora é NATIVO do VS Code.
+//
+// MUDANÇA ARQUITETURAL (v5.2 → v5.3):
+// - REMOVIDO: Mount manual de socket (/ssh-agent)
+// - REMOVIDO: SSH_AUTH_SOCK hardcoded
+// - ADICIONADO: VS Code native SSH forwarding (automático)
+//
+// JUSTIFICATIVA:
+// • Mount manual causava type mismatch (socket vs directory)
+// • Container não iniciava se SSH agent não estivesse disponível
+// • Configuração manual conflitava com política "opt-in" do post-create.sh
+//
+// NOVO COMPORTAMENTO:
+// • VS Code detecta SSH_AUTH_SOCK no host automaticamente
+// • Se disponível: forwarding transparente para o container
+// • Se ausente: container inicia normalmente (git via HTTPS)
+// • Zero configuração manual necessária
+//
+// COMPATIBILIDADE:
+// • ✅ Windows + WSL2 + Docker Desktop
+// • ✅ Linux nativo + Docker
+// • ✅ macOS + Docker Desktop
+//
+// REFERÊNCIAS:
+// • https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
+// • post-create.sh Section 7 (SSH Contract - observacional)
+// • DEVCONTAINER_BUILD_ANALYSIS.md (Solução 3)
+// ============================================================
+},
   // ============================================================
   // FEATURES - Auto-install tools and utilities
   // ============================================================
@@ -232,45 +281,68 @@
   // O sistema DEVE funcionar mesmo sem Chrome externo (fallback para Chromium local)
   //
   // ===========================================================
-  "forwardPorts": [
-    3008, // Dashboard Principal — Mission Control (HTTP + Socket.io + API)
-    9224, // Chrome Proxy Service (Container → Windows Host)
-    9229, // Node.js Debug — Primary (agente-gpt --inspect)
-    9230 // Node.js Debug — Fallback (dashboard-web --inspect)
-  ],
-  "portsAttributes": {
-    // ----------------------------------------------------------
-    // Política padrão: IGNORAR qualquer porta não declarada
-    // ----------------------------------------------------------
-    "*": {
-      "onAutoForward": "ignore"
-    },
-    // ================== UI HUMANA =============================
-    "3008": {
-      "label": "Dashboard Principal — Mission Control (50+ endpoints)",
-      "onAutoForward": "notify",
-      "protocol": "http"
-    },
-    // ================== INFRAESTRUTURA ========================
-    "9224": {
-      "label": "Chrome Proxy Service (Container → Windows Host)",
-      "onAutoForward": "ignore",
-      "protocol": "http"
-    },
-    "9225": {
-      "label": "Chrome Real (Windows Host) — CDP",
-      "onAutoForward": "ignore"
-    },
-    // ================== DEBUG =================================
-    "9229": {
-      "label": "Node.js Debug — Primary (agente-gpt)",
-      "onAutoForward": "silent"
-    },
-    "9230": {
-      "label": "Node.js Debug — Fallback (dashboard-web)",
-      "onAutoForward": "silent"
-    }
+  // ============================================================================
+  // PORT POLICY — SCOPE & NON-GOALS (CRITICAL)
+  // ----------------------------------------------------------------------------
+  // Este DevContainer governa APENAS portas abertas pelo próprio container.
+  //
+  // Portas pertencentes ao HOST (Windows) — ex.: Chrome DevTools (9225) —
+  // estão FORA do escopo técnico deste arquivo e:
+  //
+  // • NÃO podem ser forwardadas pelo VS Code
+  // • NÃO devem ser declaradas em forwardPorts
+  // • NÃO devem aparecer em portsAttributes
+  // • NÃO devem ser inferidas ou "protegidas" aqui
+  //
+  // A porta 9225 (Chrome Real, Windows Host):
+  // • É deliberadamente EXCLUÍDA deste contrato
+  // • Só é acessível via Chrome Proxy Service (9224)
+  // • Qualquer tentativa de acesso direto é violação arquitetural
+  // ============================================================================
+
+"forwardPorts": [
+  3008, // Dashboard Principal — Mission Control (HTTP + Socket.io + API)
+  9224, // Chrome Proxy Service (Container → Windows Host)
+  9229, // Node.js Debug — Primary (agente-gpt --inspect)
+  9230 // Node.js Debug — Fallback (dashboard-web --inspect)
+],
+
+"portsAttributes": {
+  // ----------------------------------------------------------
+  // Política global: DENY-BY-DEFAULT
+  // ----------------------------------------------------------
+  // • Qualquer porta NÃO declarada explicitamente é ignorada
+  // • Nenhuma inferência automática é permitida
+  // ----------------------------------------------------------
+  "*": {
+    "onAutoForward": "ignore"
   },
+// ================== UI HUMANA ==============================
+"3008": {
+    "label": "Dashboard Principal — Mission Control (HTTP + Socket.io + API)",
+    "onAutoForward": "notify",
+    "protocol": "http"
+  },
+// ================== INFRAESTRUTURA =========================
+"9224": {
+  "label": "Chrome Proxy Service (Container → Windows Host)",
+  "onAutoForward": "ignore",
+  "protocol": "http"
+    // NOTA NORMATIVA:
+    // Esta é a ÚNICA fronteira autorizada para acesso ao Chrome externo.
+    // A porta 9225 (Chrome Real, Windows Host) nunca é acessada diretamente
+    // pelo DevContainer e não pertence a este espaço de controle.
+  },
+// ================== DEBUG ==================================
+"9229": {
+  "label": "Node.js Debug — Primary (agente-gpt)",
+  "onAutoForward": "silent"
+},
+"9230": {
+  "label": "Node.js Debug — Fallback (dashboard-web)",
+  "onAutoForward": "silent"
+}
+},
   // ============================================================
   // RUNTIME ARGS - Docker runtime configuration (v5.2)
   // ============================================================
@@ -339,11 +411,11 @@
   // ============================================================
   // O postCreateCommand agora assume a responsabilidade de linkar o
   // histórico imortal e preparar o Claude/Puppeteer.
-  "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
+  "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh",
   // Roda toda vez que o container sobe (Validação técnica)
   "postStartCommand": "make info",
   // Roda quando você "entra" no terminal (Feedback visual humano)
-  "postAttachCommand": "bash .devcontainer/scripts/post-attach.sh",
+  "postAttachCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-attach.sh",
   // ============================================================
   // VS CODE CUSTOMIZATIONS
   // ============================================================
@@ -383,7 +455,6 @@
 // === FILE TYPES & SYNTAX ===
 "timonwong.shellcheck", // Validação de scripts bash/sh
 "redhat.vscode-yaml", // YAML syntax + schema validation
-"tamasfe.even-better-toml", // TOML syntax (ecosystem.config.js)
 // === TESTING & DEBUGGING ===
 "hbenl.vscode-test-explorer", // Test Explorer UI (universal runner)
 "ryanluker.vscode-coverage-gutters", // Cobertura inline
@@ -464,6 +535,10 @@
         "terminal.integrated.gpuAcceleration": "auto",
         "terminal.integrated.inheritEnv": true,
         "terminal.integrated.detectLocale": "off",
+        "remote.SSH.enableAgentForwarding": true,
+        "remote.SSH.useLocalServer": true,
+        "remote.SSH.loglevel": "info",
+
         // ========================================================
         // FILE SYSTEM & SEARCH (A Blindagem)
         // ========================================================
@@ -612,19 +687,25 @@
     //
     // Regras não negociáveis:
     // • O Docker resolve mounts ANTES da inicialização do container
-    // • O campo `target=` DEVE ser um caminho absoluto e literal
-    // • Variáveis (ex.: ${containerUserHome}) NÃO são expandidas em mounts
+ deu // • O campo `target=` (container side) DEVE ser caminho literal
+    //   - Docker NÃO expande variáveis (ex.: ${containerUserHome}, $USER)
+//   - Docker processamento ocorre ANTES do container existir
+// • O campo `source=` (host side) PODE usar variáveis VS Code
+//   - VS Code expande ${localEnv:*}, ${localWorkspaceFolder} ANTES de chamar docker
+//   - Exemplo válido: "source=${localEnv:HOME}/data,target=/data,type=bind"
     //
     // Implicação arquitetural:
     // • `mounts` materializam decisões já tomadas (infraestrutura concreta)
     // • `containerEnv` expressa semântica dinâmica (comportamento do sistema)
     //
     // Portanto:
-    // • Nunca usar variáveis em `target=` de mounts
-    // • Usar caminhos literais coerentes com `remoteUser`
+    // • ✅ VÁLIDO: source=${localWorkspaceFolder}/data,target=/app/data
+    // • ❌ INVÁLIDO: source=/data,target=${containerWorkspaceFolder}/data
+    // • Usar caminhos literais em `target=` coerentes com `remoteUser: "node"`
     // • Centralizar abstrações dinâmicas exclusivamente em `containerEnv`
     //
     // Violação deste contrato resulta em erro fatal no `docker run`.
+    // Referência: Docker CLI docs (--mount flag), VS Code DevContainers Variables
     // ============================================================================
     // =====================================================================
     // CORE — CACHE & PERFORMANCE (XDG_CACHE_HOME)
@@ -686,10 +767,37 @@
     // • Apenas forwarding seguro via agent
     // =====================================================================
     // =========================================================
-    // SSH AGENT FORWARDING — CANÔNICO (WSL / WINDOWS / LINUX)
+    // SSH AGENT FORWARDING — VS CODE NATIVE (v5.3+)
     // ---------------------------------------------------------
-    // =========================================================
-    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind,consistency=cached",
+    // HISTÓRICO:
+    // v5.2: Mount manual "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent"
+    // v5.3: REMOVIDO - Causava erro fatal de type mismatch
+    //
+    // ERRO ANTERIOR:
+    //   error mounting ... to rootfs at "/ssh-agent": not a directory:
+    //   Are you trying to mount a directory onto a file (or vice-versa)?
+    //
+    // CAUSA:
+    //   SSH_AUTH_SOCK é um socket UNIX (arquivo especial)
+    //   Docker tentava montar como diretório
+    //   Type mismatch → container não iniciava
+    //
+    // SOLUÇÃO:
+    //   VS Code Remote Containers fornece SSH forwarding NATIVO
+    //   Não requer mount manual
+    //   Funciona automaticamente quando SSH agent está presente no host
+    //
+    // BENEFÍCIOS:
+    //   ✅ Container inicia com ou sem SSH agent
+    //   ✅ Zero configuração manual
+    //   ✅ Fail-safe por design
+    //   ✅ Cross-platform (Windows/Linux/macOS)
+    //
+    // VALIDAÇÃO:
+    //   Dentro do container:
+    //   $ echo $SSH_AUTH_SOCK     # Deve mostrar path se agent disponível
+    //   $ ssh-add -l              # Lista chaves (se agent presente)
+    //   $ ssh -T git@github.com   # Testa autenticação GitHub
     // =========================================================
     // GnuPG keyring (persistente, mas isolado)
     "source=devcontainer-gpg-cache,target=/home/node/.gnupg,type=volume",
@@ -750,25 +858,26 @@
     // MODELO FÍSICO REAL (IMPORTANTE):
     //
     // • Windows Host
-    //     - Chrome REAL
+    //     - Chrome REAL (backend de automação)
     //     - Expõe Chrome DevTools Protocol (CDP) na porta 9225
     //     - Bind: 0.0.0.0 (acessível via host.docker.internal)
     //     - NUNCA é acessado diretamente pelo Puppeteer
     //
     // • DevContainer
     //     - Chrome Proxy Service roda AQUI (gerenciado por PM2)
-    //     - Escuta: localhost:9224 (frontend para Puppeteer)
-    //     - Encaminha: host.docker.internal:9225 (backend para Chrome)
-    //     - Puppeteer conecta em localhost:9224
+    //     - Escuta: localhost:9224 (frontend canônico para Puppeteer)
+    //     - Encaminha: host.docker.internal:9225 (backend para Chrome Windows)
+    //     - Puppeteer conecta SEMPRE em localhost:9224
     //
     // CONSEQUÊNCIAS DO CONTRATO:
     //
-    // • Puppeteer conecta localhost:9224 (proxy no mesmo container)
+    // • Puppeteer conecta EXCLUSIVAMENTE em localhost:9224
     // • Proxy encaminha para host.docker.internal:9225 (Chrome no Windows)
-    // • Isolamento completo: Puppeteer não conhece topologia externa
-    // • Chrome externo é OPCIONAL (fallback para Chromium local)
-    // • A ausência de Chrome NÃO quebra o sistema
-    // • Nenhum componente aqui inicia Chrome
+    // • Isolamento completo: Puppeteer NÃO conhece o host nem a porta 9225
+    // • Chrome externo é FUNDAMENTAL para operações LLM via Puppeteer
+    // • A ausência de Chrome durante build/attach é ESTADO VÁLIDO
+    // • Chrome será iniciado sob demanda quando operações LLM forem acionadas
+    // • Nenhum componente de infraestrutura inicia Chrome automaticamente
     //
     // ------------------------------------------------------------
     "PUPPETEER_MODE": "connect",
@@ -870,14 +979,24 @@
     "LANG": "pt_BR.UTF-8",
     "DOCKER_BUILDKIT": "1",
     "DEVCONTAINER_DOCKER_ENABLED": "true",
-    "SSH_AUTH_SOCK": "/ssh-agent",
     "DOCKER_HOST_ACCESS": "true",
     "DOCKER_SECURITY_LEVEL": "host-root-equivalent"
+    // =========================================================
+    // SSH VARIABLES (v5.3 - CLEANUP)
+    // ---------------------------------------------------------
+    // REMOVIDO: "DEVCONTAINER_SSH_AGENT_ALLOWED": "true"
+    // REMOVIDO: "SSH_AUTH_SOCK": "/ssh-agent"
+    //
+    // JUSTIFICATIVA:
+    // • Variáveis eram usadas com mount manual (removido)
+    // • VS Code native forwarding não requer essas variáveis
+    // • Simplificação da configuração
+    // =========================================================
   },
   // ============================================================
   // SECURITY & USER CONFIGURATION
   // ============================================================
-  // "node" é o valor que alimenta a variável ${containerUser}
+  // "node" é passado para Dockerfile via build.args.REMOTE_USER
   "remoteUser": "node",
   "updateRemoteUserUID": false,
   "privileged": false,
