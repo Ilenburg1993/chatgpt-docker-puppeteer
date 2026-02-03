@@ -52,8 +52,26 @@ const ConfigSchema = z
             .string()
             .url()
             .default(`http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`),
+
+        // --- Chrome & Proxy Connection (Topologia Canônica) ---
+        // Porta onde Chrome REAL roda (Windows Host)
         CHROME_PORT: z.number().int().min(1024).max(65535).default(9225),
+
+        // Host onde Chrome REAL roda (usado pelo Proxy para encaminhar)
+        CHROME_HOST: z.string().default(process.env.CHROME_HOST || 'host.docker.internal'),
+
+        // Porta onde Proxy roda (DevContainer)
         CHROME_PROXY_PORT: z.number().int().min(1024).max(65535).default(9224),
+
+        // Host onde Puppeteer acessa o Proxy (sempre localhost no container)
+        CHROME_PROXY_HOST: z.string().default('localhost'),
+
+        // Interface que o Proxy escuta (0.0.0.0 = todas as interfaces)
+        CHROME_PROXY_BIND: z.string().default('0.0.0.0'),
+
+        // Flag para habilitar/desabilitar proxy
+        CHROME_PROXY_ENABLED: z.boolean().default(true),
+
         IDLE_SLEEP: z.number().min(500).default(3000),
 
         // --- Engine Rhythm (Ritmo do Motor) ---
@@ -198,6 +216,43 @@ class ConfigurationManager extends EventEmitter {
     get BROWSER_URL() {
         return this.currentConfig.BROWSER_URL || this.currentConfig.DEBUG_PORT || this.currentConfig.DEBUG_URL || null;
     }
+
+    /**
+     * WebSocket endpoint do Chrome (opcional, para conexões diretas WS)
+     * Fonte: 1. process.env.CHROME_WS_ENDPOINT 2. config.json WS_ENDPOINT 3. null
+     */
+    get WS_ENDPOINT() {
+        return this.currentConfig.WS_ENDPOINT || null;
+    }
+
+    /**
+     * Retorna browserEndpoint consolidado (objeto canônico para ConnectionOrchestrator)
+     * Estrutura: { url: string, wsEndpoint?: string }
+     *
+     * Ordem de precedência:
+     * - url: CHROME_WS_ENDPOINT > BROWSER_URL > DEBUG_PORT > localhost:CHROME_PROXY_PORT
+     * - wsEndpoint: CHROME_WS_ENDPOINT (se definido)
+     */
+    get BROWSER_ENDPOINT() {
+        const proxyPort = this.currentConfig.CHROME_PROXY_PORT || 9224;
+        const defaultUrl = `http://${this.currentConfig.CHROME_PROXY_HOST || 'localhost'}:${proxyPort}`;
+
+        // URL: prioriza env vars, depois config, depois default
+        const url =
+            process.env.CHROME_WS_ENDPOINT ||
+            this.currentConfig.BROWSER_URL ||
+            this.currentConfig.DEBUG_PORT ||
+            defaultUrl;
+
+        // wsEndpoint opcional (só se for WS URL)
+        const wsEndpoint = this.currentConfig.WS_ENDPOINT || null;
+
+        return {
+            url,
+            ...(wsEndpoint && { wsEndpoint })
+        };
+    }
+
     get DEFAULT_MODEL_ID() {
         return this.currentConfig.DEFAULT_MODEL_ID;
     }
@@ -254,6 +309,26 @@ class ConfigurationManager extends EventEmitter {
     }
     get ADAPTIVE_COOLDOWN_MS() {
         return this.currentConfig.ADAPTIVE_COOLDOWN_MS;
+    }
+
+    // --- Chrome & Proxy Connection Getters ---
+    get CHROME_HOST() {
+        return this.currentConfig.CHROME_HOST;
+    }
+    get CHROME_PROXY_HOST() {
+        return this.currentConfig.CHROME_PROXY_HOST;
+    }
+    get CHROME_PROXY_BIND() {
+        return this.currentConfig.CHROME_PROXY_BIND;
+    }
+    get CHROME_PROXY_ENABLED() {
+        return this.currentConfig.CHROME_PROXY_ENABLED;
+    }
+    get CHROME_PORT() {
+        return this.currentConfig.CHROME_PORT;
+    }
+    get CHROME_PROXY_PORT() {
+        return this.currentConfig.CHROME_PROXY_PORT;
     }
 
     /**

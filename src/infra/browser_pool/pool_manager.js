@@ -21,6 +21,7 @@
 const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
 const { log } = require('@core/logger');
 const { ConnectionOrchestrator } = require('../ConnectionOrchestrator');
+const { CircuitBreakerManager, FailureCause, CircuitState } = require('./circuit_breaker');
 
 class BrowserPoolManager {
     /**
@@ -63,6 +64,12 @@ class BrowserPoolManager {
 
         // [V800] Promise memoization para prevenir race em inicialização dupla
         this._initPromise = null;
+
+        // [V1.0] Circuit Breaker para detecção inteligente de falhas
+        this.circuitBreaker = new CircuitBreakerManager({
+            poolSize: this.config.poolSize,
+            nerv: null // NERV será injetado externamente
+        });
     }
 
     /**
@@ -332,6 +339,7 @@ class BrowserPoolManager {
     /**
      * Realiza health check em todas as instâncias do pool.
      * P3.2: Detecta tanto crashes quanto degradação de performance
+     * V1.0: Integrado com Circuit Breaker para detecção inteligente de falhas
      */
     async _performHealthCheck() {
         this.stats.healthChecks++;
@@ -342,7 +350,7 @@ class BrowserPoolManager {
                 const isConnected = poolEntry.browser.isConnected();
 
                 if (!isConnected) {
-                    throw new Error('Browser desconectado');
+                    throw new Error('Browser disconnected');
                 }
 
                 // P3.2: Mede timing do smoke test para detectar degradação
@@ -364,6 +372,14 @@ class BrowserPoolManager {
                     if (poolEntry.health.consecutiveFailures >= 3) {
                         poolEntry.health.status = STATUS_VALUES.CRASHED;
                         this.stats.crashesDetected++;
+
+                        // ✅ Circuit Breaker: Registra falha
+                        const error = new Error(`Performance degradation: ${duration}ms`);
+                        this.circuitBreaker.registerFailure(poolEntry.id, error, {
+                            duration,
+                            memoryHigh: duration > 10000
+                        });
+
                         log(
                             'ERROR',
                             `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED após degradações repetidas`
@@ -374,6 +390,9 @@ class BrowserPoolManager {
                     poolEntry.health.status = STATUS_VALUES.HEALTHY;
                     poolEntry.health.consecutiveFailures = 0;
                     poolEntry.health.lastCheck = Date.now();
+
+                    // ✅ Circuit Breaker: Registra recovery
+                    this.circuitBreaker.registerRecovery(poolEntry.id);
                 }
             } catch (error) {
                 log('WARN', `[BrowserPool] Health check falhou para ${poolEntry.id}: ${error.message}`);
@@ -384,25 +403,42 @@ class BrowserPoolManager {
                     poolEntry.health.status = STATUS_VALUES.CRASHED;
                     this.stats.crashesDetected++;
 
+                    // ✅ Circuit Breaker: Registra falha com contexto
+                    const context = {
+                        consecutiveFailures: poolEntry.health.consecutiveFailures,
+                        lastCheck: poolEntry.health.lastCheck
+                    };
+                    const result = this.circuitBreaker.registerFailure(poolEntry.id, error, context);
+
                     log(
                         'ERROR',
                         `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED (${poolEntry.health.consecutiveFailures} falhas consecutivas)`
                     );
 
-                    // TODO: Auto-restart (requer orquestração externa para reiniciar Chrome)
-                    // Por enquanto, apenas marca como crashed
+                    log(
+                        'INFO',
+                        `[BrowserPool] Circuit Breaker: Causa detectada = ${result.cause}, Deve pausar = ${result.shouldPause}`
+                    );
                 }
             }
+        }
+
+        // ✅ Verifica se sistema deve pausar
+        if (this.circuitBreaker.shouldPauseSystem()) {
+            log('WARN', '[BrowserPool] ⏸️  Sistema deve PAUSAR devido ao Circuit Breaker');
+            // TODO: Emitir evento NERV para Kernel pausar
         }
     }
 
     /**
-     * Retorna health status do pool.
+     * Retorna health status do pool incluindo Circuit Breaker.
      */
     async getHealth() {
         const healthyCount = this.pool.filter(e => e.health.status === STATUS_VALUES.HEALTHY).length;
         const unhealthyCount = this.pool.filter(e => e.health.status === STATUS_VALUES.UNHEALTHY).length;
         const crashedCount = this.pool.filter(e => e.health.status === STATUS_VALUES.CRASHED).length;
+
+        const circuitBreakerStatus = this.circuitBreaker.getStatus();
 
         return {
             status: healthyCount > 0 ? 'OPERATIONAL' : 'DEGRADED',
@@ -410,7 +446,8 @@ class BrowserPoolManager {
             healthy: healthyCount,
             unhealthy: unhealthyCount,
             crashed: crashedCount,
-            stats: { ...this.stats }
+            stats: { ...this.stats },
+            circuitBreaker: circuitBreakerStatus
         };
     }
 
@@ -422,8 +459,31 @@ class BrowserPoolManager {
      */
     async _validateProxyAvailability() {
         const CONFIG = require('@core/config');
-        const host = CONFIG.CHROME_PROXY_HOST || '192.168.0.2';
-        const port = CONFIG.CHROME_PROXY_PORT || 9224;
+
+        /*
+         * CONTRATO DE TOPOLOGIA (CANÔNICO):
+         *
+         * - Chrome REAL           → Windows Host (porta 9225, bind 0.0.0.0)
+         * - Chrome Proxy Service  → DevContainer (porta 9224, bind 0.0.0.0)
+         * - Node.js / Puppeteer   → DevContainer (conecta localhost:9224)
+         *
+         * Fluxo de Conexão:
+         *   Puppeteer → Proxy (localhost:9224) → Chrome (host.docker.internal:9225)
+         *
+         * O container NUNCA acessa diretamente:
+         *   • porta 9225 (apenas via proxy)
+         *   • 127.0.0.1:9225 do Windows (rede isolada)
+         *
+         * O proxy roda NO CONTAINER para:
+         *   • Reescrever Host: headers (Chrome valida)
+         *   • Reescrever WebSocket URLs (localhost → IP container)
+         *   • Gerenciamento centralizado PM2 + logs NERV
+         */
+
+        const host = CONFIG.CHROME_PROXY_HOST || process.env.CHROME_PROXY_HOST || 'localhost';
+
+        const port = CONFIG.CHROME_PROXY_PORT || Number(process.env.CHROME_PROXY_PORT) || 9224;
+
         const url = `http://${host}:${port}/health`;
 
         try {
@@ -450,18 +510,20 @@ class BrowserPoolManager {
             log('ERROR', `[BrowserPool] ❌ Chrome Proxy indisponível: ${url}`);
             log('ERROR', `[BrowserPool] Erro: ${errorMsg}`);
             log('ERROR', '[BrowserPool]');
-            log('ERROR', '[BrowserPool] SOLUÇÃO:');
-            log('ERROR', '[BrowserPool] 1. Inicie o Chrome Proxy Service:');
-            log('ERROR', '[BrowserPool]    node scripts/chrome-proxy-service.js');
+            log('ERROR', '[BrowserPool] CONTEXTO ARQUITETURAL:');
+            log('ERROR', '[BrowserPool] • Proxy DEVE rodar no MESMO container que Node.js');
+            log('ERROR', '[BrowserPool] • Proxy esperado em localhost:9224 (dentro do container)');
             log('ERROR', '[BrowserPool]');
-            log('ERROR', '[BrowserPool] 2. Valide que proxy está online:');
-            log('ERROR', `[BrowserPool]    curl http://${host}:${port}/health`);
+            log('ERROR', '[BrowserPool] AÇÃO CORRETIVA:');
+            log('ERROR', '[BrowserPool] 1. Inicie o Chrome Proxy Service (PM2):');
+            log('ERROR', '[BrowserPool]    pm2 start ecosystem.config.js --only chrome-proxy');
+            log('ERROR', '[BrowserPool] 2. Valide manualmente (dentro do container):');
+            log('ERROR', `[BrowserPool]    curl http://localhost:${port}/health`);
             log('ERROR', '[BrowserPool]');
 
             throw new Error(`Chrome Proxy Service não está disponível em ${host}:${port} - ${errorMsg}`);
         }
     }
-
     /**
      * Shutdown gracioso do pool.
      * Fecha todas as páginas e desconecta browsers.

@@ -16,16 +16,19 @@ async function testHealthLogic() {
     console.log('📡 1. Chrome Health Logic');
     try {
         const doctor = require('../src/core/doctor');
-        const chromeConfig = require('../chrome-config.json');
+        const config = require('../config.json');
 
         const chrome = await doctor.probeChromeConnection();
 
         console.log('   ✓ Chrome connection probe:', chrome.connected ? 'CONNECTED' : 'DISCONNECTED');
-        console.log('   ✓ Endpoint:', chrome.endpoint || chromeConfig.health.chromeDebugUrl);
+        console.log(
+            '   ✓ Endpoint:',
+            chrome.endpoint || `http://${config.CHROME_PROXY_HOST}:${config.CHROME_PROXY_PORT}/json/version`
+        );
         console.log('   ✓ Version:', chrome.version || 'N/A');
         console.log('   ✓ Latency:', chrome.latency_ms, 'ms');
-        console.log('   ✓ Detected ports:', chromeConfig.connection.ports.join(', '));
-        console.log('   ✓ Mode:', chromeConfig.connection.mode);
+        console.log('   ✓ Configured port:', config.CHROME_PROXY_PORT);
+        console.log('   ✓ Mode:', config.BROWSER_MODE);
         console.log('');
     } catch (e) {
         console.log('   ✗ Error:', e.message);

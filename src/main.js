@@ -76,6 +76,36 @@ const SERVER_MODES = Object.freeze({
 });
 
 /**
+ * Verifica se uma porta está em uso.
+ * Retorna true se porta ocupada, false se disponível.
+ *
+ * @param {number} port - Porta a verificar
+ * @returns {Promise<boolean>}
+ */
+async function checkPortInUse(port) {
+    const net = require('net');
+
+    return new Promise(resolve => {
+        const server = net.createServer();
+
+        server.once('error', err => {
+            if (err.code === 'EADDRINUSE') {
+                resolve(true); // Porta em uso
+            } else {
+                resolve(false);
+            }
+        });
+
+        server.once('listening', () => {
+            server.close();
+            resolve(false); // Porta disponível
+        });
+
+        server.listen(port, '0.0.0.0');
+    });
+}
+
+/**
  * Resolve autoridade do processo (standalone|delegated).
  *
  * Precedência:
@@ -186,6 +216,45 @@ async function boot() {
             log('DEBUG', '[BOOT] GC inicial executado');
         }
 
+        // ===== VALIDAÇÃO: CONFLITO PM2 + SERVER_MODE =====
+        // Detecta se processo está rodando sob PM2 E modo é integrated
+        // → Conflito: PM2 gerencia processos separados, mas integrated tenta iniciar server inline
+        // → Resultado: 2 servidores HTTP competindo pela mesma porta (EADDRINUSE)
+        const SERVER_MODE = resolveServerMode();
+        const runningUnderPM2 = Boolean(process.env.pm_id || process.env.PM2_HOME);
+
+        if (runningUnderPM2 && SERVER_MODE === SERVER_MODES.INTEGRATED) {
+            log('FATAL', '');
+            log('FATAL', '❌ ═════════════════════════════════════════════════════════════');
+            log('FATAL', '❌ CONFLITO DETECTADO: PM2 + SERVER_MODE=integrated');
+            log('FATAL', '❌ ═════════════════════════════════════════════════════════════');
+            log('FATAL', '');
+            log('FATAL', '  PM2 está gerenciando processos separados (agente-gpt, dashboard-web)');
+            log('FATAL', '  Mas SERVER_MODE=integrated tenta iniciar servidor HTTP inline');
+            log('FATAL', '');
+            log('FATAL', '  ⚠️  RESULTADO: 2 servidores competem pela porta 3008 → EADDRINUSE crash');
+            log('FATAL', '');
+            log('FATAL', '✅ SOLUÇÕES:');
+            log('FATAL', '');
+            log('FATAL', '   1. Usar PM2 corretamente (RECOMENDADO):');
+            log('FATAL', '      export SERVER_MODE=split');
+            log('FATAL', '      pm2 restart ecosystem.config.js');
+            log('FATAL', '');
+            log('FATAL', '   2. OU rodar standalone (sem PM2):');
+            log('FATAL', '      pm2 delete all');
+            log('FATAL', '      export SERVER_MODE=integrated');
+            log('FATAL', '      node index.js');
+            log('FATAL', '');
+            log('FATAL', '═════════════════════════════════════════════════════════════════');
+            process.exit(1);
+        }
+
+        if (runningUnderPM2 && SERVER_MODE === SERVER_MODES.SPLIT) {
+            log('INFO', '[BOOT] ✅ Configuração válida: PM2 + SERVER_MODE=split');
+        } else if (!runningUnderPM2 && SERVER_MODE === SERVER_MODES.INTEGRATED) {
+            log('INFO', '[BOOT] ✅ Configuração válida: Standalone + SERVER_MODE=integrated');
+        }
+
         // ===== FASE 2: NERV (IPC 3.0 - CANAL ÚNICO) =====
         log('INFO', '[BOOT] Fase 2/6: Inicializando NERV (canal de transporte)');
 
@@ -215,44 +284,61 @@ async function boot() {
                 const { sendEvent } = require('@nerv/adapters/high_level_adapter');
                 const { ActionCode, ActorRole } = require('@shared/nerv/constants');
 
-                chromeProxy = new ChromeProxyService({
-                    PUBLIC_IP: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
-                    CHROME_PORT: CONFIG.CHROME_PORT || 9225,
-                    PROXY_PORT: CONFIG.CHROME_PROXY_PORT || 9224,
-                    LOG_LEVEL: CONFIG.LOG_LEVEL || 'INFO'
-                });
+                // ===== VALIDAÇÃO: PROXY DUPLICADO =====
+                // Verifica se porta do proxy já está em uso (PM2 pode ter iniciado processo separado)
+                const proxyPort = CONFIG.CHROME_PROXY_PORT || 9224;
+                const proxyAlreadyRunning = await checkPortInUse(proxyPort);
 
-                // Injeta NERV no proxy para telemetria
-                chromeProxy.setNERV(nerv);
+                if (proxyAlreadyRunning) {
+                    log('INFO', `[BOOT] ✅ Chrome Proxy já rodando externamente (porta ${proxyPort})`);
+                    log('INFO', '[BOOT] Assumindo proxy gerenciado por PM2 ou processo separado');
+                    log('INFO', '[BOOT] Pulando criação inline para evitar conflito EADDRINUSE');
+                    chromeProxy = null; // Não cria proxy duplicado
+                } else {
+                    log('INFO', `[BOOT] Iniciando Chrome Proxy inline (porta ${proxyPort})`);
 
-                // Inicia proxy
-                await chromeProxy.start();
+                    chromeProxy = new ChromeProxyService({
+                        PUBLIC_IP: CONFIG.CHROME_PROXY_HOST,
+                        CHROME_HOST: CONFIG.CHROME_HOST,
+                        CHROME_PORT: CONFIG.CHROME_PORT,
+                        PROXY_PORT: proxyPort,
+                        PROXY_BIND: CONFIG.CHROME_PROXY_BIND,
+                        LOG_LEVEL: CONFIG.LOG_LEVEL || 'INFO'
+                    });
 
-                // Armazena globalmente para shutdown
-                global.chromeProxy = chromeProxy;
+                    // Injeta NERV no proxy para telemetria
+                    chromeProxy.setNERV(nerv);
 
-                log('INFO', `[BOOT] ✅ Chrome Proxy Service online (porta ${CONFIG.CHROME_PROXY_PORT || 9224})`);
+                    // Inicia proxy
+                    await chromeProxy.start();
 
-                // ✅ Emite evento NERV: Proxy iniciado
-                sendEvent(
-                    nerv,
-                    ActorRole.INFRA,
-                    ActionCode.INFRA_READY,
-                    {
-                        component: 'ChromeProxyService',
-                        port: CONFIG.CHROME_PROXY_PORT || 9224,
-                        host: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
-                        timestamp: Date.now()
-                    },
-                    null, // correlationId
-                    null // target (broadcast)
-                );
+                    // Armazena globalmente para shutdown
+                    global.chromeProxy = chromeProxy;
+
+                    log('INFO', `[BOOT] ✅ Chrome Proxy Service online (porta ${proxyPort})`);
+
+                    // ✅ Emite evento NERV: Proxy iniciado
+                    sendEvent(
+                        nerv,
+                        ActorRole.INFRA,
+                        ActionCode.INFRA_READY,
+                        {
+                            component: 'ChromeProxyService',
+                            port: proxyPort,
+                            host: CONFIG.CHROME_PROXY_HOST,
+                            timestamp: Date.now(),
+                            mode: 'inline'
+                        },
+                        null, // correlationId
+                        null // target (broadcast)
+                    );
+                }
             } catch (error) {
                 log('ERROR', `[BOOT] ❌ Falha ao iniciar Chrome Proxy Service: ${error.message}`);
                 log('ERROR', '[BOOT]');
                 log('ERROR', '[BOOT] TROUBLESHOOTING:');
                 log('ERROR', '[BOOT] 1. Verifique se porta está disponível:');
-                log('ERROR', `[BOOT]    lsof -i :${CONFIG.CHROME_PROXY_PORT || 9224}`);
+                log('ERROR', `[BOOT]    lsof -i :${CONFIG.CHROME_PROXY_PORT}`);
                 log('ERROR', '[BOOT] 2. Verifique se Chrome está rodando:');
                 log('ERROR', `[BOOT]    curl http://localhost:${CONFIG.CHROME_PORT || 9225}/json/version`);
                 log('ERROR', '[BOOT]');
@@ -266,7 +352,8 @@ async function boot() {
         // NERV-based server discovery (non-blocking): escuta evento SERVER_READY
         let discoveredServerInfo = null;
         try {
-            const discoveryTimeoutMs = Number(process.env.SERVER_DISCOVERY_TIMEOUT ?? 5000);
+            // Timeout aumentado de 5s → 30s (server boot pode ser lento em cold start)
+            const discoveryTimeoutMs = Number(process.env.SERVER_DISCOVERY_TIMEOUT ?? 30000);
 
             const unsub =
                 typeof nerv.onEvent === 'function'
@@ -303,10 +390,10 @@ async function boot() {
         // ===== FASE 3: BROWSER POOL (COM RESILIÊNCIA) =====
         log('INFO', '[BOOT] Fase 3/6: Inicializando Browser Pool (modo resiliente)');
 
-        const { initializeBrowserPoolResilient, resolveChromeEndpoint } = require('./core/boot_resilience_manager');
-        const chromeEndpoint = resolveChromeEndpoint();
-        log('INFO', `[BOOT] Chrome endpoint resolvido: ${chromeEndpoint}`);
-        if (!chromeEndpoint) {
+        const { initializeBrowserPoolResilient, getBrowserEndpoint } = require('./core/boot_resilience_manager');
+        const browserEndpoint = getBrowserEndpoint();
+        log('INFO', `[BOOT] Chrome endpoint resolvido: ${browserEndpoint.url}`);
+        if (!browserEndpoint.url) {
             log('FATAL', '[BOOT] Chrome endpoint não resolvido');
             process.exit(1);
         }
@@ -316,20 +403,10 @@ async function boot() {
                 poolSize: process.env.BROWSER_POOL_SIZE || CONFIG.BROWSER_POOL_SIZE || 3,
                 allocationStrategy: process.env.ALLOCATION_STRATEGY || CONFIG.ALLOCATION_STRATEGY || 'round-robin',
                 healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || CONFIG.HEALTH_CHECK_INTERVAL || 30000,
-                browserEndpoint: {
-                    /**
-                     * Endpoint HTTP do Chrome externo já em execução.
-                     * Este processo NÃO inicia browsers e NÃO gerencia ciclo de vida.
-                     */
-                    url: chromeEndpoint,
-
-                    /**
-                     * Endpoint WebSocket do DevTools Protocol (opcional).
-                     */
-                    wsEndpoint: process.env.CHROME_WS_ENDPOINT || CONFIG.WS_ENDPOINT
-                }
+                browserEndpoint
             },
             {
+                nerv, // ✅ Injeta NERV para Circuit Breaker
                 allowDegradedMode: process.env.ALLOW_DEGRADED_MODE !== 'false',
                 autoRetry: process.env.AUTO_RETRY_CHROME !== 'false',
                 maxAutoRetries: Number.parseInt(process.env.MAX_AUTO_RETRIES ?? '2', 10)
@@ -420,9 +497,8 @@ async function boot() {
         //   process.env.SERVER_MODE ou CONFIG.SERVER_MODE
         // ----------------------------------------------------------------------
 
-        // Fonte única canônica — resolver validado (enum fechado)
-        const SERVER_MODE = resolveServerMode();
-
+        // SERVER_MODE já foi resolvido na Fase 1 (validação PM2+integrated)
+        // Apenas logamos aqui para clareza
         log('INFO', `[BOOT] Server mode (determinístico): ${SERVER_MODE}`);
 
         const serverEngine = require('./server/engine/server');

@@ -12,7 +12,7 @@
     --yellow: #d29922;
     --blue: #58a6ff;
     --purple: #bc8cff;
-    
+
     /* Fontes */
     --font-mono: 'JetBrains Mono', 'Consolas', monospace;
     --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -34,6 +34,14 @@ body {
 }
 
 /* --- SCROLLBARS (Universal) --- */
+
+/* Firefox scrollbar (W3C standard) */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+}
+
+/* Chrome/Edge/Safari scrollbar (WebKit) */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }

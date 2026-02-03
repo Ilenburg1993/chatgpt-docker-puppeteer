@@ -27,6 +27,7 @@
 const KernelLoopState = Object.freeze({
     INACTIVE: 'INACTIVE',
     ACTIVE: 'ACTIVE',
+    PAUSED: 'PAUSED', // ✅ Novo estado: Pausado por Circuit Breaker
     DEGRADED: 'DEGRADED',
     STOPPING: 'STOPPING'
 });
@@ -53,13 +54,23 @@ class KernelLoop {
      * @param {Object} params.telemetry
      * Canal de telemetria do Kernel.
      *
+     * @param {Object} [params.browserPool]
+     * Browser Pool Manager (para checar Circuit Breaker).
+     *
      * @param {Object} [params.scheduler]
      * Scheduler técnico (padrão: global).
      *
      * @param {number} [params.baseIntervalMs]
      * Intervalo base entre ciclos (padrão: 50ms).
      */
-    constructor({ executionEngine, nervBridge, telemetry, scheduler = global, baseIntervalMs = 50 }) {
+    constructor({
+        executionEngine,
+        nervBridge,
+        telemetry,
+        browserPool = null,
+        scheduler = global,
+        baseIntervalMs = 50
+    }) {
         if (!executionEngine || typeof executionEngine.evaluate !== 'function') {
             throw new Error('KernelLoop requer executionEngine.evaluate()');
         }
@@ -75,6 +86,7 @@ class KernelLoop {
         this.executionEngine = executionEngine;
         this.nervBridge = nervBridge;
         this.telemetry = telemetry;
+        this.browserPool = browserPool; // ✅ Opcional: para checar Circuit Breaker
         this.scheduler = scheduler;
         this.baseIntervalMs = baseIntervalMs;
 
@@ -152,6 +164,7 @@ class KernelLoop {
      * Executa um único ciclo lógico do Kernel.
      *
      * Sequência canônica:
+     * 0. Verifica Circuit Breaker (pausa se necessário)
      * 1. Drenagem de buffers do NERV (inbound)
      * 2. Avaliação semântica (ExecutionEngine)
      * 3. Aplicação de decisões
@@ -166,6 +179,17 @@ class KernelLoop {
         const startedAt = Date.now();
         this._lastTickAt = startedAt;
 
+        // ✅ 0. Verifica Circuit Breaker ANTES de executar
+        if (this._checkCircuitBreaker()) {
+            // Sistema pausado - pula execução mas mantém loop ativo
+            this.telemetry.info('kernel_loop_paused', {
+                tickId,
+                reason: 'Circuit Breaker OPEN',
+                at: startedAt
+            });
+            return;
+        }
+
         this.telemetry.info('kernel_loop_tick_start', {
             tickId,
             state: this.state,
@@ -173,6 +197,11 @@ class KernelLoop {
         });
 
         try {
+            // ✅ 0.5. VALIDAÇÃO DE PRÉ-REQUISITOS
+            if (!this.executionEngine || typeof this.executionEngine.evaluate !== 'function') {
+                throw new Error('CRITICAL: ExecutionEngine não está válido');
+            }
+
             // 1. Drenagem de buffer inbound (EVENTs recebidos)
             this._drainInbound();
 
@@ -207,6 +236,33 @@ class KernelLoop {
                 at: endedAt
             });
         }
+    }
+
+    /**
+     * Verifica Circuit Breaker e pausa sistema se necessário.
+     * @returns {boolean} - true se pausado, false se pode executar
+     */
+    _checkCircuitBreaker() {
+        if (!this.browserPool || !this.browserPool.circuitBreaker) {
+            return false; // Sem Browser Pool, não pausa
+        }
+
+        const shouldPause = this.browserPool.circuitBreaker.shouldPauseSystem();
+
+        if (shouldPause && this.state !== KernelLoopState.PAUSED) {
+            this.state = KernelLoopState.PAUSED;
+            this.telemetry.warning('kernel_paused_by_circuit_breaker', {
+                cause: this.browserPool.circuitBreaker.lastCause,
+                at: Date.now()
+            });
+        } else if (!shouldPause && this.state === KernelLoopState.PAUSED) {
+            this.state = KernelLoopState.ACTIVE;
+            this.telemetry.info('kernel_resumed_circuit_recovered', {
+                at: Date.now()
+            });
+        }
+
+        return shouldPause;
     }
 
     /* ===========================

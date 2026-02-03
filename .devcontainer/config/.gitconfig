@@ -1,6 +1,6 @@
 # =============================================================================
 # .gitconfig - ChatGPT Docker Puppeteer DevContainer
-# Version: 3.1 FINAL (23/01/2026)
+# Version: 3.2 (02/02/2026)
 # =============================================================================
 #
 # OBJETIVO:
@@ -15,7 +15,13 @@
 # • Complementa .gitattributes (fonte canonica)
 # • Aliases essenciais + produtividade
 #
-# CHANGELOG v3.1:
+# CHANGELOG v3.2:
+# • Removido alias duplicado 'cane'
+# • Corrigido alias 'lp' (--oneline conflitava com --pretty)
+# • Adicionados aliases de produtividade: wip, save, redo, fixup
+# • Validação automática em post-attach.sh e Makefile
+#
+# v3.1:
 # • Nome consistente: ChatGPT Docker Puppeteer
 # • Encoding UTF-8 limpo
 #
@@ -46,15 +52,15 @@
 	autocrlf = false
 	filemode = false
 	symlinks = true
-	
+
 	# Line endings (CRITICO para Windows/WSL2)
 	eol = lf
 	safecrlf = warn
-	
+
 	# Performance
 	preloadindex = true
 	fscache = true
-	
+
 	# Compression (balance performance/space)
 	compression = 9
 	looseCompression = 9
@@ -197,51 +203,50 @@
 	s = status -sb
 	st = status -sb
 	info = remote show origin
-	
+
 	# --- Add ---
 	a = add
 	aa = add --all
 	ap = add --patch
-	
+
 	# --- Commit ---
 	c = commit
 	cm = commit -m
 	ca = commit --amend
 	can = commit --amend --no-edit
-	cane = commit --amend --no-edit
-	
+
 	# --- Checkout ---
 	co = checkout
 	cob = checkout -b
 	com = checkout main
 	cod = checkout develop
-	
+
 	# --- Branch ---
 	b = branch
 	ba = branch -a
 	bd = branch -d
 	bD = branch -D
 	bm = branch -m
-	
+
 	# --- Log (visual e compacto) ---
 	l = log --oneline --graph --decorate -10
 	lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
 	ll = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --all
-	lp = log --oneline --graph --decorate --pretty=format:'%C(yellow)%h%Creset %C(cyan)%ad%Creset | %s %C(green)(%cr)%Creset %C(bold blue)<%an>%Creset' --date=short
+	lp = log --graph --decorate --pretty=format:'%C(yellow)%h%Creset %C(cyan)%ad%Creset | %s %C(green)(%cr)%Creset %C(bold blue)<%an>%Creset' --date=short
 	la = log --oneline --graph --decorate --all
-	
+
 	# --- Diff ---
 	d = diff
 	dc = diff --cached
 	ds = diff --staged
 	dw = diff --word-diff
-	
+
 	# --- Push / Pull ---
 	p = push
 	pl = pull
 	pf = push --force-with-lease
 	pu = push -u origin HEAD
-	
+
 	# --- Stash ---
 	ss = stash save
 	sl = stash list
@@ -249,20 +254,26 @@
 	sa = stash apply
 	sd = stash drop
 	sc = stash clear
-	
+
 	# --- Reset / Revert ---
 	unstage = reset HEAD --
 	undo = reset --soft HEAD~1
-	
+
 	# --- Remote ---
 	r = remote -v
-	
+
 	# --- Utilities ---
 	aliases = config --get-regexp alias
 	last = log -1 HEAD --stat
 	cleanup = !git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d
 	prune-local = !git fetch -p && git branch -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -D
-	
+
+	# --- Productivity (WIP/Savepoints) ---
+	wip = !git add -A && git commit -m "WIP: work in progress"
+	save = !git add -A && git commit -m "SAVEPOINT"
+	redo = commit --amend -C HEAD
+	fixup = commit --fixup
+
 	# --- Assume unchanged (ignorar modificacoes temporariamente) ---
 	assume = update-index --assume-unchanged
 	unassume = update-index --no-assume-unchanged
@@ -299,6 +310,10 @@
 #   git cleanup   - Remove branches ja merged
 #   git aliases   - Lista todos aliases
 #   git last      - Mostra ultimo commit
+#   git wip       - Quick WIP commit (work in progress)
+#   git save      - Savepoint commit
+#   git redo      - Amend commit mantendo mensagem
+#   git fixup     - Commit fixup para rebase interativo
 #
 # Local Overrides:
 #   Crie ~/.gitconfig.local para configs pessoais

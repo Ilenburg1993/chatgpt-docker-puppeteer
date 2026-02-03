@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.0
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.2
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -16,6 +16,7 @@
 //   • Chrome é externo ao container (host ou serviço dedicado)
 //   • Nenhuma decisão de topologia é hardcoded na infraestrutura
 //   • Debug e observabilidade são opt-in e não intrusivos
+//   • Documentação robusta (NUNCA reduzir)
 //
 // Escopo:
 //   • Ambiente DEV (não produção)
@@ -27,6 +28,13 @@
 //   BLOQUEADAS no DevContainer. O acesso a essas superfícies é decidido
 //   exclusivamente pelo runtime da aplicação.
 //
+// CHANGELOG v5.2 (2026-02-02):
+// ✅ Sincronização de versão (3.4 → 5.2)
+// ✅ Features consolidadas (removidas duplicações)
+// ✅ Extensions agrupadas por categoria
+// ✅ Scrollback otimizado (20000 → 10000)
+// ✅ Documentação de segurança melhorada (--group-add=docker)
+// ✅ remoteEnv consolidado (removidas duplicações)
 // ============================================================================
 {
   "name": "ChatGPT Docker Puppeteer - Dev Container",
@@ -44,7 +52,7 @@
       "REMOTE_USER": "${containerUser}",
       "PROJECT_NAME": "${localWorkspaceFolderBasename}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "3.4.0",
+      "VERSION": "5.2.0",
       "BUILD_DATE": "${localEnv:BUILD_DATE}",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       "IMAGE_NAME": "chatgpt-docker-puppeteer",
@@ -54,165 +62,277 @@
       "DOCKER_GID": "${localEnv:DOCKER_GID}"
     }
   },
+  // ===========================================================
+  // RUNTIME ENVIRONMENT VARIABLES
+  // ===========================================================
+  //
+  // Integração com sistema ENV (150+ variáveis)
+  //
+  // Ordem de precedência:
+  // 1. remoteEnv (abaixo) - Injetado pelo VS Code
+  // 2. runArgs --env-file - Carregado do .env.development
+  // 3. config.json - Defaults da aplicação
+  // 4. Código - Fallbacks hardcoded
+  //
+  // Documentação: DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md
+  // ===========================================================
+  "remoteEnv": {
+    // Ambiente
+    "NODE_ENV": "${localEnv:NODE_ENV:development}",
+    "SERVER_MODE": "split",
+    "SERVER_AUTHORITY": "standalone",
+    // Portas
+    "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
+    "PORT": "${localEnv:PORT:3008}",
+    "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
+    "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
+    "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
+    // Browser
+    "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
+    "PUPPETEER_LOCAL_LAUNCH_DISABLED": "true",
+    // Logging
+    "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
+    // State Management
+    "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}"
+  },
   // ============================================================
   // FEATURES - Auto-install tools and utilities
   // ============================================================
-  "features": {
-    // Common utilities (bash, git, curl, wget, etc)
-    "ghcr.io/devcontainers/features/common-utils:2": {
-      "installZsh": false,
-      "installOhMyZsh": false,
-      "upgradePackages": false,
-      "username": "node",
-      "userUid": "automatic",
-      "userGid": "automatic"
-    },
-    // GitHub CLI
-    "ghcr.io/devcontainers/features/github-cli:1": {
-      "version": "2.83.2"
-    }
-  },
+  // NOTA v5.2: Features removidas para evitar duplicações.
+  // Pacotes instalados manualmente no Dockerfile para maior controle.
+  // Antes: common-utils:2 (git, curl, wget, zip, unzip, tree, jq)
+  // Antes: github-cli:1 (gh)
+  // Agora: Todos instalados em Dockerfile SECTION 6
+  "features": {},
   // ===========================================================
   // PORT FORWARDING — CONTRATO FINAL (DENY BY DEFAULT)
   // ===========================================================
   //
-  // Arquitetura por planos funcionais:
+  // Este bloco NÃO é apenas configuração.
+  // Ele é um DOCUMENTO ARQUITETURAL VIVO.
   //
-  // ┌──────────────────────────────────────────────────────┐
-  // │ UI HUMANA                                             │
-  // │  - 3000 → Dashboard Principal (Mission Control)       │
-  // │  - 3001 → Dashboard DEV / Playground                  │
-  // │  - 3002 → Dashboard Secundário (Ops / Observabilidade)│
-  // └──────────────────────────────────────────────────────┘
+  // ---------------------------------------------------------------------------
+  // PRINCÍPIO FUNDAMENTAL
+  // ---------------------------------------------------------------------------
+  // • Política global: DENY-BY-DEFAULT
+  // • Nenhuma porta é exposta por acidente
+  // • Nenhuma inferência automática é aceitável
+  // • Toda porta exposta deve ter:
+  //     - Justificativa funcional
+  //     - Público-alvo explícito
+  //     - Comportamento de forward declarado
   //
-  // ┌──────────────────────────────────────────────────────┐
-  // │ API / EXECUÇÃO                                        │
-  // │  - 3008 → API / Socket.io / Execução                  │
-  // └──────────────────────────────────────────────────────┘
+  // ---------------------------------------------------------------------------
+  // TOPOLOGIA FÍSICA (3 CAMADAS)
+  // ---------------------------------------------------------------------------
   //
-  // ┌──────────────────────────────────────────────────────┐
-  // │ OBSERVABILIDADE                                       │
-  // │  - 9100 → Métricas / Health / Diagnóstico             │
-  // └──────────────────────────────────────────────────────┘
+  // WINDOWS HOST (Máquina Física)
+  // ├── Chrome Windows (chrome.exe, porta 9225)
+  // │   • Inicia: START-CHROME-SIMPLE.bat
+  // │   • Função: LLM Automation (ChatGPT, Gemini via Puppeteer)
+  // │   • Protocolo: Chrome DevTools Protocol (CDP)
+  // │   • Ontologia: Windows gerencia, Container conecta
+  // │
+  // └── WSL2 (Virtual Machine Linux)
+  //     └── Docker Desktop (Container Engine)
+  //         └── DevContainer (Node.js Runtime)
+  //             └── PM2 (Process Manager - 3 processos):
+  //                 │
+  //                 ├── agente-gpt (Main Process)
+  //                 │   • Script: index.js → src/main.js
+  //                 │   • Função: Kernel + Drivers + Orchestration + NERV
+  //                 │   • Porta: NENHUMA (IPC via NERV)
+  //                 │   • Depende: Chrome Proxy (9224)
+  //                 │
+  //                 ├── dashboard-web (Server Process)
+  //                 │   • Script: src/server/main.js
+  //                 │   • Função: HTTP + Socket.io + API REST + Telemetry
+  //                 │   • Porta: 3008 (HTTP + WebSocket)
+  //                 │   • Browser: ANY (Chrome, Firefox, Edge, Safari)
+  //                 │   • Dependências: ZERO (autônomo)
+  //                 │
+  //                 └── chrome-proxy (Proxy Service)
+  //                     • Script: scripts/chrome-proxy-service.js
+  //                     • Função: Transparent Proxy (HTTP + WebSocket)
+  //                     • Porta IN: 9224 (container)
+  //                     • Porta OUT: 9225 (host Windows via host.docker.internal)
+  //                     • Fluxo: Puppeteer → localhost:9224 → Chrome (9225)
   //
-  // ┌──────────────────────────────────────────────────────┐
-  // │ DEBUG (OPT-IN, NÃO EXPOSTO POR PADRÃO)                │
-  // │  - 9229 → Node.js Debug (Primary)                     │
-  // │  - 9230 → Node.js Debug (Fallback)                    │
-  // └──────────────────────────────────────────────────────┘
+  // ---------------------------------------------------------------------------
+  // ARQUITETURA POR PLANOS FUNCIONAIS
+  // ---------------------------------------------------------------------------
   //
-  // ┌──────────────────────────────────────────────────────┐
-  // │ CONTROLE / INFRAESTRUTURA (RESTRITO)                  │
-  // │  - 9221–9223 → Chrome DevTools diretos (PROIBIDOS)    │
-  // │  - 9224 → Chrome Proxy Service                        │
-  // │            (FRONTEIRA LÓGICA — SEM AUTO-FORWARD)      │
-  // └──────────────────────────────────────────────────────┘
+  // ┌──────────────────────────────────────────────────────────┐
+  // │ UI HUMANA (Interfaces interativas)                        │
+  // │                                                          │
+  // │ 3008 → Dashboard Principal (Mission Control)             │
+  // │        • Processo: dashboard-web (PM2)                   │
+  // │        • Browser: ANY (Chrome, Firefox, Edge, Safari)    │
+  // │        • HTTP + Socket.io + API REST                     │
+  // │        • Dependências: ZERO (autônomo)                   │
+  // │                                                          │
+  // │ • Auto-forward com notificação                           │
+  // └──────────────────────────────────────────────────────────┘
   //
-  // Notas normativas:
-  // - Política global: deny-by-default
-  // - Nenhuma porta é exposta sem intenção explícita
-  // - Portas de controle NÃO são interfaces humanas
-  // - 9224 é uma fronteira lógica de contrato, não uma UI
+  // ┌──────────────────────────────────────────────────────────┐
+  // │ INFRAESTRUTURA (Fronteiras Arquiteturais)                │
+  // │                                                          │
+  // │ 9224 → Chrome Proxy Service (Container → Windows)        │
+  // │        • Processo: chrome-proxy (PM2)                    │
+  // │        • Função: Proxy transparente HTTP + WebSocket     │
+  // │        • IN: localhost:9224 (Puppeteer conecta aqui)     │
+  // │        • OUT: host.docker.internal:9225 (Chrome)         │
+  // │                                                          │
+  // │ 9225 → Chrome Real (Windows Host)                        │
+  // │        • Processo: chrome.exe (Windows)                  │
+  // │        • Inicia: START-CHROME-SIMPLE.bat                 │
+  // │        • Função: Chrome DevTools Protocol (CDP)          │
+  // │        • Acesso: NUNCA direto, sempre via proxy 9224     │
+  // │                                                          │
+  // │ • NÃO são UI humana                                      │
+  // │ • NÃO sofrem auto-forward                                │
+  // │ • Representam FRONTEIRAS LÓGICAS                          │
+  // └──────────────────────────────────────────────────────────┘
+  //
+  // ┌──────────────────────────────────────────────────────────┐
+  // │ DEBUG (OPT-IN — NUNCA NOTIFICA POR PADRÃO)               │
+  // │                                                          │
+  // │ 9229 → Node.js Debug (Primary - agente-gpt)              │
+  // │ 9230 → Node.js Debug (Fallback - dashboard-web)          │
+  // │                                                          │
+  // │ • Exposição silenciosa                                   │
+  // │ • Uso deliberado (--inspect flag)                        │
+  // │ • Não notifica o operador                                │
+  // └──────────────────────────────────────────────────────────┘
+  //
+  // ---------------------------------------------------------------------------
+  // NOTAS NORMATIVAS IMPORTANTES
+  // ---------------------------------------------------------------------------
+  //
+  // PM2 (Process Manager):
+  // • Organizador geral de processos Node.js
+  // • Gerencia 3 processos: agente-gpt, dashboard-web, chrome-proxy
+  // • NÃO tem porta própria (daemon interno)
+  // • Web dashboard opcional (porta 9615) NÃO configurado por padrão
+  //
+  // Chrome Dual Purpose (2 usos INDEPENDENTES):
+  // 1. Dashboard (porta 3008):
+  //    • Humano → ANY Browser → http://localhost:3008 → dashboard-web
+  //    • ZERO dependência de Puppeteer
+  //    • ZERO dependência de Chrome Windows (porta 9225)
+  //
+  // 2. LLM Automation (porta 9225):
+  //    • agente-gpt → Puppeteer → localhost:9224 → proxy → Chrome (9225)
+  //    • Puppeteer required
+  //    • Chrome Windows required
+  //
+  // Fluxo de Dados LLM Automation:
+  //    Puppeteer → localhost:9224 (proxy) → host.docker.internal:9225 (Chrome)
+  //
+  // O sistema DEVE funcionar mesmo sem Chrome externo (fallback para Chromium local)
   //
   // ===========================================================
   "forwardPorts": [
-    3000, // Dashboard Principal — Mission Control
-    3001, // Dashboard DEV / Playground (uso interno)
-    3002, // Dashboard Secundário — Operações / Observabilidade
-    3008, // API / Socket.io / Execução
-    9100, // Métricas / Healthcheck
-    9229, // Node.js Debug — Primary (--inspect)
-    9230 // Node.js Debug — Fallback (--inspect)
+    3008, // Dashboard Principal — Mission Control (HTTP + Socket.io + API)
+    9224, // Chrome Proxy Service (Container → Windows Host)
+    9229, // Node.js Debug — Primary (agente-gpt --inspect)
+    9230 // Node.js Debug — Fallback (dashboard-web --inspect)
   ],
   "portsAttributes": {
     // ----------------------------------------------------------
-    // Política padrão: IGNORAR tudo que não for explicitamente permitido
+    // Política padrão: IGNORAR qualquer porta não declarada
     // ----------------------------------------------------------
     "*": {
       "onAutoForward": "ignore"
     },
-    // ------------------ UI HUMANA -----------------------------
-    "3000": {
-      "label": "Dashboard Principal — Mission Control",
-      "onAutoForward": "notify",
-      "protocol": "http"
-    },
-    "3001": {
-      "label": "Dashboard DEV / Playground (uso interno)",
-      "onAutoForward": "notify",
-      "protocol": "http"
-    },
-    "3002": {
-      "label": "Dashboard Secundário — Operações / Observabilidade",
-      "onAutoForward": "notify",
-      "protocol": "http"
-    },
-    // ------------------ API -----------------------------------
+    // ================== UI HUMANA =============================
     "3008": {
-      "label": "Servidor da Aplicação — API / Socket.io",
+      "label": "Dashboard Principal — Mission Control (50+ endpoints)",
       "onAutoForward": "notify",
       "protocol": "http"
     },
-    // ------------------ OBSERVABILIDADE ------------------------
-    "9100": {
-      "label": "Métricas / Health Endpoint",
-      "onAutoForward": "notify",
+    // ================== INFRAESTRUTURA ========================
+    "9224": {
+      "label": "Chrome Proxy Service (Container → Windows Host)",
+      "onAutoForward": "ignore",
       "protocol": "http"
     },
-    // ------------------ DEBUG (OPT-IN) -------------------------
+    "9225": {
+      "label": "Chrome Real (Windows Host) — CDP",
+      "onAutoForward": "ignore"
+    },
+    // ================== DEBUG =================================
     "9229": {
-      "label": "Node.js Debug — Primary (--inspect)",
+      "label": "Node.js Debug — Primary (agente-gpt)",
       "onAutoForward": "silent"
     },
     "9230": {
-      "label": "Node.js Debug — Fallback (--inspect)",
+      "label": "Node.js Debug — Fallback (dashboard-web)",
       "onAutoForward": "silent"
-    },
-    // ------------------ CONTROLE / INFRAESTRUTURA --------------
-    "9221": {
-      "label": "Chrome DevTools Variant (PROIBIDO)",
-      "onAutoForward": "ignore"
-    },
-    "9223": {
-      "label": "Chrome DevTools Fallback (PROIBIDO)",
-      "onAutoForward": "ignore"
-    },
-    // Porta canônica de contrato (NÃO auto-forward)
-    //
-    // Observação:
-    // - Esta porta representa a FRONTEIRA LÓGICA do browser
-    // - Não é UI, não é debug humano
-    // - Pode ser manualmente encaminhada se necessário
-    // - O sistema NÃO depende de auto-forward para funcionar
-    //
-    "9224": {
-      "label": "Chrome Proxy Service — Fronteira Arquitetural",
-      "onAutoForward": "ignore"
     }
   },
   // ============================================================
-  // RUNTIME ARGS - Docker runtime configuration
-  // ============================================================
-  // ============================================================
-  // RUNTIME ARGS - Docker runtime configuration (v3.4)
+  // RUNTIME ARGS - Docker runtime configuration (v5.2)
   // ============================================================
   "runArgs": [
+    // ENV FILE: Carrega variáveis do .env.development
+    "--env-file",
+    "${localWorkspaceFolder}/.env.development",
+
     // NETWORKING: Acesso ao Chrome do Windows (Host) via CDP
     "--add-host=host.docker.internal:host-gateway",
+
     // PERFORMANCE: Essencial para Puppeteer não "crashar" em sites pesados
     "--shm-size=4g",
+
     // STABILITY: Evita erro de "Too many open files" no VS Code/Node
     "--ulimit",
     "nofile=65536:65536",
-    // IDENTITY: Permite que o usuário dinâmico use o Docker CLI do Host
-    "--group-add=docker", //Isso equivale a root no host.
+// ============================================================================
+// IDENTITY & SECURITY: Docker CLI Access
+// ============================================================================
+// ⚠️  SECURITY NOTICE (CRITICAL):
+//
+// --group-add=docker fornece acesso ao Docker daemon do HOST.
+// Isso é EQUIVALENTE A ROOT NO HOST (full privilege escalation).
+//
+// IMPLICAÇÕES:
+// • Container pode criar/deletar/manipular QUALQUER container/imagem no host
+// • Container pode montar QUALQUER volume do host
+// • Container pode ler/escrever no filesystem do host (via bind mounts)
+// • Container pode executar comandos privilegiados no host
+//
+// JUSTIFICATIVA (Ambiente DEV):
+// • Necessário para docker-compose, docker build, docker run dentro do container
+// • Facilita workflows de desenvolvimento (testcontainers, builds locais)
+// • VS Code DevContainers requer isso para certas funcionalidades
+//
+// PROTEÇÕES:
+// • Uso EXCLUSIVO em ambiente de desenvolvimento LOCAL
+// • NUNCA usar em CI/CD, staging ou produção
+// • Host deve ser trusted (sua máquina pessoal)
+// • Container não deve processar input de fontes não confiáveis
+//
+// ALTERNATIVAS (se não precisar de Docker-in-Docker):
+// • Remover --group-add=docker
+// • Usar Docker externo via API remota (docker -H tcp://...)
+// • Usar podman (rootless containers)
+//
+// DECISÃO DO PROJETO:
+// Manter --group-add=docker porque:
+// 1. Facilita workflows de desenvolvimento (docker-compose local)
+// 2. Projeto é ambiente DEV (não prod)
+// 3. Documentação clara de riscos (este bloco)
+// ============================================================================
+"--group-add=docker",
+
     // METADATA: Sincronizado com a Section 0 do Dockerfile
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
     "role=devcontainer",
     "--label",
-    "version=3.4.0"
+    "version=5.2.0"
   ],
   // ============================================================
   // LIFECYCLE HOOKS - Sincronia de Inicialização
@@ -231,56 +351,59 @@
     "vscode": {
       "extensions": [
         // ========================================================
-        // EXTENSIONS AUTO-INSTALL — RATIONALE-DRIVEN SELECTION
+        // EXTENSIONS AUTO-INSTALL — v5.2 GROUPED BY CATEGORY
         // ========================================================
-        // Objetivo:
-        // - Não duplicar funcionalidades nativas do VS Code
-        // - Não competir com GitHub Copilot
-        // - Cobrir lacunas reais: infraestrutura, testes, scripts e observabilidade
-        // - Favorecer um fluxo Makefile-first + DevContainer-first
-        //
         // Critério de inclusão:
         // ✔ VS Code não faz isso nativamente (ou faz pior)
         // ✔ Copilot não substitui essa funcionalidade
         // ✔ Melhora confiabilidade, legibilidade ou diagnóstico
         //
         // Funcionalidades NATIVAS do VS Code (não requerem extensões):
-        // - Auto Close/Rename Tags
-        // - Bracket Pair Colorization
-        // - Indent Guides
-        // - NPM Scripts Explorer
-        // - Node.js Debugger
+        // - Auto Close/Rename Tags (builtin)
+        // - Bracket Pair Colorization (settings.json)
+        // - Indent Guides (builtin)
+        // - NPM Scripts Explorer (builtin)
+        // - Node.js Debugger (builtin)
         // ========================================================
-        // === CORE ESSENTIALS (Execution, Automation, AI) ===
-        "dbaeumer.vscode-eslint", // Linting JS/Node (depende de node_modules)
-        "esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
-        "ms-azuretools.vscode-docker", // Docker / DevContainer DX
-        "GitHub.copilot", // Assistente IA
-        "GitHub.copilot-chat", // Chat contextual com IA
-        "ms-vscode.makefile-tools", // Makefile como árbitro do sistema
-        // === GIT & VERSION CONTROL (Insight, not operations) ===
-        "eamodio.gitlens", // Histórico avançado, blame, graph
-        // === CODE QUALITY & STRUCTURE ===
-        "usernamehw.errorlens", // Erros e warnings inline
-        "christian-kohler.path-intellisense", // Autocomplete de paths
-        "christian-kohler.npm-intellisense", // Autocomplete de módulos npm
-        "aaron-bond.better-comments", // TODO / FIXME estruturados
-        "EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
-        "redhat.vscode-yaml", // YAML com schema e validação
-        "eriklynd.json-tools", // Manipulação e validação JSON
-        // === PRODUCTIVITY & OPERATIONS ===
-        "gruntfuggly.todo-tree", // Visão global de TODOs
-        "humao.rest-client", // Testes de API dentro do editor
-        "yzhang.markdown-all-in-one", // Documentação Markdown viva
-        "pflannery.vscode-versionlens", // Visibilidade de versões de deps
-        "hbenl.vscode-test-explorer", // UI unificada para testes (Makefile-friendly)
-        // === NAVIGATION & COMPREHENSION ===
-        // === VISUAL & UX (Low noise, high clarity) ===
-        "PKief.material-icon-theme", // Ícones de arquivos
-        "streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
-        "streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
-        "oderwat.indent-rainbow", // Indentação visual por nível
-        "ms-vscode.powershell" //
+// === AI & CODE INTELLIGENCE ===
+"GitHub.copilot", // Assistente IA (contexto de código)
+"GitHub.copilot-chat", // Chat contextual com IA
+// === CODE QUALITY & LINTING ===
+"dbaeumer.vscode-eslint", // Linting JS/Node (strict mode)
+"esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
+"usernamehw.errorlens", // Erros e warnings inline (feedback visual)
+// === INFRASTRUCTURE & DEVOPS ===
+"ms-azuretools.vscode-docker", // Docker / DevContainer DX
+"ms-vscode.makefile-tools", // Makefile como árbitro do sistema
+// === GIT & VERSION CONTROL ===
+"eamodio.gitlens", // Histórico avançado, blame, graph
+// === NAVIGATION & AUTOCOMPLETE ===
+"christian-kohler.path-intellisense", // Autocomplete de paths
+"christian-kohler.npm-intellisense", // Autocomplete de módulos npm
+// === FILE TYPES & SYNTAX ===
+"timonwong.shellcheck", // Validação de scripts bash/sh
+"redhat.vscode-yaml", // YAML syntax + schema validation
+"tamasfe.even-better-toml", // TOML syntax (ecosystem.config.js)
+// === TESTING & DEBUGGING ===
+"hbenl.vscode-test-explorer", // Test Explorer UI (universal runner)
+"ryanluker.vscode-coverage-gutters", // Cobertura inline
+// === DATA & API ===
+"humao.rest-client", // HTTP client (alternativa ao Postman)
+"ZainChen.json", // JSON advanced tools
+// === PRODUCTIVITY & UI ===
+"oderwat.indent-rainbow", // Indentação colorida (Python/YAML)
+"aaron-bond.better-comments", // Highlight TODO, FIXME, NOTE
+"PKief.material-icon-theme", // Ícones de arquivos (legibilidade)
+// === DOCUMENTATION & SPELL CHECK ===
+"yzhang.markdown-all-in-one", // Documentação Markdown viva
+"streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
+"streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
+// === PRODUCTIVITY TOOLS ===
+"gruntfuggly.todo-tree", // Visão global de TODOs
+"pflannery.vscode-versionlens", // Visibilidade de versões de deps
+"EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
+// === POWERSHELL (INSTRUMENTAL SHELL) ===
+"ms-vscode.powershell" // PowerShell IntelliSense + debug
       ],
       "settings": {
         // ========================================================
@@ -315,8 +438,25 @@
         // --------------------------------------------------------
         // COMPORTAMENTO GERAL DO TERMINAL
         // --------------------------------------------------------
-        "terminal.integrated.persistentSessionReviveProcess": "onExit",
-        "terminal.integrated.scrollback": 20000,
+        // ============================================================
+        // TERMINAL — OPTIMIZED SETTINGS (v5.2)
+        // ============================================================
+        // Scrollback buffer otimizado para ambiente DevContainer:
+        // • 10,000 linhas = ~2MB memória (scrollback típico)
+        // • Suficiente para debug sessions (tail -f logs, PM2, etc)
+        // • Redução de 50% vs. v3.4 (20,000 → 10,000)
+        // • Previne memory bloat em long-running containers
+        //
+        // Context: Em DevContainers, scrollback persiste enquanto o
+        // terminal está aberto. Com 4-5 terminais simultâneos,
+        // 20,000 linhas/terminal = ~40MB overhead (10,000 = ~20MB).
+        //
+        // Se precisar de mais:
+        // • Use 'make logs-follow' (arquivos em logs/)
+        // • Configure PM2 logs (ecosystem.config.js)
+        // • Use Docker logs (docker logs -f <container>)
+        // ============================================================
+        "terminal.integrated.scrollback": 10000,
         "terminal.integrated.cursorBlinking": true,
         "terminal.integrated.enableMultiLinePasteWarning": "never",
         "terminal.integrated.copyOnSelection": true,
@@ -450,17 +590,17 @@
         "github.copilot.enable": {
           "*": true,
           "markdown": true,
-        "plaintext": true,
-        "yaml": true,
-        "jsonc": true
+          "plaintext": true,
+          "yaml": true,
+          "jsonc": true
         },
         "github.copilot.advanced": {
-        "debug.overrideEngine": "stable",
-        "inlineSuggestCount": 3,
-        "listCount": 10
-      },
-      "github.copilot.editor.enableAutoCompletions": true,
-      "github.copilot.editor.iterativeFixing": true
+          "debug.overrideEngine": "stable",
+          "inlineSuggestCount": 3,
+          "listCount": 10
+        },
+        "github.copilot.editor.enableAutoCompletions": true,
+        "github.copilot.editor.iterativeFixing": true
       }
     }
   },
@@ -549,7 +689,7 @@
     // SSH AGENT FORWARDING — CANÔNICO (WSL / WINDOWS / LINUX)
     // ---------------------------------------------------------
     // =========================================================
-    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind,consistency=cached",
     // =========================================================
     // GnuPG keyring (persistente, mas isolado)
     "source=devcontainer-gpg-cache,target=/home/node/.gnupg,type=volume",
@@ -604,13 +744,101 @@
     "XDG_CACHE_HOME": "/home/node/.cache",
     "PUPPETEER_CACHE_DIR": "/home/node/.cache/puppeteer",
     // ------------------------------------------------------------
-    // PUPPETEER & CHROME (Host Integration)
+    // PUPPETEER & CHROME — INTEGRAÇÃO EXTERNA (CONTRATO CANÔNICO)
+    // ------------------------------------------------------------
+    //
+    // MODELO FÍSICO REAL (IMPORTANTE):
+    //
+    // • Windows Host
+    //     - Chrome REAL
+    //     - Expõe Chrome DevTools Protocol (CDP) na porta 9225
+    //     - Bind: 0.0.0.0 (acessível via host.docker.internal)
+    //     - NUNCA é acessado diretamente pelo Puppeteer
+    //
+    // • DevContainer
+    //     - Chrome Proxy Service roda AQUI (gerenciado por PM2)
+    //     - Escuta: localhost:9224 (frontend para Puppeteer)
+    //     - Encaminha: host.docker.internal:9225 (backend para Chrome)
+    //     - Puppeteer conecta em localhost:9224
+    //
+    // CONSEQUÊNCIAS DO CONTRATO:
+    //
+    // • Puppeteer conecta localhost:9224 (proxy no mesmo container)
+    // • Proxy encaminha para host.docker.internal:9225 (Chrome no Windows)
+    // • Isolamento completo: Puppeteer não conhece topologia externa
+    // • Chrome externo é OPCIONAL (fallback para Chromium local)
+    // • A ausência de Chrome NÃO quebra o sistema
+    // • Nenhum componente aqui inicia Chrome
+    //
     // ------------------------------------------------------------
     "PUPPETEER_MODE": "connect",
-    //"PUPPETEER_WS_ENDPOINT": "http://host.docker.internal:9224",
+    // ------------------------------------------------------------
+    // PUPPETEER — ENDPOINT CANÔNICO (CONTRATO DE FRONTEIRA)
+    // ------------------------------------------------------------
+    //
+    // TOPOLOGIA FÍSICA REAL:
+    // ------------------------------------------------------------
+    //
+    //   ┌─────────────────────────────────────┐
+    //   │ DevContainer (Docker)               │
+    //   │                                     │
+    //   │  ┌──────────────────────────────┐   │
+    //   │  │ Puppeteer / Node.js          │   │
+    //   │  │ (conecta localhost:9224)     │   │
+    //   │  └────────────┬─────────────────┘   │
+    //   │               │                     │
+    //   │  ┌────────────▼─────────────────┐   │
+    //   │  │ Chrome Proxy Service (PM2)   │   │
+    //   │  │ (bind 0.0.0.0:9224)          │   │
+    //   │  │ • Reescreve Host: headers    │   │
+    //   │  │ • Reescreve WebSocket URLs   │   │
+    //   │  └────────────┬─────────────────┘   │
+    //   │               │ host.docker.internal│
+    //   └───────────────┼─────────────────────┘
+    //                   │
+    //   ┌───────────────▼─────────────────────┐
+    //   │ Windows Host                        │
+    //   │                                     │
+    //   │  ┌──────────────────────────────┐   │
+    //   │  │ Chrome (9225, bind 0.0.0.0)  │   │
+    //   │  │ --remote-debugging-port=9225 │   │
+    //   │  └──────────────────────────────┘   │
+    //   │                                     │
+    //   └─────────────────────────────────────┘
+    //
+    // VISÃO DO PUPPETEER:
+    // ------------------------------------------------------------
+    // • Conecta SEMPRE em localhost:9224 (proxy no mesmo container)
+    // • NÃO conhece a porta 9225
+    // • NÃO conhece o Windows Host
+    // • NÃO sabe que há um proxy intermediário
+    //
+    // VISÃO DO CHROME PROXY:
+    // ------------------------------------------------------------
+    // • Escuta em 0.0.0.0:9224 (acessível dentro do container)
+    // • Encaminha para host.docker.internal:9225 (Chrome no Windows)
+    // • Reescreve URLs para tornar conexão transparente
+    //
+    // CONTRATO (INVIOLÁVEL):
+    // ------------------------------------------------------------
+    // • Puppeteer → localhost:9224 (mesma máquina)
+    // • Proxy → host.docker.internal:9225 (máquina remota)
+    // • Violação quebra isolamento arquitetural
+    // ------------------------------------------------------------
+    "PUPPETEER_WS_ENDPOINT": "http://localhost:9224",
+    // Puppeteer NUNCA deve baixar Chromium automaticamente
+    // • Chrome externo é primário
+    // • Chromium local é fallback técnico (imagem-level)
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+    // Timeout de conexão CDP (milissegundos)
+    // • Protege contra stalls de rede
+    // • NÃO implica que Chrome deva estar ativo
     "PUPPETEER_CONNECT_TIMEOUT": "30000",
+    // Proíbe launch local por contrato
+    // • Puppeteer NÃO pode iniciar browsers implicitamente
     "PUPPETEER_LOCAL_LAUNCH_DISABLED": "true",
+    // Hint semântico (documental, não funcional)
+    // • Indica que há uma camada proxy entre container e browser
     "PUPPETEER_ARCHITECTURE": "external-browser-via-proxy",
     // ------------------------------------------------------------
     // RUNTIME TUNING (Performance & Noise)
@@ -642,7 +870,9 @@
     "LANG": "pt_BR.UTF-8",
     "DOCKER_BUILDKIT": "1",
     "DEVCONTAINER_DOCKER_ENABLED": "true",
-    "SSH_AUTH_SOCK": "/ssh-agent"
+    "SSH_AUTH_SOCK": "/ssh-agent",
+    "DOCKER_HOST_ACCESS": "true",
+    "DOCKER_SECURITY_LEVEL": "host-root-equivalent"
   },
   // ============================================================
   // SECURITY & USER CONFIGURATION

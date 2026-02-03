@@ -103,10 +103,41 @@ function renderTasks() {
 }
 
 function copyToClipboard(text) {
-    navigator.clipboard.writeText(text);
+    // Modern clipboard API (Chrome, Firefox, Edge, Safari 13.1+ with HTTPS)
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showCopyToast();
+        }).catch(() => {
+            // Fallback if clipboard API fails
+            fallbackCopyToClipboard(text);
+        });
+    } else {
+        // Universal fallback (Safari old, HTTP, IE)
+        fallbackCopyToClipboard(text);
+    }
+}
+
+function fallbackCopyToClipboard(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showCopyToast();
+    } catch (e) {
+        showCopyToast('Erro ao copiar', true);
+    }
+    document.body.removeChild(textarea);
+}
+
+function showCopyToast(message = 'ID Copiado!', isError = false) {
     const toast = document.createElement('div');
-    toast.innerText = 'ID Copiado!';
-    toast.style.cssText = 'position:fixed; top:20px; right:20px; background:#238636; color:white; padding:5px 10px; border-radius:4px; z-index:10000; font-size:0.8rem;';
+    toast.innerText = message;
+    toast.style.cssText = `position:fixed; top:20px; right:20px; background:${isError ? '#da3633' : '#238636'}; color:white; padding:5px 10px; border-radius:4px; z-index:10000; font-size:0.8rem;`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 1500);
 }

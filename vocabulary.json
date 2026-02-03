@@ -1,0 +1,69 @@
+{
+  "en": {
+    "error_indicators": [
+      "network error",
+      "something went wrong",
+      "policy violation",
+      "limit reached",
+      "connection lost",
+      "error generating"
+    ],
+    "close_actions": [
+      "ok",
+      "okay",
+      "next",
+      "close",
+      "dismiss",
+      "accept",
+      "skip",
+      "done",
+      "got it"
+    ],
+    "input_placeholders": [
+      "message",
+      "ask",
+      "prompt",
+      "type",
+      "search"
+    ]
+  },
+  "pt": {
+    "error_indicators": [
+      "erro de rede",
+      "algo deu errado",
+      "violação",
+      "limite atingido",
+      "conexão perdida",
+      "erro ao gerar"
+    ],
+    "close_actions": [
+      "próximo",
+      "fechar",
+      "entendi",
+      "aceitar",
+      "pular",
+      "concluir",
+      "ok"
+    ],
+    "input_placeholders": [
+      "mensagem",
+      "pergunte",
+      "digite",
+      "conversar",
+      "envie",
+      "busca"
+    ]
+  },
+  "blocked": [
+    "search",
+    "find",
+    "filter",
+    "buscar",
+    "pesquisar",
+    "filtrar",
+    "feedback",
+    "report",
+    "history",
+    "histórico"
+  ]
+}

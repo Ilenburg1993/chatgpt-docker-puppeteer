@@ -49,7 +49,7 @@ function bootstrapSocketAdapter(config) {
     const createSocketAdapter = require('@infra/transport/socket_io_adapter');
 
     const socketAdapter = createSocketAdapter({
-        url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3333',
+        url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3008',
         options: config.socketOptions || {}
     });
 

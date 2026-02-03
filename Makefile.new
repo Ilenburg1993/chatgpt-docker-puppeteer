@@ -1,0 +1,124 @@
+# =============================================================================
+# Makefile — ChatGPT Docker Puppeteer (DEV / PM2-First / Production-Ready)
+# =============================================================================
+# PRINCÍPIOS CANÔNICOS:
+# • Ambiente de DESENVOLVIMENTO (DEV), não produção
+# • Makefile é o ÁRBITRO do sistema, não o criador da infra
+# • Bootstrap ≠ Runtime ≠ Health
+# • PM2 é crítico, mas NÃO presumido
+# • Compatível com Docker / DevContainer do zero
+# • Alinhado com package.json scripts
+#
+# Versão: 4.0.0
+# Data:   2026-02-02
+# Changelog:
+#   - Adicionados targets de análise (analyze:*)
+#   - Adicionados targets de queue management (queue:*)
+#   - Adicionados targets de profiles e maintenance
+#   - Melhorada organização e documentação
+#   - Adicionadas declarações .PHONY
+#   - Integração com novos pacotes (chalk, dotenv, winston)
+# =============================================================================
+
+.DEFAULT_GOAL := help
+.PHONY: help info version
+
+# =============================================================================
+# CORES (ANSI — funcionam em Linux, macOS, Git Bash, VS Code)
+# =============================================================================
+
+RED     = \033[0;31m
+GREEN   = \033[0;32m
+YELLOW  = \033[1;33m
+BLUE    = \033[0;34m
+CYAN    = \033[0;36m
+MAGENTA = \033[0;35m
+BOLD    = \033[1m
+NC      = \033[0m
+
+# =============================================================================
+# FERRAMENTAS CANÔNICAS
+# =============================================================================
+
+NODE := node
+NPM  := npm
+PM2  := npx pm2
+CURL := curl
+BASH := bash
+
+# =============================================================================
+# DETECÇÃO DE PLATAFORMA
+# =============================================================================
+
+ifeq ($(OS),Windows_NT)
+PLATFORM := Windows
+SHELL_CMD := cmd /C
+else
+UNAME_S := $(shell uname -s 2>/dev/null || echo Linux)
+ifeq ($(UNAME_S),Darwin)
+macOS
+else
+Linux
+endif
+SHELL_CMD := bash -c
+endif
+
+# =============================================================================
+# HELP / IDENTIDADE
+# =============================================================================
+
+help:
+@echo ""
+@echo "$(CYAN)╔════════════════════════════════════════════════════════════╗$(NC)"
+@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.0 (DEV)            ║$(NC)"
+@echo "$(CYAN)║  PM2-First • Bootstrap-Ready • Production-Ready             ║$(NC)"
+@echo "$(CYAN)╚════════════════════════════════════════════════════════════╝$(NC)"
+@echo ""
+@echo "$(GREEN)$(BOLD)🚀 Primeiros passos:$(NC)"
+@echo "  $(CYAN)make info$(NC)              Informações do ambiente"
+@echo "  $(CYAN)make bootstrap$(NC)         Preparar workspace"
+@echo "  $(CYAN)make install-deps$(NC)      Instalar dependências"
+@echo ""
+@echo "$(GREEN)$(BOLD)▶️  Execução:$(NC)"
+@echo "  $(CYAN)make start$(NC)             Inicia o sistema"
+@echo "  $(CYAN)make stop$(NC)              Para o sistema"
+@echo "  $(CYAN)make restart$(NC)           Reinicia"
+@echo "  $(CYAN)make status$(NC)            Status"
+@echo "  $(CYAN)make logs$(NC)              Logs"
+@echo ""
+@echo "$(YELLOW)$(BOLD)🏥 Health:$(NC)"
+@echo "  $(CYAN)make health$(NC)            Health check"
+@echo "  $(CYAN)make pm2-check$(NC)         Check completo"
+@echo "  $(CYAN)make validate-all$(NC)      Validação completa"
+@echo ""
+@echo "$(BLUE)$(BOLD)📊 Análise:$(NC)"
+@echo "  $(CYAN)make analyze-graph$(NC)     Análise de código"
+@echo "  $(CYAN)make analyze-deps$(NC)      Dependências"
+@echo ""
+@echo "$(MAGENTA)$(BOLD)📦 Queue:$(NC)"
+@echo "  $(CYAN)make queue-status$(NC)      Status da fila"
+@echo "  $(CYAN)make queue-add$(NC)         Adicionar tarefa"
+@echo ""
+@echo "$(GREEN)$(BOLD)🧪 Testes:$(NC)"
+@echo "  $(CYAN)make test$(NC)              Testes"
+@echo "  $(CYAN)make test-coverage$(NC)     Com coverage"
+@echo ""
+@echo "$(YELLOW)$(BOLD)🎨 Código:$(NC)"
+@echo "  $(CYAN)make format$(NC)            Formatar"
+@echo "  $(CYAN)make lint$(NC)              Linting"
+@echo ""
+@echo "$(CYAN)💻 Plataforma: $(BOLD)$(PLATFORM)$(NC)"
+@echo ""
+
+info:
+@echo "$(CYAN)ℹ️  Informações do ambiente$(NC)"
+@echo "  Plataforma: $(BOLD)$(PLATFORM)$(NC)"
+@echo "  Node: $(GREEN)$$($(NODE) --version 2>/dev/null || echo 'não instalado')$(NC)"
+@echo "  npm:  $(GREEN)$$($(NPM) --version 2>/dev/null || echo 'não instalado')$(NC)"
+@echo "  PM2:  $(GREEN)$$($(PM2) --version 2>/dev/null || echo 'não disponível')$(NC)"
+@echo "  Makefile: $(BOLD)v4.0.0$(NC)"
+@echo ""
+
+version:
+@echo "Makefile v4.0.0 — DEV / Production-Ready (2026-02-02)"
+

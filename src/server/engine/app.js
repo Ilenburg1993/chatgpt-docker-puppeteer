@@ -41,12 +41,13 @@ app.use(requestId);
 app.use((req, res, next) => {
     const start = process.hrtime.bigint();
 
-    res.on('finish', () => {
-        const durationMs =
-            Number(process.hrtime.bigint() - start) / 1_000_000;
-
+    // Hook ANTES de enviar headers (não após 'finish')
+    const originalWriteHead = res.writeHead;
+    res.writeHead = function (...args) {
+        const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
         res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
-    });
+        return originalWriteHead.apply(this, args);
+    };
 
     next();
 });

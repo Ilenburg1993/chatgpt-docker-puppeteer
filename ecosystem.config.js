@@ -85,12 +85,20 @@ module.exports = {
             // Ambiente
             env: {
                 NODE_ENV: 'development',
-                FORCE_COLOR: '1'
+                FORCE_COLOR: '1',
+                SERVER_MODE: 'split',          // PM2 SOBERANO: Força modo split
+                SERVER_AUTHORITY: 'standalone' // Processo autônomo
+                // CHROME_PROXY_ENABLED omitido (padrão: true)
+                // Maestro detecta proxy externo PM2 via checkPortInUse(9224)
             },
 
             env_production: {
                 NODE_ENV: 'production',
-                FORCE_COLOR: '1'
+                FORCE_COLOR: '1',
+                SERVER_MODE: 'split',          // PM2 SOBERANO: Força modo split
+                SERVER_AUTHORITY: 'standalone'
+                // CHROME_PROXY_ENABLED omitido (padrão: true)
+                // Maestro detecta proxy externo PM2 via checkPortInUse(9224)
             }
         },
 
@@ -140,13 +148,17 @@ module.exports = {
             env: {
                 PORT: 3008,
                 NODE_ENV: 'development',
-                DAEMON_MODE: 'true'
+                DAEMON_MODE: 'true',
+                SERVER_AUTHORITY: 'standalone', // PM2 SOBERANO: Processo autônomo
+                ENABLE_STATE_FILE: 'false'      // Usa NERV SERVER_READY (não estado.json)
             },
 
             env_production: {
                 PORT: 3008,
                 NODE_ENV: 'production',
-                DAEMON_MODE: 'true'
+                DAEMON_MODE: 'true',
+                SERVER_AUTHORITY: 'standalone',
+                ENABLE_STATE_FILE: 'false'
             }
         },
 

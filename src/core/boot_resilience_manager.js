@@ -34,26 +34,38 @@ const http = require('http');
  * Resolve o endpoint de Chrome Remote Debugging de forma canônica.
  * Fonte única de verdade para todo o processo de boot.
  *
- * Ordem de precedência:
+ * Ordem de precedência (via CONFIG.BROWSER_ENDPOINT):
  * 1. process.env.CHROME_WS_ENDPOINT
  * 2. CONFIG.BROWSER_URL
- * 3. Fallback local (localhost:CHROME_PROXY_PORT e.g., 9224)
+ * 3. CONFIG.DEBUG_PORT
+ * 4. Fallback local (localhost:CHROME_PROXY_PORT)
  *
  * ⚠️ Não inicia Chrome.
  * ⚠️ Não valida conectividade.
  *
- * @returns {string}
+ * @returns {string} URL do endpoint (ex: 'http://localhost:9224')
  */
 function resolveChromeEndpoint() {
     const CONFIG = require('./config');
-    const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
-    const defaultBase = `http://localhost:${proxyPort}`;
-
-    return process.env.CHROME_WS_ENDPOINT || CONFIG.BROWSER_URL || defaultBase;
+    return CONFIG.BROWSER_ENDPOINT.url;
 }
 
-/**
- * Health check para Chrome remote debugging.
+/** * Retorna objeto browserEndpoint completo para ConnectionOrchestrator.
+ *
+ * Estrutura: { url: string, wsEndpoint?: string }
+ * - url: Endpoint HTTP do Chrome DevTools Protocol
+ * - wsEndpoint: (opcional) WebSocket direto para conexões rápidas
+ *
+ * Fonte única de verdade via CONFIG.BROWSER_ENDPOINT
+ *
+ * @returns {{url: string, wsEndpoint?: string}}
+ */
+function getBrowserEndpoint() {
+    const CONFIG = require('./config');
+    return CONFIG.BROWSER_ENDPOINT;
+}
+
+/** * Health check para Chrome remote debugging.
  * “Verifica se Chrome está acessível no endpoint de Remote Debugging configurado.”
  *
  * @param {string|null} [endpoint] - ##
@@ -85,11 +97,19 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
  * entre boot normal, retry automático e retry manual.
  *
  * @param {Object} config
+ * @param {Object} [nerv] - NERV bus para Circuit Breaker (opcional)
  * @returns {Promise<Object>} BrowserPoolManager inicializado
  */
-async function createBrowserPool(config) {
+async function createBrowserPool(config, nerv = null) {
     const BrowserPoolManager = require('../infra/browser_pool/pool_manager');
     const pool = new BrowserPoolManager(config);
+
+    // ✅ Injeta NERV no Circuit Breaker
+    if (nerv && pool.circuitBreaker) {
+        pool.circuitBreaker.nerv = nerv;
+        log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
+    }
+
     await pool.initialize();
     return pool;
 }
@@ -155,10 +175,10 @@ async function tryStartChrome() {
  */
 function getChromeInstructions(errorMessage) {
     const cfg = require('./config');
-    const chromePort = process.env.CHROME_PORT || cfg.CHROME_PORT || 9225;
-    const proxyEnabled = cfg.CHROME_PROXY_ENABLED !== false;
-    const proxyPort = cfg.CHROME_PROXY_PORT || 9224;
-    const proxyHost = cfg.CHROME_PROXY_HOST || '192.168.0.2';
+    const chromePort = cfg.CHROME_PORT;
+    const proxyEnabled = cfg.CHROME_PROXY_ENABLED;
+    const proxyPort = cfg.CHROME_PROXY_PORT;
+    const proxyHost = cfg.CHROME_PROXY_HOST;
 
     const lines = [
         '',
@@ -264,10 +284,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                                 process.env.ALLOCATION_STRATEGY || CONFIG.ALLOCATION_STRATEGY || 'round-robin',
                             healthCheckInterval:
                                 process.env.HEALTH_CHECK_INTERVAL || CONFIG.HEALTH_CHECK_INTERVAL || 30000,
-                            browserEndpoint: {
-                                url: resolveChromeEndpoint(),
-                                wsEndpoint: process.env.CHROME_WS_ENDPOINT || CONFIG.WS_ENDPOINT
-                            }
+                            browserEndpoint: getBrowserEndpoint()
                         });
 
                         log('INFO', '[RESILIENCE] ✅ Browser Pool reconectado com sucesso após iniciar Chrome!');
@@ -352,10 +369,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                         allocationStrategy:
                             process.env.ALLOCATION_STRATEGY || CONFIG.ALLOCATION_STRATEGY || 'round-robin',
                         healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || CONFIG.HEALTH_CHECK_INTERVAL || 30000,
-                        browserEndpoint: {
-                            url: resolveChromeEndpoint(),
-                            wsEndpoint: process.env.CHROME_WS_ENDPOINT || CONFIG.WS_ENDPOINT
-                        }
+                        browserEndpoint: getBrowserEndpoint()
                     });
 
                     log('INFO', '[RESILIENCE] ✅ Browser Pool conectado com sucesso após correção manual!');
@@ -402,13 +416,22 @@ async function handleBrowserPoolFailure(error, options = {}) {
  *
  * @param {Object} config - Configuração do Browser Pool
  * @param {Object} [options] - Opções de resiliência
+ * @param {Object} [options.nerv] - NERV bus para Circuit Breaker (opcional)
  * @returns {Promise<Object>} - Resultado da inicialização
  */
 async function initializeBrowserPoolResilient(config, options = {}) {
+    const { nerv = null, ...resilienceOptions } = options;
     const BrowserPoolManager = require('../infra/browser_pool/pool_manager');
 
     try {
         const browserPool = new BrowserPoolManager(config);
+
+        // ✅ Injeta NERV no Circuit Breaker
+        if (nerv && browserPool.circuitBreaker) {
+            browserPool.circuitBreaker.nerv = nerv;
+            log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
+        }
+
         await browserPool.initialize();
 
         const poolHealth = await browserPool.getHealth();
@@ -426,7 +449,7 @@ async function initializeBrowserPoolResilient(config, options = {}) {
         log('WARN', `[RESILIENCE] Browser Pool falhou na inicialização: ${error.message}`);
 
         // Delega para handler de falha
-        return handleBrowserPoolFailure(error, options);
+        return handleBrowserPoolFailure(error, resilienceOptions);
     }
 }
 
@@ -436,5 +459,6 @@ module.exports = {
     getChromeInstructions,
     handleBrowserPoolFailure,
     initializeBrowserPoolResilient,
-    resolveChromeEndpoint
+    resolveChromeEndpoint,
+    getBrowserEndpoint
 };

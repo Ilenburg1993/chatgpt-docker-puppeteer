@@ -1,4 +1,4 @@
-﻿<#
+﻿﻿<#
 .SYNOPSIS
   Inicia o Google Chrome no Windows com `--remote-debugging-port` de forma robusta.
   Versão: 2.0 (2026-02-01) - Otimizado para integração com Chrome Proxy Service

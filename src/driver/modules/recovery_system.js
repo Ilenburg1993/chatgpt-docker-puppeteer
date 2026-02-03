@@ -1,148 +1,553 @@
 /* ==========================================================================
-   src/driver/modules/recovery_system.js
-   Audit Level: 500 — Instrumented Recovery Protocol (IPC 2.0)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Aplicar manobras de recuperação escalonada (Tiers) e
-                     reportar a saúde da infraestrutura para o Mission Control.
+   src/driver/modules/recovery_system.js v2.0
+   Audit Level: 500 — Instrumented Recovery Protocol (Deterministic State Repair)
+   Status: v2.0 - EventEmitter + Metrics + Timeout Protection + Retry Logic
+   Responsabilidade: Aplicar manobras de recuperação escalonadas (4 tiers).
+                     Reportar saúde de infra para o Mission Control.
    Sincronizado com: BaseDriver V320, system.js V45, stabilizer.js V43.
+
+   v2.0 Changes:
+   - EventEmitter class (7 lifecycle events)
+   - RECOVERY_CONFIG (zero magic numbers)
+   - Timeout protection em todas operações (reload, focus, kill)
+   - Retry logic em tier 2 (reload)
+   - Metrics tracking (9 counters + timing)
+   - Validação robusta de driver
+   - Complete JSDoc
+   - getStats() method
+
+   Protocol 11: Zero-Bug Tolerance
+   - Recovery via tentativas escalonadas (4 tiers)
+   - Tier 0: Cache invalidation + tactical delay
+   - Tier 1: Focus recovery (removed bringToFront → prevents Chrome window popup)
+   - Tier 2: Hard page reload + stabilizer (with retry)
+   - Tier 3: Nuclear (surgical process kill with timeout)
 ========================================================================== */
 
+const EventEmitter = require('events');
 const system = require('@infra/system');
-const stabilizer = require('./stabilizer');
+const stabilizer = require('@shared/page_stability/stabilizer');
 const { log } = require('@core/logger');
 
-class RecoverySystem {
+/* ==========================================================================
+   RECOVERY_CONFIG v2.0 - Zero Magic Numbers
+========================================================================== */
+const RECOVERY_CONFIG = {
+    /** Timeout para process kill (ms) - Default: 5s */
+    KILL_TIMEOUT_MS: parseInt(process.env.RECOVERY_KILL_TIMEOUT || '5000'),
+
+    /** Timeout para page reload (ms) - Default: 30s */
+    RELOAD_TIMEOUT_MS: parseInt(process.env.RECOVERY_RELOAD_TIMEOUT || '30000'),
+
+    /** Delay base para tier 0 backoff (ms) - Default: 1200ms */
+    TIER0_BACKOFF_BASE_MS: parseInt(process.env.RECOVERY_TIER0_BACKOFF || '1200'),
+
+    /** Delay incremental para tier 0 backoff (ms) - Default: 800ms */
+    TIER0_BACKOFF_INCREMENT_MS: parseInt(process.env.RECOVERY_TIER0_INCREMENT || '800'),
+
+    /** Timeout para focus recovery (ms) - Default: 2s */
+    FOCUS_TIMEOUT_MS: parseInt(process.env.RECOVERY_FOCUS_TIMEOUT || '2000'),
+
+    /** Máximo de retries por tier - Default: 2 */
+    MAX_TIER_RETRIES: parseInt(process.env.RECOVERY_MAX_RETRIES || '2')
+};
+
+/* ==========================================================================
+   RECOVERY_EVENTS v2.0 - Telemetria de Recovery
+========================================================================== */
+const RECOVERY_EVENTS = {
+    TIER_STARTED: 'recovery:tier_started',         // Tier iniciado
+    TIER_COMPLETED: 'recovery:tier_completed',     // Tier concluído com sucesso
+    TIER_FAILED: 'recovery:tier_failed',           // Tier falhou
+    CACHE_CLEARED: 'recovery:cache_cleared',       // Cache invalidado (tier 0)
+    FOCUS_RESTORED: 'recovery:focus_restored',     // Focus restaurado (tier 1)
+    PAGE_RELOADED: 'recovery:page_reloaded',       // Page recarregada (tier 2)
+    PROCESS_KILLED: 'recovery:process_killed'      // Processo morto (tier 3)
+};
+
+/* ==========================================================================
+   RecoverySystem v2.0 - EventEmitter Class
+========================================================================== */
+
+/**
+ * RecoverySystem v2.0 - Sistema de recuperação escalonada (4 tiers)
+ *
+ * Responsabilidades:
+ * - Executar recovery tiers baseado em attempt count (0-3)
+ * - Tier 0: Cache invalidation + tactical delay
+ * - Tier 1: Focus recovery (mouse click + window.focus)
+ * - Tier 2: Hard page reload + stabilizer wait (with retry)
+ * - Tier 3: Nuclear process kill (with timeout)
+ * - Telemetria completa via EventEmitter + IPC (_emitVital)
+ * - Metrics tracking (tier usage, success/failure, timing)
+ *
+ * @class RecoverySystem
+ * @extends EventEmitter
+ */
+class RecoverySystem extends EventEmitter {
     /**
-     * @param {object} driver - Instância do BaseDriver (acesso ao _emitVital).
+     * Cria RecoverySystem instance v2.0
+     *
+     * @constructor
+     * @param {Object} driver - Driver Puppeteer (BaseDriver instance)
+     * @throws {Error} Se driver inválido ou missing methods
+     *
+     * @example
+     * const recovery = new RecoverySystem(driver);
+     * recovery.on(RECOVERY_EVENTS.TIER_STARTED, (data) => { ... });
      */
     constructor(driver) {
+        super();
+
+        // ✅ BUG #3 FIX: Validação completa de driver
+        if (!driver) {
+            throw new Error('[RecoverySystem] Driver is required');
+        }
+
+        if (typeof driver._emitVital !== 'function') {
+            throw new Error('[RecoverySystem] Driver must have _emitVital method');
+        }
+
+        if (!driver.inputResolver) {
+            throw new Error('[RecoverySystem] Driver must have inputResolver');
+        }
+
+        if (!driver.page) {
+            throw new Error('[RecoverySystem] Driver must have page instance');
+        }
+
         this.driver = driver;
+
+        // ✅ BUG #5 FIX: Metrics persistentes
+        this.stats = {
+            tier0Applied: 0,
+            tier1Applied: 0,
+            tier2Applied: 0,
+            tier3Applied: 0,
+            totalRecoveries: 0,
+            successfulRecoveries: 0,
+            failedRecoveries: 0,
+            totalRecoveryDuration: 0,
+            maxRecoveryDuration: 0
+        };
+
+        // ✅ Configurar max listeners (memory leak detection)
+        this.setMaxListeners(20);
+
+        log('DEBUG', '[RecoverySystem] v2.0 initialized (EventEmitter + metrics)');
     }
 
+    /* ==========================================================================
+       TIER EXECUTION
+    ========================================================================== */
+
     /**
-     * Aplica um nível de recuperação baseado no número de tentativas falhas.
-     * Narra a manobra para o barramento IPC 2.0.
+     * Aplica tier de recuperação baseado em attempt count.
      *
-     * @param {Error} recoveryErr - O erro original capturado.
-     * @param {number} attempt - O índice da tentativa atual (0-3).
-     * @param {string} taskId - ID da tarefa ativa.
+     * v2.0 Features:
+     * - EventEmitter telemetry (tier_started, tier_completed, tier_failed)
+     * - IPC telemetry via _emitVital (TRIAGE_ALERT, PROGRESS_UPDATE)
+     * - Metrics tracking (tier usage, success/failure, timing)
+     * - Retry logic em tier 2 (reload)
+     * - Timeout protection em todas operações
+     *
+     * @async
+     * @param {Error} recoveryErr - Erro original que triggered recovery
+     * @param {number} attempt - Índice tier (0-3)
+     * @param {string} taskId - ID da tarefa
+     * @returns {Promise<void>}
+     * @throws {Error} Se tier 3 falhar (fatal - escalates to ExecutionEngine)
+     *
+     * @emits RECOVERY_EVENTS.TIER_STARTED - Quando tier inicia
+     * @emits RECOVERY_EVENTS.TIER_COMPLETED - Quando tier completa com sucesso
+     * @emits RECOVERY_EVENTS.TIER_FAILED - Quando tier falha
+     * @emits RECOVERY_EVENTS.CACHE_CLEARED - Quando cache é limpo (tier 0)
+     * @emits RECOVERY_EVENTS.FOCUS_RESTORED - Quando focus restaurado (tier 1)
+     * @emits RECOVERY_EVENTS.PAGE_RELOADED - Quando page recarregada (tier 2)
+     * @emits RECOVERY_EVENTS.PROCESS_KILLED - Quando processo morto (tier 3)
      */
-     
     async applyTier(recoveryErr, attempt, taskId) {
+        const startTime = Date.now();
         const msg = String(recoveryErr?.message || '').toUpperCase();
         const correlationId = this.driver.correlationId;
 
+        // ✅ Metrics
+        this.stats.totalRecoveries++;
+
         log('WARN', `[RECOVERY] Acionando Tier ${attempt} | Causa: ${recoveryErr.message}`, correlationId);
 
-        // [V500] Notifica o Supervisor sobre o início da manobra de recuperação
+        // ✅ EventEmitter telemetry (local)
+        this.emit(RECOVERY_EVENTS.TIER_STARTED, {
+            tier: attempt,
+            cause: recoveryErr.message,
+            taskId,
+            timestamp: Date.now()
+        });
+
+        // ✅ IPC telemetry (Mission Control)
         this.driver._emitVital('TRIAGE_ALERT', {
             type: 'RECOVERY_MANEUVER_START',
             severity: attempt > 1 ? 'HIGH' : 'MEDIUM',
-            evidence: {
-                tier: attempt,
-                cause: recoveryErr.message,
-                taskId
-            }
+            evidence: { tier: attempt, cause: recoveryErr.message, taskId }
         });
 
-        switch (attempt) {
-            case 0:
-                // Tier 0: Invalidação de Percepção + Delay Tático
-                this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_TIER_0_CACHE_INVALIDATION' });
-                this.driver.inputResolver.clearCache();
+        try {
+            switch (attempt) {
+                case 0:
+                    await this._executeTier0(correlationId);
+                    break;
 
-                // Backoff progressivo baseado no número da tentativa
-                await new Promise(r => {
-                    setTimeout(r, 1200 + attempt * 800);
+                case 1:
+                    await this._executeTier1(correlationId);
+                    break;
+
+                case 2:
+                    await this._executeTier2(correlationId);
+                    break;
+
+                default:
+                    // Tier 3: Nuclear (Process Kill)
+                    if (msg.includes('TIMEOUT') || msg.includes('CLOSED') || msg.includes('DETACHED') || attempt >= 3) {
+                        await this._executeTier3(correlationId, taskId, recoveryErr);
+                    }
+            }
+
+            // ✅ Success metrics
+            this.stats.successfulRecoveries++;
+            this.stats[`tier${attempt}Applied`]++;
+
+            // ✅ Timing
+            const duration = Date.now() - startTime;
+            this.stats.totalRecoveryDuration += duration;
+            this.stats.maxRecoveryDuration = Math.max(this.stats.maxRecoveryDuration, duration);
+
+            // ✅ EventEmitter telemetry
+            this.emit(RECOVERY_EVENTS.TIER_COMPLETED, {
+                tier: attempt,
+                duration,
+                taskId,
+                timestamp: Date.now()
+            });
+
+            // ✅ IPC telemetry
+            this.driver._emitVital('PROGRESS_UPDATE', {
+                step: 'RECOVERY_MANEUVER_COMPLETE',
+                tier: attempt,
+                duration
+            });
+
+            log('DEBUG', `[RECOVERY] Tier ${attempt} completed in ${duration}ms`, correlationId);
+        } catch (tierError) {
+            // ✅ Failure metrics
+            this.stats.failedRecoveries++;
+
+            // ✅ EventEmitter telemetry
+            this.emit(RECOVERY_EVENTS.TIER_FAILED, {
+                tier: attempt,
+                error: tierError.message,
+                taskId,
+                timestamp: Date.now()
+            });
+
+            log('ERROR', `[RECOVERY] Tier ${attempt} failed: ${tierError.message}`, correlationId);
+            throw tierError;
+        }
+    }
+
+    /**
+     * Executa Tier 0: Cache Invalidation + Tactical Delay
+     *
+     * @private
+     * @param {string} correlationId - Correlation ID
+     * @returns {Promise<void>}
+     */
+    async _executeTier0(correlationId) {
+        this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_TIER_0_CACHE_INVALIDATION' });
+
+        // Cache invalidation
+        this.driver.inputResolver.clearCache();
+
+        // ✅ EventEmitter telemetry
+        this.emit(RECOVERY_EVENTS.CACHE_CLEARED, {
+            timestamp: Date.now()
+        });
+
+        // Tactical delay (backoff: 1200ms + attempt*800ms)
+        const baseDelay = RECOVERY_CONFIG.TIER0_BACKOFF_BASE_MS;
+        const increment = RECOVERY_CONFIG.TIER0_BACKOFF_INCREMENT_MS;
+        const delay = baseDelay + this.stats.tier0Applied * increment;
+
+        log('DEBUG', `[RECOVERY] Tier 0: Cache cleared, waiting ${delay}ms`, correlationId);
+        await new Promise(r => setTimeout(r, delay));
+
+        // Page alive check
+        this.driver._assertPageAlive();
+    }
+
+    /**
+     * Executa Tier 1: Focus Recovery (no bringToFront)
+     *
+     * v2.0 Features:
+     * - Timeout protection em mouse.click e window.focus (P3 fix)
+     * - Browser connection validation
+     * - EventEmitter telemetry
+     *
+     * @private
+     * @param {string} correlationId - Correlation ID
+     * @returns {Promise<void>}
+     */
+    async _executeTier1(correlationId) {
+        this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_TIER_1_FOCUS_RESTORE' });
+
+        try {
+            // Validate browser connected
+            if (this.driver.page && !this.driver.page.isClosed()) {
+                const browser = this.driver.page.browser();
+                if (!browser || !browser.isConnected()) {
+                    log('WARN', `[RECOVERY] Browser desconectado - pulando recovery de foco`, correlationId);
+                    return;
+                }
+
+                // ✅ BUG #7 FIX: Timeout protection em focus operations
+                const focusTimeout = RECOVERY_CONFIG.FOCUS_TIMEOUT_MS;
+
+                // Mouse click at (1,1)
+                await Promise.race([
+                    this.driver.page.mouse.click(1, 1),
+                    this._timeout(focusTimeout, 'mouse_click')
+                ]);
+
+                // Window focus
+                await Promise.race([
+                    this.driver.page.evaluate(() => window.focus()),
+                    this._timeout(focusTimeout, 'window_focus')
+                ]);
+
+                log('DEBUG', '[RECOVERY] Tier 1: Focus restored successfully', correlationId);
+
+                // ✅ EventEmitter telemetry
+                this.emit(RECOVERY_EVENTS.FOCUS_RESTORED, {
+                    timestamp: Date.now()
                 });
-                this.driver._assertPageAlive();
-                break;
+            } else {
+                log('WARN', `[RECOVERY] Página não disponível - pulando recovery de foco`, correlationId);
+            }
+        } catch (focusErr) {
+            log('DEBUG', `[RECOVERY] Tier 1: Focus recovery failed: ${focusErr.message}`, correlationId);
 
-            case 1:
-                // Tier 1: Recuperação de Foco e Visibilidade (Focus Recovery)
-                this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_TIER_1_FOCUS_RESTORE' });
-                try {
-                    if (this.driver.page && !this.driver.page.isClosed()) {
-                        await this.driver.page.bringToFront();
-                        // Clique biomecânico "cego" no topo para forçar o foco da janela
-                        await this.driver.page.mouse.click(1, 1).catch(() => {});
-                        await this.driver.page
-                            .evaluate(() => {
-                                window.focus();
-                            })
-                            .catch(() => {});
-                    }
-                } catch (focusErr) {
-                    log('DEBUG', `[RECOVERY] Falha ao forçar foco: ${focusErr.message}`, correlationId);
-                }
-                this.driver.inputResolver.clearCache();
-                break;
-
-            case 2:
-                // Tier 2: Recarregamento de Página (Hard Reload)
-                this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_TIER_2_PAGE_RELOAD' });
-                try {
-                    if (this.driver.page && !this.driver.page.isClosed()) {
-                        log('WARN', `[RECOVERY] Forçando reload da aba ativa...`, correlationId);
-                        await this.driver.page.reload({
-                            waitUntil: 'domcontentloaded',
-                            timeout: 30000
-                        });
-                        // Bloqueia execução até que a interface pare de sofrer mutações (Entropia Zero)
-                        await stabilizer.waitForStability(this.driver.page);
-                    }
-                } catch (navErr) {
-                    log('ERROR', `[RECOVERY] Falha crítica no reload: ${navErr.message}`, correlationId);
-                }
-                break;
-
-            default:
-                // Tier 3: Manobra Nuclear (Surgical Process Kill)
-                // Aplicada em casos de congelamento de browser ou desconexão fatal.
-                if (msg.includes('TIMEOUT') || msg.includes('CLOSED') || msg.includes('DETACHED') || attempt >= 3) {
-                    this.driver._emitVital('TRIAGE_ALERT', {
-                        type: 'TERMINAL_INFRA_FAILURE',
-                        severity: 'CRITICAL',
-                        evidence: { action: 'PROCESS_KILL_TRIGGERED', taskId }
-                    });
-
-                    log('FATAL', `[RECOVERY] Tier 3 (Nuclear) atingido. Matando processo do navegador.`, correlationId);
-
-                    const browser = this.driver.page.browser();
-                    const pid = browser?.process?.()?.pid;
-                    if (pid) {
-                        // [P3 FIX] Timeout de 5s para evitar travamento em processos zombie
-                        // Se treeKill não retornar em 5s, continua o fluxo (OS eventualmente limpa)
-                        const KILL_TIMEOUT_MS = 5000;
-
-                        try {
-                            await Promise.race([
-                                system.killProcess(pid),
-                                new Promise((_, reject) => {
-                                    setTimeout(() => reject(new Error('KILL_TIMEOUT')), KILL_TIMEOUT_MS);
-                                })
-                            ]);
-                        } catch (killErr) {
-                            if (killErr.message === 'KILL_TIMEOUT') {
-                                log(
-                                    'WARN',
-                                    `[RECOVERY] Kill timeout após ${KILL_TIMEOUT_MS}ms, processo pode estar zombie`,
-                                    correlationId
-                                );
-                            } else {
-                                log('ERROR', `[RECOVERY] Falha no kill: ${killErr.message}`, correlationId);
-                            }
-                            // Continua o fluxo mesmo com falha (SO limpa eventualmente)
-                        }
-                    }
-
-                    // Lança o erro para que o ExecutionEngine aplique a política de escalada de infra
-                    throw recoveryErr;
-                }
+            // ✅ EventEmitter telemetry
+            this.emit(RECOVERY_EVENTS.TIER_FAILED, {
+                tier: 1,
+                error: focusErr.message,
+                isTimeout: focusErr.name === 'TimeoutError'
+            });
         }
 
-        this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_MANEUVER_COMPLETE', tier: attempt });
+        // Cache invalidation
+        this.driver.inputResolver.clearCache();
+    }
+
+    /**
+     * Executa Tier 2: Hard Page Reload + Stabilizer Wait
+     *
+     * v2.0 Features:
+     * - Timeout protection em reload (P2 fix)
+     * - Retry logic (MAX_TIER_RETRIES - P3 fix)
+     * - EventEmitter telemetry
+     *
+     * @private
+     * @param {string} correlationId - Correlation ID
+     * @returns {Promise<void>}
+     */
+    async _executeTier2(correlationId) {
+        this.driver._emitVital('PROGRESS_UPDATE', { step: 'RECOVERY_TIER_2_PAGE_RELOAD' });
+
+        if (!this.driver.page || this.driver.page.isClosed()) {
+            log('WARN', `[RECOVERY] Tier 2: Página não disponível`, correlationId);
+            return;
+        }
+
+        // ✅ BUG #4 FIX: Timeout protection + BUG #8 FIX: Retry logic
+        const reloadTimeout = RECOVERY_CONFIG.RELOAD_TIMEOUT_MS;
+        const maxRetries = RECOVERY_CONFIG.MAX_TIER_RETRIES;
+
+        for (let retry = 0; retry < maxRetries; retry++) {
+            try {
+                log(
+                    'WARN',
+                    `[RECOVERY] Tier 2: Forçando reload da aba ativa (attempt ${retry + 1}/${maxRetries})...`,
+                    correlationId
+                );
+
+                // ✅ Timeout wrapper
+                await Promise.race([
+                    this.driver.page.reload({
+                        waitUntil: 'domcontentloaded',
+                        timeout: reloadTimeout
+                    }),
+                    this._timeout(reloadTimeout, 'page_reload')
+                ]);
+
+                // Stabilizer wait
+                await stabilizer.waitForStability(this.driver.page);
+
+                log('DEBUG', `[RECOVERY] Tier 2: Page reloaded successfully`, correlationId);
+
+                // ✅ EventEmitter telemetry
+                this.emit(RECOVERY_EVENTS.PAGE_RELOADED, {
+                    attempt: retry + 1,
+                    timestamp: Date.now()
+                });
+
+                // ✅ Success - sair do loop
+                return;
+            } catch (reloadErr) {
+                if (retry < maxRetries - 1) {
+                    log(
+                        'WARN',
+                        `[RECOVERY] Tier 2: Reload failed (retry ${retry + 1}/${maxRetries}): ${reloadErr.message}`,
+                        correlationId
+                    );
+                    await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+                } else {
+                    log(
+                        'ERROR',
+                        `[RECOVERY] Tier 2: Falha crítica no reload após ${maxRetries} tentativas: ${reloadErr.message}`,
+                        correlationId
+                    );
+                    throw reloadErr; // Max retries
+                }
+            }
+        }
+    }
+
+    /**
+     * Executa Tier 3: Nuclear Process Kill
+     *
+     * v2.0 Features:
+     * - Timeout protection em killProcess (já presente em v1.x)
+     * - EventEmitter telemetry
+     * - Escalation to ExecutionEngine
+     *
+     * @private
+     * @param {string} correlationId - Correlation ID
+     * @param {string} taskId - Task ID
+     * @param {Error} recoveryErr - Erro original
+     * @returns {Promise<void>}
+     * @throws {Error} Always (escalates to ExecutionEngine)
+     */
+    async _executeTier3(correlationId, taskId, recoveryErr) {
+        // IPC telemetry (terminal failure)
+        this.driver._emitVital('TRIAGE_ALERT', {
+            type: 'TERMINAL_INFRA_FAILURE',
+            severity: 'CRITICAL',
+            evidence: { action: 'PROCESS_KILL_TRIGGERED', taskId }
+        });
+
+        log('FATAL', `[RECOVERY] Tier 3 (Nuclear) atingido. Matando processo do navegador.`, correlationId);
+
+        const browser = this.driver.page.browser();
+        const pid = browser?.process?.()?.pid;
+
+        if (pid) {
+            const killTimeout = RECOVERY_CONFIG.KILL_TIMEOUT_MS;
+
+            try {
+                await Promise.race([system.killProcess(pid), this._timeout(killTimeout, 'process_kill')]);
+
+                // ✅ EventEmitter telemetry
+                this.emit(RECOVERY_EVENTS.PROCESS_KILLED, {
+                    pid,
+                    timestamp: Date.now()
+                });
+
+                log('DEBUG', `[RECOVERY] Tier 3: Process ${pid} killed successfully`, correlationId);
+            } catch (killErr) {
+                if (killErr.message.includes('timeout')) {
+                    log(
+                        'WARN',
+                        `[RECOVERY] Tier 3: Kill timeout após ${killTimeout}ms, processo pode estar zombie`,
+                        correlationId
+                    );
+                } else {
+                    log('ERROR', `[RECOVERY] Tier 3: Falha no kill: ${killErr.message}`, correlationId);
+                }
+            }
+        } else {
+            log('WARN', `[RECOVERY] Tier 3: Browser PID não disponível`, correlationId);
+        }
+
+        // ✅ Escalate to ExecutionEngine
+        throw recoveryErr;
+    }
+
+    /* ==========================================================================
+       HELPERS
+    ========================================================================== */
+
+    /**
+     * Helper: Timeout promise wrapper
+     *
+     * @private
+     * @param {number} ms - Timeout em milissegundos
+     * @param {string} operation - Nome da operação (para logs)
+     * @returns {Promise<never>} Promise que rejeita após timeout
+     */
+    _timeout(ms, operation) {
+        return new Promise((_, reject) => {
+            setTimeout(() => {
+                const error = new Error(`Timeout in ${operation} after ${ms}ms`);
+                error.name = 'TimeoutError';
+                reject(error);
+            }, ms);
+        });
+    }
+
+    /* ==========================================================================
+       INTROSPECTION
+    ========================================================================== */
+
+    /**
+     * Obtém estatísticas de recovery.
+     *
+     * v2.0 Feature (BUG #5 fix)
+     *
+     * @returns {Object} Stats completas
+     * @returns {number} stats.tier0Applied - Tier 0 aplicados
+     * @returns {number} stats.tier1Applied - Tier 1 aplicados
+     * @returns {number} stats.tier2Applied - Tier 2 aplicados
+     * @returns {number} stats.tier3Applied - Tier 3 aplicados
+     * @returns {number} stats.totalRecoveries - Total recoveries
+     * @returns {number} stats.successfulRecoveries - Recoveries com sucesso
+     * @returns {number} stats.failedRecoveries - Recoveries falhados
+     * @returns {number} stats.totalRecoveryDuration - Tempo total (ms)
+     * @returns {number} stats.maxRecoveryDuration - Tempo máximo (ms)
+     * @returns {Object} stats.config - Configuração atual (RECOVERY_CONFIG)
+     *
+     * @example
+     * const stats = recovery.getStats();
+     * console.log(`Tier 0 applied: ${stats.tier0Applied} times`);
+     */
+    getStats() {
+        return {
+            ...this.stats,
+            config: { ...RECOVERY_CONFIG }
+        };
     }
 }
 
-module.exports = RecoverySystem;
+/* ==========================================================================
+   MODULE EXPORTS v2.0
+========================================================================== */
+
+module.exports = {
+    // ✅ Class export
+    RecoverySystem,
+
+    // ✅ Constantes exportadas
+    RECOVERY_CONFIG,
+    RECOVERY_EVENTS,
+
+    // ✅ Factory function (convenience)
+    create: driver => new RecoverySystem(driver)
+};
