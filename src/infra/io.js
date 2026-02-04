@@ -19,6 +19,7 @@ const controlStore = require('./fs/control_store');
 const taskStore = require('./storage/task_store');
 const responseStore = require('./storage/response_store');
 const dnaStore = require('./storage/dna_store');
+const dnaEvolution = require('./storage/dna_evolution');
 const lockManager = require('./locks/lock_manager');
 const queueCache = require('./queue/cache');
 const taskLoader = require('./queue/task_loader');
@@ -82,8 +83,19 @@ module.exports = {
     /**
      * Salva uma tarefa e invalida o cache em RAM da fila imediatamente.
      * [P5.2 FIX] Invalida ANTES do write para garantir consistency mesmo em crash.
+     * [V2.0] DoS Prevention: Queue depth limit.
      */
     async saveTask(task) {
+        // ✅ DoS Prevention: Queue depth limit
+        const MAX_QUEUE_DEPTH = 10000; // TODO: mover para config.json
+        const currentQueue = await this.getQueue();
+
+        if (currentQueue.length >= MAX_QUEUE_DEPTH) {
+            throw new Error(
+                `Queue depth limit reached (${MAX_QUEUE_DEPTH}). Clear queue or increase limit in config.json`
+            );
+        }
+
         queueCache.markDirty(); // Invalida primeiro (defensivo)
         const result = await taskStore.saveTask(task);
         return result;
@@ -159,6 +171,49 @@ module.exports = {
     invalidateDnaCache: dnaStore.invalidateCache,
 
     /**
+     * [V2.0] Restaura DNA de uma versão anterior do histórico.
+     *
+     * @param {number} versionIndex - Índice no histórico (0 = mais recente)
+     * @returns {Promise<object>} - DNA restaurado
+     * @throws {Error} - Se versão não existir
+     */
+    rollbackDna: dnaStore.rollbackDna,
+
+    /**
+     * [V2.0] Retorna histórico de versões do DNA (últimas 10).
+     *
+     * @returns {Array<object>} - [{version, timestamp, evolution_count, updated_by}]
+     */
+    getDnaHistory: dnaStore.getDnaHistory,
+
+    /**
+     * [V2.0] Evolui DNA automaticamente com protocolo SADI.
+     *
+     * @param {object} protocol - Protocolo SADI (selector, confidence)
+     * @param {string} domain - Domínio (ex: 'chatgpt.com')
+     * @param {string} intent - Intenção (ex: 'input_box')
+     * @returns {Promise<boolean>} - true se evoluiu
+     */
+    evolveWithSadiProtocol: dnaEvolution.evolveWithSadiProtocol,
+
+    /**
+     * [V2.0] Evolui DNA com protocolo SADI completo (estruturado).
+     *
+     * @param {object} fullProtocol - Protocolo completo (selector, context, isShadow, etc)
+     * @param {string} domain - Domínio
+     * @param {string} intent - Intenção
+     * @returns {Promise<boolean>} - true se evoluiu
+     */
+    evolveWithFullProtocol: dnaEvolution.evolveWithFullProtocol,
+
+    /**
+     * [V2.0] Retorna estatísticas de evolução do DNA.
+     *
+     * @returns {object} - {domain: evolutionCount}
+     */
+    getEvolutionStats: dnaEvolution.getEvolutionStats,
+
+    /**
      * Recupera a Identidade Soberana do robô de forma assíncrona.
      */
     getIdentity: async () => fsCore.safeReadJSON(PATHS.IDENTITY),
@@ -191,5 +246,5 @@ module.exports = {
     /* ==========================================================================
        7. CONTROLE OPERACIONAL (SINAIS GLOBAIS)
     ========================================================================== */
-    checkControlPause: controlStore.checkControlPause
+    checkControlPause: controlStore.checkControlPause,
 };

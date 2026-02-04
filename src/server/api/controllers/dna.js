@@ -143,4 +143,165 @@ router.put('/dna', denyIfDelegated, async (req, res) => {
     }
 });
 
+/* --------------------------------------------------------------------------
+   3. DNA V2.0 ADVANCED FEATURES
+   Endpoints: /api/config/dna/history, /dna/rollback, /dna/stats, /dna/evolve
+-------------------------------------------------------------------------- */
+
+/**
+ * GET /dna/history
+ * Retorna histórico de backups do DNA (últimas 10 versões).
+ *
+ * @returns {Array} history - Array de backups com timestamp, version, author
+ */
+router.get('/dna/history', async (req, res) => {
+    try {
+        const history = io.getDnaHistory();
+
+        res.json({
+            success: true,
+            history,
+            total: history.length,
+            max_capacity: 10,
+            request_id: req.id
+        });
+    } catch (e) {
+        log('ERROR', `[API_DNA] Falha ao recuperar histórico: ${e.message}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao acessar histórico de backups.',
+            request_id: req.id
+        });
+    }
+});
+
+/**
+ * POST /dna/rollback
+ * Restaura DNA para uma versão anterior do backup.
+ *
+ * @body {number} versionIndex - Index do backup (0 = mais recente)
+ */
+router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
+    try {
+        const { versionIndex } = req.body;
+
+        if (typeof versionIndex !== 'number' || versionIndex < 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'versionIndex deve ser um número >= 0',
+                request_id: req.id
+            });
+        }
+
+        await audit('DNA_ROLLBACK', {
+            user: 'GUI',
+            request_id: req.id,
+            version_index: versionIndex
+        });
+
+        await io.rollbackDna(versionIndex);
+
+        const dna = await io.getDna();
+
+        res.json({
+            success: true,
+            message: `DNA restaurado para versão index ${versionIndex}`,
+            current_version: dna.version,
+            request_id: req.id
+        });
+    } catch (e) {
+        log('ERROR', `[API_DNA] Falha no rollback: ${e.message}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: `Rollback falhou: ${e.message}`,
+            request_id: req.id
+        });
+    }
+});
+
+/**
+ * GET /dna/stats
+ * Retorna estatísticas de evolução do DNA (session counters).
+ *
+ * @returns {Object} stats - Evolution counters per domain
+ */
+router.get('/dna/stats', async (req, res) => {
+    try {
+        const stats = io.getEvolutionStats();
+        const dna = await io.getDna();
+
+        res.json({
+            success: true,
+            stats: {
+                session: stats, // Evolutions this session
+                total: dna.evolution_count, // Total evolutions
+                version: dna.version,
+                domains: Object.keys(dna.targets || {}).length
+            },
+            request_id: req.id
+        });
+    } catch (e) {
+        log('ERROR', `[API_DNA] Falha ao recuperar stats: ${e.message}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao acessar estatísticas de evolução.',
+            request_id: req.id
+        });
+    }
+});
+
+/**
+ * POST /dna/evolve
+ * Trigger manual de evolução DNA via SADI protocol.
+ *
+ * @body {Object} protocol - SADI protocol (target, selector, confidence, shadowRoot)
+ * @body {string} domain - Domain (e.g., 'chatgpt.com')
+ * @body {string} intent - Intent (e.g., 'input_box')
+ */
+router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
+    try {
+        const { protocol, domain, intent } = req.body;
+
+        if (!protocol || !domain || !intent) {
+            return res.status(400).json({
+                success: false,
+                error: 'protocol, domain e intent são obrigatórios',
+                request_id: req.id
+            });
+        }
+
+        await audit('DNA_MANUAL_EVOLUTION', {
+            user: 'GUI',
+            request_id: req.id,
+            domain,
+            intent,
+            confidence: protocol.confidence
+        });
+
+        const result = await io.evolveWithSadiProtocol(protocol, domain, intent);
+
+        if (result.accepted) {
+            res.json({
+                success: true,
+                message: 'DNA evoluído com sucesso',
+                stats: result.stats,
+                request_id: req.id
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                error: `Evolução rejeitada: ${result.reason}`,
+                request_id: req.id
+            });
+        }
+    } catch (e) {
+        log('ERROR', `[API_DNA] Falha na evolução manual: ${e.message}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: `Evolução falhou: ${e.message}`,
+            request_id: req.id
+        });
+    }
+});
+
 module.exports = router;
