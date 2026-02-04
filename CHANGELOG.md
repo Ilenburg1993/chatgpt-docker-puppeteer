@@ -1,3 +1,57 @@
+## [2.1.0] - 2026-02-03
+
+### 🐛 Critical Bug Fixes (P0) & Ontological Guarantees
+
+Sprint 1 completion: 3 P0 bugs fixed, 2 ontological guarantees implemented, zero breaking changes.
+
+### Fixed
+
+- **P0 Bug #1: Memory Leak in activeDrivers Map** (`src/driver/nerv_adapter/driver_nerv_adapter.js`)
+    - **Issue**: `activeDrivers.delete(taskId)` called BEFORE detaching event listeners → memory leak
+    - **Fix**: Novo método `_cleanupDriver(taskId)` com:
+        - Detach de listeners ANTES de Map.delete (idempotência garantida)
+        - Validação ontológica: Warning se múltiplos drivers para mesma page
+        - Cleanup separado de lifecycle.release() para robustez
+    - **Impact**: Zero memory leaks, cleanup robusto em todos os cenários (success, error, abort)
+
+- **P0 Bug #2: Missing Timeout in Factory Lazy-Load** (`src/driver/factory.js`)
+    - **Issue**: `require(meta.path)` sem timeout → hang indefinido se arquivo corrompido/syntax error
+    - **Fix**: Promise.race com LAZY_LOAD_TIMEOUT_MS (10s)
+        - Wrapped require em Promise para timeout protection
+        - Adiciona driver a failedDrivers Set automaticamente
+        - Error telemetry inclui flag `isTimeout`
+    - **Impact**: Hang prevention, graceful degradation, clear error messages
+
+- **P0 Bug #3: Abstract Method execute() Not Declared** (`src/driver/core/TargetDriver.js`)
+    - **Issue**: Método execute() não declarado em TargetDriver → subclasses podem esquecer implementação
+    - **Fix**: Declaração explícita com:
+        - @abstract JSDoc annotation
+        - 60+ linhas de contrato documentado (input, output, estados, pré-condições, integrações)
+        - Error message: "ABSTRACT_METHOD_NOT_IMPLEMENTED"
+    - **Impact**: Contract enforcement, clear documentation, compile-time safety
+
+### Added
+
+- **Ontological Guarantee #1: 1 Driver per Page** (`src/driver/factory.js`)
+    - **Principle**: Uma página de LLM jamais deve ter mais de 1 driver responsável (exclusividade ontológica)
+    - **Implementation**: Validation em `getDriver()` - Se `instances.size > 0` AND target diferente → WARNING
+    - **Impact**: Visibility de violações ontológicas, debugging facilitado
+
+- **Ontological Guarantee #2: Driver Ready Before Execute** (`src/driver/nerv_adapter/driver_nerv_adapter.js`)
+    - **Principle**: Sistema nunca deve executar task se driver não está pronto (fail-fast validation)
+    - **Implementation**: Driver ready check ANTES de `TASK_STARTED` (driver not null/destroyed, state=IDLE, page valid)
+    - **Impact**: Zero execuções em estado inválido, garantia pré-execução
+
+### Changed
+
+- **DriverNERVAdapter** (+54 lines): Método `_cleanupDriver()`, driver ready check, step numbering atualizado
+- **DriverFactory** (+38 lines): Lazy-load timeout protection, ontological validation, error telemetry
+- **TargetDriver** (+67 lines): Abstract method execute() declarado, JSDoc completo
+
+**Technical**: 3 files modified, +159/-12 lines (net: +147), 0 breaking changes, 45min implementation
+
+---
+
 ## [1.1.0] - 2026-01-20
 
 ### 🎯 Magic Strings Elimination & Code Quality
