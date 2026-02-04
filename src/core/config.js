@@ -139,6 +139,13 @@
    • Design Pattern: Singleton Pattern (ConfigurationManager instance)
    • Design Pattern: Observer Pattern (EventEmitter)
 
+   ⚠️ DEPRECATION WARNINGS:
+   ------------------------
+
+   • PORT → SERVER_PORT: Variável PORT está deprecated.
+     Use SERVER_PORT para evitar conflitos com variáveis de ambiente.
+     Warning emitido automaticamente durante boot se PORT for detectado.
+
    ⚠️ POR QUE NÃO UNIFICAR COM CONFIG.JSON?
    ------------------------------------------
 
@@ -184,6 +191,18 @@ function validateEnvFile() {
 
 // Run validation on module load
 validateEnvFile();
+
+/* --------------------------------------------------------------------------
+   DEPRECATION WARNING: PORT → SERVER_PORT
+-------------------------------------------------------------------------- */
+if (process.env.PORT && !process.env.SERVER_PORT) {
+    console.warn('');
+    console.warn('\x1b[33m[DEPRECATED]\x1b[0m PORT environment variable is deprecated.');
+    console.warn('\x1b[33m[DEPRECATED]\x1b[0m Please use SERVER_PORT instead to avoid conflicts.');
+    console.warn('\x1b[33m[DEPRECATED]\x1b[0m PORT will be removed in v6.0');
+    console.warn('\x1b[33m[DEPRECATED]\x1b[0m Falling back to PORT value for now...');
+    console.warn('');
+}
 
 /**
  * 1. SCHEMA MESTRE (O Contrato Paramétrico)

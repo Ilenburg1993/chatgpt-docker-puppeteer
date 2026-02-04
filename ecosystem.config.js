@@ -75,12 +75,14 @@ module.exports = {
             kill_timeout: 8000,
             listen_timeout: 8000,
 
-            // Logs estruturados
+            // Logs estruturados com rotação automática
             merge_logs: false,
             time: true,
             log_date_format: 'YYYY-MM-DD HH:mm:ss',
             error_file: './logs/agente-error.log',
             out_file: './logs/agente-out.log',
+            log_rotate_interval: '1d',    // Rotacionar diariamente
+            log_rotate_max: 7,            // Manter últimos 7 dias
 
             // Ambiente
             env: {
@@ -137,12 +139,14 @@ module.exports = {
             kill_timeout: 8000,
             listen_timeout: 8000,
 
-            // Logs
+            // Logs com rotação automática
             merge_logs: false,
             time: true,
             log_date_format: 'YYYY-MM-DD HH:mm:ss',
             error_file: './logs/dashboard-error.log',
             out_file: './logs/dashboard-out.log',
+            log_rotate_interval: '1d',    // Rotacionar diariamente
+            log_rotate_max: 7,            // Manter últimos 7 dias
 
             // Ambiente
             env: {

@@ -43,6 +43,9 @@ jobs:
       - name: Forbidden patterns check
         run: npm run check:forbidden
 
+      - name: Validate ENV files
+        run: node scripts/validate-env.js --all
+
       - name: Validate module-alias configuration
         run: |
           echo "✓ Validating module-alias setup..."
