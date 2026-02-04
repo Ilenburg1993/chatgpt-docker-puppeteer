@@ -127,16 +127,15 @@
   "// ---------------------------------------------------------------------": "",
   "// [B] MODELO / LLM / CONTEXTO DE UI": "",
   "// ---------------------------------------------------------------------": "",
-  "// Modelo preferencial (dependente da UI, rollout e conta)": "",
+  "// Modelo preferencial (GPT-5.2 é o padrão, com fallback para GPT-5-mini)": "",
   "// O código deve tolerar divergência entre UI e ID nominal": "",
-  "DEFAULT_MODEL_ID": "gpt-5",
+  "DEFAULT_MODEL_ID": "gpt-5.2",
 
   "// Permite downgrade automático se o modelo não estiver disponível": "",
   "ALLOW_MODEL_FALLBACK": true,
   "MODEL_FALLBACK_PRIORITY": [
-    "gpt-5",
-    "gpt-4.1",
-    "gpt-4o"
+    "gpt-5.2",
+    "gpt-5-mini"
   ],
 
   "// ---------------------------------------------------------------------": "",

@@ -23,7 +23,7 @@
             "prioridade": 2,
             "target": "chatgpt.com",
             "spec": {
-                "model": "gpt-4",
+                "model": "gpt-5.2",
                 "validation": {
                     "min_length": 300,
                     "max_length": 1000,

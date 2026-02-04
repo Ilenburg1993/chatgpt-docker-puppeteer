@@ -1,22 +1,26 @@
 /* ==========================================================================
    src/core/schemas/task_schema_v5.js
-   Audit Level: 100 — Mission Orchestration Schema (V5 Autonomous Platform)
+   Audit Level: 100 — Task Schema V5 (Unified Next Generation)
    Status: PRODUCTION READY
-   Responsabilidade: Definição técnica da Unidade Atômica de Trabalho V5.
-                     Suporta execução autônoma de missões complexas com iteração,
-                     validação, context flow e orquestração multi-step.
+   Responsabilidade: Definição técnica expandida da Unidade Atômica de Trabalho V5.
 
-   Breaking Changes from V4:
-   - spec.execution: Nova seção com estratégias de execução
-   - spec.validation: Expandida com validators array
-   - spec.context_config: Gerenciamento de contexto entre steps
-   - policy.workflow_policy: Políticas de workflow (budget, quality threshold)
-   - state.workflow_state: Estado de execução de workflow
-   - state.iteration_state: Estado de execução iterativa
-   - state.quality_metrics: Métricas de qualidade
-   - state.cost_tracking: Rastreamento de custos
-   - result.subtask_results: Resultados de subtasks
-   - result.validation_results: Resultados de validação
+   UNIFICAÇÃO V5 (Fevereiro 2026):
+   Combina 2 abordagens:
+   1. Mission System (workflow, iteração, validação complexa)
+   2. Execution Context + Result V2 (telemetria, multi-formato, metadata)
+
+   NOVIDADES V5:
+   1. execution: { driver, environment, retry } - Contexto de execução completo
+   2. mission: { mission_id, step_id, context } - Suporte nativo a Mission System
+   3. spec.execution: Estratégias de execução (SINGLE_SHOT, ITERATIVE, MULTI_STEP, etc)
+   4. state.metrics expandido: phases + perception telemetry
+   5. state.history estruturada: events + summary
+   6. result V2: Multi-formato storage + generation metadata + validation (LLM-as-judge)
+
+   COMPATIBILIDADE:
+   - Backward compatible com V4 via migrator_v4_to_v5.js
+   - Auto-migration transparente no task_store.js
+   - Campos V4 preservados (zero data loss)
 ========================================================================== */
 
 const { z } = require('zod');
@@ -50,6 +54,53 @@ const MetaSchemaV5 = z.object({
     source: SOURCE_SCHEMA,
     tags: z.array(z.string()).default([])
 });
+
+/**
+ * 1.5 ExecutionSchemaV5: Contexto de Execução (NOVO - Unified V5)
+ *
+ * Captura contexto completo de execução: driver usado, ambiente, retry telemetry.
+ * Preenchido automaticamente pelo BaseDriver e ExecutionEngine.
+ */
+const ExecutionSchemaV5 = z.object({
+    // Driver context
+    driver: z.object({
+        type: z.string().default('Unknown'),                                // 'ChatGPTDriver', 'GeminiDriver'
+        version: z.string().default('1.0'),                                 // Driver version (ex: '2.0')
+        connection_mode: z.enum(['launcher', 'external', 'auto']).default('auto'),
+        browser_pool_health: z.enum(['stable', 'degraded', 'circuit_open', 'unknown']).default('unknown')
+    }).default({}),
+
+    // Environment context
+    environment: z.object({
+        platform: z.string().default(process.platform),                    // 'linux', 'win32', 'darwin'
+        node_version: z.string().default(process.version),                 // 'v24.0.0'
+        container: z.boolean().default(false),                             // true se Docker
+        chrome_version: z.string().default('unknown')                      // '120.0.6099.109'
+    }).default({}),
+
+    // Retry telemetry (agregado Driver + Kernel)
+    retry: z.object({
+        tactical_attempts: z.number().int().nonnegative().default(0),     // Driver retry (operações browser)
+        strategic_attempts: z.number().int().nonnegative().default(0),    // Kernel retry (reagendamento task)
+        errors_recovered: z.array(z.string()).default([]),                // Lista de erros recuperados
+        total_backoff_ms: z.number().nonnegative().default(0)             // Tempo total aguardado entre retries
+    }).default({})
+}).default({});
+
+/**
+ * 1.6 MissionSchemaV5: Mission System Context (NOVO - Unified V5)
+ *
+ * Suporte completo para Mission System: agrupa tasks em workflows,
+ * permite context flow entre steps, checkpoint recovery.
+ */
+const MissionSchemaV5 = z.object({
+    mission_id: z.string().nullable().default(null),                       // ID da missão
+    step_id: z.string().nullable().default(null),                          // ID do step no workflow
+    step_index: z.number().int().nonnegative().default(0),                 // Posição no workflow (0-based)
+    step_dependencies: z.array(z.string()).default([]),                    // Steps que devem completar antes
+    mission_context: z.object({}).passthrough().default({}),               // Contexto acumulado (outputs de steps anteriores)
+    is_checkpoint: z.boolean().default(false)                              // Step é checkpoint para recovery?
+}).default({});
 
 /**
  * 2. SpecSchema V5: A Intenção + Estratégias de Execução.
@@ -236,7 +287,7 @@ const StateSchemaV5 = z.object({
             current_step_index: z.number().int().nonnegative().default(0),
             completed_steps: z.array(z.string()).default([]), // Step IDs completados
             failed_steps: z.array(z.string()).default([]), // Step IDs que falharam
-            accumulated_context: z.any().optional() // Resultados de steps anteriores (injeta em próximos)
+            accumulated_context: z.any().optional(), // Resultados de steps anteriores (injeta em próximos)
         })
         .optional(),
 
@@ -252,10 +303,10 @@ const StateSchemaV5 = z.object({
                         iteration: z.number(),
                         output: z.string(),
                         quality_score: z.number().optional(),
-                        validation_result: z.any().optional()
+                        validation_result: z.any().optional(),
                     })
                 )
-                .default([])
+                .default([]),
         })
         .optional(),
 
@@ -268,7 +319,7 @@ const StateSchemaV5 = z.object({
             coherence_score: z.number().min(0).max(100).optional(),
             accuracy_score: z.number().min(0).max(100).optional(),
             goal_alignment_score: z.number().min(0).max(100).optional(),
-            validation_passed: z.boolean().optional()
+            validation_passed: z.boolean().optional(),
         })
         .optional(),
 
@@ -281,43 +332,152 @@ const StateSchemaV5 = z.object({
             output_tokens: z.number().int().nonnegative().default(0),
             total_tokens: z.number().int().nonnegative().default(0),
             cost_usd: z.number().nonnegative().default(0),
-            model_used: z.string().optional()
+            model_used: z.string().optional(),
         })
         .optional(),
 
-    // Mantém metrics V4
+    // ==========================================
+    // EXPANDIDO V5: Metrics (V4 + Phases + Perception)
+    // ==========================================
     metrics: z
         .object({
+            // V4 fields (mantidos)
             duration_ms: z.number().default(0),
             token_estimate: z.number().default(0),
-            event_loop_lag_ms: z.number().default(0)
+            event_loop_lag_ms: z.number().default(0),
+
+            // NOVO V5: Phase breakdown (telemetria detalhada)
+            phases: z
+                .object({
+                    preparation_ms: z.number().default(0), // Tempo preparando contexto
+                    execution_ms: z.number().default(0), // Tempo executando (Driver)
+                    validation_ms: z.number().default(0), // Tempo validando (LLM-judge)
+                    storage_ms: z.number().default(0), // Tempo salvando resultado
+                })
+                .default({}),
+
+            // NOVO V5: Perception telemetry (ChatGPT loop específico)
+            perception: z
+                .object({
+                    cycles: z.number().int().default(0), // Quantos ciclos de percepção
+                    stable_cycles: z.number().int().default(0), // Quantos ciclos estáveis (sem mudança)
+                    continuations: z.number().int().default(0), // Auto-continuações (Continue generating)
+                    thought_blocks_pruned: z.number().int().default(0), // o1/o3 reasoning blocks removidos
+                })
+                .default({}),
         })
         .default({}),
 
-    // Mantém history V4
+    // ==========================================
+    // EXPANDIDO V5: History (V4 array + Summary)
+    // ==========================================
     history: z
-        .array(
-            z.object({
-                ts: TIMESTAMP_SCHEMA,
-                event: z.string(),
-                msg: z.string().optional(),
-                evidence: z.any().optional()
-            })
-        )
-        .default([])
+        .object({
+            events: z
+                .array(
+                    z.object({
+                        ts: TIMESTAMP_SCHEMA,
+                        event: z.string(),
+                        msg: z.string().optional(),
+                        evidence: z.any().optional(),
+                    })
+                )
+                .default([]),
+
+            // NOVO V5: Summary (agregações úteis para análise rápida)
+            summary: z
+                .object({
+                    total_events: z.number().int().default(0),
+                    errors_count: z.number().int().default(0),
+                    warnings_count: z.number().int().default(0),
+                    retry_count: z.number().int().default(0),
+                    phase_durations: z.record(z.number()).default({}), // { 'preparation': 1200, 'execution': 3400, ... }
+                })
+                .default({}),
+        })
+        .default({ events: [], summary: {} }),
 });
 
 /**
- * 5. ResultSchema V5: O Produto Final + Subtask Results + Validation Results.
+ * 5. ResultSchema V5: O Produto Final + Multi-formato + Metadata + Validation.
  */
 const ResultSchemaV5 = z.object({
-    file_path: z.string().nullable().default(null),
-    session_url: z.string().url().nullable().default(null),
-    finish_reason: z.enum(['stop', 'length', 'content_filter', 'error', 'manual', 'unknown']).default('unknown'),
-    raw_output_preview: z.string().optional(),
+    // ==========================================
+    // NOVO V5: Multi-format Storage (Response Capture V2 preparado)
+    // ==========================================
+    storage: z
+        .object({
+            text_file: z.string().nullable().default(null), // .txt (compatibilidade V4)
+            markdown_file: z.string().nullable().default(null), // .md (estruturado)
+            json_file: z.string().nullable().default(null), // .json (dados estruturados)
+            html_file: z.string().nullable().default(null), // .html (renderizável)
+        })
+        .default({}),
 
     // ==========================================
-    // NOVO V5: Subtask Results
+    // NOVO V5: Generation Metadata (Response Capture V2 preparado)
+    // ==========================================
+    generation: z
+        .object({
+            model: z.string().default('unknown'), // 'gpt-5.2', 'gpt-5-mini', ou outros LLMs
+            started_at: TIMESTAMP_SCHEMA.nullable().default(null),
+            completed_at: TIMESTAMP_SCHEMA.nullable().default(null),
+            duration_ms: z.number().default(0),
+            tokens_estimate: z.number().default(0),
+            continuations: z.number().int().default(0), // Auto-continuações
+            thought_blocks_pruned: z.number().int().default(0), // o1/o3 reasoning removido
+            retry_attempts: z.number().int().default(0), // Tentativas de retry (Driver)
+        })
+        .default({}),
+
+    // ==========================================
+    // NOVO V5: LLM-as-Judge Validation (Fase Posterior - Preparado)
+    // ==========================================
+    validation: z
+        .object({
+            completeness: z.object({
+                score: z.number().min(0).max(100), // 0-100
+                reasoning: z.string(),
+                is_complete: z.boolean(),
+            }),
+            relevance: z.object({
+                score: z.number().min(0).max(100),
+                reasoning: z.string(),
+                is_relevant: z.boolean(),
+            }),
+            quality: z.object({
+                score: z.number().min(0).max(100),
+                reasoning: z.string(),
+                overall_score: z.number().min(0).max(100),
+            }),
+            recommendation: z.enum(['ACCEPT', 'RETRY', 'MANUAL_REVIEW']),
+        })
+        .nullable()
+        .default(null), // null = validação não executada (fase posterior)
+
+    // ==========================================
+    // NOVO V5: Preview Estruturado
+    // ==========================================
+    preview: z
+        .object({
+            text: z.string().default(''), // Primeiros 500 chars (compatibilidade)
+            sections_count: z.number().int().default(0), // Quantas seções (headings)
+            code_blocks_count: z.number().int().default(0), // Quantos code blocks
+            links_count: z.number().int().default(0), // Quantos links
+            images_count: z.number().int().default(0), // Quantas imagens
+        })
+        .default({}),
+
+    // ==========================================
+    // V4 fields (mantidos para compatibilidade)
+    // ==========================================
+    file_path: z.string().nullable().default(null), // DEPRECATED: usar storage.text_file
+    session_url: z.string().url().nullable().default(null),
+    finish_reason: z.enum(['stop', 'length', 'content_filter', 'error', 'manual', 'unknown']).default('unknown'),
+    raw_output_preview: z.string().optional(), // DEPRECATED: usar preview.text
+
+    // ==========================================
+    // Mission System: Subtask Results (mantido)
     // ==========================================
     subtask_results: z
         .array(
@@ -325,13 +485,13 @@ const ResultSchemaV5 = z.object({
                 subtask_id: ID_SCHEMA,
                 status: z.string(),
                 output: z.string().optional(),
-                quality_score: z.number().optional()
+                quality_score: z.number().optional(),
             })
         )
         .default([]),
 
     // ==========================================
-    // NOVO V5: Validation Results
+    // Mission System: Validation Results (mantido)
     // ==========================================
     validation_results: z
         .array(
@@ -339,22 +499,29 @@ const ResultSchemaV5 = z.object({
                 validator_type: z.string(),
                 passed: z.boolean(),
                 score: z.number().optional(),
-                feedback: z.string().optional()
+                feedback: z.string().optional(),
             })
         )
-        .default([])
+        .default([]),
 });
 
 /**
- * TASK_SCHEMA_V5: O Contrato Mestre V5 para Missões Autônomas.
+ * TASK_SCHEMA_V5: O Contrato Mestre V5 (Unified - Fevereiro 2026)
+ *
+ * Combina:
+ * - Mission System (workflow, iteration, validation)
+ * - Execution Context (driver, environment, retry)
+ * - Result V2 (multi-formato, metadata, LLM-judge preparado)
  */
 const TaskSchemaV5 = z
     .object({
         meta: MetaSchemaV5,
         spec: SpecSchemaV5,
         policy: PolicySchemaV5,
+        execution: ExecutionSchemaV5, // NOVO V5 (Unified)
+        mission: MissionSchemaV5, // NOVO V5 (Unified)
         state: StateSchemaV5,
-        result: ResultSchemaV5
+        result: ResultSchemaV5,
     })
     .passthrough();
 
@@ -363,6 +530,8 @@ module.exports = {
     MetaSchemaV5,
     SpecSchemaV5,
     PolicySchemaV5,
+    ExecutionSchemaV5, // NOVO V5 (Unified)
+    MissionSchemaV5, // NOVO V5 (Unified)
     StateSchemaV5,
-    ResultSchemaV5
+    ResultSchemaV5,
 };

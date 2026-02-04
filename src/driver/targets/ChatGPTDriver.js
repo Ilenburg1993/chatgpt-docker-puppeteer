@@ -31,6 +31,10 @@ const analyzer = require('@shared/sadi/analyzer');
 const stabilizer = require('@shared/page_stability/stabilizer');  // ✅ BUG #1: Fixed import path
 const { log } = require('@core/logger');
 
+// ✅ Response Capture V2.0: Structured extraction + validation
+const StructuredExtractor = require('../extractors/structured_extractor');
+const LLMJudge = require('../../validation/llm_judge');
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -51,7 +55,7 @@ const CHATGPT_CONFIG = Object.freeze({
     CONTINUATION_DELAY_MS: 2000,     // 2s
 
     // Model Switching
-    DEFAULT_MODEL_ID: 'gpt-4o',
+    DEFAULT_MODEL_ID: 'gpt-5.2',
 
     // Retry
     STOP_GENERATION_MAX_RETRIES: 3,
@@ -60,16 +64,14 @@ const CHATGPT_CONFIG = Object.freeze({
 
 /**
  * ✅ v2.0: SUPPORTED_MODELS - Validação de modelo
+ * Sistema universal de LLMs - Modelos iniciais: GPT-5.2 (padrão) e GPT-5-mini
+ * Outros LLMs podem ser adicionados conforme necessário
  */
 const SUPPORTED_MODELS = Object.freeze([
-    'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-4-turbo',
-    'gpt-4',
-    'gpt-3.5-turbo',
-    'o1-preview',
-    'o1-mini',
-    'o3-mini'
+    'gpt-5.2',
+    'gpt-5-mini',
+    'gpt-5',
+    // Outros LLMs serão adicionados aqui (Gemini, Claude, etc.)
 ]);
 
 // ============================================================================
@@ -81,14 +83,19 @@ class ChatGPTDriver extends BaseDriver {
      * ChatGPT Driver - Especialista em interface OpenAI.
      * Implementa percepção incremental, thought pruning (o1/o3), auto-continuation.
      *
+     * ✅ v3.0: BREAKING CHANGE - Constructor recebe APENAS config
+     * - page e signal são null inicialmente (herdados via BaseDriver → TargetDriver)
+     * - Use attachContext(page, signal) antes de executar
+     *
      * ✅ v2.0: sendPrompt implementation, AbortSignal integration, timeout protection
      *
-     * @param {object} page - Puppeteer Page instance
      * @param {object} config - Task configuration
-     * @param {AbortSignal} signal - Cancellation signal
+     * @param {string} config.target - Must be 'chatgpt'
+     * @param {string} [config.DEFAULT_MODEL_ID] - Default model (default: gpt-5.2)
+     * @param {number} [config.STABLE_CYCLES] - Stable cycles target (default: 3)
      */
-    constructor(page, config, signal) {
-        super(page, config, signal);
+    constructor(config) {
+        super(config);
 
         this.name = 'ChatGPT';
         this.currentDomain = 'chatgpt.com';
@@ -97,6 +104,20 @@ class ChatGPTDriver extends BaseDriver {
         this.stableCyclesTarget = config.STABLE_CYCLES || CHATGPT_CONFIG.STABLE_CYCLES_TARGET;
         this.defaultModel = config.DEFAULT_MODEL_ID || CHATGPT_CONFIG.DEFAULT_MODEL_ID;
 
+        // ✅ Response Capture V2.0: Inicializar extractors
+        this.structuredExtractor = new StructuredExtractor();
+        this.llmJudge = new LLMJudge({
+            enabled: config.LLM_JUDGE_ENABLED !== false, // Habilitado por padrão
+            driver: null, // Será configurado após attachContext
+            model: config.LLM_JUDGE_MODEL || 'gpt-5-mini', // GPT-5-mini para validação (mais rápido)
+            timeout: config.LLM_JUDGE_TIMEOUT || 15000,
+        });
+
+        // Telemetria de execução (Response V2)
+        this.executionStartTime = null;
+        this.continuationCount = 0;
+        this.thoughtBlocksPruned = 0;
+
         // ✅ v2.0: Declarar capabilities (TargetDriver v2.0 validation)
         this.updateCapabilities({
             text_generation: true,
@@ -104,12 +125,12 @@ class ChatGPTDriver extends BaseDriver {
             file_upload: true, // Attachments
             context_reset: true, // Model switching
             streaming_events: true, // Incremental perception
-            vision: true, // GPT-4V
+            vision: true, // Vision capabilities (GPT-5.2)
             tools: true, // Function calling
             code_interpreter: true, // Data analysis
             web_browsing: false, // Não suportado nativamente
-            dalle: true, // DALL-E 3
-            function_calling: true // GPT-4 Turbo+
+            dalle: true, // DALL-E integration
+            function_calling: true, // Advanced function calling
         });
     }
 
@@ -165,7 +186,7 @@ class ChatGPTDriver extends BaseDriver {
             this.emit('warning', {
                 context: 'captureState',
                 error: err.message,
-                fallback: 0
+                fallback: 0,
             });
 
             return 0; // Fallback seguro
@@ -179,7 +200,7 @@ class ChatGPTDriver extends BaseDriver {
      * ✅ v2.0: Validação de modelo + validação de navegação
      *
      * @param {object} taskSpec - Especificação da tarefa
-     * @param {string} [taskSpec.model] - ID do modelo (ex: 'gpt-4o')
+     * @param {string} [taskSpec.model] - ID do modelo (ex: 'gpt-5.2', 'gpt-5-mini')
      * @param {object} [taskSpec.config] - Configurações adicionais
      * @param {boolean} [taskSpec.config.reset_context] - Forçar reset de contexto
      * @param {boolean} [taskSpec.config.require_history] - Manter histórico de conversa
@@ -201,7 +222,7 @@ class ChatGPTDriver extends BaseDriver {
 
         this._emitVital('PROGRESS_UPDATE', {
             step: 'MODEL_SYNCHRONIZATION',
-            model: modelId
+            model: modelId,
         });
 
         const targetUrl = `https://chatgpt.com/?model=${modelId}`;
@@ -217,7 +238,7 @@ class ChatGPTDriver extends BaseDriver {
                 // ✅ BUG #4: Validar navegação
                 const response = await this.page.goto(targetUrl, {
                     waitUntil: 'networkidle2',
-                    timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS
+                    timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
                 });
 
                 if (!response.ok()) {
@@ -255,12 +276,18 @@ class ChatGPTDriver extends BaseDriver {
     async sendPrompt(prompt, options = {}) {
         this.setState('TYPING');
 
+        // ✅ Response Capture V2.0: Guardar prompt atual para LLM-as-Judge
+        this.currentPrompt = prompt;
+        this.executionStartTime = new Date().toISOString();
+        this.continuationCount = 0;
+        this.thoughtBlocksPruned = 0;
+
         const { humanTyping = true, delay = 0 } = options;
 
         this._emitVital('PROGRESS_UPDATE', {
             step: 'SENDING_PROMPT',
             promptLength: prompt.length,
-            humanTyping
+            humanTyping,
         });
 
         // 1. Encontrar textarea via SADI
@@ -418,7 +445,7 @@ class ChatGPTDriver extends BaseDriver {
                         return {
                             text: clone.innerText.trim(),
                             pruned: count,
-                            textLengthBefore
+                            textLengthBefore,
                         };
                     }, responseArea.protocol);
 
@@ -426,6 +453,9 @@ class ChatGPTDriver extends BaseDriver {
 
                     // ✅ MELHORIA #5: Thought pruning metrics expandidas
                     if (extractionResult.pruned > 0) {
+                        // ✅ Response Capture V2.0: Acumular total de thought blocks removidos
+                        this.thoughtBlocksPruned += extractionResult.pruned;
+
                         const textLengthAfter = currentText.length;
                         const ratio =
                             extractionResult.textLengthBefore > 0
@@ -438,7 +468,7 @@ class ChatGPTDriver extends BaseDriver {
                             textLengthAfter,
                             retentionRatio: ratio,
                             model: this.defaultModel,
-                            selector: responseArea.protocol.selector
+                            selector: responseArea.protocol.selector,
                         });
 
                         log(
@@ -459,14 +489,14 @@ class ChatGPTDriver extends BaseDriver {
                     delta: textDelta,
                     stableCycles,
                     elapsedMs: Date.now() - startTime,
-                    isBusy: responseArea?.isBusy || false
+                    isBusy: responseArea?.isBusy || false,
                 });
 
                 if (textDelta > 0) {
                     this._emitVital('TEXT_DELTA', {
                         length: currentText.length,
                         delta: textDelta,
-                        status: 'STREAMING'
+                        status: 'STREAMING',
                     });
                     stableCycles = 0;
                     lastText = currentText;
@@ -494,7 +524,7 @@ class ChatGPTDriver extends BaseDriver {
                     this._emitVital('AUTO_CONTINUATION', {
                         count: continuationCount,
                         textLengthCurrent: currentText.length,
-                        elapsedMs: Date.now() - startTime
+                        elapsedMs: Date.now() - startTime,
                     });
 
                     log(
@@ -536,11 +566,48 @@ class ChatGPTDriver extends BaseDriver {
                         textLength: currentText.length,
                         stableCycles,
                         continuations: continuationCount,
-                        elapsedMs: Date.now() - startTime
+                        elapsedMs: Date.now() - startTime,
                     });
 
+                    // ✅ Response Capture V2.0: Extração estruturada
+                    const extractedContent = await this.structuredExtractor.extract(this.page, responseArea.protocol);
+
+                    // ✅ Response Capture V2.0: Telemetria de geração
+                    const generation = {
+                        model: this.defaultModel,
+                        started_at: this.executionStartTime || new Date(startTime).toISOString(),
+                        completed_at: new Date().toISOString(),
+                        duration_ms: Date.now() - startTime,
+                        tokens_estimate: this._estimateTokens(currentText),
+                        continuations: continuationCount,
+                        thought_blocks_pruned: this.thoughtBlocksPruned,
+                        retry_attempts: 0, // Será preenchido pelo Kernel
+                    };
+
+                    // ✅ Response Capture V2.0: Validação LLM-as-Judge (opcional)
+                    let validation = null;
+                    if (this.llmJudge.enabled && this.currentPrompt) {
+                        try {
+                            validation = await this.llmJudge.validate(this.currentPrompt, currentText, signal);
+                        } catch (error) {
+                            log(
+                                'WARN',
+                                `[${this.name}] LLM-as-Judge falhou, continuando sem validação`,
+                                this.correlationId
+                            );
+                        }
+                    }
+
+                    // ✅ Response Capture V2.0: Response V2 completa
+                    const responseV2 = {
+                        content: extractedContent,
+                        generation,
+                        validation,
+                        preview: extractedContent.preview,
+                    };
+
                     this.setState(STATUS_VALUES.IDLE);
-                    return currentText;
+                    return responseV2;
                 }
 
                 // 6. Stall Adaptativo
@@ -565,7 +632,7 @@ class ChatGPTDriver extends BaseDriver {
                         continuations: continuationCount,
                         responseAreaBusy: responseArea?.isBusy || false,
                         currentUrl: this.page.url(),
-                        watchdogIdleSince: watchdogIdleTime
+                        watchdogIdleSince: watchdogIdleTime,
                     });
 
                     throw new Error(`STALL_DETECTED: Latência excedeu ${adaptiveData.timeout}ms`);
@@ -629,7 +696,7 @@ class ChatGPTDriver extends BaseDriver {
      */
     async _tryStopGeneration() {
         const stopProtocol = await analyzer.findSendButtonSelector(this.page, {
-            selector: '[aria-label*="Stop"], .stop-button'
+            selector: '[aria-label*="Stop"], .stop-button',
         });
 
         if (stopProtocol && stopProtocol.protocol) {
@@ -648,7 +715,7 @@ class ChatGPTDriver extends BaseDriver {
         await this.page.keyboard.press('Escape');
 
         this._emitVital('GENERATION_STOPPED', {
-            method: 'ESC_FALLBACK'
+            method: 'ESC_FALLBACK',
         });
 
         return false; // Fallback usado
@@ -692,6 +759,22 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         await super.destroy();
+    }
+
+    /**
+     * Estima número de tokens baseado no texto
+     * Usa heurística: ~4 caracteres = 1 token (inglês/português)
+     *
+     * @param {string} text - Texto para estimar
+     * @returns {number} - Estimativa de tokens
+     * @private
+     */
+    _estimateTokens(text) {
+        if (!text || typeof text !== 'string') {
+            return 0;
+        }
+        // Heurística simples: 1 token ≈ 4 caracteres
+        return Math.ceil(text.length / 4);
     }
 }
 
