@@ -1,7 +1,16 @@
 /* ==========================================================================
    src/logic/adaptive.js
-   Audit Level: 100 — Industrial Hardening (Consolidated V45)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
+   Audit Level: 100 — Industrial Hardening (Consolidated V46)
+   Status: PRODUCTION READY (Statistical Engine 2.0)
+   Changelog V46:
+   - FIX CRÍTICO: Variância corrigida (Welford's Algorithm completo)
+   - ADD: Circuit breaker para degradação extrema (>120s)
+   - ADD: Health check API (getHealthStatus)
+   - ADD: Target GC automático (max 100 targets)
+   - ADD: Decay de targets inativos (24h+ threshold)
+   - ADD: Percentile support (P50/P95/P99/P99.7)
+   - REMOVE: success_count (código morto)
+   - DOC: context_penalty rationale documentado
 ========================================================================== */
 
 const fs = require('fs').promises;
@@ -19,6 +28,13 @@ const SEED_STREAM = 500;
 const SEED_ECHO = 2000;
 
 /* --------------------------------------------------------------------------
+   CONSTANTES DE CIRCUIT BREAKER & GC
+-------------------------------------------------------------------------- */
+const CIRCUIT_BREAKER_THRESHOLD_MS = 120000; // 2min - targets mais lentos acionam circuit breaker
+const TARGET_INACTIVE_THRESHOLD_MS = 86400000; // 24h - decay de targets inativos
+const MAX_TARGETS = 100; // Limite de targets para GC automático
+
+/* --------------------------------------------------------------------------
    SCHEMAS (INTEGRIDADE)
 -------------------------------------------------------------------------- */
 const StatsSchema = z.object({
@@ -31,7 +47,7 @@ const TargetProfileSchema = z.object({
     ttft: StatsSchema,
     stream: StatsSchema,
     echo: StatsSchema,
-    success_count: z.number()
+    last_update: z.number().default(0),
 });
 
 const AdaptiveStateSchema = z.object({
@@ -145,10 +161,48 @@ function updateStats(stats, value, label) {
 
     const alpha = stats.count < 20 ? 0.4 : CONFIG.ADAPTIVE_ALPHA || 0.15;
     const diff = value - stats.avg;
+    const oldAvg = stats.avg;
 
-    stats.avg = Math.round(stats.avg + alpha * diff);
-    stats.var = Math.max(0, Math.round((1 - alpha) * (stats.var + alpha * diff * diff)));
+    // Welford's Algorithm correto:
+    stats.avg = oldAvg + alpha * diff;
+    const diff2 = value - stats.avg; // Diff com NOVA média
+    stats.var = (1 - alpha) * stats.var + alpha * diff * diff2;
+
+    // Arredondamento final APENAS da média (variância mantida precisa)
+    stats.avg = Math.round(stats.avg);
+    stats.var = Math.max(0, stats.var); // Sem arredondamento para manter precisão
     stats.count++;
+}
+
+/* --------------------------------------------------------------------------
+   FUNÇÕES AUXILIARES (CIRCUIT BREAKER, DECAY, GC)
+-------------------------------------------------------------------------- */
+function shouldCircuitBreak(stats) {
+    return stats.count >= 5 && stats.avg > CIRCUIT_BREAKER_THRESHOLD_MS;
+}
+
+function decayIfNeeded(profile, now) {
+    const age = now - profile.last_update;
+    if (age > TARGET_INACTIVE_THRESHOLD_MS) {
+        // Decay exponencial: mais velho = menos confiança
+        const decayFactor = Math.max(0.1, Math.exp(-age / (7 * TARGET_INACTIVE_THRESHOLD_MS)));
+        profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
+        profile.stream.count = Math.floor(profile.stream.count * decayFactor);
+        profile.echo.count = Math.floor(profile.echo.count * decayFactor);
+        log('INFO', `[ADAPTIVE] Decay aplicado: age=${Math.round(age/3600000)}h, factor=${decayFactor.toFixed(2)}`);
+    }
+}
+
+function garbageCollectTargets() {
+    const targets = Object.entries(state.targets);
+    if (targets.length > MAX_TARGETS) {
+        const sorted = targets.sort((a, b) => a[1].last_update - b[1].last_update);
+        const toRemove = sorted.slice(0, sorted.length - MAX_TARGETS);
+        toRemove.forEach(([key]) => {
+            delete state.targets[key];
+            log('INFO', `[ADAPTIVE] GC: removido target inativo: ${key}`);
+        });
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -163,14 +217,19 @@ async function recordMetric(type, ms, target = 'generic') {
     }
 
     const key = target.toLowerCase();
+    const now = Date.now();
+
     if (!state.targets[key]) {
         state.targets[key] = {
             ttft: createEmptyStats(SEED_TTFT),
             stream: createEmptyStats(SEED_STREAM),
             echo: createEmptyStats(SEED_ECHO),
-            success_count: 0
+            last_update: now,
         };
     }
+
+    // Update timestamp
+    state.targets[key].last_update = now;
 
     switch (type) {
         case 'ttft':
@@ -187,9 +246,15 @@ async function recordMetric(type, ms, target = 'generic') {
             break;
     }
 
-    state.last_adjustment_at = Date.now(); // [FIX] Atualização de contrato
+    state.last_adjustment_at = Date.now();
 
-    debouncedPersist(); // [P7.1] Debounce ao invés de probabilístico
+    // [V46] Garbage collection de targets inativos
+    if (Math.random() < 0.01) {
+        // 1% chance por call (evita overhead)
+        garbageCollectTargets();
+    }
+
+    debouncedPersist();
 }
 
 async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 'STREAM') {
@@ -197,18 +262,49 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
         await readyPromise;
     }
 
+    const now = Date.now();
     const profile = state.targets[target.toLowerCase()];
+
+    // [V46] Decay de targets inativos
+    if (profile) {
+        decayIfNeeded(profile, now);
+    }
+
     const stats = !profile
-        ? createEmptyStats(phase === 'STREAM' ? SEED_STREAM : SEED_TTFT) // [FIX] Fallback consistente
+        ? createEmptyStats(phase === 'STREAM' ? SEED_STREAM : SEED_TTFT)
         : phase === 'INITIAL' || phase === 'TTFT'
           ? profile.ttft
           : profile.stream;
+
+    // [V46] Circuit Breaker para degradação extrema
+    if (shouldCircuitBreak(stats)) {
+        log(
+            'ERROR',
+            `[ADAPTIVE] ⚠️  Circuit breaker ativado: ${target} (avg=${stats.avg}ms > ${CIRCUIT_BREAKER_THRESHOLD_MS}ms)`
+        );
+        return {
+            timeout: 300000,
+            circuit_broken: true,
+            breakdown: {
+                learned_avg: stats.avg,
+                safety_margin: 0,
+                context_penalty: 0,
+                std_dev: Math.round(Math.sqrt(Math.max(0, stats.var))),
+            },
+            phase,
+            target: target.toLowerCase(),
+            warning: 'Target extremamente lento - considere fallback',
+        };
+    }
 
     const avg = Math.max(1, stats.avg);
     const std = Math.sqrt(Math.max(0, stats.var));
 
     const base = avg;
-    const margin = Math.round(3 * std);
+    const margin = Math.round(3 * std); // P99.7 se distribuição normal
+
+    // Context penalty: log2(n+2)*2000 = ~2s por dobra de mensagens (cap 20s)
+    // Rationale: conversas longas precisam de mais tempo (modelo carrega mais contexto)
     const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 
     const total = base + margin + context;
@@ -216,14 +312,15 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
 
     return {
         timeout: Math.min(300000, Math.max(min, total)),
+        circuit_broken: false, // [V46] Sempre presente para consistência de API
         breakdown: {
             learned_avg: base,
             safety_margin: margin,
             context_penalty: context,
-            std_dev: Math.round(std)
+            std_dev: Math.round(std),
         },
         phase,
-        target: target.toLowerCase()
+        target: target.toLowerCase(),
     };
 }
 
@@ -248,17 +345,60 @@ async function getStabilityMetrics(target = 'generic') {
     };
 }
 
+async function getHealthStatus() {
+    if (!isReady) {
+        await readyPromise;
+    }
+
+    const now = Date.now();
+    const targets = Object.entries(state.targets);
+    const staleTargets = targets.filter(([, p]) => now - p.last_update > TARGET_INACTIVE_THRESHOLD_MS);
+    const circuitBrokenTargets = targets.filter(([, p]) => shouldCircuitBreak(p.stream));
+
+    return {
+        status: isReady ? 'HEALTHY' : 'NOT_READY',
+        state_file: STATE_FILE,
+        targets_count: targets.length,
+        stale_targets_count: staleTargets.length,
+        stale_targets: staleTargets.map(([k]) => k),
+        circuit_broken_count: circuitBrokenTargets.length,
+        circuit_broken_targets: circuitBrokenTargets.map(([k, p]) => ({ target: k, avg: p.stream.avg })),
+        infra_health: state.infra.count >= 10 ? 'SUFFICIENT_DATA' : 'INSUFFICIENT_DATA',
+        infra_samples: state.infra.count,
+        last_adjustment: state.last_adjustment_at > 0 ? new Date(state.last_adjustment_at).toISOString() : 'never',
+        persist_locked: persistLock,
+        pending_persist: pendingPersist,
+    };
+}
+
+function getPercentileTimeout(stats, percentile = 95) {
+    const z_scores = {
+        50: 0.0, // P50 (mediana)
+        95: 1.645, // P95
+        99: 2.326, // P99
+        99.7: 3.0, // P99.7 (atual padrão)
+    };
+
+    const avg = Math.max(1, stats.avg);
+    const std = Math.sqrt(Math.max(0, stats.var));
+    const z = z_scores[percentile] || 1.645;
+
+    return Math.round(avg + z * std);
+}
+
 module.exports = {
     recordMetric,
     getAdjustedTimeout,
     getStabilityMetrics,
+    getHealthStatus, // [V46] NEW
+    getPercentileTimeout, // [V46] NEW
     getSnapshot: () => JSON.parse(JSON.stringify(state)),
-    forcePersist: persist, // [P7.5] Exposto para shutdown hooks e testes
+    forcePersist: persist,
     get values() {
         return {
             HEARTBEAT_TIMEOUT: Math.round(state.infra.avg * 5),
             ECHO_TIMEOUT: Math.round((state.targets.chatgpt?.echo.avg || SEED_ECHO) * 3),
-            PROGRESS_TIMEOUT: 60000
+            PROGRESS_TIMEOUT: 60000,
         };
-    }
+    },
 };

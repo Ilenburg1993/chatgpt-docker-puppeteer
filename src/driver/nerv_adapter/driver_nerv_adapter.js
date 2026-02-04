@@ -2,20 +2,29 @@
    src/driver/nerv_adapter/driver_nerv_adapter.js
    Subsistema: DRIVER — NERV Adapter
    Audit Level: 800 — Critical Decoupling Layer (Singularity Edition)
-   Version: 2.0 (EventEmitter + Complete Resilience)
+   Version: 3.0 (Pool-Ready + Simplified API)
 
    Responsabilidade:
    - Adaptar NERV (pub/sub) para o domínio do DRIVER
-   - Gerenciar instâncias de DriverLifecycleManager
+   - API PÚBLICA SIMPLES: executeTask(task) → response
+   - Gerenciar pool de drivers via Factory (acquire/release)
    - Escutar COMMANDS vindos do KERNEL via NERV
    - Emitir EVENTS de telemetria do driver via NERV + EventEmitter local
    - Garantir ZERO acoplamento direto com outros subsistemas
+   - Expor API SIMPLES para execução de tasks
 
    Princípios:
    - NÃO importa KERNEL, SERVER ou INFRA diretamente
    - NÃO acessa filesystem diretamente (usa KERNEL para decisões)
    - NÃO decide estratégias (apenas executa ordens)
    - Comunicação 100% via NERV (IPC) + EventEmitter (local)
+
+   v3.0 Features (BREAKING CHANGES):
+   - Pool-based driver management (NO DriverLifecycleManager)
+   - Direct factory integration (acquireFromPool/releaseToPool)
+   - Simplified API: executeTask(task) → response
+   - Context management (attach/detach) abstracted
+   - AbortSignal per task (not per LifecycleManager)
 
    v2.0 Features:
    - EventEmitter inheritance (duplo canal: local + NERV)
@@ -30,7 +39,8 @@
 ========================================================================== */
 
 const EventEmitter = require('events');
-const DriverLifecycleManager = require('../DriverLifecycleManager');
+const driverFactory = require('../factory');
+// ✅ v3.0: DriverLifecycleManager REMOVED - Pool management direto via factory
 
 const {
     STATUS_VALUES: STATUS_VALUES
@@ -82,7 +92,14 @@ const ADAPTER_CONFIG = {
     CIRCUIT_BREAKER_TIMEOUT_MS: parseInt(process.env.ADAPTER_CIRCUIT_TIMEOUT || '60000'),
 
     /** Tamanho máximo da fila de tasks - Default: 100 */
-    MAX_QUEUE_SIZE: parseInt(process.env.ADAPTER_MAX_QUEUE || '100')
+    MAX_QUEUE_SIZE: parseInt(process.env.ADAPTER_MAX_QUEUE || '100'),
+
+    // ✅ U5: Smart Retry Configuration
+    /** Máximo de retries para tasks - Default: 3 */
+    MAX_RETRY_ATTEMPTS: parseInt(process.env.ADAPTER_MAX_RETRIES || '3'),
+
+    /** Backoff inicial para retry (ms) - Default: 1000ms (1s → 2s → 4s) */
+    RETRY_BACKOFF_MS: parseInt(process.env.ADAPTER_RETRY_BACKOFF || '1000'),
 };
 
 // ============================================================================
@@ -196,7 +213,9 @@ class DriverNERVAdapter extends EventEmitter {
         this.config = config;
         this.degradedMode = !browserPool; // Flag para modo degradado
 
-        // Mapa de drivers ativos: taskId -> { lifecycleManager, listeners }
+        // ✅ v3.0: Mapa de drivers ativos (direct pool-based)
+        // Key: taskId
+        // Value: { driver, abortController, page, listeners, aborting }
         this.activeDrivers = new Map();
 
         // ✅ v2.0: Task queue (quando MAX_ACTIVE_DRIVERS atingido)
@@ -205,13 +224,26 @@ class DriverNERVAdapter extends EventEmitter {
         // ✅ v2.0: Telemetry buffer (batch emit para performance)
         this.telemetryBuffer = [];
 
-        // ✅ v2.0: Circuit breaker state
-        this.circuitBreaker = {
-            state: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
-            failures: 0,
-            threshold: ADAPTER_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
-            timeout: ADAPTER_CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS,
-            lastFailureTime: null
+        // ✅ U2: Per-target circuit breaker (fault isolation)
+        // Map<target, BreakerState>
+        // BreakerState: { state, failures, threshold, timeout, lastFailureTime }
+        this.circuitBreakers = new Map();
+
+        // ✅ U4: Performance telemetria (timing breakdown)
+        this.performanceMetrics = {
+            poolAcquireTimes: [],
+            contextAttachTimes: [],
+            executeTimes: [],
+            detachTimes: [],
+            releaseTimes: [],
+            totalTimes: [],
+            // Agregações
+            avgPoolAcquire: 0,
+            avgContextAttach: 0,
+            avgExecute: 0,
+            avgDetach: 0,
+            avgRelease: 0,
+            avgTotal: 0,
         };
 
         // ✅ v2.0: Estatísticas observacionais expandidas (14 métricas)
@@ -234,13 +266,18 @@ class DriverNERVAdapter extends EventEmitter {
             degradedModeWarnings: 0,
             circuitBreakerTrips: 0,
 
+            // ✅ U5: Retry metrics
+            tasksRetried: 0,
+            retriesSucceeded: 0,
+            retriesFailed: 0,
+
             // ✅ Timing metrics
             totalTaskDuration: 0,
             maxTaskDuration: 0,
             minTaskDuration: Infinity,
 
             // ✅ Uptime
-            startTime: Date.now()
+            startTime: Date.now(),
         };
 
         // Setup de listeners NERV
@@ -293,7 +330,7 @@ class DriverNERVAdapter extends EventEmitter {
                     {
                         error: err.message,
                         taskId: envelope.payload?.taskId,
-                        originalCommand: envelope.actionCode
+                        originalCommand: envelope.actionCode,
                     },
                     envelope.correlationId
                 );
@@ -339,7 +376,7 @@ class DriverNERVAdapter extends EventEmitter {
                     error: 'Sistema em modo degradado - Browser Pool não disponível',
                     reason: 'DEGRADED_MODE',
                     suggestion:
-                        'Configure o browserEndpoint/proxy com remote debugging exposto ao container (ver CONFIG.DEBUG_PORT ou CHROME_WS_ENDPOINT) e reinicie o sistema'
+                        'Configure o browserEndpoint/proxy com remote debugging exposto ao container (ver CONFIG.DEBUG_PORT ou CHROME_WS_ENDPOINT) e reinicie o sistema',
                 },
                 correlationId
             );
@@ -347,7 +384,7 @@ class DriverNERVAdapter extends EventEmitter {
         }
 
         switch (actionCode) {
-            case ActionCode.DRIVER_EXECUTE_TASK:
+            case ActionCode.DRIVER_EXECUTE_TASK: {
                 // ✅ v1.1: Valida pré-requisitos antes de executar
                 const { validateBrowserPool } = require('@core/validators/prerequisite_validator');
                 const poolValidation = validateBrowserPool(this.browserPool);
@@ -362,7 +399,7 @@ class DriverNERVAdapter extends EventEmitter {
                             taskId: payload?.taskId,
                             error: poolValidation.details.message,
                             reason: poolValidation.reason,
-                            suggestion: poolValidation.details.suggestion
+                            suggestion: poolValidation.details.suggestion,
                         },
                         correlationId
                     );
@@ -371,6 +408,7 @@ class DriverNERVAdapter extends EventEmitter {
 
                 await this._executeTask(payload, correlationId);
                 break;
+            }
 
             case ActionCode.DRIVER_ABORT:
                 await this._abortTask(payload, correlationId);
@@ -389,6 +427,7 @@ class DriverNERVAdapter extends EventEmitter {
      * Executa uma tarefa usando DriverLifecycleManager.
      * Aloca página do BrowserPool, cria driver, executa e monitora.
      *
+     * ✅ v3.0 (U5): Smart retry logic - TRANSIENT errors retriables
      * ✅ v2.0: Timeout protection em todas as fases
      * ✅ v2.0: Circuit breaker check
      * ✅ v2.0: Queue quando MAX_ACTIVE_DRIVERS atingido
@@ -405,6 +444,7 @@ class DriverNERVAdapter extends EventEmitter {
      * @param {string} payload.task.spec.target - Target name (chatgpt, gemini, etc)
      * @param {string} payload.task.spec.prompt - Prompt para driver
      * @param {string} correlationId - NERV correlation ID
+     * @param {number} [retryCount=0] - Current retry attempt (U5)
      *
      * @returns {Promise<void>}
      *
@@ -414,9 +454,10 @@ class DriverNERVAdapter extends EventEmitter {
      * @emits ADAPTER_EVENTS.TASK_COMPLETED quando task completa com sucesso
      * @emits ADAPTER_EVENTS.TASK_FAILED quando task falha
      * @emits ADAPTER_EVENTS.TASK_QUEUED quando task enfileirada
+     * @emits ADAPTER_EVENTS.TASK_RETRYING quando retry iniciado (U5)
      */
-    async _executeTask(payload, correlationId) {
-        const { task } = payload;
+    async _executeTask(payload, correlationId, retryCount = 0) {
+        const { task, signal } = payload;
 
         if (!task || !task.meta || !task.meta.id) {
             throw new Error('Task inválida recebida via NERV');
@@ -425,7 +466,36 @@ class DriverNERVAdapter extends EventEmitter {
         const taskId = task.meta.id;
         const startTime = Date.now();
 
+        // ✅ U4: Performance telemetria (timing breakdown)
+        const timings = {
+            total: startTime,
+            poolAcquire: null,
+            contextAttach: null,
+            execute: null,
+            detach: null,
+            release: null,
+        };
+
         log('INFO', `[DriverNERVAdapter] Iniciando execução: ${taskId}`, correlationId);
+
+        // ✅ P1 BUG #4 FIX: Verifica se signal já está abortado ANTES de executar (fail-fast)
+        if (signal && signal.aborted) {
+            log('WARN', `[DriverNERVAdapter] Task ${taskId} already aborted before execution`, correlationId);
+
+            this._emitBoth(
+                ADAPTER_EVENTS.TASK_ABORTED,
+                ActionCode.DRIVER_TASK_ABORTED,
+                {
+                    taskId,
+                    reason: 'PRE_EXECUTION_ABORT',
+                    message: 'AbortSignal was already aborted before task execution started',
+                },
+                correlationId
+            );
+
+            this.stats.tasksAborted++;
+            return;
+        }
 
         // ✅ 1. Verifica se já existe driver para essa task
         if (this.activeDrivers.has(taskId)) {
@@ -433,20 +503,24 @@ class DriverNERVAdapter extends EventEmitter {
             return;
         }
 
-        // ✅ 2. Circuit breaker check
-        if (!this._canExecute()) {
-            const error = `Circuit breaker OPEN - too many recent failures (${this.circuitBreaker.failures}/${this.circuitBreaker.threshold})`;
+        // ✅ U2: Per-target circuit breaker check
+        const target = payload.target || 'chatgpt';
 
-            log('WARN', `[DriverNERVAdapter] ${error}`, correlationId);
+        if (!this._canExecute(target)) {
+            const breaker = this.circuitBreakers.get(target);
+            const error = `Circuit breaker OPEN for target ${target} - too many recent failures (${breaker.failures}/${breaker.threshold})`;
+
+            log('WARN', `[DriverNERVAdapter] U2: ${error}`, correlationId);
 
             this._emitBoth(
                 ADAPTER_EVENTS.TASK_FAILED,
                 ActionCode.DRIVER_TASK_FAILED,
                 {
                     taskId,
+                    target,
                     error,
                     reason: 'CIRCUIT_BREAKER_OPEN',
-                    suggestion: `Aguarde ${Math.floor(this.circuitBreaker.timeout / 1000)}s para circuit breaker recovery`
+                    suggestion: `Aguarde ${Math.floor(breaker.timeout / 1000)}s para circuit breaker recovery`,
                 },
                 correlationId
             );
@@ -470,7 +544,7 @@ class DriverNERVAdapter extends EventEmitter {
                         taskId,
                         error,
                         reason: 'QUEUE_FULL',
-                        suggestion: 'Aguarde tasks ativas completarem ou aumente MAX_QUEUE_SIZE'
+                        suggestion: 'Aguarde tasks ativas completarem ou aumente MAX_QUEUE_SIZE',
                     },
                     correlationId
                 );
@@ -492,41 +566,107 @@ class DriverNERVAdapter extends EventEmitter {
             this.emit(ADAPTER_EVENTS.TASK_QUEUED, {
                 taskId,
                 queueSize: this.taskQueue.length,
-                activeDrivers: this.activeDrivers.size
+                activeDrivers: this.activeDrivers.size,
             });
 
             return;
         }
 
         let page = null;
-        let lifecycleManager = null;
         let driver = null;
         let listeners = [];
+        let abortHandler = null;
 
         try {
+            // ✅ P1 BUG #4 FIX: Adiciona listener de abort (fail-fast durante execução)
+            if (signal) {
+                abortHandler = () => {
+                    log('WARN', `[DriverNERVAdapter] Abort signal received for task ${taskId}`, correlationId);
+
+                    // ✅ v3.0: Marca como aborting em Map separado
+                    this.abortedTasks.set(taskId, {
+                        aborting: true,
+                        abortReason: 'USER_ABORT',
+                        timestamp: Date.now(),
+                    });
+                };
+
+                signal.addEventListener('abort', abortHandler, { once: true });
+            }
+
             // ✅ 4. Aloca página do pool (com timeout)
+            const poolAcquireStart = Date.now();
             page = await Promise.race([
                 this.browserPool.allocate(task.spec.target),
-                this._timeout(ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS, 'browserPool.allocate')
+                this._timeout(ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS, 'browserPool.allocate'),
             ]);
 
             log('DEBUG', `[DriverNERVAdapter] Página alocada para task ${taskId}`, correlationId);
 
-            // ✅ 5. Cria DriverLifecycleManager (com timeout)
-            lifecycleManager = new DriverLifecycleManager(page, task, this.config);
+            // ✅ P0-U5: Update page taskId (temp → real)
+            if (this.browserPool.updatePageTaskId) {
+                this.browserPool.updatePageTaskId(page, taskId);
+            }
 
+            // ✅ 5. v3.0: Acquire driver do pool (pool-ready architecture)
             driver = await Promise.race([
-                lifecycleManager.acquire(),
-                this._timeout(ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS, 'lifecycleManager.acquire')
+                driverFactory.acquireFromPool(task.spec.target),
+                this._timeout(ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS, 'driverFactory.acquireFromPool'),
             ]);
 
-            // ✅ 6. Salva no Map com listeners array
-            this.activeDrivers.set(taskId, { lifecycleManager, listeners });
+            timings.poolAcquire = Date.now() - poolAcquireStart; // ✅ U4
+
+            log(
+                'DEBUG',
+                `[DriverNERVAdapter] Driver acquired from pool: ${driver.target} (busy=${driver.busy})`,
+                correlationId
+            );
+
+            // ✅ 6. v3.0: Attach context (page + signal + correlationId)
+            const attachStart = Date.now();
+            driver.attachContext(page, signal, correlationId);
+            timings.contextAttach = Date.now() - attachStart; // ✅ U4
+
+            log('DEBUG', `[DriverNERVAdapter] Context attached to driver (state=${driver.state})`, correlationId);
+
+            // ✅ 7. Salva no Map (driver direto, não LifecycleManager)
+            this.activeDrivers.set(taskId, driver);
 
             // ✅ 7. Conecta listeners de telemetria do driver
             listeners = this._attachDriverTelemetry(driver, taskId, correlationId);
 
-            // ✅ 8. Emite evento de início (duplo canal)
+            // ✅ 8. GARANTIA PRÉ-EXECUÇÃO: Driver ready check (ontológico)
+            // Valida que driver está pronto ANTES de emitir TASK_STARTED
+            if (!driver) {
+                throw new Error('[DriverNERVAdapter] Driver is null after acquire');
+            }
+
+            if (driver.destroyed) {
+                throw new Error('[DriverNERVAdapter] Driver is destroyed after acquire');
+            }
+
+            if (driver.state !== 'IDLE') {
+                log(
+                    'WARN',
+                    `[DriverNERVAdapter] Driver state is '${driver.state}' (expected 'IDLE'). ` +
+                        `Forçando reset para IDLE antes de executar.`,
+                    correlationId
+                );
+                driver.setState('IDLE');
+            }
+
+            // Validação adicional: Page ainda válida
+            if (!driver.page || driver.page.isClosed()) {
+                throw new Error('[DriverNERVAdapter] Driver page is null or closed after acquire');
+            }
+
+            log(
+                'DEBUG',
+                `[DriverNERVAdapter] ✅ Driver ready check passed: state=${driver.state}, destroyed=${driver.destroyed}, page.isClosed=${driver.page.isClosed()}`,
+                correlationId
+            );
+
+            // ✅ 9. Emite evento de início (duplo canal) - APENAS após validações
             this._emitBoth(
                 ADAPTER_EVENTS.TASK_STARTED,
                 ActionCode.DRIVER_TASK_STARTED,
@@ -534,75 +674,177 @@ class DriverNERVAdapter extends EventEmitter {
                     taskId,
                     target: task.spec.target,
                     driverType: driver.constructor.name,
-                    activeDrivers: this.activeDrivers.size
+                    driverState: driver.state,
+                    pageUrl: driver.page.url(),
+                    activeDrivers: this.activeDrivers.size,
                 },
                 correlationId
             );
 
-            // ✅ 9. Executa a tarefa (com timeout)
+            // ✅ 10. Executa a tarefa (com timeout)
+            const executeStart = Date.now();
             const result = await Promise.race([
                 driver.execute(task.spec.prompt),
-                this._timeout(ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS, 'driver.execute')
+                this._timeout(ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS, 'driver.execute'),
             ]);
+            timings.execute = Date.now() - executeStart; // ✅ U4
 
-            // ✅ 10. Calcula timing metrics
+            // ✅ 11. Calcula timing metrics
             const duration = Date.now() - startTime;
             this.stats.totalTaskDuration += duration;
             this.stats.maxTaskDuration = Math.max(this.stats.maxTaskDuration, duration);
             this.stats.minTaskDuration = Math.min(this.stats.minTaskDuration, duration);
 
-            // ✅ 11. Emite evento de conclusão (duplo canal)
+            // ✅ U4: Salva timing breakdown para agregação
+            timings.total = duration;
+            this._recordPerformanceMetrics(timings);
+
+            // ✅ V2.0: Salvar response ANTES de emitir evento (garante dados persistidos)
+            try {
+                await saveResponse(taskId, result, task);
+                log('INFO', `[DriverNERVAdapter] Response saved for task ${taskId}`, correlationId);
+            } catch (saveError) {
+                log(
+                    'ERROR',
+                    `[DriverNERVAdapter] Failed to save response for ${taskId}: ${saveError.message}`,
+                    correlationId
+                );
+                // Continua mesmo se salvar falhar (response ainda pode ser usada)
+            }
+
+            // ✅ 12. Emite evento de conclusão (duplo canal)
+            // ✅ V2.0: Inclui ResponseV2 completo no payload (não apenas status)
             this._emitBoth(
                 ADAPTER_EVENTS.TASK_COMPLETED,
                 ActionCode.DRIVER_TASK_COMPLETED,
                 {
                     taskId,
-                    result: {
-                        status: STATUS_VALUES.SUCCESS,
-                        outputLength: result?.length || 0,
-                        duration
-                    }
+                    result: result, // ✅ ResponseV2 object completo
+                    // ✅ U4: Performance breakdown
+                    timings: {
+                        poolAcquire: timings.poolAcquire,
+                        contextAttach: timings.contextAttach,
+                        execute: timings.execute,
+                        total: duration,
+                    },
                 },
                 correlationId
             );
 
             this.stats.tasksExecuted++;
 
-            // ✅ Circuit breaker: Record success
-            this._recordSuccess();
+            // ✅ U2: Circuit breaker success (per-target)
+            this._recordSuccess(task.spec.target || 'chatgpt');
         } catch (error) {
-            const isTimeout = error.name === 'TimeoutError';
+            // ✅ P1 BUG #4 FIX: Verifica se erro foi causado por abort
+            const abortEntry = this.abortedTasks.get(taskId);
+            const wasAborted = abortEntry && abortEntry.aborting;
 
-            log(
-                'ERROR',
-                `[DriverNERVAdapter] Falha na execução: ${error.message} ${isTimeout ? `(operation: ${error.operation})` : ''}`,
-                correlationId
-            );
+            if (wasAborted) {
+                // Caso especial: Task foi abortada (não é falha técnica)
+                log('WARN', `[DriverNERVAdapter] Task ${taskId} aborted during execution`, correlationId);
 
-            if (isTimeout) {
-                this.stats.tasksTimedOut++;
+                this._emitBoth(
+                    ADAPTER_EVENTS.TASK_ABORTED,
+                    ActionCode.DRIVER_TASK_ABORTED,
+                    {
+                        taskId,
+                        reason: abortEntry.abortReason || 'USER_ABORT',
+                        message: 'Task execution was aborted by AbortSignal',
+                    },
+                    correlationId
+                );
+
+                this.stats.tasksAborted++;
+
+                // NÃO incrementa driversCrashed nem record failure (não é falha)
+            } else {
+                // ✅ U5: Smart Retry Logic
+                const errorType = this._classifyError(error);
+                const canRetry = errorType === 'TRANSIENT' && retryCount < ADAPTER_CONFIG.MAX_RETRY_ATTEMPTS;
+
+                if (canRetry) {
+                    // Retry automático (exponential backoff: 1s → 2s → 4s)
+                    const backoffMs = ADAPTER_CONFIG.RETRY_BACKOFF_MS * Math.pow(2, retryCount);
+
+                    log(
+                        'WARN',
+                        `[DriverNERVAdapter] U5: TRANSIENT error detected. Retrying (${retryCount + 1}/${ADAPTER_CONFIG.MAX_RETRY_ATTEMPTS}) after ${backoffMs}ms backoff`,
+                        correlationId
+                    );
+
+                    this.stats.tasksRetried++;
+
+                    this._emitBoth(
+                        ADAPTER_EVENTS.TASK_RETRYING || ADAPTER_EVENTS.TASK_STARTED, // Fallback se evento não existe
+                        ActionCode.DRIVER_TASK_STARTED,
+                        {
+                            taskId,
+                            retryAttempt: retryCount + 1,
+                            maxRetries: ADAPTER_CONFIG.MAX_RETRY_ATTEMPTS,
+                            backoffMs,
+                            errorType,
+                        },
+                        correlationId
+                    );
+
+                    // Aguarda backoff antes de retry
+                    await new Promise(resolve => setTimeout(resolve, backoffMs));
+
+                    // Retry recursivo (incrementa retryCount)
+                    return this._executeTask(payload, correlationId, retryCount + 1);
+                }
+
+                // Não pode retry (FATAL ou max retries atingido)
+                const isTimeout = error.name === 'TimeoutError';
+
+                log(
+                    'ERROR',
+                    `[DriverNERVAdapter] U5: ${errorType} error - NO RETRY. ` +
+                        `Error: ${error.message} ${isTimeout ? `(operation: ${error.operation})` : ''}`,
+                    correlationId
+                );
+
+                if (retryCount > 0) {
+                    this.stats.retriesFailed++;
+                }
+
+                if (isTimeout) {
+                    this.stats.tasksTimedOut++;
+                }
+
+                this._emitBoth(
+                    ADAPTER_EVENTS.TASK_FAILED,
+                    ActionCode.DRIVER_TASK_FAILED,
+                    {
+                        taskId,
+                        error: error.message,
+                        errorType: error.constructor.name,
+                        isTimeout,
+                        operation: error.operation || 'unknown',
+                        errorClassification: errorType, // U5
+                        retriesAttempted: retryCount, // U5
+                    },
+                    correlationId
+                );
+
+                this.stats.driversCrashed++;
+
+                // ✅ U2: Circuit breaker failure (per-target)
+                const targetForFailure = task?.spec?.target || payload?.target || 'chatgpt';
+                this._recordFailure(targetForFailure);
+            }
+        } finally {
+            // ✅ P1 BUG #4 FIX: Remove listener de abort (cleanup)
+            if (signal && abortHandler) {
+                signal.removeEventListener('abort', abortHandler);
             }
 
-            this._emitBoth(
-                ADAPTER_EVENTS.TASK_FAILED,
-                ActionCode.DRIVER_TASK_FAILED,
-                {
-                    taskId,
-                    error: error.message,
-                    errorType: error.constructor.name,
-                    isTimeout,
-                    operation: error.operation || 'unknown'
-                },
-                correlationId
-            );
+            // ✅ v3.0: Cleanup de abortedTasks Map
+            this.abortedTasks.delete(taskId);
 
-            this.stats.driversCrashed++;
-
-            // ✅ Circuit breaker: Record failure
-            this._recordFailure();
-        } finally {
-            // ✅ 12. Cleanup robusto (com timeout e detach listeners)
-            await this._finallyCleanup(taskId, lifecycleManager, page, driver, listeners);
+            // ✅ 13. v3.0: Cleanup pool-ready (detach context + release to pool)
+            await this._finallyCleanup(taskId, page, driver, listeners);
         }
     }
 
@@ -646,7 +888,10 @@ class DriverNERVAdapter extends EventEmitter {
             // ✅ Release com timeout
             await Promise.race([lifecycleManager.release(), this._timeout(5000, 'lifecycleManager.release (abort)')]);
         } catch (err) {
+            // ✅ P1 BUG #5 FIX: Emite erro via telemetria completa
             log('ERROR', `[DriverNERVAdapter] Erro ao abortar task ${taskId}: ${err.message}`, correlationId);
+
+            await this._emitError('task_abort', err, taskId, correlationId, 'abort');
         } finally {
             this.activeDrivers.delete(taskId);
         }
@@ -656,7 +901,7 @@ class DriverNERVAdapter extends EventEmitter {
             ActionCode.DRIVER_TASK_ABORTED,
             {
                 taskId,
-                reason: 'USER_REQUESTED'
+                reason: 'USER_REQUESTED',
             },
             correlationId
         );
@@ -691,18 +936,22 @@ class DriverNERVAdapter extends EventEmitter {
             if (this.browserPool) {
                 browserPoolHealth = await Promise.race([
                     this.browserPool.getHealth(),
-                    this._timeout(5000, 'browserPool.getHealth')
+                    this._timeout(5000, 'browserPool.getHealth'),
                 ]);
             } else {
                 browserPoolHealth = { status: 'DEGRADED', reason: 'Pool not available' };
                 healthStatus = STATUS_VALUES.DEGRADED;
             }
         } catch (poolError) {
-            log('WARN', `[DriverNERVAdapter] Error getting browser pool health: ${poolError.message}`, correlationId);
+            // ✅ P1 BUG #5 FIX: Emite erro via telemetria completa
+            log('ERROR', `[DriverNERVAdapter] Health check failed: ${poolError.message}`, correlationId);
+
+            await this._emitError('health_check', poolError, null, correlationId, 'health_check');
+
             browserPoolHealth = {
                 status: 'ERROR',
                 error: poolError.message,
-                isTimeout: poolError.name === 'TimeoutError'
+                isTimeout: poolError.name === 'TimeoutError',
             };
             healthStatus = STATUS_VALUES.UNHEALTHY;
         }
@@ -712,10 +961,19 @@ class DriverNERVAdapter extends EventEmitter {
             activeDrivers: this.activeDrivers.size,
             queuedTasks: this.taskQueue.length,
             degradedMode: this.degradedMode,
-            circuitBreaker: {
-                state: this.circuitBreaker.state,
-                failures: this.circuitBreaker.failures,
-                threshold: this.circuitBreaker.threshold
+            // ✅ U2: Per-target circuit breakers
+            circuitBreakers: Array.from(this.circuitBreakers.entries()).map(([target, breaker]) => ({
+                target,
+                state: breaker.state,
+                failures: breaker.failures,
+                threshold: breaker.threshold,
+            })),
+            // ✅ U4: Performance metrics
+            performance: {
+                avgPoolAcquire: this.performanceMetrics.avgPoolAcquire,
+                avgContextAttach: this.performanceMetrics.avgContextAttach,
+                avgExecute: this.performanceMetrics.avgExecute,
+                avgTotal: this.performanceMetrics.avgTotal,
             },
             stats: { ...this.stats },
             browserPoolHealth,
@@ -724,9 +982,9 @@ class DriverNERVAdapter extends EventEmitter {
                 maxQueueSize: ADAPTER_CONFIG.MAX_QUEUE_SIZE,
                 executeTimeout: ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
                 shutdownTimeout: ADAPTER_CONFIG.SHUTDOWN_TIMEOUT_MS,
-                circuitBreakerThreshold: ADAPTER_CONFIG.CIRCUIT_BREAKER_THRESHOLD
+                circuitBreakerThreshold: ADAPTER_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
             },
-            uptime: Date.now() - this.stats.startTime
+            uptime: Date.now() - this.stats.startTime,
         };
 
         this._emitBoth(ADAPTER_EVENTS.HEALTH_CHECK, ActionCode.DRIVER_HEALTH_REPORT, health, correlationId);
@@ -740,6 +998,61 @@ class DriverNERVAdapter extends EventEmitter {
         );
 
         return health;
+    }
+
+    /**
+     * ✅ U4: Registra performance metrics (timing breakdown).
+     *
+     * Agrega timings para cálculo de médias.
+     * Mantém apenas últimos 100 samples (sliding window).
+     *
+     * @private
+     * @param {Object} timings - Timing breakdown
+     * @param {number} timings.poolAcquire - Pool acquire time (ms)
+     * @param {number} timings.contextAttach - Context attach time (ms)
+     * @param {number} timings.execute - Execute time (ms)
+     * @param {number} timings.total - Total time (ms)
+     * @returns {void}
+     */
+    _recordPerformanceMetrics(timings) {
+        const { poolAcquire, contextAttach, execute, total } = timings;
+
+        // Adiciona samples (limite 100 para sliding window)
+        if (poolAcquire !== null) {
+            this.performanceMetrics.poolAcquireTimes.push(poolAcquire);
+            if (this.performanceMetrics.poolAcquireTimes.length > 100) {
+                this.performanceMetrics.poolAcquireTimes.shift();
+            }
+        }
+
+        if (contextAttach !== null) {
+            this.performanceMetrics.contextAttachTimes.push(contextAttach);
+            if (this.performanceMetrics.contextAttachTimes.length > 100) {
+                this.performanceMetrics.contextAttachTimes.shift();
+            }
+        }
+
+        if (execute !== null) {
+            this.performanceMetrics.executeTimes.push(execute);
+            if (this.performanceMetrics.executeTimes.length > 100) {
+                this.performanceMetrics.executeTimes.shift();
+            }
+        }
+
+        if (total !== null) {
+            this.performanceMetrics.totalTimes.push(total);
+            if (this.performanceMetrics.totalTimes.length > 100) {
+                this.performanceMetrics.totalTimes.shift();
+            }
+        }
+
+        // Calcula médias (para health checks)
+        const avg = arr => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+
+        this.performanceMetrics.avgPoolAcquire = Math.round(avg(this.performanceMetrics.poolAcquireTimes));
+        this.performanceMetrics.avgContextAttach = Math.round(avg(this.performanceMetrics.contextAttachTimes));
+        this.performanceMetrics.avgExecute = Math.round(avg(this.performanceMetrics.executeTimes));
+        this.performanceMetrics.avgTotal = Math.round(avg(this.performanceMetrics.totalTimes));
     }
 
     /**
@@ -772,7 +1085,7 @@ class DriverNERVAdapter extends EventEmitter {
                 {
                     taskId,
                     stateTransition: data,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 },
                 correlationId
             );
@@ -788,7 +1101,7 @@ class DriverNERVAdapter extends EventEmitter {
                     taskId,
                     vitalType: 'PROGRESS',
                     data,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 },
                 correlationId
             );
@@ -807,7 +1120,7 @@ class DriverNERVAdapter extends EventEmitter {
                     taskId,
                     anomalyType: data.type,
                     severity: data.severity,
-                    details: data.message
+                    details: data.message,
                 },
                 correlationId
             );
@@ -876,7 +1189,6 @@ class DriverNERVAdapter extends EventEmitter {
      */
     async _emitEvent(actionCode, payload, correlationId) {
         const maxRetries = ADAPTER_CONFIG.EVENT_RETRY_MAX_ATTEMPTS;
-        let lastError = null;
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
@@ -889,20 +1201,21 @@ class DriverNERVAdapter extends EventEmitter {
 
                 return; // Success
             } catch (err) {
-                lastError = err;
+                // Unused but kept for potential future debugging
+                const _lastError = err;
 
                 if (attempt < maxRetries - 1) {
                     const backoff = ADAPTER_CONFIG.EVENT_RETRY_BACKOFF_MS * (attempt + 1);
                     log(
                         'WARN',
-                        `[DriverNERVAdapter] Falha ao emitir evento (tentativa ${attempt + 1}/${maxRetries}): ${err.message}`,
+                        `[DriverNERVAdapter] Falha ao emitir evento (tentativa ${attempt + 1}/${maxRetries}): ${_lastError.message}`,
                         correlationId
                     );
                     await new Promise(resolve => setTimeout(resolve, backoff));
                 } else {
                     log(
                         'ERROR',
-                        `[DriverNERVAdapter] Falha permanente ao emitir evento após ${maxRetries} tentativas: ${err.message}`,
+                        `[DriverNERVAdapter] Falha permanente ao emitir evento após ${maxRetries} tentativas: ${_lastError.message}`,
                         correlationId
                     );
 
@@ -914,7 +1227,7 @@ class DriverNERVAdapter extends EventEmitter {
                         operation: '_emitEvent',
                         actionCode,
                         error: err.message,
-                        retries: maxRetries
+                        retries: maxRetries,
                     });
                 }
             }
@@ -962,7 +1275,7 @@ class DriverNERVAdapter extends EventEmitter {
             actionCode,
             payload,
             correlationId,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
 
         // Flush se buffer cheio
@@ -997,6 +1310,53 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     /**
+     * ✅ P1 BUG #5 FIX: Template unificado para emissão de erros
+     * Garante telemetria completa (local + NERV) em todos os pontos de falha.
+     *
+     * @private
+     * @async
+     *
+     * @param {string} operation - Nome da operação que falhou
+     * @param {Error} error - Error object
+     * @param {string} taskId - Task ID (pode ser null se erro pré-task)
+     * @param {string} correlationId - NERV correlation ID
+     * @param {string} phase - Phase onde erro ocorreu ('allocate', 'acquire', 'execute', 'release')
+     *
+     * @returns {Promise<void>}
+     */
+    async _emitError(operation, error, taskId, correlationId, phase) {
+        // 1. Log detalhado
+        log('ERROR', `[DriverNERVAdapter] ${operation} failed: ${error.message}`, {
+            taskId,
+            correlationId,
+            phase,
+            stack: error.stack,
+        });
+
+        // 2. Emite local + NERV
+        await this._emitBoth(
+            ADAPTER_EVENTS.ERROR,
+            ActionCode.DRIVER_ERROR,
+            {
+                taskId,
+                operation,
+                error: error.message,
+                errorType: error.constructor.name,
+                stack: error.stack,
+                phase,
+                timestamp: Date.now(),
+            },
+            correlationId
+        );
+
+        // 3. Atualiza stats
+        this.stats.tasksRejected++;
+
+        // 4. Circuit breaker check (opcional - pode descomentar se necessário)
+        // this._checkCircuitBreaker();
+    }
+
+    /**
      * Cria promise que rejeita após timeout (helper).
      *
      * ✅ v2.0: Helper para Promise.race timeout protection
@@ -1022,21 +1382,24 @@ class DriverNERVAdapter extends EventEmitter {
     /**
      * Cleanup final robusto (always executes).
      *
+     * ✅ v3.0 (C4): Atomic cleanup - activeDrivers.delete() ANTES de processar fila.
      * ✅ v2.0: Detach listeners, release resources, process queue
+     *
+     * C4 FIX: Garante que activeDrivers.size está correto ANTES de checar capacidade
+     * para processar próxima task na fila (elimina race condition).
      *
      * @private
      * @async
      *
      * @param {string} taskId - Task ID
-     * @param {Object} lifecycleManager - DriverLifecycleManager instance
      * @param {Object} page - Puppeteer page
      * @param {Object} driver - Driver instance
      * @param {Array<Object>} listeners - Array de listeners
      *
      * @returns {Promise<void>}
      */
-    async _finallyCleanup(taskId, lifecycleManager, page, driver, listeners) {
-        // ✅ 1. Detach listeners
+    async _finallyCleanup(taskId, page, driver, listeners) {
+        // ✅ 1. Detach listeners ANTES de qualquer cleanup (P0 Bug #1 Fix)
         if (driver && listeners && listeners.length > 0) {
             try {
                 this._detachDriverTelemetry(driver, listeners);
@@ -1045,21 +1408,33 @@ class DriverNERVAdapter extends EventEmitter {
             }
         }
 
-        // ✅ 2. Release lifecycle manager
-        if (lifecycleManager) {
+        // ✅ 2. v3.0 (C2): Detach context + release to pool (FORCE detach para garantir)
+        if (driver) {
             try {
-                await Promise.race([
-                    lifecycleManager.release(),
-                    this._timeout(5000, 'lifecycleManager.release (finally)')
-                ]);
-            } catch (err) {
-                log('WARN', `[DriverNERVAdapter] Error releasing lifecycle manager: ${err.message}`);
-            }
+                // ✅ C2: Force detach (garante detach mesmo se erro/estado inválido)
+                driver.detachContext({ force: true });
 
-            this.activeDrivers.delete(taskId);
+                log('DEBUG', `[DriverNERVAdapter] Context detached from driver (state=${driver.state})`);
+
+                // Release driver back to pool (IDLE state)
+                await Promise.race([
+                    driverFactory.releaseToPool(driver),
+                    this._timeout(5000, 'driverFactory.releaseToPool (finally)'),
+                ]);
+
+                log('DEBUG', `[DriverNERVAdapter] Driver released to pool (target=${driver.target})`);
+            } catch (err) {
+                log('WARN', `[DriverNERVAdapter] Error detaching/releasing driver: ${err.message}`);
+            }
         }
 
-        // ✅ 3. Release page
+        // ✅ C4: CRITICAL - Cleanup do Map ANTES de processar fila
+        // Garante que activeDrivers.size está correto na check de capacidade
+        if (taskId) {
+            this._cleanupDriver(taskId);
+        }
+
+        // ✅ 4. Release page
         if (page && this.browserPool) {
             try {
                 await Promise.race([this.browserPool.release(page), this._timeout(5000, 'browserPool.release')]);
@@ -1068,45 +1443,114 @@ class DriverNERVAdapter extends EventEmitter {
             }
         }
 
-        // ✅ 4. Process next task from queue
-        if (this.taskQueue.length > 0 && this.activeDrivers.size < ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS) {
-            const next = this.taskQueue.shift();
-
-            log('DEBUG', `[DriverNERVAdapter] Processing queued task (${this.taskQueue.length} remaining)`);
-
-            // Execute async (não bloqueia cleanup)
-            setImmediate(() => {
-                this._executeTask(next.payload, next.correlationId).catch(err => {
-                    log('ERROR', `[DriverNERVAdapter] Error executing queued task: ${err.message}`);
-                });
-            });
-        }
+        // ✅ C4: Process next task from queue APÓS cleanup (activeDrivers.size correto)
+        this._processNextQueuedTask();
     }
 
     /**
-     * Verifica se pode executar task (circuit breaker check).
+     * ✅ C4: Process next task from queue (extracted method).
      *
-     * ✅ v2.0: Circuit breaker pattern (CLOSED, OPEN, HALF_OPEN)
+     * PRÉ-CONDIÇÃO: activeDrivers.delete() já foi executado (activeDrivers.size correto).
+     * Valida capacidade (MAX_ACTIVE_DRIVERS) antes de executar.
+     *
+     * @private
+     * @returns {void}
+     */
+    _processNextQueuedTask() {
+        if (this.taskQueue.length === 0) {
+            // Nada na fila
+            return;
+        }
+
+        // ✅ C4: Check capacidade COM activeDrivers.size correto
+        if (this.activeDrivers.size >= ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS) {
+            log(
+                'DEBUG',
+                `[DriverNERVAdapter] C4: Queue has ${this.taskQueue.length} tasks but MAX_ACTIVE_DRIVERS ` +
+                    `reached (${this.activeDrivers.size}/${ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS}). Waiting...`
+            );
+            return;
+        }
+
+        const next = this.taskQueue.shift();
+
+        log(
+            'DEBUG',
+            `[DriverNERVAdapter] C4: Processing queued task ` +
+                `(${this.taskQueue.length} remaining, ${this.activeDrivers.size} active)`
+        );
+
+        // Execute async (não bloqueia cleanup)
+        setImmediate(() => {
+            this._executeTask(next.payload, next.correlationId).catch(err => {
+                log('ERROR', `[DriverNERVAdapter] C4: Error executing queued task: ${err.message}`);
+            });
+        });
+    }
+
+    /**
+     * Cleanup robusto de driver do activeDrivers Map.
+     * ✅ P0 Bug #1 Fix: Detach listeners antes de delete (memory leak prevention)
+     * ✅ Garantia Ontológica: Valida que apenas 1 driver existe por page
      *
      * @private
      *
+     * @param {string} taskId - Task ID para cleanup
+     *
+     * @returns {void}
+     */
+    _cleanupDriver(taskId) {
+        const driver = this.activeDrivers.get(taskId);
+
+        if (!driver) {
+            // Já foi cleaned up (idempotência)
+            return;
+        }
+
+        // ✅ v3.0: Remove do Map (memory leak fix)
+        this.activeDrivers.delete(taskId);
+
+        log('DEBUG', `[DriverNERVAdapter] Task ${taskId} cleaned from activeDrivers Map (driver=${driver.target})`);
+    }
+
+    /**
+     * ✅ U2: Verifica se pode executar task (per-target circuit breaker check).
+     *
+     * Fault isolation: Circuit breaker isolado por target.
+     * Falhas em chatgpt NÃO afetam gemini.
+     *
+     * @private
+     * @param {string} target - Target name (chatgpt, gemini, etc)
      * @returns {boolean} true se pode executar, false se circuit breaker OPEN
      */
-    _canExecute() {
-        const { state, failures, threshold, timeout, lastFailureTime } = this.circuitBreaker;
+    _canExecute(target) {
+        // ✅ U2: Lazy initialization do circuit breaker por target
+        if (!this.circuitBreakers.has(target)) {
+            this.circuitBreakers.set(target, {
+                state: 'CLOSED',
+                failures: 0,
+                threshold: ADAPTER_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
+                timeout: ADAPTER_CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS,
+                lastFailureTime: null,
+            });
+        }
+
+        const breaker = this.circuitBreakers.get(target);
+        const { state, failures, threshold, timeout, lastFailureTime } = breaker;
 
         if (state === 'CLOSED') return true;
 
         if (state === 'OPEN') {
             // Check se timeout passou (recovery)
             if (Date.now() - lastFailureTime > timeout) {
-                this.circuitBreaker.state = 'HALF_OPEN';
-                log('INFO', '[DriverNERVAdapter] Circuit breaker HALF_OPEN (recovery attempt)');
+                breaker.state = 'HALF_OPEN';
+                log('INFO', `[DriverNERVAdapter] U2: Circuit breaker HALF_OPEN for ${target} (recovery attempt)`);
 
                 this.emit(ADAPTER_EVENTS.CIRCUIT_BREAKER_CLOSED, {
+                    target,
                     state: 'HALF_OPEN',
                     failures: failures,
-                    threshold: threshold
+                    threshold: threshold,
                 });
 
                 return true;
@@ -1122,56 +1566,164 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     /**
-     * Registra sucesso de task (circuit breaker).
+     * ✅ U2: Registra sucesso de task (per-target circuit breaker).
      *
-     * ✅ v2.0: Reset failures em sucesso
+     * Reset failures para target específico.
      *
      * @private
-     *
+     * @param {string} target - Target name
      * @returns {void}
      */
-    _recordSuccess() {
-        if (this.circuitBreaker.state === 'HALF_OPEN') {
-            this.circuitBreaker.state = 'CLOSED';
-            log('INFO', '[DriverNERVAdapter] Circuit breaker CLOSED (recovered)');
+    _recordSuccess(target) {
+        if (!this.circuitBreakers.has(target)) return;
+
+        const breaker = this.circuitBreakers.get(target);
+
+        if (breaker.state === 'HALF_OPEN') {
+            breaker.state = 'CLOSED';
+            log('INFO', `[DriverNERVAdapter] U2: Circuit breaker CLOSED for ${target} (recovered)`);
 
             this.emit(ADAPTER_EVENTS.CIRCUIT_BREAKER_CLOSED, {
+                target,
                 state: 'CLOSED',
-                previousFailures: this.circuitBreaker.failures
+                previousFailures: breaker.failures,
             });
         }
 
-        this.circuitBreaker.failures = 0;
+        breaker.failures = 0;
     }
 
     /**
-     * Registra falha de task (circuit breaker).
+     * ✅ U5: Classifica erro como TRANSIENT (retriable) ou FATAL (não retriable).
+     * ✅ BUG-03 FIXED: Page closed/disconnected são FATAL (não retry).
      *
-     * ✅ v2.0: Incrementa failures, abre circuit breaker se threshold atingido
+     * TRANSIENT errors (retry recommended):
+     * - Network errors (ECONNREFUSED, ENOTFOUND, etc)
+     * - Timeout errors
+     * - 502/503/504 HTTP errors
+     * - Navigation timeout (recoverable)
+     *
+     * FATAL errors (não retry):
+     * - Page closed by user
+     * - Page disconnected
+     * - Target closed
+     * - Browser disconnected
+     * - AbortSignal (user requested)
+     * - Validation errors
+     * - 400/401/403/404 HTTP errors
+     * - Driver destroyed
      *
      * @private
+     * @param {Error} error - Error object
+     * @returns {string} 'TRANSIENT' | 'FATAL'
+     */
+    _classifyError(error) {
+        const message = error.message || '';
+        const name = error.name || '';
+
+        // ✅ BUG-03 FIX: FATAL - Page lifecycle errors (não retry)
+        if (
+            message.includes('Page closed') ||
+            message.includes('page.isClosed()') ||
+            message.includes('target closed') ||
+            message.includes('Target closed') ||
+            message.includes('Page is null or closed') ||
+            message.includes('Browser disconnected') ||
+            message.includes('Session closed') ||
+            message.includes('Protocol error') ||
+            message.includes('Target.sendMessageToTarget')
+        ) {
+            return 'FATAL';
+        }
+
+        // TRANSIENT: Network errors
+        if (
+            message.includes('ECONNREFUSED') ||
+            message.includes('ENOTFOUND') ||
+            message.includes('ETIMEDOUT') ||
+            message.includes('ECONNRESET') ||
+            message.includes('socket hang up')
+        ) {
+            return 'TRANSIENT';
+        }
+
+        // TRANSIENT: Timeout errors (exceto page closed timeout)
+        if (name === 'TimeoutError' || message.includes('timeout')) {
+            return 'TRANSIENT';
+        }
+
+        // TRANSIENT: HTTP 5xx errors (server-side)
+        if (message.match(/502|503|504/)) {
+            return 'TRANSIENT';
+        }
+
+        // FATAL: User abort
+        if (message.includes('abort') || name === 'AbortError') {
+            return 'FATAL';
+        }
+
+        // FATAL: Validation errors
+        if (message.includes('validation') || message.includes('invalid')) {
+            return 'FATAL';
+        }
+
+        // FATAL: HTTP 4xx errors (client-side)
+        if (message.match(/400|401|403|404/)) {
+            return 'FATAL';
+        }
+
+        // FATAL: Driver destroyed
+        if (message.includes('destroyed') || message.includes('Driver is null')) {
+            return 'FATAL';
+        }
+
+        // Default: TRANSIENT (conservative approach - prefer retry)
+        return 'TRANSIENT';
+    }
+
+    /**
+     * ✅ U2: Registra falha de task (per-target circuit breaker).
      *
+     * Incrementa failures para target específico.
+     * Fault isolation: Falhas em chatgpt NÃO afetam gemini.
+     *
+     * @private
+     * @param {string} target - Target name
      * @returns {void}
      *
      * @emits ADAPTER_EVENTS.CIRCUIT_BREAKER_OPEN quando threshold atingido
      */
-    _recordFailure() {
-        this.circuitBreaker.failures++;
-        this.circuitBreaker.lastFailureTime = Date.now();
+    _recordFailure(target) {
+        if (!this.circuitBreakers.has(target)) {
+            // Lazy init
+            this.circuitBreakers.set(target, {
+                state: 'CLOSED',
+                failures: 0,
+                threshold: ADAPTER_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
+                timeout: ADAPTER_CONFIG.CIRCUIT_BREAKER_TIMEOUT_MS,
+                lastFailureTime: null,
+            });
+        }
 
-        if (this.circuitBreaker.failures >= this.circuitBreaker.threshold) {
-            this.circuitBreaker.state = 'OPEN';
+        const breaker = this.circuitBreakers.get(target);
+
+        breaker.failures++;
+        breaker.lastFailureTime = Date.now();
+
+        if (breaker.failures >= breaker.threshold) {
+            breaker.state = 'OPEN';
             this.stats.circuitBreakerTrips++;
 
             log(
                 'WARN',
-                `[DriverNERVAdapter] Circuit breaker OPEN (${this.circuitBreaker.failures} failures >= ${this.circuitBreaker.threshold} threshold)`
+                `[DriverNERVAdapter] U2: Circuit breaker OPEN for ${target} (${breaker.failures} failures >= ${breaker.threshold} threshold)`
             );
 
             this.emit(ADAPTER_EVENTS.CIRCUIT_BREAKER_OPEN, {
-                failures: this.circuitBreaker.failures,
-                threshold: this.circuitBreaker.threshold,
-                timeout: this.circuitBreaker.timeout
+                target,
+                failures: breaker.failures,
+                threshold: breaker.threshold,
+                timeout: breaker.timeout,
             });
         }
     }
@@ -1236,7 +1788,7 @@ class DriverNERVAdapter extends EventEmitter {
 
             this.emit(ADAPTER_EVENTS.DEGRADED_MODE, {
                 reason: 'Browser Pool not available',
-                suggestion: 'Configure browserEndpoint/proxy e reinicie'
+                suggestion: 'Configure browserEndpoint/proxy e reinicie',
             });
 
             this.stats.degradedModeWarnings++;
@@ -1347,7 +1899,7 @@ class DriverNERVAdapter extends EventEmitter {
             total: results.length,
             success: successCount,
             failed: failedCount,
-            duration
+            duration,
         };
 
         // ✅ 5. Emit shutdown event
@@ -1389,8 +1941,8 @@ class DriverNERVAdapter extends EventEmitter {
             circuitBreaker: {
                 state: this.circuitBreaker.state,
                 failures: this.circuitBreaker.failures,
-                threshold: this.circuitBreaker.threshold
-            }
+                threshold: this.circuitBreaker.threshold,
+            },
         };
     }
 }

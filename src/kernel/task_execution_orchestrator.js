@@ -41,7 +41,7 @@ class TaskExecutionOrchestrator {
         this.nerv = nerv;
         this.nervBridge = nervBridge;
 
-        // Cache de execuções em andamento: task_id → correlationId
+        // Cache de execuções em andamento: task_id → { task, correlationId, startedAt }
         this.activeExecutions = new Map();
 
         // Setup de listeners NERV
@@ -67,8 +67,12 @@ class TaskExecutionOrchestrator {
         // 1. Hook: beforeExecution (orchestrator prepara task)
         const preparedTask = this.nervBridge.beforeTaskExecution(task);
 
-        // 2. Cacheia correlationId para afterExecution
-        this.activeExecutions.set(taskId, correlationId);
+        // 2. Cacheia task completa + correlationId para afterExecution
+        this.activeExecutions.set(taskId, {
+            task: preparedTask,
+            correlationId,
+            startedAt: Date.now()
+        });
 
         // 3. Emite comando para Driver executar task
         this.nervBridge.emitCommand({
@@ -115,24 +119,24 @@ class TaskExecutionOrchestrator {
     async _handleTaskCompleted(payload, correlationId) {
         const { taskId, result } = payload;
 
-        if (!this.activeExecutions.has(taskId)) {
+        // Recupera task do cache
+        const cached = this.activeExecutions.get(taskId);
+        if (!cached) {
             // Task não estava sendo orquestrada (pode ser V1.x ou external)
             return;
         }
 
-        logger.log('INFO', `[TaskExecutionOrchestrator] Task completada: ${taskId}`, correlationId);
+        const task = cached.task;
+        const executionDuration = Date.now() - cached.startedAt;
 
-        // Recupera task (precisamos reconstruir ou ter cache)
-        // NOTA: Por ora, vamos assumir que o resultado vem com a task
-        // Em implementação completa, precisaríamos de um cache de tasks
-        const executionResult = result || {};
+        logger.log(
+            'INFO',
+            `[TaskExecutionOrchestrator] Task completada: ${taskId} (${executionDuration}ms)`,
+            correlationId
+        );
 
         // Hook: afterExecution (orchestrator decide próxima ação)
-        // NOTA: Precisamos da task original aqui. Por ora, vamos usar um placeholder.
-        // Na implementação completa, cachearíamos a task no beforeExecution.
-        const task = { meta: { id: taskId } }; // Placeholder
-
-        const decision = await this.nervBridge.afterTaskExecution(task, executionResult);
+        const decision = await this.nervBridge.afterTaskExecution(task, result);
 
         logger.log('DEBUG', `[TaskExecutionOrchestrator] Decisão: ${decision.action} para task ${taskId}`, correlationId);
 
@@ -151,7 +155,8 @@ class TaskExecutionOrchestrator {
     async _handleTaskFailed(payload, correlationId) {
         const { taskId, error } = payload;
 
-        if (!this.activeExecutions.has(taskId)) {
+        const cached = this.activeExecutions.get(taskId);
+        if (!cached) {
             return;
         }
 

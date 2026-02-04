@@ -25,6 +25,7 @@
 // ^ Desabilita 'no-undef' porque código usa APIs browser (document, window, CSS)
 
 const i18n = require('@core/i18n');
+const io = require('@infra/io');
 
 /* ==========================================================================
    CONFIGURATION & CONSTANTS
@@ -492,6 +493,36 @@ async function findChatInputSelector(page, langCode = 'en') {
         // v4.0: Cache result
         if (result) {
             detectionCache.set(cacheKey, { result, timestamp: Date.now() });
+
+            // ✅ v5.0: AUTO-EVOLUTION - Persist to DNA if confidence >= 75
+            if (result.confidence >= 75 && result.protocol) {
+                try {
+                    const domain = new URL(page.url()).hostname;
+                    const evolutionResult = await io.evolveWithSadiProtocol(
+                        {
+                            target: 'textarea, div[contenteditable="true"], [role="textbox"]',
+                            selector: result.protocol.selector,
+                            confidence: Math.min(result.confidence, 100), // Cap at 100
+                            shadowRoot: result.protocol.isShadowRoot || false,
+                        },
+                        domain,
+                        'input_box'
+                    );
+
+                    if (evolutionResult.accepted) {
+                        debug(
+                            'findChatInputSelector: DNA evolved - %s (confidence %d)',
+                            result.protocol.selector,
+                            result.confidence
+                        );
+                    } else {
+                        debug('findChatInputSelector: DNA evolution rejected - %s', evolutionResult.reason);
+                    }
+                } catch (evolutionError) {
+                    // Graceful degradation - don't fail if evolution fails
+                    console.warn('[SADI] DNA evolution failed:', evolutionError.message);
+                }
+            }
         }
 
         return result;

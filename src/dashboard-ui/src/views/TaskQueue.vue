@@ -149,11 +149,12 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useTaskStore } from '@/stores/tasks';
 import { useRealtime } from '@/composables/useRealtime';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { useTaskStore } from '@/stores/tasks';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+// TODO: Substituir por componentes customizados
+// import { ElMessage, ElMessageBox } from 'element-plus';
 
 export default {
     name: 'TaskQueue',

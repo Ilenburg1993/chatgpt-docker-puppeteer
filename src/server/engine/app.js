@@ -28,7 +28,13 @@ const app = express();
 /* --------------------------------------------------------------------------
    0.5 PROXY AWARENESS (OBRIGATÓRIO EM CONTAINER / LB)
 -------------------------------------------------------------------------- */
-app.set('trust proxy', true);
+// Apenas para dev local: trust apenas loopback
+// Em produção: configure explicitamente o número de proxies
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1); // Trust first proxy only
+} else {
+    app.set('trust proxy', 'loopback'); // Trust apenas 127.0.0.1, ::1
+}
 
 /* --------------------------------------------------------------------------
    1. TRACEABILITY ABSOLUTA
@@ -72,7 +78,15 @@ const allowedOrigins = new Set(
     [
         'http://localhost:3008',
         'http://127.0.0.1:3008',
-        process.env.DASHBOARD_ORIGIN
+        'http://localhost:5173', // Vite dev server (porta padrão)
+        'http://localhost:5174', // Vite dev server (porta alternativa)
+        'http://localhost:5175', // Vite dev server (porta alternativa 2)
+        'http://localhost:5176', // Vite dev server (porta alternativa 3)
+        'http://172.17.0.2:5173', // Vite network access
+        'http://172.17.0.2:5174', // Vite network access (alt)
+        'http://172.17.0.2:5175', // Vite network access (alt 2)
+        'http://172.17.0.2:5176', // Vite network access (alt 3)
+        process.env.DASHBOARD_ORIGIN,
     ].filter(Boolean)
 );
 
@@ -103,7 +117,13 @@ const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    skip: req => {
+        // Skip rate limit para dev mode (requests locais)
+        const isDev = process.env.NODE_ENV !== 'production';
+        const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+        return isDev && isLocal;
+    },
 });
 
 /* --------------------------------------------------------------------------

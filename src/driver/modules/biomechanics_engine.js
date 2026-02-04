@@ -258,7 +258,7 @@ class BiomechanicsEngine extends EventEmitter {
      *
      * Cache com TTL: re-detecta após MODIFIER_CACHE_TTL_MS (default: 1h).
      *
-     * @returns {Promise<string|null>} 'Meta' (Mac), 'Control' (Win/Linux), null (mobile)
+     * @returns {Promise<string|null>} 'Control' (Win/Linux), null (mobile)
      *
      * @example
      * const mod = await engine.getModifier(); // 'Control' no Windows
@@ -287,11 +287,10 @@ class BiomechanicsEngine extends EventEmitter {
                 return (navigator.platform || '').toLowerCase();
             });
 
-            if (platform.includes('mac')) {
-                this.modifier = 'Meta';
-            } else if (platform === 'mobile') {
+            if (platform === 'mobile') {
                 this.modifier = null;
             } else {
+                // Windows/Linux sempre usa Control
                 this.modifier = 'Control';
             }
 

@@ -20,6 +20,8 @@
 
 const TargetDriver = require('./TargetDriver');
 const { log } = require('@core/logger');
+const DriverReadinessGuard = require('../guards/DriverReadinessGuard');
+const PageSessionTracker = require('../trackers/PageSessionTracker');
 
 /* ==========================================================================
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
@@ -75,28 +77,33 @@ class BaseDriver extends TargetDriver {
     /**
      * Construtor do BaseDriver - Orquestrador modular de execução.
      *
-     * @param {object} page - Instância ativa do Puppeteer
+     * ✅ v3.0: BREAKING CHANGE - Constructor recebe APENAS config
+     * - page e signal são null inicialmente (herdados de TargetDriver)
+     * - Use attachContext(page, signal) antes de executar
+     *
      * @param {object} config - Configuração da tarefa (clonada)
-     * @param {AbortSignal} signal - Sinal soberano de interrupção
+     * @param {string} config.target - Target específico (chatgpt, gemini, etc)
      *
      * @throws {Error} MODULE_INSTANTIATION_FAILED - Se subsistema falhar ao inicializar
      */
-    constructor(page, config, signal) {
-        super(page, config, signal);
+    constructor(config) {
+        super(config);
 
         // ✅ v2.0: Readonly properties
         Object.defineProperty(this, 'name', {
             value: 'BaseUniversalDriver',
             writable: false,
-            enumerable: true
+            enumerable: true,
         });
 
-        this.currentDomain = this._updateDomain();
+        // ✅ v3.0: currentDomain será atualizado quando page for attached
+        this.currentDomain = null;
 
         // ✅ v2.0: Auto-generate correlation ID
         this.correlationId = this._generateCorrelationId();
 
         // [V800] Instanciação da Malha Modular de Execução
+        // ✅ v3.0: Módulos instanciados IMEDIATAMENTE (não precisam de page)
         try {
             this.recovery = new RecoverySystem(this);
             this.handles = new HandleManager(this);
@@ -104,6 +111,12 @@ class BaseDriver extends TargetDriver {
             this.frameNavigator = new FrameNavigator(this);
             this.biomechanics = new BiomechanicsEngine(this);
             this.submission = new SubmissionController(this);
+
+            // ✅ Phase 1 (P0-U4): Readiness guard (pre-execution validation)
+            this.readinessGuard = new DriverReadinessGuard(this);
+
+            // ✅ Phase 2 (P1-U1): Session tracker (adaptive timeout)
+            this.sessionTracker = new PageSessionTracker(this);
 
             // ✅ v2.0: Validate module instantiation
             this._validateModules();
@@ -141,7 +154,9 @@ class BaseDriver extends TargetDriver {
             'inputResolver',
             'frameNavigator',
             'biomechanics',
-            'submission'
+            'submission',
+            'readinessGuard', // ✅ Phase 1 (P0-U4)
+            'sessionTracker', // ✅ Phase 2 (P1-U1)
         ];
 
         for (const moduleName of requiredModules) {
@@ -152,7 +167,7 @@ class BaseDriver extends TargetDriver {
     }
 
     /**
-     * Propaga correlation ID para TODOS os 6 módulos.
+     * Propaga correlation ID para TODOS os 8 módulos (v3.1 - Phase 2).
      * @private
      */
     _propagateCorrelationToModules() {
@@ -162,7 +177,9 @@ class BaseDriver extends TargetDriver {
             this.inputResolver,
             this.frameNavigator,
             this.biomechanics,
-            this.submission
+            this.submission,
+            this.readinessGuard, // ✅ Phase 1 (P0-U4)
+            this.sessionTracker, // ✅ Phase 2 (P1-U1)
         ];
 
         modules.forEach(module => {
@@ -214,10 +231,33 @@ class BaseDriver extends TargetDriver {
         this._emitVital('RETRY_BACKOFF', {
             attempt,
             delay,
-            type: RETRY_BACKOFF_TYPE
+            type: RETRY_BACKOFF_TYPE,
         });
 
         await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    /**
+     * Calcula timeout adaptativo baseado em métricas de sessão.
+     * ✅ Phase 2 (P1-U2): Adaptive timeout adjustment
+     *
+     * @param {number} baseTimeout - Timeout base em milliseconds
+     * @returns {number} Timeout ajustado (baseTimeout * multiplier)
+     * @private
+     */
+    _calculateAdaptiveTimeout(baseTimeout) {
+        const multiplier = this.sessionTracker.getTimeoutMultiplier();
+        const adjustedTimeout = Math.round(baseTimeout * multiplier);
+
+        if (multiplier > 1.0) {
+            log(
+                'DEBUG',
+                `[BASEDRIVER] Adaptive timeout: ${baseTimeout}ms → ${adjustedTimeout}ms (${multiplier}x)`,
+                this.correlationId
+            );
+        }
+
+        return adjustedTimeout;
     }
 
     /**
@@ -254,7 +294,7 @@ class BaseDriver extends TargetDriver {
             type,
             payload,
             correlationId: this.correlationId,
-            ts: Date.now()
+            ts: Date.now(),
         });
     }
 
@@ -299,7 +339,7 @@ class BaseDriver extends TargetDriver {
         if (emitEvent && previousDomain && previousDomain !== this.currentDomain) {
             this._emitVital('DOMAIN_CHANGED', {
                 from: previousDomain,
-                to: this.currentDomain
+                to: this.currentDomain,
             });
         }
 
@@ -319,7 +359,7 @@ class BaseDriver extends TargetDriver {
             inputResolver: this.inputResolver
                 ? {
                       status: 'healthy',
-                      cacheSize: this.inputResolver.cacheSize || 0
+                      cacheSize: this.inputResolver.cacheSize || 0,
                   }
                 : 'missing',
             frameNavigator: this.frameNavigator ? 'healthy' : 'missing',
@@ -327,9 +367,9 @@ class BaseDriver extends TargetDriver {
             submission: this.submission
                 ? {
                       status: 'healthy',
-                      locked: this.submission.isLocked?.() || false
+                      locked: this.submission.isLocked?.() || false,
                   }
-                : 'missing'
+                : 'missing',
         };
     }
 
@@ -369,17 +409,55 @@ class BaseDriver extends TargetDriver {
         const startTime = Date.now();
         const timings = {};
 
+        // ✅ Phase 2 (P1-U1): Record turn start
+        const turnNumber = this.sessionTracker.recordTurn();
+
         // ✅ v2.0: Emit execution start
         this._emitVital('EXECUTION_START', {
             taskId,
             textLength: text.length,
-            correlationId: this.correlationId
+            correlationId: this.correlationId,
+            turnNumber, // ✅ Phase 2: Include turn number
         });
 
         // ====================================================================
-        // 0. VALIDAÇÃO DE PRÉ-REQUISITOS
+        // 0A. PRE-EXECUTION READINESS CHECK (Phase 1 - P0-U4)
         // ====================================================================
-        let stepStart = Date.now();
+        stepStart = Date.now();
+
+        // ✅ Phase 2 (P1-U2): Apply adaptive timeout
+        const baseStabilityTimeout = 10000; // 10s base
+        const adaptiveStabilityTimeout = this._calculateAdaptiveTimeout(baseStabilityTimeout);
+
+        const readiness = await this.readinessGuard.validateReadiness({
+            stabilityTimeout: adaptiveStabilityTimeout, // ✅ Phase 2: Adaptive timeout
+            skipTriage: false,
+            skipSession: true, // Phase 1: Session tracking not implemented yet
+        });
+
+        timings.readinessCheck = Date.now() - stepStart;
+
+        // ✅ Phase 1: Emit readiness check result
+        this._emitVital('READINESS_CHECK', {
+            ready: readiness.ready,
+            checksPass: readiness.checks.filter(c => c.passed).length,
+            checksFail: readiness.checks.filter(c => !c.passed).length,
+            issues: readiness.issues,
+            duration: timings.readinessCheck,
+        });
+
+        // ✅ Phase 1: Abort if NOT ready
+        if (!readiness.ready) {
+            const fatalIssues = readiness.issues.filter(i => i.severity === 'FATAL');
+            const error = new Error('READINESS_CHECK_FAILED: ' + fatalIssues.map(i => i.message).join('; '));
+            error.details = readiness;
+            throw error;
+        }
+
+        // ====================================================================
+        // 0B. VALIDAÇÃO DE PRÉ-REQUISITOS (Legacy validator)
+        // ====================================================================
+        stepStart = Date.now();
 
         const { validateLLMPage } = require('@core/validators/prerequisite_validator');
         const pageValidation = await validateLLMPage(this.page);
@@ -390,7 +468,7 @@ class BaseDriver extends TargetDriver {
         this._emitVital('PREREQUISITE_CHECK', {
             valid: pageValidation.valid,
             reason: pageValidation.reason,
-            duration: timings.prerequisite
+            duration: timings.prerequisite,
         });
 
         if (!pageValidation.valid) {
@@ -437,7 +515,7 @@ class BaseDriver extends TargetDriver {
                     this._emitVital('RETRY_ATTEMPT', {
                         attempt: attempts,
                         maxAttempts: MAX_RETRY_ATTEMPTS,
-                        errorHistory: errorHistory.length
+                        errorHistory: errorHistory.length,
                     });
                 }
 
@@ -455,7 +533,7 @@ class BaseDriver extends TargetDriver {
                 this._emitVital('SELECTOR_RESOLVED', {
                     selector: proto.selector,
                     confidence: proto.confidence || 'unknown',
-                    duration: timings.resolution
+                    duration: timings.resolution,
                 });
 
                 // ✅ v2.0: Signal check after resolution
@@ -475,7 +553,7 @@ class BaseDriver extends TargetDriver {
                 this._emitVital('CONTEXT_ACQUIRED', {
                     depth: execContext.depth || 0,
                     type: execContext.type || 'main',
-                    duration: timings.navigation
+                    duration: timings.navigation,
                 });
 
                 // ✅ v2.0: Signal check after navigation
@@ -501,7 +579,7 @@ class BaseDriver extends TargetDriver {
                 // ✅ v2.0: Emit typing start
                 this._emitVital('TYPING_START', {
                     textLength: text.length,
-                    taskId
+                    taskId,
                 });
 
                 // ✅ v2.0: Propagate signal to biomechanics
@@ -524,7 +602,7 @@ class BaseDriver extends TargetDriver {
                 // ✅ v2.0: Emit submission success
                 this._emitVital('SUBMISSION_SUCCESS', {
                     taskId,
-                    duration: timings.submission
+                    duration: timings.submission,
                 });
 
                 this.setState(TargetDriver.STATES.IDLE);
@@ -534,19 +612,42 @@ class BaseDriver extends TargetDriver {
                 // ================================================================
                 const totalDuration = Date.now() - startTime;
 
+                // ✅ Phase 2 (P1-U1): Record response time
+                const { avgResponseTime, trend } = this.sessionTracker.recordResponseTime(totalDuration, true);
+
+                // ✅ Phase 2 (P1-U3): Emit session metrics
+                const sessionMetrics = this.sessionTracker.getMetrics();
+                this._emitVital('SESSION_METRICS_UPDATE', {
+                    turnNumber,
+                    turnCount: sessionMetrics.turnCount,
+                    avgResponseTime,
+                    trend,
+                    sessionHealth: sessionMetrics.sessionHealth,
+                    healthLevel: sessionMetrics.healthLevel,
+                    timeoutMultiplier: sessionMetrics.timeoutMultiplier,
+                });
+
                 this._emitVital('EXECUTION_SUCCESS', {
                     taskId,
                     attempts: attempts + 1,
                     totalDuration,
                     timings: {
                         prerequisite: timings.prerequisite,
+                        readinessCheck: timings.readinessCheck,
                         waitBusy: timings.waitBusy,
                         resolution: timings.resolution,
                         navigation: timings.navigation,
                         preparation: timings.preparation,
                         typing: timings.typing,
-                        submission: timings.submission
-                    }
+                        submission: timings.submission,
+                    },
+                    // ✅ Phase 2: Include session context
+                    sessionContext: {
+                        turnNumber,
+                        avgResponseTime,
+                        trend,
+                        timeoutMultiplier: sessionMetrics.timeoutMultiplier,
+                    },
                 });
 
                 return;
@@ -571,15 +672,15 @@ class BaseDriver extends TargetDriver {
                     evidence: {
                         attempt: attempts,
                         error: err.message,
-                        stack: err.stack?.substring(0, 300)
-                    }
+                        stack: err.stack?.substring(0, 300),
+                    },
                 });
 
                 errorHistory.push({
                     attempt: attempts,
                     error: err.message.substring(0, ERROR_MESSAGE_MAX_LENGTH),
                     errorClass,
-                    ts: Date.now()
+                    ts: Date.now(),
                 });
 
                 // ✅ v2.0: Removed dead code (errorHistory.length never > MAX_RETRY_ATTEMPTS)
@@ -604,6 +705,11 @@ class BaseDriver extends TargetDriver {
         // ====================================================================
         // FINAL FAILURE - MAX RETRIES EXCEEDED
         // ====================================================================
+        const totalDuration = Date.now() - startTime;
+
+        // ✅ Phase 2 (P1-U1): Record failed response time
+        this.sessionTracker.recordResponseTime(totalDuration, false);
+
         const finalErr = new Error('EXECUTION_FAIL');
         finalErr.history = errorHistory;
         finalErr.attempts = attempts;
@@ -612,7 +718,13 @@ class BaseDriver extends TargetDriver {
             taskId,
             attempts,
             errorHistory,
-            totalDuration: Date.now() - startTime
+            totalDuration,
+            // ✅ Phase 2: Include session context
+            sessionContext: {
+                turnNumber,
+                turnCount: this.sessionTracker.turnCount,
+                avgResponseTime: this.sessionTracker.getMetrics().avgResponseTime,
+            },
         });
 
         throw finalErr;
@@ -632,7 +744,7 @@ class BaseDriver extends TargetDriver {
             { name: 'handles', fn: async () => await this.handles.clearAll() },
             { name: 'biomechanics', fn: async () => await this.biomechanics.releaseModifiers() },
             { name: 'inputResolver', fn: () => this.inputResolver.clearCache() },
-            { name: 'submission', fn: () => this.submission.clearLock() }
+            { name: 'submission', fn: () => this.submission.clearLock() },
         ];
 
         for (const step of cleanupSteps) {
@@ -641,7 +753,7 @@ class BaseDriver extends TargetDriver {
             } catch (err) {
                 const errorInfo = {
                     module: step.name,
-                    error: err.message
+                    error: err.message,
                 };
                 cleanupErrors.push(errorInfo);
 
@@ -654,7 +766,7 @@ class BaseDriver extends TargetDriver {
         if (cleanupErrors.length > 0) {
             this._emitVital('CLEANUP_WARNINGS', {
                 errors: cleanupErrors,
-                totalErrors: cleanupErrors.length
+                totalErrors: cleanupErrors.length,
             });
         }
 

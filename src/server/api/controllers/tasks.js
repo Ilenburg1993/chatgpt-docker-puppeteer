@@ -45,6 +45,11 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
     try {
+        // ✅ Defense in depth: Sanitização explícita ANTES de parseTask
+        if (req.body?.meta?.id) {
+            req.body.meta.id = req.body.meta.id.replace(/[^a-zA-Z0-9._-]/g, '');
+        }
+
         // O healer converte formatos legados e aplica defaults do Zod
         const task = schemas.parseTask(req.body);
         await io.saveTask(task);
@@ -52,13 +57,13 @@ router.post('/', async (req, res) => {
         await audit('CREATE_TASK', {
             id: task.meta.id,
             source: 'GUI',
-            request_id: req.id
+            request_id: req.id,
         });
 
         res.json({
             success: true,
             id: task.meta.id,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('WARN', `[API_TASKS] Ingestão rejeitada: ${e.message}`, req.id);

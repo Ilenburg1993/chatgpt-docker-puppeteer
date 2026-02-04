@@ -1,0 +1,42 @@
+/* Mission Control - Dark Theme Variables (Tailwind 4.x compatible) */
+
+:root.dark,
+.dark {
+  /* Background colors */
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1e293b;
+  
+  /* Text colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  
+  /* Border colors */
+  --border-default: #334155;
+  --border-subtle: #1e293b;
+  
+  /* Accent colors */
+  --accent-primary: #3b82f6;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-error: #ef4444;
+}
+
+/* Apply dark theme */
+.dark body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.dark #app {
+  background-color: var(--bg-primary);
+}
+
+/* Status colors */
+.status-pending { color: #f59e0b; }
+.status-running { color: #3b82f6; }
+.status-success { color: #10b981; }
+.status-failed { color: #ef4444; }
+.status-paused { color: #94a3b8; }
+.status-cancelled { color: #6b7280; }

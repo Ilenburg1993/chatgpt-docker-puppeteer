@@ -199,7 +199,7 @@ function getChromeInstructions(errorMessage) {
             '  Terminal 1 - Inicie o Chrome:',
             '    Windows:',
             '      scripts\\start-chrome.bat',
-            '    Linux/WSL/Mac:',
+            '    Linux/WSL:'
             '      bash scripts/start-chrome.sh',
             '',
             '  Terminal 2 - Inicie o Chrome Proxy Service:',
@@ -221,7 +221,7 @@ function getChromeInstructions(errorMessage) {
             '  Windows:',
             '    scripts\\start-chrome.bat',
             '',
-            '  Linux/WSL/Mac:',
+            '  Linux/WSL:'
             '    bash scripts/start-chrome.sh',
             '',
             'OU manualmente:',

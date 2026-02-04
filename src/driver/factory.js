@@ -1,23 +1,25 @@
 /* ==========================================================================
-   src/driver/factory.js v2.0
-   Audit Level: 700 — Reactive Driver Factory (Singularity Edition)
-   Status: v2.0 - EventEmitter + Full Validation + Telemetry + Health Check
-   Responsabilidade: Descoberta, instanciação Lazy-Load e gestão reativa de
-                     cache de drivers com suporte a sinais soberanos.
-   Sincronizado com: TargetDriver.js v2.0, BaseDriver v2.0,
-                     DriverLifecycleManager v2.0.
+   src/driver/factory.js v3.0
+   Audit Level: 700 — Reactive Driver Factory (Pool Edition)
+   Status: v3.0 - BREAKING CHANGES - Pool-Ready Architecture
+   Responsabilidade: Descoberta, instanciação Lazy-Load e gestão de pool de
+                     drivers reutilizáveis (IDLE state) com telemetria.
+   Sincronizado com: TargetDriver.js v3.0 (attach/detach support)
+
+   v3.0 Changes (BREAKING):
+   - ✅ Remove cache WeakMap (replaced by pool Map)
+   - ✅ Novo createDriver(target, config) - Creates UNATTACHED driver
+   - ✅ Pool structure: Map<target, Driver[]> - IDLE drivers
+   - ✅ acquireFromPool(target) - Get IDLE driver or create
+   - ✅ releaseToPool(driver) - Return driver to IDLE state
+   - ✅ Health checks & GC (evict idle > 5min)
+   - ✅ Warmup: MIN_POOL_SIZE drivers created at boot
 
    v2.0 Changes:
    - EventEmitter class (6 lifecycle events)
    - FACTORY_CONFIG (zero magic numbers)
    - Robust parameter validation (P0 fixes)
-   - Discovery validation (P0 fix)
    - Timeout protection in invalidatePageCache (P1 fix)
-   - Granular try-catch in lazy-load (P1 fix)
-   - Cache validation with destroyed check (P1 fix)
-   - Health check endpoint
-   - Cache size limit (memory leak prevention)
-   - Metrics collection
    - Complete JSDoc
 ========================================================================== */
 
@@ -28,43 +30,64 @@ const TargetDriver = require('./core/TargetDriver');
 const { log } = require('@core/logger');
 
 /* ==========================================================================
-   FACTORY_CONFIG v2.0 - Zero Magic Numbers
+   FACTORY_CONFIG v3.0 - Pool Management
 ========================================================================== */
 const FACTORY_CONFIG = {
+    // Discovery
     TARGETS_DIR: path.join(__dirname, 'targets'),
     DEFAULT_TARGET: process.env.FACTORY_DEFAULT_TARGET || 'chatgpt',
     VALIDATE_ON_BOOT: process.env.FACTORY_VALIDATE_BOOT === 'true',
-    INVALIDATE_TIMEOUT_MS: 5000,           // Timeout para destroy em invalidatePageCache
-    MAX_DRIVERS_PER_PAGE: 10,              // Limite de drivers por página (memory leak prevention)
-    DISCOVERY_RETRY_COUNT: 3,              // Tentativas de retry em discovery
-    LAZY_LOAD_TIMEOUT_MS: 10000            // Timeout para lazy-load de driver
+    DISCOVERY_RETRY_COUNT: 3,
+    LAZY_LOAD_TIMEOUT_MS: 10000,
+
+    // ✅ v3.0: Pool Management
+    MAX_POOL_SIZE: parseInt(process.env.DRIVER_POOL_MAX_SIZE) || 5,
+    MIN_POOL_SIZE: parseInt(process.env.DRIVER_POOL_MIN_SIZE) || 2,
+    IDLE_TIMEOUT_MS: parseInt(process.env.DRIVER_IDLE_TIMEOUT_MS) || 300000, // 5min
+    WARMUP_TARGETS: (process.env.DRIVER_WARMUP_TARGETS || 'chatgpt,gemini').split(','),
+    HEALTH_CHECK_INTERVAL_MS: parseInt(process.env.DRIVER_HEALTH_INTERVAL_MS) || 30000, // 30s
+    POOL_ENABLED: process.env.DRIVER_POOL_ENABLED !== 'false', // Default true
+
+    // ✅ C1: Backpressure Strategy
+    BACKPRESSURE_TIMEOUT_MS: parseInt(process.env.DRIVER_BACKPRESSURE_TIMEOUT_MS) || 5000, // 5s
+    BACKPRESSURE_ALLOW_TEMPORARY: process.env.DRIVER_BACKPRESSURE_TEMP !== 'false', // Default true
 };
 
 /* ==========================================================================
-   FACTORY_EVENTS v2.0 - Telemetria de Factory
+   FACTORY_EVENTS v3.0 - Pool Telemetry
 ========================================================================== */
 const FACTORY_EVENTS = {
-    DISCOVERY_COMPLETE: 'factory:discovery_complete',   // Discovery concluído
-    DRIVER_CREATED: 'factory:driver_created',           // Driver criado
-    DRIVER_REUSED: 'factory:driver_reused',             // Driver reutilizado do cache
-    DRIVER_EVICTED: 'factory:driver_evicted',           // Driver evictado do cache
-    CACHE_INVALIDATED: 'factory:cache_invalidated',     // Cache invalidado
-    ERROR: 'factory:error'                              // Erro em qualquer operação
+    DISCOVERY_COMPLETE: 'factory:discovery_complete',
+    DRIVER_CREATED: 'factory:driver_created',
+    POOL_HIT: 'factory:pool_hit', // ✅ v3.0: Reused from pool
+    POOL_MISS: 'factory:pool_miss', // ✅ v3.0: Created new (pool empty)
+    POOL_EXHAUSTED: 'factory:pool_exhausted', // ✅ v3.0: All drivers busy
+    DRIVER_RELEASED: 'factory:driver_released', // ✅ v3.0: Returned to pool
+    DRIVER_EVICTED: 'factory:driver_evicted', // ✅ v3.0: Removed from pool (GC)
+    POOL_INITIALIZED: 'factory:pool_initialized', // ✅ v3.0: Warmup complete
+    ERROR: 'factory:error',
 };
 
 /* ==========================================================================
-   DriverFactory v2.0 - EventEmitter Class
+   DriverFactory v3.0 - Pool-Ready Architecture
 ========================================================================== */
 
 /**
- * DriverFactory v2.0 - Factory pattern para criação e cache de drivers
+ * DriverFactory v3.0 - Pool pattern para criação e reuse de drivers
+ *
+ * ✅ BREAKING CHANGES from v2.0:
+ * - NO cache WeakMap (removed)
+ * - Pool Map<target, DriverEntry[]> (drivers IDLE)
+ * - createDriver(target, config) - Creates UNATTACHED driver
+ * - acquireFromPool(target) - Get IDLE driver
+ * - releaseToPool(driver) - Return IDLE driver
  *
  * Responsabilidades:
  * - Auto-discovery de drivers no diretório targets/
  * - Lazy-loading de classes (carrega apenas quando necessário)
- * - Cache por página (WeakMap + Map)
- * - Auto-evicção reativa (driver.once('destroyed'))
- * - Invalidação global de cache
+ * - Pool de drivers IDLE (reutilizáveis entre tasks)
+ * - Warmup automático (MIN_POOL_SIZE drivers criados no boot)
+ * - Health checks & GC (evict drivers idle > 5min)
  * - Telemetria completa via EventEmitter
  *
  * @class DriverFactory
@@ -72,9 +95,9 @@ const FACTORY_EVENTS = {
  */
 class DriverFactory extends EventEmitter {
     /**
-     * Construtor do DriverFactory v2.0
+     * Construtor do DriverFactory v3.0
      *
-     * Inicializa registry, cache, métricas e executa discovery automático.
+     * Inicializa registry, pool, métricas e executa discovery + warmup.
      */
     constructor() {
         super();
@@ -90,28 +113,23 @@ class DriverFactory extends EventEmitter {
         this.registry = Object.create(null);
 
         /**
-         * Cache de instâncias vivas (WeakMap).
+         * ✅ v3.0: Pool de drivers IDLE (reutilizáveis).
          *
-         * ✅ Estrutura: WeakMap<Page, Map<targetName, DriverInstance>>
+         * Estrutura: Map<target, DriverEntry[]>
          *
-         * Por que WeakMap?
-         * - Keys devem ser objetos (Page instance)
-         * - GC automático: Se page é coletado → entry é removido automaticamente
-         * - Previne memory leaks: Drivers não mantém páginas vivas
+         * DriverEntry: {
+         *   driver: TargetDriver,
+         *   target: string,
+         *   busy: boolean,
+         *   createdAt: number,
+         *   lastUsedAt: number | null,
+         *   totalUses: number
+         * }
          *
-         * Limitações:
-         * - Não iterável (não tem .keys(), .values(), .entries())
-         * - Não tem .size
-         * - Keys apenas objects (não strings/numbers)
-         *
-         * Inner Map:
-         * - Keys: targetName (string) - ex: 'chatgpt', 'gemini'
-         * - Values: DriverInstance (TargetDriver subclass)
-         *
-         * @type {WeakMap<Page, Map<string, TargetDriver>>}
+         * @type {Map<string, Array<Object>>}
          * @private
          */
-        this.pageCache = new WeakMap();
+        this.pool = new Map();
 
         /**
          * Set de drivers que falharam no lazy-load.
@@ -130,20 +148,36 @@ class DriverFactory extends EventEmitter {
          */
         this.metrics = {
             driversCreated: 0,
-            driversReused: 0,
+            poolHits: 0,
+            poolMisses: 0,
+            poolExhausted: 0,
+            driversReleased: 0,
             driversDestroyed: 0,
-            cacheHits: 0,
-            cacheMisses: 0,
+            driversEvicted: 0,
             discoveryTime: 0,
-            evictions: 0,
-            invalidations: 0,
-            errors: 0
+            errors: 0,
+            poolBackpressureRecovered: 0, // ✅ C1: Backpressure recoveries
+            temporaryDriversCreated: 0, // ✅ C1: Temporary drivers created
         };
 
-        // ✅ Configurar max listeners (memory leak detection)
+        /**
+         * ✅ v3.0: Health check timer
+         * @type {NodeJS.Timeout | null}
+         * @private
+         */
+        this.healthTimer = null;
+
+        /**
+         * ✅ v3.0: Global driver config (usado para criar novos drivers)
+         * @type {Object}
+         * @private
+         */
+        this.config = {};
+
+        // Configurar max listeners
         this.setMaxListeners(50);
 
-        // ✅ Executar discovery automático
+        // Executar discovery + warmup automático
         this._discover();
     }
 
@@ -154,13 +188,7 @@ class DriverFactory extends EventEmitter {
     /**
      * Fase de descoberta automática de drivers.
      *
-     * v2.0 Features:
-     * - Validação robusta de diretório
-     * - Try-catch granular por arquivo
-     * - Validação de que pelo menos 1 driver foi descoberto
-     * - Validação opcional de herança TargetDriver (FACTORY_VALIDATE_BOOT)
-     * - Validação de DEFAULT_TARGET
-     * - Métricas de discovery time
+     * v3.0: Após discovery, executa initializePool() para warmup
      *
      * @private
      * @throws {Error} Se nenhum driver for descoberto ou DEFAULT_TARGET inválido
@@ -172,14 +200,14 @@ class DriverFactory extends EventEmitter {
         let discovered = 0;
 
         try {
-            // ✅ BUG #1 FIX: Validar que diretório existe
+            // Validar que diretório existe
             if (!fs.existsSync(FACTORY_CONFIG.TARGETS_DIR)) {
                 const error = `Diretório de targets não existe: ${FACTORY_CONFIG.TARGETS_DIR}`;
                 log('FATAL', `[FACTORY] ${error}`);
                 throw new Error(error);
             }
 
-            // ✅ Try-catch robusto em readdir
+            // Ler diretório com try-catch robusto
             let files;
             try {
                 files = fs.readdirSync(FACTORY_CONFIG.TARGETS_DIR);
@@ -189,7 +217,7 @@ class DriverFactory extends EventEmitter {
                 throw new Error(error);
             }
 
-            // ✅ Processar cada arquivo com try-catch individual
+            // Processar cada arquivo com try-catch individual
             for (const file of files) {
                 if (!file.endsWith('Driver.js')) {
                     continue;
@@ -199,35 +227,35 @@ class DriverFactory extends EventEmitter {
                     const targetKey = file.replace('Driver.js', '').toLowerCase();
                     const driverPath = path.join(FACTORY_CONFIG.TARGETS_DIR, file);
 
-                    // ✅ Validar que arquivo é acessível
+                    // Validar que arquivo é acessível
                     if (!fs.existsSync(driverPath)) {
                         log('WARN', `[FACTORY] Driver file não encontrado: ${driverPath}`);
                         continue;
                     }
 
-                    // ✅ BUG #6 FIX: Validação opcional de herança em boot (skip se síncrono)
-                    // Nota: Validação completa requer instanciação, que pode ser pesada em boot
-                    // Por padrão desabilitada (FACTORY_VALIDATE_BOOT=false)
-
-                    // ✅ Registrar driver
+                    // Registrar driver
                     this.registry[targetKey] = {
                         path: driverPath,
-                        className: file.replace('.js', '')
+                        className: file.replace('.js', ''),
                     };
+
+                    // ✅ v3.0: Inicializar pool vazio para este target
+                    this.pool.set(targetKey, []);
+
                     discovered++;
                 } catch (fileError) {
                     log('WARN', `[FACTORY] Erro ao processar ${file}: ${fileError.message}`);
                 }
             }
 
-            // ✅ BUG #1 FIX: Validar que pelo menos 1 driver foi descoberto
+            // Validar que pelo menos 1 driver foi descoberto
             if (discovered === 0) {
                 const error = `Nenhum driver descoberto em ${FACTORY_CONFIG.TARGETS_DIR}. Sistema não pode operar.`;
                 log('FATAL', `[FACTORY] ${error}`);
                 throw new Error(error);
             }
 
-            // ✅ BUG #8 FIX: Validar DEFAULT_TARGET ou usar primeiro descoberto
+            // Validar DEFAULT_TARGET ou usar primeiro descoberto
             const defaultKey = FACTORY_CONFIG.DEFAULT_TARGET.toLowerCase();
             if (!this.registry[defaultKey]) {
                 const availableTargets = Object.keys(this.registry);
@@ -239,7 +267,7 @@ class DriverFactory extends EventEmitter {
                 );
             }
 
-            // ✅ Métricas e telemetria
+            // Métricas e telemetria
             this.metrics.discoveryTime = Date.now() - startTime;
 
             log('INFO', `[FACTORY] ${discovered} targets mapeados em ${this.metrics.discoveryTime}ms`);
@@ -248,8 +276,22 @@ class DriverFactory extends EventEmitter {
                 targetCount: discovered,
                 targets: Object.keys(this.registry),
                 defaultTarget: FACTORY_CONFIG.DEFAULT_TARGET,
-                discoveryTime: this.metrics.discoveryTime
+                discoveryTime: this.metrics.discoveryTime,
             });
+
+            // ✅ v3.0: Inicializar pool (warmup) após discovery
+            if (FACTORY_CONFIG.POOL_ENABLED) {
+                this.initializePool().catch(err => {
+                    log('ERROR', `[FACTORY] Pool initialization failed: ${err.message}`);
+                    this.emit(FACTORY_EVENTS.ERROR, {
+                        operation: 'pool_init',
+                        error: err.message,
+                    });
+                });
+
+                // ✅ v3.0: Start health checks timer
+                this._startHealthChecks();
+            }
         } catch (e) {
             this.metrics.errors++;
             log('FATAL', `[FACTORY] Erro catastrófico no mapeamento de drivers: ${e.message}`);
@@ -257,273 +299,7 @@ class DriverFactory extends EventEmitter {
             this.emit(FACTORY_EVENTS.ERROR, {
                 operation: 'discovery',
                 error: e.message,
-                stack: e.stack
-            });
-
-            throw e; // ✅ Re-throw para prevenir execução com registry vazio
-        }
-    }
-
-    /* ==========================================================================
-       DRIVER ACQUISITION
-    ========================================================================== */
-
-    /**
-     * Obtém ou cria a instância do driver com injeção de sinal e sincronia de config.
-     *
-     * v2.0 Features:
-     * - Validação completa de parâmetros (P0 fix)
-     * - Cache validation robusta com destroyed check (P1 fix)
-     * - Granular try-catch em lazy-load (P1 fix)
-     * - Cache size limit (eviction de LRU se necessário)
-     * - Error recovery (não tenta re-load de drivers falhados)
-     * - Telemetria completa (created, reused, evicted)
-     * - Métricas de cache hit/miss
-     *
-     * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt', 'gemini')
-     * @param {import('puppeteer').Page} page - Instância ativa da página do Puppeteer
-     * @param {Object} config - Configuração da tarefa (clonada para imutabilidade)
-     * @param {string} config.target - Target específico (chatgpt, gemini, etc)
-     * @param {number} [config.timeout] - Timeout em milissegundos
-     * @param {AbortSignal} signal - Sinal soberano de cancelamento da tarefa
-     *
-     * @returns {TargetDriver} Instância de TargetDriver pronta para execução
-     * @throws {Error} Se parâmetros inválidos, página fechada ou target não existe
-     *
-     * @emits factory:driver_created - Quando novo driver é criado
-     * @emits factory:driver_reused - Quando driver do cache é reutilizado
-     * @emits factory:driver_evicted - Quando driver é evictado por cache limit
-     * @emits factory:error - Se erro na criação do driver
-     *
-     * @example
-     * const driver = factory.getDriver('chatgpt', page, { timeout: 30000 }, abortSignal);
-     * const response = await driver.execute(task);
-     */
-    getDriver(targetName, page, config, signal) {
-        // ✅ BUG #2 FIX: Validar todos os parâmetros obrigatórios
-        if (!page) {
-            const error = 'Parameter "page" is required';
-            log('ERROR', `[FACTORY] ${error}`);
-            throw new Error(`[FACTORY] ${error}`);
-        }
-
-        if (!config || typeof config !== 'object') {
-            const error = 'Parameter "config" must be an object';
-            log('ERROR', `[FACTORY] ${error}`);
-            throw new Error(`[FACTORY] ${error}`);
-        }
-
-        if (!signal || !(signal instanceof AbortSignal)) {
-            const error = 'Parameter "signal" must be an AbortSignal instance';
-            log('ERROR', `[FACTORY] ${error}`);
-            throw new Error(`[FACTORY] ${error}`);
-        }
-
-        const key = (targetName || FACTORY_CONFIG.DEFAULT_TARGET).toLowerCase();
-
-        // A. LIVENESS GUARD: Impede o acoplamento em abas mortas
-        if (page.isClosed()) {
-            const error = `Tentativa de acoplar driver em aba encerrada (${key})`;
-            log('ERROR', `[FACTORY] ${error}`);
-            throw new Error(`[FACTORY] ${error}`);
-        }
-
-        // B. RESOLUÇÃO DE CACHE (Nível 1: Página)
-        if (!this.pageCache.has(page)) {
-            this.pageCache.set(page, new Map());
-        }
-        const instances = this.pageCache.get(page);
-
-        // C. ✅ BUG #3 FIX: REAPROVEITAMENTO com validação robusta
-        if (instances.has(key)) {
-            const cachedInstance = instances.get(key);
-
-            // ✅ Validar que instância é válida
-            if (!cachedInstance) {
-                log('WARN', `[FACTORY] Cached instance is null for ${key}, removing from cache`);
-                instances.delete(key);
-            } else {
-                // ✅ Verificar estado destroyed com fallback
-                const isDestroyed =
-                    cachedInstance.destroyed === true ||
-                    (typeof cachedInstance.isDestroyed === 'function' && cachedInstance.isDestroyed());
-
-                if (!isDestroyed) {
-                    // ✅ Validar que driver ainda é válido (página não fechada)
-                    if (cachedInstance.page && !cachedInstance.page.isClosed()) {
-                        // [R5] Sincronia Paramétrica: Atualiza a configuração para a nova missão
-                        if (config && typeof config === 'object') {
-                            cachedInstance.config = { ...config };
-                        }
-
-                        // [R3] Sincronia de Sinal: O driver deve obedecer ao novo sinal de aborto
-                        cachedInstance.signal = signal;
-
-                        // ✅ Métricas e telemetria
-                        this.metrics.cacheHits++;
-                        this.metrics.driversReused++;
-
-                        log('DEBUG', `[FACTORY] Reaproveitando driver em cache: ${cachedInstance.name}`);
-
-                        this.emit(FACTORY_EVENTS.DRIVER_REUSED, {
-                            target: key,
-                            name: cachedInstance.name,
-                            cacheHits: this.metrics.cacheHits
-                        });
-
-                        return cachedInstance;
-                    } else {
-                        log('WARN', `[FACTORY] Cached driver ${key} has closed page, invalidating`);
-                    }
-                } else {
-                    log('DEBUG', `[FACTORY] Cached driver ${key} was destroyed, removing from cache`);
-                }
-
-                // ✅ Remover instância inválida
-                instances.delete(key);
-            }
-        }
-
-        // ✅ Métricas
-        this.metrics.cacheMisses++;
-
-        // D. ✅ IMPROVEMENT #6: Error Recovery - Não tentar re-load de drivers falhados
-        if (this.failedDrivers.has(key)) {
-            const error = `Driver ${key} previously failed to load`;
-            log('ERROR', `[FACTORY] ${error}`);
-            throw new Error(`[FACTORY] ${error}`);
-        }
-
-        // E. INSTANCIAÇÃO (Lazy-Loading dinâmico)
-        const meta = this.registry[key];
-        if (!meta) {
-            const error = `Target '${key}' não suportado. Disponíveis: ${Object.keys(this.registry).join(', ')}`;
-            log('ERROR', `[FACTORY] ${error}`);
-            throw new Error(`[FACTORY] ${error}`);
-        }
-
-        // F. ✅ IMPROVEMENT #5: Cache Size Limit - Evict LRU se necessário
-        if (instances.size >= FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE) {
-            log(
-                'WARN',
-                `[FACTORY] Cache limit reached for page (${instances.size}/${FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE}). Evicting oldest.`
-            );
-
-            // ✅ Evict primeiro driver (FIFO - poderia ser LRU com timestamps)
-            const oldestKey = instances.keys().next().value;
-            const oldestDriver = instances.get(oldestKey);
-
-            try {
-                if (oldestDriver && !oldestDriver.destroyed) {
-                    oldestDriver.destroy().catch(err => {
-                        log('WARN', `[FACTORY] Error destroying evicted driver ${oldestKey}: ${err.message}`);
-                    });
-                }
-            } catch (evictError) {
-                log('WARN', `[FACTORY] Eviction error for ${oldestKey}: ${evictError.message}`);
-            }
-
-            instances.delete(oldestKey);
-            this.metrics.evictions++;
-
-            this.emit(FACTORY_EVENTS.DRIVER_EVICTED, {
-                target: oldestKey,
-                reason: 'cache_limit',
-                cacheSize: instances.size
-            });
-        }
-
-        // G. ✅ BUG #4 FIX: Lazy-Load com try-catch granular
-        let DriverClass;
-        let instance;
-
-        try {
-            // ✅ Fase 1: Load da classe
-            try {
-                DriverClass = require(meta.path);
-            } catch (requireError) {
-                this.failedDrivers.add(key); // ✅ Marcar como falhado
-                log('ERROR', `[FACTORY] Failed to load driver class '${key}': ${requireError.message}`, {
-                    stack: requireError.stack,
-                    path: meta.path
-                });
-                throw new Error(`Driver class load failed: ${requireError.message}`);
-            }
-
-            // ✅ Validar que DriverClass é função (constructor)
-            if (typeof DriverClass !== 'function') {
-                this.failedDrivers.add(key);
-                throw new Error(`[FACTORY] '${meta.className}' exports is not a constructor function`);
-            }
-
-            // ✅ Fase 2: Instanciação
-            try {
-                instance = new DriverClass(page, { ...config }, signal);
-            } catch (constructorError) {
-                this.failedDrivers.add(key);
-                log('ERROR', `[FACTORY] Driver constructor failed for '${key}': ${constructorError.message}`, {
-                    stack: constructorError.stack
-                });
-                throw new Error(`Driver construction failed: ${constructorError.message}`);
-            }
-
-            // ✅ Fase 3: Validação de contrato
-            if (!(instance instanceof TargetDriver)) {
-                this.failedDrivers.add(key);
-                throw new Error(`[FACTORY] '${meta.className}' viola o contrato TargetDriver.`);
-            }
-
-            // ✅ Fase 4: Setup de auto-eviction
-            instance.once('destroyed', () => {
-                const currentMap = this.pageCache.get(page);
-                if (currentMap) {
-                    currentMap.delete(key);
-                    this.metrics.driversDestroyed++;
-                    log('DEBUG', `[FACTORY] Cache removido para: ${key} (Ciclo encerrado)`);
-
-                    this.emit(FACTORY_EVENTS.DRIVER_EVICTED, {
-                        target: key,
-                        reason: 'destroyed',
-                        name: instance.name
-                    });
-                }
-            });
-
-            // ✅ Fase 5: Cache
-            instances.set(key, instance);
-            this.metrics.driversCreated++;
-
-            log('INFO', `[FACTORY] Novo Driver '${instance.name}' acoplado com sucesso.`);
-
-            this.emit(FACTORY_EVENTS.DRIVER_CREATED, {
-                target: key,
-                name: instance.name,
-                className: meta.className,
-                driversCreated: this.metrics.driversCreated
-            });
-
-            return instance;
-        } catch (e) {
-            // ✅ Cleanup em caso de erro
-            if (instance && typeof instance.destroy === 'function') {
-                try {
-                    instance.destroy().catch(() => {});
-                } catch (cleanupError) {
-                    log('WARN', `[FACTORY] Cleanup failed for ${key}: ${cleanupError.message}`);
-                }
-            }
-
-            this.metrics.errors++;
-
-            log('ERROR', `[FACTORY] Erro na ativação do driver '${key}': ${e.message}`, {
-                stack: e.stack
-            });
-
-            this.emit(FACTORY_EVENTS.ERROR, {
-                operation: 'getDriver',
-                target: key,
-                error: e.message,
-                stack: e.stack
+                stack: e.stack,
             });
 
             throw e;
@@ -531,103 +307,617 @@ class DriverFactory extends EventEmitter {
     }
 
     /* ==========================================================================
-       CACHE INVALIDATION
+       POOL MANAGEMENT (v3.0)
     ========================================================================== */
 
     /**
-     * Invalidação Global: Limpeza profunda de uma sessão.
+     * ✅ v3.0: Inicializa pool com warm drivers (MIN_POOL_SIZE).
      *
-     * v2.0 Features:
-     * - Timeout protection em cada destroy (P1 fix)
-     * - Cleanup paralelo (Promise.allSettled)
-     * - Report de drivers que falharam
-     * - Telemetria completa
-     * - Métricas de invalidation
+     * Cria MIN_POOL_SIZE drivers UNATTACHED para cada WARMUP_TARGET.
+     * Drivers ficam em estado IDLE (ready para acquireFromPool).
      *
-     * Garante que todos os drivers vinculados a uma aba sejam destruídos.
-     *
-     * @param {object} page - Instância da página do Puppeteer.
-     * @param {object} [options] - Opções de invalidação
-     * @param {number} [options.timeout=5000] - Timeout por driver em ms
-     *
-     * @returns {Promise<Object>} Resultado da invalidação { success, failed, total }
-     *
-     * @emits factory:cache_invalidated - Quando cache é invalidado
-     * @emits factory:error - Se erro na invalidação
+     * @returns {Promise<void>}
+     * @emits factory:pool_initialized - Quando warmup completa
      */
-    async invalidatePageCache(page, options = {}) {
-        const timeout = options.timeout || FACTORY_CONFIG.INVALIDATE_TIMEOUT_MS;
+    async initializePool() {
+        log('INFO', '[FACTORY] Initializing driver pool (warmup)...');
 
-        if (!this.pageCache.has(page)) {
-            log('DEBUG', '[FACTORY] Nenhum cache para invalidar (página não tem drivers)');
-            return { success: 0, failed: 0, total: 0 };
+        const warmupPromises = [];
+
+        for (const target of FACTORY_CONFIG.WARMUP_TARGETS) {
+            const targetKey = target.trim().toLowerCase();
+
+            if (!this.registry[targetKey]) {
+                log('WARN', `[FACTORY] Warmup target '${targetKey}' not found in registry. Skipping.`);
+                continue;
+            }
+
+            // Criar MIN_POOL_SIZE drivers para este target
+            for (let i = 0; i < FACTORY_CONFIG.MIN_POOL_SIZE; i++) {
+                const promise = this._createWarmDriver(targetKey).catch(err => {
+                    log('WARN', `[FACTORY] Failed to create warm driver ${targetKey}[${i}]: ${err.message}`);
+                    return null;
+                });
+                warmupPromises.push(promise);
+            }
         }
 
-        const instances = this.pageCache.get(page);
-        const totalDrivers = instances.size;
+        // Aguardar todos os warm drivers
+        await Promise.allSettled(warmupPromises);
 
-        log('DEBUG', `[FACTORY] Invalidação forçada: Limpando ${totalDrivers} drivers da aba.`);
+        const totalWarm = this._getTotalPoolSize();
 
-        // ✅ BUG #5 FIX: Cleanup paralelo com timeout
-        const cleanupPromises = [];
-        const failedDrivers = [];
+        log('INFO', `[FACTORY] Pool initialized: ${totalWarm} warm drivers created`);
 
-        for (const [name, driver] of instances.entries()) {
-            const cleanupPromise = (async () => {
-                try {
-                    if (!driver.destroyed) {
-                        // ✅ Timeout wrapper
-                        const destroyPromise = driver.destroy();
-                        const timeoutPromise = new Promise((_, reject) => {
-                            setTimeout(() => reject(new Error('Destroy timeout')), timeout);
-                        });
-
-                        await Promise.race([destroyPromise, timeoutPromise]);
-                        log('DEBUG', `[FACTORY] Driver ${name} destroyed successfully`);
-                        return { name, success: true };
-                    }
-                    return { name, success: true, skipped: true };
-                } catch (e) {
-                    failedDrivers.push({ name, error: e.message });
-                    log('WARN', `[FACTORY] Erro no descarte do driver '${name}': ${e.message}`);
-                    return { name, success: false, error: e.message };
-                }
-            })();
-
-            cleanupPromises.push(cleanupPromise);
-        }
-
-        // ✅ Aguardar todos os cleanups (paralelo)
-        const results = await Promise.allSettled(cleanupPromises);
-
-        const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-        const failedCount = failedDrivers.length;
-
-        if (failedCount > 0) {
-            log('WARN', `[FACTORY] ${failedCount}/${totalDrivers} drivers falharam no cleanup`, {
-                failed: failedDrivers
-            });
-        }
-
-        instances.clear();
-        this.pageCache.delete(page);
-        this.metrics.invalidations++;
-
-        const result = {
-            success: successCount,
-            failed: failedCount,
-            total: totalDrivers,
-            drivers: results.map(r => (r.status === 'fulfilled' ? r.value : { success: false }))
-        };
-
-        log('INFO', `[FACTORY] Page cache invalidated. Success: ${successCount}/${totalDrivers}`);
-
-        this.emit(FACTORY_EVENTS.CACHE_INVALIDATED, {
-            ...result,
-            invalidations: this.metrics.invalidations
+        this.emit(FACTORY_EVENTS.POOL_INITIALIZED, {
+            targets: FACTORY_CONFIG.WARMUP_TARGETS,
+            poolSize: totalWarm,
+            minPoolSize: FACTORY_CONFIG.MIN_POOL_SIZE,
         });
+    }
 
-        return result;
+    /**
+     * ✅ v3.0: Cria driver WARM (UNATTACHED, pronto para attach).
+     *
+     * @param {string} target - Target name
+     * @returns {Promise<TargetDriver>} Driver UNATTACHED
+     * @private
+     */
+    async _createWarmDriver(target) {
+        try {
+            // Criar driver sem context (UNATTACHED)
+            const driver = this.createDriver(target, this.config);
+
+            // Adicionar ao pool
+            const pool = this.pool.get(target);
+            if (pool) {
+                pool.push({
+                    driver,
+                    target,
+                    busy: false,
+                    createdAt: Date.now(),
+                    lastUsedAt: null,
+                    totalUses: 0,
+                });
+
+                log('DEBUG', `[FACTORY] Warm driver created: ${target} (pool size: ${pool.length})`);
+            }
+
+            return driver;
+        } catch (error) {
+            log('ERROR', `[FACTORY] Failed to create warm driver ${target}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * ✅ v3.0: Cria driver sem context (UNATTACHED state).
+     *
+     * BREAKING CHANGE from v2.0:
+     * - NO page parameter
+     * - NO signal parameter
+     * - Driver em estado UNATTACHED (page=null, signal=null)
+     * - Use driver.attachContext(page, signal) antes de executar
+     *
+     * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt', 'gemini')
+     * @param {Object} config - Configuração do driver
+     * @param {string} config.target - Target específico
+     * @param {number} [config.timeout] - Timeout em milissegundos
+     *
+     * @returns {Promise<TargetDriver>} Driver em estado UNATTACHED
+     * @throws {Error} Se target não existe ou erro na criação
+     *
+     * @emits factory:driver_created - Quando driver é criado
+     * @emits factory:error - Se erro na criação
+     *
+     * @example
+     * const driver = await factory.createDriver('chatgpt', { timeout: 30000 });
+     * // driver.state === 'UNATTACHED'
+     * // driver.page === null
+     * // driver.signal === null
+     */
+    async createDriver(targetName, config = {}) {
+        const key = (targetName || FACTORY_CONFIG.DEFAULT_TARGET).toLowerCase();
+
+        // Validar config
+        if (!config || typeof config !== 'object') {
+            const error = 'Parameter "config" must be an object';
+            log('ERROR', `[FACTORY] ${error}`);
+            throw new Error(`[FACTORY] ${error}`);
+        }
+
+        // Error recovery: não tentar re-load de drivers falhados
+        if (this.failedDrivers.has(key)) {
+            const error = `Driver ${key} previously failed to load`;
+            log('ERROR', `[FACTORY] ${error}`);
+            throw new Error(`[FACTORY] ${error}`);
+        }
+
+        // Lazy-loading
+        const meta = this.registry[key];
+        if (!meta) {
+            const error = `Target '${key}' não suportado. Disponíveis: ${Object.keys(this.registry).join(', ')}`;
+            log('ERROR', `[FACTORY] ${error}`);
+            throw new Error(`[FACTORY] ${error}`);
+        }
+
+        let DriverClass;
+        let instance;
+
+        try {
+            // ✅ P0-U6: Add expectedDomain to config
+            const enhancedConfig = {
+                ...config,
+                target: key,
+                expectedDomain: this._getExpectedDomain(key),
+            };
+
+            // Lazy-load COM timeout
+            try {
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => {
+                        reject(new Error(`Lazy-load timeout após ${FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS}ms`));
+                    }, FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS);
+                });
+
+                const requirePromise = new Promise((resolve, reject) => {
+                    setImmediate(() => {
+                        try {
+                            const loadedClass = require(meta.path);
+                            resolve(loadedClass);
+                        } catch (err) {
+                            reject(err);
+                        }
+                    });
+                });
+
+                DriverClass = await Promise.race([requirePromise, timeoutPromise]);
+            } catch (requireError) {
+                this.failedDrivers.add(key);
+                log('ERROR', `[FACTORY] Failed to load driver class '${key}': ${requireError.message}`);
+
+                this.emit(FACTORY_EVENTS.ERROR, {
+                    operation: 'lazy_load',
+                    target: key,
+                    error: requireError.message,
+                });
+
+                throw new Error(`Driver class load failed: ${requireError.message}`);
+            }
+
+            // Validar que DriverClass é função
+            if (typeof DriverClass !== 'function') {
+                this.failedDrivers.add(key);
+                throw new Error(`[FACTORY] '${meta.className}' exports is not a constructor function`);
+            }
+
+            // ✅ v3.0: Instanciar COM APENAS CONFIG (NO page, NO signal)
+            try {
+                instance = new DriverClass(enhancedConfig); // ✅ P0-U6: Uses enhancedConfig with expectedDomain
+            } catch (constructorError) {
+                this.failedDrivers.add(key);
+                log('ERROR', `[FACTORY] Driver constructor failed for '${key}': ${constructorError.message}`);
+                throw new Error(`Driver construction failed: ${constructorError.message}`);
+            }
+
+            // Validar contrato
+            if (!(instance instanceof TargetDriver)) {
+                this.failedDrivers.add(key);
+                throw new Error(`[FACTORY] '${meta.className}' viola o contrato TargetDriver.`);
+            }
+
+            // Setup de telemetria
+            instance.once('destroyed', () => {
+                this.metrics.driversDestroyed++;
+                log('DEBUG', `[FACTORY] Driver destroyed: ${key}`);
+            });
+
+            this.metrics.driversCreated++;
+
+            log('DEBUG', `[FACTORY] Driver created: ${instance.name} (UNATTACHED)`);
+
+            this.emit(FACTORY_EVENTS.DRIVER_CREATED, {
+                target: key,
+                name: instance.name,
+                className: meta.className,
+                driversCreated: this.metrics.driversCreated,
+            });
+
+            return instance;
+        } catch (e) {
+            // Cleanup em caso de erro
+            if (instance && typeof instance.destroy === 'function') {
+                try {
+                    instance.destroy().catch(() => {});
+                } catch (_cleanupError) {
+                    // Ignore cleanup errors
+                }
+            }
+
+            this.metrics.errors++;
+
+            log('ERROR', `[FACTORY] Erro na ativação do driver '${key}': ${e.message}`);
+
+            this.emit(FACTORY_EVENTS.ERROR, {
+                operation: 'createDriver',
+                target: key,
+                error: e.message,
+            });
+
+            throw e;
+        }
+    }
+
+    /**
+     * ✅ v3.0: Acquire driver do pool (ou cria novo se pool vazio).
+     *
+     * POOL HIT: Retorna driver IDLE existente (reuse)
+     * POOL MISS: Cria novo driver se pool < MAX_POOL_SIZE
+     * POOL EXHAUSTED: Lança erro se todos drivers busy
+     *
+     * @param {string} targetName - Nome da IA alvo
+     * @returns {TargetDriver} Driver em estado UNATTACHED (ready para attachContext)
+     * @throws {Error} Se pool exhausted ou target não existe
+     *
+     * @emits factory:pool_hit - Quando driver reutilizado
+     * @emits factory:pool_miss - Quando driver criado (pool vazio)
+     * @emits factory:pool_exhausted - Quando todos drivers busy
+     *
+     * @example
+     * const driver = await factory.acquireFromPool('chatgpt');
+     * driver.attachContext(page, signal, 'task-123');
+     * const response = await driver.execute(prompt);
+     * driver.detachContext();
+     * factory.releaseToPool(driver);
+     */
+    async acquireFromPool(targetName) {
+        const key = (targetName || FACTORY_CONFIG.DEFAULT_TARGET).toLowerCase();
+
+        const pool = this.pool.get(key);
+
+        if (!pool) {
+            throw new Error(`[FACTORY] Invalid target: ${key}`);
+        }
+
+        // 1. Busca driver disponível (não busy, estado UNATTACHED)
+        let entry = pool.find(e => !e.busy && e.driver.state === 'UNATTACHED' && !e.driver.destroyed);
+
+        if (entry) {
+            // POOL HIT - reusa driver IDLE
+            this.metrics.poolHits++;
+
+            log('DEBUG', `[FACTORY] POOL HIT: Reusing driver for ${key} (uses: ${entry.totalUses})`);
+
+            this.emit(FACTORY_EVENTS.POOL_HIT, {
+                target: key,
+                poolSize: pool.length,
+                totalUses: entry.totalUses,
+                poolHits: this.metrics.poolHits,
+            });
+        } else {
+            // POOL MISS - cria novo ou aguarda
+            this.metrics.poolMisses++;
+
+            if (pool.length < FACTORY_CONFIG.MAX_POOL_SIZE) {
+                log('DEBUG', `[FACTORY] POOL MISS: Creating new driver for ${key}`);
+
+                const driver = this.createDriver(key, this.config);
+
+                entry = {
+                    driver,
+                    target: key,
+                    busy: false,
+                    createdAt: Date.now(),
+                    lastUsedAt: null,
+                    totalUses: 0,
+                };
+
+                pool.push(entry);
+
+                this.emit(FACTORY_EVENTS.POOL_MISS, {
+                    target: key,
+                    poolSize: pool.length,
+                    poolMisses: this.metrics.poolMisses,
+                });
+            } else {
+                // ✅ C1: POOL EXHAUSTED - BACKPRESSURE STRATEGY
+                this.metrics.poolExhausted++;
+
+                log(
+                    'WARN',
+                    `[FACTORY] POOL EXHAUSTED: All ${FACTORY_CONFIG.MAX_POOL_SIZE} drivers for ${key} are busy. ` +
+                        `Attempting backpressure recovery (timeout: ${FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS}ms)`
+                );
+
+                this.emit(FACTORY_EVENTS.POOL_EXHAUSTED, {
+                    target: key,
+                    poolSize: pool.length,
+                    maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
+                    poolExhausted: this.metrics.poolExhausted,
+                });
+
+                // ✅ C1: ESTRATÉGIA 1 - Aguardar release (backpressure)
+                try {
+                    const driver = await this._waitForDriverRelease(key, FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS);
+
+                    this.metrics.poolBackpressureRecovered++;
+
+                    log('INFO', `[FACTORY] Backpressure recovered: driver released for ${key}`);
+
+                    return driver; // Retry acquire (recursivo)
+                } catch (_timeoutError) {
+                    // ✅ C1: ESTRATÉGIA 2 (Fallback) - Driver temporário
+                    if (FACTORY_CONFIG.BACKPRESSURE_ALLOW_TEMPORARY) {
+                        log(
+                            'WARN',
+                            `[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)`
+                        );
+
+                        const tempDriver = this.createDriver(key, this.config);
+                        tempDriver._isTemporary = true; // Flag para não adicionar ao pool
+
+                        this.metrics.temporaryDriversCreated++;
+
+                        // NÃO adiciona ao pool, retorna direto
+                        return tempDriver;
+                    }
+
+                    // ✅ C1: REJECT como último recurso
+                    throw new Error(
+                        `[FACTORY] POOL_EXHAUSTED: All ${FACTORY_CONFIG.MAX_POOL_SIZE} drivers for ${key} are busy ` +
+                            `(timeout waiting for release: ${FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS}ms)`
+                    );
+                }
+            }
+        }
+
+        // 2. Marca como busy
+        entry.busy = true;
+        entry.lastUsedAt = Date.now();
+        entry.totalUses++;
+
+        // 3. Validar que driver é válido
+        if (entry.driver.destroyed) {
+            throw new Error(`[FACTORY] Driver was destroyed (should not happen)`);
+        }
+
+        log('DEBUG', `[FACTORY] Acquired driver: ${key} (uses: ${entry.totalUses})`);
+
+        return entry.driver;
+    }
+
+    /**
+     * ✅ v3.0 (C3): Libera driver de volta ao pool (estado UNATTACHED).
+     * ✅ C3: Strict validation - Garante que driver está em estado correto.
+     *
+     * PRÉ-CONDIÇÕES:
+     * - Driver deve estar UNATTACHED (detachContext() já foi chamado)
+     * - Driver não pode estar destruído
+     *
+     * PÓS-CONDIÇÕES:
+     * - Driver volta para pool (busy=false) SE validação OK
+     * - Driver removido do pool SE validação falhar
+     * - Evento DRIVER_RELEASED emitido
+     *
+     * @param {TargetDriver} driver - Driver para liberar
+     * @returns {void}
+     *
+     * @emits factory:driver_released - Quando driver volta ao pool
+     *
+     * @example
+     * const response = await driver.execute(prompt);
+     * driver.detachContext();
+     * factory.releaseToPool(driver);  // Driver volta IDLE
+     */
+    releaseToPool(driver) {
+        if (!driver) {
+            log('WARN', '[FACTORY] releaseToPool called with null driver');
+            return;
+        }
+
+        // 1. Encontra entry no pool
+        let entry = null;
+        let pool = null;
+
+        for (const [_target, targetPool] of this.pool.entries()) {
+            entry = targetPool.find(e => e.driver === driver);
+            if (entry) {
+                pool = targetPool;
+                break;
+            }
+        }
+
+        if (!entry) {
+            log('WARN', `[FACTORY] Driver not found in pool. Destroying.`);
+            driver.destroy().catch(err => {
+                log('WARN', `[FACTORY] Error destroying orphan driver: ${err.message}`);
+            });
+            return;
+        }
+
+        // ✅ C3: STRICT VALIDATION - Driver DEVE estar UNATTACHED
+        if (driver.state !== 'UNATTACHED') {
+            log(
+                'ERROR',
+                `[FACTORY] C3 VALIDATION FAILED: Driver released but not UNATTACHED (state: ${driver.state}). ` +
+                    `Expected detachContext() before release. Attempting force detach...`
+            );
+
+            // ✅ C3: Tenta force detach (C2 idempotência)
+            if (driver.isContextAttached && driver.isContextAttached()) {
+                try {
+                    driver.detachContext({ force: true });
+
+                    log(
+                        'WARN',
+                        `[FACTORY] C3: Force detach succeeded. Driver now ${driver.state}. ` +
+                            `Marking available (warning: incomplete cleanup may have occurred).`
+                    );
+                } catch (detachErr) {
+                    log(
+                        'ERROR',
+                        `[FACTORY] C3 CRITICAL: Force detach FAILED: ${detachErr.message}. ` +
+                            `Driver compromised - removing from pool (will be destroyed on next GC).`
+                    );
+
+                    // ✅ C3: Remove driver do pool (corrupted state)
+                    const index = pool.indexOf(entry);
+                    if (index !== -1) {
+                        pool.splice(index, 1);
+                    }
+
+                    // Tentar destruir imediatamente
+                    driver.destroy().catch(destroyErr => {
+                        log('ERROR', `[FACTORY] C3: Error destroying compromised driver: ${destroyErr.message}`);
+                    });
+
+                    this.metrics.errors++;
+                    return; // NÃO marca como disponível
+                }
+            }
+        }
+
+        // ✅ C3: Verificação final (paranoia check)
+        if (driver.state !== 'UNATTACHED') {
+            log(
+                'ERROR',
+                `[FACTORY] C3 PARANOIA CHECK FAILED: Driver still not UNATTACHED after force detach ` +
+                    `(state: ${driver.state}). Removing from pool.`
+            );
+
+            const index = pool.indexOf(entry);
+            if (index !== -1) {
+                pool.splice(index, 1);
+            }
+
+            driver.destroy().catch(() => {});
+            this.metrics.errors++;
+            return;
+        }
+
+        // ✅ C3: Validation OK - Marca como disponível
+        entry.busy = false;
+
+        log('DEBUG', `[FACTORY] Released driver: ${entry.target} (uses: ${entry.totalUses}, idle again)`);
+
+        this.metrics.driversReleased++;
+
+        this.emit(FACTORY_EVENTS.DRIVER_RELEASED, {
+            target: entry.target,
+            totalUses: entry.totalUses,
+            poolSize: pool.length,
+            driversReleased: this.metrics.driversReleased,
+        });
+    }
+
+    /**
+     * ✅ v3.0: Health checks & garbage collection.
+     *
+     * Remove drivers idle por > IDLE_TIMEOUT_MS SE pool > MIN_POOL_SIZE.
+     *
+     * @private
+     */
+    _startHealthChecks() {
+        this.healthTimer = setInterval(() => {
+            try {
+                const now = Date.now();
+
+                for (const [target, pool] of this.pool.entries()) {
+                    // Remove drivers idle por muito tempo (se pool > MIN)
+                    for (let i = pool.length - 1; i >= 0; i--) {
+                        const entry = pool[i];
+
+                        if (entry.busy || entry.driver.destroyed) {
+                            continue;
+                        }
+
+                        const idleTime = now - (entry.lastUsedAt || entry.createdAt);
+                        const shouldRemove =
+                            idleTime > FACTORY_CONFIG.IDLE_TIMEOUT_MS && pool.length > FACTORY_CONFIG.MIN_POOL_SIZE;
+
+                        if (shouldRemove) {
+                            log('DEBUG', `[FACTORY] GC: Removing idle driver: ${target} (idle: ${idleTime}ms)`);
+
+                            // Destrói driver
+                            entry.driver.destroy().catch(err => {
+                                log('WARN', `[FACTORY] GC: Error destroying driver: ${err.message}`);
+                            });
+
+                            // Remove do pool
+                            pool.splice(i, 1);
+
+                            this.metrics.driversEvicted++;
+
+                            this.emit(FACTORY_EVENTS.DRIVER_EVICTED, {
+                                target,
+                                reason: 'idle_timeout',
+                                idleTime,
+                                poolSize: pool.length,
+                                driversEvicted: this.metrics.driversEvicted,
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                log('ERROR', `[FACTORY] Health check error: ${err.message}`);
+            }
+        }, FACTORY_CONFIG.HEALTH_CHECK_INTERVAL_MS);
+    }
+
+    /**
+     * ✅ C1: Aguarda release de driver (backpressure strategy).
+     *
+     * Escuta evento DRIVER_RELEASED e tenta acquire novamente quando disponível.
+     *
+     * @param {string} target - Target name
+     * @param {number} timeout - Timeout em ms
+     * @returns {Promise<TargetDriver>} Driver released
+     * @throws {Error} Se timeout
+     * @private
+     */
+    _waitForDriverRelease(target, timeout) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this.off(FACTORY_EVENTS.DRIVER_RELEASED, listener);
+                reject(new Error('TIMEOUT'));
+            }, timeout);
+
+            const listener = event => {
+                if (event.target === target) {
+                    clearTimeout(timer);
+                    this.off(FACTORY_EVENTS.DRIVER_RELEASED, listener);
+
+                    // Tenta acquire novamente (recursivo)
+                    this.acquireFromPool(target).then(resolve).catch(reject);
+                }
+            };
+
+            this.on(FACTORY_EVENTS.DRIVER_RELEASED, listener);
+        });
+    }
+
+    /**
+     * ✅ v3.0: Para health checks timer.
+     * @private
+     */
+    _stopHealthChecks() {
+        if (this.healthTimer) {
+            clearInterval(this.healthTimer);
+            this.healthTimer = null;
+        }
+    }
+
+    /**
+     * ✅ v3.0: Obtém tamanho total do pool.
+     * @private
+     * @returns {number} Total de drivers no pool
+     */
+    _getTotalPoolSize() {
+        let total = 0;
+        for (const pool of this.pool.values()) {
+            total += pool.length;
+        }
+        return total;
     }
 
     /* ==========================================================================
@@ -635,7 +925,7 @@ class DriverFactory extends EventEmitter {
     ========================================================================== */
 
     /**
-     * ✅ BUG #9 FIX: Obtém metadata de um driver específico
+     * Obtém metadata de um driver específico.
      *
      * @param {string} targetName - Nome do target
      * @returns {Object|null} Metadata { path, className } ou null se não existe
@@ -646,7 +936,7 @@ class DriverFactory extends EventEmitter {
     }
 
     /**
-     * ✅ BUG #9 FIX: Obtém metadata de todos os drivers
+     * Obtém metadata de todos os drivers.
      *
      * @returns {Object} Clone do registry completo
      */
@@ -655,7 +945,7 @@ class DriverFactory extends EventEmitter {
     }
 
     /**
-     * ✅ BUG #9 FIX: Verifica se target existe no registry
+     * Verifica se target existe no registry.
      *
      * @param {string} targetName - Nome do target
      * @returns {boolean} true se existe, false caso contrário
@@ -666,7 +956,7 @@ class DriverFactory extends EventEmitter {
     }
 
     /**
-     * ✅ BUG #9 FIX: Obtém o target padrão
+     * Obtém o target padrão.
      *
      * @returns {string} Nome do target padrão
      */
@@ -675,58 +965,73 @@ class DriverFactory extends EventEmitter {
     }
 
     /**
-     * ✅ IMPROVEMENT #4: Health Check Endpoint
-     *
-     * Retorna o status de saúde completo da factory.
-     * Útil para monitoramento e debugging.
-     *
-     * v2.0 Features:
-     * - Discovered targets
-     * - Cache stats (impossível com WeakMap, mas reporta descobertos)
-     * - Métricas completas
-     * - Failed drivers
-     * - Config atual
+     * ✅ v3.0: Health Check Endpoint (Pool-aware).
      *
      * @returns {Object} Health status completo
      */
     getHealth() {
-        const health = {
+        const poolStats = [];
+        for (const [target, pool] of this.pool.entries()) {
+            const busy = pool.filter(e => e.busy).length;
+            const idle = pool.filter(e => !e.busy).length;
+
+            poolStats.push({
+                target,
+                total: pool.length,
+                busy,
+                idle,
+                destroyed: pool.filter(e => e.driver.destroyed).length,
+            });
+        }
+
+        return {
             discovered: Object.keys(this.registry).length,
             targets: Object.keys(this.registry),
             defaultTarget: FACTORY_CONFIG.DEFAULT_TARGET,
             failedDrivers: Array.from(this.failedDrivers),
+
+            // ✅ v3.0: Pool stats
+            pool: {
+                enabled: FACTORY_CONFIG.POOL_ENABLED,
+                totalSize: this._getTotalPoolSize(),
+                maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
+                minPoolSize: FACTORY_CONFIG.MIN_POOL_SIZE,
+                idleTimeout: FACTORY_CONFIG.IDLE_TIMEOUT_MS,
+                warmupTargets: FACTORY_CONFIG.WARMUP_TARGETS,
+                byTarget: poolStats,
+            },
+
             metrics: {
                 driversCreated: this.metrics.driversCreated,
-                driversReused: this.metrics.driversReused,
-                driversDestroyed: this.metrics.driversDestroyed,
-                cacheHits: this.metrics.cacheHits,
-                cacheMisses: this.metrics.cacheMisses,
-                cacheHitRate:
-                    this.metrics.cacheMisses > 0
-                        ? (
-                              (this.metrics.cacheHits / (this.metrics.cacheHits + this.metrics.cacheMisses)) *
-                              100
-                          ).toFixed(2) + '%'
+                poolHits: this.metrics.poolHits,
+                poolMisses: this.metrics.poolMisses,
+                poolHitRate:
+                    this.metrics.poolMisses > 0
+                        ? ((this.metrics.poolHits / (this.metrics.poolHits + this.metrics.poolMisses)) * 100).toFixed(
+                              2
+                          ) + '%'
                         : 'N/A',
-                evictions: this.metrics.evictions,
-                invalidations: this.metrics.invalidations,
+                poolExhausted: this.metrics.poolExhausted,
+                driversReleased: this.metrics.driversReleased,
+                driversDestroyed: this.metrics.driversDestroyed,
+                driversEvicted: this.metrics.driversEvicted,
                 errors: this.metrics.errors,
-                discoveryTime: this.metrics.discoveryTime
+                discoveryTime: this.metrics.discoveryTime,
             },
+
             config: {
                 targetsDir: FACTORY_CONFIG.TARGETS_DIR,
                 defaultTarget: FACTORY_CONFIG.DEFAULT_TARGET,
                 validateOnBoot: FACTORY_CONFIG.VALIDATE_ON_BOOT,
-                invalidateTimeout: FACTORY_CONFIG.INVALIDATE_TIMEOUT_MS,
-                maxDriversPerPage: FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE
-            }
+                maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
+                minPoolSize: FACTORY_CONFIG.MIN_POOL_SIZE,
+                idleTimeout: FACTORY_CONFIG.IDLE_TIMEOUT_MS,
+            },
         };
-
-        return health;
     }
 
     /**
-     * ✅ IMPROVEMENT #7: Obtém métricas de performance
+     * Obtém métricas de performance.
      *
      * @returns {Object} Métricas completas
      */
@@ -735,22 +1040,75 @@ class DriverFactory extends EventEmitter {
     }
 
     /**
-     * ✅ Reseta métricas (útil para testes)
+     * Reseta métricas (útil para testes).
      *
      * @private
      */
     _resetMetrics() {
         this.metrics = {
             driversCreated: 0,
-            driversReused: 0,
+            poolHits: 0,
+            poolMisses: 0,
+            poolExhausted: 0,
+            driversReleased: 0,
             driversDestroyed: 0,
-            cacheHits: 0,
-            cacheMisses: 0,
+            driversEvicted: 0,
             discoveryTime: 0,
-            evictions: 0,
-            invalidations: 0,
-            errors: 0
+            errors: 0,
         };
+    }
+
+    /**
+     * ✅ v3.0: Shutdown graceful do pool.
+     *
+     * Destrói todos os drivers e para health checks.
+     *
+     * @returns {Promise<void>}
+     */
+    async shutdown() {
+        log('INFO', '[FACTORY] Shutting down pool...');
+
+        // Para health checks
+        this._stopHealthChecks();
+
+        // Destrói todos os drivers
+        const destroyPromises = [];
+
+        for (const [target, pool] of this.pool.entries()) {
+            for (const entry of pool) {
+                if (!entry.driver.destroyed) {
+                    destroyPromises.push(
+                        entry.driver.destroy().catch(err => {
+                            log('WARN', `[FACTORY] Error destroying driver ${target}: ${err.message}`);
+                        })
+                    );
+                }
+            }
+            pool.length = 0; // Clear pool
+        }
+
+        await Promise.allSettled(destroyPromises);
+
+        log('INFO', '[FACTORY] Pool shutdown complete');
+    }
+
+    /**
+     * ✅ P0-U6: Retorna expected domain para target.
+     *
+     * Usado para validar que página está no domain correto antes de attach.
+     *
+     * @private
+     * @param {string} target - Target name (chatgpt, gemini, etc)
+     * @returns {string|null} Expected domain ou null se não mapeado
+     */
+    _getExpectedDomain(target) {
+        const domains = {
+            chatgpt: 'chatgpt.com',
+            gemini: 'gemini.google.com',
+            claude: 'claude.ai',
+            openai: 'openai.com',
+        };
+        return domains[target] || null;
     }
 }
 
@@ -759,20 +1117,22 @@ class DriverFactory extends EventEmitter {
 ========================================================================== */
 
 /**
- * Singleton instance da DriverFactory v2.0
+ * Singleton instance da DriverFactory v3.0
  *
  * @type {DriverFactory}
  */
 const factory = new DriverFactory();
 
 /**
- * Module exports - Compatibilidade com v1.0 + novos métodos v2.0
+ * Module exports - v3.0 API (BREAKING CHANGES)
  */
 module.exports = {
-    // ✅ v1.0 API (compatibilidade)
-    getDriver: factory.getDriver.bind(factory),
-    invalidatePageCache: factory.invalidatePageCache.bind(factory),
-    availableTargets: Object.keys(factory.registry),
+    // ✅ v3.0 Pool API (NEW)
+    createDriver: factory.createDriver.bind(factory),
+    acquireFromPool: factory.acquireFromPool.bind(factory),
+    releaseToPool: factory.releaseToPool.bind(factory),
+    initializePool: factory.initializePool.bind(factory),
+    shutdown: factory.shutdown.bind(factory),
 
     // ✅ v2.0 EventEmitter API
     on: factory.on.bind(factory),
@@ -795,5 +1155,9 @@ module.exports = {
     FACTORY_EVENTS,
 
     // ✅ Singleton instance (para casos avançados)
-    factory
+    factory,
+
+    // ✅ DEPRECATED: v2.0 API (mantido para compatibilidade temporária)
+    // getDriver: Removed - Use acquireFromPool + driver.attachContext instead
+    availableTargets: Object.keys(factory.registry),
 };

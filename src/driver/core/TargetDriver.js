@@ -1,11 +1,18 @@
 /* ==========================================================================
-   src/driver/core/TargetDriver.js v2.0
+   src/driver/core/TargetDriver.js v3.0
    Audit Level: 800 — Sovereign Contract Master (Validation Edition)
-   Status: PRODUCTION (Protocol 12 - State Machine Validated)
+   Status: PRODUCTION (Protocol 13 - Pool-Ready Architecture)
    Responsabilidade: Classe abstrata mestre. Define o contrato de execução,
                      gerencia a máquina de estados validada e o canal de sinais vitais.
-   Sincronizado com: BaseDriver V800, DriverLifecycleManager V70,
+   Sincronizado com: BaseDriver V800, DriverFactory V300,
                      TelemetryBridge V500.
+
+   Changelog v3.0 (BREAKING CHANGES):
+   - ✅ Constructor: Remove page/signal (config apenas) - Pool-ready
+   - ✅ Novo método: attachContext(page, signal) - Context injection
+   - ✅ Novo método: detachContext() - Context cleanup
+   - ✅ Validação: executeTask() requer context attached
+   - ✅ Estado: UNATTACHED adicionado (driver sem context)
 
    Changelog v2.0:
    - State transition matrix (validação de transições)
@@ -68,7 +75,9 @@ const EVENTS = Object.freeze({
     VITAL: 'driver:vital', // Canal sensorial para TelemetryBridge
     WARNING: 'warning', // Alertas não fatais
     DEBUG: 'debug', // Dados de depuração técnica
-    ABORT_SIGNAL_RECEIVED: 'abort_received' // ✅ v2.0: AbortSignal disparado
+    ABORT_SIGNAL_RECEIVED: 'abort_received', // ✅ v2.0: AbortSignal disparado
+    CONTEXT_ATTACHED: 'context_attached', // ✅ v3.0: Context attached (page + signal)
+    CONTEXT_DETACHED: 'context_detached', // ✅ v3.0: Context detached
 });
 
 /* ==========================================================================
@@ -76,11 +85,12 @@ const EVENTS = Object.freeze({
 ========================================================================== */
 
 const STATES = Object.freeze({
-    IDLE: STATUS_VALUES.IDLE, // Ocioso, aguardando tarefa
+    UNATTACHED: 'UNATTACHED', // ✅ v3.0: Sem context (page/signal null) - Pool state
+    IDLE: STATUS_VALUES.IDLE, // Ocioso, aguardando tarefa (context attached)
     PREPARING: 'PREPARING', // Configurando contexto/modelo
     TYPING: 'TYPING', // Executando interação biomecânica
     WAITING: 'WAITING', // Aguardando resposta da IA
-    STALLED: STATUS_VALUES.STALLED // Detectado provável travamento
+    STALLED: STATUS_VALUES.STALLED, // Detectado provável travamento
 });
 
 /* ==========================================================================
@@ -88,11 +98,12 @@ const STATES = Object.freeze({
 ========================================================================== */
 
 const STATE_TRANSITIONS = Object.freeze({
-    [STATES.IDLE]: [STATES.PREPARING],
+    [STATES.UNATTACHED]: [STATES.IDLE], // ✅ v3.0: UNATTACHED → IDLE (via attachContext)
+    [STATES.IDLE]: [STATES.PREPARING, STATES.UNATTACHED], // ✅ v3.0: IDLE → UNATTACHED (via detachContext)
     [STATES.PREPARING]: [STATES.TYPING, STATES.IDLE],
     [STATES.TYPING]: [STATES.WAITING, STATES.IDLE],
     [STATES.WAITING]: [STATES.IDLE, STATES.STALLED],
-    [STATES.STALLED]: [STATES.IDLE]
+    [STATES.STALLED]: [STATES.IDLE],
 });
 
 /* ==========================================================================
@@ -117,17 +128,18 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * Classe abstrata base para todos os drivers de LLM.
  * Define contrato de execução, gerencia estados validados e emite telemetria.
  *
+ * ✅ v3.0: Pool-ready architecture (attach/detach context)
  * ✅ v2.0: State transition matrix, AbortSignal integration, capabilities validation
  *
  * @abstract
  * @extends EventEmitter
  *
- * @property {object} page - Puppeteer page instance
- * @property {object} config - Task configuration
- * @property {AbortSignal} signal - Cancellation signal
+ * @property {object|null} page - Puppeteer page instance (null se UNATTACHED)
+ * @property {object} config - Driver configuration (immutable)
+ * @property {AbortSignal|null} signal - Cancellation signal (null se UNATTACHED)
  * @property {string} name - Driver name
  * @property {boolean} destroyed - Destruction flag
- * @property {string} correlationId - Correlation ID for tracing
+ * @property {string|null} correlationId - Correlation ID for tracing
  *
  * @fires TargetDriver#STATE_CHANGE - State transitions
  * @fires TargetDriver#STATE_ENTERED - Entering new state
@@ -139,18 +151,25 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @fires TargetDriver#WARNING - Non-fatal warnings
  * @fires TargetDriver#DEBUG - Debug information
  * @fires TargetDriver#ABORT_SIGNAL_RECEIVED - AbortSignal triggered
+ * @fires TargetDriver#CONTEXT_ATTACHED - Context attached (page + signal)
+ * @fires TargetDriver#CONTEXT_DETACHED - Context detached
  */
 class TargetDriver extends EventEmitter {
     /**
      * Construtor do TargetDriver - Classe abstrata base.
      *
-     * @param {object} page - Instância da página do Puppeteer
-     * @param {object} config - Configuração da tarefa (clonada)
-     * @param {AbortSignal} [signal] - Sinal soberano vindo do LifecycleManager
+     * ✅ v3.0: BREAKING CHANGE - Constructor agora recebe APENAS config
+     * - page e signal são null inicialmente (estado UNATTACHED)
+     * - Use attachContext(page, signal) para injetar context antes de executar
+     *
+     * @param {object} config - Configuração do driver (clonada para imutabilidade)
+     * @param {string} config.target - Target específico (chatgpt, gemini, etc)
+     * @param {number} [config.timeout] - Timeout em milissegundos
      *
      * @throws {Error} Se tentar instanciar TargetDriver diretamente
+     * @throws {Error} Se config não fornecido
      */
-    constructor(page, config, signal) {
+    constructor(config) {
         super();
 
         // Proteção de Classe Abstrata
@@ -158,33 +177,35 @@ class TargetDriver extends EventEmitter {
             throw new Error('[TARGET_DRIVER] Erro Fatal: Classe abstrata não pode ser instanciada diretamente.');
         }
 
-        // ✅ v2.0: Readonly properties (configurable para permitir null em destroy)
-        Object.defineProperty(this, 'page', {
-            value: page,
-            writable: false,
-            configurable: true,
-            enumerable: true
-        });
+        // ✅ v3.0: Validar config obrigatório
+        if (!config || typeof config !== 'object') {
+            throw new Error('[TARGET_DRIVER] Parameter "config" is required and must be an object');
+        }
 
+        // ✅ v3.0: page e signal são NULL inicialmente (estado UNATTACHED)
+        this.page = null;
+        this.signal = null;
+
+        // ✅ v2.0: Readonly config (configurable para permitir null em destroy)
         Object.defineProperty(this, 'config', {
-            value: config,
+            value: { ...config }, // Clone para imutabilidade
             writable: false,
-            enumerable: true
+            enumerable: true,
         });
 
         Object.defineProperty(this, '_createdAt', {
             value: Date.now(),
             writable: false,
-            enumerable: false
+            enumerable: false,
         });
 
-        this.signal = signal;
         this.name = 'Generic';
         this.destroyed = false;
         this.correlationId = null;
 
         // Propriedades da Máquina de Estados
-        this._state = STATES.IDLE;
+        // ✅ v3.0: Estado inicial UNATTACHED (sem context)
+        this._state = STATES.UNATTACHED;
         this.stateUpdated = Date.now();
 
         // ✅ v2.0: State history tracking
@@ -197,8 +218,8 @@ class TargetDriver extends EventEmitter {
         // Capacidades Técnicas Iniciais (Manifesto de Habilidades)
         this._capabilities = { ...TARGETDRIVER_CONFIG.DEFAULT_CAPABILITIES };
 
-        // ✅ v2.0: AbortSignal integration
-        this._setupAbortListener();
+        // ✅ v3.0: AbortSignal listener será configurado em attachContext()
+        this._abortHandler = null;
     }
 
     /* ==========================================================================
@@ -207,15 +228,29 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Configura listener para AbortSignal.
-     * ✅ v2.0: Sincroniza estado automaticamente com cancelamento
+     * ✅ v3.0: Chamado por attachContext() (não mais no constructor)
      *
      * @private
      */
     _setupAbortListener() {
-        if (this.signal) {
-            this.signal.addEventListener('abort', () => {
+        if (this.signal && !this._abortHandler) {
+            this._abortHandler = () => {
                 this._handleAbort();
-            });
+            };
+            this.signal.addEventListener('abort', this._abortHandler);
+        }
+    }
+
+    /**
+     * Remove listener de AbortSignal.
+     * ✅ v3.0: Chamado por detachContext()
+     *
+     * @private
+     */
+    _teardownAbortListener() {
+        if (this.signal && this._abortHandler) {
+            this.signal.removeEventListener('abort', this._abortHandler);
+            this._abortHandler = null;
         }
     }
 
@@ -231,7 +266,7 @@ class TargetDriver extends EventEmitter {
         this.emit(EVENTS.ABORT_SIGNAL_RECEIVED, {
             currentState: this._state,
             correlationId: this.correlationId,
-            ts: Date.now()
+            ts: Date.now(),
         });
 
         log('WARN', `[${this.name}] AbortSignal received. Resetting state to IDLE.`, this.correlationId);
@@ -291,6 +326,214 @@ class TargetDriver extends EventEmitter {
     }
 
     /* ==========================================================================
+      CONTEXT MANAGEMENT (v3.0 - POOL-READY ARCHITECTURE)
+  ========================================================================== */
+
+    /**
+     * Attach context (page + signal) ao driver ANTES de executar task.
+     *
+     * ✅ v3.0: Pool-ready - Driver pode ser reutilizado entre tasks
+     *
+     * PRÉ-CONDIÇÕES:
+     * - Driver em estado UNATTACHED
+     * - Driver não destruído
+     * - Page válida (não null, não closed)
+     * - Signal válido (AbortSignal instance)
+     *
+     * PÓS-CONDIÇÕES:
+     * - Driver em estado IDLE (ready para execute)
+     * - Page attached
+     * - Signal attached + listener configurado
+     * - Evento CONTEXT_ATTACHED emitido
+     *
+     * @param {import('puppeteer').Page} page - Puppeteer page instance
+     * @param {AbortSignal} signal - Cancellation signal
+     * @param {string} [correlationId] - Correlation ID para tracing
+     *
+     * @returns {void}
+     * @throws {Error} Se driver não está UNATTACHED, está destruído, ou parâmetros inválidos
+     *
+     * @example
+     * const driver = factory.acquireFromPool('chatgpt');
+     * driver.attachContext(page, abortSignal, 'task-123');
+     * const response = await driver.execute(prompt);
+     */
+    attachContext(page, signal, correlationId = null) {
+        // Validações
+        if (this.destroyed) {
+            throw new Error(`[${this.name}] Cannot attach context: driver destroyed`);
+        }
+
+        if (this._state !== STATES.UNATTACHED) {
+            throw new Error(
+                `[${this.name}] Cannot attach context: driver not UNATTACHED (current: ${this._state}). ` +
+                    `Call detachContext() first.`
+            );
+        }
+
+        if (!page) {
+            throw new Error(`[${this.name}] Cannot attach context: page is required`);
+        }
+
+        if (page.isClosed && page.isClosed()) {
+            throw new Error(`[${this.name}] Cannot attach context: page is closed`);
+        }
+
+        if (!signal || !(signal instanceof AbortSignal)) {
+            throw new Error(`[${this.name}] Cannot attach context: signal must be AbortSignal instance`);
+        }
+
+        // ✅ P0-U6: Domain validation (previne attach em página errada)
+        if (this.config.expectedDomain) {
+            const currentUrl = page.url ? page.url() : '';
+
+            // Skip validation for about:blank (not navigated yet)
+            if (currentUrl !== 'about:blank' && currentUrl !== '' && !currentUrl.includes(this.config.expectedDomain)) {
+                throw new Error(
+                    `[${this.name}] Domain mismatch: expected ${this.config.expectedDomain}, got ${currentUrl}`
+                );
+            }
+        }
+
+        // Attach page + signal
+        this.page = page;
+        this.signal = signal;
+        this.correlationId = correlationId;
+
+        // Setup AbortSignal listener
+        this._setupAbortListener();
+
+        // Transição: UNATTACHED → IDLE
+        this.setState(STATES.IDLE);
+
+        // Telemetria
+        this.emit(EVENTS.CONTEXT_ATTACHED, {
+            pageUrl: page.url ? page.url() : 'unknown',
+            correlationId,
+            ts: Date.now(),
+        });
+
+        log('DEBUG', `[${this.name}] Context attached: ${correlationId || 'no-correlation'}`, this.correlationId);
+    }
+
+    /**
+     * Detach context (page + signal) do driver APÓS executar task.
+     *
+     * ✅ v3.0 (C2): Pool-ready - Driver volta para estado UNATTACHED (disponível para reuse).
+     * ✅ C2: Idempotência - Pode ser chamado múltiplas vezes sem erro (force flag).
+     *
+     * PRÉ-CONDIÇÕES:
+     * - Driver não destruído (throw se destroyed=true)
+     * - Driver em estado IDLE (recomendado, warning se não)
+     *
+     * PÓS-CONDIÇÕES:
+     * - Driver em estado UNATTACHED (ready para novo attach)
+     * - Page = null
+     * - Signal = null + listener removido
+     * - correlationId = null
+     * - Evento CONTEXT_DETACHED emitido
+     *
+     * @param {object} [options] - Opções de detach
+     * @param {boolean} [options.force=false] - Se true, ignora validação de estado (não throw)
+     * @returns {void}
+     * @throws {Error} Se driver destruído (sempre)
+     * @throws {Error} Se driver não está IDLE E force=false
+     *
+     * @example
+     * const response = await driver.execute(prompt);
+     * driver.detachContext();  // Normal detach (IDLE required)
+     *
+     * // C2: Force detach (finally block - garantir release)
+     * try {
+     *   await driver.execute(prompt);
+     * } finally {
+     *   driver.detachContext({ force: true });  // Sempre detach (mesmo se erro)
+     * }
+     */
+    detachContext(options = {}) {
+        const { force = false } = options;
+
+        // ✅ C2: ALWAYS validate destroyed (não pode ser idempotente em drivers destruídos)
+        if (this.destroyed) {
+            throw new Error(`[${this.name}] Cannot detach context: driver destroyed`);
+        }
+
+        // ✅ C2: Idempotência - Se já UNATTACHED, nada a fazer (return early)
+        if (this._state === STATES.UNATTACHED && !this.page && !this.signal) {
+            log('DEBUG', `[${this.name}] Detach called but already UNATTACHED (idempotent call)`);
+            return;
+        }
+
+        // ✅ C2: Validação de estado (somente se force=false)
+        if (!force && this._state !== STATES.IDLE) {
+            throw new Error(
+                `[${this.name}] Cannot detach context: driver not IDLE (current: ${this._state}). ` +
+                    `Call detachContext({ force: true }) to override.`
+            );
+        }
+
+        // ✅ C2: Warning se forçando detach em estado não-IDLE (telemetria crítica)
+        if (force && this._state !== STATES.IDLE) {
+            log(
+                'WARN',
+                `[${this.name}] FORCED detach: driver not IDLE (current: ${this._state}). ` +
+                    `This may indicate incomplete task execution or error recovery.`,
+                this.correlationId
+            );
+        }
+
+        const oldCorrelationId = this.correlationId;
+
+        // Teardown AbortSignal listener
+        this._teardownAbortListener();
+
+        // Detach page + signal
+        this.page = null;
+        this.signal = null;
+        this.correlationId = null;
+
+        // Transição: * → UNATTACHED
+        // ✅ C2: Force setState (mesmo que validation falhe)
+        try {
+            this.setState(STATES.UNATTACHED);
+        } catch (stateError) {
+            // ✅ C2: Se setState falhar (transition inválida), force state
+            log(
+                'WARN',
+                `[${this.name}] setState(UNATTACHED) failed: ${stateError.message}. ` + `Forcing state transition.`,
+                oldCorrelationId
+            );
+            this._state = STATES.UNATTACHED;
+            this.stateUpdated = Date.now();
+        }
+
+        // Telemetria
+        this.emit(EVENTS.CONTEXT_DETACHED, {
+            previousCorrelationId: oldCorrelationId,
+            forced: force && this._state !== STATES.IDLE,
+            ts: Date.now(),
+        });
+
+        log('DEBUG', `[${this.name}] Context detached: ${oldCorrelationId || 'no-correlation'}`);
+    }
+
+    /**
+     * Valida se driver está ready para executar task (context attached).
+     *
+     * ✅ v3.0: Pool-ready - Validação de pré-condições
+     *
+     * @returns {boolean} True se context attached e driver ready
+     *
+     * @example
+     * if (!driver.isContextAttached()) {
+     *   throw new Error('Driver not ready: attach context first');
+     * }
+     */
+    isContextAttached() {
+        return this.page !== null && this.signal !== null && this._state !== STATES.UNATTACHED;
+    }
+
+    /* ==========================================================================
       GESTÃO DE ESTADO E CAPACIDADES (v2.0)
   ========================================================================== */
 
@@ -332,7 +575,7 @@ class TargetDriver extends EventEmitter {
                 state: oldState,
                 to: newState,
                 duration_ms: duration,
-                ts: now
+                ts: now,
             });
 
             this._state = newState;
@@ -343,7 +586,7 @@ class TargetDriver extends EventEmitter {
                 from: oldState,
                 to: newState,
                 ts: now,
-                duration_ms: duration
+                duration_ms: duration,
             });
 
             if (this._stateHistory.length > TARGETDRIVER_CONFIG.MAX_STATE_HISTORY_SIZE) {
@@ -355,14 +598,14 @@ class TargetDriver extends EventEmitter {
                 from: oldState,
                 to: newState,
                 ts: now,
-                duration_ms: duration
+                duration_ms: duration,
             });
 
             // ✅ v2.0: Emit state entered
             this.emit(EVENTS.STATE_ENTERED, {
                 state: newState,
                 from: oldState,
-                ts: now
+                ts: now,
             });
         }
     }
@@ -435,7 +678,7 @@ class TargetDriver extends EventEmitter {
                 stateStuckError: stateAge > TARGETDRIVER_CONFIG.STATE_TIMEOUT_ERROR_MS,
                 uptime,
                 errorCount: this._errorCount,
-                stateTransitions: this._stateHistory.length
+                stateTransitions: this._stateHistory.length,
             },
 
             // ✅ v2.0: Capabilities snapshot
@@ -447,7 +690,7 @@ class TargetDriver extends EventEmitter {
             // Legacy fields
             isPageAttached: isPageAlive,
             name: this.name,
-            correlationId: this.correlationId
+            correlationId: this.correlationId,
         };
     }
 
@@ -460,7 +703,7 @@ class TargetDriver extends EventEmitter {
     getErrorStats() {
         return {
             errorCount: this._errorCount,
-            lastError: this._lastError
+            lastError: this._lastError,
         };
     }
 
@@ -496,7 +739,79 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Prepara contexto para execução.
+     * ✅ P0 BUG #3 FIX: Método abstrato execute() declarado explicitamente
+     *
+     * Executa uma tarefa (1 prompt → 1 resposta).
+     * Este é o método CORE de todo driver - representa 1 interação completa com LLM.
+     *
+     * ✅ v3.0: VALIDAÇÃO - Requer context attached (page + signal)
+     *
+     * CONTRATO:
+     * - Input: prompt (string) - O texto a ser enviado para o LLM
+     * - Output: response (string) - A resposta completa do LLM
+     * - Timing: 2-5min (depende da complexidade do prompt)
+     *
+     * ESTADO:
+     * - IDLE → PREPARING → TYPING → WAITING → IDLE (sucesso)
+     * - Qualquer estado → IDLE (abort via AbortSignal)
+     *
+     * PRÉ-CONDIÇÕES (v3.0):
+     * - Context attached (page não null, signal não null)
+     * - Page não está closed (validatePage passou)
+     * - Interface ready (validateLLMInterface passou)
+     * - DNA loaded (getTargetRules executou)
+     * - Estado inicial: IDLE
+     *
+     * INTEGRAÇÃO:
+     * - DNA: Usa selectors de dynamic_rules.json (this.dnaRules)
+     * - BiomechanicsEngine: Typing biomimético, click submit
+     * - AbortSignal: Checked a cada ciclo de perception loop
+     * - Telemetria: Emite STATE_CHANGE, VITAL, progress events
+     *
+     * GARANTIAS ONTOLÓGICAS (v3.0):
+     * - Driver pode executar N tasks sequencialmente (reuse)
+     * - Driver é agnóstico de task (só executa quando context attached)
+     *
+     * @abstract
+     * @param {string} _prompt - Prompt a ser enviado para o LLM
+     * @returns {Promise<string>} Resposta completa do LLM
+     * @throws {Error} Se context não attached ou método não implementado
+     *
+     * @example
+     * // ChatGPTDriver.execute() implementation:
+     * async execute(prompt) {
+     *   // ✅ v3.0: Validar context attached
+     *   if (!this.isContextAttached()) {
+     *     throw new Error('Context not attached');
+     *   }
+     *
+     *   this.setState('PREPARING');
+     *   await this.prepareContext();
+     *   this.setState('TYPING');
+     *   await this.sendPrompt(prompt);
+     *   this.setState('WAITING');
+     *   const response = await this.waitForResponse();
+     *   this.setState('IDLE');
+     *   return response;
+     * }
+     */
+    async execute(_prompt) {
+        // ✅ v3.0: Validação de context attached
+        if (!this.isContextAttached()) {
+            throw new Error(
+                `[${this.constructor.name}] CONTEXT_NOT_ATTACHED: Cannot execute without context. ` +
+                    `Call attachContext(page, signal) before execute().`
+            );
+        }
+
+        throw new Error(
+            `[${this.constructor.name}] ABSTRACT_METHOD_NOT_IMPLEMENTED: 'execute' não implementado. ` +
+                `Classe ${this.constructor.name} DEVE implementar execute(prompt) para ser funcional. ` +
+                `Veja contrato completo no JSDoc de TargetDriver.execute().`
+        );
+    }
+
+    /**     * Prepara contexto para execução.
      * @abstract
      * @param {object} _taskSpec - Especificação da task
      * @returns {Promise<void>}
@@ -591,7 +906,7 @@ class TargetDriver extends EventEmitter {
             this._lastError = {
                 type: 'EMIT_AFTER_DESTROY',
                 event,
-                ts: Date.now()
+                ts: Date.now(),
             };
 
             log('WARN', `[${this.name}] Tentativa de emit após destroy: ${event}`, this.correlationId);
@@ -603,7 +918,7 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Destruição profunda da instância e sinalização para a Factory.
-     * ✅ v2.0: Cleanup garantido e telemetria de errors
+     * ✅ v3.0: Garante detach de context antes de destroy
      *
      * Garante que o robô seja removido do cache e a memória seja liberada.
      *
@@ -613,6 +928,16 @@ class TargetDriver extends EventEmitter {
         if (this.destroyed) {
             return;
         }
+
+        // ✅ v3.0: Detach context se ainda attached
+        if (this.isContextAttached()) {
+            try {
+                this.detachContext();
+            } catch (err) {
+                log('WARN', `[${this.name}] Error detaching context during destroy: ${err.message}`);
+            }
+        }
+
         this.destroyed = true;
 
         // [R2] Notifica a Factory para remoção imediata do cache de instâncias
@@ -620,10 +945,8 @@ class TargetDriver extends EventEmitter {
 
         this.removeAllListeners();
 
-        // ✅ v2.0: Nullify readonly properties (configurable: true allows this)
-        Object.defineProperty(this, 'page', { value: null });
-
         // Clear references
+        this.page = null;
         this.signal = null;
 
         try {

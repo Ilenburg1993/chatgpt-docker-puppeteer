@@ -235,7 +235,7 @@ class ConnectionOrchestrator {
     detectEnvironment() {
         this.setState(STATES.DETECTING_ENV);
         const platform = os.platform();
-        this.env = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'mac' : 'linux';
+        this.env = platform === 'win32' ? 'windows' : 'linux';
         return this.env;
     }
 

@@ -1,87 +1,88 @@
-<template>
-    <aside class="sidebar">
-        <nav class="nav-menu">
-            <router-link to="/dashboard" class="nav-item">
-                <span class="icon">📊</span>
-                <span>Dashboard</span>
-            </router-link>
-            <router-link to="/missions" class="nav-item">
-                <span class="icon">🎯</span>
-                <span>Missions</span>
-            </router-link>
-            <router-link to="/tasks" class="nav-item">
-                <span class="icon">📋</span>
-                <span>Tasks</span>
-            </router-link>
-            <router-link to="/workflow" class="nav-item">
-                <span class="icon">🔄</span>
-                <span>Workflow</span>
-            </router-link>
-            <router-link to="/metrics" class="nav-item">
-                <span class="icon">📈</span>
-                <span>Metrics</span>
-            </router-link>
-            <router-link to="/events" class="nav-item">
-                <span class="icon">⚡</span>
-                <span>Events</span>
-            </router-link>
-            <router-link to="/health" class="nav-item">
-                <span class="icon">💚</span>
-                <span>Health</span>
-            </router-link>
-            <router-link to="/templates" class="nav-item">
-                <span class="icon">📝</span>
-                <span>Templates</span>
-            </router-link>
-        </nav>
-    </aside>
-</template>
+<script setup>
+import { Activity, BarChart3, ChevronLeft, LayoutDashboard, ListTodo } from 'lucide-vue-next';
+import { useRoute } from 'vue-router';
 
-<script>
-export default {
-    name: 'Sidebar'
+const props = defineProps({
+  collapsed: {
+    type: Boolean,
+    default: false
+  }
+});
+
+const emit = defineEmits(['toggle']);
+
+const route = useRoute();
+
+const menuItems = [
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+  { icon: ListTodo, label: 'Tasks', path: '/tasks' },
+  { icon: BarChart3, label: 'Metrics', path: '/metrics' },
+  { icon: Activity, label: 'System Health', path: '/health' },
+];
+
+const isActive = (path) => {
+  return route.path === path || route.path.startsWith(path + '/');
+};
+
+const handleToggle = () => {
+  emit('toggle');
 };
 </script>
 
-<style scoped>
-.sidebar {
-    width: 240px;
-    background-color: #34495e;
-    color: white;
-    overflow-y: auto;
-}
+<template>
+  <aside
+    :class="[
+      'relative bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-700/50 flex flex-col transition-all duration-300 z-20 shadow-2xl',
+      collapsed ? 'w-16' : 'w-64'
+    ]"
+  >
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-violet-600/5 pointer-events-none"></div>
 
-.nav-menu {
-    display: flex;
-    flex-direction: column;
-    padding: 10px 0;
-}
+    <div class="flex-1 overflow-y-auto scrollbar-thin py-6 relative">
+      <nav class="space-y-2 px-3">
+        <router-link
+          v-for="item in menuItems"
+          :key="item.path"
+          :to="item.path"
+          :class="[
+            'group flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 relative overflow-hidden',
+            isActive(item.path)
+              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/50'
+              : 'text-gray-400 hover:text-white hover:bg-slate-800/50 backdrop-blur-sm'
+          ]"
+        >
+          <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+          <component
+            :is="item.icon"
+            :size="22"
+            class="flex-shrink-0 transition-all duration-300 group-hover:scale-110"
+            :class="isActive(item.path) ? 'drop-shadow-lg' : ''"
+          />
+          <span
+            v-if="!collapsed"
+            class="text-sm font-semibold tracking-wide transition-all duration-300"
+          >
+            {{ item.label }}
+          </span>
+          <div
+            v-if="isActive(item.path) && !collapsed"
+            class="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse"
+          ></div>
+        </router-link>
+      </nav>
+    </div>
 
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 20px;
-    color: #ecf0f1;
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.nav-item:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-.nav-item.router-link-active {
-    background-color: #3498db;
-    border-left: 4px solid #2980b9;
-}
-
-.nav-item .icon {
-    font-size: 1.2rem;
-}
-
-.nav-item span:last-child {
-    font-size: 0.95rem;
-    font-weight: 500;
-}
-</style>
+    <div class="p-4 border-t border-slate-700/50 bg-slate-900/50 backdrop-blur-sm relative">
+      <button
+        @click="handleToggle"
+        class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 group"
+      >
+        <ChevronLeft
+          :size="20"
+          :class="['transition-all duration-300 group-hover:scale-110', collapsed && 'rotate-180']"
+        />
+        <span v-if="!collapsed" class="text-sm font-medium">Collapse</span>
+      </button>
+    </div>
+  </aside>
+</template>

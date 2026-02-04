@@ -25,7 +25,7 @@
 ========================================================================== */
 
 const EventEmitter = require('events');
-const system = require('@infra/system');
+// const system = require('@infra/system'); // ✅ v3.0: Removed (external browser mode)
 const stabilizer = require('@shared/page_stability/stabilizer');
 const { log } = require('@core/logger');
 
@@ -56,13 +56,13 @@ const RECOVERY_CONFIG = {
    RECOVERY_EVENTS v2.0 - Telemetria de Recovery
 ========================================================================== */
 const RECOVERY_EVENTS = {
-    TIER_STARTED: 'recovery:tier_started',         // Tier iniciado
-    TIER_COMPLETED: 'recovery:tier_completed',     // Tier concluído com sucesso
-    TIER_FAILED: 'recovery:tier_failed',           // Tier falhou
-    CACHE_CLEARED: 'recovery:cache_cleared',       // Cache invalidado (tier 0)
-    FOCUS_RESTORED: 'recovery:focus_restored',     // Focus restaurado (tier 1)
-    PAGE_RELOADED: 'recovery:page_reloaded',       // Page recarregada (tier 2)
-    PROCESS_KILLED: 'recovery:process_killed'      // Processo morto (tier 3)
+    TIER_STARTED: 'recovery:tier_started', // Tier iniciado
+    TIER_COMPLETED: 'recovery:tier_completed', // Tier concluído com sucesso
+    TIER_FAILED: 'recovery:tier_failed', // Tier falhou
+    CACHE_CLEARED: 'recovery:cache_cleared', // Cache invalidado (tier 0)
+    FOCUS_RESTORED: 'recovery:focus_restored', // Focus restaurado (tier 1)
+    PAGE_RELOADED: 'recovery:page_reloaded', // Page recarregada (tier 2)
+    BROWSER_DISCONNECTED: 'recovery:browser_disconnected', // Browser disconnected (tier 3 - external mode)
 };
 
 /* ==========================================================================
@@ -128,7 +128,7 @@ class RecoverySystem extends EventEmitter {
             successfulRecoveries: 0,
             failedRecoveries: 0,
             totalRecoveryDuration: 0,
-            maxRecoveryDuration: 0
+            maxRecoveryDuration: 0,
         };
 
         // ✅ Configurar max listeners (memory leak detection)
@@ -181,14 +181,14 @@ class RecoverySystem extends EventEmitter {
             tier: attempt,
             cause: recoveryErr.message,
             taskId,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
 
         // ✅ IPC telemetry (Mission Control)
         this.driver._emitVital('TRIAGE_ALERT', {
             type: 'RECOVERY_MANEUVER_START',
             severity: attempt > 1 ? 'HIGH' : 'MEDIUM',
-            evidence: { tier: attempt, cause: recoveryErr.message, taskId }
+            evidence: { tier: attempt, cause: recoveryErr.message, taskId },
         });
 
         try {
@@ -226,14 +226,14 @@ class RecoverySystem extends EventEmitter {
                 tier: attempt,
                 duration,
                 taskId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
 
             // ✅ IPC telemetry
             this.driver._emitVital('PROGRESS_UPDATE', {
                 step: 'RECOVERY_MANEUVER_COMPLETE',
                 tier: attempt,
-                duration
+                duration,
             });
 
             log('DEBUG', `[RECOVERY] Tier ${attempt} completed in ${duration}ms`, correlationId);
@@ -246,7 +246,7 @@ class RecoverySystem extends EventEmitter {
                 tier: attempt,
                 error: tierError.message,
                 taskId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
 
             log('ERROR', `[RECOVERY] Tier ${attempt} failed: ${tierError.message}`, correlationId);
@@ -269,7 +269,7 @@ class RecoverySystem extends EventEmitter {
 
         // ✅ EventEmitter telemetry
         this.emit(RECOVERY_EVENTS.CACHE_CLEARED, {
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
 
         // Tactical delay (backoff: 1200ms + attempt*800ms)
@@ -312,22 +312,19 @@ class RecoverySystem extends EventEmitter {
                 const focusTimeout = RECOVERY_CONFIG.FOCUS_TIMEOUT_MS;
 
                 // Mouse click at (1,1)
-                await Promise.race([
-                    this.driver.page.mouse.click(1, 1),
-                    this._timeout(focusTimeout, 'mouse_click')
-                ]);
+                await Promise.race([this.driver.page.mouse.click(1, 1), this._timeout(focusTimeout, 'mouse_click')]);
 
                 // Window focus
                 await Promise.race([
                     this.driver.page.evaluate(() => window.focus()),
-                    this._timeout(focusTimeout, 'window_focus')
+                    this._timeout(focusTimeout, 'window_focus'),
                 ]);
 
                 log('DEBUG', '[RECOVERY] Tier 1: Focus restored successfully', correlationId);
 
                 // ✅ EventEmitter telemetry
                 this.emit(RECOVERY_EVENTS.FOCUS_RESTORED, {
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
             } else {
                 log('WARN', `[RECOVERY] Página não disponível - pulando recovery de foco`, correlationId);
@@ -339,7 +336,7 @@ class RecoverySystem extends EventEmitter {
             this.emit(RECOVERY_EVENTS.TIER_FAILED, {
                 tier: 1,
                 error: focusErr.message,
-                isTimeout: focusErr.name === 'TimeoutError'
+                isTimeout: focusErr.name === 'TimeoutError',
             });
         }
 
@@ -383,9 +380,9 @@ class RecoverySystem extends EventEmitter {
                 await Promise.race([
                     this.driver.page.reload({
                         waitUntil: 'domcontentloaded',
-                        timeout: reloadTimeout
+                        timeout: reloadTimeout,
                     }),
-                    this._timeout(reloadTimeout, 'page_reload')
+                    this._timeout(reloadTimeout, 'page_reload'),
                 ]);
 
                 // Stabilizer wait
@@ -393,10 +390,16 @@ class RecoverySystem extends EventEmitter {
 
                 log('DEBUG', `[RECOVERY] Tier 2: Page reloaded successfully`, correlationId);
 
+                // ✅ Phase 2 Integration: Reset sessionTracker após reload
+                if (this.driver.sessionTracker && typeof this.driver.sessionTracker.reset === 'function') {
+                    this.driver.sessionTracker.reset();
+                    log('DEBUG', '[RECOVERY] SessionTracker reset após page reload', correlationId);
+                }
+
                 // ✅ EventEmitter telemetry
                 this.emit(RECOVERY_EVENTS.PAGE_RELOADED, {
                     attempt: retry + 1,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
 
                 // ✅ Success - sair do loop
@@ -422,12 +425,15 @@ class RecoverySystem extends EventEmitter {
     }
 
     /**
-     * Executa Tier 3: Nuclear Process Kill
+     * Executa Tier 3: Graceful Disconnect (External Browser Mode)
      *
-     * v2.0 Features:
-     * - Timeout protection em killProcess (já presente em v1.x)
-     * - EventEmitter telemetry
+     * v3.0 Features (External Connection):
+     * - Disconnect Puppeteer connection gracefully
+     * - Emit user notification (browser needs manual restart)
      * - Escalation to ExecutionEngine
+     *
+     * Note: Em modo EXTERNAL, browser.process() retorna null.
+     * Chrome roda no Windows (user-managed), não pode ser killed remotamente.
      *
      * @private
      * @param {string} correlationId - Correlation ID
@@ -441,41 +447,46 @@ class RecoverySystem extends EventEmitter {
         this.driver._emitVital('TRIAGE_ALERT', {
             type: 'TERMINAL_INFRA_FAILURE',
             severity: 'CRITICAL',
-            evidence: { action: 'PROCESS_KILL_TRIGGERED', taskId }
+            evidence: {
+                action: 'CONNECTION_LOST_CRITICAL',
+                taskId,
+                mode: 'EXTERNAL_BROWSER',
+                userAction: 'MANUAL_BROWSER_RESTART_REQUIRED',
+            },
         });
 
-        log('FATAL', `[RECOVERY] Tier 3 (Nuclear) atingido. Matando processo do navegador.`, correlationId);
+        log('FATAL', `[RECOVERY] Tier 3: Critical connection failure - browser may need manual restart`, correlationId);
 
         const browser = this.driver.page.browser();
-        const pid = browser?.process?.()?.pid;
 
-        if (pid) {
-            const killTimeout = RECOVERY_CONFIG.KILL_TIMEOUT_MS;
-
-            try {
-                await Promise.race([system.killProcess(pid), this._timeout(killTimeout, 'process_kill')]);
+        // ✅ v3.0: External mode - graceful disconnect
+        try {
+            if (browser && browser.isConnected()) {
+                log('DEBUG', '[RECOVERY] Tier 3: Disconnecting Puppeteer gracefully...', correlationId);
+                await browser.disconnect(); // Graceful disconnect (não close)
 
                 // ✅ EventEmitter telemetry
-                this.emit(RECOVERY_EVENTS.PROCESS_KILLED, {
-                    pid,
-                    timestamp: Date.now()
+                this.emit(RECOVERY_EVENTS.BROWSER_DISCONNECTED, {
+                    mode: 'EXTERNAL',
+                    reason: 'TIER3_RECOVERY',
+                    timestamp: Date.now(),
                 });
 
-                log('DEBUG', `[RECOVERY] Tier 3: Process ${pid} killed successfully`, correlationId);
-            } catch (killErr) {
-                if (killErr.message.includes('timeout')) {
-                    log(
-                        'WARN',
-                        `[RECOVERY] Tier 3: Kill timeout após ${killTimeout}ms, processo pode estar zombie`,
-                        correlationId
-                    );
-                } else {
-                    log('ERROR', `[RECOVERY] Tier 3: Falha no kill: ${killErr.message}`, correlationId);
-                }
+                log('DEBUG', `[RECOVERY] Tier 3: Browser disconnected successfully`, correlationId);
+            } else {
+                log('DEBUG', `[RECOVERY] Tier 3: Browser already disconnected`, correlationId);
             }
-        } else {
-            log('WARN', `[RECOVERY] Tier 3: Browser PID não disponível`, correlationId);
+        } catch (disconnectErr) {
+            log('WARN', `[RECOVERY] Tier 3: Disconnect error: ${disconnectErr.message}`, correlationId);
         }
+
+        // ✅ User notification via NERV
+        this.driver._emitVital('USER_NOTIFICATION', {
+            type: 'BROWSER_RESTART_REQUIRED',
+            severity: 'CRITICAL',
+            message: 'Browser connection lost. Please restart Chrome and reconnect.',
+            taskId,
+        });
 
         // ✅ Escalate to ExecutionEngine
         throw recoveryErr;
@@ -531,7 +542,7 @@ class RecoverySystem extends EventEmitter {
     getStats() {
         return {
             ...this.stats,
-            config: { ...RECOVERY_CONFIG }
+            config: { ...RECOVERY_CONFIG },
         };
     }
 }
