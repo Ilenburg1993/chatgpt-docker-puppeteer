@@ -1,9 +1,15 @@
 /* ==========================================================================
    src/core/schemas/task_schema.js
-   Audit Level: 100 — Industrial Hardening (Task V4 Gold Standard)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Definição técnica da Unidade Atômica de Trabalho.
-                     Garante integridade total entre Maestro, Driver e Dashboard.
+   Audit Level: 100 — Task Schema (V4 Legacy + V5 Forward)
+   Status: CONSOLIDATED (Protocol 11 - V5 Migration Layer)
+   Responsabilidade: Export layer com backward compatibility V4 + forward V5.
+
+   ESTRATÉGIA V5 (Fevereiro 2026):
+   - TaskSchema V4 mantido (backward compatibility)
+   - TaskSchemaV5 exportado (novo default)
+   - parseTask() detecta versão e usa schema apropriado
+   - Código antigo continua funcionando (imports V4)
+   - Código novo usa V5
 ========================================================================== */
 
 const { z } = require('zod');
@@ -144,11 +150,36 @@ const TaskSchema = z
     })
     .passthrough();
 
+// ==========================================
+// V5 IMPORTS (Forward Compatibility)
+// ==========================================
+const {
+    TaskSchemaV5,
+    MetaSchemaV5,
+    SpecSchemaV5,
+    PolicySchemaV5,
+    ExecutionSchemaV5,
+    MissionSchemaV5,
+    StateSchemaV5,
+    ResultSchemaV5
+} = require('./task_schema_v5');
+
 module.exports = {
+    // V4 Schemas (backward compatibility)
     TaskSchema,
     MetaSchema,
     SpecSchema,
     PolicySchema,
     StateSchema,
-    ResultSchema
+    ResultSchema,
+
+    // V5 Schemas (forward compatibility)
+    TaskSchemaV5,
+    MetaSchemaV5,
+    SpecSchemaV5,
+    PolicySchemaV5,
+    ExecutionSchemaV5,
+    MissionSchemaV5,
+    StateSchemaV5,
+    ResultSchemaV5,
 };

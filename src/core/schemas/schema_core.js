@@ -21,7 +21,7 @@ module.exports = {
         Timestamp: shared.TIMESTAMP_SCHEMA,
         Status: shared.STATUS_SCHEMA,
         Source: shared.SOURCE_SCHEMA,
-        Priority: shared.PRIORITY_SCHEMA
+        Priority: shared.PRIORITY_SCHEMA,
     },
 
     // 2. Contratos de Percepção (DNA)
@@ -40,12 +40,20 @@ module.exports = {
 
     /**
      * parseTask: O ponto de entrada oficial para novas tarefas.
-     * Utiliza o motor de cura para garantir compatibilidade e integridade.
-     * Automaticamente migra tasks V4 → V5 se necessário.
+     *
+     * FUNCIONALIDADE V5 (Fevereiro 2026):
+     * 1. healTask(): Cura/valida dados brutos (schema V4 ou V5)
+     * 2. autoMigrateTask(): Auto-migra V4 → V5 transparentemente
+     * 3. Retorna task V5 validada (backward compatible)
+     *
+     * Comportamento:
+     * - Task V4: healed → migrated V4→V5 → validated V5 → returned
+     * - Task V5: healed → validated V5 → returned
+     * - Task sem versão: healed → assume V4 → migrated → returned V5
      */
     parseTask: raw => {
         const healed = healTask(raw);
         // Auto-migração transparente V4 → V5
         return migrator.autoMigrateTask(healed);
-    }
+    },
 };
