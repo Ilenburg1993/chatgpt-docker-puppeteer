@@ -1,35 +1,85 @@
 {
-    "_meta": {
-        "version": 5,
-        "last_updated": "2026-01-18T12:06:03.846Z",
-        "updated_by": "TEST_SADI_EVOLUTION",
-        "evolution_count": 2
+  "_meta": {
+    "version": 97,
+    "last_updated": "2026-02-04T06:43:42.843Z",
+    "updated_by": "test-cleanup",
+    "evolution_count": 94
+  },
+  "targets": {
+    "chatgpt.com": {
+      "selectors": {
+        "input_box": [
+          "input-8ca6f4ef-fcdd-4967-8b70-aa62813710fa",
+          "#prompt-textarea",
+          "div[contenteditable='true'][role='textbox']",
+          "textarea"
+        ]
+      },
+      "behavior_overrides": {}
     },
-    "targets": {
-        "chatgpt.com": {
-            "selectors": {
-                "input_box": [
-                    "input-8ca6f4ef-fcdd-4967-8b70-aa62813710fa",
-                    "#prompt-textarea",
-                    "div[contenteditable='true'][role='textbox']",
-                    "textarea"
-                ]
-            },
-            "behavior_overrides": {}
-        },
-        "openai.com": {
-            "selectors": {
-                "input_box": ["#prompt-textarea"],
-                "send_button": ["[data-testid='send-button']"]
-            },
-            "behavior_overrides": {},
-            "// --- ALIAS ---": "Mapeamento para compatibilidade de subdomínios"
-        }
+    "openai.com": {
+      "selectors": {
+        "input_box": [
+          "#prompt-textarea"
+        ],
+        "send_button": [
+          "[data-testid='send-button']"
+        ]
+      },
+      "behavior_overrides": {},
+      "// --- ALIAS ---": "Mapeamento para compatibilidade de subdomínios"
     },
-    "global_selectors": {
-        "input_box": ["textarea", "div[contenteditable='true']", "[role='textbox']", "input[type='text']"],
-        "send_button": ["button[type='submit']", "[data-testid*='send']", "[aria-label*='Send']", "button:has(svg)"]
+    "test-domain.com": {
+      "selectors": {
+        "test_input": [
+          "#test-selector-001"
+        ]
+      },
+      "behavior_overrides": {}
     },
-    "// --- REGRAS POR ALVO (TARGETS) ---": "Isolamento semântico por domínio IA",
-    "// --- SELETORES GLOBAIS (FALLBACK) ---": "Padrões universais de interfaces de chat"
+    "test-rate-limit.com": {
+      "selectors": {
+        "test_rate_0": [
+          "#test-rate-0"
+        ],
+        "test_rate_1": [
+          "#test-rate-1"
+        ],
+        "test_rate_2": [
+          "#test-rate-2"
+        ],
+        "test_rate_3": [
+          "#test-rate-3"
+        ],
+        "test_rate_4": [
+          "#test-rate-4"
+        ]
+      },
+      "behavior_overrides": {}
+    },
+    "test-duplicate.com": {
+      "selectors": {
+        "test_duplicate": [
+          "#test-duplicate-selector"
+        ]
+      },
+      "behavior_overrides": {}
+    }
+  },
+  "global_selectors": {
+    "input_box": [
+      "textarea",
+      "div[contenteditable='true']",
+      "[role='textbox']",
+      "input[type='text']"
+    ],
+    "send_button": [
+      "button[type='submit']",
+      "[data-testid*='send']",
+      "[aria-label*='Send']",
+      "button:has(svg)"
+    ]
+  },
+  "// --- REGRAS POR ALVO (TARGETS) ---": "Isolamento semântico por domínio IA",
+  "// --- SELETORES GLOBAIS (FALLBACK) ---": "Padrões universais de interfaces de chat"
 }

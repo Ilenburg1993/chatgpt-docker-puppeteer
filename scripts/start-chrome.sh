@@ -66,8 +66,7 @@ detect_platform() {
         else
             echo "linux"
         fi
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
+
     else
         echo "unknown"
     fi
@@ -92,11 +91,6 @@ find_chrome_path() {
                 "/usr/bin/google-chrome-stable"
                 "/usr/bin/chromium"
                 "/usr/bin/chromium-browser"
-            )
-            ;;
-        macos)
-            local paths=(
-                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
             )
             ;;
         *)
@@ -165,8 +159,8 @@ start_chrome() {
                 --remote-allow-origins=* \
                 &>/dev/null &
             ;;
-        linux|macos)
-            # Linux/Mac nativos
+        linux)
+            # Linux nativo
             nohup "$chrome_path" \
                 --remote-debugging-port="$CHROME_DEBUG_PORT" \
                 --user-data-dir="$CHROME_USER_DATA_DIR" \
@@ -250,9 +244,6 @@ main() {
                 echo "  → sudo apt install google-chrome-stable"
                 echo "  ou"
                 echo "  → sudo apt install chromium-browser"
-                ;;
-            macos)
-                echo "  → https://www.google.com/chrome/"
                 ;;
         esac
         return 1

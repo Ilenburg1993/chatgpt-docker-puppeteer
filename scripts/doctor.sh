@@ -134,8 +134,7 @@ else
     echo "   Para iniciar:"
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo "   google-chrome --remote-debugging-port=${CHROME_PORT} --user-data-dir=\"$HOME/chrome-automation-profile\""
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=${CHROME_PORT}"
+
     fi
 fi
 echo ""

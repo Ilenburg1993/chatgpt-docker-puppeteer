@@ -88,6 +88,12 @@ help:
 	@echo "  $(CYAN)make logs-follow$(NC)       Logs em tempo real"
 	@echo "  $(CYAN)make monit$(NC)             Dashboard PM2"
 	@echo ""
+	@echo "$(GREEN)$(BOLD)🌐 Dashboard UI (Vite):$(NC)"
+	@echo "  $(CYAN)make dashboard-check$(NC)   Diagnóstico completo"
+	@echo "  $(CYAN)make dashboard-guide$(NC)   Guia port forwarding"
+	@echo "  $(CYAN)make dashboard-open$(NC)    Abrir Simple Browser"
+	@echo "  $(CYAN)make dashboard-sync$(NC)    Check config sync (rebuild needed?)"
+	@echo ""
 	@echo "$(YELLOW)$(BOLD)🏥 Health & Validação:$(NC)"
 	@echo "  $(CYAN)make health$(NC)            Health check PM2"
 	@echo "  $(CYAN)make pm2-check$(NC)         Check completo (6 validações)"
@@ -256,7 +262,7 @@ workspace-clean:
 # 4️⃣ RUNTIME OPERACIONAL (PM2 / daemon)
 # =============================================================================
 
-.PHONY: ensure-pm2 start stop restart reload status logs logs-follow monit
+.PHONY: ensure-pm2 start stop restart reload status logs logs-follow monit dashboard-check dashboard-guide dashboard-open dashboard-test-windows dashboard-sync
 
 ensure-pm2:
 	@command -v pm2 >/dev/null 2>&1 || echo "$(YELLOW)Usando PM2 via npx$(NC)"
@@ -291,6 +297,39 @@ logs-follow:
 monit:
 	@echo "$(CYAN)📊 Dashboard PM2 (Ctrl+C para sair)$(NC)"
 	@$(NPM) run daemon:monit || true
+
+# =============================================================================
+# 4️⃣.5 DASHBOARD UI (VITE DEV SERVER)
+# =============================================================================
+
+.PHONY: dashboard-check dashboard-guide dashboard-open dashboard-test-windows
+
+dashboard-check:
+	@echo "$(CYAN)🔍 Dashboard Access Diagnostics$(NC)"
+	@bash scripts/check-dashboard-access.sh
+
+dashboard-guide:
+	@echo "$(CYAN)📖 Port Forwarding Setup Guide$(NC)"
+	@bash scripts/guide-port-forwarding.sh
+
+dashboard-open:
+	@echo "$(CYAN)🌐 Opening Dashboard in Browser$(NC)"
+	@bash scripts/open-dashboard-browser.sh
+
+dashboard-test-windows:
+	@echo "$(CYAN)🪟 Test Dashboard Access from Windows$(NC)"
+	@echo ""
+	@echo "Run this command in Windows PowerShell (not in container):"
+	@echo ""
+	@echo "  cd $(shell pwd)"
+	@echo '  $$PSScriptRoot\scripts\test-dashboard-from-windows.ps1'
+	@echo ""
+	@echo "Or manually test:"
+	@echo "  Test-NetConnection -ComputerName localhost -Port 5173"
+
+dashboard-sync:
+	@echo "$(CYAN)🔄 DevContainer Config Sync Check$(NC)"
+	@bash scripts/check-devcontainer-sync.sh
 
 # =============================================================================
 # 5️⃣ HEALTH (PM2 SOVEREIGN MODE)

@@ -382,7 +382,15 @@
       "sourceMaps": true,
       "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "autoAttachChildProcesses": true,
-      "showAsyncStacks": true
+      "showAsyncStacks": true,
+      "presentation": {
+        "hidden": false,
+        "group": "attach",
+        "order": 1
+      }
+      // ⚠️  WARNING: Only use this when PM2 is running with --node-args="--inspect=0.0.0.0:9229"
+      // To start with debug: pm2 start ecosystem.config.js --node-args="--inspect=0.0.0.0:9229"
+      // To check if debug is active: curl -s http://127.0.0.1:9229/json/list
     },
     {
       "type": "node",
@@ -394,7 +402,13 @@
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "${workspaceFolder}",
       "sourceMaps": true,
-      "autoAttachChildProcesses": true
+      "autoAttachChildProcesses": true,
+      "presentation": {
+        "hidden": false,
+        "group": "attach",
+        "order": 2
+      }
+      // ⚠️  WARNING: Only use when dashboard is running with --inspect=0.0.0.0:9230
     },
     {
       "type": "node",
@@ -409,7 +423,13 @@
       "sourceMaps": true,
       "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
       "autoAttachChildProcesses": true,
-      "showAsyncStacks": true
+      "showAsyncStacks": true,
+      "presentation": {
+        "hidden": false,
+        "group": "attach",
+        "order": 3
+      }
+      // ⚠️  For standalone Docker (not DevContainer)
     },
     {
       "type": "node",
@@ -422,7 +442,52 @@
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "/app",
       "sourceMaps": true,
-      "autoAttachChildProcesses": true
+      "autoAttachChildProcesses": true,
+      "presentation": {
+        "hidden": false,
+        "group": "attach",
+        "order": 4
+      }
+      // ⚠️  For standalone Docker (not DevContainer)
+    },
+    {
+      "name": "🎨 Debug Vite Dev Server (Vue)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/src/dashboard-ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_ENV": "development",
+        "VITE_CJS_TRACE": "true"
+      },
+      "presentation": {
+        "hidden": false,
+        "group": "vue",
+        "order": 1
+      }
+      // Use this to debug Vite configuration issues
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "🌐 Debug Vue App in Chrome",
+      "url": "http://localhost:5173/dashboard/",
+      "webRoot": "${workspaceFolder}/src/dashboard-ui",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "/@fs/*": "${workspaceFolder}/*"
+      },
+      "presentation": {
+        "hidden": false,
+        "group": "vue",
+        "order": 2
+      },
+      "preLaunchTask": null
+      // ⚠️  Requires Vite dev server running (port 5173)
+      // ⚠️  Requires Chrome remote debugging enabled
     }
   ],
   "compounds": [
