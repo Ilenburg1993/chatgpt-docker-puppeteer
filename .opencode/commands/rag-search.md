@@ -12,7 +12,7 @@ Searches the codebase using semantic vector search powered by RAG (Retrieval-Aug
 
 This command uses the local RAG system to perform semantic search across the entire codebase:
 - **LanceDB** for vector storage
-- **Ollama** (qwen3-embedding:4b) for embeddings
+- **Ollama** (nomic-embed-text:latest) for embeddings
 - **Incremental indexing** with fingerprint-based change detection
 
 ## Usage
@@ -64,7 +64,7 @@ This command uses the local RAG system to perform semantic search across the ent
 
 ## How It Works
 
-1. **Query Embedding**: Your query is embedded using Ollama (qwen3-embedding:4b)
+1. **Query Embedding**: Your query is embedded using Ollama (nomic-embed-text:latest)
 2. **Vector Search**: LanceDB performs semantic similarity search
 3. **Ranking**: Results sorted by relevance (cosine distance)
 4. **Formatting**: Output formatted as Markdown with code snippets
@@ -133,7 +133,7 @@ curl http://host.docker.internal:11434/api/version
 **Solution:** Pull the embedding model on host:
 ```bash
 # On host machine:
-ollama pull qwen3-embedding:4b
+ollama pull nomic-embed-text:latest
 ```
 
 ## Related Commands

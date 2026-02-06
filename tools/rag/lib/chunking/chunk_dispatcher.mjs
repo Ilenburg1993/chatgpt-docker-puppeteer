@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { MAX_CHUNK_CHARS } from '../contract.mjs';
 import { chunkMarkdown } from './chunk_md.mjs';
 import { chunkCode } from './chunk_code.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
@@ -35,7 +36,7 @@ export function buildTags(relPath) {
     return tags;
 }
 
-export function chunkByType({ relPath, lines, maxChunkChars = 4000, minChunkChars = 200 }) {
+export function chunkByType({ relPath, lines, maxChunkChars = MAX_CHUNK_CHARS, minChunkChars = 200 }) {
     const language = detectLanguage(relPath);
     if (language === 'markdown') return chunkMarkdown({ lines, maxChunkChars, minChunkChars });
     if (language === 'js' || language === 'ts' || language === 'sh' || language === 'ps1') {

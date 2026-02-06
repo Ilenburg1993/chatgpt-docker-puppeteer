@@ -49,19 +49,37 @@ export class OllamaEmbeddingsProvider {
     }
 
     async embed(text) {
+        // SAFETY: Truncate excessively long texts (conservative limit for nomic-embed-text)
+        // nomic-embed-text supports 8192 tokens (~32k chars), but being conservative with 3k chars
+        const MAX_SAFE_CHARS = 3000;
+        let truncatedText = text;
+        let wasTruncated = false;
+
+        if (text.length > MAX_SAFE_CHARS) {
+            truncatedText = text.slice(0, MAX_SAFE_CHARS);
+            wasTruncated = true;
+            console.warn(`[RAG] Text truncated: ${text.length} → ${MAX_SAFE_CHARS} chars (model context limit)`);
+        }
+
         return retryWithBackoff(
             async () => {
-                const body = { model: this.model, input: text };
+                const body = { model: this.model, input: truncatedText };
+                console.log(`[RAG]     • Sending to Ollama: ${truncatedText.length} chars, model=${this.model}`);
+
+                const startTime = Date.now();
                 const resp = await fetchJson(`${this.baseURL}/embeddings`, {
                     timeoutMs: this.timeoutMs,
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
                     body: JSON.stringify(body)
                 });
+                const elapsed = Date.now() - startTime;
+
                 const vector = resp?.data?.[0]?.embedding;
                 if (!Array.isArray(vector) || vector.length === 0) {
                     throw new Error('OLLAMA_EMBEDDINGS_BAD_RESPONSE');
                 }
+                console.log(`[RAG]     ✓ Ollama response: ${vector.length}D vector in ${elapsed}ms`);
                 return vector.map(n => Number(n));
             },
             {

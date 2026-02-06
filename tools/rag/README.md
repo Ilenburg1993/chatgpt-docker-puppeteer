@@ -42,7 +42,7 @@ Flags úteis:
 
 - Define constantes e helpers determinísticos (`chunk_id`, `file_id`, `sha256`).
 - Defaults:
-  - modelo embeddings: `qwen3-embedding:4b`
+  - modelo embeddings: `nomic-embed-text:latest`
   - baseURL Ollama: `http://host.docker.internal:11434/v1`
   - `SCHEMA_VERSION=1`, `CHUNKER_VERSION="v1"`
 
@@ -160,7 +160,7 @@ Além disso:
     - `curl http://host.docker.internal:11434/api/version`
     - `curl http://host.docker.internal:11434/v1/models`
 - `has_model=false`:
-  - Baixe o modelo no host: `ollama pull qwen3-embedding:4b`
+  - Baixe o modelo no host: `ollama pull nomic-embed-text:latest`
 - `EMBEDDING_DIM_MISMATCH`:
   - Mudou o modelo/dimensão. Faça reset explícito:
     - `npm run rag:reset -- --yes`

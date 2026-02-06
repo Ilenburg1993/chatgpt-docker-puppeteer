@@ -213,6 +213,7 @@ export async function ragIndex(options = {}) {
                 });
 
                 // Embed with retry logic (handles transient failures)
+                console.log(`[RAG]   → Embedding chunk ${report.embedded_chunks + 1}/${ranges.length}: ${text.length} chars (lines ${r.startLine}-${r.endLine})`);
                 const vector = await retryWithBackoff(
                     () => embeddings.embed(text),
                     {
@@ -225,6 +226,11 @@ export async function ragIndex(options = {}) {
                     }
                 );
                 report.embedded_chunks++;
+
+                // Throttle: Small delay between embeddings to avoid overwhelming Ollama (CPU-heavy)
+                if (report.embedded_chunks % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 200)); // 200ms pause every 5 embeddings
+                }
 
                 if (!manifest.embedding.dim) {
                     manifest.embedding.dim = vector.length;

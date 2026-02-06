@@ -23,7 +23,7 @@ if (values.json) {
     console.log(`  Directories:      ${report.writable ? '✅' : '❌'} Writable`);
     console.log(`  Manifest:         ${report.manifest_ok ? '✅' : '❌'} ${report.manifest_ok ? 'Valid' : 'Error'}`);
     console.log(`  Ollama:           ${report.ollama?.ok ? '✅' : '❌'} ${report.ollama?.ok ? 'Connected' : 'Unreachable'}`);
-    console.log(`  Embedding Model:  ${report.ollama?.hasModel ? '✅' : '❌'} ${report.ollama?.hasModel ? (report.manifest?.embedding?.model || 'qwen3-embedding:4b') : 'Not found'}`);
+    console.log(`  Embedding Model:  ${report.ollama?.hasModel ? '✅' : '❌'} ${report.ollama?.hasModel ? (report.manifest?.embedding?.model || 'nomic-embed-text:latest') : 'Not found'}`);
     console.log(`  LanceDB:          ${report.lancedb?.ok ? '✅' : '❌'} ${report.lancedb?.ok ? 'Accessible' : 'Error'}`);
 
     if (!report.ok) {
@@ -32,7 +32,7 @@ if (values.json) {
             console.log('  • Check Ollama: curl http://host.docker.internal:11434/api/version');
         }
         if (!report.ollama?.hasModel) {
-            console.log('  • Install model: ollama pull qwen3-embedding:4b');
+            console.log('  • Install model: ollama pull nomic-embed-text:latest');
         }
         if (!report.manifest_ok) {
             console.log('  • Reset index: npm run rag:reset -- --yes');
