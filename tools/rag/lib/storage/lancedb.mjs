@@ -69,9 +69,21 @@ function buildWhere({ pathPrefix, ext, tags }) {
     return parts.length ? parts.join(' AND ') : null;
 }
 
-export async function search(table, vector, { topK = 8, filters = {} } = {}) {
+export async function search(table, vector, { topK = 8, filters = {}, distanceRange } = {}) {
     const where = buildWhere(filters);
-    let q = table.search(vector).limit(topK * 5);
+    let q = table.search(vector);
+
+    // LanceDB v0.24: Distance range filtering (discard irrelevant results)
+    // distanceRange: { min, max } or [min, max]
+    // Example: distanceRange: [0, 0.8] filters out results with distance > 0.8
+    if (distanceRange) {
+        const [min, max] = Array.isArray(distanceRange)
+            ? distanceRange
+            : [distanceRange.min || 0, distanceRange.max || 1];
+        q = q.distanceRange(min, max);
+    }
+
+    q = q.limit(topK * 5);
     if (where) q = q.where(where);
     const rows = await q.toArray();
 
