@@ -3,7 +3,9 @@ import path from 'node:path';
 import ignore from 'ignore';
 import { isProbablyBinary } from './text.mjs';
 
-const ALLOW_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.json', '.md', '.yml', '.yaml', '.sh', '.ps1']);
+// Exclude .md files for first indexing (heavy, many docs)
+// Can be re-enabled later with: analysis/ excluded + selective indexing
+const ALLOW_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.json', '.yml', '.yaml', '.sh', '.ps1']);
 const ALWAYS_ALLOW_BASENAMES = new Set(['Dockerfile', 'Makefile']);
 const ALWAYS_DENY_BASENAMES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']);
 
