@@ -49,6 +49,9 @@ dist/
 build/
 *.tgz
 
+# Old dashboard (deprecated, use src/dashboard-ui/)
+public/
+
 # IDE and editors
 # .vscode/ (permitido para versionamento dos arquivos de configuração)
 #!.vscode/extensions.json
