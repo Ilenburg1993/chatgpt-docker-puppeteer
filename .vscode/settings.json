@@ -120,7 +120,7 @@
   "editor.suggest.matchOnWordStartOnly": false,
   "editor.suggest.showStatusBar": true,
   "editor.tabCompletion": "on",
-  "editor.wordBasedSuggestions": "off",
+  "editor.wordBasedSuggestions": "offWithInlineSuggestions",
   "editor.wordBasedSuggestionsMode": "currentDocument",
   // ============================================================
   // 7. LINGUAGENS — JAVASCRIPT / TYPESCRIPT / JSON
@@ -433,4 +433,5 @@
 "windowsaistudio.enableRemoteFine-tuningAndInference": true,
 "editor.autoIndentOnPaste": true,
 "editor.occurrencesHighlightDelay": 100,
+"workbench.externalBrowser": "chrome",
 }

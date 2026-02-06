@@ -370,9 +370,20 @@ export async function ragQuery(options = {}) {
 }
 
 /**
- * Hybrid search (vector + FTS) with formatted output
- * Combines semantic vector search with lexical full-text search
+ * Hybrid search (vector + FTS + reranking + MMR) with formatted output
+ * Combines semantic vector search with lexical full-text search,
+ * multi-signal reranking, and MMR diversity algorithm
  * @param {object} options - Search options
+ * @param {string} options.query - Query text
+ * @param {number} options.topK - Number of results (default: 8)
+ * @param {string} options.pathPrefix - Filter by path prefix
+ * @param {string} options.ext - Filter by file extension
+ * @param {string[]} options.tags - Filter by tags
+ * @param {object|array} options.distanceRange - Min/max distance range
+ * @param {boolean} options.rerank - Enable reranking (default: true)
+ * @param {object} options.rerankWeights - Custom rerank weights
+ * @param {boolean} options.mmr - Enable MMR diversity (default: true)
+ * @param {number} options.mmrLambda - MMR lambda (default: 0.7)
  * @returns {Promise<object>} - Search results + metadata
  */
 export async function ragHybridSearch(options = {}) {
@@ -385,7 +396,18 @@ export async function ragHybridSearch(options = {}) {
         model: options.model || manifest.embedding.model
     });
 
-    const { query, topK = 8, pathPrefix, ext, tags, distanceRange } = options;
+    const {
+        query,
+        topK = 8,
+        pathPrefix,
+        ext,
+        tags,
+        distanceRange,
+        rerank = true,         // Enable reranking by default
+        rerankWeights,         // Custom weights (optional)
+        mmr = true,            // Enable MMR by default
+        mmrLambda = 0.7        // MMR lambda (0.7 = 70% relevance, 30% diversity)
+    } = options;
 
     // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
     let vector;
@@ -413,12 +435,16 @@ export async function ragHybridSearch(options = {}) {
     const db = await openDb(paths.dbDir);
     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
 
-    console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}`);
+    console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
 
     const results = await hybridSearch(table, vector, query, {
         topK,
         filters: { pathPrefix, ext, tags },
-        distanceRange
+        distanceRange,
+        rerank,
+        rerankWeights,
+        mmr,
+        mmrLambda
     });
 
     try {
@@ -433,7 +459,10 @@ export async function ragHybridSearch(options = {}) {
         dim: manifest.embedding.dim,
         model: manifest.embedding.model || embeddings.model,
         query,
-        hybridMode: true
+        hybridMode: true,
+        rerank,
+        mmr,
+        mmrLambda
     };
 }
 

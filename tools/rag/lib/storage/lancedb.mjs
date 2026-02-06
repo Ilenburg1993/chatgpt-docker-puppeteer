@@ -1,5 +1,7 @@
 import { connect, Index } from '@lancedb/lancedb';
 import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List } from 'apache-arrow';
+import { rerank } from '../retrieve/reranker.mjs';
+import { maximalMarginalRelevance } from '../retrieve/diversity.mjs';
 
 export const TABLE_NAME = 'chunks_v1';
 
@@ -129,19 +131,30 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
 }
 
 /**
- * Hybrid search: Vector (semantic) + FTS (lexical)
+ * Hybrid search: Vector (semantic) + FTS (lexical) + Reranking + MMR
  * Combines vector similarity with full-text search for better precision
  * @param {Table} table - LanceDB table
  * @param {number[]} vector - Query embedding
  * @param {string} textQuery - Original query text for FTS
  * @param {object} options - Search options
- * @returns {Promise<object[]>} - Ranked results
+ * @param {number} options.topK - Number of results to return (default: 8)
+ * @param {object} options.filters - Path, ext, tags filters
+ * @param {object} options.distanceRange - Min/max distance range
+ * @param {boolean} options.rerank - Enable multi-signal reranking (default: true)
+ * @param {object} options.rerankWeights - Custom rerank weights (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
+ * @param {boolean} options.mmr - Enable MMR for diversity (default: true)
+ * @param {number} options.mmrLambda - MMR lambda parameter (default: 0.7, 1.0 = only relevance, 0.0 = only diversity)
+ * @returns {Promise<object[]>} - Ranked results with rerank_score and rerank_signals
  */
 export async function hybridSearch(table, vector, textQuery, options = {}) {
     const {
         topK = 8,
         filters = {},
-        distanceRange
+        distanceRange,
+        rerank: shouldRerank = true,     // Enable reranking by default
+        rerankWeights,                    // Custom rerank weights (optional)
+        mmr: shouldMMR = true,            // Enable MMR by default
+        mmrLambda = 0.7                   // MMR lambda (0.7 = 70% relevance, 30% diversity)
     } = options;
 
     // LanceDB v0.24 API: query().fullTextSearch().nearestTo()
@@ -158,8 +171,9 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
         q = q.distanceRange(min, max);
     }
 
-    // Over-fetch for filtering (5x topK)
-    q = q.limit(topK * 5);
+    // Over-fetch for reranking: get 2x topK to have more candidates
+    const fetchLimit = shouldRerank ? topK * 2 : topK * 5;
+    q = q.limit(fetchLimit);
 
     // Apply WHERE filters (path, ext)
     const where = buildWhere(filters);
@@ -187,8 +201,28 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
         return String(a.chunk_id).localeCompare(String(b.chunk_id));
     });
 
-    // Return top K
-    return filtered.slice(0, topK).map(formatResult);
+    // Format results first (needed for reranking)
+    let results = filtered.map(formatResult);
+
+    // Apply reranking (if enabled and we have results)
+    if (shouldRerank && results.length > 0) {
+        console.log(`[RAG] Reranking ${results.length} results with 6 signals...`);
+        results = rerank(results, textQuery, { weights: rerankWeights });
+    }
+
+    // Apply MMR for diversity (if enabled and we have more results than topK)
+    if (shouldMMR && results.length > topK) {
+        console.log(`[RAG] Applying MMR for diversity (lambda=${mmrLambda})...`);
+        results = maximalMarginalRelevance(results, {
+            lambda: mmrLambda,
+            topK
+        });
+    } else {
+        // Just slice to topK if MMR disabled
+        results = results.slice(0, topK);
+    }
+
+    return results;
 }
 
 function formatResult(r) {

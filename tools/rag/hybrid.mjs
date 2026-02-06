@@ -11,7 +11,10 @@ const { positionals, values } = parseArgs({
         tag: { type: 'string', multiple: true },
         json: { type: 'boolean', default: false },
         'ollama-base-url': { type: 'string' },
-        model: { type: 'string' }
+        model: { type: 'string' },
+        rerank: { type: 'boolean', default: true },
+        mmr: { type: 'boolean', default: true },
+        'mmr-lambda': { type: 'string' }
     }
 });
 
@@ -24,6 +27,11 @@ if (!query) {
     console.error('  --ext .js             Filter by file extension');
     console.error('  --path-prefix src/    Filter by path prefix');
     console.error('  --tag <tag>           Filter by tag (can be repeated)');
+    console.error('  --rerank              Enable multi-signal reranking (default: true)');
+    console.error('  --no-rerank           Disable reranking');
+    console.error('  --mmr                 Enable MMR diversity (default: true)');
+    console.error('  --no-mmr              Disable MMR diversity');
+    console.error('  --mmr-lambda N        MMR lambda [0-1] (default: 0.7, higher = more relevance)');
     console.error('  --json                Output JSON format');
     console.error('  --ollama-base-url     Ollama API base URL');
     console.error('  --model               Embedding model name');
@@ -32,6 +40,8 @@ if (!query) {
     console.error('  npm run rag:hybrid -- "CHROME_PROXY_PORT"');
     console.error('  npm run rag:hybrid -- "kernel loop 20Hz" --topk 5');
     console.error('  npm run rag:hybrid -- "adaptive throttler" --path-prefix src/');
+    console.error('  npm run rag:hybrid -- "context" --no-rerank --no-mmr  # Vector+FTS only');
+    console.error('  npm run rag:hybrid -- "kernel" --mmr-lambda 0.5  # More diversity');
     console.error('');
     process.exit(2);
 }
@@ -43,7 +53,10 @@ const result = await ragHybridSearch({
     ext: values.ext,
     tags: values.tag || [],
     ollamaBaseUrl: values['ollama-base-url'],
-    model: values.model
+    model: values.model,
+    rerank: values.rerank,
+    mmr: values.mmr,
+    mmrLambda: values['mmr-lambda'] ? Number(values['mmr-lambda']) : undefined
 });
 
 if (values.json) {
@@ -51,13 +64,27 @@ if (values.json) {
 } else {
     console.log(`\n[RAG Hybrid Search] Query: "${result.query}"`);
     console.log(`Model: ${result.model} (${result.dim}D)`);
+    console.log(`Features: Vector + FTS${result.rerank ? ' + Rerank' : ''}${result.mmr ? ' + MMR' : ''}`);
+    if (result.mmr) {
+        console.log(`MMR lambda: ${result.mmrLambda} (${(result.mmrLambda * 100).toFixed(0)}% relevance, ${((1 - result.mmrLambda) * 100).toFixed(0)}% diversity)`);
+    }
     console.log(`Found ${result.results.length} results:\n`);
 
     for (const [idx, r] of result.results.entries()) {
         console.log(`[${idx + 1}] 📄 ${r.path}:${r.start_line}-${r.end_line}`);
-        const score = typeof r.score === 'number' ? r.score.toFixed(4) : 'N/A';
-        const distance = typeof r.distance === 'number' ? r.distance.toFixed(4) : 'N/A';
-        console.log(`    Score: ${score} | Distance: ${distance}`);
+
+        // Show rerank score if available
+        if (typeof r.rerank_score === 'number') {
+            console.log(`    Rerank Score: ${r.rerank_score.toFixed(4)}`);
+            if (r.rerank_signals) {
+                console.log(`    Signals: sem=${r.rerank_signals.semantic} lex=${r.rerank_signals.lexical} rec=${r.rerank_signals.recency} type=${r.rerank_signals.fileType} len=${r.rerank_signals.length} pos=${r.rerank_signals.position}`);
+            }
+        } else {
+            const score = typeof r.score === 'number' ? r.score.toFixed(4) : 'N/A';
+            const distance = typeof r.distance === 'number' ? r.distance.toFixed(4) : 'N/A';
+            console.log(`    Score: ${score} | Distance: ${distance}`);
+        }
+
         console.log(`    Language: ${r.language || 'unknown'} | Size: ${r.text.length} chars`);
 
         // Preview first 120 chars
