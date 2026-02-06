@@ -10,7 +10,7 @@ import { chunkByType, detectLanguage, buildTags } from './chunking/chunk_dispatc
 import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
 import { EmbeddingCache } from './embeddings/embed_cache.mjs';
 import { AdaptiveThrottler } from './adaptive_throttler.mjs';
-import { openDb, ensureTable, deleteByPath, addChunks, search } from './storage/lancedb.mjs';
+import { openDb, ensureTable, deleteByPath, addChunks, search, hybridSearch } from './storage/lancedb.mjs';
 import { formatMarkdownResults } from './format.mjs';
 
 // Singleton query embedding cache
@@ -366,6 +366,74 @@ export async function ragQuery(options = {}) {
         topK: options.topK ?? 8,
         filters: options.filters || {},
         results
+    };
+}
+
+/**
+ * Hybrid search (vector + FTS) with formatted output
+ * Combines semantic vector search with lexical full-text search
+ * @param {object} options - Search options
+ * @returns {Promise<object>} - Search results + metadata
+ */
+export async function ragHybridSearch(options = {}) {
+    const paths = getRagPaths(options.paths);
+    await ensureDirs(paths);
+    const manifest = (await loadManifest(paths)) || createEmptyManifest();
+
+    const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
+        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+        model: options.model || manifest.embedding.model
+    });
+
+    const { query, topK = 8, pathPrefix, ext, tags, distanceRange } = options;
+
+    // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
+    let vector;
+    if (!options.embeddingsProvider) {
+        vector = queryEmbedCache.get(query, embeddings.model);
+        if (vector) {
+            console.log('[RAG] Query embedding: cache hit ✅');
+        }
+    }
+
+    if (!vector) {
+        if (!options.embeddingsProvider) {
+            console.log('[RAG] Query embedding: cache miss, generating...');
+        }
+        vector = await embeddings.embed(query);
+        if (!options.embeddingsProvider) {
+            queryEmbedCache.set(query, embeddings.model, vector);
+        }
+    }
+
+    if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
+        throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+    }
+
+    const db = await openDb(paths.dbDir);
+    const table = await ensureTable(db, manifest.embedding.dim || vector.length);
+
+    console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}`);
+
+    const results = await hybridSearch(table, vector, query, {
+        topK,
+        filters: { pathPrefix, ext, tags },
+        distanceRange
+    });
+
+    try {
+        await db.close();
+    } catch (_) {
+        // ignore
+    }
+
+    return {
+        results,
+        topK,
+        dim: manifest.embedding.dim,
+        model: manifest.embedding.model || embeddings.model,
+        query,
+        hybridMode: true
     };
 }
 

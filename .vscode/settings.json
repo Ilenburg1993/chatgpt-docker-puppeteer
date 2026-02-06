@@ -31,12 +31,12 @@
   // ============================================================
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "modificationsIfAvailable",
-  "editor.formatOnPaste": false,
+  "editor.formatOnPaste": true,
   "editor.formatOnType": false,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
   "editor.tabSize": 4,
   "editor.insertSpaces": true,
-  "editor.detectIndentation": false,
+  "editor.detectIndentation": true,
   "editor.wordWrap": "on",
   "editor.wordWrapColumn": 120,
   "editor.wrappingIndent": "indent",
@@ -276,7 +276,7 @@
   "diffEditor.wordWrap": "on",
   "diffEditor.maxComputationTime": 5000,
   "diffEditor.renderIndicators": true,
-  "diffEditor.ignoreTrimWhitespace": false,
+  "diffEditor.ignoreTrimWhitespace": true,
   // ============================================================
   // 12. PROBLEMS / DEBUG / TASKS / TESTING
   // ============================================================
@@ -361,7 +361,7 @@
   // ============================================================
   // 15. WORKBENCH / WINDOW / TELEMETRIA
   // ============================================================
-"workbench.colorTheme": "Default Dark Modern",
+"workbench.colorTheme": "GitHub Dark Default",
   "workbench.iconTheme": "material-icon-theme",
   "workbench.startupEditor": "none",
   "workbench.editor.enablePreview": true,
@@ -431,4 +431,6 @@
 "chat.tools.terminal.sandbox.enabled": true,
 "terminal.integrated.shellIntegration.environmentReporting": true,
 "windowsaistudio.enableRemoteFine-tuningAndInference": true,
+"editor.autoIndentOnPaste": true,
+"editor.occurrencesHighlightDelay": 100,
 }

@@ -103,6 +103,7 @@
     "rag:health": "node tools/rag/health.mjs",
     "rag:index": "node tools/rag/index.mjs",
     "rag:ask": "node tools/rag/ask.mjs",
+    "rag:hybrid": "node tools/rag/hybrid.mjs",
     "rag:reset": "node tools/rag/reset.mjs",
     "rag:full-rebuild": "npm run rag:reset -- --yes && npm run rag:index"
   },

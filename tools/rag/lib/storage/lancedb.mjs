@@ -1,4 +1,4 @@
-import { connect } from '@lancedb/lancedb';
+import { connect, Index } from '@lancedb/lancedb';
 import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List } from 'apache-arrow';
 
 export const TABLE_NAME = 'chunks_v1';
@@ -35,6 +35,28 @@ export async function ensureTable(db, embeddingDim) {
     const schema = buildSchema(embeddingDim);
     await db.createEmptyTable(TABLE_NAME, schema);
     return db.openTable(TABLE_NAME);
+}
+
+/**
+ * Create Full-Text Search index on 'text' column
+ * @param {Table} table - LanceDB table
+ * @param {object} options - Index options (currently unused, reserved for future)
+ * @returns {Promise<void>}
+ */
+export async function createFTSIndex(table, options = {}) {
+    console.log('[RAG] Creating FTS index on "text" column...');
+    try {
+        // LanceDB v0.24 API: await table.createIndex(columnName, { config: Index.fts() })
+        await table.createIndex('text', { config: Index.fts() });
+        console.log('[RAG] ✓ FTS index created successfully');
+    } catch (err) {
+        if (err.message && (err.message.includes('already exists') || err.message.includes('Index already exists'))) {
+            console.log('[RAG] FTS index already exists, skipping');
+        } else {
+            console.error('[RAG] Failed to create FTS index:', err.message);
+            throw err;
+        }
+    }
 }
 
 export async function deleteByPath(table, relPath) {
@@ -103,7 +125,74 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
     });
 
     const sliced = filtered.slice(0, topK);
-    return sliced.map(r => ({
+    return sliced.map(formatResult);
+}
+
+/**
+ * Hybrid search: Vector (semantic) + FTS (lexical)
+ * Combines vector similarity with full-text search for better precision
+ * @param {Table} table - LanceDB table
+ * @param {number[]} vector - Query embedding
+ * @param {string} textQuery - Original query text for FTS
+ * @param {object} options - Search options
+ * @returns {Promise<object[]>} - Ranked results
+ */
+export async function hybridSearch(table, vector, textQuery, options = {}) {
+    const {
+        topK = 8,
+        filters = {},
+        distanceRange
+    } = options;
+
+    // LanceDB v0.24 API: query().fullTextSearch().nearestTo()
+    let q = table
+        .query()
+        .fullTextSearch(textQuery)  // FTS search on indexed 'text' column
+        .nearestTo(vector);         // Vector search (HNSW)
+
+    // Apply distance range filter (if specified)
+    if (distanceRange) {
+        const [min, max] = Array.isArray(distanceRange)
+            ? distanceRange
+            : [distanceRange.min || 0, distanceRange.max || 1];
+        q = q.distanceRange(min, max);
+    }
+
+    // Over-fetch for filtering (5x topK)
+    q = q.limit(topK * 5);
+
+    // Apply WHERE filters (path, ext)
+    const where = buildWhere(filters);
+    if (where) q = q.where(where);
+
+    // Execute query
+    const rows = await q.toArray();
+
+    // Client-side tag filtering (LanceDB WHERE doesn't support array contains well)
+    let filtered = rows;
+    if (filters?.tags?.length) {
+        const required = new Set(filters.tags.map(String));
+        filtered = rows.filter(r =>
+            Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t))
+        );
+    }
+
+    // Sort by combined score (LanceDB already blended vector + FTS)
+    filtered.sort((a, b) => {
+        const da = typeof a._distance === 'number' ? a._distance : 0;
+        const db = typeof b._distance === 'number' ? b._distance : 0;
+        if (da !== db) return da - db;
+        if (a.path !== b.path) return String(a.path).localeCompare(String(b.path));
+        if (a.start_line !== b.start_line) return (a.start_line || 0) - (b.start_line || 0);
+        return String(a.chunk_id).localeCompare(String(b.chunk_id));
+    });
+
+    // Return top K
+    return filtered.slice(0, topK).map(formatResult);
+}
+
+function formatResult(r) {
+    return {
         score: typeof r._distance === 'number' ? -r._distance : 0,
         distance: r._distance,
         chunk_id: r.chunk_id,
@@ -118,7 +207,8 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
         tags: r.tags || [],
         text: r.text,
         content_sha256: r.content_sha256,
-        embedding_model: r.embedding_model
-    }));
+        embedding_model: r.embedding_model,
+        indexed_at: r.indexed_at
+    };
 }
 
