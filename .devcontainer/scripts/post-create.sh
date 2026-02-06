@@ -374,6 +374,10 @@ readonly OPERATIONAL_ENV_VARS=(
     NERV_TELEMETRY
     NERV_INTEGRATION
     WS_IDLE_TIMEOUT_MS
+
+    # RAG (LanceDB) — memória local (paths)
+    RAG_DB_DIR
+    RAG_INDEX_DIR
 )
 
 # ---------------------------------------------------------------------------
@@ -893,6 +897,10 @@ readonly CRITICAL_VOLUMES=(
     "${USER_HOME}/.config"
     "${USER_HOME}/.claude"
     "${USER_HOME}/.local/state"
+
+    # RAG (LanceDB) — crítico para o subsistema de memória local
+    "${USER_HOME}/.local/share/rag-db"
+    "${USER_HOME}/.local/share/rag-index"
 )
 
 # ---------------------------------------------------------------------------

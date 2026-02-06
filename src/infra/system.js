@@ -1,28 +1,16 @@
-/* ==========================================================================
-   src/infra/system.js
-   Audit Level: 45 — System & Process Manager (NASA Standard)
-   Responsabilidade: Controle cirúrgico de processos (Tree-Kill) e Orquestração PM2.
-   Sincronizado com: server.js (V40), Maestro index.js (V240).
-========================================================================== */
-
-const { exec } = require('child_process');
-const pm2 = require('pm2');
-const treeKill = require('tree-kill');
-const path = require('path');
-const { log } = require('@core/logger');
-
-// Optional: prefer `execa` for promise-based subprocess control; fallback to `exec` when unavailable.
-let execa = null;
-try {
-    execa = require('execa');
-} catch (err) {
-    execa = null;
-}
+import { exec } from 'node:child_process';
+import { createRequire } from 'node:module';
+import pm2 from 'pm2';
+import treeKill from 'tree-kill';
+import path from 'node:path';
+import { execa } from 'execa';
+import { log } from '#core/logger';
 
 const AGENTE_NAME = 'agente-gpt';
 
-// Importa a configuração oficial do PM2 (elimina duplicação - P3.1)
-const ecosystemConfig = require(path.join(__dirname, '../../ecosystem.config.js'));
+// Importa a configuração oficial do PM2 (CJS — usa createRequire)
+const require_ = createRequire(import.meta.url);
+const ecosystemConfig = require_(path.join(import.meta.dirname, '../../ecosystem.config.cjs'));
 
 /**
  * Interface Promisificada interna para o PM2.
@@ -284,10 +272,4 @@ async function killChromeGlobal() {
     });
 }
 
-module.exports = {
-    getAgentStatus,
-    controlAgent,
-    killProcess,
-    killChromeGlobal,
-    pm2Raw: pm2 // Expõe a instância bruta para o bus de eventos realtime
-};
+export { getAgentStatus, controlAgent, killProcess, killChromeGlobal, pm2 as pm2Raw };

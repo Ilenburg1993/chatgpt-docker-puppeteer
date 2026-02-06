@@ -1,34 +1,13 @@
-/* ==========================================================================
-   src/kernel/kernel.js
-   Subsistema: KERNEL — Núcleo Soberano de Decisão
-   Arquivo: kernel.js
-
-   Papel:
-   - Compor todos os subsistemas do Kernel de forma explícita
-   - Integrar o NERV como camada de comunicação IPC
-   - Expor interface mínima e controlada
-   - Estabelecer a topologia canônica do sistema
-
-   IMPORTANTE:
-   - NÃO executa lógica de negócio aqui
-   - NÃO decide (delega ao ExecutionEngine)
-   - NÃO controla tempo diretamente (delega ao KernelLoop)
-   - NÃO interpreta EVENTs (delega ao ObservationStore)
-   - Apenas COMPÕE e CONECTA subsistemas
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const { ActorRole } = require('@shared/nerv/constants');
-const { KernelLoop } = require('./kernel_loop/kernel_loop');
-const { TaskRuntime } = require('./task_runtime/task_runtime');
-const { ObservationStore } = require('./observation_store/observation_store');
-const { PolicyEngine } = require('./policy_engine/policy_engine');
-const { ExecutionEngine } = require('./execution_engine/execution_engine');
-const { KernelTelemetry } = require('./telemetry/kernel_telemetry');
-const { KernelNERVBridge } = require('./nerv_bridge/kernel_nerv_bridge');
-const { OrchestratorEngine } = require('../orchestrator/orchestrator_engine');
-const { TaskExecutionOrchestrator } = require('./task_execution_orchestrator');
+import { ActorRole } from '#shared/nerv/constants';
+import { KernelLoop } from './kernel_loop/kernel_loop.js';
+import { TaskRuntime } from './task_runtime/task_runtime.js';
+import { ObservationStore } from './observation_store/observation_store.js';
+import { PolicyEngine } from './policy_engine/policy_engine.js';
+import { ExecutionEngine } from './execution_engine/execution_engine.js';
+import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
+import { KernelNERVBridge } from './nerv_bridge/kernel_nerv_bridge.js';
+import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
+import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
 
 /* ===========================
    Fábrica do Kernel
@@ -305,6 +284,4 @@ function createKernel({
     return kernelInterface;
 }
 
-module.exports = {
-    createKernel
-};
+export { createKernel };

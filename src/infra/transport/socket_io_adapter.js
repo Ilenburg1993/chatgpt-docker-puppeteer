@@ -1,16 +1,6 @@
 
-/* ==========================================================================
-   src/infra/transport/socket_io_adapter.js
-   Audit Level: 590 — Physical Transport Layer (Socket.io Implementation)
-   Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade:
-     - Envelopar a biblioteca 'socket.io-client'.
-     - Traduzir eventos de rede física para eventos do NERV.
-     - Garantir que erros de conexão não derrubem o processo.
-========================================================================== */
-
-const { io } = require('socket.io-client');
-const EventEmitter = require('events');
+import { io } from 'socket.io-client';
+import EventEmitter from 'node:events';
 
 /**
  * Cria uma instância do adaptador de transporte para Socket.io.
@@ -154,4 +144,4 @@ function createSocketAdapter(config) {
     };
 }
 
-module.exports = createSocketAdapter;
+export default createSocketAdapter;

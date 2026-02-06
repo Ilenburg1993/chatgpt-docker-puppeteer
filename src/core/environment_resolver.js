@@ -1,13 +1,4 @@
-/* ==========================================================================
-   src/core/environment_resolver.js
-   Audit Level: 700 — Sovereign Environment Decision Protocol (Singularity)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Identificar o alvo operacional (IA) com base no contexto
-                     do navegador e metadados de domínio.
-   Sincronizado com: driver/factory.js V50, execution_engine.js V1.4.0.
-========================================================================== */
-
-const driverFactory = require('@driver/factory');
+import * as driverFactory from '#driver/factory';
 
 class EnvironmentResolver {
     /**
@@ -98,4 +89,4 @@ class EnvironmentResolver {
     }
 }
 
-module.exports = EnvironmentResolver;
+export default EnvironmentResolver;

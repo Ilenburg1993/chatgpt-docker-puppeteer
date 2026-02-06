@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: Driver Adapters
- * @module tests/unit/driver/test_driver_adapters.spec.js
- * @description Valida adaptadores de ChatGPT e Gemini
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('Driver Adapters - Adaptadores de Plataforma', () => {
     describe('1. ChatGPT Adapter', () => {

@@ -1,28 +1,6 @@
-/* ==========================================================================
-   src/nerv/emission/emission.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: emission/
-   Arquivo: emission.js
-
-   Papel:
-   - Compor o módulo de emissão do NERV
-   - Expor interface declarativa mínima para emissão
-   - Encaminhar envelopes para o pipeline técnico correto
-
-   IMPORTANTE:
-   - NÃO cria envelopes
-   - NÃO decide quando emitir
-   - NÃO espera respostas
-   - NÃO interpreta payload
-   - NÃO garante entrega
-   - NÃO conhece Kernel, Driver ou política
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const createEmitCommand = require('./emit_command');
-const createEmitEvent = require('./emit_event');
-const createEmitAck = require('./emit_ack');
+import createEmitCommand from './emit_command.js';
+import createEmitEvent from './emit_event.js';
+import createEmitAck from './emit_ack.js';
 
 /* ===========================
    Fábrica do módulo emission
@@ -85,4 +63,4 @@ function createEmission({ envelopes, buffers, correlation, telemetry }) {
     });
 }
 
-module.exports = createEmission;
+export default createEmission;

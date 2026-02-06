@@ -1,15 +1,10 @@
-/**
- * Tests: Response Adapter V2.0
- * Testa conversão V1↔V2, auto-detection, e task.result population
- */
-
-const path = require('path');
-const fs = require('fs');
-const { saveResponse, loadResponse, isResponseV2, convertV1toV2 } = require('../src/infra/storage/response_adapter');
-const { log } = require('../src/core/logger');
+import path from 'node:path';
+import fs from 'node:fs';
+import { saveResponse, loadResponse, isResponseV2, convertV1toV2 } from '#infra/storage/response_adapter';
+import { log } from '#core/logger';
 
 // Diretórios temporários para testes (NOTA: response_store_v2 salva em respostas/ produção)
-const TEST_DIR = path.join(__dirname, 'temp_test_responses');
+const TEST_DIR = path.join(import.meta.dirname, 'temp_test_responses');
 const RESPONSES_DIR = path.join(TEST_DIR, 'respostas');
 
 // Mock task para testes
@@ -255,7 +250,7 @@ async function runTests() {
 }
 
 // Run
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     runTests()
         .then(success => {
             process.exit(success ? 0 : 1);
@@ -266,4 +261,4 @@ if (require.main === module) {
         });
 }
 
-module.exports = { runTests };
+export { runTests };

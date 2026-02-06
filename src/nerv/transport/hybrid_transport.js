@@ -1,28 +1,5 @@
-/* ==========================================================================
-   src/nerv/transport/hybrid_transport.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: transport/
-   Arquivo: hybrid_transport.js (ONDA 2.6)
-
-   Papel:
-   - Implementar transporte híbrido: local (EventEmitter) + remoto (Socket.io)
-   - Rotear mensagens locais via EventEmitter (0 latência)
-   - Rotear mensagens remotas via Socket.io (para SERVER/Dashboard)
-   - Fornecer interface unificada para NERV
-
-   IMPORTANTE:
-   - Modo LOCAL: EventEmitter puro (in-process, sem Socket.io)
-   - Modo HYBRID: EventEmitter + Socket.io (local fast-path + remoto)
-   - NÃO interpreta envelopes
-   - NÃO valida mensagens
-   - NÃO conhece Kernel, Driver ou Server
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const EventEmitter = require('events');
-
-const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
+import EventEmitter from 'node:events';
+import { CONNECTION_MODES } from '#core/constants/browser';
 
 /**
  * Cria transporte híbrido com suporte local + remoto.
@@ -220,4 +197,4 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     });
 }
 
-module.exports = createHybridTransport;
+export default createHybridTransport;

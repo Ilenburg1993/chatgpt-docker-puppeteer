@@ -1,26 +1,4 @@
-/* ==========================================================================
-   src/nerv/reception/reception.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: reception/
-   Arquivo: reception.js
-
-   Papel:
-   - Compor o módulo de recepção do NERV
-   - Expor interface mínima e neutra de entrada de fatos
-   - Encapsular a recepção bruta e notificação de handlers
-
-   IMPORTANTE:
-   - NÃO interpreta payload
-   - NÃO decide consequências
-   - NÃO aciona Kernel ou Driver
-   - NÃO gera ACK automaticamente
-   - NÃO bloqueia fluxo
-   - Atua apenas como fronteira factual
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const createReceive = require('./receive');
+import createReceive from './receive.js';
 
 /* ===========================
    Fábrica do módulo reception
@@ -72,4 +50,4 @@ function createReception({ envelopes, correlation, telemetry }) {
     });
 }
 
-module.exports = createReception;
+export default createReception;

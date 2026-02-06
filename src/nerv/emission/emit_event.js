@@ -1,26 +1,4 @@
-/* ==========================================================================
-   src/nerv/emission/emit_event.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: emission/
-   Arquivo: emit_event.js
-
-   Papel:
-   - Emitir envelopes do tipo EVENT de forma unilateral
-   - Executar o pipeline técnico de saída do NERV
-   - Registrar telemetria e correlação de forma observável
-
-   IMPORTANTE:
-   - NÃO cria envelopes
-   - NÃO interpreta payload
-   - NÃO espera resposta
-   - NÃO decide retry
-   - NÃO garante entrega
-   - NÃO conhece Kernel, Driver ou política
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const { MessageType } = require('@shared/nerv/constants');
+import { MessageType } from '#shared/nerv/constants';
 
 /* ===========================
    Fábrica do emissor de EVENT
@@ -109,4 +87,4 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
     });
 }
 
-module.exports = createEmitEvent;
+export default createEmitEvent;

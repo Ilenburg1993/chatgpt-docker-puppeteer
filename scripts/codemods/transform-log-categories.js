@@ -1,30 +1,4 @@
-/**
- * Codemod: Replace log category magic strings with constants
- *
- * ⚠️ NOTE: This codemod is INTENTIONALLY NOT APPLIED to this codebase.
- *
- * Reason: The logging system uses standard severity levels (INFO, ERROR, WARN, DEBUG, FATAL)
- * as the first argument, not functional categories. Functional categories like [BOOT],
- * [LIFECYCLE], etc. appear as descriptive tags WITHIN log messages, not as standalone strings.
- *
- * Example current usage:
- *   log('INFO', '[BOOT] System starting...')  ✓ Correct pattern
- *   log(LOG_CATEGORIES.BOOT, 'Message')      ✗ Not used in this codebase
- *
- * The LOG_CATEGORIES constant (src/core/constants/logging.js) serves as:
- * - Documentation reference for available category tags
- * - Standard vocabulary for message prefixes
- * - Future-proofing if pattern changes
- *
- * Transforms (if needed in other codebases):
- *   '[BOOT]' → LOG_CATEGORIES.BOOT (in strings)
- *   'BOOT' → LOG_CATEGORIES.BOOT (standalone)
- *
- * Usage:
- *   npx jscodeshift -t scripts/codemods/transform-log-categories.js src/path/to/file.js
- */
-
-const path = require('path');
+import path from 'node:path';
 
 function getImportPath(filePath, targetPath) {
     const relativePath = path.relative(path.dirname(filePath), targetPath);

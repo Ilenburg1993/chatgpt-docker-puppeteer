@@ -1,21 +1,5 @@
-/* ==========================================================================
-   src/infra/queue/query_engine.js
-   Audit Level: 700 — Sovereign Query Engine (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Prover API de consulta de alto nível sobre o cache da fila.
-                     Garante isolamento de projeto e resiliência semântica.
-
-   CONTRATO DE OPERAÇÃO:
-     - Todas as consultas operam EXCLUSIVAMENTE sobre SNAPSHOT ESTÁVEL.
-     - O snapshot é imutável durante o ciclo de leitura.
-     - Este módulo NÃO força observação e NÃO muta o estado do disco.
-========================================================================== */
-
-const cache = require('./cache');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
+import * as cache from './cache.js';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 /**
  * Filtra e ordena as tarefas concluídas de um projeto específico.
@@ -96,9 +80,4 @@ async function findFirstByTag(projectId, tag) {
     return [...context].reverse().find(task => Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)) || null;
 }
 
-module.exports = {
-    findById,
-    findLast,
-    findLastByTag,
-    findFirstByTag
-};
+export { findById, findLast, findLastByTag, findFirstByTag };

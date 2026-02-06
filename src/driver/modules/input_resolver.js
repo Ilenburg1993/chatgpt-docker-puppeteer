@@ -1,45 +1,8 @@
-/**
- * @fileoverview InputResolver v2.0 - Governed Input Resolver (Singularity Edition)
- * 
- * RESPONSABILIDADES:
- * - Localizar interfaces de interação priorizando DNA (rules) sobre heurística
- * - Gerenciar cache multi-domain com LRU eviction
- * - Reportar telemetria via eventos locais + IPC
- * - Rastrear métricas de resolution (cache hit rate, source distribution)
- * 
- * PROTOCOL: 12 (Governed Resolution v2.0)
- * AUDIT LEVEL: 750 (Governed Input Resolver)
- * STATUS: CONSOLIDATED v2.0 (EventEmitter + Config + Metrics + Multi-Domain Cache)
- * 
- * SYNCHRONIZED WITH:
- * - analyzer.js V500 (SADI heuristic scan)
- * - io.js V730 (DNA rules facade)
- * - config.js V740 (central configuration)
- * 
- * FLUXO DE RESOLUÇÃO (3 Camadas):
- * 1. CACHE VALIDATION (O(1) lookup, multi-domain Map)
- * 2. DNA FIRST (Rules-Based, domain-specific selectors)
- * 3. HEURISTIC SECOND (SADI Scan, fallback com retry)
- * 
- * EVENTOS EMITIDOS:
- * - resolver:resolution_started (início da resolução)
- * - resolver:cache_hit (cache válido encontrado)
- * - resolver:cache_miss (cache inválido ou ausente)
- * - resolver:dna_match (seletor DNA encontrado)
- * - resolver:heuristic_match (seletor heurístico encontrado)
- * - resolver:resolution_completed (resolução concluída)
- * - resolver:resolution_failed (resolução falhou)
- * - resolver:cache_cleared (cache invalidado)
- * 
- * @version 2.0.0
- * @since 2026-02-01
- */
-
-const EventEmitter = require('events');
-const analyzer = require('@shared/sadi/analyzer');
-const io = require('@infra/io');
-const CONFIG = require('@core/config');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import * as analyzer from '#shared/sadi/analyzer';
+import * as io from '#infra/io';
+import CONFIG from '#core/config';
+import { log } from '#core/logger';
 
 /**
  * Configuração de timeouts e cache para input resolution.
@@ -410,7 +373,7 @@ class InputResolver extends EventEmitter {
                 if (ok) {
                     return protocol;
                 }
-            } catch (validationErr) {
+            } catch (_err) {
                 // Continue to next candidate
                 continue;
             }
@@ -640,10 +603,4 @@ function create(driver) {
     return new InputResolver(driver);
 }
 
-// ✅ Module exports completo (IMPROVEMENT #10)
-module.exports = {
-    InputResolver,
-    RESOLVER_CONFIG,
-    RESOLVER_EVENTS,
-    create
-};
+export { InputResolver, RESOLVER_CONFIG, RESOLVER_EVENTS, create };

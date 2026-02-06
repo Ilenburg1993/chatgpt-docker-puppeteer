@@ -1,21 +1,8 @@
-/* ==========================================================================
-   src/infra/queue/cache.js
-   Audit Level: 700 — Sovereign Queue Observer (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade:
-     - Autoridade central de OBSERVAÇÃO da fila de tarefas.
-     - Produção de snapshot consistente do estado do disco em RAM.
-     - Colapso de múltiplos gatilhos em uma única varredura (Debounce).
-     - Heartbeat de segurança contra falhas de watchers físicos.
-
-   Sincronizado com: paths.js V700, fs_watcher.js V600, io.js V700.
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
-const pLimit = require('p-limit'); // P9.7: Concurrency control
-const { log } = require('@core/logger');
-const PATHS = require('../fs/paths');
+import fs from 'node:fs';
+import path from 'node:path';
+import pLimit from 'p-limit';
+import { log } from '#core/logger';
+import * as PATHS from '../fs/paths.js';
 
 // --- CONFIGURAÇÃO DE CADÊNCIA ---
 const CACHE_HEARTBEAT_MS = 5000; // Varredura forçada a cada 5s
@@ -168,8 +155,4 @@ function getCacheMetrics() {
     };
 }
 
-module.exports = {
-    getQueue,
-    markDirty,
-    getCacheMetrics
-};
+export { getQueue, markDirty, getCacheMetrics };

@@ -1,20 +1,7 @@
-/* ==========================================================================
-   src/server/api/controllers/missions.js
-   Mission API Controller (V2.0)
-   Status: NEW (Mission Orchestration Platform)
-
-   Responsabilidade:
-     - REST APIs para gerenciamento de missões
-     - CRUD operations (create, read, list, delete)
-     - Execution control (execute, pause, resume)
-     - Feedback injection
-     - Progress tracking
-========================================================================== */
-
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * IMPORTANTE: MissionManager será injetado via setter após boot
@@ -496,5 +483,5 @@ router.get('/templates/list', requireMissionManager, async (req, res) => {
     }
 });
 
-module.exports = router;
-module.exports.setMissionManager = setMissionManager;
+export default router;
+export { setMissionManager };

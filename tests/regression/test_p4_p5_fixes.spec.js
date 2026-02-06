@@ -1,21 +1,5 @@
-/* ==========================================================================
-   tests/test_p4_p5_fixes.js
-   Suite de Testes para Correções P4 e P5 (Critical Cases Analysis V2)
-
-   P4 Fixes (Defensive Improvements):
-   - P4.1: Stabilizer MutationObserver Cleanup
-   - P4.2: Server Components Shutdown (Reconcilier + Hardware)
-   - P4.3: Signal Handler Concurrent Shutdown Guard
-
-   P5 Fixes (Optimistic Protections):
-   - P5.1: KERNEL State Transition Optimistic Locking
-   - P5.2: I/O Cache Invalidation Early (Invalidate-Before-Write)
-
-   Referência: CRITICAL_CASES_ANALYSIS_V2.md
-========================================================================== */
-
-const fs = require('fs').promises;
-const path = require('path');
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 // Cores para output
 const colors = {
@@ -50,7 +34,7 @@ async function test1_StabilizerCleanup() {
 
     log('INFO', 'Verificando código do stabilizer.js...');
 
-    const stabilizerPath = path.join(__dirname, '..', '..', 'src', 'driver', 'modules', 'stabilizer.js');
+    const stabilizerPath = path.join(import.meta.dirname, '..', '..', 'src', 'shared', 'page_stability', 'stabilizer.js');
     const content = await fs.readFile(stabilizerPath, 'utf-8');
 
     const checks = [
@@ -90,7 +74,7 @@ async function test2_ServerShutdown() {
 
     log('INFO', 'Verificando main.js shutdown phases...');
 
-    const mainPath = path.join(__dirname, '..', '..', 'src', 'main.js');
+    const mainPath = path.join(import.meta.dirname, '..', '..', 'src', 'main.js');
     const content = await fs.readFile(mainPath, 'utf-8');
 
     const checks = [
@@ -130,7 +114,7 @@ async function test3_SignalGuard() {
 
     log('INFO', 'Verificando signal handlers em main.js...');
 
-    const mainPath = path.join(__dirname, '..', '..', 'src', 'main.js');
+    const mainPath = path.join(import.meta.dirname, '..', '..', 'src', 'main.js');
     const content = await fs.readFile(mainPath, 'utf-8');
 
     const checks = [
@@ -174,7 +158,7 @@ async function test4_KernelLocking() {
 
     log('INFO', 'Verificando task_runtime.js...');
 
-    const taskRuntimePath = path.join(__dirname, '..', '..', 'src', 'kernel', 'task_runtime', 'task_runtime.js');
+    const taskRuntimePath = path.join(import.meta.dirname, '..', '..', 'src', 'kernel', 'task_runtime', 'task_runtime.js');
     const content = await fs.readFile(taskRuntimePath, 'utf-8');
 
     const checks = [
@@ -218,7 +202,7 @@ async function test5_CacheInvalidation() {
 
     log('INFO', 'Verificando io.js invalidation order...');
 
-    const ioPath = path.join(__dirname, '..', '..', 'src', 'infra', 'io.js');
+    const ioPath = path.join(import.meta.dirname, '..', '..', 'src', 'infra', 'io.js');
     const content = await fs.readFile(ioPath, 'utf-8');
 
     // Verificar ordem dentro das funções saveTask e deleteTask

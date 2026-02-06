@@ -1,28 +1,4 @@
-/* ==========================================================================
-   src/kernel/task_runtime/task_runtime.js
-   Subsistema: KERNEL — Núcleo Soberano de Decisão
-   Módulo: task_runtime/
-   Arquivo: task_runtime.js
-
-   Papel:
-   - Manter a existência lógica contínua das tarefas
-   - Registrar transições de estado por decisão explícita
-   - Preservar histórico interno imutável
-   - Fornecer snapshots thread-safe
-
-   IMPORTANTE:
-   - NÃO decide (apenas registra decisões)
-   - NÃO executa (apenas mantém estado lógico)
-   - NÃO observa EVENTs (isso é papel do ObservationStore)
-   - NÃO interpreta silêncio ou timeout
-   - NÃO comunica via IPC
-
-   Toda mutação ocorre SOMENTE por ordem explícita do ExecutionEngine.
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const EventEmitter = require('events');
+import EventEmitter from 'node:events';
 
 /* ===========================
    Estados lógicos de tarefa
@@ -399,7 +375,4 @@ class TaskRuntime extends EventEmitter {
     }
 }
 
-module.exports = {
-    TaskRuntime,
-    TaskState
-};
+export { TaskRuntime, TaskState };

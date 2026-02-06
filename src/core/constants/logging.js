@@ -175,7 +175,4 @@ const LOG_CATEGORIES_ARRAY = Object.values(LOG_CATEGORIES);
  */
 Object.freeze(LOG_CATEGORIES);
 
-module.exports = {
-    LOG_CATEGORIES,
-    LOG_CATEGORIES_ARRAY
-};
+export { LOG_CATEGORIES, LOG_CATEGORIES_ARRAY };

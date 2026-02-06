@@ -1,23 +1,11 @@
-#!/usr/bin/env node
-/* ==========================================================================
-   tests/test_adaptive_v46.js
-   Testes de validação ADAPTIVE SYSTEM V46
-   - Variância correta (Welford's Algorithm)
-   - Circuit breaker
-   - Health check API
-   - Target GC
-   - Decay de targets inativos
-========================================================================== */
-
-require('module-alias/register');
-const adaptive = require('@logic/adaptive');
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport adaptive from '#logic/adaptive';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /* --------------------------------------------------------------------------
    SETUP & TEARDOWN
 -------------------------------------------------------------------------- */
-const STATE_FILE = path.join(__dirname, '..', 'logs', 'adaptive_state.json');
+const STATE_FILE = path.join(import.meta.dirname, '..', 'logs', 'adaptive_state.json');
 let originalState = null;
 
 async function setup() {

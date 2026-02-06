@@ -106,11 +106,4 @@ function createUnpacker() {
     });
 }
 
-/* ===========================
-   Exportação canônica
-=========================== */
-
-module.exports = Object.freeze({
-    pack,
-    createUnpacker
-});
+export { pack, createUnpacker };

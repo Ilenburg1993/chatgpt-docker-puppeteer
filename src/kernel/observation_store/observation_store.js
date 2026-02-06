@@ -1,32 +1,4 @@
-/* ==========================================================================
-   src/kernel/observation_store/observation_store.js
-   Subsistema: KERNEL — Núcleo Soberano de Decisão
-   Módulo: observation_store/
-   Arquivo: observation_store.js
-
-   Papel:
-   - Registrar EVENTs como fatos históricos imutáveis
-   - Preservar atraso, duplicação e contradição
-   - Indexar observações por correlation_id
-   - Fornecer leitura imutável para o ExecutionEngine
-
-   IMPORTANTE:
-   - NÃO decide
-   - NÃO interpreta EVENTs semanticamente
-   - NÃO valida veracidade
-   - NÃO encerra tarefas
-   - NÃO comunica via IPC
-   - NÃO espera EVENTs
-
-   Princípios:
-   - Neutralidade absoluta
-   - Imutabilidade semântica
-   - Causalidade aberta
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const EventEmitter = require('events');
+import EventEmitter from 'node:events';
 
 /* ===========================
    Estrutura de Registro de Observação
@@ -378,6 +350,4 @@ class ObservationStore extends EventEmitter {
     }
 }
 
-module.exports = {
-    ObservationStore
-};
+export { ObservationStore };

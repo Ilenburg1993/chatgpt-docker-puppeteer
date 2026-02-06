@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: Kernel Task Runtime
- * @module tests/unit/kernel/test_task_runtime.spec.js
- * @description Valida runtime, contexto de execução e timeouts
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('Kernel Task Runtime - Ambiente de Execução', () => {
     describe('1. Contexto de Execução', () => {

@@ -1,14 +1,7 @@
-/* ==========================================================================
-   src/core/logger.js
-   Audit Level: 40 — Unified Logging & Audit System (NASA Standard)
-   Responsabilidade: Centralizar Logs, Métricas e Auditoria com Rotação Automática.
-   Sincronizado com: server.js (V40), io.js (V36), doctor.js (V38).
-========================================================================== */
+import fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '../../');
+const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
 
 // --- DEFINIÇÃO DE ARQUIVOS ---
@@ -171,15 +164,8 @@ cleanOldFiles('agente_');
 cleanOldFiles('metrics_');
 cleanOldFiles('audit_');
 
-module.exports = {
-    log,
-    audit,
-    metric,
-    logMetric: metric,
-    LOG_DIR,
-    // Export wrappers for convenience
-    debug: log.debug,
-    info: log.info,
-    warn: log.warn,
-    error: log.error
-};
+export const debug = log.debug;
+export const info = log.info;
+export const warn = log.warn;
+export const error = log.error;
+export { log, audit, metric, metric as logMetric, LOG_DIR };

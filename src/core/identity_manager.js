@@ -1,21 +1,8 @@
-/* ==========================================================================
-   src/core/identity_manager.js
-   Audit Level: 510 — Sovereign Identity Manager (Canonical)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Gerenciar a identidade soberana do robô.
-                     - robot_id: DNA persistente (imutável no disco)
-                     - instance_id: Vida efêmera (gerada a cada boot)
-                     - Capabilities: Declaração de habilidades técnicas
-   Sincronizado com: io.js V52, shared/nerv/schemas.js (NERV Protocol 2.0)
-========================================================================== */
-
-const { v4: uuidv4 } = require('uuid');
-const io = require('@infra/io');
-const { log } = require('./logger');
-
-// Importação do Shared Kernel (Validação Nativa)
-const { validateRobotIdentity } = require('@shared/nerv/schemas');
-const { ActorRole, PROTOCOL_VERSION } = require('@shared/nerv/constants');
+import { v4 as uuidv4 } from 'uuid';
+import * as io from '#infra/io';
+import { log } from './logger.js';
+import { validateRobotIdentity } from '#shared/nerv/schemas';
+import { ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
 
 class IdentityManager {
     constructor() {
@@ -135,5 +122,4 @@ class IdentityManager {
     }
 }
 
-// Singleton canônico: Garante que o robô não tenha "crise de identidade"
-module.exports = new IdentityManager();
+export default new IdentityManager();

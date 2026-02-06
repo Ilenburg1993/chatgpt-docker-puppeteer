@@ -1,23 +1,10 @@
-/* ==========================================================================
-   tests/integration/test_context_flow.spec.js
-   Integration Test: Context Flow End-to-End
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Testa context accumulation através do MissionManager
-     - Valida que contexto é passado corretamente entre steps
-     - Verifica memory store integration
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, before, after } = require('node:test');
-const { ContextManager, CHUNKING_STRATEGY } = require('../../src/orchestrator/context_manager');
-const { MissionManager } = require('../../src/missions/mission_manager');
-const { MissionStateManager } = require('../../src/missions/mission_state_manager');
-const path = require('path');
-const fs = require('fs/promises');
+import assert from 'node:assert';
+import { describe, it, before, after } from 'node:test';
+import { ContextManager, CHUNKING_STRATEGY } from '#orchestrator/context_manager';
+import { MissionManager } from '#missions/mission_manager';
+import { MissionStateManager } from '#missions/mission_state_manager';
+import path from 'node:path';
+import fs from 'fs/promises';
 
 describe('Context Flow Integration Tests', () => {
     let contextManager;
@@ -40,7 +27,7 @@ describe('Context Flow Integration Tests', () => {
     };
 
     before(async () => {
-        testMissionsDir = path.join(__dirname, '../../missions-test-context');
+        testMissionsDir = path.join(import.meta.dirname, '../../missions-test-context');
         await fs.mkdir(testMissionsDir, { recursive: true });
 
         // Cria ContextManager compartilhado

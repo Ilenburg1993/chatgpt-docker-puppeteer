@@ -1,42 +1,13 @@
-/* ==========================================================================
-   src/nerv/NERV.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Arquivo: NERV.js
-
-   Estatuto:
-   - COMPOSITOR ESTRUTURAL PURO
-   - NÃO executa fluxo
-   - NÃO registra callbacks internos
-   - NÃO drena buffers
-   - NÃO reage a eventos
-   - NÃO decide
-   - NÃO interpreta
-
-   Este arquivo apenas CONSTRÓI e EXPÕE o NERV.
-========================================================================== */
-
-/* ===========================
-   Imports canônicos
-=========================== */
-
-// Protocolo universal NERV
-const envelopesModule = require('@shared/nerv/envelope');
-
-const { CONNECTION_MODES: CONNECTION_MODES } = require('@core/constants/browser.js');
-
-// Núcleo estrutural
-const createCorrelation = require('./correlation/correlation_store');
-const createTelemetry = require('./telemetry/ipc_telemetry');
-
-// Infraestrutura
-const createBuffers = require('./buffers/buffers');
-const createTransport = require('./transport/transport');
-const createHybridTransport = require('./transport/hybrid_transport'); // ONDA 2.6
-
-// Fronteiras semânticas neutras
-const createEmission = require('./emission/emission');
-const createReception = require('./reception/reception');
-const createHealth = require('./health/health');
+import * as envelopesModule from '#shared/nerv/envelope';
+import { CONNECTION_MODES } from '#core/constants/browser';
+import createCorrelation from './correlation/correlation_store.js';
+import createTelemetry from './telemetry/ipc_telemetry.js';
+import createBuffers from './buffers/buffers.js';
+import createTransport from './transport/transport.js';
+import createHybridTransport from './transport/hybrid_transport.js';
+import createEmission from './emission/emission.js';
+import createReception from './reception/reception.js';
+import createHealth from './health/health.js';
 
 /* ===========================
    Funções auxiliares de bootstrap
@@ -45,8 +16,8 @@ const createHealth = require('./health/health');
 /**
  * Bootstrap: Socket.io adapter para modo híbrido
  */
-function bootstrapSocketAdapter(config) {
-    const createSocketAdapter = require('@infra/transport/socket_io_adapter');
+async function bootstrapSocketAdapter(config) {
+    const createSocketAdapter = await import('#infra/transport/socket_io_adapter').then(m => m.default ?? m);
 
     const socketAdapter = createSocketAdapter({
         url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3008',
@@ -190,7 +161,7 @@ function buildPublicAPI({
 async function createNERV(config = {}) {
     /* 0. Modo de operação */
     const mode = config.mode || CONNECTION_MODES.LOCAL;
-    const socketAdapter = mode === CONNECTION_MODES.HYBRID ? bootstrapSocketAdapter(config) : null;
+    const socketAdapter = mode === CONNECTION_MODES.HYBRID ? await bootstrapSocketAdapter(config) : null;
 
     /* 1. Telemetria */
     const telemetry = createTelemetry({ namespace: 'nerv' });
@@ -254,4 +225,4 @@ async function createNERV(config = {}) {
     return Object.freeze(publicAPI);
 }
 
-module.exports = { createNERV };
+export { createNERV };

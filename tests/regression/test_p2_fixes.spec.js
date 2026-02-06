@@ -1,14 +1,6 @@
-/* ==========================================================================
-   tests/test_p2_fixes.js
-   Testes para Correções P2 (Critical Cases Analysis)
-
-   Valida:
-   1. Shutdown - Try-Catch Per Phase (isolamento de erros)
-   2. HandleManager - AbortController (cancelamento em timeout)
-========================================================================== */
-
-const path = require('path');
-const HandleManager = require('../../src/driver/modules/handle_manager');
+import { promises as fsPromises } from 'node:fs';
+import path from 'node:path';
+import { HandleManager } from '#driver/modules/handle_manager';
 
 // ============================================================================
 // TEST 1: Shutdown - Isolamento de Erros Por Fase
@@ -332,13 +324,12 @@ async function testCodeValidation() {
     console.log('\n=== TEST 5: Validação de Código Modificado ===');
 
     try {
-        const fs = require('fs').promises;
 
         console.log('> Verificando arquivos modificados...');
 
         // Valida src/main.js
-        const mainPath = path.join(__dirname, '../../src/main.js');
-        const mainCode = await fs.readFile(mainPath, 'utf-8');
+        const mainPath = path.join(import.meta.dirname, '../../src/main.js');
+        const mainCode = await fsPromises.readFile(mainPath, 'utf-8');
 
         if (!mainCode.includes('shutdownPhases')) {
             console.error('❌ main.js não contém array shutdownPhases');
@@ -362,8 +353,8 @@ async function testCodeValidation() {
         console.log('✅ main.js contém shutdown com isolamento de erros');
 
         // Valida handle_manager.js
-        const handlePath = path.join(__dirname, '../../src/driver/modules/handle_manager.js');
-        const handleCode = await fs.readFile(handlePath, 'utf-8');
+        const handlePath = path.join(import.meta.dirname, '../../src/driver/modules/handle_manager.js');
+        const handleCode = await fsPromises.readFile(handlePath, 'utf-8');
 
         if (!handleCode.includes('AbortController')) {
             console.error('❌ handle_manager.js não usa AbortController');
@@ -445,18 +436,11 @@ async function runAllTests() {
 }
 
 // Executa se chamado diretamente
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     runAllTests().catch(error => {
         console.error('💥 Erro fatal na suite de testes:', error);
         process.exit(1);
     });
 }
 
-module.exports = {
-    testShutdownPhaseIsolation,
-    testHandleManagerAbort,
-    testHandleManagerComplete,
-    testHandleManagerWithErrors,
-    testCodeValidation,
-    runAllTests
-};
+export { testShutdownPhaseIsolation, testHandleManagerAbort, testHandleManagerComplete, testHandleManagerWithErrors, testCodeValidation, runAllTests };

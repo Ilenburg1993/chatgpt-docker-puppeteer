@@ -9,14 +9,14 @@
 
 // Lazy load para evitar circular dependency
 let dnaStore = null;
-const getDnaStore = () => {
+const getDnaStore = async () => {
     if (!dnaStore) {
-        dnaStore = require('./dna_store');
+        dnaStore = await import('./dna_store.js').then(m => m.default ?? m);
     }
     return dnaStore;
 };
 
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Threshold de confiança mínimo para persistir selector (0-100)
@@ -68,7 +68,7 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
         }
 
         // 3. Carrega DNA atual
-        const dnaStore = getDnaStore();
+        const dnaStore = await getDnaStore();
         const dna = await dnaStore.getDna();
 
         // 4. Verifica se selector já existe
@@ -158,7 +158,7 @@ async function evolveWithFullProtocol(fullProtocol, domain, intent) {
             return false;
         }
 
-        const dnaStore = getDnaStore();
+        const dnaStore = await getDnaStore();
         const dna = await dnaStore.getDna();
 
         if (!dna.targets[domain]) {
@@ -206,11 +206,4 @@ function getEvolutionStats() {
     return stats;
 }
 
-module.exports = {
-    evolveWithSadiProtocol,
-    evolveWithFullProtocol,
-    resetEvolutionCounters,
-    getEvolutionStats,
-    MIN_CONFIDENCE_THRESHOLD,
-    MAX_EVOLUTIONS_PER_DOMAIN,
-};
+export { evolveWithSadiProtocol, evolveWithFullProtocol, resetEvolutionCounters, getEvolutionStats, MIN_CONFIDENCE_THRESHOLD, MAX_EVOLUTIONS_PER_DOMAIN };

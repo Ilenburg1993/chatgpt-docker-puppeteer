@@ -1,13 +1,4 @@
-/* ==========================================================================
-   src/server/middleware/request_id.js
-   Audit Level: 600 — Transactional DNA Injector (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Garantir que toda requisição HTTP possua um identificador
-                     único universal (UUID) para rastreabilidade de ponta a ponta.
-   Sincronizado com: error_handler.js V600, app.js V100.
-========================================================================== */
-
-const crypto = require('crypto');
+import crypto from 'node:crypto';
 
 /**
  * Regex para validação rigorosa de UUID v4.
@@ -43,4 +34,4 @@ function requestId(req, res, next) {
     next();
 }
 
-module.exports = requestId;
+export default requestId;

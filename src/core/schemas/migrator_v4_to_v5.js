@@ -1,23 +1,5 @@
-/* ==========================================================================
-   src/core/schemas/migrator_v4_to_v5.js
-   Audit Level: 100 — Schema Migration Engine
-   Status: PRODUCTION READY
-   Responsabilidade: Migração automática e transparente de Tasks V4 → V5.
-                     Garante backward compatibility e zero downtime.
-
-   Strategy:
-   1. Detecta versão da task (meta.version)
-   2. Se V4: adiciona campos novos com valores default (SINGLE_SHOT behavior)
-   3. Se V5: valida e retorna como está
-   4. Se desconhecida: migração conservadora + logging
-
-   Usage:
-   const { migrateTaskV4toV5 } = require('./migrator_v4_to_v5');
-   const taskV5 = migrateTaskV4toV5(taskV4);
-========================================================================== */
-
-const { TaskSchemaV5 } = require('./task_schema_v5');
-const logger = require('../logger');
+import { TaskSchemaV5 } from './task_schema_v5.js';
+import * as logger from '../logger.js';
 
 /**
  * Detecta se task é V4 baseado na versão.
@@ -399,12 +381,4 @@ function autoMigrateTask(task) {
     return migrateTaskV4toV5(task);
 }
 
-module.exports = {
-    isV4Task,
-    isV5Task,
-    migrateTaskV4toV5,
-    migrateBatchV4toV5,
-    validateV5Task,
-    downgradeV5toV4,
-    autoMigrateTask
-};
+export { isV4Task, isV5Task, migrateTaskV4toV5, migrateBatchV4toV5, validateV5Task, downgradeV5toV4, autoMigrateTask };

@@ -1,13 +1,5 @@
-#!/usr/bin/env node
-/* ==========================================================================
-   scripts/refactor-to-aliases.js
-   Script de Migração: Caminhos Relativos → Aliases
-
-   Converte todos os require() do projeto para usar os aliases @core, @infra, etc.
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 // Mapeamento de aliases
 const ALIAS_MAP = {
@@ -121,7 +113,7 @@ function refactorFile(filePath) {
 
 // Executar
 console.log('🔍 Buscando arquivos JavaScript em src/...');
-findJSFiles(path.join(__dirname, '../src'));
+findJSFiles(path.join(import.meta.dirname, '../src'));
 
 console.log(`📊 Encontrados ${filesToProcess.length} arquivos para processar`);
 

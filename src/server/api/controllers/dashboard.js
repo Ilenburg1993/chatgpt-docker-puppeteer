@@ -1,23 +1,10 @@
-/* ==========================================================================
-   src/server/api/controllers/dashboard.js
-   Dashboard API: Extended Task & Telemetry Controller
-   Status: NEW (Mission Control v2.0)
-
-   Responsabilidade:
-     - APIs REST estendidas para Dashboard V2
-     - Consulta de tasks unificadas (disco + kernel)
-     - Métricas de telemetria em tempo real
-     - Histórico de métricas
-     - Alertas e health status
-========================================================================== */
-
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
-const { log } = require('@core/logger');
-const denyIfDelegated = require('../../middleware/deny_if_delegated');
-const taskSyncBridge = require('@server/dashboard-api/task_sync_bridge');
-const telemetryAggregator = require('@server/dashboard-api/telemetry_aggregator');
+import { log } from '#core/logger';
+import denyIfDelegated from '../../middleware/deny_if_delegated.js';
+import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
+import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
 
 /* --------------------------------------------------------------------------
    1. TASKS - APIs Unificadas
@@ -425,4 +412,4 @@ router.get('/bridge/metrics', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

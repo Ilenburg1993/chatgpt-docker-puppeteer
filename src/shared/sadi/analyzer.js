@@ -1,31 +1,5 @@
-/* ==========================================================================
-   src/shared/sadi/analyzer.js
-   Audit Level: 500 — Instrumented SADI Fortress (IPC 2.0)
-   Status: CONSOLIDATED v4.0 (Feb 2026 - Zero-Bug Tolerance + Performance)
-
-   Subsistema: SHARED — SADI (Sensory Analysis Deep Intelligence)
-   Responsabilidade: Percepção visual profunda, identificação de elementos por
-                     DNA (SVG/Atributos) e cálculo de confiança sensorial.
-
-   Camada Compartilhada: Usado por CORE (validators), DRIVER (targets/modules)
-
-   Sincronizado com: BaseDriver V320, input_resolver.js V500, i18n.js V32.
-
-   NOTA: Este arquivo contém código que roda em contexto de browser via
-         page.evaluate(), então usa APIs globais do browser (document, window, CSS).
-
-   CHANGELOG v4.0 (Feb 2026):
-   - 7 bugs críticos corrigidos (async, validation, fallbacks)
-   - 15 melhorias implementadas (cache, scoring, telemetria)
-   - Performance: 90% faster com cache (30ms vs 300ms)
-   - Accuracy: 85%→95% (input), 95%→99% (button)
-========================================================================== */
-
-/* eslint-disable no-undef */
-// ^ Desabilita 'no-undef' porque código usa APIs browser (document, window, CSS)
-
-const i18n = require('@core/i18n');
-const io = require('@infra/io');
+import * as i18n from '#core/i18n';
+import * as io from '#infra/io';
 
 /* ==========================================================================
    CONFIGURATION & CONSTANTS
@@ -103,7 +77,7 @@ const sadiLogic = (terms, svgSigs) => {
                 for (let i = 0; i < nodes.length; i++) {
                     accumulator.push(nodes[i]);
                 }
-            } catch (e) {
+            } catch (_) {
                 return accumulator;
             }
 
@@ -118,7 +92,7 @@ const sadiLogic = (terms, svgSigs) => {
                     if (f.contentDocument) {
                         SADI.query(selector, f.contentDocument, onlyFrames, accumulator);
                     }
-                } catch (e) {
+                } catch (_) {
                     // Ignore cross-origin frame access errors
                 }
             }
@@ -152,7 +126,7 @@ const sadiLogic = (terms, svgSigs) => {
                     if (url.protocol.startsWith('http')) {
                         srcPath = `[src*="${CSS.escape(url.pathname)}"]`;
                     }
-                } catch (e) {
+                } catch (_) {
                     // Ignore URL parse errors
                 }
             }
@@ -222,7 +196,7 @@ const sadiLogic = (terms, svgSigs) => {
                             return true;
                         }
                     }
-                } catch (e) {
+                } catch (_) {
                     // Ignore DOM access errors
                 }
             }
@@ -291,7 +265,7 @@ const sadiLogic = (terms, svgSigs) => {
                         break;
                     }
                 }
-            } catch (e) {
+            } catch (_) {
                 path.push('barrier');
             }
 
@@ -345,7 +319,7 @@ async function findFrameByPath(page, framePath) {
                 return framePath.includes(validPath);
             }
             return framePath.includes(f.name());
-        } catch (e) {
+        } catch (_) {
             return false;
         }
     });
@@ -755,7 +729,7 @@ async function validateCandidateInteractivity(page, protocol) {
 
                 try {
                     el.focus();
-                } catch (e) {
+                } catch (_) {
                     return false;
                 }
                 const active = SADI.getActiveElement();
@@ -773,10 +747,4 @@ async function validateCandidateInteractivity(page, protocol) {
     }
 }
 
-module.exports = {
-    findChatInputSelector,
-    findSendButtonSelector,
-    findResponseArea,
-    validateCandidateInteractivity,
-    findFrameByPath
-};
+export { findChatInputSelector, findSendButtonSelector, findResponseArea, validateCandidateInteractivity, findFrameByPath };

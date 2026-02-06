@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-const pathModule = require('path');
-const { execSync } = require('child_process');
-const fs = require('fs');
-const projectRoot = pathModule.join(__dirname, '..');
+import pathModule from 'node:path';
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+const projectRoot = pathModule.join(import.meta.dirname, '..');
 process.chdir(projectRoot);
 
 console.log('\n═══════════════════════════════════════════════════════════════════');
@@ -14,12 +14,12 @@ let exitCode = 0;
 // Job 1: Dependencies
 console.log('📦 [1/6] Dependencies Validation...\n');
 try {
-  const pkg = require(pathModule.join(projectRoot, 'package.json'));
-  if (!pkg._moduleAliases) {
-    console.error('❌ Missing _moduleAliases');
+  const pkg = JSON.parse(fs.readFileSync(pathModule.join(projectRoot, 'package.json'), 'utf8'));
+  if (!pkg.imports) {
+    console.error('❌ Missing imports (subpath imports)');
     exitCode = 1;
   } else {
-    const aliases = Object.keys(pkg._moduleAliases);
+    const aliases = Object.keys(pkg.imports);
     console.log('✅ Module aliases:', aliases.length, 'configured');
     console.log('   ', aliases.join(', '));
   }

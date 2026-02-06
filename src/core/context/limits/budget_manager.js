@@ -66,4 +66,4 @@ class BudgetManager {
     }
 }
 
-module.exports = { BudgetManager, GLOBAL_CONTEXT_LIMIT };
+export { BudgetManager, GLOBAL_CONTEXT_LIMIT };

@@ -1,37 +1,6 @@
-/* ==========================================================================
-   src/driver/core/TargetDriver.js v3.0
-   Audit Level: 800 — Sovereign Contract Master (Validation Edition)
-   Status: PRODUCTION (Protocol 13 - Pool-Ready Architecture)
-   Responsabilidade: Classe abstrata mestre. Define o contrato de execução,
-                     gerencia a máquina de estados validada e o canal de sinais vitais.
-   Sincronizado com: BaseDriver V800, DriverFactory V300,
-                     TelemetryBridge V500.
-
-   Changelog v3.0 (BREAKING CHANGES):
-   - ✅ Constructor: Remove page/signal (config apenas) - Pool-ready
-   - ✅ Novo método: attachContext(page, signal) - Context injection
-   - ✅ Novo método: detachContext() - Context cleanup
-   - ✅ Validação: executeTask() requer context attached
-   - ✅ Estado: UNATTACHED adicionado (driver sem context)
-
-   Changelog v2.0:
-   - State transition matrix (validação de transições)
-   - AbortSignal integration (cancelamento automático)
-   - Capabilities schema validation
-   - Health metrics expandidos (12+ campos)
-   - State history tracking (últimas 20 transições)
-   - Telemetria avançada (7+ eventos)
-   - Error tracking e counter
-   - JSDoc completo
-========================================================================== */
-
-const EventEmitter = require('events');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
-
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import { log } from '#core/logger';
 
 /* ==========================================================================
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
@@ -969,9 +938,8 @@ class TargetDriver extends EventEmitter {
 TargetDriver.EVENTS = EVENTS;
 TargetDriver.STATES = STATES;
 
-module.exports = TargetDriver;
+export default TargetDriver;
 
-// ✅ v2.0: Export configs para testing/introspection
-module.exports.TARGETDRIVER_CONFIG = TARGETDRIVER_CONFIG;
-module.exports.STATE_TRANSITIONS = STATE_TRANSITIONS;
-module.exports.CAPABILITIES_SCHEMA = CAPABILITIES_SCHEMA;
+export { TARGETDRIVER_CONFIG };
+export { STATE_TRANSITIONS };
+export { CAPABILITIES_SCHEMA };

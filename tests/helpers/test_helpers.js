@@ -1,14 +1,13 @@
-/* tests/helpers.js (V3 Compliant) */
-const fs = require('fs');
-const path = require('path');
-const child_process = require('child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import child_process from 'node:child_process';
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const LOG_DIR = path.join(ROOT, 'logs');
 const RUN_LOCK = path.join(ROOT, 'RUNNING.lock');
 const LOG_FILE_CURRENT = path.join(LOG_DIR, 'agente_current.log');
-const TMP_DIR = path.join(__dirname, 'tmp');
+const TMP_DIR = path.join(import.meta.dirname, 'tmp');
 
 if (!fs.existsSync(TMP_DIR)) {
     fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -188,17 +187,4 @@ async function waitForCondition(fn, timeout = 10000, interval = 500) {
     return false;
 }
 
-module.exports = {
-    writeTask,
-    readTask,
-    removeRunLock,
-    cleanTmp,
-    startAgent,
-    stopAgent,
-    waitForCondition,
-    readLatestGlobalLogTail,
-    sleep,
-    ensureDirs,
-    ROOT,
-    QUEUE_DIR
-};
+export { writeTask, readTask, removeRunLock, cleanTmp, startAgent, stopAgent, waitForCondition, readLatestGlobalLogTail, sleep, ensureDirs, ROOT, QUEUE_DIR };

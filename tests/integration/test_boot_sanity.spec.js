@@ -1,44 +1,30 @@
-/* ==========================================================================
-   tests/integration/test_boot_sanity.spec.js
-   Sanity Check: Boot Sequence with Mission System
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Verifica se sistema inicia com todas integrações (NERV, Kernel, MissionManager)
-     - Valida que boot sequence funciona corretamente
-     - Teste rápido de smoke test para validar integração básica
-========================================================================== */
-
-// IMPORTANTE: Ativa path aliases (@core, @shared, etc.)
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it } = require('node:test');
-const path = require('path');
-const fs = require('fs/promises');
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
+import path from 'node:path';
+import fs from 'fs/promises';
 
 describe('Boot Sequence Sanity Check (V2.0)', () => {
-    it('should have MissionManager module available', () => {
-        const { MissionManager } = require('../../src/missions/mission_manager');
+    it('should have MissionManager module available', async () => {
+        const { MissionManager } = await import('#missions/mission_manager');
         assert.ok(MissionManager, 'MissionManager deveria estar disponível');
         assert.strictEqual(typeof MissionManager, 'function', 'MissionManager deveria ser uma classe');
     });
 
-    it('should have WorkflowGenerator module available', () => {
-        const { WorkflowGenerator } = require('../../src/missions/workflow_generator');
+    it('should have WorkflowGenerator module available', async () => {
+        const { WorkflowGenerator } = await import('#missions/workflow_generator');
         assert.ok(WorkflowGenerator, 'WorkflowGenerator deveria estar disponível');
         assert.strictEqual(typeof WorkflowGenerator, 'function', 'WorkflowGenerator deveria ser uma classe');
     });
 
-    it('should have MissionStateManager module available', () => {
-        const { MissionStateManager, MISSION_STATUS } = require('../../src/missions/mission_state_manager');
+    it('should have MissionStateManager module available', async () => {
+        const { MissionStateManager, MISSION_STATUS } = await import('#missions/mission_state_manager');
         assert.ok(MissionStateManager, 'MissionStateManager deveria estar disponível');
         assert.ok(MISSION_STATUS, 'MISSION_STATUS deveria estar disponível');
         assert.strictEqual(typeof MISSION_STATUS.PENDING, 'string', 'Status PENDING deveria estar definido');
     });
 
     it('should have book_writing template available', async () => {
-        const templatePath = path.join(__dirname, '../../src/missions/templates/book_writing.json');
+        const templatePath = path.join(import.meta.dirname, '../../src/missions/templates/book_writing.json');
         const exists = await fs
             .access(templatePath)
             .then(() => true)
@@ -56,8 +42,8 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
         assert.ok(template.params, 'Template deveria ter params');
     });
 
-    it('should have missions REST API controller available', () => {
-        const missionsController = require('../../src/server/api/controllers/missions');
+    it('should have missions REST API controller available', async () => {
+        const missionsController = await import('#server/api/controllers/missions').then(m => m.default ?? m);
         assert.ok(missionsController, 'Missions controller deveria estar disponível');
         assert.strictEqual(
             typeof missionsController.setMissionManager,
@@ -67,7 +53,7 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
     });
 
     it('should have missions directory created', async () => {
-        const missionsDir = path.join(__dirname, '../../missions');
+        const missionsDir = path.join(import.meta.dirname, '../../missions');
         const exists = await fs
             .access(missionsDir)
             .then(() => true)
@@ -76,8 +62,8 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
         assert.ok(exists, 'Diretório missions/ deveria existir');
     });
 
-    it('should be able to create MissionManager instance with mocked dependencies', () => {
-        const { MissionManager } = require('../../src/missions/mission_manager');
+    it('should be able to create MissionManager instance with mocked dependencies', async () => {
+        const { MissionManager } = await import('#missions/mission_manager');
 
         // Mock simples de Kernel e NERV
         const mockKernel = {
@@ -104,15 +90,15 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
         assert.ok(typeof manager.resumeMission === 'function', 'Deveria ter método resumeMission');
     });
 
-    it('should have OrchestratorEngine integrated in Kernel', () => {
-        const { createKernel } = require('../../src/kernel/kernel');
+    it('should have OrchestratorEngine integrated in Kernel', async () => {
+        const { createKernel } = await import('#kernel/kernel');
 
         assert.ok(createKernel, 'createKernel deveria estar disponível');
         assert.strictEqual(typeof createKernel, 'function', 'createKernel deveria ser função');
     });
 
-    it('should have TaskExecutionOrchestrator module available', () => {
-        const { TaskExecutionOrchestrator } = require('../../src/kernel/task_execution_orchestrator');
+    it('should have TaskExecutionOrchestrator module available', async () => {
+        const { TaskExecutionOrchestrator } = await import('#kernel/task_execution_orchestrator');
 
         assert.ok(TaskExecutionOrchestrator, 'TaskExecutionOrchestrator deveria estar disponível');
         assert.strictEqual(
@@ -122,8 +108,8 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
         );
     });
 
-    it('should have OrchestratorEngine module available', () => {
-        const { OrchestratorEngine } = require('../../src/orchestrator/orchestrator_engine');
+    it('should have OrchestratorEngine module available', async () => {
+        const { OrchestratorEngine } = await import('#orchestrator/orchestrator_engine');
 
         assert.ok(OrchestratorEngine, 'OrchestratorEngine deveria estar disponível');
         assert.strictEqual(typeof OrchestratorEngine, 'function', 'OrchestratorEngine deveria ser uma classe');

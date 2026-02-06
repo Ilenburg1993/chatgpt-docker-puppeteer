@@ -1,16 +1,5 @@
-#!/usr/bin/env node
-/* ==========================================================================
-   fix-promise-executor-return.js
-   Corrige padrão no-promise-executor-return automaticamente
-
-   Transforma:
-     new Promise(r => setTimeout(r, 100))
-   Em:
-     new Promise(r => { setTimeout(r, 100); })
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 // Padrão regex para encontrar o problema
 const PATTERN = /new Promise\(r => setTimeout\(r, (\d+)\)\)/g;

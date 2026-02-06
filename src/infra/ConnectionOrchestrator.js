@@ -1,51 +1,11 @@
-/* ==========================================================================
-   src/infra/ConnectionOrchestrator.js
-   Audit Level: 21 — Hardened Infrastructure State Machine (Leak Proof)
-   Status: ENHANCED — Connection-Only Pattern (Ontological Architecture)
-
-   ONTOLOGICAL PRINCIPLE:
-   Chrome é propriedade do Windows Host. DevContainer APENAS conecta.
-
-   RESPONSIBILITIES:
-   ✅ DevContainer (ConnectionOrchestrator):
-      - Conectar a Chrome via browserEndpoint (localhost:9224)
-      - Validar conexão (health checks)
-      - Retry logic (exponential backoff)
-      - Page selection (scanForTargetPage)
-
-   ❌ DevContainer NÃO deve:
-      - Iniciar Chrome (launcher mode) → Windows responsibility
-      - Configurar Chrome args → Windows responsibility
-      - Gerenciar Chrome lifecycle → Windows responsibility
-      - Detectar Chrome installation → Windows responsibility
-
-   ✅ Windows Host (START-CHROME-SIMPLE.bat):
-      - Iniciar Chrome com --remote-debugging-port=9225
-      - Configurar args (--no-first-run, --disable-gpu, etc.)
-      - Gerenciar profile (--user-data-dir)
-      - Lifecycle (start/stop/restart)
-
-   FLOW:
-   1. Windows: START-CHROME-SIMPLE.bat → Chrome @ localhost:9225
-   2. DevContainer: PM2 → chromeProxyService @ localhost:9224
-   3. Proxy: localhost:9224 → host.docker.internal:9225
-   4. ConnectionOrchestrator: connect(localhost:9224) → Proxy → Chrome
-
-   SUPPORTED MODES:
-   - wsEndpoint: Connect via WebSocket (default, most stable)
-   - connect: Connect via browserURL (fallback)
-   - auto: Try all modes in order
-========================================================================== */
-
-const puppeteerExtra = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-// Note: avoid unused alias 'puppeteer' to satisfy lint rules
-const puppeteerCore = require('puppeteer-core');
-const os = require('os');
-const path = require('path');
-const { log } = require('@core/logger');
-const CONFIG = require('@core/config');
-const { createMockBrowser } = require('./mock_chrome');
+import puppeteerExtra from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import puppeteerCore from 'puppeteer-core';
+import os from 'node:os';
+import path from 'node:path';
+import { log } from '#core/logger';
+import CONFIG from '#core/config';
+import { createMockBrowser } from './mock_chrome.js';
 
 // Aplica stealth plugin para anti-detection
 puppeteerExtra.use(StealthPlugin());
@@ -767,4 +727,4 @@ class ConnectionOrchestrator {
     }
 }
 
-module.exports = { ConnectionOrchestrator, STATES };
+export { ConnectionOrchestrator, STATES };

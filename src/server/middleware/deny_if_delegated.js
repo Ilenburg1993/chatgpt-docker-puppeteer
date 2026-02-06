@@ -1,4 +1,4 @@
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Middleware que bloqueia operações de escrita/configuração
@@ -21,4 +21,4 @@ function denyIfDelegated(req, res, next) {
     return next();
 }
 
-module.exports = denyIfDelegated;
+export default denyIfDelegated;

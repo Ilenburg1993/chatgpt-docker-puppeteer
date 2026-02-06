@@ -1,7 +1,5 @@
-#!/usr/bin/env node
-// Simple HTTP mock that serves Chrome DevTools JSON endpoints used by ConnectionOrchestrator
-const http = require('http');
-const { v4: uuidv4 } = require('uuid');
+#!/usr/bin/env nodeimport http from 'node:http';
+import { v4 as uuidv4 } from 'uuid';
 
 const port = parseInt(process.env.MOCK_CHROME_PORT || process.env.CHROME_PORT || '9225', 10);
 const host = process.env.MOCK_CHROME_HOST || process.env.CHROME_HOST || '127.0.0.1';

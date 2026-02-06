@@ -1,30 +1,6 @@
-/* ==========================================================================
-   src/orchestrator/checkpoint_manager.js
-   Audit Level: 100 — Checkpoint Manager (V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Gerenciar checkpoints de missões para crash recovery.
-
-   Funcionalidades:
-   - Salvar checkpoints a cada step completado
-   - Carregar último checkpoint para recovery
-   - Listar histórico de checkpoints
-   - Limpar checkpoints antigos (LRU)
-   - Integração com MissionStateManager
-
-   Checkpoint Structure:
-   {
-       checkpoint_id: 'checkpoint-1643000000000',
-       mission_id: 'mission-123',
-       timestamp: 1643000000000,
-       step_index: 5,
-       mission_state: { ...full mission state... },
-       metadata: { created_by, reason, etc }
-   }
-========================================================================== */
-
-const fs = require('fs/promises');
-const path = require('path');
-const logger = require('@core/logger');
+import fs from 'fs/promises';
+import path from 'node:path';
+import * as logger from '#core/logger';
 
 /**
  * CheckpointManager - Gerencia checkpoints de missões para crash recovery.
@@ -316,4 +292,4 @@ class CheckpointManager {
     }
 }
 
-module.exports = { CheckpointManager };
+export { CheckpointManager };

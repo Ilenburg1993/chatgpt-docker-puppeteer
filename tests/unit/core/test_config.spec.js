@@ -1,21 +1,14 @@
-/**
- * Testes Unitários: Core Config Completo
- * @module tests/unit/core/test_config_completo.spec.js
- * @description Valida config.json, dynamic_rules.json e hot-reload
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const errors = 0;
 
 describe('Core Config Completo - Configuração', () => {
     describe('1. config.json - Estrutura Básica', () => {
         it('deve existir e ser JSON válido', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
 
             assert.ok(fs.existsSync(configPath), 'config.json deve existir');
 
@@ -26,7 +19,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve ter campos obrigatórios', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
             const required = ['DEBUG_PORT', 'IDLE_SLEEP', 'CYCLE_DELAY', 'allowedDomains'];
@@ -37,7 +30,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve validar tipos dos campos', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
             assert.strictEqual(typeof config.IDLE_SLEEP, 'number');
@@ -48,7 +41,7 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('2. dynamic_rules.json - Regras Dinâmicas', () => {
         it('deve existir e ser JSON válido', () => {
-            const rulesPath = path.join(__dirname, '../../../dynamic_rules.json');
+            const rulesPath = path.join(import.meta.dirname, '../../../dynamic_rules.json');
 
             // Pode não existir em ambiente de teste
             if (fs.existsSync(rulesPath)) {
@@ -60,7 +53,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve ter estrutura de targets e selectors', () => {
-            const rulesPath = path.join(__dirname, '../../../dynamic_rules.json');
+            const rulesPath = path.join(import.meta.dirname, '../../../dynamic_rules.json');
 
             if (fs.existsSync(rulesPath)) {
                 const rules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8'));
@@ -71,7 +64,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve ter metadados de versão', () => {
-            const rulesPath = path.join(__dirname, '../../../dynamic_rules.json');
+            const rulesPath = path.join(import.meta.dirname, '../../../dynamic_rules.json');
 
             if (fs.existsSync(rulesPath)) {
                 const rules = JSON.parse(fs.readFileSync(rulesPath, 'utf-8'));
@@ -83,15 +76,15 @@ describe('Core Config Completo - Configuração', () => {
     });
 
     describe('3. Integração com Zod', () => {
-        it('deve carregar CONFIG sem erros', () => {
-            const CONFIG = require('../../../src/core/config');
+        it('deve carregar CONFIG sem erros', async () => {
+            const CONFIG = await import('#core/config').then(m => m.default ?? m);
 
             assert.ok(CONFIG, 'CONFIG deve ser exportado');
             assert.ok(typeof CONFIG.reload === 'function', 'Deve ter método reload');
         });
 
-        it('deve fornecer acesso a configurações', () => {
-            const CONFIG = require('../../../src/core/config');
+        it('deve fornecer acesso a configurações', async () => {
+            const CONFIG = await import('#core/config').then(m => m.default ?? m);
 
             // Verificar estrutura básica
             assert.ok(CONFIG.all || CONFIG.isInitialized !== undefined);
@@ -99,14 +92,14 @@ describe('Core Config Completo - Configuração', () => {
     });
 
     describe('4. Hot-Reload de Configuração', () => {
-        it('deve ter método reload disponível', () => {
-            const CONFIG = require('../../../src/core/config');
+        it('deve ter método reload disponível', async () => {
+            const CONFIG = await import('#core/config').then(m => m.default ?? m);
 
             assert.ok(typeof CONFIG.reload === 'function');
         });
 
-        it('deve invalidar cache ao recarregar', () => {
-            const CONFIG = require('../../../src/core/config');
+        it('deve invalidar cache ao recarregar', async () => {
+            const CONFIG = await import('#core/config').then(m => m.default ?? m);
 
             // Simular reload (não executar para não afetar outros testes)
             const hasReload = typeof CONFIG.reload === 'function';
@@ -117,7 +110,7 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('5. Valores Padrão', () => {
         it('deve ter IDLE_SLEEP padrão', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
             assert.ok(typeof config.IDLE_SLEEP === 'number');
@@ -125,7 +118,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve ter CYCLE_DELAY padrão', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
             assert.ok(typeof config.CYCLE_DELAY === 'number');
@@ -134,7 +127,7 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('6. Domínios Permitidos', () => {
         it('deve ter lista de domínios permitidos', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
             assert.ok(Array.isArray(config.allowedDomains));
@@ -142,7 +135,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve incluir domínios essenciais', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
             const essentials = ['chat.openai.com', 'gemini.google.com'];
@@ -162,13 +155,13 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('7. Segurança e .gitignore', () => {
         it('deve ter .gitignore configurado', () => {
-            const gitignorePath = path.join(__dirname, '../../../.gitignore');
+            const gitignorePath = path.join(import.meta.dirname, '../../../.gitignore');
 
             assert.ok(fs.existsSync(gitignorePath), '.gitignore deve existir');
         });
 
         it('deve ignorar arquivos sensíveis', () => {
-            const gitignorePath = path.join(__dirname, '../../../.gitignore');
+            const gitignorePath = path.join(import.meta.dirname, '../../../.gitignore');
             const content = fs.readFileSync(gitignorePath, 'utf-8');
 
             const patterns = ['.env', 'logs/', 'fila/', 'profile/'];
@@ -181,7 +174,7 @@ describe('Core Config Completo - Configuração', () => {
 
     describe('8. Validação de Formato', () => {
         it('config.json não deve ter sintaxe JSON quebrada', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const content = fs.readFileSync(configPath, 'utf-8');
 
             // Não deve lançar erro
@@ -189,7 +182,7 @@ describe('Core Config Completo - Configuração', () => {
         });
 
         it('deve ter encoding UTF-8', () => {
-            const configPath = path.join(__dirname, '../../../config.json');
+            const configPath = path.join(import.meta.dirname, '../../../config.json');
             const content = fs.readFileSync(configPath, 'utf-8');
 
             // Deve conseguir ler como UTF-8

@@ -1,13 +1,9 @@
-/* scripts/gerador_tarefa.js (Audit Level 15 - Power CLI) */
-// Responsabilidade: Interface de linha de comando para criação de tarefas robustas.
-// Recursos: Modo Interativo, Templates, Escrita Atômica, Multi-Target.
+import fs from 'node:fs';
+import path from 'node:path';
+import readline from 'node:readline';
+import crypto from 'node:crypto';
 
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
-const crypto = require('crypto');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const TEMPLATE_DIR = path.join(ROOT, 'templates');
 

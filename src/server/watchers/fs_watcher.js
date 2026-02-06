@@ -1,27 +1,8 @@
-/* ==========================================================================
-   src/server/watchers/fs_watcher.js
-   Audit Level: 600 — Filesystem Sensor (IPC 2.0 Singularity)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-
-   RESPONSABILIDADE CANÔNICA:
-     - Atuar como SENSOR FÍSICO do filesystem (Fila de Tarefas).
-     - Detectar indícios de mudança (nível de Inode/Escrita).
-     - Sinalizar barramentos de dados (UI / Maestro / Cache).
-
-   PROIBIÇÕES EXPLÍCITAS (Protocolo de Desacoplamento):
-     ❌ Não aplicar lógica de cache ou interpretação de JSON.
-     ❌ Não aplicar debounce ou janelas temporais.
-     ❌ Não inferir consistência de dados.
-
-   Toda autoridade de consolidação temporal e semântica pertence
-   exclusivamente ao sistema de infraestrutura (cache.js).
-========================================================================== */
-
-const fs = require('fs');
-const fsp = require('fs').promises;
-const io = require('@infra/io');
-const { notify, notifyAgent } = require('@server/engine/socket');
-const { log } = require('@core/logger');
+import fs from 'node:fs';
+import { promises as fsp } from 'node:fs';
+import * as io from '#infra/io';
+import { notify, notifyAgent } from '#server/engine/socket';
+import { log } from '#core/logger';
 
 /**
  * Instância ativa do watcher do SO.
@@ -124,7 +105,4 @@ function stop() {
     }
 }
 
-module.exports = {
-    init,
-    stop
-};
+export { init, stop };

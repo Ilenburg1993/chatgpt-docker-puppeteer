@@ -1,21 +1,15 @@
-/**
- * Global Test Setup
- * Executa antes de todos os testes
- * @audit-level 50 - Test infrastructure
- */
-
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Diretórios temporários necessários para testes
  */
 const TMP_DIRS = [
-    path.join(__dirname, 'tmp'),
-    path.join(__dirname, 'tmp', 'fila'),
-    path.join(__dirname, 'tmp', 'respostas'),
-    path.join(__dirname, 'tmp', 'logs'),
-    path.join(__dirname, 'tmp', 'profile')
+    path.join(import.meta.dirname, 'tmp'),
+    path.join(import.meta.dirname, 'tmp', 'fila'),
+    path.join(import.meta.dirname, 'tmp', 'respostas'),
+    path.join(import.meta.dirname, 'tmp', 'logs'),
+    path.join(import.meta.dirname, 'tmp', 'profile')
 ];
 
 /**
@@ -92,4 +86,4 @@ setup().catch(error => {
     process.exit(1);
 });
 
-module.exports = { setup, TMP_DIRS, TEST_ENV, GLOBAL_TEST_CONFIG };
+export { setup, TMP_DIRS, TEST_ENV, GLOBAL_TEST_CONFIG };

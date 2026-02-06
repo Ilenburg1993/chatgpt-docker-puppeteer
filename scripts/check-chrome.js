@@ -1,8 +1,4 @@
-#!/usr/bin/env node
-// scripts/check-chrome.js
-// Executa um check rápido usando ConnectionOrchestrator.synchronize()
-require('module-alias/register');
-const { ConnectionOrchestrator } = require('../src/infra/ConnectionOrchestrator');
+#!/usr/bin/env nodeimport { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 (async () => {
     try {
         const report = await ConnectionOrchestrator.synchronize();

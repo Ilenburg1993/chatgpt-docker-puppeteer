@@ -1,20 +1,9 @@
-/* ==========================================================================
-   src/infra/queue/task_loader.js
-   Audit Level: 700 — Sovereign Task Loader (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar a ingestão de tarefas, realizar a auto-cura de
-                     processos zumbis e gerenciar transições de estado em lote.
-   Sincronizado com: cache.js V700, task_store.js V700, scheduler.js V100.
-========================================================================== */
-
-const cache = require('./cache');
-
-const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
-
-const { getNextEligible } = require('./scheduler');
-const { saveTask } = require('../storage/task_store');
-const CONFIG = require('@core/config');
-const { log } = require('@core/logger');
+import * as cache from './cache.js';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import { getNextEligible } from './scheduler.js';
+import { saveTask } from '../storage/task_store.js';
+import CONFIG from '#core/config';
+import { log } from '#core/logger';
 
 /**
  * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima
@@ -23,7 +12,7 @@ const { log } = require('@core/logger');
  * @param {string|null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
  * @returns {Promise<object|null>}
  */
- 
+
 async function loadNextTask(targetFilter = null) {
     // 1. Aquisição de Snapshot Estável (RAM)
     const allTasks = await cache.getQueue();
@@ -154,7 +143,4 @@ async function bulkRetryFailed() {
     return count;
 }
 
-module.exports = {
-    loadNextTask,
-    bulkRetryFailed
-};
+export { loadNextTask, bulkRetryFailed };

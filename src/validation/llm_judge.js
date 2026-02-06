@@ -1,18 +1,4 @@
-/* ==========================================================================
-   src/validation/llm_judge.js
-   LLM-as-Judge Response Validator
-
-   Responsabilidade:
-   - Validar qualidade de resposta LLM usando outro LLM como juiz
-   - 3 dimensões: completeness, relevance, quality
-   - Score 0-100 para cada dimensão
-   - Recomendação: ACCEPT, RETRY, MANUAL_REVIEW
-
-   Histórico:
-   - 2026-02-04: Criado (Response Capture V2.0)
-========================================================================== */
-
-const logger = require('@core/logger');
+import * as logger from '#core/logger';
 
 /**
  * LLMJudge - Valida qualidade de resposta usando LLM como juiz
@@ -403,4 +389,4 @@ Respond ONLY in JSON format:
     }
 }
 
-module.exports = LLMJudge;
+export default LLMJudge;

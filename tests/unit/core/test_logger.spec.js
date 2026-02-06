@@ -1,24 +1,14 @@
-/**
- * Testes Unitários: Logger
- * @module tests/unit/core/test_logger.spec.js
- * @description Valida sistema de logging, rotação de arquivos e métricas
- * @audit-level 40
- */
+import { describe, it, before, after, beforeEach } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import sinon from 'sinon';
 
-const { describe, it, before, after, beforeEach } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const sinon = require('sinon');
-
-// Mock do logger antes de importar
-const loggerPath = '../../../src/core/logger';
-delete require.cache[require.resolve(loggerPath)];
-
-const logger = require(loggerPath);
+// Import logger module (ESM)
+const logger = await import('#core/logger').then(m => m.default ?? m);
 
 describe('Logger - Sistema de Logging Unificado', () => {
-    const TEST_LOG_DIR = path.join(__dirname, '../../tmp/logs');
+    const TEST_LOG_DIR = path.join(import.meta.dirname, '../../tmp/logs');
     const TEST_LOG_FILE = path.join(TEST_LOG_DIR, 'test_agente.log');
 
     before(() => {
@@ -127,7 +117,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
     describe('3. Persistência em Arquivo', () => {
         it('deve criar arquivo de log se não existir', () => {
             // Logger cria automaticamente o diretório logs/
-            const logsDir = path.join(__dirname, '../../../logs');
+            const logsDir = path.join(import.meta.dirname, '../../../logs');
 
             assert.ok(fs.existsSync(logsDir), 'Diretório logs/ deve existir');
         });
@@ -140,7 +130,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
                 setTimeout(resolve, 100);
             });
 
-            const logFile = path.join(__dirname, '../../../logs/agente_current.log');
+            const logFile = path.join(import.meta.dirname, '../../../logs/agente_current.log');
             if (fs.existsSync(logFile)) {
                 const content = fs.readFileSync(logFile, 'utf-8');
                 // Verificar que há conteúdo
@@ -241,9 +231,9 @@ describe('Logger - Sistema de Logging Unificado', () => {
     });
 
     describe('8. Integração com Sistema', () => {
-        it('deve ser usável como módulo singleton', () => {
-            const logger1 = require('../../../src/core/logger');
-            const logger2 = require('../../../src/core/logger');
+        it('deve ser usável como módulo singleton', async () => {
+            const logger1 = await import('#core/logger').then(m => m.default ?? m);
+            const logger2 = await import('#core/logger').then(m => m.default ?? m);
 
             assert.strictEqual(logger1, logger2, 'Deve retornar a mesma instância');
         });

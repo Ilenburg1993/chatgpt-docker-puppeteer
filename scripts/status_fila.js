@@ -1,11 +1,7 @@
-/* scripts/status_fila.js (Audit Level 15 - Intelligent Dashboard) */
-// Responsabilidade: Monitoramento em tempo real da fila com telemetria avançada.
-// Uso: node scripts/status_fila.js [--watch] [--failed] [--tag "Projeto X"]
+import fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 
 // --- ARGUMENTOS ---

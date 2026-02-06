@@ -1,34 +1,8 @@
-#!/usr/bin/env node
-/**
- * Dependencies Auditor
- *
- * Purpose: Compares declared dependencies in package.json with actual modules used in code
- *
- * Detects:
- * - Missing dependencies (used in code but not in package.json)
- * - Unused dependencies (in package.json but not found in code)
- * - Native Node.js modules (for reference)
- *
- * Usage:
- *   node scripts/audit-dependencies.js
- *   node scripts/audit-dependencies.js --json > deps-report.json
- *
- * Exit Codes:
- *   0 - All dependencies are correct
- *   1 - Missing or unused dependencies found
- *   2 - Error during execution
- *
- * Note: This is a heuristic analysis. Manual review recommended for:
- * - Dynamic requires (e.g., require(variable))
- * - Optional dependencies
- * - Peer dependencies
- */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 const JSON_OUTPUT = process.argv.includes('--json');
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..');
 
 // Read package.json
 const pkgPath = path.join(ROOT, 'package.json');

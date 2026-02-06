@@ -198,6 +198,12 @@ RUN apt-get update \
     openssl \
     ca-certificates \
     curl \
+    # -------------------------------------------------------------------------
+    # NEW
+    # -------------------------------------------------------------------------
+    cmake \
+    libssl-dev \
+    zlib1g-dev \
     \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -346,8 +352,8 @@ RUN apt-get update \
     fonts-noto-core \
     fonts-noto-ui-core \
     fonts-noto-color-emoji \
-    fonts-noto-cjk \
-    fonts-noto-extra \
+    ##fonts-noto-cjk \
+    ##fonts-noto-extra \
     fonts-jetbrains-mono \
     \
     # -------------------------------------------------------------------------
@@ -528,8 +534,7 @@ RUN apt-get update \
     # ---------------------------------------------------------------------
     # • Markdown → PDF/HTML/DOCX
     # =====================================================================
-    pandoc \
-    \
+    ## pandoc pesado
     # =====================================================================
     # DATABASE & PROTOCOL (v5.1)
     # ---------------------------------------------------------------------
@@ -809,8 +814,9 @@ RUN mkdir -p \
     \
     ${HOME_DIR}/.local/share \
     ${HOME_DIR}/.local/share/github-copilot \
+    ${HOME_DIR}/.local/share/rag-db \
+    ${HOME_DIR}/.local/share/rag-index \
     ${HOME_DIR}/.local/state \
-    ${HOME_DIR}/.local/state/github-copilot \
     ${HOME_DIR}/.local/bin \
     \
     # =====================================================================

@@ -1,11 +1,4 @@
-#!/usr/bin/env node
-/**
- * Test: Health Endpoint Validation
- * Status: Development (Pre-v1.0)
- * Purpose: Validate that health endpoints return expected structure
- */
-
-const http = require('http');
+#!/usr/bin/env nodeimport http from 'node:http';
 
 console.log('\n=== TEST: Health Endpoint Validation ===');
 
@@ -14,7 +7,7 @@ console.log('> Validating health endpoint implementation...');
 
 try {
     // Check doctor.js exports
-    const doctor = require('../../../src/core/doctor');
+    const doctor = await import('#core/doctor').then(m => m.default ?? m);
     if (!doctor.probeChromeConnection) {
         throw new Error('probeChromeConnection not exported from doctor.js');
     }
@@ -24,7 +17,7 @@ try {
     console.log('✓ doctor.js exports validated');
 
     // Check router.js includes health endpoint
-    const fs = require('fs');
+    const fs = await import('node:fs').then(m => m.default ?? m);
     const routerContent = fs.readFileSync('./src/server/api/router.js', 'utf-8');
     if (!routerContent.includes('GET /api/health')) {
         throw new Error('/api/health endpoint not found in router.js');

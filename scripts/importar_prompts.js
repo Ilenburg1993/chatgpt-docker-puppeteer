@@ -1,9 +1,8 @@
-/* scripts/importar_prompts.js (Audit Level 14 - Industrial Bulk Import) */
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const SOURCE_FILE = process.argv[2] || path.join(ROOT, 'prompts.txt');
 

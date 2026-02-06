@@ -1,6 +1,4 @@
-// ^ Exports usados externamente
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * @fileoverview PageSessionTracker - Session metrics and health tracking
@@ -538,11 +536,7 @@ class PageSessionTracker {
     }
 }
 
-/* ==========================================================================
-   EXPORTS
-========================================================================== */
-
-module.exports = PageSessionTracker;
-module.exports.HEALTH_LEVELS = HEALTH_LEVELS;
-module.exports.TIMEOUT_MULTIPLIERS = TIMEOUT_MULTIPLIERS;
-module.exports.TRACKER_CONFIG = TRACKER_CONFIG;
+export default PageSessionTracker;
+export { HEALTH_LEVELS };
+export { TIMEOUT_MULTIPLIERS };
+export { TRACKER_CONFIG };

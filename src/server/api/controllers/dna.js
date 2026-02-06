@@ -1,20 +1,10 @@
-/* ==========================================================================
-   src/server/api/controllers/dna.js
-   Audit Level: 700 — Intelligence & DNA Controller (Traceability Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Gerenciar as configurações mestras e a evolução do genoma
-                     de seletores (SADI) com rastreabilidade total.
-   Sincronizado com: io.js V700, request_id.js V600, schemas.js V410.
-========================================================================== */
-
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const path = require('path');
-
-const io = require('@infra/io');
-const { audit, log } = require('@core/logger');
-const { ROOT } = require('@infra/fs/fs_utils');
-const denyIfDelegated = require('../../middleware/deny_if_delegated');
+import path from 'node:path';
+import * as io from '#infra/io';
+import { audit, log } from '#core/logger';
+import { ROOT } from '#infra/fs/fs_utils';
+import denyIfDelegated from '../../middleware/deny_if_delegated.js';
 
 // Caminho físico absoluto para o arquivo de configuração mestre
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -304,4 +294,4 @@ router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

@@ -1,22 +1,7 @@
-/* ==========================================================================
-   tests/unit/missions/test_feedback_processor.spec.js
-   Unit Tests: FeedbackProcessor
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Testar processamento de feedback
-     - Testar categorização automática
-     - Testar extração de action items e patterns
-     - Testar injeção em prompts
-     - Testar integração com MemoryStore
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, beforeEach } = require('node:test');
-const { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT } = require('../../../src/missions/feedback_processor');
-const { ContextManager } = require('../../../src/orchestrator/context_manager');
+import assert from 'node:assert';
+import { describe, it, beforeEach } from 'node:test';
+import { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT } from '#missions/feedback_processor';
+import { ContextManager } from '#orchestrator/context_manager';
 
 describe('FeedbackProcessor Unit Tests', () => {
     let feedbackProcessor;

@@ -1,10 +1,4 @@
-/**
- * Mock do Logger
- * Para uso em testes que não precisam de logging real
- * @audit-level 50 - Test infrastructure
- */
-
-const sinon = require('sinon');
+import sinon from 'sinon';
 
 /**
  * Cria um logger mockado com todos os métodos
@@ -55,7 +49,4 @@ function criarLoggerSilencioso() {
     };
 }
 
-module.exports = {
-    criarLoggerMock,
-    criarLoggerSilencioso
-};
+export { criarLoggerMock, criarLoggerSilencioso };

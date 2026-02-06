@@ -1,34 +1,13 @@
-/* ==========================================================================
-   src/infra/storage/task_store.js
-   Audit Level: 700 — Sovereign Task Storage (V5 Auto-Migration Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Persistência física de objetos Task no disco com
-                     auto-migration transparente V4 → V5.
-
-   NOVIDADES V5 (Fevereiro 2026):
-   - Auto-detect version (V4 vs V5)
-   - Auto-migrate V4 → V5 ao carregar (transparent)
-   - Salva sempre em V5 (forward-only migration)
-   - Backward compatible (V4 clients funcionam via parseTask)
-
-   Sincronizado com: task_schema_v5.js, migrator_v4_to_v5.js
-========================================================================== */
-
-const fs = require('fs');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
+import fs from 'node:fs';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 const fsp = fs.promises;
-const path = require('path');
-
-// [V700] Importação da Bússola Física para quebrar dependências circulares
-const PATHS = require('../fs/paths');
-const { atomicWrite, safeReadJSON } = require('../fs/fs_core');
-const { parseTask } = require('@core/schemas');
-const { autoMigrateTask } = require('@core/schemas/migrator_v4_to_v5');
-const logger = require('@core/logger');
+import path from 'node:path';
+import * as PATHS from '../fs/paths.js';
+import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';
+import { parseTask } from '#core/schemas';
+import { autoMigrateTask } from '#core/schemas/migrator_v4_to_v5';
+import * as logger from '#core/logger';
 
 /**
  * Salva uma tarefa no disco após validação V5.
@@ -152,10 +131,4 @@ async function clearQueue() {
     return { deleted, preserved };
 }
 
-module.exports = {
-    saveTask,
-    loadTask,
-    deleteTask,
-    listTaskFiles,
-    clearQueue
-};
+export { saveTask, loadTask, deleteTask, listTaskFiles, clearQueue };

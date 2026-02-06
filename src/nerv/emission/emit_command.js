@@ -1,26 +1,4 @@
-/* ==========================================================================
-   src/nerv/emission/emit_command.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: emission/
-   Arquivo: emit_command.js
-
-   Papel:
-   - Emitir envelopes do tipo COMMAND de forma unilateral
-   - Executar o pipeline técnico de saída do NERV
-   - Registrar telemetria e correlação de forma observável
-
-   IMPORTANTE:
-   - NÃO cria envelopes
-   - NÃO interpreta payload
-   - NÃO espera resposta
-   - NÃO decide retry
-   - NÃO garante entrega
-   - NÃO conhece Kernel, Driver ou política
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const { MessageType } = require('@shared/nerv/constants');
+import { MessageType } from '#shared/nerv/constants';
 
 /* ===========================
    Fábrica do emissor de COMMAND
@@ -109,4 +87,4 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
     });
 }
 
-module.exports = createEmitCommand;
+export default createEmitCommand;

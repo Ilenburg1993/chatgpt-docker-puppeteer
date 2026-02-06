@@ -1,25 +1,18 @@
-/**
- * @file tests/unit/core/test_schema_v5.spec.js
- * Testes unitários para Task Schema V5 e Migrator V4→V5
- * FASE 3.5 - Cobertura de Mission Orchestration Platform
- */
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { TaskSchemaV5 } from '#core/schemas/task_schema_v5';
 
-// Activate module aliases FIRST
-require('module-alias/register');
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const { TaskSchemaV5 } = require('../../../src/core/schemas/task_schema_v5');
-const {
+import {
     isV4Task,
     isV5Task,
     migrateTaskV4toV5,
     migrateBatchV4toV5,
     validateV5Task,
     downgradeV5toV4,
-    autoMigrateTask
-} = require('../../../src/core/schemas/migrator_v4_to_v5');
-const { STATUS_VALUES } = require('../../../src/core/constants/tasks');
+    autoMigrateTask,
+} from '#core/schemas/migrator_v4_to_v5';
+
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 describe('Task Schema V5 Validation', () => {
     describe('Validação de tasks V5 válidas', () => {

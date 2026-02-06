@@ -1,16 +1,4 @@
-/* ==========================================================================
-   tests/test_chrome_proxy_integration.js
-   Teste de Integração: ChromeProxyService + ConnectionOrchestrator + BrowserPool
-
-   Valida:
-   - Proxy inicia corretamente
-   - Pool valida proxy antes de conectar
-   - Conexões via proxy funcionam
-   - Shutdown gracioso
-   - Eventos NERV emitidos
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 // Configuração de teste
 process.env.NODE_ENV = 'test';
@@ -39,8 +27,8 @@ async function testChromeProxyIntegration() {
     try {
         // ===== 1. Iniciar NERV =====
         log('INFO', '[TEST] 1/6: Criando NERV...');
-        const nervFactory = require('@shared/nerv/factory');
-        const nervConstants = require('@shared/nerv/constants');
+        const nervFactory = await import('#nerv/nerv').then(m => m.default ?? m);
+        const nervConstants = await import('#shared/nerv/constants').then(m => m.default ?? m);
         const { createNERV } = nervFactory;
         const { CONNECTION_MODES } = nervConstants;
 
@@ -66,8 +54,8 @@ async function testChromeProxyIntegration() {
         // ===== 2. Iniciar Chrome Proxy Service =====
         log('INFO', '[TEST] 2/6: Iniciando Chrome Proxy Service...');
 
-        const ChromeProxyService = require('../src/infra/proxy/chromeProxyService');
-        const CONFIG = require('@core/config');
+        const ChromeProxyService = await import('#infra/proxy/chromeProxyService').then(m => m.default ?? m);
+        const CONFIG = await import('#core/config').then(m => m.default ?? m);
 
         chromeProxy = new ChromeProxyService({
             PUBLIC_IP: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
@@ -99,7 +87,7 @@ async function testChromeProxyIntegration() {
         // ===== 4. Criar Browser Pool (com validação de proxy) =====
         log('INFO', '[TEST] 4/6: Criando Browser Pool (deve validar proxy)...');
 
-        const BrowserPoolManager = require('../src/infra/browser_pool/pool_manager');
+        const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
 
         browserPool = new BrowserPoolManager({
             poolSize: 1, // 1 instância apenas para teste
@@ -191,7 +179,7 @@ async function testChromeProxyIntegration() {
 }
 
 // Executa teste
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     log('INFO', '⚠️ ATENÇÃO: Este teste requer Chrome rodando em localhost:9225');
     log('INFO', '⚠️ Execute: bash scripts/start-chrome.sh OU scripts\\start-chrome.bat');
     log('INFO', '');
@@ -201,4 +189,4 @@ if (require.main === module) {
     }, 1000);
 }
 
-module.exports = { testChromeProxyIntegration };
+export { testChromeProxyIntegration };

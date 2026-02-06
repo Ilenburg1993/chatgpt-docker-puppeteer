@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: Infra Lock Manager
- * @module tests/unit/infra/test_lock_manager.spec.js
- * @description Valida aquisição, liberação e validação de locks com PID
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('Infra Lock Manager - Gerenciador de Locks', () => {
     describe('1. Aquisição de Locks', () => {

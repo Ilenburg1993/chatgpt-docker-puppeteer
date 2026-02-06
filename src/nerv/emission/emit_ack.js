@@ -1,25 +1,4 @@
-/* ==========================================================================
-   src/nerv/emission/emit_ack.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: emission/
-   Arquivo: emit_ack.js
-
-   Papel:
-   - Emitir envelopes do tipo ACK de forma PURAMENTE TÉCNICA
-   - Registrar confirmação de RECEBIMENTO FÍSICO
-   - Nunca fechar causalidade nem indicar sucesso lógico
-
-   IMPORTANTE:
-   - ACK NÃO é resposta semântica
-   - ACK NÃO encerra correlação
-   - ACK NÃO garante entrega
-   - ACK NÃO indica sucesso
-   - ACK NÃO altera fluxo do sistema
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const { MessageType } = require('@shared/nerv/constants');
+import { MessageType } from '#shared/nerv/constants';
 
 /* ===========================
    Fábrica do emissor de ACK
@@ -108,4 +87,4 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
     });
 }
 
-module.exports = createEmitAck;
+export default createEmitAck;

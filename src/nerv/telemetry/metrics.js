@@ -105,4 +105,4 @@ function createMetrics() {
     });
 }
 
-module.exports = createMetrics;
+export default createMetrics;

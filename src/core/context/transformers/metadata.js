@@ -69,4 +69,4 @@ function extractTaskMetadata(task, transformType) {
     }
 }
 
-module.exports = { extractTaskMetadata };
+export { extractTaskMetadata };

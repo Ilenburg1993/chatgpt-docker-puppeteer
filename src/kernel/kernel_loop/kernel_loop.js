@@ -32,11 +32,7 @@ const KernelLoopState = Object.freeze({
     STOPPING: 'STOPPING'
 });
 
-/* ===========================
-   Tipos de Decisão (importado de ExecutionEngine)
-=========================== */
-
-const { DecisionKind } = require('../execution_engine/execution_engine');
+import { DecisionKind } from '../execution_engine/execution_engine.js';
 
 /* ===========================
    Fábrica do KernelLoop
@@ -494,7 +490,4 @@ class KernelLoop {
     }
 }
 
-module.exports = {
-    KernelLoop,
-    KernelLoopState
-};
+export { KernelLoop, KernelLoopState };

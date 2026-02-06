@@ -1,38 +1,6 @@
-/**
- * @fileoverview SubmissionController v2.0 - Submissão Atômica com Anti-Race Condition
- * 
- * RESPONSABILIDADES:
- * - Garantir submissão atômica de mensagem (Enter key + fallback sintético)
- * - Prevenir disparos duplos via lock temporal (anti-race condition)
- * - Reportar telemetria de fechamento de transação via eventos
- * - Rastrear métricas de submission (physical/synthetic, success/failure)
- * 
- * PROTOCOL: 12 (Atomic Submission v2.0)
- * AUDIT LEVEL: 500 (Instrumented Atomic Submission)
- * STATUS: CONSOLIDATED v2.0 (EventEmitter + Config + Metrics + Timeout)
- * 
- * SYNCHRONIZED WITH:
- * - BaseDriver V320 (message submission orchestration)
- * - adaptive.js V100 (debounce timeout calculation)
- * - TelemetryBridge V500 (IPC emission)
- * 
- * EVENTOS EMITIDOS:
- * - submission:started (início da submissão)
- * - submission:lock_acquired (lock anti-race adquirido)
- * - submission:enter_sent (Enter key enviada)
- * - submission:cleared_confirmed (campo limpo confirmado)
- * - submission:synthetic_triggered (fallback sintético acionado)
- * - submission:completed (submissão concluída)
- * - submission:failed (submissão falhou)
- * - submission:lock_cleared (lock liberado manualmente)
- * 
- * @version 2.0.0
- * @since 2026-02-01
- */
-
-const EventEmitter = require('events');
-const adaptive = require('@logic/adaptive');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import * as adaptive from '#logic/adaptive';
+import { log } from '#core/logger';
 
 /**
  * Configuração de timeouts e delays para submission.
@@ -569,10 +537,4 @@ function create(driver) {
     return new SubmissionController(driver);
 }
 
-// ✅ Module exports completo (IMPROVEMENT #10)
-module.exports = {
-    SubmissionController,
-    SUBMISSION_CONFIG,
-    SUBMISSION_EVENTS,
-    create
-};
+export { SubmissionController, SUBMISSION_CONFIG, SUBMISSION_EVENTS, create };

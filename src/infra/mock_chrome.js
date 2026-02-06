@@ -1,12 +1,7 @@
-/**
- * Lightweight mock browser used for tests and CI when external Chrome is not available.
- * Provides the minimal API surface used by ConnectionOrchestrator and BrowserPool.
- */
-const { v4: uuidv4 } = require('uuid');
+import { v4 as uuidv4 } from 'uuid';
 
 function createMockPage() {
     const uid = uuidv4();
-    let closed = false;
 
     const page = {
         _id: uid,
@@ -15,7 +10,7 @@ function createMockPage() {
         url() {
             return this._url;
         },
-        async goto(url, options = {}) {
+        async goto(url, _ = {}) {
             this._url = url;
             // pequeno delay simulado para aproximar comportamento real
             await new Promise(resolve => setTimeout(resolve, 5));
@@ -106,4 +101,4 @@ function createMockBrowser() {
     return Promise.resolve(browser);
 }
 
-module.exports = { createMockBrowser };
+export { createMockBrowser };

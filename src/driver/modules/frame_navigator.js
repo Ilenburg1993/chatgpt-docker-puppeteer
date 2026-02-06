@@ -1,38 +1,5 @@
-/**
- * @fileoverview FrameNavigator v2.0 - Instrumented Frame Navigator
- *
- * RESPONSABILIDADES:
- * - Navegar em hierarquias complexas de IFrames e Shadow DOM
- * - Calcular offsets físicos (bounding boxes) acumulados
- * - Detectar e reportar barreiras (security/infra)
- * - Gerenciar cleanup de handles (dispose com retry)
- * - Rastrear métricas de navegação em tempo real
- *
- * PROTOCOL: 12 (Governed Frame Navigation v2.0)
- * AUDIT LEVEL: 500 (Instrumented Frame Navigator)
- * STATUS: CONSOLIDATED v2.0 (EventEmitter + Config + Metrics + Timeout)
- *
- * SYNCHRONIZED WITH:
- * - BaseDriver V320 (driver integration)
- * - analyzer.js V500 (SADI protocol parsing)
- * - handle_manager.js V500 (handle registration)
- *
- * EVENTOS EMITIDOS:
- * - frame_nav:navigation_started (navegação iniciada)
- * - frame_nav:navigation_completed (navegação completa)
- * - frame_nav:navigation_failed (navegação falhou)
- * - frame_nav:frame_entered (entrada em frame bem-sucedida)
- * - frame_nav:frame_entry_failed (falha ao entrar em frame)
- * - frame_nav:infra_barrier_detected (barreira de infraestrutura)
- * - frame_nav:security_barrier_detected (barreira de segurança CORS/CSP)
- * - frame_nav:max_depth_reached (profundidade máxima atingida)
- *
- * @version 2.0.0
- * @since 2026-02-01
- */
-
-const EventEmitter = require('events');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import { log } from '#core/logger';
 
 /**
  * Configuração de navegação em frames (timeouts, depth limit, retry).
@@ -609,11 +576,4 @@ function create(driver) {
     return new FrameNavigator(driver);
 }
 
-// ✅ Module exports completo (IMPROVEMENT #10)
-module.exports = {
-    FrameNavigator,
-    FRAME_NAV_CONFIG,
-    FRAME_NAV_EVENTS,
-    FrameNavError,
-    create
-};
+export { FrameNavigator, FRAME_NAV_CONFIG, FRAME_NAV_EVENTS, FrameNavError, create };

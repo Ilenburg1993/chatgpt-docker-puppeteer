@@ -190,4 +190,4 @@ function createIPCTelemetry(config = {}) {
     });
 }
 
-module.exports = createIPCTelemetry;
+export default createIPCTelemetry;

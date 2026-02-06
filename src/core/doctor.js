@@ -1,26 +1,15 @@
-/* ==========================================================================
-   src/core/doctor.js
-   Audit Level: 39 — Universal Physician (Standardized Metrics Edition)
-   Responsabilidade: Auditoria Preditiva, Triangulação de Rede e Manifesto de Cura.
-   Sincronização: server.js (V40), SADI e Futuro Sistema de Telemetria.
-========================================================================== */
+import fs from 'node:fs';
+import { STATUS_VALUES } from './constants/tasks.js';
+import { promises as fsp } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import https from 'node:https';
+import http from 'node:http';
+import { exec } from 'node:child_process';
+import CONFIG from './config.js';
+import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 
-const fs = require('fs');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('./constants/tasks.js');
-
-const fsp = require('fs').promises;
-const path = require('path');
-const os = require('os');
-const https = require('https');
-const http = require('http');
-const { exec } = require('child_process');
-const CONFIG = require('./config');
-const { ConnectionOrchestrator } = require('../infra/ConnectionOrchestrator');
-
-const ROOT = path.resolve(__dirname, '../../');
+const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
 const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 
@@ -225,7 +214,7 @@ async function validateDNASanity() {
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
-    const io = require('@infra/io'); // Carrega dinamicamente para evitar ciclos
+    const io = await import('#infra/io').then(m => m.default ?? m); // Carrega dinamicamente para evitar ciclos
 
     const targets = ['https://www.google.com', ...(CONFIG.allowedDomains || []).map(d => `https://${d}`)];
     const [networkResults, storage, dna, lag, chrome] = await Promise.all([
@@ -324,4 +313,4 @@ async function runFullCheck() {
     };
 }
 
-module.exports = { runFullCheck, getHardwareMetrics, probeChromeConnection };
+export { runFullCheck, getHardwareMetrics, probeChromeConnection };

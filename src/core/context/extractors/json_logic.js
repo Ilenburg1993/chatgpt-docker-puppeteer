@@ -34,4 +34,4 @@ function extractJsonByStack(content) {
     return '{}';
 }
 
-module.exports = { extractJsonByStack };
+export { extractJsonByStack };

@@ -1,17 +1,5 @@
-/* ==========================================================================
-   tests/test_p3_fixes.js
-   Suite de Testes para Correções P3 (Critical Cases Analysis)
-
-   P3: RecoverySystem - Kill Timeout Protection
-   - Proteção contra travamento em killProcess() zombie
-   - Timeout de 5s para operação de kill
-   - Continuação do fluxo mesmo com falha
-
-   Referência: CRITICAL_CASES_ANALYSIS.md (Caso 10)
-========================================================================== */
-
-const fs = require('fs/promises');
-const path = require('path');
+import fs from 'fs/promises';
+import path from 'node:path';
 
 // Cores para output
 const colors = {
@@ -261,7 +249,7 @@ async function test5_CodeValidation() {
 
     log('INFO', 'Verificando arquivo recovery_system.js...');
 
-    const recoverySystemPath = path.join(__dirname, '..', '..', 'src', 'driver', 'modules', 'recovery_system.js');
+    const recoverySystemPath = path.join(import.meta.dirname, '..', '..', 'src', 'driver', 'modules', 'recovery_system.js');
     const content = await fs.readFile(recoverySystemPath, 'utf-8');
 
     const checks = [

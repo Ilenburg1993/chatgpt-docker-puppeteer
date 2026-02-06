@@ -1,19 +1,8 @@
-/* ==========================================================================
-   src/infra/locks/lock_manager.js
-   Audit Level: 700 — Sovereign Lock Manager (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Exclusão mútua baseada em filesystem para controle de
-                     concorrência entre instâncias do Maestro.
-   Sincronizado com: paths.js V700, process_guard.js V100, fs_core.js V700.
-========================================================================== */
-
-const fs = require('fs').promises;
-const path = require('path');
-
-// [V700] Importações de infraestrutura base para evitar dependências circulares
-const PATHS = require('../fs/paths');
-const { safeReadJSON } = require('../fs/fs_core');
-const { isProcessAlive } = require('./process_guard');
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import * as PATHS from '../fs/paths.js';
+import { safeReadJSON } from '../fs/fs_core.js';
+import { isProcessAlive } from './process_guard.js';
 
 const RUN_LOCK_PREFIX = 'RUNNING_';
 const MAX_ORPHAN_RECOVERY_ATTEMPTS = 3;
@@ -113,7 +102,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
                 });
 
                 // [FASE 3] Verifica se somos únicos no recovery
-                const lockDir = require('path').dirname(lockFile);
+                const lockDir = path.dirname(lockFile);
                 const files = await fs.readdir(lockDir);
                 const recoveryFiles = files.filter(f => f.includes('.recovery.'));
 
@@ -177,4 +166,4 @@ async function releaseLock(target = 'global', taskId = null) {
     }
 }
 
-module.exports = { acquireLock, releaseLock };
+export { acquireLock, releaseLock };

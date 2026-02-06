@@ -34,7 +34,7 @@ export default [
         ],
         languageOptions: {
             ecmaVersion: 'latest',
-            sourceType: 'commonjs',
+            sourceType: 'module',
             globals: {
                 ...globals.node
             }
@@ -74,7 +74,7 @@ export default [
         ],
         languageOptions: {
             ecmaVersion: 'latest',
-            sourceType: 'commonjs',
+            sourceType: 'module',
             globals: {
                 ...globals.node
             }
@@ -104,7 +104,7 @@ export default [
     // 3. Browser context (Puppeteer / page.evaluate)
     // ======================================================
     {
-        files: ['src/driver/**/*.js', 'src/driver/modules/**/*.js', 'src/driver/targets/**/*.js'],
+        files: ['src/driver/**/*.js', 'src/shared/page_stability/**/*.js', 'src/shared/biomechanics/**/*.js', 'src/shared/sadi/**/*.js', 'src/infra/browser_pool/**/*.js', 'test-proxy-final.js'],
         ignores: ['node_modules/**', 'dist/**', 'coverage/**', 'backups/**', 'old/**', 'src/dashboard-ui/**'],
         languageOptions: {
             globals: {
@@ -158,7 +158,7 @@ export default [
         ignores: ['node_modules/**', 'backups/**', 'old/**'],
         languageOptions: {
             ecmaVersion: 'latest',
-            sourceType: 'commonjs',
+            sourceType: 'module',
             globals: {
                 ...globals.node
             }

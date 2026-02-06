@@ -1,10 +1,5 @@
-/**
- * Tests: DNA System V2.0
- * Testa evolução automática, backup, rollback e validação do sistema de DNA
- */
-
-const io = require('../src/infra/io');
-const identityManager = require('../src/core/identity_manager');
+import * as io from '#infra/io';
+import identityManager from '#core/identity_manager';
 
 // Test counters
 let passed = 0;
@@ -213,7 +208,7 @@ async function runTests() {
 }
 
 // Run
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     runTests()
         .then(success => {
             process.exit(success ? 0 : 1);
@@ -224,4 +219,4 @@ if (require.main === module) {
         });
 }
 
-module.exports = { runTests };
+export { runTests };

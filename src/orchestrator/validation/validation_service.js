@@ -1,16 +1,6 @@
-/* ==========================================================================
-   src/orchestrator/validation/validation_service.js
-   Audit Level: 100 — Validation Service (Mission Orchestration)
-   Status: PRODUCTION READY
-   Responsabilidade: Serviço central de validação de outputs de LLMs.
-                     Suporta múltiplos validadores: regex, schema, length, llm_judge.
-
-   NERV Integration: Emite eventos de validação via NERV bus.
-========================================================================== */
-
-const logger = require('@core/logger');
-const { ActionCode, ActorRole } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import * as logger from '#core/logger';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 /**
  * ValidationService - Serviço de validação de outputs.
@@ -259,4 +249,4 @@ class ValidationService {
     }
 }
 
-module.exports = { ValidationService };
+export { ValidationService };

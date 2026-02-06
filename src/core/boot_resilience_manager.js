@@ -1,25 +1,7 @@
-/* ==========================================================================
-   src/core/boot_resilience_manager.js
-   Audit Level: 850 — Boot Sequence Resilience & Graceful Degradation
-   Status: V1.0 (2026-01-29)
-
-   Responsabilidade:
-   - Detectar e tratar falhas durante boot sequence
-   - Oferecer opções ao usuário quando subsistemas críticos falharem
-   - Habilitar modo degradado (boot parcial) quando possível
-   - Guiar usuário para corrigir problemas (ex: Chrome não rodando)
-   - Evitar crashes catastróficos com mensagens úteis
-
-   Princípios:
-   - Graceful degradation > Hard failure
-   - User guidance > Cryptic errors
-   - Retry com inteligência > Give up imediato
-   - Boot parcial > No boot
-========================================================================== */
-
-const { log } = require('./logger');
-const { execSync } = require('child_process');
-const http = require('http');
+import { log } from './logger.js';
+import { execSync } from 'node:child_process';
+import http from 'node:http';
+import CONFIG from './config.js';
 
 /**
  * Resultado canônico de decisões de boot relacionadas ao Browser Pool.
@@ -46,7 +28,6 @@ const http = require('http');
  * @returns {string} URL do endpoint (ex: 'http://localhost:9224')
  */
 function resolveChromeEndpoint() {
-    const CONFIG = require('./config');
     return CONFIG.BROWSER_ENDPOINT.url;
 }
 
@@ -61,7 +42,6 @@ function resolveChromeEndpoint() {
  * @returns {{url: string, wsEndpoint?: string}}
  */
 function getBrowserEndpoint() {
-    const CONFIG = require('./config');
     return CONFIG.BROWSER_ENDPOINT;
 }
 
@@ -101,7 +81,7 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
  * @returns {Promise<Object>} BrowserPoolManager inicializado
  */
 async function createBrowserPool(config, nerv = null) {
-    const BrowserPoolManager = require('../infra/browser_pool/pool_manager');
+    const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
     const pool = new BrowserPoolManager(config);
 
     // ✅ Injeta NERV no Circuit Breaker
@@ -133,7 +113,7 @@ async function tryStartChrome() {
         log('INFO', '[RESILIENCE] Tentando iniciar Chrome automaticamente...');
 
         // Verifica se script existe
-        const fs = require('fs');
+        const fs = await import('node:fs').then(m => m.default ?? m);
         const scriptPath = './scripts/start-chrome.sh';
 
         if (!fs.existsSync(scriptPath)) {
@@ -174,11 +154,10 @@ async function tryStartChrome() {
  * @returns {string[]}
  */
 function getChromeInstructions(errorMessage) {
-    const cfg = require('./config');
-    const chromePort = cfg.CHROME_PORT;
-    const proxyEnabled = cfg.CHROME_PROXY_ENABLED;
-    const proxyPort = cfg.CHROME_PROXY_PORT;
-    const proxyHost = cfg.CHROME_PROXY_HOST;
+    const chromePort = CONFIG.CHROME_PORT;
+    const proxyEnabled = CONFIG.CHROME_PROXY_ENABLED;
+    const proxyPort = CONFIG.CHROME_PROXY_PORT;
+    const proxyHost = CONFIG.CHROME_PROXY_HOST;
 
     const lines = [
         '',
@@ -199,7 +178,7 @@ function getChromeInstructions(errorMessage) {
             '  Terminal 1 - Inicie o Chrome:',
             '    Windows:',
             '      scripts\\start-chrome.bat',
-            '    Linux/WSL:'
+            '    Linux/WSL:',
             '      bash scripts/start-chrome.sh',
             '',
             '  Terminal 2 - Inicie o Chrome Proxy Service:',
@@ -221,7 +200,7 @@ function getChromeInstructions(errorMessage) {
             '  Windows:',
             '    scripts\\start-chrome.bat',
             '',
-            '  Linux/WSL:'
+            '  Linux/WSL:',
             '    bash scripts/start-chrome.sh',
             '',
             'OU manualmente:',
@@ -276,7 +255,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                 if (chromeStarted) {
                     // Chrome iniciado! Tenta reconectar Browser Pool usando createBrowserPool
                     try {
-                        const CONFIG = require('./config');
+                        const CONFIG = await import('./config.js').then(m => m.default ?? m);
 
                         const browserPool = await createBrowserPool({
                             poolSize: process.env.BROWSER_POOL_SIZE || CONFIG.BROWSER_POOL_SIZE || 3,
@@ -336,7 +315,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
         }
 
         // Lê escolha do usuário (com timeout de 60s)
-        const readline = require('readline');
+        const readline = await import('node:readline').then(m => m.default ?? m);
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
@@ -362,7 +341,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                 log('INFO', '[RESILIENCE] Tentando reconectar...');
 
                 try {
-                    const CONFIG = require('./config');
+                    const CONFIG = await import('./config.js').then(m => m.default ?? m);
 
                     const browserPool = await createBrowserPool({
                         poolSize: process.env.BROWSER_POOL_SIZE || CONFIG.BROWSER_POOL_SIZE || 3,
@@ -421,7 +400,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
  */
 async function initializeBrowserPoolResilient(config, options = {}) {
     const { nerv = null, ...resilienceOptions } = options;
-    const BrowserPoolManager = require('../infra/browser_pool/pool_manager');
+    const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
 
     try {
         const browserPool = new BrowserPoolManager(config);
@@ -453,12 +432,4 @@ async function initializeBrowserPoolResilient(config, options = {}) {
     }
 }
 
-module.exports = {
-    checkChromeHealth,
-    tryStartChrome,
-    getChromeInstructions,
-    handleBrowserPoolFailure,
-    initializeBrowserPoolResilient,
-    resolveChromeEndpoint,
-    getBrowserEndpoint
-};
+export { checkChromeHealth, tryStartChrome, getChromeInstructions, handleBrowserPoolFailure, initializeBrowserPoolResilient, resolveChromeEndpoint, getBrowserEndpoint };

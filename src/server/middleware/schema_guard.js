@@ -1,13 +1,4 @@
-/* ==========================================================================
-   src/server/middleware/schema_guard.js
-   Audit Level: 600 — API Integrity Guard (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Validar payloads de entrada contra Schemas Zod, garantindo
-                     a integridade dos dados antes do processamento lógico.
-   Sincronizado com: core/schemas V100, logger.js V40, request_id.js V600.
-========================================================================== */
-
-const { log, audit } = require('@core/logger');
+import { log, audit } from '#core/logger';
 
 /**
  * Factory de Validação: Cria um middleware Express para um Schema específico.
@@ -76,4 +67,4 @@ const schemaGuard = schema => (req, res, next) => {
     next();
 };
 
-module.exports = schemaGuard;
+export default schemaGuard;

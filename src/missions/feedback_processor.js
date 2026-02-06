@@ -1,17 +1,4 @@
-/* ==========================================================================
-   src/missions/feedback_processor.js
-   Audit Level: 100 — Feedback Processing Engine (V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Processar feedback textual, extrair patterns, injetar em steps.
-
-   Funcionalidades:
-   - Processar e categorizar feedback do usuário
-   - Extrair action items e patterns reutilizáveis
-   - Integração com MemoryStore via ContextManager
-   - Injeção inteligente de feedback em prompts
-========================================================================== */
-
-const logger = require('@core/logger');
+import * as logger from '#core/logger';
 
 /**
  * Categorias de feedback reconhecidas pelo sistema.
@@ -366,8 +353,4 @@ class FeedbackProcessor {
     }
 }
 
-module.exports = {
-    FeedbackProcessor,
-    FEEDBACK_CATEGORY,
-    INJECTION_FORMAT
-};
+export { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT };

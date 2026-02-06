@@ -1,31 +1,9 @@
-#!/usr/bin/env node
-/**
- * Audit Tool: Temporary Scripts Analyzer
- *
- * Purpose: Scans /tmp/ directory for JavaScript files and classifies them by utility
- *
- * Categories:
- * - IMMEDIATE: One-time use, already fulfilled purpose (can be deleted)
- * - REUSABLE: General-purpose tools with long-term value (should be in scripts/)
- * - DEV_TOOL: Development/debugging utilities (should be in scripts/ or tools/)
- * - SYSTEM: VSCode/system files (ignore)
- *
- * Usage:
- *   node scripts/audit-tmp-scripts.js
- *   node scripts/audit-tmp-scripts.js --auto-cleanup  # Move useful scripts automatically
- *
- * Output:
- *   - Lists all scripts with classification
- *   - Recommends actions (keep/move/delete)
- *   - Optionally executes recommendations
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync: _execSync } = require('child_process');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
+import { execSync as _execSync } from 'node:child_process';
 
 const TMP_DIR = '/tmp';
-const _SCRIPTS_DIR = path.join(__dirname);
+const _SCRIPTS_DIR = path.join(import.meta.dirname);
 const AUTO_CLEANUP = process.argv.includes('--auto-cleanup');
 
 // Classification rules based on filename and content patterns
@@ -208,7 +186,7 @@ function executeRecommendations(toMove, toDelete) {
         console.log('\n♻️  MOVING REUSABLE SCRIPTS:\n');
         toMove.forEach(({ filename, classification }) => {
             const source = path.join(TMP_DIR, filename);
-            const target = path.join(__dirname, '..', classification.target);
+            const target = path.join(import.meta.dirname, '..', classification.target);
 
             try {
                 fs.copyFileSync(source, target);
@@ -238,8 +216,8 @@ function executeRecommendations(toMove, toDelete) {
 }
 
 // Execute
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     auditTmpScripts();
 }
 
-module.exports = { auditTmpScripts, classifyScript };
+export { auditTmpScripts, classifyScript };

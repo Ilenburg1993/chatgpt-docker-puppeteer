@@ -56,4 +56,4 @@ function smartTruncate(text, limit = 2000) {
     return `${sub.slice(0, safeCut).trim()}\n\n[... CONTEÚDO RESUMIDO POR SEGURANÇA ...]`;
 }
 
-module.exports = { smartTruncate };
+export { smartTruncate };

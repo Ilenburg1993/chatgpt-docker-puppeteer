@@ -1,22 +1,8 @@
-/* ==========================================================================
-   src/infra/storage/response_adapter.js
-   Response Adapter - V1 ↔ V2 Compatibility Layer
-
-   Responsabilidade:
-   - Detectar formato de response (string V1 vs object V2)
-   - Adaptar response V1 → V2 (backward compatibility)
-   - Salvar response no formato correto
-   - Preencher task.result com campos apropriados
-
-   Histórico:
-   - 2026-02-04: Criado (Response Capture V2.0)
-========================================================================== */
-
-const { saveResponseV2, loadResponseV2 } = require('./response_store_v2');
-const logger = require('@core/logger');
-const fs = require('fs').promises;
-const path = require('path');
-const { ROOT } = require('@infra/fs/paths');
+import { saveResponseV2, loadResponseV2 } from './response_store_v2.js';
+import * as logger from '#core/logger';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { ROOT } from '#infra/fs/paths';
 
 const RESPONSE_DIR = path.join(ROOT, 'respostas');
 
@@ -201,7 +187,7 @@ async function loadResponse(taskId, format) {
                 }
 
                 return text;
-            } catch (_error) {
+            } catch (_) {
                 logger.warn('[RESPONSE_ADAPTER] Response não encontrada (V1 e V2)', {
                     taskId,
                     format,
@@ -230,9 +216,4 @@ function escapeHtml(text) {
         .replace(/'/g, '&#039;');
 }
 
-module.exports = {
-    saveResponse,
-    loadResponse,
-    isResponseV2,
-    convertV1toV2,
-};
+export { saveResponse, loadResponse, isResponseV2, convertV1toV2 };

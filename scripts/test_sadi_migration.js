@@ -1,28 +1,25 @@
-#!/usr/bin/env node
-require('module-alias/register');
-
-console.log('Testing SADI migration...\n');
+#!/usr/bin/env nodeconsole.log('Testing SADI migration...\n');
 
 try {
     // Test 1: SADI module loads
     console.log('1. Loading SADI analyzer...');
-    const analyzer = require('@shared/sadi/analyzer');
+    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
     console.log('   ✅ SADI module loaded');
     console.log('   Exports:', Object.keys(analyzer).join(', '));
 
     // Test 2: prerequisite_validator loads
     console.log('\n2. Loading prerequisite_validator...');
-    const validator = require('@core/validators/prerequisite_validator');
+    const validator = await import('#core/validators/prerequisite_validator').then(m => m.default ?? m);
     console.log('   ✅ prerequisite_validator loaded');
 
     // Test 3: input_resolver loads
     console.log('\n3. Loading input_resolver...');
-    const input = require('@driver/modules/input_resolver');
+    const input = await import('#driver/modules/input_resolver').then(m => m.default ?? m);
     console.log('   ✅ input_resolver loaded');
 
     // Test 4: biomechanics_engine loads
     console.log('\n4. Loading biomechanics_engine...');
-    const bio = require('@driver/modules/biomechanics_engine');
+    const bio = await import('#driver/modules/biomechanics_engine').then(m => m.default ?? m);
     console.log('   ✅ biomechanics_engine loaded');
 
     console.log('\n✅ SUCCESS: All modules load correctly after SADI migration!');

@@ -1,16 +1,7 @@
-/* ==========================================================================
-   src/server/watchers/log_watcher.js
-   Audit Level: 600 — Log Integrity Watcher (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Monitorar a saúde física e a existência do log operacional.
-                     Garante a re-anexação do watcher em eventos de rotação.
-   Sincronizado com: logger.js V40, log_tail.js V600, lifecycle.js V600.
-========================================================================== */
-
-const fs = require('fs');
-const fsp = require('fs').promises;
-const path = require('path');
-const { LOG_DIR, log } = require('@core/logger');
+import fs from 'node:fs';
+import { promises as fsp } from 'node:fs';
+import path from 'node:path';
+import { LOG_DIR, log } from '#core/logger';
 
 /**
  * Caminho absoluto do alvo de vigilância.
@@ -114,7 +105,4 @@ function stop() {
     }
 }
 
-module.exports = {
-    init,
-    stop
-};
+export { init, stop };

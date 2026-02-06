@@ -1,26 +1,6 @@
-/* ==========================================================================
-   src/missions/mission_state_manager.js
-   Audit Level: 100 — Mission State Manager (V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Gerenciar persistência de missões no filesystem.
-                     CRUD operations para state.json, outputs/, checkpoints/.
-
-   Estrutura de Diretórios:
-   missions/
-   ├── mission-001/
-   │   ├── state.json          # Metadata + workflow + progress
-   │   ├── outputs/            # Outputs de cada step
-   │   │   ├── step-1-outline.txt
-   │   │   └── step-2-chapter-1.txt
-   │   ├── checkpoints/        # Checkpoints para recovery
-   │   │   └── checkpoint-latest.json
-   │   └── logs/               # Logs específicos da missão
-   │       └── execution.log
-========================================================================== */
-
-const fs = require('fs/promises');
-const path = require('path');
-const logger = require('@core/logger');
+import fs from 'fs/promises';
+import path from 'node:path';
+import * as logger from '#core/logger';
 
 /**
  * Status válidos para missões.
@@ -374,7 +354,4 @@ class MissionStateManager {
     }
 }
 
-module.exports = {
-    MissionStateManager,
-    MISSION_STATUS
-};
+export { MissionStateManager, MISSION_STATUS };

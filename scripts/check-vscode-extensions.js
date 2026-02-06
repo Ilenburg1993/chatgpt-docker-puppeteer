@@ -1,11 +1,5 @@
-#!/usr/bin/env node
-/**
- * VS Code Extensions Checker
- * Verifica status das extensões recomendadas vs instaladas
- */
-
-const fs = require('fs');
-const { execSync } = require('child_process');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import { execSync } from 'node:child_process';
 
 // Remove comentários do JSONC
 function parseJSONC(content) {

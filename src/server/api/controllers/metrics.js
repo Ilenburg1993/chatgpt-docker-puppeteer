@@ -1,10 +1,4 @@
-/* ==========================================================================
-   src/server/api/controllers/metrics.js
-   Metrics Controller - Endpoints de métricas do sistema
-   Status: STUB (Implementação mínima funcional)
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * GET /api/metrics - Métricas gerais do sistema
@@ -44,7 +38,4 @@ async function getTaskMetrics(req, res) {
     }
 }
 
-module.exports = {
-    getMetrics,
-    getTaskMetrics
-};
+export { getMetrics, getTaskMetrics };

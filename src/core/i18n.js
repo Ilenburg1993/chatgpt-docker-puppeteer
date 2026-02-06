@@ -1,16 +1,9 @@
-/* ==========================================================================
-   src/core/i18n.js
-   Audit Level: 32 — Universal Linguistic Core (NASA Standard)
-   Responsabilidade: Gestão de vocabulário dinâmico, tradução e auto-aprendizado.
-   Garantias: Escrita Atômica, Fallback Hierárquico, Normalização de Locale.
-========================================================================== */
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { log } from './logger.js';
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { log } = require('./logger');
-
-const ROOT = path.resolve(__dirname, '../../');
+const ROOT = path.resolve(import.meta.dirname, '../../');
 const VOCAB_FILE = path.join(ROOT, 'vocabulary.json');
 
 // --- DICIONÁRIO SEMENTE (IMUTÁVEL NO CÓDIGO) ---
@@ -197,4 +190,4 @@ async function learnTerm(langCode, category, term) {
     }
 }
 
-module.exports = { getTerms, learnTerm };
+export { getTerms, learnTerm };

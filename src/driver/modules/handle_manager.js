@@ -1,24 +1,5 @@
-/* ==========================================================================
-   src/driver/modules/handle_manager.js v2.0
-   Audit Level: 100 — Handle Lifecycle Management
-   Status: v2.0 PRODUCTION (EventEmitter + Full Observability)
-   Responsabilidade: Gestão de handles do Puppeteer com cleanup automático.
-
-   v2.0 Features:
-   - EventEmitter inheritance (duplo canal: local + log)
-   - HANDLE_CONFIG (3 keys, zero magic numbers)
-   - HANDLE_EVENTS (5 eventos locais)
-   - Validação completa de handles (tipo + dispose method)
-   - Timeout protection (clearAll + dispose individual)
-   - Metrics expandidos (7 métricas + timing)
-   - clearOne() method (cleanup seletivo)
-   - getStats() method (introspection completa)
-   - JSDoc 100% completo
-   - Module exports completo (class + config + factory)
-========================================================================== */
-
-const EventEmitter = require('events');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import { log } from '#core/logger';
 
 /* ==========================================================================
    HANDLE_CONFIG - Configurações centralizadas (zero magic numbers)
@@ -289,7 +270,6 @@ class HandleManager extends EventEmitter {
 
         let cleanedCount = 0;
         let errorsCount = 0;
-        let timeoutOccurred = false;
 
         try {
             // Cleanup com suporte a abort
@@ -358,7 +338,6 @@ class HandleManager extends EventEmitter {
         } catch (_abortErr) {
             // ✅ Timeout atingido: cleanup interrompido
             clearTimeout(timeoutId);
-            timeoutOccurred = true;
 
             const remaining = this.activeHandles.length;
             const duration = Date.now() - startTime;
@@ -533,20 +512,8 @@ class HandleManager extends EventEmitter {
     }
 }
 
-/* ==========================================================================
-   Module Exports - Class + Config + Factory
-========================================================================== */
-
-module.exports = {
-    // ✅ Class export
-    HandleManager,
-
-    // ✅ Constants export (para testes e configuração externa)
-    HANDLE_CONFIG,
-    HANDLE_EVENTS,
-
-    // ✅ Factory function (alternative constructor)
-    create: (driver) => {
-        return new HandleManager(driver);
-    }
+export const create = (driver) => {
+    return new HandleManager(driver);
 };
+
+export { HandleManager, HANDLE_CONFIG, HANDLE_EVENTS };

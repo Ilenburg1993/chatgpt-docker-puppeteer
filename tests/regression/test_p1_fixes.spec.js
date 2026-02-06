@@ -1,18 +1,8 @@
-/* ==========================================================================
-   tests/test_p1_fixes.js
-   Testes para Correções P1 (Critical Cases Analysis)
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
+import { acquireLock, releaseLock } from '#infra/locks/lock_manager';
 
-   Valida:
-   1. Lock Manager - Two-Phase Commit (atomicidade)
-   2. BrowserPool - Promise Memoization (init race)
-   3. IPC Client - ACK Resilience (documentado)
-========================================================================== */
-
-const path = require('path');
-const fs = require('fs').promises;
-const { acquireLock, releaseLock } = require('../../src/infra/locks/lock_manager');
-
-const ROOT = path.resolve(__dirname, '../..');
+const ROOT = path.resolve(import.meta.dirname, '../..');
 const LOCK_DIR = ROOT;
 
 // ============================================================================
@@ -379,18 +369,11 @@ async function runAllTests() {
 }
 
 // Executa se chamado diretamente
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     runAllTests().catch(error => {
         console.error('💥 Erro fatal na suite de testes:', error);
         process.exit(1);
     });
 }
 
-module.exports = {
-    testLockTwoPhaseCommit,
-    testLockConcurrency,
-    testLockNoTempOrphans,
-    testBrowserPoolMemoization,
-    testIntegrationValidation,
-    runAllTests
-};
+export { testLockTwoPhaseCommit, testLockConcurrency, testLockNoTempOrphans, testBrowserPoolMemoization, testIntegrationValidation, runAllTests };

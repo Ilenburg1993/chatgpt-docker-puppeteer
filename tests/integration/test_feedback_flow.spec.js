@@ -1,23 +1,10 @@
-/* ==========================================================================
-   tests/integration/test_feedback_flow.spec.js
-   Integration Test: Feedback Flow End-to-End
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Testa feedback flow: MissionManager → FeedbackProcessor → MemoryStore
-     - Valida processamento, categorização e armazenamento
-     - Verifica injeção em task prompts
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, before, after, beforeEach } = require('node:test');
-const { MissionManager, MISSION_STATUS } = require('../../src/missions/mission_manager');
-const { FeedbackProcessor } = require('../../src/missions/feedback_processor');
-const { ContextManager } = require('../../src/orchestrator/context_manager');
-const path = require('path');
-const fs = require('fs/promises');
+import assert from 'node:assert';
+import { describe, it, before, after, beforeEach } from 'node:test';
+import { MissionManager, MISSION_STATUS } from '#missions/mission_manager';
+import { FeedbackProcessor } from '#missions/feedback_processor';
+import { ContextManager } from '#orchestrator/context_manager';
+import path from 'node:path';
+import fs from 'fs/promises';
 
 describe('Feedback Flow Integration Tests', () => {
     let missionManager;
@@ -40,7 +27,7 @@ describe('Feedback Flow Integration Tests', () => {
     };
 
     before(async () => {
-        testMissionsDir = path.join(__dirname, '../../missions-test-feedback');
+        testMissionsDir = path.join(import.meta.dirname, '../../missions-test-feedback');
         await fs.mkdir(testMissionsDir, { recursive: true });
 
         contextManager = new ContextManager();

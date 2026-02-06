@@ -180,7 +180,7 @@
     "editor.defaultFormatter": "vscode.json-language-features"
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-containers"
@@ -415,4 +415,20 @@
 "[vue]": {
     "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
 },
+"claudeCode.allowDangerouslySkipPermissions": true,
+"workbench.editor.alwaysShowEditorActions": true,
+"workbench.editor.closeOnFileDelete": true,
+"workbench.editor.enablePreviewFromCodeNavigation": true,
+"workbench.editor.enablePreviewFromQuickOpen": true,
+"chat.agentSessionProjection.enabled": true,
+"chat.editMode.hidden": false,
+"chat.editing.explainChanges.enabled": true,
+"chat.editor.wordWrap": "on",
+"chat.experimental.useSkillAdherencePrompt": true,
+"chat.includeReferencedInstructions": true,
+"chat.mcp.assisted.nuget.enabled": true,
+"chat.tips.enabled": true,
+"chat.tools.terminal.sandbox.enabled": true,
+"terminal.integrated.shellIntegration.environmentReporting": true,
+"windowsaistudio.enableRemoteFine-tuningAndInference": true,
 }

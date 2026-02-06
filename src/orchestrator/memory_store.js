@@ -1,16 +1,4 @@
-/* ==========================================================================
-   src/orchestrator/memory_store.js
-   Memory Store - Armazenamento de Patterns Aprendidos
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Armazenar patterns aprendidos de missões anteriores
-     - Buscar patterns relevantes baseado em query
-     - Gerenciar cache LRU (Least Recently Used)
-     - Fornecer estatísticas de uso
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Tipos de patterns suportados
@@ -259,5 +247,5 @@ class MemoryStore {
     }
 }
 
-module.exports = MemoryStore;
-module.exports.PATTERN_TYPE = PATTERN_TYPE;
+export default MemoryStore;
+export { PATTERN_TYPE };

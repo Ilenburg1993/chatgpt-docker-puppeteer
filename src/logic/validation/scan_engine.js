@@ -1,20 +1,10 @@
-/* ==========================================================================
-   src/logic/validation/scan_engine.js
-   Audit Level: 100 — Industrial Hardening (Async Stream Engine - Platinum)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar a leitura eficiente do arquivo e a aplicação
-                     simultânea de múltiplas regras de auditoria em um único passo.
-   Sincronizado com: format_rules.js (V1.1), physical_rules.js (V1.0),
-                     semantic_rules.js (V1.1), fs_utils.js (V2.5).
-========================================================================== */
-
-const fs = require('fs');
-const fsp = require('fs').promises;
-const readline = require('readline');
-const { MAX_JSON_SIZE } = require('@infra/fs/fs_utils');
-const { checkPhysicalIntegrity } = require('./rules/physical_rules');
-const { evaluateLine, compileForbiddenList } = require('./rules/semantic_rules');
-const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/format_rules');
+import fs from 'node:fs';
+import { promises as fsp } from 'node:fs';
+import readline from 'node:readline';
+import { MAX_JSON_SIZE } from '#infra/fs/fs_utils';
+import { checkPhysicalIntegrity } from './rules/physical_rules.js';
+import { evaluateLine, compileForbiddenList } from './rules/semantic_rules.js';
+import { validateJSON, validateRegex, validateMarkdownCode } from './rules/format_rules.js';
 
 /**
  * Executa a auditoria completa em uma única passagem de leitura.
@@ -25,7 +15,7 @@ const { validateJSON, validateRegex, validateMarkdownCode } = require('./rules/f
  * @param {AbortSignal} signal - Sinal para interrupção imediata.
  * @returns {Promise<object>} { ok: boolean, reason: string|null }
  */
- 
+
 async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = null) {
     let fileStream = null;
 
@@ -132,4 +122,4 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
     }
 }
 
-module.exports = { runSinglePassValidation };
+export { runSinglePassValidation };

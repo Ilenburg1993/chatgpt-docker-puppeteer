@@ -1,31 +1,4 @@
-/**
- * @fileoverview PageValidator - Page Health Validation System
- *
- * RESPONSABILIDADE:
- * - Validar health de páginas ANTES de allocation para drivers
- * - Detectar páginas crashed, disconnected, ou em estado inválido
- * - Validar target URL (domain) para prevenir alocação incorreta
- * - Verificar DOM readiness para garantir página pronta para uso
- *
- * INTEGRAÇÃO:
- * - Usado por: BrowserPoolManager.allocate() (pré-allocation check)
- * - Previne: Driver receber páginas corrompidas/crashed
- * - Impact: Elimina 100% de page corruption na allocation
- *
- * VALIDATION CHECKS:
- * 1. Page alive (não null, não closed)
- * 2. Page connected (evaluate test)
- * 3. Target URL validation (domain match)
- * 4. DOM readiness (document.readyState)
- *
- * @version 1.0.0
- * @since 2026-02-03
- */
-
-/* eslint-disable no-undef */
-// ^ Desabilita: 'document' usado em page.evaluate()
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Severity levels para validation issues.
@@ -225,7 +198,7 @@ class PageValidator {
         try {
             await page.evaluate(() => 1 + 1);
             return true;
-        } catch (err) {
+        } catch (_) {
             return false;
         }
     }
@@ -241,9 +214,4 @@ class PageValidator {
     }
 }
 
-module.exports = {
-    PageValidator,
-    SEVERITY,
-    ISSUE_TYPES,
-    EXPECTED_DOMAINS,
-};
+export { PageValidator, SEVERITY, ISSUE_TYPES, EXPECTED_DOMAINS };

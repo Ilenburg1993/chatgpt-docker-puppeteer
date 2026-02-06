@@ -1,7 +1,5 @@
-// ^ Exports usados externamente
-
-const EventEmitter = require('events');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import { log } from '#core/logger';
 
 /**
  * @fileoverview PeriodicHealthMonitor - CDP-based browser health monitoring
@@ -613,12 +611,8 @@ class PeriodicHealthMonitor extends EventEmitter {
     }
 }
 
-/* ==========================================================================
-   EXPORTS
-========================================================================== */
-
-module.exports = PeriodicHealthMonitor;
-module.exports.HEALTH_STATUS = HEALTH_STATUS;
-module.exports.CHECK_TYPES = CHECK_TYPES;
-module.exports.MONITOR_EVENTS = MONITOR_EVENTS;
-module.exports.MONITOR_CONFIG = MONITOR_CONFIG;
+export default PeriodicHealthMonitor;
+export { HEALTH_STATUS };
+export { CHECK_TYPES };
+export { MONITOR_EVENTS };
+export { MONITOR_CONFIG };

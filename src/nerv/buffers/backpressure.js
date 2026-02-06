@@ -72,4 +72,4 @@ function createBackpressure({ telemetry }) {
     });
 }
 
-module.exports = createBackpressure;
+export default createBackpressure;

@@ -1,16 +1,10 @@
-/**
- * Global Test Teardown
- * Executa após todos os testes
- * @audit-level 50 - Test infrastructure
- */
-
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Diretórios temporários para limpar
  */
-const TMP_DIRS = [path.join(__dirname, 'tmp')];
+const TMP_DIRS = [path.join(import.meta.dirname, 'tmp')];
 
 /**
  * Cleanup principal
@@ -58,4 +52,4 @@ teardown().catch(error => {
     process.exit(1);
 });
 
-module.exports = { teardown, TMP_DIRS };
+export { teardown, TMP_DIRS };

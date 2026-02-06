@@ -1,22 +1,13 @@
-/* ==========================================================================
-   src/core/context/engine/context_engine.js
-   Audit Level: 100 — Ultimate Diamond (Cognitive Orchestrator)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestração da resolução de contexto, gestão de recursão
-                     e aplicação de transformadores semânticos.
-   Sincronizado com: io.js (V36), ref_parser.js (V1.0), budget_manager.js (V1.0).
-========================================================================== */
-
-const io = require('@infra/io');
-const { parseReferences } = require('../parsing/ref_parser');
-const { assertSafetyDepth } = require('../limits/guardrails');
-const { BudgetManager } = require('../limits/budget_manager');
-const { extractJsonByStack } = require('../extractors/json_logic');
-const { extractCodeBlocks } = require('../extractors/code_logic');
-const { smartTruncate } = require('../transformers/summary');
-const { extractTaskMetadata } = require('../transformers/metadata');
-const identity = require('../transformers/identity');
-const { log } = require('../../logger');
+import * as io from '#infra/io';
+import { parseReferences } from '../parsing/ref_parser.js';
+import { assertSafetyDepth } from '../limits/guardrails.js';
+import { BudgetManager } from '../limits/budget_manager.js';
+import { extractJsonByStack } from '../extractors/json_logic.js';
+import { extractCodeBlocks } from '../extractors/code_logic.js';
+import { smartTruncate } from '../transformers/summary.js';
+import { extractTaskMetadata } from '../transformers/metadata.js';
+import identity from '../transformers/identity.js';
+import { log } from '../../logger.js';
 
 /**
  * Transform Types: Tipos de transformação de contexto suportados
@@ -64,7 +55,7 @@ async function applyTransform(content, transform, targetTask) {
  * @param {number} depth - Nível atual de recursão.
  * @param {BudgetManager} budget - Gestor de volume de injeção.
  */
- 
+
 async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {
     // 1. GUARDRAILS: Validação de segurança e aborto
     if (signal?.aborted) {
@@ -163,4 +154,4 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
     return resolveContext(resolvedText, currentTask, signal, depth + 1, currentBudget);
 }
 
-module.exports = { resolveContext };
+export { resolveContext };

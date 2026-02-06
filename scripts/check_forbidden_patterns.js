@@ -1,11 +1,7 @@
-#!/usr/bin/env node
-// scripts/check_forbidden_patterns.js
-// Verifica padrões proibidos em `src/` e falha com código != 0 se encontrados.
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'src');
 
 const IGNORED_DIRS = ['node_modules', 'backups', 'tests', 'backups', '.git'];

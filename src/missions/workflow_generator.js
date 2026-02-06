@@ -1,23 +1,11 @@
-/* ==========================================================================
-   src/missions/workflow_generator.js
-   Audit Level: 100 — Workflow Generator (V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Gerar workflows estruturados a partir de templates.
-                     - Carrega templates do diretório templates/
-                     - Valida parâmetros fornecidos
-                     - Expande steps com repeat_for_each
-                     - Substitui placeholders ({{param}})
-                     - Retorna workflow pronto para execução
-========================================================================== */
-
-const fs = require('fs/promises');
-const path = require('path');
-const logger = require('@core/logger');
+import fs from 'fs/promises';
+import path from 'node:path';
+import * as logger from '#core/logger';
 
 /**
  * Diretório de templates.
  */
-const TEMPLATES_DIR = path.join(__dirname, 'templates');
+const TEMPLATES_DIR = path.join(import.meta.dirname, 'templates');
 
 /**
  * WorkflowGenerator - Gera workflows a partir de templates.
@@ -300,6 +288,4 @@ class WorkflowGenerator {
     }
 }
 
-module.exports = {
-    WorkflowGenerator
-};
+export { WorkflowGenerator };

@@ -1,26 +1,12 @@
-/* ==========================================================================
-   tests/integration/test_boot_integration_phase2.spec.js
-   Boot Integration Test - Phase 2 Components
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Validar que boot sequence inicializa componentes Phase 2 corretamente
-     - Validar que ContextManager é compartilhado entre Kernel e MissionManager
-     - Validar que FeedbackProcessor e CheckpointManager são inicializados
-     - Validar que dependências estão injetadas corretamente
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, before } = require('node:test');
-const { MissionManager } = require('../../src/missions/mission_manager');
-const { FeedbackProcessor } = require('../../src/missions/feedback_processor');
-const { CheckpointManager } = require('../../src/orchestrator/checkpoint_manager');
-const { ContextManager } = require('../../src/orchestrator/context_manager');
-const { OrchestratorEngine } = require('../../src/orchestrator/orchestrator_engine');
-const { createKernel } = require('../../src/kernel/kernel');
-const { createNERV } = require('../../src/nerv/nerv');
+import assert from 'node:assert';
+import { describe, it, before } from 'node:test';
+import { MissionManager } from '#missions/mission_manager';
+import { FeedbackProcessor } from '#missions/feedback_processor';
+import { CheckpointManager } from '#orchestrator/checkpoint_manager';
+import { ContextManager } from '#orchestrator/context_manager';
+import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
+import { createKernel } from '#kernel/kernel';
+import { createNERV } from '#nerv/nerv';
 
 describe('Boot Integration - Phase 2 Components', () => {
     let nerv;

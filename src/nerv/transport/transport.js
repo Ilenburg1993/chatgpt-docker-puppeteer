@@ -1,28 +1,6 @@
-/* ==========================================================================
-   src/nerv/transport/transport.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: transport/
-   Arquivo: transport.js
-
-   Papel:
-   - Compor o subsistema de transporte físico do NERV
-   - Conectar framing, conexão e reconexão
-   - Expor interface técnica mínima ao NERV
-
-   IMPORTANTE:
-   - NÃO interpreta frames
-   - NÃO valida envelopes
-   - NÃO decide retry lógico
-   - NÃO garante entrega
-   - NÃO conhece Kernel, Driver ou Server
-   - Atua exclusivamente no plano físico
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const createConnection = require('./connection');
-const createReconnect = require('./reconnect');
-const framing = require('./framing');
+import createConnection from './connection.js';
+import createReconnect from './reconnect.js';
+import * as framing from './framing.js';
 
 /* ===========================
    Fábrica do transporte
@@ -143,4 +121,4 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     });
 }
 
-module.exports = createTransport;
+export default createTransport;

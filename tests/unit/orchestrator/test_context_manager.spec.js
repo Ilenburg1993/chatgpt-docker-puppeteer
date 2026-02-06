@@ -1,19 +1,7 @@
-/* ==========================================================================
-   tests/unit/orchestrator/test_context_manager.spec.js
-   Unit Tests: ContextManager e MemoryStore
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Testar ContextManager (accumulation, chunking, summarization)
-     - Testar MemoryStore (patterns, busca, LRU)
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, beforeEach } = require('node:test');
-const { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY } = require('../../../src/orchestrator/context_manager');
-const MemoryStore = require('../../../src/orchestrator/memory_store');
+import assert from 'node:assert';
+import { describe, it, beforeEach } from 'node:test';
+import { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY } from '#orchestrator/context_manager';
+import MemoryStore from '#orchestrator/memory_store';
 
 describe('ContextManager Unit Tests', () => {
     let contextManager;

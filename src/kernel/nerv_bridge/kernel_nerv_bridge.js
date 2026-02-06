@@ -1,28 +1,5 @@
-/* ==========================================================================
-   src/kernel/nerv_bridge/kernel_nerv_bridge.js
-   Subsistema: KERNEL — Núcleo Soberano de Decisão
-   Módulo: nerv_bridge/
-   Arquivo: kernel_nerv_bridge.js
-
-   Papel:
-   - Integrar o Kernel ao NERV como camada de comunicação IPC
-   - Receber EVENTs do mundo e encaminhá-los ao ObservationStore
-   - Emitir COMMANDs do Kernel via NERV
-   - Traduzir entre semântica do Kernel e estrutura do NERV
-
-   IMPORTANTE:
-   - NÃO decide nada
-   - NÃO interpreta payload dos envelopes
-   - NÃO valida verdade semântica
-   - NÃO fecha causalidade
-   - Atua apenas como ponte estrutural
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-// UUID helper removed (not used in this module)
-const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 /* ===========================
    Utilitários internos
@@ -538,6 +515,4 @@ class KernelNERVBridge {
     }
 }
 
-module.exports = {
-    KernelNERVBridge
-};
+export { KernelNERVBridge };

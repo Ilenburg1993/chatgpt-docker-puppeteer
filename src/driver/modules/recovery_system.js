@@ -1,33 +1,6 @@
-/* ==========================================================================
-   src/driver/modules/recovery_system.js v2.0
-   Audit Level: 500 — Instrumented Recovery Protocol (Deterministic State Repair)
-   Status: v2.0 - EventEmitter + Metrics + Timeout Protection + Retry Logic
-   Responsabilidade: Aplicar manobras de recuperação escalonadas (4 tiers).
-                     Reportar saúde de infra para o Mission Control.
-   Sincronizado com: BaseDriver V320, system.js V45, stabilizer.js V43.
-
-   v2.0 Changes:
-   - EventEmitter class (7 lifecycle events)
-   - RECOVERY_CONFIG (zero magic numbers)
-   - Timeout protection em todas operações (reload, focus, kill)
-   - Retry logic em tier 2 (reload)
-   - Metrics tracking (9 counters + timing)
-   - Validação robusta de driver
-   - Complete JSDoc
-   - getStats() method
-
-   Protocol 11: Zero-Bug Tolerance
-   - Recovery via tentativas escalonadas (4 tiers)
-   - Tier 0: Cache invalidation + tactical delay
-   - Tier 1: Focus recovery (removed bringToFront → prevents Chrome window popup)
-   - Tier 2: Hard page reload + stabilizer (with retry)
-   - Tier 3: Nuclear (surgical process kill with timeout)
-========================================================================== */
-
-const EventEmitter = require('events');
-// const system = require('@infra/system'); // ✅ v3.0: Removed (external browser mode)
-const stabilizer = require('@shared/page_stability/stabilizer');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import { log } from '#core/logger';
 
 /* ==========================================================================
    RECOVERY_CONFIG v2.0 - Zero Magic Numbers
@@ -547,18 +520,5 @@ class RecoverySystem extends EventEmitter {
     }
 }
 
-/* ==========================================================================
-   MODULE EXPORTS v2.0
-========================================================================== */
-
-module.exports = {
-    // ✅ Class export
-    RecoverySystem,
-
-    // ✅ Constantes exportadas
-    RECOVERY_CONFIG,
-    RECOVERY_EVENTS,
-
-    // ✅ Factory function (convenience)
-    create: driver => new RecoverySystem(driver)
-};
+export const create = driver => new RecoverySystem(driver);
+export { RecoverySystem, RECOVERY_CONFIG, RECOVERY_EVENTS };

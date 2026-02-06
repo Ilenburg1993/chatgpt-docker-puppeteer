@@ -201,26 +201,4 @@ const TechnicalCode = Object.freeze({
     HANDSHAKE_FAILED: 'HANDSHAKE_FAILED'
 });
 
-/**
- * --------------------------------------------------------------------------
- * EXPLICIT PROHIBITIONS (DOCUMENTARY, NOT ENUMERABLE)
- * --------------------------------------------------------------------------
- * Não existem no vocabulário do IPC 2.0:
- * - RESPONSE
- * - RESULT
- * - SUCCESS
- * - FAILURE (semântico)
- * - RETURN_VALUE
- * - EXCEPTION (de negócio)
- *
- * A ausência estrutural desses termos é constitucional.
- */
-
-module.exports = Object.freeze({
-    PROTOCOL_VERSION,
-    MessageType,
-    ActionCode,
-    ActorRole,
-    ChannelState,
-    TechnicalCode
-});
+export { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole, ChannelState, TechnicalCode };

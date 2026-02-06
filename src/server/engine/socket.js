@@ -1,19 +1,9 @@
-/* ==========================================================================
-   src/server/engine/socket.js
-   Audit Level: 600 — Sovereign Distribution Hub (IPC 2.0 Singularity)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Singleton do Socket.io. Gerencia o roteamento de Envelopes,
-                     validação de identidade, salas de comando e telemetria.
-   Sincronizado com: shared/nerv/schemas.js (NERV Protocol 2.0),
-                     ipc_client.js V600.
-========================================================================== */
-
-const { Server } = require('socket.io');
-const { v4: uuidv4 } = require('uuid');
-const EventEmitter = require('events');
-const { log } = require('@core/logger');
-const { validateRobotIdentity, validateIPCEnvelope } = require('@shared/nerv/schemas');
-const { PROTOCOL_VERSION, ActorRole } = require('@shared/nerv/constants');
+import { Server } from 'socket.io';
+import { v4 as uuidv4 } from 'uuid';
+import EventEmitter from 'node:events';
+import { log } from '#core/logger';
+import { validateRobotIdentity, validateIPCEnvelope } from '#shared/nerv/schemas';
+import { PROTOCOL_VERSION, ActorRole } from '#shared/nerv/constants';
 
 /**
  * Instância única do barramento (Singleton).
@@ -341,83 +331,67 @@ function broadcastTaskUpdate(taskId, data) {
     }, 50); // 50ms debounce window
 }
 
-module.exports = {
-    init,
-    sendCommand,
-    notify,
-    stop,
-    broadcastTaskUpdate,
-    getRegistry: () => Array.from(agentRegistry.values()),
-    getIO: () => ioInstance,
-    // Expose EventEmitter methods for ServerNERVAdapter
-    on: (...args) => internalEmitter.on(...args),
-    once: (...args) => internalEmitter.once(...args),
-    off: (...args) => internalEmitter.off(...args),
-    emit: (...args) => internalEmitter.emit(...args),
-    /**
-     * Envia evento para cliente específico via Socket.io
-     * @param {string} clientId - ID do socket do cliente
-     * @param {string} eventName - Nome do evento
-     * @param {object} data - Dados a enviar
-     */
-    sendToClient: (clientId, eventName, data) => {
-        if (!ioInstance) {
-            log('WARN', '[HUB] Tentativa de enviar evento sem io instance');
-            return;
-        }
-        const socket = ioInstance.sockets.sockets.get(clientId);
-        if (socket) {
-            socket.emit(eventName, data);
-        } else {
-            log('WARN', `[HUB] Cliente ${clientId} não encontrado para evento ${eventName}`);
-        }
-    },
-    /**
-     * Conecta ao servidor Socket.io externo (modo split PM2).
-     * Em modo split, o agente não cria servidor HTTP - conecta ao dashboard-web.
-     * @param {number} port - Porta do servidor externo (default: 3008)
-     * @returns {object} EventEmitter para comunicação bidirecional
-     */
-    connectExternal: async (port = 3008) => {
-        const { io: ioClient } = require('socket.io-client');
-        const url = `http://localhost:${port}`;
+export const getRegistry = () => Array.from(agentRegistry.values());
+export const getIO = () => ioInstance;
+export const on = (...args) => internalEmitter.on(...args);
+export const once = (...args) => internalEmitter.once(...args);
+export const off = (...args) => internalEmitter.off(...args);
+export const emit = (...args) => internalEmitter.emit(...args);
 
-        log('INFO', `[HUB] Conectando a servidor externo: ${url}`);
-
-        const clientSocket = ioClient(url, {
-            auth: { token: 'SYSTEM_MAESTRO_PRIME' },
-            transports: ['websocket'],
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 5
-        });
-
-        // Aguardar conexão
-        await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Timeout connecting to external server')), 5000);
-            clientSocket.on('connect', () => {
-                clearTimeout(timeout);
-                log('INFO', `[HUB] ✅ Conectado a servidor externo (${url})`);
-                resolve();
-            });
-            clientSocket.on('connect_error', err => {
-                clearTimeout(timeout);
-                reject(err);
-            });
-        });
-
-        // Bridge events do cliente para o internalEmitter
-        clientSocket.onAny((eventName, ...args) => {
-            internalEmitter.emit(eventName, ...args);
-        });
-
-        // Retornar adaptador compatível com interface esperada
-        return {
-            on: (event, handler) => clientSocket.on(event, handler),
-            off: (event, handler) => clientSocket.off(event, handler),
-            emit: (event, data) => clientSocket.emit(event, data),
-            connected: () => clientSocket.connected,
-            disconnect: () => clientSocket.disconnect()
-        };
+export const sendToClient = (clientId, eventName, data) => {
+    if (!ioInstance) {
+        log('WARN', '[HUB] Tentativa de enviar evento sem io instance');
+        return;
+    }
+    const socket = ioInstance.sockets.sockets.get(clientId);
+    if (socket) {
+        socket.emit(eventName, data);
+    } else {
+        log('WARN', `[HUB] Cliente ${clientId} não encontrado para evento ${eventName}`);
     }
 };
+
+export const connectExternal = async (port = 3008) => {
+    const { io: ioClient } = await import('socket.io-client');
+    const url = `http://localhost:${port}`;
+
+    log('INFO', `[HUB] Conectando a servidor externo: ${url}`);
+
+    const clientSocket = ioClient(url, {
+        auth: { token: 'SYSTEM_MAESTRO_PRIME' },
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5
+    });
+
+    // Aguardar conexão
+    await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout connecting to external server')), 5000);
+        clientSocket.on('connect', () => {
+            clearTimeout(timeout);
+            log('INFO', `[HUB] ✅ Conectado a servidor externo (${url})`);
+            resolve();
+        });
+        clientSocket.on('connect_error', err => {
+            clearTimeout(timeout);
+            reject(err);
+        });
+    });
+
+    // Bridge events do cliente para o internalEmitter
+    clientSocket.onAny((eventName, ...args) => {
+        internalEmitter.emit(eventName, ...args);
+    });
+
+    // Retornar adaptador compatível com interface esperada
+    return {
+        on: (event, handler) => clientSocket.on(event, handler),
+        off: (event, handler) => clientSocket.off(event, handler),
+        emit: (event, data) => clientSocket.emit(event, data),
+        connected: () => clientSocket.connected,
+        disconnect: () => clientSocket.disconnect()
+    };
+};
+
+export { init, sendCommand, notify, stop, broadcastTaskUpdate };

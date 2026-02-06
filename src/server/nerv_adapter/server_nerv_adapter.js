@@ -1,47 +1,6 @@
-/* ==========================================================================
-   src/server/nerv_adapter/server_nerv_adapter.js
-   SUBSISTEMA: SERVER — NERV ADAPTER (HARDENED BUILD)
-   Audit Level: 900 — Critical Decoupling Boundary (Hardened)
-
-   --------------------------------------------------------------------------
-   PAPEL ARQUITETURAL
-   --------------------------------------------------------------------------
-   Camada de adaptação entre:
-     • NERV (IPC / Event Bus soberano)
-     • Socket Hub (Dashboard / Clients)
-
-   Este módulo é uma Anti-Corruption Layer:
-     ✔ traduz dashboard → ActionCodes NERV
-     ✔ traduz eventos NERV → eventos Socket
-     ✔ aplica filtros de visibilidade
-     ✔ não contém lógica de negócio
-     ✔ não conhece Kernel ou Driver
-     ✔ não executa decisões — apenas roteia
-
-   --------------------------------------------------------------------------
-   INVARIANTES (NÃO NEGOCIÁVEIS)
-   --------------------------------------------------------------------------
-     ✔ Comunicação inter-subsistemas = NERV apenas
-     ✔ Nenhum import de Kernel ou Driver
-     ✔ Nenhum acesso direto a filesystem
-     ✔ Nenhum spawn de processo
-     ✔ Nenhuma decisão de domínio
-     ✔ Broadcast apenas de EVENT (não COMMAND)
-
-   --------------------------------------------------------------------------
-   HARDENING INCLUÍDO
-   --------------------------------------------------------------------------
-     ✔ Validação de interface do socketHub
-     ✔ Registro explícito de handlers → cleanup no shutdown
-     ✔ Guard contra shutdown concorrente
-     ✔ Stats consistentes (incremento pós-sucesso)
-     ✔ Filtro de eventos sensíveis
-     ✔ Gancho para validação de payload (schema-ready)
-========================================================================== */
-
-const { log } = require('@core/logger');
-const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import { log } from '#core/logger';
+import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 /* ==========================================================================
    CONSTANTES DE SEGURANÇA
@@ -379,4 +338,4 @@ class ServerNERVAdapter {
     }
 }
 
-module.exports = ServerNERVAdapter;
+export default ServerNERVAdapter;

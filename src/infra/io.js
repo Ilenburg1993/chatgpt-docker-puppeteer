@@ -1,250 +1,111 @@
-/* ==========================================================================
-   src/infra/io.js — UNIFIED FACADE (V730 — Singularity Edition)
-   Audit Level: 730 — Hardened Unified I/O (Zero-Bug Tolerance)
-   Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade: Ponto único de autoridade para todas as operações de I/O,
-                     armazenamento, travas, inteligência de fila e higiene.
-   Sincronizado com: paths.js V700, dna_store.js V730, task_store.js V700.
-========================================================================== */
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import * as PATHS from './fs/paths.js';
+import * as fsCore from './fs/fs_core.js';
+import * as controlStore from './fs/control_store.js';
+import * as taskStore from './storage/task_store.js';
+import * as responseStore from './storage/response_store.js';
+import * as dnaStore from './storage/dna_store.js';
+import * as dnaEvolution from './storage/dna_evolution.js';
+import * as lockManager from './locks/lock_manager.js';
+import * as queueCache from './queue/cache.js';
+import * as taskLoader from './queue/task_loader.js';
+import * as queryEngine from './queue/query_engine.js';
 
-const fs = require('fs').promises;
-const path = require('path');
+export const ROOT = PATHS.ROOT;
+export const QUEUE_DIR = PATHS.QUEUE;
+export const RESPONSE_DIR = PATHS.RESPONSE;
+export const sanitizeFilename = fsCore.sanitizeFilename;
+export const atomicWrite = fsCore.atomicWrite;
+export const safeReadJSON = fsCore.safeReadJSON;
 
-// Subsistemas de Infraestrutura (Nível Baixo)
-const PATHS = require('./fs/paths');
-const fsCore = require('./fs/fs_core');
-const controlStore = require('./fs/control_store');
+export const cleanupOrphans = async function() {
+    let totalCleaned = 0;
+    const targetDirs = [PATHS.QUEUE, PATHS.RESPONSE, path.dirname(PATHS.IDENTITY)];
 
-// Subsistemas de Domínio (Nível de Aplicação)
-const taskStore = require('./storage/task_store');
-const responseStore = require('./storage/response_store');
-const dnaStore = require('./storage/dna_store');
-const dnaEvolution = require('./storage/dna_evolution');
-const lockManager = require('./locks/lock_manager');
-const queueCache = require('./queue/cache');
-const taskLoader = require('./queue/task_loader');
-const queryEngine = require('./queue/query_engine');
-
-/**
- * @module io
- * @description Facade unificada para operações de I/O, armazenamento e gerenciamento de fila.
- * Consolidação de todos os subsistemas de infraestrutura em uma interface única.
- *
- * @property {string} ROOT - Diretório raiz do projeto
- * @property {string} QUEUE_DIR - Diretório da fila de tarefas
- * @property {string} RESPONSE_DIR - Diretório de respostas
- *
- * @example
- * const io = require('./infra/io');
- * const task = await io.loadTask('task-123');
- * await io.saveResponse('task-123', 'Response text');
- */
-module.exports = {
-    /* ==========================================================================
-       1. CAMADA FÍSICA E HIGIENE (SISTEMA OPERACIONAL)
-    ========================================================================== */
-    ROOT: PATHS.ROOT,
-    QUEUE_DIR: PATHS.QUEUE,
-    RESPONSE_DIR: PATHS.RESPONSE,
-    sanitizeFilename: fsCore.sanitizeFilename,
-    atomicWrite: fsCore.atomicWrite,
-    safeReadJSON: fsCore.safeReadJSON,
-
-    /**
-     * Realiza a limpeza profunda de arquivos temporários órfãos (.tmp).
-     * Varre simultaneamente os diretórios de Fila, Respostas e Storage.
-     * @returns {Promise<number>} Total de arquivos removidos.
-     */
-
-    async cleanupOrphans() {
-        let totalCleaned = 0;
-        const targetDirs = [PATHS.QUEUE, PATHS.RESPONSE, path.dirname(PATHS.IDENTITY)];
-
-        for (const dir of targetDirs) {
-            try {
-                const files = await fs.readdir(dir);
-                const tmpFiles = files.filter(f => f.includes('.tmp'));
-
-                for (const file of tmpFiles) {
-                    await fs.unlink(path.join(dir, file)).catch(() => {});
-                    totalCleaned++;
-                }
-            } catch (_) {
-                /* Falha em diretório específico não interrompe a higiene */
-            }
-        }
-        return totalCleaned;
-    },
-
-    /* ==========================================================================
-       2. GESTÃO DE TAREFAS (COM AUTO-INVALIDAÇÃO DE CACHE)
-    ========================================================================== */
-
-    /**
-     * Salva uma tarefa e invalida o cache em RAM da fila imediatamente.
-     * [P5.2 FIX] Invalida ANTES do write para garantir consistency mesmo em crash.
-     * [V2.0] DoS Prevention: Queue depth limit.
-     */
-    async saveTask(task) {
-        // ✅ DoS Prevention: Queue depth limit
-        const MAX_QUEUE_DEPTH = 10000; // TODO: mover para config.json
-        const currentQueue = await this.getQueue();
-
-        if (currentQueue.length >= MAX_QUEUE_DEPTH) {
-            throw new Error(
-                `Queue depth limit reached (${MAX_QUEUE_DEPTH}). Clear queue or increase limit in config.json`
-            );
-        }
-
-        queueCache.markDirty(); // Invalida primeiro (defensivo)
-        const result = await taskStore.saveTask(task);
-        return result;
-    },
-
-    /**
-     * Remove uma tarefa e invalida o cache em RAM da fila.
-     * [P5.2 FIX] Invalida ANTES do delete para garantir consistency.
-     */
-    async deleteTask(id) {
-        queueCache.markDirty(); // Invalida primeiro (defensivo)
-        await taskStore.deleteTask(id);
-    },
-
-    loadTask: async id => {
-        // [P8.8] SECURITY: Validate not a symlink (prevent symlink attacks)
-        const filePath = path.join(PATHS.QUEUE, `${id}.json`);
+    for (const dir of targetDirs) {
         try {
-            const stats = await fs.lstat(filePath);
-            if (stats.isSymbolicLink()) {
-                throw new Error('SECURITY_SYMLINK_DENIED: Symbolic links not allowed in queue');
+            const files = await fs.readdir(dir);
+            const tmpFiles = files.filter(f => f.includes('.tmp'));
+
+            for (const file of tmpFiles) {
+                await fs.unlink(path.join(dir, file)).catch(() => {});
+                totalCleaned++;
             }
-        } catch (err) {
-            if (err.message && err.message.includes('SECURITY_SYMLINK_DENIED')) {
-                throw err;
-            }
-            // File doesn't exist or other error, let taskLoader handle it
+        } catch (_) {
+            /* Falha em diretório específico não interrompe a higiene */
         }
-
-        return taskStore.loadTask(id);
-    },
-    clearQueue: taskStore.clearQueue,
-
-    /* ==========================================================================
-       3. GESTÃO DE RESULTADOS (ARTEFATOS)
-    ========================================================================== */
-    loadResponse: responseStore.loadResponse,
-    deleteResponse: responseStore.deleteResponse,
-
-    /* ==========================================================================
-       4. ENGINE DE CONSULTA (RAM - SNAPSHOT ESTÁVEL)
-    ========================================================================== */
-    findById: queryEngine.findById,
-    findLast: queryEngine.findLast,
-    findLastByTag: queryEngine.findLastByTag,
-    findFirstByTag: queryEngine.findFirstByTag,
-
-    /* ==========================================================================
-       5. DNA, IDENTIDADE E LOCKS (SOBERANIA GENÔMICA)
-    ========================================================================== */
-
-    /**
-     * Recupera o DNA completo (dynamic_rules.json).
-     */
-    getDna: dnaStore.getDna,
-
-    /**
-     * Persiste a evolução do DNA com metadados de autor.
-     * Invalida o cache genômico interno automaticamente.
-     */
-    saveDna: dnaStore.saveDna,
-
-    /**
-     * [V730] Recupera as regras específicas para um domínio IA (ex: chatgpt.com).
-     * Implementa fallback automático para seletores globais.
-     */
-    getTargetRules: dnaStore.getTargetRules,
-
-    /**
-     * [V730] Invalida o cache genômico em RAM.
-     * Deve ser chamado quando o disco sofre alteração externa (Watcher).
-     */
-    invalidateDnaCache: dnaStore.invalidateCache,
-
-    /**
-     * [V2.0] Restaura DNA de uma versão anterior do histórico.
-     *
-     * @param {number} versionIndex - Índice no histórico (0 = mais recente)
-     * @returns {Promise<object>} - DNA restaurado
-     * @throws {Error} - Se versão não existir
-     */
-    rollbackDna: dnaStore.rollbackDna,
-
-    /**
-     * [V2.0] Retorna histórico de versões do DNA (últimas 10).
-     *
-     * @returns {Array<object>} - [{version, timestamp, evolution_count, updated_by}]
-     */
-    getDnaHistory: dnaStore.getDnaHistory,
-
-    /**
-     * [V2.0] Evolui DNA automaticamente com protocolo SADI.
-     *
-     * @param {object} protocol - Protocolo SADI (selector, confidence)
-     * @param {string} domain - Domínio (ex: 'chatgpt.com')
-     * @param {string} intent - Intenção (ex: 'input_box')
-     * @returns {Promise<boolean>} - true se evoluiu
-     */
-    evolveWithSadiProtocol: dnaEvolution.evolveWithSadiProtocol,
-
-    /**
-     * [V2.0] Evolui DNA com protocolo SADI completo (estruturado).
-     *
-     * @param {object} fullProtocol - Protocolo completo (selector, context, isShadow, etc)
-     * @param {string} domain - Domínio
-     * @param {string} intent - Intenção
-     * @returns {Promise<boolean>} - true se evoluiu
-     */
-    evolveWithFullProtocol: dnaEvolution.evolveWithFullProtocol,
-
-    /**
-     * [V2.0] Retorna estatísticas de evolução do DNA.
-     *
-     * @returns {object} - {domain: evolutionCount}
-     */
-    getEvolutionStats: dnaEvolution.getEvolutionStats,
-
-    /**
-     * Recupera a Identidade Soberana do robô de forma assíncrona.
-     */
-    getIdentity: async () => fsCore.safeReadJSON(PATHS.IDENTITY),
-
-    /**
-     * Persiste a Identidade Soberana de forma atômica.
-     */
-    saveIdentity: async data => fsCore.atomicWrite(PATHS.IDENTITY, JSON.stringify(data, null, 2)),
-
-    acquireLock: lockManager.acquireLock,
-    releaseLock: lockManager.releaseLock,
-
-    /* ==========================================================================
-       6. INTELIGÊNCIA DE FILA (ORQUESTRAÇÃO)
-    ========================================================================== */
-    getQueue: queueCache.getQueue,
-    setCacheDirty: queueCache.markDirty,
-    loadNextTask: taskLoader.loadNextTask,
-    bulkRetryFailed: taskLoader.bulkRetryFailed,
-
-    /**
-     * Carrega todas as tarefas da fila (via cache inteligente).
-     * @returns {Promise<Array>} Lista de todas as tarefas
-     */
-    loadAllTasks: async () => {
-        const queue = await queueCache.getQueue();
-        return queue.tasks || [];
-    },
-
-    /* ==========================================================================
-       7. CONTROLE OPERACIONAL (SINAIS GLOBAIS)
-    ========================================================================== */
-    checkControlPause: controlStore.checkControlPause,
+    }
+    return totalCleaned;
 };
+
+export const saveTask = async function(task) {
+    // ✅ DoS Prevention: Queue depth limit
+    const MAX_QUEUE_DEPTH = 10000; // TODO: mover para config.json
+    const currentQueue = await getQueue();
+
+    if (currentQueue.length >= MAX_QUEUE_DEPTH) {
+        throw new Error(
+            `Queue depth limit reached (${MAX_QUEUE_DEPTH}). Clear queue or increase limit in config.json`
+        );
+    }
+
+    queueCache.markDirty(); // Invalida primeiro (defensivo)
+    const result = await taskStore.saveTask(task);
+    return result;
+};
+
+export const deleteTask = async function(id) {
+    queueCache.markDirty(); // Invalida primeiro (defensivo)
+    await taskStore.deleteTask(id);
+};
+
+export const loadTask = async id => {
+    // [P8.8] SECURITY: Validate not a symlink (prevent symlink attacks)
+    const filePath = path.join(PATHS.QUEUE, `${id}.json`);
+    try {
+        const stats = await fs.lstat(filePath);
+        if (stats.isSymbolicLink()) {
+            throw new Error('SECURITY_SYMLINK_DENIED: Symbolic links not allowed in queue');
+        }
+    } catch (err) {
+        if (err.message && err.message.includes('SECURITY_SYMLINK_DENIED')) {
+            throw err;
+        }
+        // File doesn't exist or other error, let taskLoader handle it
+    }
+
+    return taskStore.loadTask(id);
+};
+
+export const clearQueue = taskStore.clearQueue;
+export const loadResponse = responseStore.loadResponse;
+export const deleteResponse = responseStore.deleteResponse;
+export const findById = queryEngine.findById;
+export const findLast = queryEngine.findLast;
+export const findLastByTag = queryEngine.findLastByTag;
+export const findFirstByTag = queryEngine.findFirstByTag;
+export const getDna = dnaStore.getDna;
+export const saveDna = dnaStore.saveDna;
+export const getTargetRules = dnaStore.getTargetRules;
+export const invalidateDnaCache = dnaStore.invalidateCache;
+export const rollbackDna = dnaStore.rollbackDna;
+export const getDnaHistory = dnaStore.getDnaHistory;
+export const evolveWithSadiProtocol = dnaEvolution.evolveWithSadiProtocol;
+export const evolveWithFullProtocol = dnaEvolution.evolveWithFullProtocol;
+export const getEvolutionStats = dnaEvolution.getEvolutionStats;
+export const getIdentity = async () => fsCore.safeReadJSON(PATHS.IDENTITY);
+export const saveIdentity = async data => fsCore.atomicWrite(PATHS.IDENTITY, JSON.stringify(data, null, 2));
+export const acquireLock = lockManager.acquireLock;
+export const releaseLock = lockManager.releaseLock;
+export const getQueue = queueCache.getQueue;
+export const setCacheDirty = queueCache.markDirty;
+export const loadNextTask = taskLoader.loadNextTask;
+export const bulkRetryFailed = taskLoader.bulkRetryFailed;
+
+export const loadAllTasks = async () => {
+    const queue = await queueCache.getQueue();
+    return queue.tasks || [];
+};
+
+export const checkControlPause = controlStore.checkControlPause;

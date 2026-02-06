@@ -1,15 +1,6 @@
-/* ==========================================================================
-   src/server/realtime/telemetry/hardware.js
-   Audit Level: 700 — Infrastructure Pulse Emitter (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Coletar métricas de hardware do motor de diagnóstico e
-                     transmitir via barramento Socket.io em tempo real.
-   Sincronizado com: doctor.js V39, engine/socket.js V600, main.js V700.
-========================================================================== */
-
-const doctor = require('@core/doctor');
-const { notify } = require('@server/engine/socket');
-const { log } = require('@core/logger');
+import * as doctor from '#core/doctor';
+import { notify } from '#server/engine/socket';
+import { log } from '#core/logger';
 
 /**
  * Referência privada para o temporizador do ciclo de amostragem.
@@ -94,7 +85,4 @@ function stop() {
     }
 }
 
-module.exports = {
-    init,
-    stop
-};
+export { init, stop };

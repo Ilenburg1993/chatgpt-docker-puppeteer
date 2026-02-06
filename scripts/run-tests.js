@@ -1,6 +1,5 @@
-#!/usr/bin/env node
-const { spawnSync } = require('child_process');
-const os = require('os');
+#!/usr/bin/env nodeimport { spawnSync } from 'node:child_process';
+import os from 'node:os';
 
 const platform = os.platform();
 let cmd;

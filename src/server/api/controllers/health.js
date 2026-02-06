@@ -1,10 +1,4 @@
-/* ==========================================================================
-   src/server/api/controllers/health.js
-   Health Check Controller - Endpoints de monitoramento do sistema
-   Status: STUB (Implementação mínima funcional)
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * GET /api/health - Health check geral do sistema
@@ -32,7 +26,7 @@ async function getHealth(req, res) {
  */
 async function getChromeHealth(req, res) {
     try {
-        const { checkChromeHealth, getBrowserEndpoint } = require('@core/boot_resilience_manager');
+        const { checkChromeHealth, getBrowserEndpoint } = await import('#core/boot_resilience_manager');
         const browserEndpoint = getBrowserEndpoint();
 
         const isHealthy = await checkChromeHealth(browserEndpoint.url, 3000);
@@ -67,7 +61,7 @@ async function getChromeHealth(req, res) {
  */
 async function getPm2Health(req, res) {
     try {
-        const pm2Bridge = require('@server/realtime/bus/pm2_bridge');
+        const pm2Bridge = await import('#server/realtime/bus/pm2_bridge').then(m => m.default ?? m);
         const snapshot = pm2Bridge.getSnapshot();
 
         res.json({
@@ -113,10 +107,4 @@ async function getDiskHealth(req, res) {
     }
 }
 
-module.exports = {
-    getHealth,
-    getChromeHealth,
-    getPm2Health,
-    getKernelHealth,
-    getDiskHealth
-};
+export { getHealth, getChromeHealth, getPm2Health, getKernelHealth, getDiskHealth };

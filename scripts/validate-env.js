@@ -1,21 +1,10 @@
-#!/usr/bin/env node
-/**
- * validate-env.js - ENV Schema Validator
- *
- * Valida arquivos .env contra .env.schema.json
- *
- * Uso:
- *   node scripts/validate-env.js [--file .env.development]
- *   node scripts/validate-env.js --all
- */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 // ============================================================================
 // Configuração
 // ============================================================================
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const SCHEMA_PATH = path.join(ROOT, '.env.schema.json');
 const DEFAULT_ENV_FILES = ['.env.development', '.env.production', '.env.test'];
 
@@ -299,8 +288,8 @@ function main() {
     process.exit(totalErrors > 0 ? 1 : 0);
 }
 
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-module.exports = { EnvValidator, parseEnvFile };
+export { EnvValidator, parseEnvFile };

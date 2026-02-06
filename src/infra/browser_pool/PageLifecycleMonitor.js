@@ -1,29 +1,4 @@
-/**
- * @fileoverview PageLifecycleMonitor - Page Lifecycle Event Monitoring System
- *
- * RESPONSABILIDADE:
- * - Monitorar eventos de lifecycle de páginas (close, error, disconnect)
- * - Detectar quando usuário fecha página manualmente
- * - Auto-cleanup de páginas crashed/disconnected
- * - Emit NERV events para informar adapter de mudanças de estado
- * - Prevenir pool corruption (páginas closed no registro)
- *
- * INTEGRAÇÃO:
- * - Usado por: BrowserPoolManager.allocate() (após page allocation)
- * - Emite: NERV events (BROWSER_PAGE_CLOSED, BROWSER_PAGE_ERROR, etc)
- * - Previne: Pool corruption, wasted retries, incorrect stats
- * - Impact: Elimina 100% de pool corruption + correct stats
- *
- * MONITORED EVENTS:
- * 1. page.on('close') - Usuário fecha página ou browser fecha
- * 2. page.on('error') - JavaScript errors na página
- * 3. page.on('disconnected') - Target disconnected (crash)
- *
- * @version 1.0.0
- * @since 2026-02-03
- */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Event types emitidos pelo monitor.
@@ -288,8 +263,4 @@ class PageLifecycleMonitor {
     }
 }
 
-module.exports = {
-    PageLifecycleMonitor,
-    LIFECYCLE_EVENTS,
-    CLOSE_REASONS,
-};
+export { PageLifecycleMonitor, LIFECYCLE_EVENTS, CLOSE_REASONS };

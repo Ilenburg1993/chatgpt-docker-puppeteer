@@ -1,19 +1,5 @@
-/* ==========================================================================
-   src/kernel/task_execution_orchestrator.js
-   Audit Level: 100 — Task Execution Orchestrator (V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Orquestrar execução de tasks V5 com suporte a strategies.
-                     Integra Kernel → Orchestrator → Driver via NERV.
-
-   IMPORTANTE:
-   - Intercepta tasks antes de enviar para Driver
-   - Chama beforeExecution() do OrchestratorEngine
-   - Escuta completion events do Driver
-   - Chama afterExecution() e processa decisões (RETRY/NEXT_STEP/DONE)
-========================================================================== */
-
-const logger = require('@core/logger');
-const { ActionCode, MessageType } = require('@shared/nerv/constants');
+import * as logger from '#core/logger';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 
 /**
  * TaskExecutionOrchestrator - Orquestra execução de tasks V5.
@@ -187,4 +173,4 @@ class TaskExecutionOrchestrator {
     }
 }
 
-module.exports = { TaskExecutionOrchestrator };
+export { TaskExecutionOrchestrator };

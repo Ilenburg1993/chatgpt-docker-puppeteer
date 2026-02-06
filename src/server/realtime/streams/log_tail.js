@@ -1,20 +1,9 @@
-/* ==========================================================================
-   src/server/realtime/streams/log_tail.js
-   Audit Level: 700 — Resilient Log Streamer (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Monitorar o arquivo de log operacional e transmitir
-                     novas linhas em tempo real para o Dashboard.
-   Sincronizado com: paths.js V700, socket.js V600, logger.js V40.
-========================================================================== */
-
-const fs = require('fs');
-const fsp = require('fs').promises;
-const path = require('path');
-
-// [V700] Importação da autoridade de caminhos para evitar dependências circulares
-const PATHS = require('@infra/fs/paths');
-const { log: internalLog } = require('@core/logger');
-const { notify } = require('@server/engine/socket');
+import fs from 'node:fs';
+import { promises as fsp } from 'node:fs';
+import path from 'node:path';
+import * as PATHS from '#infra/fs/paths';
+import { log as internalLog } from '#core/logger';
+import { notify } from '#server/engine/socket';
 
 /**
  * Localização física do alvo de streaming.
@@ -147,7 +136,4 @@ function stop() {
     internalLog('INFO', '[LOG_TAIL] Motor de streaming encerrado.');
 }
 
-module.exports = {
-    init,
-    stop
-};
+export { init, stop };

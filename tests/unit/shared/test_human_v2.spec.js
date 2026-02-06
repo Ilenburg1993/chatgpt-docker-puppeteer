@@ -1,14 +1,5 @@
-/**
- * Testes Unitários: human.js v2.0
- * @module tests/unit/shared/test_human_v2.spec.js
- * @description Valida todas as funcionalidades do human.js v2.0 (7 bugs + 12 melhorias)
- * @version 2.0
- * @audit-level 42
- */
-
-require('module-alias/register');
-const { describe, it, mock, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert');
+import { describe, it, mock, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert';
 
 describe('human.js v2.0 - Unit Tests', () => {
     let mockDriver;
@@ -42,8 +33,7 @@ describe('human.js v2.0 - Unit Tests', () => {
         };
 
         // Import module fresh for each test
-        delete require.cache[require.resolve('@shared/biomechanics/human')];
-        humanModule = require('@shared/biomechanics/human');
+        humanModule = await import('#shared/biomechanics/human').then(m => m.default ?? m);
     });
 
     afterEach(() => {
@@ -574,12 +564,11 @@ describe('human.js v2.0 - Unit Tests', () => {
     // ======================
 
     describe('Performance Tests', () => {
-        it('gaussian cache deve reduzir tempo de execução', () => {
+        it('gaussian cache deve reduzir tempo de execução', async () => {
             const { gaussian } = humanModule;
 
-            // Limpar cache (reimportar módulo)
-            delete require.cache[require.resolve('@shared/biomechanics/human')];
-            const freshHuman = require('@shared/biomechanics/human');
+            // Reimport module fresh
+            const freshHuman = await import('#shared/biomechanics/human').then(m => m.default ?? m);
 
             const iterations = 1000;
             const params = [10, 2];

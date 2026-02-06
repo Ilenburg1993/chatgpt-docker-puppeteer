@@ -226,4 +226,4 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     });
 }
 
-module.exports = createCorrelationStore;
+export default createCorrelationStore;

@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: Kernel Policy Engine
- * @module tests/unit/kernel/test_policy_engine.spec.js
- * @description Valida políticas de retry, backoff e decisões de execução
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('Kernel Policy Engine - Motor de Políticas', () => {
     describe('1. Políticas de Retry', () => {

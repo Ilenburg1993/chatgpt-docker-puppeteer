@@ -1,16 +1,7 @@
-/* ==========================================================================
-   src/core/infra_failure_policy.js
-   Audit Level: 700 — Sovereign Infra Failure Escalation Protocol
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Decidir, executar e reportar manobras de emergência
-                     sobre a infraestrutura física (Navegador/Processos).
-   Sincronizado com: system.js V45, ipc_client.js V600, constants.js V400.
-========================================================================== */
-
-const system = require('@infra/system');
-const { log, audit } = require('./logger');
-const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import * as system from '#infra/system';
+import { log, audit } from './logger.js';
+import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // NERV instance will be injected via setNERV()
 let nervInstance = null;
@@ -148,4 +139,4 @@ class InfraFailurePolicy {
     }
 }
 
-module.exports = { InfraFailurePolicy, setNERV };
+export { InfraFailurePolicy, setNERV };

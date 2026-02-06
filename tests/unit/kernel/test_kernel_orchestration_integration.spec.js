@@ -1,17 +1,8 @@
-/**
- * @file tests/unit/kernel/test_kernel_orchestration_integration.spec.js
- * Testes de integração Kernel + OrchestratorEngine + TaskExecutionOrchestrator
- * FASE 3 - Mission Orchestration Platform V2.0
- */
-
-// Activate module aliases FIRST
-require('module-alias/register');
-
-const { describe, it, beforeEach } = require('node:test');
-const assert = require('node:assert');
-const EventEmitter = require('events');
-const { createKernel } = require('../../../src/kernel/kernel');
-const { ActionCode, MessageType } = require('../../../src/shared/nerv/constants');
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert';
+import EventEmitter from 'node:events';
+import { createKernel } from '#kernel/kernel';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 
 // Mock NERV simple
 class MockNERV extends EventEmitter {
@@ -51,7 +42,7 @@ class MockNERV extends EventEmitter {
     }
 }
 
-describe('Kernel Orchestration Integration (V2.0)', () => {
+describe('Kernel Orchestration Integration (V2.0)', async () => {
     let nerv;
     let kernel;
 
@@ -74,7 +65,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
         });
     });
 
-    describe('2. Task execution flow (SINGLE_SHOT strategy)', () => {
+    describe('2. Task execution flow (SINGLE_SHOT strategy)', async () => {
         it('should execute task V5 with SINGLE_SHOT strategy end-to-end', async () => {
             // Inicia kernel antes de executar tasks
             kernel.start();
@@ -124,7 +115,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
         });
     });
 
-    describe('3. Task execution flow (ITERATIVE strategy)', () => {
+    describe('3. Task execution flow (ITERATIVE strategy)', async () => {
         it('should execute task V5 with ITERATIVE strategy and handle RETRY', async () => {
             kernel.start();
 
@@ -205,7 +196,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
         });
     });
 
-    describe('4. beforeExecution/afterExecution hooks', () => {
+    describe('4. beforeExecution/afterExecution hooks', async () => {
         it('should call beforeExecution before sending to driver', async () => {
             kernel.start();
             const taskV5 = {
@@ -270,7 +261,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
         });
     });
 
-    describe('6. shutdown() cleanup', () => {
+    describe('6. shutdown() cleanup', async () => {
         it('should cleanup taskExecutor on shutdown', async () => {
             kernel.start();
 
@@ -282,12 +273,12 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
     });
 });
 
-describe('TaskExecutionOrchestrator (standalone)', () => {
+describe('TaskExecutionOrchestrator (standalone)', async () => {
     let nerv;
     let nervBridge;
     let orchestrator;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         nerv = new MockNERV();
 
         // Mock simplificado do nervBridge
@@ -308,11 +299,11 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
         };
 
         // Importa TaskExecutionOrchestrator
-        const { TaskExecutionOrchestrator } = require('../../../src/kernel/task_execution_orchestrator');
+        const { TaskExecutionOrchestrator } = await import('#kernel/task_execution_orchestrator');
         orchestrator = new TaskExecutionOrchestrator({ nerv, nervBridge });
     });
 
-    describe('executeTask()', () => {
+    describe('executeTask()', async () => {
         it('should call beforeTaskExecution and emit DRIVER_EXECUTE_TASK', async () => {
             const task = {
                 meta: { id: 'task-001', version: '5.0' },
@@ -340,7 +331,7 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
         });
     });
 
-    describe('cleanup()', () => {
+    describe('cleanup()', async () => {
         it('should clear active executions', async () => {
             const task = {
                 meta: { id: 'task-cleanup', version: '5.0' },

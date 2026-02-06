@@ -1,9 +1,6 @@
-// scripts/test-health-logic.js
-// Testa a lógica dos health endpoints sem precisar do servidor rodando
+import path from 'node:path';
 
-const path = require('path');
-
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..');
 process.chdir(ROOT);
 
 async function testHealthLogic() {
@@ -15,8 +12,8 @@ async function testHealthLogic() {
     // Test 1: Chrome Health
     console.log('📡 1. Chrome Health Logic');
     try {
-        const doctor = require('../src/core/doctor');
-        const config = require('../config.json');
+        const doctor = await import('#core/doctor').then(m => m.default ?? m);
+        const config = await import('../config.json').then(m => m.default ?? m);
 
         const chrome = await doctor.probeChromeConnection();
 
@@ -38,7 +35,7 @@ async function testHealthLogic() {
     // Test 2: PM2 Health
     console.log('📡 2. PM2 Health Logic');
     try {
-        const system = require('../src/infra/system');
+        const system = await import('#infra/system').then(m => m.default ?? m);
 
         const status = await system.getAgentStatus();
 
@@ -47,7 +44,7 @@ async function testHealthLogic() {
 
         // Try to list PM2 processes
         try {
-            const pm2 = require('pm2');
+            const pm2 = await import('pm2').then(m => m.default ?? m);
             const allProcesses = await new Promise((resolve, reject) => {
                 pm2.list((err, list) => {
                     if (err) {
@@ -86,8 +83,8 @@ async function testHealthLogic() {
     // Test 3: Disk Health
     console.log('📡 3. Disk Health Logic');
     try {
-        const fs = require('fs');
-        const { execSync } = require('child_process');
+        const fs = await import('node:fs').then(m => m.default ?? m);
+        const { execSync } = await import('node:child_process');
 
         const getDirSize = dirPath => {
             try {
@@ -146,8 +143,8 @@ async function testHealthLogic() {
     // Test 4: Kernel Health (simplified without NERV)
     console.log('📡 4. Kernel Health Logic (Simplified)');
     try {
-        const io = require('../src/infra/io');
-        const { STATUS_VALUES } = require('../src/core/constants/tasks');
+        const io = await import('#infra/io').then(m => m.default ?? m);
+        const { STATUS_VALUES } = await import('#core/constants/tasks');
 
         const tasks = await io.loadAllTasks();
         const runningTasks = tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length;

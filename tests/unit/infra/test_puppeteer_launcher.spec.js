@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-core');
+import puppeteer from 'puppeteer-core';
 
 (async () => {
     console.log('🚀 Teste rápido: connect-only (puppeteer-core)...');

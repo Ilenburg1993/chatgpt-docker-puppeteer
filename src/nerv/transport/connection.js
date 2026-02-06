@@ -176,4 +176,4 @@ function createConnection({ telemetry, adapter }) {
     });
 }
 
-module.exports = createConnection;
+export default createConnection;

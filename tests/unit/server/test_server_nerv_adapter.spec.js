@@ -1,13 +1,6 @@
-/**
- * Testes Unitários: Server NERV Adapter
- * @module tests/unit/server/test_server_nerv_adapter.spec.js
- * @description Valida integração do servidor com NERV
- * @audit-level 32
- */
-
-const { describe, it, beforeEach } = require('node:test');
-const assert = require('node:assert');
-const sinon = require('sinon');
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert';
+import sinon from 'sinon';
 
 describe('Server NERV Adapter - Integração Server-NERV', () => {
     let adapter;

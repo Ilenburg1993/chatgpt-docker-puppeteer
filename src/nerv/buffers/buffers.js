@@ -1,28 +1,6 @@
-/* ==========================================================================
-   src/nerv/buffers/buffers.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: buffers/
-   Arquivo: buffers.js
-
-   Papel:
-   - Compor as filas técnicas inbound e outbound
-   - Centralizar configuração de limites técnicos
-   - Expor interface mínima e neutra para uso pelo NERV
-   - Conectar buffers à telemetria e backpressure
-
-   IMPORTANTE:
-   - NÃO decide prioridade
-   - NÃO interpreta envelopes
-   - NÃO conhece Kernel, Driver ou Server
-   - NÃO interfere no fluxo lógico
-   - Atua apenas como infraestrutura técnica
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const createOutboundQueue = require('./outbound_queue');
-const createInboundQueue = require('./inbound_queue');
-const createBackpressure = require('./backpressure');
+import createOutboundQueue from './outbound_queue.js';
+import createInboundQueue from './inbound_queue.js';
+import createBackpressure from './backpressure.js';
 
 /* ===========================
    Fábrica do subsistema buffers
@@ -142,4 +120,4 @@ function createBuffers({ telemetry, limits = {} }) {
     });
 }
 
-module.exports = createBuffers;
+export default createBuffers;

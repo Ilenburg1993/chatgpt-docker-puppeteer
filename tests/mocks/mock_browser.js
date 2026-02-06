@@ -1,10 +1,4 @@
-/**
- * Mock do Browser (Puppeteer)
- * Para uso em testes que não precisam de browser real
- * @audit-level 50 - Test infrastructure
- */
-
-const sinon = require('sinon');
+import sinon from 'sinon';
 
 /**
  * Cria uma página mockada do Puppeteer
@@ -113,9 +107,4 @@ function criarConnectionOrchestratorMock() {
     };
 }
 
-module.exports = {
-    criarPaginaMock,
-    criarBrowserMock,
-    criarBrowserPoolMock,
-    criarConnectionOrchestratorMock
-};
+export { criarPaginaMock, criarBrowserMock, criarBrowserPoolMock, criarConnectionOrchestratorMock };

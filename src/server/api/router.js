@@ -1,28 +1,14 @@
-/* ==========================================================================
-   src/server/api/router.js
-   Audit Level: 700 — Sovereign API Gateway (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Ponto central de roteamento do Mission Control Prime.
-                     Orquestra a hierarquia de namespaces e sela a malha de
-                     proteção (Error Boundary) da API.
-   Sincronizado com: controllers/tasks.js V700, controllers/system.js V700,
-                     controllers/dna.js V700, middleware/error_handler.js V600.
-========================================================================== */
-
-const tasksController = require('./controllers/tasks');
-const dashboardController = require('./controllers/dashboard');
-const missionsController = require('./controllers/missions');
-
-// STATUS_VALUES moved to controllers where needed
-
-const systemController = require('./controllers/system');
-const dnaController = require('./controllers/dna');
-const { notFound, errorHandler } = require('../middleware/error_handler');
-const denyIfDelegated = require('../middleware/deny_if_delegated');
-const { log } = require('@core/logger');
-const { apiLimiter } = require('@server/engine/app');
-const healthController = require('./controllers/health');
-const metricsController = require('./controllers/metrics');
+import tasksController from './controllers/tasks.js';
+import dashboardController from './controllers/dashboard.js';
+import missionsController from './controllers/missions.js';
+import systemController from './controllers/system.js';
+import dnaController from './controllers/dna.js';
+import { notFound, errorHandler } from '../middleware/error_handler.js';
+import denyIfDelegated from '../middleware/deny_if_delegated.js';
+import { log } from '#core/logger';
+import { apiLimiter } from '#server/engine/app';
+import * as healthController from './controllers/health.js';
+import * as metricsController from './controllers/metrics.js';
 
 /**
  * Aplica a malha de rotas à instância do Express.
@@ -120,4 +106,4 @@ function applyRoutes(app) {
     log('INFO', '[GATEWAY] Sincronia de namespaces e Error Boundary operacionais.');
 }
 
-module.exports = { applyRoutes };
+export { applyRoutes };

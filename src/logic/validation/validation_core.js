@@ -1,15 +1,6 @@
-/* ==========================================================================
-   src/logic/validation/validation_core.js
-   Audit Level: 100 — Industrial Hardening (Quality Orchestrator - Platinum)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Fachada principal para auditoria de resultados.
-                     Integra motor de varredura com inteligência linguística.
-   Sincronizado com: scan_engine.js (V1.1), i18n.js (V32), index.js (V190).
-========================================================================== */
-
-const i18n = require('@core/i18n');
-const { runSinglePassValidation } = require('./scan_engine');
-const { log } = require('@core/logger');
+import * as i18n from '#core/i18n';
+import { runSinglePassValidation } from './scan_engine.js';
+import { log } from '#core/logger';
 
 /**
  * Realiza a auditoria completa de qualidade de um resultado em disco.
@@ -68,4 +59,4 @@ async function validateTaskResult(task, filePath, signal = null) {
     }
 }
 
-module.exports = { validateTaskResult };
+export { validateTaskResult };

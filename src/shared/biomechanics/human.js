@@ -1,43 +1,5 @@
-/* ==========================================================================
-   src/shared/biomechanics/human.js
-   Audit Level: 500 — Instrumented Biomechanics (IPC 2.0 Singularity)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-
-   Subsistema: SHARED — Biomechanics (Universal Tool)
-   Responsabilidade: Simulação biomecânica de mouse e teclado.
-                     Agora suporta ganchos de amostragem para telemetria.
-
-   Camada Compartilhada: Usado por DRIVER, INFRA (health checks), TESTS
-
-   Versão: v2.0 (Feb 2026)
-   Changelog:
-     - v1.0 (Jan 2026): Initial version in driver/modules
-     - v1.5 (Jan 2026): Added telemetry hooks (onPulse)
-     - v2.0 (Feb 2026): Migrated to shared/ + FULL CONSOLIDATION (7 bugs fixed, 12 improvements)
-
-       Phase 1 - Critical Fixes:
-       * Fixed cursor cache memory leak (Map + LRU + auto-cleanup)
-       * Added parameter validation (defensive programming)
-       * Fixed empty text handling (throws error)
-       * Externalized configuration (BIOMECHANICS_CONFIG)
-
-       Phase 2 - Robustness:
-       * Focus lock with retry (3 attempts, eliminates race condition)
-       * Enhanced telemetry (12 event types, comprehensive observability)
-       * Retry logic for element not found (3 retries with backoff)
-       * Abort signal propagation (granular checkpoints)
-
-       Phase 3 - Polish:
-       * Gaussian distribution cache (2x faster, prevents outliers)
-       * Viewport boundary validation (defensive checks)
-       * Typing speed profiles (slow/average/fast/expert)
-       * Error telemetry (all catch blocks report to onPulse)
-
-   Sincronizado com: ghost-cursor, logger
-========================================================================== */
-
-const { createCursor } = require('ghost-cursor');
-const { log: _log } = require('@core/logger');
+import { createCursor } from 'ghost-cursor';
+import { log as _log } from '#core/logger';
 
 // ============================================
 // CONFIGURATION (Externalized from v2.0)
@@ -218,7 +180,7 @@ async function detectKeyboardLayout(page) {
             const lang = (navigator.language || 'en').toLowerCase();
             return lang.includes('fr') ? 'azerty' : 'qwerty';
         });
-    } catch (_e) {
+    } catch (_err) {
         return 'qwerty';
     }
 }
@@ -621,11 +583,4 @@ async function humanType(
     }
 }
 
-// [v2.0] Export config and helpers for testing
-module.exports = {
-    humanClick,
-    humanType,
-    wakeUpMove,
-    gaussian: gaussianRandom,
-    HUMAN_CONFIG: BIOMECHANICS_CONFIG
-};
+export { humanClick, humanType, wakeUpMove, gaussianRandom as gaussian, BIOMECHANICS_CONFIG as HUMAN_CONFIG };

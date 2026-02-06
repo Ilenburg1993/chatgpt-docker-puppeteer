@@ -1,8 +1,5 @@
-#!/usr/bin/env node
-// Script para corrigir blocos catch vazios
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 function fixFile(filePath) {
     let content = fs.readFileSync(filePath, 'utf-8');

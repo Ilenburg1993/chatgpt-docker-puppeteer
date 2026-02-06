@@ -60,4 +60,4 @@ function parseReferences(text) {
     }));
 }
 
-module.exports = { parseReferences };
+export { parseReferences };

@@ -1,93 +1,23 @@
-/* ==========================================================================
-   src/server/main.js
-   SERVER PROCESS — CANONICAL BOOTSTRAP (HARDENED & DOCUMENTED)
-
-   Papel Arquitetural:
-   Processo dedicado do subsistema SERVER. Responsável por prover a camada
-   de interface externa (HTTP + Socket + API + Telemetria) desacoplada do
-   KERNEL e DRIVER, comunicando-se com o restante do sistema via NERV.
-
-   Escopo:
-     ✔ Fundação HTTP container-safe
-     ✔ Hub Socket.io
-     ✔ API Gateway (router)
-     ✔ Telemetria e streams
-     ✔ Watchers de infraestrutura
-     ✔ Instância NERV local do processo
-     ✔ ServerNERVAdapter (ponte NERV ⇄ Socket)
-     ✔ Persistência de estado para descoberta IPC
-     ✔ Supervisor/Reconciler
-
-   Invariantes Operacionais:
-     ✔ Bind HTTP ocorre SOMENTE via engine/server
-     ✔ Socket hub só inicializa após bind
-     ✔ Router nunca inicia servidor
-     ✔ NERV é criado antes do ServerNERVAdapter
-     ✔ Adapter nunca cria NERV — apenas recebe
-     ✔ Reconciler sobe por último
-     ✔ Falha de boot aborta processo
-     ✔ Ordem de boot é determinística
-
-   Propriedades de Segurança:
-     — Nenhum subsistema crítico inicia fora do bootstrap()
-     — Persistência IPC é atômica
-     — Sem bind implícito
-     — Sem dupla inicialização de engines
-========================================================================== */
-
-/* --------------------------------------------------------------------------
-   MODULE RESOLUTION GUARD — deve ser o PRIMEIRO require do processo
-   Garante funcionamento de aliases (@core, @infra, etc.)
--------------------------------------------------------------------------- */
-require('module-alias/register');
-
-const { log } = require('@core/logger');
-const CONFIG = require('@core/config');
-const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('@shared/nerv/constants');
-const { CONNECTION_MODES } = require('@core/constants/browser.js');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
-const Authority = require('@core/authority');
-const Discovery = require('@nerv/discovery');
-
-// Authority helper loaded from src/core/authority.js
-
-/* --------------------------------------------------------------------------
-   ENGINE LAYER — fundações físicas
--------------------------------------------------------------------------- */
-const serverEngine = require('./engine/server');   // HTTP singleton engine
-const socketHub = require('./engine/socket');      // Socket.io hub
-const lifecycle = require('./engine/lifecycle');   // signal/shutdown manager
-const app = require('./engine/app');               // Express app configurada
-
-/* --------------------------------------------------------------------------
-   API GATEWAY
--------------------------------------------------------------------------- */
-const router = require('./api/router');
-
-/* --------------------------------------------------------------------------
-   TELEMETRIA & STREAMING
--------------------------------------------------------------------------- */
-const pm2Bridge = require('./realtime/bus/pm2_bridge');
-const logTail = require('./realtime/streams/log_tail');
-const hardwareTelemetry = require('./realtime/telemetry/hardware');
-// const snapshot = require('./telemetry/snapshot'); // TODO: Criar módulo snapshot
-
-/* --------------------------------------------------------------------------
-   WATCHERS DE INFRA
--------------------------------------------------------------------------- */
-const fsWatcher = require('./watchers/fs_watcher');
-const logWatcher = require('./watchers/log_watcher');
-
-/* --------------------------------------------------------------------------
-   SUPERVISOR / AUTOCURA
--------------------------------------------------------------------------- */
-const reconciler = require('./supervisor/reconcilier');
-
-/* --------------------------------------------------------------------------
-   NERV + ADAPTER
--------------------------------------------------------------------------- */
-const ServerNERVAdapter = require('./nerv_adapter/server_nerv_adapter');
-const NERV = require('@nerv/nerv');
+import { log } from '#core/logger';
+import CONFIG from '#core/config';
+import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from '#shared/nerv/constants';
+import { CONNECTION_MODES } from '#core/constants/browser';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import * as Authority from '#core/authority';
+import * as Discovery from '#nerv/discovery';
+import * as serverEngine from './engine/server.js';
+import * as socketHub from './engine/socket.js';
+import * as lifecycle from './engine/lifecycle.js';
+import app from './engine/app.js';
+import * as router from './api/router.js';
+import * as pm2Bridge from './realtime/bus/pm2_bridge.js';
+import * as logTail from './realtime/streams/log_tail.js';
+import * as hardwareTelemetry from './realtime/telemetry/hardware.js';
+import * as fsWatcher from './watchers/fs_watcher.js';
+import * as logWatcher from './watchers/log_watcher.js';
+import reconciler from './supervisor/reconcilier.js';
+import ServerNERVAdapter from './nerv_adapter/server_nerv_adapter.js';
+import * as NERV from '#nerv/nerv';
 
 
 /* ==========================================================================
@@ -298,7 +228,7 @@ async function bootstrap(options = {}) {
         // Injeção opcional de MissionManager passada via options (delegated ou embed)
         try {
             if (options.missionManager) {
-                const missionsController = require('./api/controllers/missions');
+                const missionsController = await import('./api/controllers/missions.js').then(m => m.default ?? m);
                 if (typeof missionsController.setMissionManager === 'function') {
                     missionsController.setMissionManager(options.missionManager);
                     log('DEBUG', '[BOOT] MissionManager injetado via options.missionManager');
@@ -321,7 +251,7 @@ async function bootstrap(options = {}) {
         // Atualiza readiness do app HTTP para consumo do endpoint /ready
         try {
             try {
-                const app = require('./engine/app');
+                const app = await import('./engine/app.js').then(m => m.default ?? m);
                 app.locals = app.locals || {};
                 app.locals.runtimeReadiness = {
                     nerv: Boolean(nerv),
@@ -361,7 +291,7 @@ async function bootstrap(options = {}) {
    ENTRYPOINT CONTROL
 ========================================================================== */
 
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
    (async () => {
        try {
            await bootstrap();
@@ -372,4 +302,4 @@ if (require.main === module) {
    })();
 }
 
-module.exports = bootstrap;
+export default bootstrap;

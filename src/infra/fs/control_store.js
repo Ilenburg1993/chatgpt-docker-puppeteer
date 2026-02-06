@@ -1,22 +1,13 @@
-/* ==========================================================================
-   src/infra/fs/control_store.js
-   Audit Level: 100 — Industrial Hardening
-   Responsabilidade: Gestão de sinais de controle global (Pausa/Resumo).
-========================================================================== */
-
-const { CONTROL_FILE, safeReadJSON } = require('./fs_core');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
+import { CONTROL, safeReadJSON } from './fs_core.js';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 async function checkControlPause() {
     try {
-        const control = await safeReadJSON(CONTROL_FILE);
+        const control = await safeReadJSON(CONTROL);
         return control && control.estado === STATUS_VALUES.PAUSED;
     } catch (e) {
         return false; // Em caso de erro, assume execução normal
     }
 }
 
-module.exports = { checkControlPause };
+export { checkControlPause };

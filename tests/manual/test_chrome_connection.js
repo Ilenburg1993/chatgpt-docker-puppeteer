@@ -1,16 +1,4 @@
-/* ==========================================================================
-   tests/test_chrome_connection.js
-   Teste de conexão com Chrome externo (Windows host)
-
-   Uso:
-    1. Iniciar Chrome no Windows:
-     chrome.exe --remote-debugging-port=9225 --user-data-dir="C:\chrome-automation-profile"
-
-   2. Executar teste:
-      node tests/test_chrome_connection.js
-========================================================================== */
-
-const puppeteer = require('puppeteer-core');
+import puppeteer from 'puppeteer-core';
 
 const CHROME_URL = process.env.CHROME_REMOTE_URL || 'http://host.docker.internal:9225';
 

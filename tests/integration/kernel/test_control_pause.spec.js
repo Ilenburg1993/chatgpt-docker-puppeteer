@@ -1,9 +1,6 @@
-// tests/test_control_pause.js
-// Verifica obediência aos estados PAUSED e RUN do controle.json
-
-const fs = require('fs');
-const path = require('path');
-const { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, ROOT } = require('./helpers');
+import fs from 'node:fs';
+import path from 'node:path';
+import { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, ROOT } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Controle de Pausa Dinâmica ===');

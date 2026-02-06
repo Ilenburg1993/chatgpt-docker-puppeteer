@@ -1,19 +1,4 @@
-/* ==========================================================================
-   tests/test_chrome_proxy_v2.js
-   Unit Tests for ChromeProxyService v2.0
-
-   Tests:
-   - Config validation
-   - Circuit breaker
-   - URL rewriting
-   - CORS headers
-   - Cache behavior
-========================================================================== */
-
-// Setup module aliases before requiring the service
-require('module-alias/register');
-
-const assert = require('assert');
+import assert from 'node:assert';
 
 console.log('[TEST] ChromeProxyService v2.0 - Starting tests...\n');
 
@@ -34,8 +19,7 @@ const mockConfig = {
     CHROME_PROXY_BIND: '0.0.0.0'
 };
 
-// Inject mocks before requiring
-const Module = require('module');
+import Module from 'node:module';
 const originalRequire = Module.prototype.require;
 Module.prototype.require = function (id) {
     if (id.includes('core/logger') || id === '@core/logger') {
@@ -47,7 +31,7 @@ Module.prototype.require = function (id) {
     return originalRequire.apply(this, arguments);
 };
 
-const ChromeProxyService = require('../src/infra/proxy/chromeProxyService');
+import ChromeProxyService from '#infra/proxy/chromeProxyService';
 
 /* ==========================================================================
    Test 1: Config Validation

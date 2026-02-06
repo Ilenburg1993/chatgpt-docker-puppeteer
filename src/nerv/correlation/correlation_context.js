@@ -142,4 +142,4 @@ function createCorrelationContext({ store, telemetry }) {
     });
 }
 
-module.exports = createCorrelationContext;
+export default createCorrelationContext;

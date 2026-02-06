@@ -1,24 +1,8 @@
-/* ==========================================================================
-   src/orchestrator/orchestrator_engine.js
-   Audit Level: 100 — Orchestrator Engine (Mission Orchestration Platform V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Motor central de orquestração de missões autônomas.
-                     Implementa estratégias: SINGLE_SHOT, ITERATIVE, MULTI_STEP.
-
-   NERV Integration: Totalmente integrado com NERV bus para zero-coupling.
-
-   Architecture:
-   - Recebe tasks V5 com execution strategies
-   - Gerencia iterações, validação e workflows
-   - Emite eventos NERV para observabilidade
-   - Integra com ValidationService para quality control
-========================================================================== */
-
-const { ValidationService } = require('./validation/validation_service');
-const { ContextManager } = require('./context_manager');
-const logger = require('@core/logger');
-const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import { ValidationService } from './validation/validation_service.js';
+import { ContextManager } from './context_manager.js';
+import * as logger from '#core/logger';
+import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 /**
  * OrchestratorEngine - Motor de orquestração de missões.
@@ -484,4 +468,4 @@ class OrchestratorEngine {
     }
 }
 
-module.exports = { OrchestratorEngine };
+export { OrchestratorEngine };

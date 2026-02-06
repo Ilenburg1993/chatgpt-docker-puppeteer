@@ -1,26 +1,12 @@
-/* ==========================================================================
-   tests/integration/test_phase2_integration.spec.js
-   Phase 2 Integration Smoke Tests
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Validar integração completa Phase 2 Backend
-     - Testar: FeedbackProcessor + CheckpointManager + MissionManager
-     - Testar: Crash recovery end-to-end
-     - Testar: Novos ActionCodes NERV acessíveis
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, before, after } = require('node:test');
-const { MissionManager, MISSION_STATUS } = require('../../src/missions/mission_manager');
-const { FeedbackProcessor, FEEDBACK_CATEGORY } = require('../../src/missions/feedback_processor');
-const { CheckpointManager } = require('../../src/orchestrator/checkpoint_manager');
-const { ContextManager } = require('../../src/orchestrator/context_manager');
-const { ActionCode } = require('../../src/shared/nerv/constants');
-const path = require('path');
-const fs = require('fs/promises');
+import assert from 'node:assert';
+import { describe, it, before, after } from 'node:test';
+import { MissionManager, MISSION_STATUS } from '#missions/mission_manager';
+import { FeedbackProcessor, FEEDBACK_CATEGORY } from '#missions/feedback_processor';
+import { CheckpointManager } from '#orchestrator/checkpoint_manager';
+import { ContextManager } from '#orchestrator/context_manager';
+import { ActionCode } from '#shared/nerv/constants';
+import path from 'node:path';
+import fs from 'fs/promises';
 
 describe('Phase 2 Integration Smoke Tests', () => {
     let missionManager;
@@ -44,7 +30,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
     };
 
     before(async () => {
-        testMissionsDir = path.join(__dirname, '../../missions-test-phase2');
+        testMissionsDir = path.join(import.meta.dirname, '../../missions-test-phase2');
         await fs.mkdir(testMissionsDir, { recursive: true });
 
         const contextManager = new ContextManager();

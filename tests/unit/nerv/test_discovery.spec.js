@@ -1,13 +1,9 @@
-// Ensure module aliases (e.g., @core, @infra) are registered for tests
-require('module-alias/register');
-
-const { test } = require('node:test');
-const assert = require('assert');
-const fs = require('fs');
-
-const PATHS = require('../../../src/infra/fs/paths');
-const Discovery = require('../../../src/nerv/discovery');
-const { ActionCode } = require('../../../src/shared/nerv/constants');
+import { test } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import * as PATHS from '#infra/fs/paths';
+import * as Discovery from '#nerv/discovery';
+import { ActionCode } from '#shared/nerv/constants';
 
 function makeMockNerv() {
     let listeners = [];

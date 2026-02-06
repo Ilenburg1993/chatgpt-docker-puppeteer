@@ -1,40 +1,14 @@
-/* ==========================================================================
-   src/infra/proxy/chromeProxyService.js
-   Chrome DevTools Protocol WebSocket Proxy (v2.0 - Hardened)
-
-   CHANGELOG v2.0:
-   - ✅ CORS whitelist (security fix)
-   - ✅ Error handling structured (replaced void err)
-   - ✅ Rate limiting active (1000 req/min)
-   - ✅ Idle timeout 5min (LLM-friendly)
-   - ✅ Config validation (fail-fast)
-   - ✅ Circuit breaker (resilience)
-   - ✅ Retry with backoff (transient failures)
-   - ✅ Enhanced health check (validates Chrome)
-   - ✅ Metrics with labels (method/status/path)
-   - ✅ Request tracing (correlation IDs)
-   - ✅ Compression (gzip)
-   - ✅ Cache /json/version (30s TTL)
-   - ✅ Keep-alive (ping/pong)
-   - ✅ Graceful shutdown with timeout
-   - ✅ Better PUBLIC_IP detection (Docker-aware)
-
-   Exporta: ChromeProxyService (start/stop)
-========================================================================== */
-
-const http = require('http');
-const net = require('net');
-const os = require('os');
-const { promisify } = require('util');
-
-const express = require('express');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const compression = require('compression');
-const logger = require('../../core/logger');
-const { AsyncLocalStorage } = require('async_hooks');
-const { v4: uuidv4 } = require('uuid');
-const promClient = require('prom-client');
+import http from 'node:http';
+import net from 'node:net';
+import os from 'node:os';
+import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import compression from 'compression';
+import * as logger from '#core/logger';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { v4 as uuidv4 } from 'uuid';
+import promClient from 'prom-client';
 
 // NERV integration (optional) - lazy loaded
 let createNERV = null;
@@ -42,8 +16,7 @@ let HighLevelNERV = null;
 let ActionCode = null;
 let ActorRole = null;
 
-// Importa configuração centralizada
-const CONFIG = require('../../core/config');
+import CONFIG from '#core/config';
 
 // Configurações locais do proxy (sobrescrevem CONFIG se fornecidas via env)
 const LOCAL_CONFIG = {
@@ -210,9 +183,25 @@ class ChromeProxyService {
             this.config.PUBLIC_IP = this._detectPublicIP();
         }
 
-        // Initialize http-proxy
+        // Initialize http-proxy (async — stores promise)
+        this._proxyReady = this._initProxy();
+
+        // Idle connection cleanup (5 minutes for LLM sessions)
+        this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '300000', 10);
+        this._idleCheckInterval = setInterval(
+            () => this._cleanupIdleConnections(),
+            Math.max(10000, this._idleTimeoutMs / 2)
+        );
+    }
+
+    /**
+     * Async initializer for http-proxy.
+     * Called from the constructor; result stored in this._proxyReady.
+     * @private
+     */
+    async _initProxy() {
         try {
-            const httpProxy = require('http-proxy');
+            const httpProxy = await import('http-proxy').then(m => m.default ?? m);
             this.wsProxy = httpProxy.createProxyServer({
                 target: `http://${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`,
                 ws: true,
@@ -235,16 +224,9 @@ class ChromeProxyService {
             this.wsProxy = null;
             this.log('warn', 'http-proxy unavailable, falling back to raw socket method');
         }
-
-        // Idle connection cleanup (5 minutes for LLM sessions)
-        this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '300000', 10);
-        this._idleCheckInterval = setInterval(
-            () => this._cleanupIdleConnections(),
-            Math.max(10000, this._idleTimeoutMs / 2)
-        );
     }
 
-    /* ======================================================================
+        /* ======================================================================
        Configuration Validation
     ====================================================================== */
     _validateConfig() {
@@ -914,10 +896,10 @@ class ChromeProxyService {
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
-                const nervModule = require('../../nerv/nerv');
+                const nervModule = await import('#nerv/nerv').then(m => m.default ?? m);
                 createNERV = nervModule?.createNERV || null;
-                HighLevelNERV = require('../../nerv/adapters/high_level_adapter');
-                const nervConsts = require('../../shared/nerv/constants');
+                HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
+                const nervConsts = await import('#shared/nerv/constants').then(m => m.default ?? m);
                 ActionCode = nervConsts?.ActionCode || nervConsts;
                 ActorRole = nervConsts?.ActorRole || {};
 
@@ -1112,4 +1094,4 @@ class ChromeProxyService {
     }
 }
 
-module.exports = ChromeProxyService;
+export default ChromeProxyService;

@@ -49,4 +49,4 @@ function checkPhysicalIntegrity(task, stats) {
     return { ok: true, reason: null };
 }
 
-module.exports = { checkPhysicalIntegrity };
+export { checkPhysicalIntegrity };

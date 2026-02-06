@@ -1,12 +1,4 @@
-#!/usr/bin/env node
-/**
- * Dedicated health check script for Docker HEALTHCHECK
- * - Faster startup than inline node -e
- * - Better error reporting
- * - Timeout protection
- */
-
-const http = require('http');
+#!/usr/bin/env nodeimport http from 'node:http';
 
 const options = {
     hostname: 'localhost',

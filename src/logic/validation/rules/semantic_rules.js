@@ -54,7 +54,4 @@ function compileForbiddenList(systemTerms = [], userTerms = []) {
         .map(t => t.trim().toLowerCase());
 }
 
-module.exports = {
-    evaluateLine,
-    compileForbiddenList
-};
+export { evaluateLine, compileForbiddenList };

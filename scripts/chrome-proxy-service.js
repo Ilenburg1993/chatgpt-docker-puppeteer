@@ -1,13 +1,4 @@
-#!/usr/bin/env node
-/*
- * Lightweight CLI wrapper for the ChromeProxyService module.
- * This file intentionally exposes a `class ChromeProxyService` wrapper so
- * static-file checks (tests) that look for the class and method names
- * succeed while delegating implementation to `src/infra/proxy/chromeProxyService`.
- */
-
-require('module-alias/register');
-const _Impl = require('../src/infra/proxy/chromeProxyService');
+#!/usr/bin/env nodeimport _Impl from '#infra/proxy/chromeProxyService';
 
 // Wrapper class - re-exposes important method names for static checks
 // and delegates to the real implementation.
@@ -53,9 +44,6 @@ async function main() {
     }
 }
 
-if (require.main === module) main();
+if (import.meta.filename === process.argv[1]) main();
 
-/* ==========================================================================
-   EXPORTS (for programmatic usage)
-========================================================================== */
-module.exports = ChromeProxyService;
+export default ChromeProxyService;

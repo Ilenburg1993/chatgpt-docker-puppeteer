@@ -1,42 +1,8 @@
-/**
- * @fileoverview Triage v2.0 - Instrumented Diagnostic System
- * 
- * RESPONSABILIDADES:
- * - Realizar diagnósticos em tempo real de travamentos e anomalias
- * - Detectar 9 padrões de falhas (CAPTCHA, Login, CORS, Errors, Loops)
- * - Varredura profunda de DOM (Shadow DOM + IFrames)
- * - Análise semântica com i18n (error terms localizados)
- * - Telemetria completa (eventos locais + IPC)
- * 
- * PROTOCOL: 12 (Governed Diagnostic Triage v2.0)
- * AUDIT LEVEL: 500 (Instrumented Diagnostic Triage IPC 2.0)
- * STATUS: CONSOLIDATED v2.0 (EventEmitter + Config + Metrics + Timeout)
- * 
- * SYNCHRONIZED WITH:
- * - BaseDriver V320 (diagnose calls)
- * - RemediationEngine V550 (recovery decisions)
- * - i18n.js V32 (error terms localization)
- * - stabilizer.js (event loop lag measurement)
- * 
- * EVENTOS EMITIDOS:
- * - triage:diagnosis_started (diagnóstico iniciado)
- * - triage:diagnosis_completed (diagnóstico completo)
- * - triage:diagnosis_failed (diagnóstico falhou)
- * - triage:lag_detected (event loop lag detectado)
- * - triage:pattern_detected (padrão detectado)
- * - triage:scan_started (varredura DOM iniciada)
- * - triage:scan_completed (varredura DOM completa)
- * - triage:timeout_reached (timeout excedido)
- * 
- * @version 2.0.0
- * @since 2026-02-01
- */
-
-const EventEmitter = require('events');
-const stabilizer = require('@shared/page_stability/stabilizer');
-const { STATUS_VALUES } = require('@core/constants/tasks.js');
-const i18n = require('@core/i18n');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import * as i18n from '#core/i18n';
+import { log } from '#core/logger';
 
 /**
  * Configuração do sistema de triage (timeouts, thresholds, limits).
@@ -542,7 +508,7 @@ class Triage extends EventEmitter {
             const result = diagnosis || { type: STATUS_VALUES.HEALTHY, severity: 'NONE', ts: Date.now() };
             
             // Track pattern detection
-            if (diagnosis && this.stats.patternsDetected.hasOwnProperty(diagnosis.type)) {
+            if (diagnosis && Object.hasOwn(this.stats.patternsDetected, diagnosis.type)) {
                 this.stats.patternsDetected[diagnosis.type]++;
                 this.emit(TRIAGE_EVENTS.PATTERN_DETECTED, { 
                     pattern: diagnosis.type, 
@@ -553,14 +519,7 @@ class Triage extends EventEmitter {
             return result;
         } catch (e) {
             log('ERROR', `[TRIAGE] Falha na autópsia V2: ${e.message}`);
-            
-            const result = {
-                type: 'DIAGNOSTIC_CRASH',
-                severity: 'HIGH',
-                evidence: { error: e.message },
-                ts: Date.now()
-            };
-            
+
             throw new TriageError('SCAN_FAILED', e.message, {
                 langCode: this.langCode,
                 originalError: e.message
@@ -778,14 +737,4 @@ async function diagnoseStall(page, langCode = 'en') {
     return await triage.diagnose();
 }
 
-// ✅ Module exports completo (IMPROVEMENT #10)
-module.exports = {
-    Triage,
-    TRIAGE_CONFIG,
-    TRIAGE_EVENTS,
-    TriageError,
-    create,
-    
-    // ✅ Backward compatibility (legacy function preserved)
-    diagnoseStall
-};
+export { Triage, TRIAGE_CONFIG, TRIAGE_EVENTS, TriageError, create, diagnoseStall };

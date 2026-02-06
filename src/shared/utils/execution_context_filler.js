@@ -1,26 +1,6 @@
-/* ==========================================================================
-   src/shared/utils/execution_context_filler.js
-   Audit Level: 100 — Execution Context Filler (V5 Integration)
-   Status: PRODUCTION READY
-   Responsabilidade: Preencher execution context de tasks V5 com dados do ambiente.
-
-   USO:
-   const { fillExecutionContext } = require('@shared/utils/execution_context_filler');
-
-   // Antes de executar task
-   fillExecutionContext(task, { driver, browserPool });
-
-   // Ou após execução bem-sucedida
-   fillExecutionContext(task, {
-       driver: driverInstance,
-       browserPool: poolManager,
-       tacticalAttempts: 2,
-       strategicAttempts: 1
-   });
-========================================================================== */
-
-const os = require('os');
-const logger = require('@core/logger');
+import os from 'node:os';
+import * as logger from '#core/logger';
+import fs from 'node:fs';
 
 /**
  * Preenche execution context de uma task V5.
@@ -114,7 +94,6 @@ function fillExecutionContext(task, options) {
  */
 function _detectContainer() {
     try {
-        const fs = require('fs');
         // Método 1: Verifica /.dockerenv
         if (fs.existsSync('/.dockerenv')) {
             return true;
@@ -141,7 +120,7 @@ function _detectContainer() {
  * @returns {string} Chrome version ou 'unknown'
  * @private
  */
-function _getChromeVersion(browserPool) {
+async function _getChromeVersion(browserPool) {
     try {
         // Tenta obter versão do browserPool
         if (browserPool?.browser?.version) {
@@ -149,7 +128,7 @@ function _getChromeVersion(browserPool) {
         }
 
         // Fallback: tenta obter via puppeteer
-        const puppeteer = require('puppeteer');
+        const puppeteer = await import('puppeteer').then(m => m.default ?? m);
         if (puppeteer.executablePath) {
             // Versão está embutida no path geralmente
             return 'unknown';
@@ -236,8 +215,4 @@ function incrementStrategicAttempts(task, errorRecovered, backoffMs) {
     });
 }
 
-module.exports = {
-    fillExecutionContext,
-    incrementTacticalAttempts,
-    incrementStrategicAttempts,
-};
+export { fillExecutionContext, incrementTacticalAttempts, incrementStrategicAttempts };

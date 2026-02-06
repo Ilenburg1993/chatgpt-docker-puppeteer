@@ -1,13 +1,4 @@
-/* ==========================================================================
-   src/infra/ipc/buffer.js
-   Audit Level: 450 — Resilient Outbox Buffer (IPC 2.0)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Gerenciar a fila de saída (Outbox) para mensagens pendentes.
-                     Garante a persistência em RAM durante blackouts de rede
-                     e o replay ordenado (FIFO) após a reconexão.
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 class IPCBuffer {
     /**
@@ -67,4 +58,4 @@ class IPCBuffer {
     }
 }
 
-module.exports = IPCBuffer;
+export default IPCBuffer;

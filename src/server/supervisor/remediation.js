@@ -1,19 +1,6 @@
-/* ==========================================================================
-   src/server/supervisor/remediation.js
-   Audit Level: 700 — Remediation Logic Engine (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Atuar como a inteligência prescritiva do sistema.
-                     Traduz diagnósticos de stall em manobras de autocura.
-   Sincronizado com: reconciler.js V700, triage.js V70, constants.js V400.
-========================================================================== */
-
-const { ActionCode } = require('@shared/nerv/constants');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
-
-const { log } = require('@core/logger');
+import { ActionCode } from '#shared/nerv/constants';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import { log } from '#core/logger';
 
 /**
  * Tabela de Políticas de Remediação (The Remediation Matrix).
@@ -142,5 +129,4 @@ class RemediationEngine {
     }
 }
 
-// Exporta como Singleton (Pure Logic Engine)
-module.exports = new RemediationEngine();
+export default new RemediationEngine();

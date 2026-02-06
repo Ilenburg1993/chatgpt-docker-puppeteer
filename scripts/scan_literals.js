@@ -1,15 +1,8 @@
-#!/usr/bin/env node
-/**
- * Scan híbrido: Grep + AST para identificar magic strings candidatos a constantes
- * Fase 1: Grep patterns (rápido, wide net)
- * Fase 2: AST analysis (preciso, validação)
- */
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'src');
 const TESTS = path.join(ROOT, 'tests');
 

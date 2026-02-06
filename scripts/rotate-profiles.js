@@ -1,23 +1,8 @@
-#!/usr/bin/env node
+#!/usr/bin/env nodeimport { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { log } from '#core/logger';
 
-/* ==========================================================================
-   scripts/rotate-profiles.js
-   Profile Rotation Job - Prevents indefinite disk usage growth
-
-   Rotaciona profiles persistentes do Chrome (profile/) para evitar
-   crescimento descontrolado de cache/cookies/localStorage.
-
-   Uso:
-   - Manual: node scripts/rotate-profiles.js
-   - Cron: 0 2 * * 0 (todo domingo às 2h)
-   - npm script: npm run profiles:rotate
-========================================================================== */
-
-const fs = require('fs').promises;
-const path = require('path');
-const { log } = require('../src/core/logger');
-
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..');
 const PROFILE_DIR = path.join(ROOT, 'profile');
 const BACKUP_DIR = path.join(ROOT, 'profile_backups');
 const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
@@ -243,13 +228,8 @@ async function main() {
 }
 
 // Executar se chamado diretamente
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-module.exports = {
-    rotateProfile,
-    cleanOldBackups,
-    getBackupStats,
-    getDirectorySize
-};
+export { rotateProfile, cleanOldBackups, getBackupStats, getDirectorySize };

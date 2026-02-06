@@ -1,19 +1,6 @@
-/* ==========================================================================
-   src/driver/extractors/structured_extractor.js
-   Structured Response Extractor V2.0
-
-   Responsabilidade:
-   - Extrair resposta LLM em múltiplos formatos (HTML, Markdown, JSON)
-   - Preservar estrutura completa (code blocks, links, images, tables)
-   - Remover thought blocks (o1/o3 reasoning)
-
-   Histórico:
-   - 2026-02-04: Criado (Response Capture V2.0)
-========================================================================== */
-
-const TurndownService = require('turndown');
-const { parse: parseHTML } = require('node-html-parser');
-const logger = require('@core/logger');
+import TurndownService from 'turndown';
+import { parse as parseHTML } from 'node-html-parser';
+import * as logger from '#core/logger';
 
 /**
  * StructuredExtractor - Extrai resposta LLM em múltiplos formatos
@@ -413,4 +400,4 @@ class StructuredExtractor {
     }
 }
 
-module.exports = StructuredExtractor;
+export default StructuredExtractor;

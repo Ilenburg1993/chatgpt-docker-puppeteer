@@ -1,13 +1,4 @@
-/* ==========================================================================
-   src/server/middleware/error_handler.js
-   Audit Level: 600 — API Error Boundary (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Capturar falhas em cascata, prevenir o colapso do processo
-                     e prover respostas de erro rastreáveis via Request ID.
-   Sincronizado com: request_id.js V50, logger.js V40, app.js V100.
-========================================================================== */
-
-const { log, audit } = require('@core/logger');
+import { log, audit } from '#core/logger';
 
 /**
  * Middleware para tratamento de rotas não localizadas (404).
@@ -69,7 +60,4 @@ function errorHandler(err, req, res, next) {
     });
 }
 
-module.exports = {
-    notFound,
-    errorHandler
-};
+export { notFound, errorHandler };

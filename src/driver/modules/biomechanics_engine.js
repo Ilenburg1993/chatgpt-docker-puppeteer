@@ -1,52 +1,10 @@
-/**
- * @fileoverview BiomechanicsEngine v2.0 - Instrumented Biomechanics Engine
- *
- * RESPONSABILIDADES:
- * - Gerenciar execução física de interações (click, type, scroll)
- * - Detectar platform/modifier keys (Meta/Control/mobile)
- * - Coordenar digitação biomimética (human mode vs zen mode)
- * - Reportar telemetria biomecânica em tempo real (eventos + IPC)
- * - Rastrear métricas de interações (clicks, typing, scrolls)
- *
- * PROTOCOL: 12 (Governed Biomechanics v2.0)
- * AUDIT LEVEL: 500 (Instrumented Biomechanics Engine)
- * STATUS: CONSOLIDATED v2.0 (EventEmitter + Config + Metrics + Timeout)
- *
- * SYNCHRONIZED WITH:
- * - BaseDriver V320 (driver integration)
- * - human.js V500 (biomimetic typing + clicking)
- * - stabilizer.js V500 (page stability + lag measurement)
- * - analyzer.js V500 (response area detection)
- * - adaptive.js V500 (timeout adjustment)
- *
- * EVENTOS EMITIDOS:
- * - biomech:prepare_started (preparação de elemento iniciada)
- * - biomech:prepare_completed (preparação concluída)
- * - biomech:scroll_started (scroll iniciado)
- * - biomech:scroll_completed (scroll concluído)
- * - biomech:typing_started (digitação iniciada)
- * - biomech:typing_completed (digitação concluída)
- * - biomech:zen_mode_activated (zen mode ativado)
- * - biomech:human_mode_activated (human mode ativado)
- * - biomech:clear_started (limpeza iniciada)
- * - biomech:clear_completed (limpeza concluída)
- * - biomech:wait_started (espera iniciada)
- * - biomech:wait_completed (espera concluída)
- * - biomech:modifiers_release_started (release de modifiers iniciado)
- * - biomech:modifiers_release_completed (release concluído)
- *
- * @version 2.0.0
- * @since 2026-02-01
- */
-
-const EventEmitter = require('events');
-const human = require('@shared/biomechanics/human');
-const { CONNECTION_MODES } = require('@core/constants/browser.js');
-const { STATUS_VALUES } = require('@core/constants/tasks.js');
-const analyzer = require('@shared/sadi/analyzer');
-const stabilizer = require('@shared/page_stability/stabilizer');
-const adaptive = require('@logic/adaptive');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import * as human from '#shared/biomechanics/human';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import * as analyzer from '#shared/sadi/analyzer';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import * as adaptive from '#logic/adaptive';
+import { log } from '#core/logger';
 
 /**
  * Configuração de timeouts, thresholds e delays para biomechanics.
@@ -863,10 +821,4 @@ function create(driver) {
     return new BiomechanicsEngine(driver);
 }
 
-// ✅ Module exports completo (IMPROVEMENT #10)
-module.exports = {
-    BiomechanicsEngine,
-    BIOMECH_CONFIG,
-    BIOMECH_EVENTS,
-    create
-};
+export { BiomechanicsEngine, BIOMECH_CONFIG, BIOMECH_EVENTS, create };

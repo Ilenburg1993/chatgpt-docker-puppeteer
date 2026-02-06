@@ -1,14 +1,5 @@
-/* ==========================================================================
-   src/core/schemas/task_healer.js
-   Audit Level: 100 — Industrial Hardening (High-Performance Healing)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Normalizar e curar objetos de tarefa, convertendo formatos
-                     legados (V1/V2/V3) para o padrão estrito V4 Gold.
-   Sincronizado com: task_schema.js (V1.1), shared_types.js (V1.1).
-========================================================================== */
-
-const { TaskSchema } = require('./task_schema');
-const { log } = require('../logger');
+import { TaskSchema } from './task_schema.js';
+import { log } from '../logger.js';
 
 /**
  * HEAL_TASK: O Motor de Normalização e Cura.
@@ -17,7 +8,7 @@ const { log } = require('../logger');
  * @param {object} raw - Objeto bruto vindo da fila, API ou scripts.
  * @returns {object} Tarefa validada e curada conforme o Schema V4.
  */
- 
+
 function healTask(raw) {
     if (!raw || typeof raw !== 'object') {
         throw new Error('[HEALER] Input inválido: A tarefa deve ser um objeto.');
@@ -87,4 +78,4 @@ function healTask(raw) {
     }
 }
 
-module.exports = { healTask };
+export { healTask };

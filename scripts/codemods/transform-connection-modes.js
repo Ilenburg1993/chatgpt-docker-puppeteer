@@ -1,16 +1,4 @@
-/**
- * Codemod: Replace connection mode magic strings with constants
- *
- * Transforms:
- *   'hybrid' → CONNECTION_MODES.HYBRID
- *   'local' → CONNECTION_MODES.LOCAL
- *   etc.
- *
- * Usage:
- *   npx jscodeshift -t scripts/codemods/transform-connection-modes.js src/path/to/file.js
- */
-
-const path = require('path');
+import path from 'node:path';
 
 function getImportPath(filePath, targetPath) {
     const relativePath = path.relative(path.dirname(filePath), targetPath);

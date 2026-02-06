@@ -1,4 +1,4 @@
-const BrowserPoolManager = require('../../../src/infra/browser_pool/pool_manager');
+import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
 (async () => {
     console.log('🚀 Testando BrowserPoolManager...');

@@ -48,4 +48,4 @@ function assertSafetyDepth(depth) {
     return true;
 }
 
-module.exports = { assertSafetyDepth, MAX_RECURSION_DEPTH };
+export { assertSafetyDepth, MAX_RECURSION_DEPTH };

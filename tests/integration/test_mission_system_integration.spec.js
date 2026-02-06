@@ -1,25 +1,10 @@
-/* ==========================================================================
-   tests/integration/test_mission_system_integration.spec.js
-   Integration Test: Mission System Integration
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Testa integração completa do sistema de missões
-     - Verifica boot sequence com MissionManager
-     - Valida REST API endpoints
-     - Testa execução end-to-end (MissionManager → Kernel → OrchestratorEngine)
-========================================================================== */
-
-// IMPORTANTE: Ativa path aliases (@core, @shared, etc.)
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, before, after } = require('node:test');
-const { MissionManager } = require('../../src/missions/mission_manager');
-const { createNERV } = require('../../src/nerv/nerv');
-const { createKernel } = require('../../src/kernel/kernel');
-const fs = require('fs/promises');
-const path = require('path');
+import assert from 'node:assert';
+import { describe, it, before, after } from 'node:test';
+import { MissionManager } from '#missions/mission_manager';
+import { createNERV } from '#nerv/nerv';
+import { createKernel } from '#kernel/kernel';
+import fs from 'fs/promises';
+import path from 'node:path';
 
 /**
  * Suite de testes de integração do sistema de missões.
@@ -35,7 +20,7 @@ describe('Mission System Integration (E2E)', () => {
     let nerv;
     let kernel;
     let missionManager;
-    const testMissionsDir = path.join(__dirname, '../../missions-test');
+    const testMissionsDir = path.join(import.meta.dirname, '../../missions-test');
 
     before(async () => {
         // Setup: Cria diretório temporário para missões de teste
@@ -87,7 +72,7 @@ describe('Mission System Integration (E2E)', () => {
             assert.ok(kernel, 'Kernel deveria estar rodando');
 
             // 4. Inicializa MissionManager
-            const { MissionStateManager } = require('../../src/missions/mission_state_manager');
+            const { MissionStateManager } = await import('#missions/mission_state_manager');
             const stateManager = new MissionStateManager({ baseDir: testMissionsDir });
 
             missionManager = new MissionManager({

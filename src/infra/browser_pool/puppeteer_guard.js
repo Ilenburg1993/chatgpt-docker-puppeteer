@@ -48,12 +48,10 @@
  * Basta importar este módulo UMA vez, cedo no boot.
  *
  * Exemplo:
- *   require('./infra/browser_pool/puppeteer_launch_guard');
+ *   import './infra/browser_pool/puppeteer_guard.js';
  *
  * ============================================================================
  */
-
-'use strict';
 
 /**
  * Mensagem única e canônica de violação arquitetural.
@@ -71,71 +69,68 @@ const ARCH_VIOLATION_MESSAGE =
  */
 const isLaunchDisabled = process.env.PUPPETEER_LOCAL_LAUNCH_DISABLED === 'true';
 
-if (!isLaunchDisabled) {
-    // Arquitetura não está em modo restritivo → não interfere
-    module.exports = { active: false };
-    return;
-}
+let active = false;
+let guarded = false;
+let originalLaunch = null;
 
-/**
- * Tentativa defensiva de carregar puppeteer-core.
- * Não falha se não estiver presente (ambientes parciais, testes, lint, etc).
- */
-let puppeteer;
-
-try {
-    puppeteer = require('puppeteer-core');
-} catch (err) {
-    // puppeteer-core não carregado — ambiente ainda não o requer
-    module.exports = { active: true, guarded: false };
-    return;
-}
-
-/**
- * Aplica o guard apenas se `launch` existir e for função.
- * Isso cobre:
- * - puppeteer-core
- * - puppeteer-extra (que reexporta launch)
- */
-if (puppeteer && typeof puppeteer.launch === 'function') {
-    const originalLaunch = puppeteer.launch;
+if (isLaunchDisabled) {
+    // Arquitetura está em modo restritivo — aplica o guard
+    active = true;
 
     /**
-     * Substituição explícita.
-     * NÃO chama o original.
-     * NÃO tenta fallback.
-     * Falha de forma inequívoca.
+     * Tentativa defensiva de carregar puppeteer-core.
+     * Não falha se não estiver presente (ambientes parciais, testes, lint, etc).
      */
-    puppeteer.launch = function forbiddenLaunch() {
-        const error = new Error(ARCH_VIOLATION_MESSAGE);
-
-        // Metadados úteis para forensics / logs estruturados
-        error.code = 'ARCH_FORBIDDEN_PUPPETEER_LAUNCH';
-        error.originalFunction = 'puppeteer.launch';
-        error.replacedBy = 'puppeteer.connect';
-
-        throw error;
-    };
-
-    /**
-     * Congela a propriedade para impedir redefinição posterior.
-     * (best-effort: não falha se não for possível)
-     */
+    let puppeteer = null;
     try {
-        Object.defineProperty(puppeteer, 'launch', {
-            configurable: false,
-            writable: false
-        });
+        puppeteer = await import('puppeteer-core');
+        // handle default export: puppeteer-core might export via default
+        if (puppeteer.default) puppeteer = puppeteer.default;
     } catch (_) {
-        // Ambiente não permite redefinir property — ignora
+        // puppeteer-core não carregado — ambiente ainda não o requer
     }
 
-    module.exports = {
-        active: true,
-        guarded: true,
-        originalLaunch: originalLaunch
-    };
-} else {
-    // puppeteer carregado, mas sem launch (edge case)
-    module.exports = { active: true, guarded: false };
+    /**
+     * Aplica o guard apenas se `launch` existir e for função.
+     * Isso cobre:
+     * - puppeteer-core
+     * - puppeteer-extra (que reexporta launch)
+     */
+    if (puppeteer && typeof puppeteer.launch === 'function') {
+        originalLaunch = puppeteer.launch;
+
+        /**
+         * Substituição explícita.
+         * NÃO chama o original.
+         * NÃO tenta fallback.
+         * Falha de forma inequívoca.
+         */
+        puppeteer.launch = function forbiddenLaunch() {
+            const error = new Error(ARCH_VIOLATION_MESSAGE);
+
+            // Metadados úteis para forensics / logs estruturados
+            error.code = 'ARCH_FORBIDDEN_PUPPETEER_LAUNCH';
+            error.originalFunction = 'puppeteer.launch';
+            error.replacedBy = 'puppeteer.connect';
+
+            throw error;
+        };
+
+        /**
+         * Congela a propriedade para impedir redefinição posterior.
+         * (best-effort: não falha se não for possível)
+         */
+        try {
+            Object.defineProperty(puppeteer, 'launch', {
+                configurable: false,
+                writable: false
+            });
+        } catch (_) {
+            // Ambiente não permite redefinir property — ignora
+        }
+
+        guarded = true;
+    }
 }
+
+export { active, guarded, originalLaunch };

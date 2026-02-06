@@ -1,21 +1,12 @@
-/* ==========================================================================
-   src/server/api/controllers/tasks.js
-   Audit Level: 700 — Task Domain Controller (Traceability Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Ponto único de autoridade para o ciclo de vida de tarefas,
-                     gestão de fila e entrega de artefatos de resposta.
-   Sincronizado com: io.js V700, request_id.js V600, error_handler.js V600.
-========================================================================== */
-
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import path from 'node:path';
+import fs from 'node:fs';
 const fsp = fs.promises;
 const router = express.Router();
 
-const io = require('@infra/io');
-const schemas = require('@core/schemas');
-const { audit, log } = require('@core/logger');
+import * as io from '#infra/io';
+import * as schemas from '#core/schemas';
+import { audit, log } from '#core/logger';
 
 /* --------------------------------------------------------------------------
    1. OPERAÇÕES DE CONSULTA E CRIAÇÃO (CRUD)
@@ -240,4 +231,4 @@ router.get('/:id', (req, res, next) => {
     downloadResult(req, res);
 });
 
-module.exports = router;
+export default router;

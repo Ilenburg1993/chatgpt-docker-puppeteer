@@ -1,35 +1,5 @@
-/* ==========================================================================
-   src/kernel/telemetry/kernel_telemetry.js
-   Subsistema: KERNEL — Núcleo Soberano de Decisão
-   Módulo: telemetry/
-   Arquivo: kernel_telemetry.js
-
-   Papel:
-   - Tornar observável o estado interno do Kernel
-   - Registrar eventos estruturais via NERV (desacoplado)
-   - Garantir não-silêncio epistemológico
-   - Alimentar dashboards e auditorias
-
-   IMPORTANTE:
-   - NÃO decide
-   - NÃO executa ações
-   - NÃO interpreta o mundo
-   - NÃO fecha causalidade
-   - NÃO corrige estados
-   - USA NERV para emitir (não EventEmitter interno)
-
-   A telemetria é:
-   - Transversal
-   - Estrutural
-   - Obrigatória
-   - Passiva
-   - Desacoplada (via NERV)
-
-   Linguagem: JavaScript (Node.js)
-========================================================================== */
-
-const { ActorRole, MessageType, ActionCode } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // ONDA 2.5: Removido EventEmitter, usa NERV para comunicação
 
@@ -369,7 +339,4 @@ class KernelTelemetry {
     }
 }
 
-module.exports = {
-    KernelTelemetry,
-    TelemetrySeverity
-};
+export { KernelTelemetry, TelemetrySeverity };

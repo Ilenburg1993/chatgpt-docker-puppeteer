@@ -1,18 +1,5 @@
-/* ==========================================================================
-   src/server/dashboard-api/task_sync_bridge.js
-   Dashboard API: Task Sync Bridge
-   Status: NEW (Mission Control v2.0)
-
-   Responsabilidade:
-     - Unificar estado do disco (Queue Cache) com estado em memória (Kernel)
-     - Manter cache de estado runtime para consulta rápida
-     - Escutar eventos NERV para atualização em tempo real
-     - Notificar dashboards conectados via Socket.io
-     - Prover API unificada para consulta de tasks
-========================================================================== */
-
-const EventEmitter = require('events');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import { log } from '#core/logger';
 
 /**
  * Estados unificados para visualização no dashboard.
@@ -108,10 +95,10 @@ class TaskSyncBridge extends EventEmitter {
      * Getter lazy para Queue Cache.
      * Evita dependência circular no boot.
      */
-    get queueCache() {
+    async getQueueCache() {
         if (!this._queueCache) {
             try {
-                this._queueCache = require('@infra/queue/cache');
+                this._queueCache = await import('#infra/queue/cache').then(m => m.default ?? m);
             } catch (err) {
                 log('WARN', `[TaskSyncBridge] Queue cache não disponível: ${err.message}`);
                 return null;
@@ -263,8 +250,9 @@ class TaskSyncBridge extends EventEmitter {
      */
     async getUnifiedTasks() {
         // Busca tasks do disco
-        const diskTasks = this.queueCache
-            ? await this.queueCache.getQueue()
+        const _qc = await this.getQueueCache();
+        const diskTasks = _qc
+            ? await _qc.getQueue()
             : [];
 
         // Unifica com estado do kernel
@@ -281,8 +269,9 @@ class TaskSyncBridge extends EventEmitter {
         if (!taskId) return null;
 
         // Busca do disco
-        const diskTasks = this.queueCache
-            ? await this.queueCache.getQueue()
+        const _qc2 = await this.getQueueCache();
+        const diskTasks = _qc2
+            ? await _qc2.getQueue()
             : [];
 
         const diskTask = diskTasks.find(t =>
@@ -400,6 +389,6 @@ class TaskSyncBridge extends EventEmitter {
 // Singleton instance
 const taskSyncBridge = new TaskSyncBridge();
 
-module.exports = taskSyncBridge;
-module.exports.TaskSyncBridge = TaskSyncBridge;
-module.exports.UnifiedStatus = UnifiedStatus;
+export default taskSyncBridge;
+export { TaskSyncBridge };
+export { UnifiedStatus };

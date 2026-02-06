@@ -1,18 +1,5 @@
-/* ==========================================================================
-   src/kernel/policies/policy_engine.js
-   Audit Level: 830 — The Constitutional Court
-   Status: CONSOLIDATED (Protocol 11)
-   Responsabilidade:
-     - Avaliar o estado atual contra as regras de negócio.
-     - Transformar observações em propostas de ação.
-     - Garantir que o robô não viole limites de segurança (Retries, Timeouts).
-========================================================================== */
-
-const { ActionCode, MessageType } = require('@shared/nerv/constants');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
+import { ActionCode, MessageType } from '#shared/nerv/constants';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 class PolicyEngine {
     constructor(config) {
@@ -111,10 +98,10 @@ class PolicyEngine {
        HELPERS DE BUROCRACIA (Criação de Envelopes de Resposta)
     ========================================================= */
 
-    _createRejectionEnvelope(originalObs, reason) {
+    async _createRejectionEnvelope(originalObs, reason) {
         // Cria um envelope virtual para ser enviado pelo NERV
-        const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
-        const { ActorRole } = require('@shared/nerv/constants');
+        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
+        const { ActorRole } = await import('#shared/nerv/constants');
 
         return HighLevelNERV.makeEnvelope({
             actor: ActorRole.MAESTRO,
@@ -126,9 +113,9 @@ class PolicyEngine {
         });
     }
 
-    _createTaskFailedEnvelope(task, reason) {
-        const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
-        const { ActorRole } = require('@shared/nerv/constants');
+    async _createTaskFailedEnvelope(task, reason) {
+        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
+        const { ActorRole } = await import('#shared/nerv/constants');
 
         return HighLevelNERV.makeEnvelope({
             actor: ActorRole.MAESTRO,
@@ -144,4 +131,4 @@ class PolicyEngine {
     }
 }
 
-module.exports = PolicyEngine;
+export default PolicyEngine;

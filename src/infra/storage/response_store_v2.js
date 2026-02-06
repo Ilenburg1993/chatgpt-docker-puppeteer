@@ -1,21 +1,8 @@
-/* ==========================================================================
-   src/infra/storage/response_store_v2.js
-   Multi-Format Response Storage V2.0
-
-   Responsabilidade:
-   - Salvar resposta LLM em 4 formatos (.txt, .md, .json, .html)
-   - Carregar resposta (backward compatible com V1)
-   - Atomic writes (garantir integridade)
-
-   Histórico:
-   - 2026-02-04: Criado (Response Capture V2.0)
-========================================================================== */
-
-const fs = require('fs').promises;
-const path = require('path');
-const { ROOT } = require('@infra/fs/paths');
-const logger = require('@core/logger');
-const { atomicWrite } = require('@infra/io');
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { ROOT } from '#infra/fs/paths';
+import * as logger from '#core/logger';
+import { atomicWrite } from '#infra/io';
 
 // Diretório de respostas
 const RESPONSE_DIR = path.join(ROOT, 'respostas');
@@ -39,7 +26,7 @@ async function saveResponseV2(taskId, responseData) {
         const basePath = path.join(RESPONSE_DIR, taskId);
 
         // Salvar cada formato (atomic writes)
-        const filePaths = await Promise.all([
+        await Promise.all([
             // 1. Texto plano (compatibilidade V1)
             atomicWrite(`${basePath}.txt`, responseData.content.text, 'utf-8'),
 
@@ -288,10 +275,4 @@ function wrapHTML(htmlContent, taskId) {
 </html>`;
 }
 
-module.exports = {
-    saveResponseV2,
-    loadResponseV2,
-    listAvailableFormats,
-    responseExists,
-    deleteResponseV2,
-};
+export { saveResponseV2, loadResponseV2, listAvailableFormats, responseExists, deleteResponseV2 };

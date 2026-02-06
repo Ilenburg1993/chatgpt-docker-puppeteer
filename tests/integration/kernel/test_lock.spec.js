@@ -1,7 +1,4 @@
-// tests/test_lock.js
-// Testa se dois processos respeitam a exclusão mútua.
-
-const {
+import {
     writeTask,
     readTask,
     startAgent,
@@ -9,8 +6,8 @@ const {
     waitForCondition,
     removeRunLock,
     readLatestGlobalLogTail,
-    sleep
-} = require('./helpers');
+    sleep,
+} from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Lock Atomicidade & Concorrência ===');

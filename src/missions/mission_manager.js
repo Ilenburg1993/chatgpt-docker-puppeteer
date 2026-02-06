@@ -1,29 +1,11 @@
-/* ==========================================================================
-   src/missions/mission_manager.js
-   Audit Level: 100 — Mission Manager (V2.0)
-   Status: PRODUCTION READY
-   Responsabilidade: Gerenciar ciclo de vida completo de missões.
-                     - CRUD operations (create, read, update, delete)
-                     - Execução de missões (gerar tasks V5 e enviar para Kernel)
-                     - Pausar/resumir missões
-                     - Injetar feedback
-                     - Monitorar progresso
-
-   Integra:
-   - MissionStateManager (persistência filesystem)
-   - WorkflowGenerator (gerar workflows de templates)
-   - Kernel (executar tasks V5)
-   - NERV (escutar eventos de conclusão)
-========================================================================== */
-
-const { v4: uuidv4 } = require('uuid');
-const logger = require('@core/logger');
-const { MissionStateManager, MISSION_STATUS } = require('./mission_state_manager');
-const { WorkflowGenerator } = require('./workflow_generator');
-const { ActionCode, MessageType } = require('@shared/nerv/constants');
-const { ContextManager } = require('../orchestrator/context_manager');
-const { FeedbackProcessor } = require('./feedback_processor');
-const { CheckpointManager } = require('../orchestrator/checkpoint_manager');
+import { v4 as uuidv4 } from 'uuid';
+import * as logger from '#core/logger';
+import { MissionStateManager, MISSION_STATUS } from './mission_state_manager.js';
+import { WorkflowGenerator } from './workflow_generator.js';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
+import { ContextManager } from '#orchestrator/context_manager';
+import { FeedbackProcessor } from './feedback_processor.js';
+import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 
 /**
  * MissionManager - Gerencia ciclo de vida de missões.
@@ -693,7 +675,4 @@ class MissionManager {
     }
 }
 
-module.exports = {
-    MissionManager,
-    MISSION_STATUS
-};
+export { MissionManager, MISSION_STATUS };

@@ -1,22 +1,7 @@
-/* ==========================================================================
-   tests/test_schema_v5.js
-   Test Suite: Task Schema V5 Validation & Migration
-   Status: PRODUCTION READY
-   Responsabilidade: Validar schema V5, migração V4→V5, backward compatibility.
-========================================================================== */
-
-// Setup module aliases
-require('module-alias/register');
-
-const {
-    TaskSchemaV5,
-    ExecutionSchemaV5,
-    MissionSchemaV5,
-    ResultSchemaV5,
-} = require('../src/core/schemas/task_schema_v5');
-const { migrateTaskV4toV5, autoMigrateTask, validateV5Task } = require('../src/core/schemas/migrator_v4_to_v5');
-const { TaskSchema } = require('../src/core/schemas/task_schema');
-const { fillExecutionContext } = require('../src/shared/utils/execution_context_filler');
+import { TaskSchemaV5, ExecutionSchemaV5, MissionSchemaV5, ResultSchemaV5 } from '#core/schemas/task_schema_v5';
+import { migrateTaskV4toV5, autoMigrateTask, validateV5Task } from '#core/schemas/migrator_v4_to_v5';
+import { TaskSchema } from '#core/schemas/task_schema';
+import { fillExecutionContext } from '#shared/utils/execution_context_filler';
 
 console.log('\n🧪 ===== TEST SUITE: Task Schema V5 =====\n');
 
@@ -200,7 +185,7 @@ try {
 console.log('\n📋 TEST 3: Backward Compatibility (Downgrade V5 → V4)\n');
 
 try {
-    const { downgradeV5toV4 } = require('../src/core/schemas/migrator_v4_to_v5');
+    const { downgradeV5toV4 } = await import('#core/schemas/migrator_v4_to_v5');
 
     const taskV5 = migrateTaskV4toV5(taskV4);
     const downgradedV4 = downgradeV5toV4(taskV5);

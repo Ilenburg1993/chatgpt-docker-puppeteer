@@ -1,17 +1,7 @@
-/* ==========================================================================
-   src/server/realtime/bus/pm2_bridge.js
-   Audit Level: 800 — PM2 Event Bridge (PM2 Sovereign Edition)
-   Status: ENHANCED (PM2-First Architecture)
-   Responsabilidade: Capturar eventos de ciclo de vida de TODOS os processos PM2
-                     e transmitir via barramento Socket.io para o Mission Control.
-                     Monitora: agente-gpt, dashboard-web, chrome-proxy
-   Sincronizado com: ecosystem.config.js V800, socket.js V600, main.js V900.
-========================================================================== */
-
-const { pm2Raw } = require('@infra/system');
-const { notify } = require('@server/engine/socket');
-const { log } = require('@core/logger');
-const CONFIG = require('@core/config');
+import { pm2Raw } from '#infra/system';
+import { notify } from '#server/engine/socket';
+import { log } from '#core/logger';
+import CONFIG from '#core/config';
 
 /**
  * Processos gerenciados (ecosystem.config.js)
@@ -272,10 +262,4 @@ async function refreshSnapshot() {
     });
 }
 
-module.exports = {
-    init,
-    stop,
-    getProcessStates,
-    refreshSnapshot,
-    MANAGED_PROCESSES
-};
+export { init, stop, getProcessStates, refreshSnapshot, MANAGED_PROCESSES };

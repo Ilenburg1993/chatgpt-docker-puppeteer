@@ -147,4 +147,4 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
     });
 }
 
-module.exports = createOutboundQueue;
+export default createOutboundQueue;

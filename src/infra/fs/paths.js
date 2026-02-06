@@ -1,16 +1,7 @@
-/* ==========================================================================
-   src/infra/fs/paths.js
-   Audit Level: 700 — Physical Path Authority (Shared Infrastructure)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Centralizar todos os caminhos de diretórios e arquivos.
-                     Este módulo é o "Nível Zero": PROIBIDO importar outros
-                     módulos do projeto aqui para evitar ciclos.
-========================================================================== */
-
-const path = require('path');
+import path from 'node:path';
 
 // Cálculo da Raiz do Projeto (Agnóstico ao local de execução)
-const ROOT = path.normalize(path.join(__dirname, '..', '..', '..'));
+const ROOT = path.normalize(path.join(import.meta.dirname, '..', '..', '..'));
 
 /**
  * DIRETÓRIOS DO SISTEMA
@@ -45,12 +36,13 @@ const LIMITS = {
     MAX_LOG_SIZE: 5 * 1024 * 1024 // 5MB para rotação
 };
 
-module.exports = {
-    ...DIRS,
-    ...FILES,
-    ...LIMITS,
-    // Atalhos para compatibilidade
-    QUEUE_DIR: DIRS.QUEUE,
-    RESPONSE_DIR: DIRS.RESPONSE,
-    LOG_DIR: DIRS.LOGS
-};
+// Named exports (flattened from DIRS / FILES / LIMITS)
+export { ROOT };
+export const { QUEUE, RESPONSE, LOGS, CORRUPT, REPORTS } = DIRS;
+export const { CONFIG, RULES, CONTROL, STATE, IDENTITY, VOCAB } = FILES;
+export const { MAX_JSON_SIZE, MAX_LOG_SIZE } = LIMITS;
+export const QUEUE_DIR = DIRS.QUEUE;
+export const RESPONSE_DIR = DIRS.RESPONSE;
+export const LOG_DIR = DIRS.LOGS;
+
+export { DIRS, FILES, LIMITS };

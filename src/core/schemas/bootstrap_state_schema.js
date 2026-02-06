@@ -1,17 +1,5 @@
-/* ==========================================================================
-   src/core/schemas/bootstrap_state_schema.js
-   Audit Level: 100 — Bootstrap State Contract
-   Status: CONSOLIDATED (Protocol 11)
-    Responsabilidade: Definir o contrato estrito do estado de bootstrap
-                            (arquivo de estado legado para compatibilidade).
-========================================================================== */
-
-// DEPRECATED: Schema for legacy file-based bootstrap state (arquivo de estado legado).
-// Prefer discovery via NERV `SERVER_READY` events. This schema remains for
-// backward compatibility during migration.
-
-const { z } = require('zod');
-const { TIMESTAMP_SCHEMA } = require('./shared_types');
+import { z } from 'zod';
+import { TIMESTAMP_SCHEMA } from './shared_types.js';
 
 const BootstrapStateSchema = z
     .object({
@@ -24,6 +12,4 @@ const BootstrapStateSchema = z
     })
     .strict(); // <-- PROIBIÇÃO DE CAMPOS EXTRAS
 
-module.exports = {
-    BootstrapStateSchema
-};
+export { BootstrapStateSchema };

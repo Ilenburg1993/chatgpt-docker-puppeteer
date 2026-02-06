@@ -1,21 +1,8 @@
-#!/usr/bin/env node
-/**
- * Run All Tests - Comprehensive Test Runner with Report Generation
- *
- * Executes all test suites and generates a detailed final report.
- *
- * Usage:
- *   npm run test:all
- *   node scripts/run-all-tests.js
- *   node scripts/run-all-tests.js --watch
- *   node scripts/run-all-tests.js --json
- */
+#!/usr/bin/env nodeimport { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..');
 const REPORTS_DIR = path.join(ROOT, 'logs', 'test-reports');
 
 // ============================================================================
@@ -388,7 +375,7 @@ function generateMarkdownReport(results) {
 // Main
 // ============================================================================
 
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     runTests()
         .then(exitCode => {
             process.exit(exitCode);
@@ -399,4 +386,4 @@ if (require.main === module) {
         });
 }
 
-module.exports = { runTests };
+export { runTests };

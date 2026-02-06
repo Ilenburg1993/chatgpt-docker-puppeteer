@@ -160,4 +160,4 @@ function createReconnect({ telemetry, start, stop, policy = {} }) {
     });
 }
 
-module.exports = createReconnect;
+export default createReconnect;

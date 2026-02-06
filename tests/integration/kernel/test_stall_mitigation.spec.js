@@ -1,6 +1,13 @@
-/* tests/test_stall_mitigation.js (V3 Compliant) */
-const puppeteer = require('puppeteer-core'); // Usa core para conectar no local
-const { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondition, sleep } = require('./helpers');
+import puppeteer from 'puppeteer-core';
+
+import {
+    writeTask,
+    startAgent,
+    stopAgent,
+    readLatestGlobalLogTail,
+    waitForCondition,
+    sleep,
+} from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Stall Mitigation (Watchdog V4) ===');

@@ -1,19 +1,8 @@
-/* ==========================================================================
-   src/infra/storage/response_store.js
-   Audit Level: 700 — Sovereign Response Storage (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Recuperação segura, resiliente e higienizada de arquivos
-                     de resposta (.txt) gerados pelas IAs.
-   Sincronizado com: paths.js V700, fs_utils.js V700.
-========================================================================== */
-
-const fs = require('fs').promises;
-const fss = require('fs');
-const path = require('path');
-
-// [V700] Importações de baixo nível para evitar dependências circulares
-const PATHS = require('../fs/paths');
-const { sleep, cleanText } = require('../fs/fs_utils');
+import { promises as fs } from 'node:fs';
+import fss from 'node:fs';
+import path from 'node:path';
+import * as PATHS from '../fs/paths.js';
+import { sleep, cleanText } from '../fs/fs_utils.js';
 
 /**
  * Lê o conteúdo de uma resposta anterior com blindagem de memória e I/O.
@@ -90,4 +79,4 @@ async function deleteResponse(taskId) {
     }
 }
 
-module.exports = { loadResponse, deleteResponse };
+export { loadResponse, deleteResponse };

@@ -1,20 +1,5 @@
-/* ==========================================================================
-   src/shared/nerv/envelope.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: Protocol (Linguagem Universal)
-   Audit Level: 510 — NERV Protocol Canonical Envelope
-   Status: CONSTITUTIONAL (Singularity Edition)
-
-   Responsabilidade: Construção imutável do Envelope NERV
-   - Factory createEnvelope() com validação constitucional
-   - Estrutura: protocol/identity/causality/type/payload (5 blocos)
-   - Imutabilidade garantida por deepFreeze
-   - Zero inferência: todos os campos explícitos
-========================================================================== */
-
-const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('./constants');
-
-const { v4: uuidv4 } = require('uuid');
+import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from './constants.js';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * --------------------------------------------------------------------------
@@ -140,9 +125,6 @@ function deepFreeze(obj) {
     return obj;
 }
 
-module.exports = {
-    createEnvelope
-};
 
 // Normalization helper: accepts either a canonical envelope or a flattened
 // envelope ({ actor, messageType, actionCode, payload, correlationId, target })
@@ -212,9 +194,4 @@ function assertValid(envelope) {
     return true;
 }
 
-// Augment exports
-module.exports = {
-    createEnvelope,
-    normalize,
-    assertValid
-};
+export { createEnvelope, normalize, assertValid };

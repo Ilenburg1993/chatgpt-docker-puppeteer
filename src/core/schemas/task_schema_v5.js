@@ -1,42 +1,14 @@
-/* ==========================================================================
-   src/core/schemas/task_schema_v5.js
-   Audit Level: 100 — Task Schema V5 (Unified Next Generation)
-   Status: PRODUCTION READY
-   Responsabilidade: Definição técnica expandida da Unidade Atômica de Trabalho V5.
+import { z } from 'zod';
+import { CONNECTION_MODES } from '../constants/browser.js';
 
-   UNIFICAÇÃO V5 (Fevereiro 2026):
-   Combina 2 abordagens:
-   1. Mission System (workflow, iteração, validação complexa)
-   2. Execution Context + Result V2 (telemetria, multi-formato, metadata)
-
-   NOVIDADES V5:
-   1. execution: { driver, environment, retry } - Contexto de execução completo
-   2. mission: { mission_id, step_id, context } - Suporte nativo a Mission System
-   3. spec.execution: Estratégias de execução (SINGLE_SHOT, ITERATIVE, MULTI_STEP, etc)
-   4. state.metrics expandido: phases + perception telemetry
-   5. state.history estruturada: events + summary
-   6. result V2: Multi-formato storage + generation metadata + validation (LLM-as-judge)
-
-   COMPATIBILIDADE:
-   - Backward compatible com V4 via migrator_v4_to_v5.js
-   - Auto-migration transparente no task_store.js
-   - Campos V4 preservados (zero data loss)
-========================================================================== */
-
-const { z } = require('zod');
-
-const {
-    CONNECTION_MODES: CONNECTION_MODES
-} = require('../constants/browser.js');
-
-const {
+import {
     ID_SCHEMA,
     TIMESTAMP_SCHEMA,
     CLEAN_STRING_SCHEMA,
     PRIORITY_SCHEMA,
     SOURCE_SCHEMA,
-    STATUS_SCHEMA
-} = require('./shared_types');
+    STATUS_SCHEMA,
+} from './shared_types.js';
 
 /**
  * 1. MetaSchema V5: Identidade e Rastreabilidade + Hierarquia de Missões.
@@ -525,13 +497,4 @@ const TaskSchemaV5 = z
     })
     .passthrough();
 
-module.exports = {
-    TaskSchemaV5,
-    MetaSchemaV5,
-    SpecSchemaV5,
-    PolicySchemaV5,
-    ExecutionSchemaV5, // NOVO V5 (Unified)
-    MissionSchemaV5, // NOVO V5 (Unified)
-    StateSchemaV5,
-    ResultSchemaV5,
-};
+export { TaskSchemaV5, MetaSchemaV5, SpecSchemaV5, PolicySchemaV5, ExecutionSchemaV5, MissionSchemaV5, StateSchemaV5, ResultSchemaV5 };

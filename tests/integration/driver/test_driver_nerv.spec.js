@@ -1,21 +1,5 @@
-/* ==========================================================================
-   tests/test_driver_nerv_integration.js
-   Teste de Integração: DRIVER ↔ NERV ↔ KERNEL/SERVER
-
-   Objetivo: Validar que o DRIVER usa NERV como transportador universal,
-   sem acoplamentos diretos com KERNEL ou SERVER.
-
-   Princípios testados:
-   1. Driver NÃO importa KERNEL diretamente
-   2. Driver NÃO importa SERVER diretamente
-   3. Driver NÃO acessa filesystem diretamente
-   4. Toda comunicação passa pelo NERV (pub/sub)
-   5. Telemetria do driver flui via NERV
-   6. Comandos ao driver chegam via NERV
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 console.log(`
 ╔══════════════════════════════════════════════════════════════╗

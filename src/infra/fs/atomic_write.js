@@ -1,13 +1,7 @@
-/* ==========================================================================
-   src/infra/fs/atomic_write.js
-   Audit Level: 100 — Industrial Hardening
-   Responsabilidade: Escrita atômica para prevenção de corrupção de dados.
-========================================================================== */
-
-const fs = require('fs').promises;
-const fss = require('fs');
-const crypto = require('crypto');
-const { sleep } = require('./fs_utils');
+import { promises as fs } from 'node:fs';
+import fss from 'node:fs';
+import crypto from 'node:crypto';
+import { sleep } from './fs_utils.js';
 
 async function atomicWrite(filepath, content) {
     const uuid = crypto.randomBytes(4).toString('hex');
@@ -45,4 +39,4 @@ async function atomicWrite(filepath, content) {
     }
 }
 
-module.exports = { atomicWrite };
+export { atomicWrite };

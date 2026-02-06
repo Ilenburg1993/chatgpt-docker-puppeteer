@@ -1,23 +1,12 @@
-/* ==========================================================================
-   src/server/engine/app.js
-   Audit Level: 300 — Sovereign Express Engine (Production-Grade)
-   Status: HARDENED / OBSERVABLE / FUTURE-PROOF
-
-   Papel:
-   Fundação HTTP do sistema.
-   Pipeline Express puro, determinístico e auditável.
-========================================================================== */
-
-const express = require('express');
-const path = require('path');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const cors = require('cors');
-const helmet = require('helmet');
-
-const { ROOT, LOG_DIR } = require('@infra/fs/fs_utils');
-const requestId = require('../middleware/request_id');
-const hardware = require('@core/hardware');
+import express from 'express';
+import path from 'node:path';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import cors from 'cors';
+import helmet from 'helmet';
+import { ROOT, LOG_DIR } from '#infra/fs/fs_utils';
+import requestId from '../middleware/request_id.js';
+import * as hardware from '#core/hardware';
 
 /* --------------------------------------------------------------------------
    0. INSTÂNCIA SOBERANA
@@ -219,9 +208,5 @@ app.use((err, req, res, next) => {
     });
 });
 
-/* --------------------------------------------------------------------------
-   EXPORTS
--------------------------------------------------------------------------- */
-
-module.exports = app;
-module.exports.apiLimiter = apiLimiter;
+export default app;
+export { apiLimiter };

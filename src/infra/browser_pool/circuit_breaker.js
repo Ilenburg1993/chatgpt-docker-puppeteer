@@ -1,31 +1,4 @@
-/* ==========================================================================
-   src/infra/browser_pool/circuit_breaker.js
-   Subsistema: INFRA — Circuit Breaker Inteligente
-   Versão: 1.0
-   Criado: 2026-02-01
-
-   Responsabilidade:
-   - Detectar CAUSA da falha do Chrome (7 cenários)
-   - Gerenciar 3 estados: OPERATIONAL, DEGRADED, CIRCUIT_OPEN
-   - Políticas diferenciadas por causa
-   - Comunicar via NERV events para Kernel e Dashboard
-
-   Cenários de Falha:
-   1. USER_CLOSED - Usuário fechou manualmente
-   2. TECHNICAL_CRASH - Crash interno do Chrome
-   3. CHROME_RESTARTED - Chrome reiniciou (Windows update, etc.)
-   4. NETWORK_ISSUE - Timeout/rede instável
-   5. PROXY_FAILURE - Chrome Proxy Service down
-   6. OUT_OF_MEMORY - OOM do Chrome
-   7. PROCESS_SUSPENDED - Windows suspendeu processo
-
-   Estados do Circuit Breaker:
-   - OPERATIONAL: 3/3 instâncias healthy
-   - DEGRADED: 1-2 instâncias down
-   - CIRCUIT_OPEN: 0 instâncias, sistema pausado
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Causas de falha (7 cenários)
@@ -472,8 +445,4 @@ class CircuitBreakerManager {
     }
 }
 
-module.exports = {
-    CircuitBreakerManager,
-    FailureCause,
-    CircuitState
-};
+export { CircuitBreakerManager, FailureCause, CircuitState };

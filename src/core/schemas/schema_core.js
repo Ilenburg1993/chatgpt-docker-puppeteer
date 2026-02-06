@@ -1,59 +1,23 @@
-/* ==========================================================================
-   src/core/schemas/schema_core.js
-   Audit Level: 100 — Industrial Hardening (Unified Genomic Facade)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Ponto de entrada único para todos os contratos de dados.
-                     Unifica tipos, DNA e o motor de cura de tarefas.
-========================================================================== */
+import * as shared from './shared_types.js';
+import { DnaSchema, SelectorProtocolSchema } from './dna_schema.js';
+import { TaskSchema } from './task_schema.js';
+import { TaskSchemaV5 } from './task_schema_v5.js';
+import { healTask } from './task_healer.js';
+import { BootstrapStateSchema } from './bootstrap_state_schema.js';
+import * as migrator from './migrator_v4_to_v5.js';
 
-const shared = require('./shared_types');
-const { DnaSchema, SelectorProtocolSchema } = require('./dna_schema');
-const { TaskSchema } = require('./task_schema');
-const { TaskSchemaV5 } = require('./task_schema_v5');
-const { healTask } = require('./task_healer');
-const { BootstrapStateSchema } = require('./bootstrap_state_schema');
-const migrator = require('./migrator_v4_to_v5');
-
-module.exports = {
-    // 1. Tipos Primitivos e Utilitários
-    types: {
-        ID: shared.ID_SCHEMA,
-        Timestamp: shared.TIMESTAMP_SCHEMA,
-        Status: shared.STATUS_SCHEMA,
-        Source: shared.SOURCE_SCHEMA,
-        Priority: shared.PRIORITY_SCHEMA,
-    },
-
-    // 2. Contratos de Percepção (DNA)
-    DnaSchema,
-    SelectorProtocolSchema,
-
-    // 3. Contratos de Missão (Tasks)
-    TaskSchema, // V4 (legacy)
-    TaskSchemaV5, // V5 (mission orchestration)
-
-    // 4. Contratos de Bootstrap / Infra
-    BootstrapStateSchema,
-
-    // 5. Migration Tools
-    migrator,
-
-    /**
-     * parseTask: O ponto de entrada oficial para novas tarefas.
-     *
-     * FUNCIONALIDADE V5 (Fevereiro 2026):
-     * 1. healTask(): Cura/valida dados brutos (schema V4 ou V5)
-     * 2. autoMigrateTask(): Auto-migra V4 → V5 transparentemente
-     * 3. Retorna task V5 validada (backward compatible)
-     *
-     * Comportamento:
-     * - Task V4: healed → migrated V4→V5 → validated V5 → returned
-     * - Task V5: healed → validated V5 → returned
-     * - Task sem versão: healed → assume V4 → migrated → returned V5
-     */
-    parseTask: raw => {
-        const healed = healTask(raw);
-        // Auto-migração transparente V4 → V5
-        return migrator.autoMigrateTask(healed);
-    },
+export const types = {
+    ID: shared.ID_SCHEMA,
+    Timestamp: shared.TIMESTAMP_SCHEMA,
+    Status: shared.STATUS_SCHEMA,
+    Source: shared.SOURCE_SCHEMA,
+    Priority: shared.PRIORITY_SCHEMA,
 };
+
+export const parseTask = raw => {
+    const healed = healTask(raw);
+    // Auto-migração transparente V4 → V5
+    return migrator.autoMigrateTask(healed);
+};
+
+export { DnaSchema, SelectorProtocolSchema, TaskSchema, TaskSchemaV5, BootstrapStateSchema, migrator };

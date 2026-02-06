@@ -1,35 +1,13 @@
 #!/usr/bin/env node
-/**
- * NERV Constants Validator
- *
- * Purpose: Validates that all ActionCodes used in production code are defined in constants.js
- *
- * Validates:
- * - All used ActionCodes are defined
- * - Reports unused defined ActionCodes (for cleanup consideration)
- * - Ensures constants.js completeness
- *
- * Usage:
- *   node scripts/validate-nerv-constants.js
- *   node scripts/validate-nerv-constants.js --strict    # Exit 1 if unused constants found
- *   node scripts/validate-nerv-constants.js --json      # JSON output
- *
- * Exit Codes:
- *   0 - All constants are valid
- *   1 - Missing constants or unused (in --strict mode)
- *   2 - Error during execution
- *
- * Note: Update the 'used' array manually when new ActionCodes are added to code.
- * Future improvement: Parse code automatically to extract used ActionCodes.
- */
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const path = require('path');
 const STRICT = process.argv.includes('--strict');
 const JSON_OUTPUT = process.argv.includes('--json');
 
 // Import constants
-const constantsPath = path.join(__dirname, '..', 'src', 'shared', 'nerv', 'constants.js');
-const constants = require(constantsPath);
+const constantsPath = path.join(import.meta.dirname, '..', 'src', 'shared', 'nerv', 'constants.js');
+const constants = await import(pathToFileURL(path.resolve(constantsPath)).href).then(m => m.default ?? m);
 
 // ActionCodes used in production code (manually curated)
 // TODO: Automate by parsing src/ with AST

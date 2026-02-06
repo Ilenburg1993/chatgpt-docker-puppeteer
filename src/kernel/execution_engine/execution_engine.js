@@ -316,7 +316,4 @@ class ExecutionEngine {
     }
 }
 
-module.exports = {
-    ExecutionEngine,
-    DecisionKind
-};
+export { ExecutionEngine, DecisionKind };

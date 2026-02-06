@@ -24,4 +24,4 @@ function extractCodeBlocks(content) {
     return matches.join('\n\n').trim();
 }
 
-module.exports = { extractCodeBlocks };
+export { extractCodeBlocks };

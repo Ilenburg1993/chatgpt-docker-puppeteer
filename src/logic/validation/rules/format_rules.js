@@ -98,8 +98,4 @@ function validateMarkdownCode(content) {
     return { ok: true, reason: null };
 }
 
-module.exports = {
-    validateJSON,
-    validateRegex,
-    validateMarkdownCode
-};
+export { validateJSON, validateRegex, validateMarkdownCode };

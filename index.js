@@ -6,13 +6,9 @@
    This file exists for compatibility with:
    - package.json "main" field
    - Docker CMD
-   - PM2 ecosystem.config.js
+   - PM2 ecosystem.config.cjs
    - Legacy scripts
 ========================================================================== */
 
-// Activate module aliases (MUST be first)
-require('module-alias/register');
-
-// Delegate to actual entry point and execute main()
-const { main } = require('./src/main');
+import { main } from './src/main.js';
 main();

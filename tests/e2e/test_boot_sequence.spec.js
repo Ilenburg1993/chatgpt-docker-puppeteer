@@ -1,5 +1,5 @@
-const path = require('path');
-const config = require('../../src/core/config');
+import path from 'node:path';
+import config from '#core/config';
 
 console.log('🚀 Testando sequência de boot...\n');
 
@@ -11,7 +11,7 @@ console.log('🚀 Testando sequência de boot...\n');
 
     // FASE 2: Identity
     console.log('FASE 2: Identity Manager');
-    const identity = require('../../src/core/identity_manager');
+    const identity = await import('#core/identity_manager').then(m => m.default ?? m);
     await identity.initialize();
     console.log('  Robot ID:', `${identity.getRobotId().substring(0, 8)}...`);
     console.log('  Instance ID:', `${identity.getInstanceId().substring(0, 8)}...`);
@@ -19,7 +19,7 @@ console.log('🚀 Testando sequência de boot...\n');
 
     // FASE 3: NERV
     console.log('FASE 3: NERV Transport');
-    const { createNERV } = require('../../src/nerv/nerv');
+    const { createNERV } = await import('#nerv/nerv');
     const nerv = await createNERV({ mode: 'local' });
     const nervStatus = nerv.getStatus();
     console.log('  Mode:', nervStatus.mode);
@@ -28,7 +28,7 @@ console.log('🚀 Testando sequência de boot...\n');
 
     // FASE 4: BrowserPool
     console.log('FASE 4: BrowserPool Manager');
-    const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
+    const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
     const pool = new BrowserPoolManager({
         poolSize: 1,
         browserEndpoint: {
@@ -52,8 +52,8 @@ console.log('🚀 Testando sequência de boot...\n');
         messageReceived = true;
     });
 
-    const { createEnvelope } = require('../../src/shared/nerv/envelope');
-    const { MessageType, ActionCode, ActorRole } = require('../../src/shared/nerv/constants');
+    const { createEnvelope } = await import('#shared/nerv/envelope');
+    const { MessageType, ActionCode, ActorRole } = await import('#shared/nerv/constants');
 
     const envelope = createEnvelope({
         actor: ActorRole.KERNEL,

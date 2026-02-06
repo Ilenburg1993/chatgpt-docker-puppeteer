@@ -1,28 +1,8 @@
-#!/usr/bin/env node
-/**
- * Code Graph Analyzer using TypeScript Language Server
- *
- * Generates dependency graphs, call graphs, and architectural insights
- * using TypeScript's Program API for accurate JavaScript analysis.
- *
- * Usage:
- *   node scripts/analyze-code-graph.js [options]
- *
- * Options:
- *   --deps          Show dependency graph
- *   --circular      Find circular dependencies
- *   --nerv          Map NERV event flows
- *   --orphans       Find orphaned modules
- *   --stats         Show architecture statistics
- *   --export-json   Export results to analysis/code-graph.json
- *   --export-dot    Export Graphviz DOT format
- */
+#!/usr/bin/env nodeimport ts from 'typescript';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const ts = require('typescript');
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const JSCONFIG = path.join(ROOT, 'jsconfig.json');
 
 // Parse command line arguments

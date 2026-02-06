@@ -1,12 +1,8 @@
-/* scripts/flow_manager.js (Audit Level 15 - Enterprise Flow Manager) */
-// Responsabilidade: Gerenciar fluxos de trabalho (Blueprints) com integridade total.
-// Recursos: Detecção de Ciclos, Escrita Atômica, Idempotência e Sanitização.
+import fs from 'node:fs';
+import path from 'node:path';
+import yaml from 'js-yaml';
 
-const fs = require('fs');
-const path = require('path');
-const yaml = require('js-yaml');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const BLUEPRINTS_DIR = path.join(ROOT, 'blueprints');
 

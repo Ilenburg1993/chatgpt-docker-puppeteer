@@ -1,39 +1,12 @@
-/* ==========================================================================
-   src/driver/targets/ChatGPTDriver.js
-   Audit Level: 500 — Ultimate ChatGPT Specialist (IPC 2.0 Singularity)
-   Status: v2.0 (Protocol 12 - State Machine Validated)
-   Responsabilidade: Especialista em interface OpenAI. Gerencia percepção de
-                     resposta, poda de raciocínio (o1/o3) e telemetria de fluxo.
-
-   ✅ v2.0 Features:
-   - sendPrompt implementation (abstract method)
-   - AbortSignal integration (TargetDriver v2.0)
-   - Timeout máximo (10min, previne hang)
-   - Thought pruning metrics expandidas
-   - Auto-continuation counter
-   - Empty response detection
-   - Retry logic em stopGeneration
-   - Error handling robusto
-   - JSDoc completo
-
-   Sincronizado com: BaseDriver v2.0, TargetDriver v2.0, stabilizer.js v2.0
-========================================================================== */
-
-const BaseDriver = require('@core/BaseDriver');
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
-
-const triage = require('../modules/triage');
-const adaptive = require('@logic/adaptive');
-const analyzer = require('@shared/sadi/analyzer');
-const stabilizer = require('@shared/page_stability/stabilizer');  // ✅ BUG #1: Fixed import path
-const { log } = require('@core/logger');
-
-// ✅ Response Capture V2.0: Structured extraction + validation
-const StructuredExtractor = require('../extractors/structured_extractor');
-const LLMJudge = require('../../validation/llm_judge');
+import BaseDriver from '#driver/core/BaseDriver';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import * as triage from '../modules/triage.js';
+import * as adaptive from '#logic/adaptive';
+import * as analyzer from '#shared/sadi/analyzer';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import { log } from '#core/logger';
+import StructuredExtractor from '../extractors/structured_extractor.js';
+import LLMJudge from '#validation/llm_judge';
 
 // ============================================================================
 // CONFIGURATION
@@ -146,7 +119,7 @@ class ChatGPTDriver extends BaseDriver {
      * @override
      */
     async validatePage() {
-        const { validateLLMPage, validateLLMInterface } = require('@core/validators/prerequisite_validator');
+        const { validateLLMPage, validateLLMInterface } = await import('#core/validators/prerequisite_validator');
 
         // Valida URL
         const pageValidation = await validateLLMPage(this.page);
@@ -589,7 +562,7 @@ class ChatGPTDriver extends BaseDriver {
                     if (this.llmJudge.enabled && this.currentPrompt) {
                         try {
                             validation = await this.llmJudge.validate(this.currentPrompt, currentText, signal);
-                        } catch (error) {
+                        } catch (_err) {
                             log(
                                 'WARN',
                                 `[${this.name}] LLM-as-Judge falhou, continuando sem validação`,
@@ -778,12 +751,7 @@ class ChatGPTDriver extends BaseDriver {
     }
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+export default ChatGPTDriver;
 
-module.exports = ChatGPTDriver;
-
-// ✅ v2.0: Export configs para testing/introspection
-module.exports.CHATGPT_CONFIG = CHATGPT_CONFIG;
-module.exports.SUPPORTED_MODELS = SUPPORTED_MODELS;
+export { CHATGPT_CONFIG };
+export { SUPPORTED_MODELS };

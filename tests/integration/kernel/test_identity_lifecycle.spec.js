@@ -1,14 +1,8 @@
-/* ==========================================================================
-   tests/integration/identity_lifecycle.test.js
-   Audit Level: 400 — Identity Persistence Audit (Phase 2.1)
-   Responsabilidade: Validar o nascimento, reconhecimento e a unicidade de
-                     instância do robô no disco.
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
-const identityManager = require('../../../src/core/identity_manager');
-const io = require('../../../src/infra/io');
+import fs from 'node:fs';
+import path from 'node:path';
+import identityManager from '#core/identity_manager';
+import * as io from '#infra/io';
+import { v4 as uuidv4 } from 'uuid';
 
 // Caminho físico do DNA (Sincronizado com identity_manager.js)
 const IDENTITY_FILE = path.join(io.ROOT, 'src/infra/storage/robot_identity.json');
@@ -39,7 +33,7 @@ async function runIdentityTest() {
         // Nota: Como o manager é um singleton, vamos apenas re-executar o init
         // mas o instanceId deve ser resetado manualmente para o teste ser fiel
         const oldInstanceId = identityManager.instanceId;
-        identityManager.instanceId = require('uuid').v4();
+        identityManager.instanceId = uuidv4();
 
         await identityManager.initialize();
         const dna2 = identityManager.robotId;

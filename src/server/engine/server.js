@@ -1,34 +1,6 @@
-/* ============================================================================
-   src/server/engine/server.js
-   HTTP ENGINE — NETWORK FOUNDATION (CONTAINER-SAFE)
-
-   Função:
-     Fundação HTTP física do sistema. Responsável apenas por:
-       • criar o servidor HTTP sobre a app Express
-       • realizar bind seguro (container / devcontainer / docker)
-       • alocar porta livre dentro de faixa controlada
-       • expor instância bruta para camadas de transporte (ex: Socket.io)
-       • garantir shutdown limpo
-
-   Propriedades arquiteturais:
-       — sem lógica de negócio
-       — sem spawn de processos
-       — sem conhecimento de rotas
-       — singleton por processo
-       — bind explícito (0.0.0.0 por padrão)
-
-   Consumido por:
-       • src/server/main.js   (modo servidor dedicado)
-       • src/main.js          (modo maestro integrado)
-
-   Notas de operação:
-       — DevContainer / Docker exigem bind 0.0.0.0
-       — Port hunting é limitado para não sair da faixa forwardada
-============================================================================ */
-
-const http = require('http');
-const app = require('./app');
-const { log } = require('@core/logger');
+import http from 'node:http';
+import app from './app.js';
+import { log } from '#core/logger';
 
 /** @type {import('http').Server|null} */
 let httpServer = null;
@@ -163,12 +135,4 @@ function getRawServer() {
     return httpServer;
 }
 
-/* ---------------------------------------------------------------------------
-   EXPORTS
---------------------------------------------------------------------------- */
-
-module.exports = {
-    start,
-    stop,
-    getRawServer
-};
+export { start, stop, getRawServer };

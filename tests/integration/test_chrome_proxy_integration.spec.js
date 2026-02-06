@@ -1,11 +1,6 @@
 #!/usr/bin/env node
-/* ==========================================================================
-   SUITE DE TESTES AUTOMÁTICOS - Chrome Proxy Integration
-   Valida configurações, arquivos e lógica antes de testar no Windows
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Cores para output
 const colors = {
@@ -25,8 +20,7 @@ const log = {
     section: msg => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`)
 };
 
-// Global config derived for tests (evita hardcodes de porta)
-const GLOBAL_CONFIG = require('/workspaces/chatgpt-docker-puppeteer/config.json');
+import GLOBAL_CONFIG from '/workspaces/chatgpt-docker-puppeteer/config.json';
 const PROXY_PORT = GLOBAL_CONFIG.CHROME_PROXY_PORT || 9224;
 const CHROME_PORT = GLOBAL_CONFIG.CHROME_PORT || 9225;
 
@@ -54,7 +48,7 @@ function testConfigFiles() {
     // 1.1 - config.json existe e é JSON válido
     let config;
     try {
-        config = require('/workspaces/chatgpt-docker-puppeteer/config.json');
+        config = JSON.parse(fs.readFileSync('/workspaces/chatgpt-docker-puppeteer/config.json', 'utf8'));
         assert(true, 'config.json existe e é JSON válido');
     } catch (e) {
         assert(false, `config.json inválido: ${e.message}`);
@@ -87,7 +81,7 @@ function testConfigFiles() {
     // 1.4 - chrome-config.json existe e é JSON válido
     let chromeConfig;
     try {
-        chromeConfig = require('/workspaces/chatgpt-docker-puppeteer/chrome-config.json');
+        chromeConfig = JSON.parse(fs.readFileSync('/workspaces/chatgpt-docker-puppeteer/chrome-config.json', 'utf8'));
         assert(true, 'chrome-config.json existe e é JSON válido');
     } catch (e) {
         assert(false, `chrome-config.json inválido: ${e.message}`);
@@ -136,7 +130,7 @@ function testConfigFiles() {
 // ==========================================================================
 // TESTE 2: Validação de Arquivos de Scripts
 // ==========================================================================
-function testScriptFiles() {
+async function testScriptFiles() {
     log.section('TESTE 2: Validação de Arquivos de Scripts');
 
     const projectRoot = '/workspaces/chatgpt-docker-puppeteer';
@@ -163,7 +157,7 @@ function testScriptFiles() {
     // 2.4 - start-chrome-with-proxy.bat tem conteúdo válido
     try {
         const content = fs.readFileSync(launcherPath, 'utf8');
-        const cfg = require('/workspaces/chatgpt-docker-puppeteer/config.json');
+        const cfg = await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m);
         const expectedChromePort = cfg.CHROME_PORT || cfg.CHROME_DIRECT_PORT || 9225;
         assert(
             content.includes(`CHROME_DEBUG_PORT=${expectedChromePort}`),
@@ -205,10 +199,10 @@ function testScriptFiles() {
 // ==========================================================================
 // TESTE 3: Validação de Lógica de Priorização
 // ==========================================================================
-function testPrioritizationLogic() {
+async function testPrioritizationLogic() {
     log.section('TESTE 3: Validação de Lógica de Priorização');
 
-    const chromeConfig = require('/workspaces/chatgpt-docker-puppeteer/chrome-config.json');
+    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(m => m.default ?? m);
 
     // 3.1 - Ordem de portas está correta
     const ports = chromeConfig.connection.ports;
@@ -250,10 +244,10 @@ function testPrioritizationLogic() {
 // ==========================================================================
 // TESTE 4: Validação de URL Rewriting (Simulação)
 // ==========================================================================
-function testURLRewriting() {
+async function testURLRewriting() {
     log.section('TESTE 4: Simulação de URL Rewriting');
 
-    const config = require('/workspaces/chatgpt-docker-puppeteer/config.json');
+    const config = await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m);
 
     // 4.1 - Mock de resposta do Chrome (localhost)
     const chromeResponse = {
@@ -305,10 +299,10 @@ function testURLRewriting() {
 // ==========================================================================
 // TESTE 5: Validação de Health Endpoints
 // ==========================================================================
-function testHealthEndpoints() {
+async function testHealthEndpoints() {
     log.section('TESTE 5: Validação de Health Endpoints');
 
-    const chromeConfig = require('/workspaces/chatgpt-docker-puppeteer/chrome-config.json');
+    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(m => m.default ?? m);
 
     // 5.1 - Health URLs estão definidas
     assert(chromeConfig.health.chromeDebugUrl !== undefined, 'chromeDebugUrl está definido');
@@ -384,7 +378,7 @@ function testDocumentation() {
 // ==========================================================================
 // MAIN - Executar Todos os Testes
 // ==========================================================================
-function main() {
+async function main() {
     console.log(`
 ${colors.cyan}╔═══════════════════════════════════════════════════════════════════╗
 ║                                                                   ║
@@ -396,12 +390,12 @@ ${colors.cyan}╔═════════════════════
     log.info('Iniciando testes automáticos...\n');
 
     try {
-        testConfigFiles();
-        testScriptFiles();
-        testPrioritizationLogic();
-        testURLRewriting();
-        testHealthEndpoints();
-        testDocumentation();
+        await testConfigFiles();
+        await testScriptFiles();
+        await testPrioritizationLogic();
+        await testURLRewriting();
+        await testHealthEndpoints();
+        await testDocumentation();
 
         // Resumo final
         log.section('RESUMO DOS TESTES');

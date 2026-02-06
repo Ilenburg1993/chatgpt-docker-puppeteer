@@ -1,24 +1,9 @@
-/* ==========================================================================
-   src/logic/adaptive.js
-   Audit Level: 100 — Industrial Hardening (Consolidated V46)
-   Status: PRODUCTION READY (Statistical Engine 2.0)
-   Changelog V46:
-   - FIX CRÍTICO: Variância corrigida (Welford's Algorithm completo)
-   - ADD: Circuit breaker para degradação extrema (>120s)
-   - ADD: Health check API (getHealthStatus)
-   - ADD: Target GC automático (max 100 targets)
-   - ADD: Decay de targets inativos (24h+ threshold)
-   - ADD: Percentile support (P50/P95/P99/P99.7)
-   - REMOVE: success_count (código morto)
-   - DOC: context_penalty rationale documentado
-========================================================================== */
-
-const fs = require('fs').promises;
-const fss = require('fs');
-const path = require('path');
-const { z } = require('zod');
-const { log, LOG_DIR } = require('@core/logger');
-const CONFIG = require('@core/config');
+import { promises as fs } from 'node:fs';
+import fss from 'node:fs';
+import path from 'node:path';
+import { z } from 'zod';
+import { log, LOG_DIR } from '#core/logger';
+import CONFIG from '#core/config';
 
 /* --------------------------------------------------------------------------
    CONSTANTES DE SEMENTE (SEEDS)
@@ -386,19 +371,11 @@ function getPercentileTimeout(stats, percentile = 95) {
     return Math.round(avg + z * std);
 }
 
-module.exports = {
-    recordMetric,
-    getAdjustedTimeout,
-    getStabilityMetrics,
-    getHealthStatus, // [V46] NEW
-    getPercentileTimeout, // [V46] NEW
-    getSnapshot: () => JSON.parse(JSON.stringify(state)),
-    forcePersist: persist,
-    get values() {
-        return {
-            HEARTBEAT_TIMEOUT: Math.round(state.infra.avg * 5),
-            ECHO_TIMEOUT: Math.round((state.targets.chatgpt?.echo.avg || SEED_ECHO) * 3),
-            PROGRESS_TIMEOUT: 60000,
-        };
-    },
+export const getSnapshot = () => JSON.parse(JSON.stringify(state));
+export const forcePersist = persist;
+export const values = {
+    get HEARTBEAT_TIMEOUT() { return Math.round(state.infra.avg * 5); },
+    get ECHO_TIMEOUT() { return Math.round((state.targets.chatgpt?.echo.avg || SEED_ECHO) * 3); },
+    get PROGRESS_TIMEOUT() { return 60000; },
 };
+export { recordMetric, getAdjustedTimeout, getStabilityMetrics, getHealthStatus, getPercentileTimeout };

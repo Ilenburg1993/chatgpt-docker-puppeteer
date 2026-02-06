@@ -1,15 +1,8 @@
-/**
- * Testes Unitários: Infra IO Operations
- * @module tests/unit/infra/test_io.spec.js
- * @description Valida operações de I/O, cache e atomicidade
- * @audit-level 32
- */
-
-const { describe, it, before, after } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const { tmpdir } = require('os');
+import { describe, it, before, after } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
 
 describe('Infra IO Operations - Operações de Entrada/Saída', () => {
     let testDir;

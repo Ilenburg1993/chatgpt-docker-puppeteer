@@ -1,25 +1,13 @@
-/* ==========================================================================
-   src/server/api/controllers/system.js
-   Audit Level: 700 — System & Observability Controller (Traceability Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Ponto único de autoridade para observabilidade de agentes,
-                     diagnósticos de saúde, controle de processos e travas.
-   Sincronizado com: engine/socket.js V600, system.js V45, doctor.js V39,
-                     request_id.js V600.
-========================================================================== */
-
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const fs = require('fs').promises;
-const path = require('path');
-
-// Motores de Infraestrutura, Core e Comunicação
-const system = require('@infra/system');
-const doctor = require('@core/doctor');
-const io = require('@infra/io');
-const socketHub = require('@server/engine/socket');
-const { audit, log } = require('@core/logger');
-const { ROOT } = require('@infra/fs/fs_utils');
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import * as system from '#infra/system';
+import * as doctor from '#core/doctor';
+import * as io from '#infra/io';
+import * as socketHub from '#server/engine/socket';
+import { audit, log } from '#core/logger';
+import { ROOT } from '#infra/fs/fs_utils';
 
 /* --------------------------------------------------------------------------
    1. OBSERVABILIDADE DE AGENTES (IPC 2.0)
@@ -231,4 +219,4 @@ router.get('/locks', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

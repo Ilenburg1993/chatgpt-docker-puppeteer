@@ -1,35 +1,5 @@
-#!/usr/bin/env node
-/**
- * Magic Strings Scanner
- *
- * Purpose: Deep scan for hardcoded strings that should be constants
- *
- * Detects 11 different patterns:
- * 1. actor: 'STRING' assignments
- * 2. messageType: 'STRING' assignments
- * 3. actionCode: 'STRING' assignments
- * 4. kind: 'STRING' assignments
- * 5. envelope.actor === 'STRING' comparisons
- * 6. envelope.messageType === 'STRING' comparisons
- * 7. envelope.kind === 'STRING' comparisons
- * 8. actionCode === 'STRING' comparisons
- * 9. case 'ACTIONCODE': switch statements
- * 10. { actor: 'STRING' } object literals
- * 11. source/target: 'role' in headers
- *
- * Usage:
- *   node scripts/scan_magic_strings.js                    # Scan src/ only
- *   node scripts/scan_magic_strings.js --include-tests    # Include tests/
- *   node scripts/scan_magic_strings.js --directory path/  # Custom directory
- *
- * Exit Codes:
- *   0 - No magic strings found (success)
- *   1 - Magic strings found in src/
- *   2 - Error during execution
- */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -286,7 +256,7 @@ function main() {
 }
 
 // Execute
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     try {
         const exitCode = main();
         process.exit(exitCode);
@@ -297,4 +267,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { scanFile, scanDirectory, PATTERNS };
+export { scanFile, scanDirectory, PATTERNS };

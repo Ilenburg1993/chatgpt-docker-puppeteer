@@ -1,25 +1,16 @@
-/**
- * @file tests/unit/missions/test_mission_manager_integration.spec.js
- * Testes de integração Mission Manager + MissionStateManager + WorkflowGenerator
- * FASE 4 - Mission Orchestration Platform V2.0
- */
-
-// Activate module aliases FIRST
-require('module-alias/register');
-
-const { describe, it, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs/promises');
-const path = require('path');
-const EventEmitter = require('events');
-const { MissionStateManager, MISSION_STATUS } = require('../../../src/missions/mission_state_manager');
-const { WorkflowGenerator } = require('../../../src/missions/workflow_generator');
-const { MissionManager } = require('../../../src/missions/mission_manager');
-const { ActionCode, MessageType } = require('../../../src/shared/nerv/constants');
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert';
+import fs from 'fs/promises';
+import path from 'node:path';
+import EventEmitter from 'node:events';
+import { MissionStateManager, MISSION_STATUS } from '#missions/mission_state_manager';
+import { WorkflowGenerator } from '#missions/workflow_generator';
+import { MissionManager } from '#missions/mission_manager';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 
 // Diretórios de teste
-const TEST_MISSIONS_DIR = path.join(__dirname, '../../tmp/missions');
-const TEST_TEMPLATES_DIR = path.join(__dirname, '../../../src/missions/templates');
+const TEST_MISSIONS_DIR = path.join(import.meta.dirname, '../../tmp/missions');
+const TEST_TEMPLATES_DIR = path.join(import.meta.dirname, '../../../src/missions/templates');
 
 // Mock NERV simples
 class MockNERV extends EventEmitter {

@@ -1,20 +1,8 @@
-/**
- * Integration Tests - FASE 8: Super Launcher PM2-First
- *
- * Testa todos os componentes implementados nas fases 1-7:
- * - Launchers (LAUNCHER.bat + launcher.sh)
- * - Scripts utilitários (quick-ops, watch-logs, etc)
- * - Health endpoints (/api/health/*)
- * - Dashboard HTML
- *
- * Ambiente: Linux (codespaces) - cross-platform onde possível
- */
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = path.resolve(__dirname, '../..');
+const ROOT = path.resolve(import.meta.dirname, '../..');
 
 // Cores para output
 const colors = {

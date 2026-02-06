@@ -1,17 +1,8 @@
-/**
- * @file tests/unit/orchestrator/test_orchestrator_engine.spec.js
- * Testes unitários para OrchestratorEngine e ValidationService
- * FASE 2 - Mission Orchestration Platform
- */
-
-// Activate module aliases FIRST
-require('module-alias/register');
-
-const { describe, it, beforeEach } = require('node:test');
-const assert = require('node:assert');
-const { OrchestratorEngine } = require('../../../src/orchestrator/orchestrator_engine');
-const { ValidationService } = require('../../../src/orchestrator/validation/validation_service');
-const { STATUS_VALUES } = require('../../../src/core/constants/tasks');
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert';
+import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
+import { ValidationService } from '#orchestrator/validation/validation_service';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 describe('ValidationService', () => {
     let validationService;

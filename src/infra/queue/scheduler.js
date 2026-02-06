@@ -1,6 +1,4 @@
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 /* ==========================================================================
    src/infra/queue/scheduler.js
@@ -113,4 +111,4 @@ function getNextEligible(allTasks, targetFilter = null) {
     });
 }
 
-module.exports = { getNextEligible };
+export { getNextEligible };

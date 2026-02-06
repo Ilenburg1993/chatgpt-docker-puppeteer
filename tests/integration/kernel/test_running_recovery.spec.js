@@ -1,5 +1,11 @@
-/* tests/test_running_recovery.js (V3 Compliant) */
-const { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock } = require('./helpers');
+import {
+    writeTask,
+    readTask,
+    startAgent,
+    stopAgent,
+    waitForCondition,
+    removeRunLock,
+} from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Recovery de Zumbis (Schema V3) ===');

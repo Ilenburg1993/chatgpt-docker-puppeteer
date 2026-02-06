@@ -28,9 +28,4 @@ function isStandalone(authority) {
     return String(authority).toLowerCase() === SERVER_AUTHORITIES.STANDALONE;
 }
 
-module.exports = {
-    SERVER_AUTHORITIES,
-    resolveAuthority,
-    isDelegated,
-    isStandalone
-};
+export { SERVER_AUTHORITIES, resolveAuthority, isDelegated, isStandalone };

@@ -1,22 +1,5 @@
-/* ==========================================================================
-   tests/test_ariadne_thread.js
-   Teste de Integração: Fio de Ariadne (End-to-End Connectivity)
-
-   Objetivo: Validar que todos os subsistemas estão conectados corretamente
-   e podem se comunicar através do NERV (canal único de transporte).
-
-   Fluxo testado:
-   1. Boot completo do sistema
-   2. Verificação de conectividade NERV ↔ KERNEL
-   3. Verificação de conectividade NERV ↔ DriverAdapter
-   4. Verificação de conectividade NERV ↔ ServerAdapter
-   5. Verificação de acesso ao BrowserPool
-   6. Teste de mensagem end-to-end (COMMAND → EVENT)
-   7. Shutdown gracioso
-========================================================================== */
-
-const { boot, shutdown } = require('../../src/main');
-const path = require('path');
+import { boot, shutdown } from '#/main';
+import path from 'node:path';
 
 console.log(`
 ╔══════════════════════════════════════════════════════════════╗
@@ -63,7 +46,7 @@ async function test1_BootSequence() {
             console.log('  (BrowserPool desabilitado para testes sem Chrome externo)');
 
             // Temporariamente mocka o BrowserPool para não tentar conectar
-            const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
+            const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
             const originalInitialize = BrowserPoolManager.prototype.initialize;
             const originalGetHealth = BrowserPoolManager.prototype.getHealth;
             const originalShutdown = BrowserPoolManager.prototype.shutdown;

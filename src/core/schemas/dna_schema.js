@@ -1,14 +1,5 @@
-/* ==========================================================================
-   src/core/schemas/dna_schema.js
-   Audit Level: 100 — Industrial Hardening (Evolutionary DNA - Platinum)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Definir a estrutura das regras dinâmicas e seletores
-                     aprendidos pelo SADI. Garante a integridade da evolução.
-   Sincronizado com: BaseDriver.js (V255), stabilizer.js (V41), io.js (V36).
-========================================================================== */
-
-const { z } = require('zod');
-const { TIMESTAMP_SCHEMA } = require('./shared_types');
+import { z } from 'zod';
+import { TIMESTAMP_SCHEMA } from './shared_types.js';
 
 /**
  * SelectorProtocolSchema: O formato de saída do SADI V10+.
@@ -86,8 +77,4 @@ const DnaSchema = z
     })
     .passthrough();
 
-module.exports = {
-    DnaSchema,
-    SelectorProtocolSchema,
-    DomainRulesSchema
-};
+export { DnaSchema, SelectorProtocolSchema, DomainRulesSchema };

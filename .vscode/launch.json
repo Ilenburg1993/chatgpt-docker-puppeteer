@@ -6,7 +6,9 @@
       "request": "launch",
       "name": "🚀 Debug Agente (Enhanced)",
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048", "--expose-gc"],
+      "runtimeArgs": [
+        "--max-old-space-size=2048"
+      ],
       "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "sourceMaps": true,
       "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],

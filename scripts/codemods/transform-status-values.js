@@ -1,16 +1,4 @@
-/**
- * Codemod: Replace status value magic strings with constants
- *
- * Transforms:
- *   'PENDING' → STATUS_VALUES.PENDING
- *   'RUNNING' → STATUS_VALUES.RUNNING
- *   etc.
- *
- * Usage:
- *   npx jscodeshift -t scripts/codemods/transform-status-values.js src/path/to/file.js
- */
-
-const path = require('path');
+import path from 'node:path';
 
 function getImportPath(filePath, targetPath) {
     const relativePath = path.relative(path.dirname(filePath), targetPath);

@@ -1,22 +1,11 @@
-/* ==========================================================================
-   src/core/forensics.js
-   Audit Level: 710 — Hardened Sovereign Forensic Engine (Singularity)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Capturar evidências técnicas e visuais de falhas críticas
-                     com proteção contra travamentos do navegador (Anti-Hang).
-   Sincronizado com: paths.js V700, io.js V700, ipc_client.js V600.
-========================================================================== */
-
-const fs = require('fs').promises;
-const path = require('path');
-const { log } = require('./logger');
-
-// Infraestrutura e Shared Kernel
-const PATHS = require('@infra/fs/paths');
-const io = require('@infra/io');
-const identityManager = require('./identity_manager');
-const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { log } from './logger.js';
+import * as PATHS from '#infra/fs/paths';
+import * as io from '#infra/io';
+import identityManager from './identity_manager.js';
+import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // NERV instance will be injected via setNERV()
 let nervInstance = null;
@@ -141,4 +130,4 @@ async function _captureVisualEvidence(page, folder, _) {
     await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
 }
 
-module.exports = { createCrashDump, setNERV };
+export { createCrashDump, setNERV };

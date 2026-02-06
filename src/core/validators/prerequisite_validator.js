@@ -1,21 +1,4 @@
-/* ==========================================================================
-   src/core/validators/prerequisite_validator.js
-   Subsistema: CORE — Validação de Pré-requisitos
-   Versão: 1.0
-   Criado: 2026-02-01
-
-   Responsabilidade:
-   - Validar pré-condições antes de executar operações críticas
-   - Retornar mensagens claras quando pré-requisitos não satisfeitos
-   - Centralizar lógica de validação para evitar duplicação
-
-   Princípios:
-   - Fail-fast: Detectar problemas antes de começar operação
-   - Clear errors: Mensagens descritivas do que falta
-   - No assumptions: Validar tudo explicitamente
-========================================================================== */
-
-const { log } = require('@core/logger');
+import { log } from '#core/logger';
 
 /**
  * Resultados de validação de pré-requisitos.
@@ -99,7 +82,7 @@ async function validateLLMInterface(page) {
     }
 
     // Usa analyzer.js (SADI) em vez de seletores hardcoded
-    const analyzer = require('@shared/sadi/analyzer');
+    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
     const url = page.url();
 
     try {
@@ -298,12 +281,4 @@ function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
     return ValidationResult.ok();
 }
 
-module.exports = {
-    ValidationResult,
-    validateLLMPage,
-    validateLLMInterface,
-    validateBrowserPool,
-    validateBrowserConnection,
-    validateDriverExecution,
-    validateKernelExecution
-};
+export { ValidationResult, validateLLMPage, validateLLMInterface, validateBrowserPool, validateBrowserConnection, validateDriverExecution, validateKernelExecution };

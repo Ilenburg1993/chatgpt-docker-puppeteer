@@ -398,8 +398,4 @@ class PolicyEngine {
     }
 }
 
-module.exports = {
-    PolicyEngine,
-    PolicyLevel,
-    PolicyAlertType
-};
+export { PolicyEngine, PolicyLevel, PolicyAlertType };

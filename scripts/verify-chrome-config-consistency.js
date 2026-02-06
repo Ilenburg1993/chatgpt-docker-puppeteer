@@ -1,4 +1,4 @@
-const config = require('../config.json');
+import config from '../config.json';
 
 console.log('🔍 VERIFICAÇÃO DE CONFIGURAÇÃO');
 console.log('=' .repeat(70));

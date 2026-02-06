@@ -99,50 +99,50 @@
   "NODE_ENV": "${localEnv:NODE_ENV:development}",
   "SERVER_MODE": "split",
   "SERVER_AUTHORITY": "standalone",
-// Portas (fonte única: SERVER_PORT)
-"SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
+  // Portas (fonte única: SERVER_PORT)
+  "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
   // PORT deprecated v6.0: Use apenas SERVER_PORT
   "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
   "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
   "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
-// Browser (contrato estrutural)
-"BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
-// Logging
-"LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
-// State & lifecycle
-"ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
-"REEXECUTE_POST_CREATE": "${localEnv:REEXECUTE_POST_CREATE:false}"
-// ============================================================
-// SSH AGENT FORWARDING
-// ============================================================
-// NOTA v5.3: SSH forwarding agora é NATIVO do VS Code.
-//
-// MUDANÇA ARQUITETURAL (v5.2 → v5.3):
-// - REMOVIDO: Mount manual de socket (/ssh-agent)
-// - REMOVIDO: SSH_AUTH_SOCK hardcoded
-// - ADICIONADO: VS Code native SSH forwarding (automático)
-//
-// JUSTIFICATIVA:
-// • Mount manual causava type mismatch (socket vs directory)
-// • Container não iniciava se SSH agent não estivesse disponível
-// • Configuração manual conflitava com política "opt-in" do post-create.sh
-//
-// NOVO COMPORTAMENTO:
-// • VS Code detecta SSH_AUTH_SOCK no host automaticamente
-// • Se disponível: forwarding transparente para o container
-// • Se ausente: container inicia normalmente (git via HTTPS)
-// • Zero configuração manual necessária
-//
-// COMPATIBILIDADE:
-// • ✅ Windows + WSL2 + Docker Desktop
-// • ✅ Linux nativo + Docker
-// • ✅ macOS + Docker Desktop
-//
-// REFERÊNCIAS:
-// • https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
-// • post-create.sh Section 7 (SSH Contract - observacional)
-// • DEVCONTAINER_BUILD_ANALYSIS.md (Solução 3)
-// ============================================================
+  // Browser (contrato estrutural)
+  "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
+  // Logging
+  "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
+  // State & lifecycle
+  "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
+  "REEXECUTE_POST_CREATE": "${localEnv:REEXECUTE_POST_CREATE:false}"
+  // ============================================================
+  // SSH AGENT FORWARDING
+  // ============================================================
+  // NOTA v5.3: SSH forwarding agora é NATIVO do VS Code.
+  //
+  // MUDANÇA ARQUITETURAL (v5.2 → v5.3):
+  // - REMOVIDO: Mount manual de socket (/ssh-agent)
+  // - REMOVIDO: SSH_AUTH_SOCK hardcoded
+  // - ADICIONADO: VS Code native SSH forwarding (automático)
+  //
+  // JUSTIFICATIVA:
+  // • Mount manual causava type mismatch (socket vs directory)
+  // • Container não iniciava se SSH agent não estivesse disponível
+  // • Configuração manual conflitava com política "opt-in" do post-create.sh
+  //
+  // NOVO COMPORTAMENTO:
+  // • VS Code detecta SSH_AUTH_SOCK no host automaticamente
+  // • Se disponível: forwarding transparente para o container
+  // • Se ausente: container inicia normalmente (git via HTTPS)
+  // • Zero configuração manual necessária
+  //
+  // COMPATIBILIDADE:
+  // • ✅ Windows + WSL2 + Docker Desktop
+  // • ✅ Linux nativo + Docker
+  // • ✅ macOS + Docker Desktop
+  //
+  // REFERÊNCIAS:
+  // • https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
+  // • post-create.sh Section 7 (SSH Contract - observacional)
+  // • DEVCONTAINER_BUILD_ANALYSIS.md (Solução 3)
+  // ============================================================
 },
   // ============================================================
   // FEATURES - Auto-install tools and utilities
@@ -715,12 +715,12 @@
     //
     // Regras não negociáveis:
     // • O Docker resolve mounts ANTES da inicialização do container
- deu // • O campo `target=` (container side) DEVE ser caminho literal
+    // • O campo `target=` (container side) DEVE ser caminho literal
     //   - Docker NÃO expande variáveis (ex.: ${containerUserHome}, $USER)
-//   - Docker processamento ocorre ANTES do container existir
-// • O campo `source=` (host side) PODE usar variáveis VS Code
-//   - VS Code expande ${localEnv:*}, ${localWorkspaceFolder} ANTES de chamar docker
-//   - Exemplo válido: "source=${localEnv:HOME}/data,target=/data,type=bind"
+    //   - Docker processamento ocorre ANTES do container existir
+    // • O campo `source=` (host side) PODE usar variáveis VS Code
+    //   - VS Code expande ${localEnv:*}, ${localWorkspaceFolder} ANTES de chamar docker
+    //   - Exemplo válido: "source=${localEnv:HOME}/data,target=/data,type=bind"
     //
     // Implicação arquitetural:
     // • `mounts` materializam decisões já tomadas (infraestrutura concreta)

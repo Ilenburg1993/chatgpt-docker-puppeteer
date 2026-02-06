@@ -1,15 +1,7 @@
-/**
- * Testes Unitários: NERV Envelope
- * @module tests/unit/nerv/test_envelope.spec.js
- * @description Valida criação, validação e serialização de envelopes NERV
- * @audit-level 510
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-
-const { createEnvelope } = require('../../../src/shared/nerv/envelope');
-const { MessageType, ActionCode, ActorRole } = require('../../../src/shared/nerv/constants');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { createEnvelope } from '#shared/nerv/envelope';
+import { MessageType, ActionCode, ActorRole } from '#shared/nerv/constants';
 
 describe('NERV Envelope - Protocolo Universal', () => {
     describe('1. Criação Básica de Envelope', () => {

@@ -1,9 +1,4 @@
-/**
- * Teste completo do ConnectionOrchestrator
- * Valida todos os modos de conexão e configurações
- */
-
-const { ConnectionOrchestrator, STATES } = require('../../../src/infra/ConnectionOrchestrator');
+import { ConnectionOrchestrator, STATES } from '#infra/ConnectionOrchestrator';
 
 console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
 

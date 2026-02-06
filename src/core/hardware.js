@@ -1,16 +1,5 @@
-/* ==========================================================================
-   src/core/hardware.js
-   Audit Level: 100 — Hardware Monitoring & System Metrics
-   Status: NEW (P9.1 Performance Optimization)
-
-   Responsabilidade:
-   - Expor métricas de hardware (heap, CPU, memory)
-   - Integração com v8.getHeapStatistics()
-   - Fornecer dados para health checks e observabilidade
-========================================================================== */
-
-const v8 = require('v8');
-const os = require('os');
+import v8 from 'node:v8';
+import os from 'node:os';
 
 /**
  * Retorna estatísticas detalhadas de heap memory.
@@ -112,10 +101,4 @@ function getAllMetrics() {
     };
 }
 
-module.exports = {
-    getHeapStats,
-    getCPUStats,
-    getMemoryStats,
-    getSystemInfo,
-    getAllMetrics
-};
+export { getHeapStats, getCPUStats, getMemoryStats, getSystemInfo, getAllMetrics };

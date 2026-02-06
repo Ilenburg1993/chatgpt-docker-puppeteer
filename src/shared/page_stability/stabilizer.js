@@ -1,51 +1,5 @@
-/* ==========================================================================
-   src/shared/page_stability/stabilizer.js
-   Audit Level: 500 — Instrumented System Stabilizer (IPC 2.0)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-
-   Subsistema: SHARED — Page Stability (Universal Tool)
-   Responsabilidade: Garantir que a interface está estática e responsiva antes
-                     de interações físicas, narrando o status de prontidão.
-
-   Camada Compartilhada: Usado por DRIVER, INFRA (health checks), VALIDATORS
-
-   Versão: v2.0 (Feb 2026) - COMPLETE
-   Changelog:
-     - v3.0 (Jan 2026): Original version in driver/modules
-     - v4.0 (Jan 2026): Migrated to shared/page_stability
-     - v2.0 (Feb 2026): FULL CONSOLIDATION (8 bugs fixed, 14 improvements)
-
-       Phase 1 - Critical Fixes:
-       * Added parameter validation (defensive programming)
-       * Externalized configuration (STABILIZER_CONFIG with 20+ constants)
-       * Fixed magic numbers across all phases
-
-       Phase 2 - Robustness:
-       * Enhanced error handling (logging before fallback)
-       * Fixed MutationObserver memory leak (guaranteed cleanup)
-       * Added abort signal support (graceful cancellation)
-       * Implemented retry logic (3 retries with exponential backoff)
-       * Comprehensive telemetry (17 event types)
-
-       Phase 3 - Polish:
-       * Optimized spinner detection (cache + early exit)
-       * Phase timeout granularity (balanced distribution)
-       * MutationObserver optimization (attribute filter)
-       * Adaptive silence window (scaled by metrics)
-       * CPU lag histogram tracking
-       * Phase skip detection
-       * Enriched return value (object with 8+ fields)
-       * Spinner false positive filter
-       * Consistent error propagation strategy
-
-   Sincronizado com: BaseDriver V320, adaptive.js V100, TelemetryBridge V500.
-========================================================================== */
-
-const { log } = require('@core/logger');
-
-const { STATUS_VALUES } = require('@core/constants/tasks.js');
-
-const adaptive = require('@logic/adaptive');
+import { log } from '#core/logger';
+import * as adaptive from '#logic/adaptive';
 
 // ============================================
 // CONFIGURATION (Externalized from v2.0)
@@ -187,7 +141,7 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                                     if (node.contentDocument && checkSpinnersDeep(node.contentDocument)) {
                                         return true;
                                     }
-                                } catch (_e) {
+                                } catch (_err) {
                                     // Ignore cross-origin iframe access errors
                                 }
                             }
@@ -447,7 +401,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                                         roots.push(node.contentDocument);
                                                         queue.push(node.contentDocument);
                                                     }
-                                                } catch (_e) {
+                                                } catch (_err) {
                                                     // Ignore cross-origin iframe access errors
                                                 }
                                             }
@@ -471,7 +425,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                         });
                                         observers.push(obs);
                                         window.__STABILIZER_OBSERVERS.push(obs);
-                                    } catch (_e) {
+                                    } catch (_err) {
                                         // Ignore observer errors
                                     }
                                 });
@@ -523,7 +477,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                             window.__STABILIZER_OBSERVERS.forEach(obs => {
                                 try {
                                     obs.disconnect();
-                                } catch (_e) {
+                                } catch (_err) {
                                     // Ignore observer cleanup errors
                                 }
                             });
@@ -698,10 +652,4 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
     }
 }
 
-// [v2.0] Export config for testing
-module.exports = {
-    waitForStability,
-    measureEventLoopLag,
-    getPageLoadStatus,
-    STABILIZER_CONFIG
-};
+export { waitForStability, measureEventLoopLag, getPageLoadStatus, STABILIZER_CONFIG };

@@ -1,11 +1,5 @@
-/*
- * src/nerv/adapters/high_level_adapter.js
- * High-level helpers for creating and sending NERV envelopes.
- * Provides convenience wrappers: sendEvent, sendCommand, sendAck
- */
-
-const { createEnvelope } = require('@shared/nerv/envelope');
-const { MessageType } = require('@shared/nerv/constants');
+import { createEnvelope } from '#shared/nerv/envelope';
+import { MessageType } from '#shared/nerv/constants';
 
 function makeEnvelope({ actor, target = null, messageType, actionCode, payload = {}, correlationId = null }) {
     return createEnvelope({ actor, target, messageType, actionCode, payload, correlationId });
@@ -59,9 +53,4 @@ function sendAck(nerv, actor, actionCode, correlationId = null, target = null) {
     return envelope;
 }
 
-module.exports = {
-    makeEnvelope,
-    sendEvent,
-    sendCommand,
-    sendAck
-};
+export { makeEnvelope, sendEvent, sendCommand, sendAck };

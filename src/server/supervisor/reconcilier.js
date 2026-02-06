@@ -1,17 +1,7 @@
-/* ==========================================================================
-   src/server/supervisor/reconciler.js
-   Audit Level: 700 — Sovereign State Reconciler (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Atuar como o Control Plane do sistema. Monitorar a frota,
-                     detectar desvios (drifts) e orquestrar a autocura.
-   Sincronizado com: engine/socket.js V600, remediation.js V600,
-                     shared/nerv/constants.js (NERV Protocol 2.0)
-========================================================================== */
-
-const socketHub = require('@server/engine/socket');
-const remediation = require('./remediation');
-const { log } = require('@core/logger');
-const { ActionCode, MessageType } = require('@shared/nerv/constants');
+import * as socketHub from '#server/engine/socket';
+import remediation from './remediation.js';
+import { log } from '#core/logger';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 
 class SupervisorReconciler {
     constructor() {
@@ -171,5 +161,4 @@ class SupervisorReconciler {
     }
 }
 
-// Exporta o Singleton Soberano
-module.exports = new SupervisorReconciler();
+export default new SupervisorReconciler();

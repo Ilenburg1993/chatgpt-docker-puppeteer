@@ -1,14 +1,5 @@
-#!/usr/bin/env node
-/* ==========================================================================
-   scripts/validate_config.js
-   Configuration Validation Script
-
-   Validates all configuration files and environment variables
-   Exit code 0 = valid, 1 = invalid
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 const CONFIG_FILES = {
     'config.json': {
@@ -262,7 +253,7 @@ class ConfigValidator {
 }
 
 // Run validation
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     const validator = new ConfigValidator();
     validator.run().catch(error => {
         console.error('Fatal error during validation:', error);
@@ -270,4 +261,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = ConfigValidator;
+export default ConfigValidator;

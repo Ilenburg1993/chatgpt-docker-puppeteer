@@ -1,54 +1,9 @@
-/* ==========================================================================
-   src/driver/nerv_adapter/driver_nerv_adapter.js
-   Subsistema: DRIVER — NERV Adapter
-   Audit Level: 800 — Critical Decoupling Layer (Singularity Edition)
-   Version: 3.0 (Pool-Ready + Simplified API)
-
-   Responsabilidade:
-   - Adaptar NERV (pub/sub) para o domínio do DRIVER
-   - API PÚBLICA SIMPLES: executeTask(task) → response
-   - Gerenciar pool de drivers via Factory (acquire/release)
-   - Escutar COMMANDS vindos do KERNEL via NERV
-   - Emitir EVENTS de telemetria do driver via NERV + EventEmitter local
-   - Garantir ZERO acoplamento direto com outros subsistemas
-   - Expor API SIMPLES para execução de tasks
-
-   Princípios:
-   - NÃO importa KERNEL, SERVER ou INFRA diretamente
-   - NÃO acessa filesystem diretamente (usa KERNEL para decisões)
-   - NÃO decide estratégias (apenas executa ordens)
-   - Comunicação 100% via NERV (IPC) + EventEmitter (local)
-
-   v3.0 Features (BREAKING CHANGES):
-   - Pool-based driver management (NO DriverLifecycleManager)
-   - Direct factory integration (acquireFromPool/releaseToPool)
-   - Simplified API: executeTask(task) → response
-   - Context management (attach/detach) abstracted
-   - AbortSignal per task (not per LifecycleManager)
-
-   v2.0 Features:
-   - EventEmitter inheritance (duplo canal: local + NERV)
-   - ADAPTER_CONFIG (8 constantes, zero magic numbers)
-   - ADAPTER_EVENTS (10 eventos locais)
-   - Timeout protection (execute, shutdown, health check)
-   - Circuit breaker pattern (resilience)
-   - Telemetry buffer (batch emit)
-   - Metrics expandidos (14 métricas)
-   - JSDoc completo (100%)
-   - Error recovery (detach listeners, cleanup)
-========================================================================== */
-
-const EventEmitter = require('events');
-const driverFactory = require('../factory');
-// ✅ v3.0: DriverLifecycleManager REMOVED - Pool management direto via factory
-
-const {
-    STATUS_VALUES: STATUS_VALUES
-} = require('@core/constants/tasks.js');
-
-const { log } = require('@core/logger');
-const { ActionCode, MessageType, ActorRole } = require('@shared/nerv/constants');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
+import EventEmitter from 'node:events';
+import * as driverFactory from '../factory.js';
+import { STATUS_VALUES } from '#core/constants/tasks';
+import { log } from '#core/logger';
+import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // ============================================================================
 // ADAPTER_CONFIG - Zero Magic Numbers
@@ -386,7 +341,7 @@ class DriverNERVAdapter extends EventEmitter {
         switch (actionCode) {
             case ActionCode.DRIVER_EXECUTE_TASK: {
                 // ✅ v1.1: Valida pré-requisitos antes de executar
-                const { validateBrowserPool } = require('@core/validators/prerequisite_validator');
+                const { validateBrowserPool } = await import('#core/validators/prerequisite_validator');
                 const poolValidation = validateBrowserPool(this.browserPool);
 
                 if (!poolValidation.valid) {
@@ -1947,20 +1902,8 @@ class DriverNERVAdapter extends EventEmitter {
     }
 }
 
-// ============================================================================
-// Module Exports
-// ============================================================================
-
-module.exports = {
-    // ✅ Class export
-    DriverNERVAdapter,
-
-    // ✅ Constants export (para testes)
-    ADAPTER_CONFIG,
-    ADAPTER_EVENTS,
-
-    // ✅ Factory function (alternative constructor)
-    create: (nerv, browserPool, config) => {
-        return new DriverNERVAdapter(nerv, browserPool, config);
-    }
+export const create = (nerv, browserPool, config) => {
+    return new DriverNERVAdapter(nerv, browserPool, config);
 };
+
+export { DriverNERVAdapter, ADAPTER_CONFIG, ADAPTER_EVENTS };

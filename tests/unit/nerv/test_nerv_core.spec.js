@@ -1,14 +1,7 @@
-/**
- * Testes Unitários: NERV Core
- * @module tests/unit/nerv/test_nerv_core.spec.js
- * @description Valida event bus, pub/sub, correlação de eventos
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const { criarNERVMock } = require('../../mocks/mock_nerv');
-const { ActorRole, MessageType, ActionCode } = require('../../../src/shared/nerv/constants');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { criarNERVMock } from '../../mocks/mock_nerv.js';
+import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
 
 describe('NERV Core - Event Bus Central', () => {
     describe('1. Criação e Inicialização', () => {

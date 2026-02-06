@@ -40,4 +40,4 @@ function isProcessAlive(pid) {
     }
 }
 
-module.exports = { isProcessAlive };
+export { isProcessAlive };

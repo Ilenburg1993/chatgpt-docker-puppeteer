@@ -1,22 +1,5 @@
-#!/usr/bin/env node
-/**
- * @fileoverview Phase 3 Integration Test - Monitoring & Reconnection
- *
- * **Tests**:
- * 1. PeriodicHealthMonitor initialization
- * 2. CDP-based health checks (connection, memory, targets)
- * 3. Status change detection (HEALTHY → WARNING → CRITICAL)
- * 4. ConnectionRecoveryStrategy (reconnection flow)
- * 5. External browser mode notifications
- *
- * **Run**: node tests/test_phase3_monitoring.js
- */
-
-// ✅ Register module aliases FIRST (before any imports)
-require('module-alias/register');
-
-const assert = require('assert');
-const EventEmitter = require('events');
+#!/usr/bin/env nodeimport assert from 'node:assert';
+import EventEmitter from 'node:events';
 
 /* ==========================================================================
    MOCK SETUP
@@ -56,11 +39,7 @@ class MockBrowserPoolManager {
     }
 }
 
-/* ==========================================================================
-   TEST SUITE
-========================================================================== */
-
-const PeriodicHealthMonitor = require('../src/infra/browser_pool/PeriodicHealthMonitor');
+import PeriodicHealthMonitor from '#infra/browser_pool/PeriodicHealthMonitor';
 const { HEALTH_STATUS, CHECK_TYPES, MONITOR_EVENTS, MONITOR_CONFIG } = PeriodicHealthMonitor;
 
 async function runTests() {

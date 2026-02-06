@@ -1,25 +1,7 @@
-#!/usr/bin/env node
-/**
- * PORT MANAGER - Centralized Port Conflict Detection & Resolution
- *
- * Features:
- * - Detects port conflicts automatically
- * - Resolves conflicts using alternative ports
- * - Shows process info (PID, name) for occupied ports
- * - Generates detailed logs
- * - Can be used standalone or imported as module
- *
- * Usage:
- *   node scripts/port-manager.js check              # Check all ports
- *   node scripts/port-manager.js check 9224         # Check specific port
- *   node scripts/port-manager.js resolve            # Auto-resolve conflicts
- *   node scripts/port-manager.js kill 9224          # Kill process on port
- */
-
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const { promisify } = require('util');
+#!/usr/bin/env nodeimport { exec } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
@@ -27,8 +9,8 @@ const execAsync = promisify(exec);
 // CONFIGURATION
 // ============================================================================
 
-const CONFIG_PATH = path.join(__dirname, '../config/ports.json');
-const LOG_DIR = path.join(__dirname, '../logs');
+const CONFIG_PATH = path.join(import.meta.dirname, '../config/ports.json');
+const LOG_DIR = path.join(import.meta.dirname, '../logs');
 const LOG_FILE = path.join(LOG_DIR, 'port-manager.log');
 
 // Ensure logs directory exists
@@ -343,7 +325,7 @@ async function main() {
                     }
                 }
 
-                const updatedConfigPath = path.join(__dirname, '../config/ports.resolved.json');
+                const updatedConfigPath = path.join(import.meta.dirname, '../config/ports.resolved.json');
                 fs.writeFileSync(updatedConfigPath, JSON.stringify(updatedConfig, null, 2));
                 log('success', `Updated configuration saved to: ${updatedConfigPath}`);
                 break;
@@ -380,24 +362,13 @@ async function main() {
     }
 }
 
-// ============================================================================
-// EXPORTS (for use as module)
-// ============================================================================
-
-module.exports = {
-    checkPort,
-    checkAllPorts,
-    findAvailablePort,
-    killProcessOnPort,
-    autoResolveConflicts,
-    log
-};
+export { checkPort, checkAllPorts, findAvailablePort, killProcessOnPort, autoResolveConflicts, log };
 
 // ============================================================================
 // RUN CLI
 // ============================================================================
 
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     main().catch(error => {
         console.error('[FATAL ERROR]', error);
         process.exit(1);

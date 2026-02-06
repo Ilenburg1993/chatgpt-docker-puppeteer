@@ -1,38 +1,5 @@
-#!/usr/bin/env node
-/**
- * Unused Variables Auto-Fixer
- *
- * Purpose: Automatically fixes ESLint 'no-unused-vars' errors by prefixing with underscore
- *
- * Fixes:
- * - catch (e) → catch (_e)
- * - function(param) → function(_param)
- * - const varName = ... → const _varName = ...
- * - { destructured } → { destructured: _destructured }
- *
- * Usage:
- *   # Step 1: Generate list of unused vars
- *   npx eslint . --format unix | grep "is defined but never used\|is assigned a value but never used" > /tmp/unused-vars.txt
- *
- *   # Step 2: Fix automatically
- *   node scripts/fixes/fix-unused-vars.js /tmp/unused-vars.txt
- *
- *   # Step 3: Verify fixes
- *   npx eslint . --quiet
- *
- * Exit Codes:
- *   0 - Fixes applied successfully
- *   1 - Input file not found or invalid
- *   2 - Error during processing
- *
- * WARNING: This script modifies files in-place. Commit your changes first!
- *
- * Example input format (ESLint unix output):
- *   /path/file.js:42:10: 'varName' is defined but never used
- */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 const inputFile = process.argv[2] || '/tmp/unused-vars.txt';
 

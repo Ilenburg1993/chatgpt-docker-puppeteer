@@ -1,29 +1,15 @@
-/* ==========================================================================
-   tests/unit/orchestrator/test_checkpoint_manager.spec.js
-   Unit Tests: CheckpointManager
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Testar salvamento de checkpoints
-     - Testar carregamento e recovery
-     - Testar listagem e cleanup
-     - Testar auto-cleanup (LRU)
-========================================================================== */
-
-require('module-alias/register');
-
-const assert = require('assert');
-const { describe, it, beforeEach, afterEach } = require('node:test');
-const { CheckpointManager } = require('../../../src/orchestrator/checkpoint_manager');
-const path = require('path');
-const fs = require('fs/promises');
+import assert from 'node:assert';
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import { CheckpointManager } from '#orchestrator/checkpoint_manager';
+import path from 'node:path';
+import fs from 'fs/promises';
 
 describe('CheckpointManager Unit Tests', () => {
     let checkpointManager;
     let testBaseDir;
 
     beforeEach(async () => {
-        testBaseDir = path.join(__dirname, '../../test-checkpoints');
+        testBaseDir = path.join(import.meta.dirname, '../../test-checkpoints');
         await fs.mkdir(testBaseDir, { recursive: true });
 
         checkpointManager = new CheckpointManager({

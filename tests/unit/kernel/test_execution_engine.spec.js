@@ -1,13 +1,6 @@
-/**
- * Testes Unitários: Kernel Execution Engine
- * @module tests/unit/kernel/test_execution_engine.spec.js
- * @description Valida ciclo de vida de tarefas e transições de estado
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const { STATUS_VALUES } = require('../../../src/core/constants/tasks');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 describe('Kernel Execution Engine - Motor de Execução', () => {
     describe('1. Ciclo de Vida de Tarefas', () => {

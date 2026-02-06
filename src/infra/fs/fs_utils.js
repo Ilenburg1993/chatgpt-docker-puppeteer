@@ -1,15 +1,6 @@
-/* ==========================================================================
-   src/infra/fs/fs_utils.js
-   Audit Level: 700 — Infrastructure Support Utilities (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Prover funções utilitárias para manipulação de arquivos,
-                     sanitização de dados e controle de tempo.
-   Sincronizado com: paths.js V700.
-========================================================================== */
-
-const fs = require('fs');
-const path = require('path');
-const PATHS = require('./paths');
+import fs from 'node:fs';
+import path from 'node:path';
+import * as PATHS from './paths.js';
 
 /**
  * REGEX UNIVERSAL DE LIMPEZA (ASCII 0-31 + 127/DEL)
@@ -93,24 +84,12 @@ function isPathSafe(filePath) {
     }
 
     // Resolve to absolute path
-    const ROOT = path.resolve(__dirname, '../..');
+    const ROOT = path.resolve(import.meta.dirname, '../..');
     const normalized = path.normalize(path.resolve(filePath));
 
     // Must start with workspace root
     return normalized.startsWith(ROOT);
 }
 
-module.exports = {
-    // Re-exporta os caminhos para manter compatibilidade com a Fachada de IO
-    ...PATHS,
-
-    // Constantes de utilidade
-    CONTROL_CHARS_REGEX,
-
-    // Funções de suporte
-    ensureInfrastructure,
-    sanitizeFilename,
-    cleanText,
-    sleep,
-    isPathSafe
-};
+export * from './paths.js';
+export { CONTROL_CHARS_REGEX, ensureInfrastructure, sanitizeFilename, cleanText, sleep, isPathSafe };

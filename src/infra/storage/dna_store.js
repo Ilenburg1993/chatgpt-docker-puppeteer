@@ -1,16 +1,7 @@
-/* ==========================================================================
-   src/infra/storage/dna_store.js
-   Audit Level: 730 — Sovereign Genomic Storage (Singularity Edition)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Gestão da persistência, integridade e evolução do genoma
-                     de interface (dynamic_rules.json).
-   Sincronizado com: paths.js V700, fs_core.js V700, dna_schema.js V100.
-========================================================================== */
-
-const PATHS = require('../fs/paths');
-const { atomicWrite, safeReadJSON } = require('../fs/fs_core');
-const { DnaSchema } = require('@core/schemas');
-const { log } = require('@core/logger');
+import * as PATHS from '../fs/paths.js';
+import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';
+import { DnaSchema } from '#core/schemas';
+import { log } from '#core/logger';
 
 /**
  * ESTRUTURA BÁSICA V4 GOLD (Baseline de Segurança)
@@ -238,11 +229,4 @@ function getDnaHistory() {
     }));
 }
 
-module.exports = {
-    getDna,
-    saveDna,
-    getTargetRules,
-    invalidateCache,
-    rollbackDna,
-    getDnaHistory,
-};
+export { getDna, saveDna, getTargetRules, invalidateCache, rollbackDna, getDnaHistory };

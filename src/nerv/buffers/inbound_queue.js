@@ -147,4 +147,4 @@ function createInboundQueue({ telemetry, maxSize = null }) {
     });
 }
 
-module.exports = createInboundQueue;
+export default createInboundQueue;

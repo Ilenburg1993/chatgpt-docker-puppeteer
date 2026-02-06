@@ -1,13 +1,7 @@
-/**
- * @file tests/unit/core/test_schemas.spec.js
- * Testes unitários para validação de schemas Zod (Task V4 + DNA)
- * FASE 3 - Cobertura de Core/Schemas
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const schemas = require('../../../src/core/schemas');
-const { STATUS_VALUES } = require('../../../src/core/constants/tasks');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import * as schemas from '#core/schemas';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 describe('Task Schema Validation', () => {
     describe('Validação de tarefas válidas', () => {

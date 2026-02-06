@@ -1,12 +1,7 @@
-#!/usr/bin/env node
-// scripts/check_estado_references.js
-// Lista referências a 'estado.json' em todo o repositório e falha
-// se encontrar usos fora das áreas permitidas.
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 
 const ALLOWED_PATTERNS = [
     'DOCUMENTAÇÃO/DEPRECATIONS/',

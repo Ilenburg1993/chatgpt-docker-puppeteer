@@ -1,7 +1,6 @@
-#!/usr/bin/env node
-'use strict';
+#!/usr/bin/env node'use strict';
 
-const WebSocket = require('ws');
+import WebSocket from 'ws';
 
 const endpoint =
     process.argv[2] ||

@@ -1,19 +1,7 @@
-#!/usr/bin/env node
-
-/**
- * Script de manutenção do Puppeteer
- * Limpa profiles temporários e valida cache
- *
- * Uso:
- *   npm run maintenance
- *   node scripts/puppeteer_maintenance.js
- *   node scripts/puppeteer_maintenance.js --clean-cache (remove cache completo)
- */
-
-const { ConnectionOrchestrator } = require('../src/infra/ConnectionOrchestrator');
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+#!/usr/bin/env nodeimport { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const cleanCache = args.includes('--clean-cache');
@@ -33,7 +21,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
 
         // Tamanho do cache
         try {
-            const { execSync } = require('child_process');
+            const { execSync } = await import('node:child_process');
             const size = execSync(`du -sh ${cacheInfo.path} 2>/dev/null | cut -f1`).toString().trim();
             console.log('  Size:', size);
         } catch (_e) {

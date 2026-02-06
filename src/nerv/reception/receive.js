@@ -145,4 +145,4 @@ function createReception({ envelopes, correlation, telemetry }) {
     });
 }
 
-module.exports = createReception;
+export default createReception;

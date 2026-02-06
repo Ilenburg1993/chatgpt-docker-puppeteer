@@ -235,4 +235,4 @@ function createHealth({ telemetry, thresholds = {} }) {
     });
 }
 
-module.exports = createHealth;
+export default createHealth;

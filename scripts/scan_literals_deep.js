@@ -1,13 +1,7 @@
-#!/usr/bin/env node
-/**
- * Scan profundo: Análise completa de magic strings para extração de constantes
- * Usa análise regex avançada + contexto semântico
- */
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'src');
 
 console.log('🚀 Iniciando Scan Profundo de Magic Strings\n');

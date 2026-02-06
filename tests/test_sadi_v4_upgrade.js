@@ -1,20 +1,11 @@
-#!/usr/bin/env node
-/**
- * Test script para SADI Analyzer v4.0
- * Valida: validação de parâmetros, cache, telemetria, scoring
- */
-
-const path = require('path');
-
-// Configurar module-alias ANTES de qualquer import
-require('module-alias/register');
+#!/usr/bin/env nodeimport path from 'node:path';
 
 console.log('\n🧪 SADI Analyzer v4.0 - Upgrade Validation\n');
 
 // Test 1: Module loads
 console.log('✅ Test 1: Module loading');
 try {
-    const analyzer = require('@shared/sadi/analyzer');
+    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
     console.log('   ✓ SADI module loaded');
     console.log('   Exports:', Object.keys(analyzer).join(', '));
 
@@ -34,7 +25,7 @@ try {
 console.log('✅ Test 2: Parameter validation (defensive programming)');
 
 (async () => {
-    const analyzer = require('@shared/sadi/analyzer');
+    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
 
     try {
         // Should throw on invalid page

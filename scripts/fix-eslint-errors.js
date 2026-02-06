@@ -1,17 +1,5 @@
-#!/usr/bin/env node
-/**
- * Auto-Fix ESLint Errors Script
- * Version: 1.0
- * Date: 2026-01-22
- *
- * Fixes common ESLint errors automatically:
- * - no-promise-executor-return (11 occurrences)
- * - no-proto (4 occurrences)
- * - no-control-regex (2 occurrences)
- */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 // ============================================================================
 // 1. Fix no-promise-executor-return (wrap return in void)

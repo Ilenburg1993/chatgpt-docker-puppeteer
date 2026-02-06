@@ -1,8 +1,7 @@
-#!/usr/bin/env node
-'use strict';
+#!/usr/bin/env node'use strict';
 
-const http = require('http');
-const WebSocket = require('ws');
+import http from 'node:http';
+import WebSocket from 'ws';
 
 const HOST = process.env.CHROME_HOST || '127.0.0.1';
 const PORT = Number(process.env.CHROME_PORT || process.argv[2] || 9225);

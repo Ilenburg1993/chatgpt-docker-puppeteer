@@ -1,18 +1,5 @@
-/* ==========================================================================
-   src/server/dashboard-api/telemetry_aggregator.js
-   Dashboard API: Telemetry Aggregator
-   Status: NEW (Mission Control v2.0)
-
-   Responsabilidade:
-     - Coletar métricas de sistema a 1Hz (hardware, NERV, queue)
-     - Manter ring buffers para histórico (1 hora de dados)
-     - Broadcast métricas via Socket.io para dashboards
-     - Prover API para consulta de métricas atuais e históricas
-     - Detectar anomalias e emitir alertas
-========================================================================== */
-
-const { log } = require('@core/logger');
-const hardware = require('@core/hardware');
+import { log } from '#core/logger';
+import * as hardware from '#core/hardware';
 
 /**
  * Ring Buffer para armazenamento eficiente de métricas históricas.
@@ -172,10 +159,10 @@ class TelemetryAggregator {
     /**
      * Getter lazy para Queue Cache.
      */
-    get queueCache() {
+    async getQueueCache() {
         if (!this._queueCache) {
             try {
-                this._queueCache = require('@infra/queue/cache');
+                this._queueCache = await import('#infra/queue/cache').then(m => m.default ?? m);
             } catch (err) {
                 log('DEBUG', `[TelemetryAggregator] Queue cache não disponível`);
                 return null;
@@ -216,9 +203,10 @@ class TelemetryAggregator {
 
         // Queue metrics
         let queueMetrics = { size: 0, hitRate: 0 };
-        if (this.queueCache) {
+        const _qc = await this.getQueueCache();
+        if (_qc) {
             try {
-                const cacheMetrics = this.queueCache.getCacheMetrics();
+                const cacheMetrics = _qc.getCacheMetrics();
                 queueMetrics = {
                     size: cacheMetrics.queueSize || 0,
                     hitRate: cacheMetrics.hitRate || 0,
@@ -525,6 +513,6 @@ class TelemetryAggregator {
 // Singleton instance
 const telemetryAggregator = new TelemetryAggregator();
 
-module.exports = telemetryAggregator;
-module.exports.TelemetryAggregator = TelemetryAggregator;
-module.exports.RingBuffer = RingBuffer;
+export default telemetryAggregator;
+export { TelemetryAggregator };
+export { RingBuffer };

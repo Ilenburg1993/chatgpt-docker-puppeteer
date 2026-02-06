@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: Server Middleware
- * @module tests/unit/server/test_middleware.spec.js
- * @description Valida middleware de error handling, request ID e schema guard
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('Server Middleware - Request Processing', () => {
     describe('1. Error Handler Middleware', () => {

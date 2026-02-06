@@ -1,11 +1,7 @@
-/* scripts/visualizar_fila.js (Audit Level 15 - Project Topology) */
-// Responsabilidade: Gerar visualização topológica da fila (DOT ou HTML Interativo).
-// Uso: node scripts/visualizar_fila.js [--html] [--prio-min N]
+import fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const HTML_OUT = path.join(PUBLIC_DIR, 'graph.html');

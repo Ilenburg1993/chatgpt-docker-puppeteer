@@ -1,37 +1,7 @@
-#!/usr/bin/env node
-/*
- * ===========================================
- * TEST: Universal Tools Migration Validation
- * ===========================================
- *
- * Purpose: Validate that human.js and stabilizer.js migration to shared/ layer is complete
- *
- * Validation Steps:
- * 1. Verify old files removed (driver/modules/human.js, driver/modules/stabilizer.js)
- * 2. Verify new files exist (shared/biomechanics/human.js, shared/page_stability/stabilizer.js)
- * 3. Verify all modules load without errors
- * 4. Verify function exports are intact
- * 5. Verify READMEs exist
- * 6. Verify ESLint passes (0 errors)
- *
- * Expected Result: All checks pass, 0 errors, migration complete
- *
- * Usage:
- *   node tests/test_universal_tools_migration.js
- *
- * Exit Codes:
- *   0: All tests passed
- *   1: One or more tests failed
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-// ============================================
-// Module Alias Registration (required for @core, @shared imports)
-// ============================================
-require('module-alias/register');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 // ============================================
 // ANSI Colors
@@ -131,15 +101,15 @@ const modulesToLoad = [
     { path: 'src/driver/modules/recovery_system.js', name: 'Recovery System' }
 ];
 
-modulesToLoad.forEach(({ path: modulePath, name }) => {
+for (const { path: modulePath, name } of modulesToLoad) {
     try {
         const fullPath = path.join(process.cwd(), modulePath);
-        require(fullPath);
+        await import(pathToFileURL(fullPath).href);
         pass(`Module loads: ${name}`);
     } catch (err) {
         fail(`Module loads: ${name}`, err.message);
     }
-});
+}
 
 // ============================================
 // Test 4: Verify Function Exports
@@ -148,7 +118,7 @@ modulesToLoad.forEach(({ path: modulePath, name }) => {
 section('Test 4: Verify Function Exports');
 
 try {
-    const human = require(path.join(process.cwd(), 'src/shared/biomechanics/human.js'));
+    const human = await import(pathToFileURL(path.join(process.cwd(), 'src/shared/biomechanics/human.js')).href);
 
     const humanFunctions = ['humanClick', 'humanType', 'wakeUpMove'];
     humanFunctions.forEach(fn => {
@@ -163,7 +133,7 @@ try {
 }
 
 try {
-    const stabilizer = require(path.join(process.cwd(), 'src/shared/page_stability/stabilizer.js'));
+    const stabilizer = await import(pathToFileURL(path.join(process.cwd(), 'src/shared/page_stability/stabilizer.js')).href);
 
     const stabilizerFunctions = ['waitForStability', 'measureEventLoopLag', 'getPageLoadStatus'];
     stabilizerFunctions.forEach(fn => {

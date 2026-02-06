@@ -1,40 +1,16 @@
-/* ==========================================================================
-   src/driver/factory.js v3.0
-   Audit Level: 700 — Reactive Driver Factory (Pool Edition)
-   Status: v3.0 - BREAKING CHANGES - Pool-Ready Architecture
-   Responsabilidade: Descoberta, instanciação Lazy-Load e gestão de pool de
-                     drivers reutilizáveis (IDLE state) com telemetria.
-   Sincronizado com: TargetDriver.js v3.0 (attach/detach support)
-
-   v3.0 Changes (BREAKING):
-   - ✅ Remove cache WeakMap (replaced by pool Map)
-   - ✅ Novo createDriver(target, config) - Creates UNATTACHED driver
-   - ✅ Pool structure: Map<target, Driver[]> - IDLE drivers
-   - ✅ acquireFromPool(target) - Get IDLE driver or create
-   - ✅ releaseToPool(driver) - Return driver to IDLE state
-   - ✅ Health checks & GC (evict idle > 5min)
-   - ✅ Warmup: MIN_POOL_SIZE drivers created at boot
-
-   v2.0 Changes:
-   - EventEmitter class (6 lifecycle events)
-   - FACTORY_CONFIG (zero magic numbers)
-   - Robust parameter validation (P0 fixes)
-   - Timeout protection in invalidatePageCache (P1 fix)
-   - Complete JSDoc
-========================================================================== */
-
-const EventEmitter = require('events');
-const fs = require('fs');
-const path = require('path');
-const TargetDriver = require('./core/TargetDriver');
-const { log } = require('@core/logger');
+import EventEmitter from 'node:events';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import TargetDriver from './core/TargetDriver.js';
+import { log } from '#core/logger';
 
 /* ==========================================================================
    FACTORY_CONFIG v3.0 - Pool Management
 ========================================================================== */
 const FACTORY_CONFIG = {
     // Discovery
-    TARGETS_DIR: path.join(__dirname, 'targets'),
+    TARGETS_DIR: path.join(import.meta.dirname, 'targets'),
     DEFAULT_TARGET: process.env.FACTORY_DEFAULT_TARGET || 'chatgpt',
     VALIDATE_ON_BOOT: process.env.FACTORY_VALIDATE_BOOT === 'true',
     DISCOVERY_RETRY_COUNT: 3,
@@ -460,18 +436,9 @@ class DriverFactory extends EventEmitter {
                     }, FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS);
                 });
 
-                const requirePromise = new Promise((resolve, reject) => {
-                    setImmediate(() => {
-                        try {
-                            const loadedClass = require(meta.path);
-                            resolve(loadedClass);
-                        } catch (err) {
-                            reject(err);
-                        }
-                    });
-                });
+                const importPromise = import(pathToFileURL(meta.path).href).then(mod => mod.default ?? mod);
 
-                DriverClass = await Promise.race([requirePromise, timeoutPromise]);
+                DriverClass = await Promise.race([importPromise, timeoutPromise]);
             } catch (requireError) {
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Failed to load driver class '${key}': ${requireError.message}`);
@@ -1123,41 +1090,20 @@ class DriverFactory extends EventEmitter {
  */
 const factory = new DriverFactory();
 
-/**
- * Module exports - v3.0 API (BREAKING CHANGES)
- */
-module.exports = {
-    // ✅ v3.0 Pool API (NEW)
-    createDriver: factory.createDriver.bind(factory),
-    acquireFromPool: factory.acquireFromPool.bind(factory),
-    releaseToPool: factory.releaseToPool.bind(factory),
-    initializePool: factory.initializePool.bind(factory),
-    shutdown: factory.shutdown.bind(factory),
-
-    // ✅ v2.0 EventEmitter API
-    on: factory.on.bind(factory),
-    once: factory.once.bind(factory),
-    off: factory.off.bind(factory),
-    emit: factory.emit.bind(factory),
-
-    // ✅ v2.0 Introspection API
-    getDriverMetadata: factory.getDriverMetadata.bind(factory),
-    getAllDriversMetadata: factory.getAllDriversMetadata.bind(factory),
-    hasTarget: factory.hasTarget.bind(factory),
-    getDefaultTarget: factory.getDefaultTarget.bind(factory),
-
-    // ✅ v2.0 Health & Metrics API
-    getHealth: factory.getHealth.bind(factory),
-    getMetrics: factory.getMetrics.bind(factory),
-
-    // ✅ Constantes exportadas
-    FACTORY_CONFIG,
-    FACTORY_EVENTS,
-
-    // ✅ Singleton instance (para casos avançados)
-    factory,
-
-    // ✅ DEPRECATED: v2.0 API (mantido para compatibilidade temporária)
-    // getDriver: Removed - Use acquireFromPool + driver.attachContext instead
-    availableTargets: Object.keys(factory.registry),
-};
+export const createDriver = factory.createDriver.bind(factory);
+export const acquireFromPool = factory.acquireFromPool.bind(factory);
+export const releaseToPool = factory.releaseToPool.bind(factory);
+export const initializePool = factory.initializePool.bind(factory);
+export const shutdown = factory.shutdown.bind(factory);
+export const on = factory.on.bind(factory);
+export const once = factory.once.bind(factory);
+export const off = factory.off.bind(factory);
+export const emit = factory.emit.bind(factory);
+export const getDriverMetadata = factory.getDriverMetadata.bind(factory);
+export const getAllDriversMetadata = factory.getAllDriversMetadata.bind(factory);
+export const hasTarget = factory.hasTarget.bind(factory);
+export const getDefaultTarget = factory.getDefaultTarget.bind(factory);
+export const getHealth = factory.getHealth.bind(factory);
+export const getMetrics = factory.getMetrics.bind(factory);
+export const availableTargets = Object.keys(factory.registry);
+export { FACTORY_CONFIG, FACTORY_EVENTS, factory };

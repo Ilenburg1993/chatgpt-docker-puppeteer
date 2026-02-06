@@ -1,14 +1,5 @@
-/**
- * Mock do NERV (Event Bus)
- * Para uso em testes que precisam simular eventos do NERV
- * @audit-level 50 - Test infrastructure
- *
- * IMPORTANTE: Este mock reflete a API real do NERV que usa envelopes estruturados,
- * não a API EventEmitter simples (eventName, data).
- */
-
-const sinon = require('sinon');
-const EventEmitter = require('events');
+import sinon from 'sinon';
+import EventEmitter from 'node:events';
 
 /**
  * Helper para extrair nome do evento de um envelope NERV.
@@ -209,7 +200,4 @@ function criarNERVSimples() {
     };
 }
 
-module.exports = {
-    criarNERVMock,
-    criarNERVSimples
-};
+export { criarNERVMock, criarNERVSimples };

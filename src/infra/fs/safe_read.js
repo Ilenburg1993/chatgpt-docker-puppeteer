@@ -1,13 +1,7 @@
-/* ==========================================================================
-   src/infra/fs/safe_read.js
-   Audit Level: 100 — Industrial Hardening (Iterative Resilience)
-   Status: CONSOLIDATED (Protocol 11)
-========================================================================== */
-
-const fs = require('fs').promises;
-const fss = require('fs');
-const path = require('path');
-const { CORRUPT_DIR, MAX_JSON_SIZE, sleep } = require('./fs_utils');
+import { promises as fs } from 'node:fs';
+import fss from 'node:fs';
+import path from 'node:path';
+import { CORRUPT, MAX_JSON_SIZE, sleep } from './fs_utils.js';
 
 /**
  * Lê um JSON do disco com proteção contra corrupção e travamentos de arquivo.
@@ -42,7 +36,7 @@ async function safeReadJSON(filepath) {
 
             // Tratamento de integridade (JSON malformado ou gigante)
             const fileName = path.basename(filepath);
-            const badFile = path.join(CORRUPT_DIR, `${fileName}.${Date.now()}.bad`);
+            const badFile = path.join(CORRUPT, `${fileName}.${Date.now()}.bad`);
 
             try {
                 await fs.rename(filepath, badFile);
@@ -57,4 +51,4 @@ async function safeReadJSON(filepath) {
     return null;
 }
 
-module.exports = { safeReadJSON };
+export { safeReadJSON };

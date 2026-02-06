@@ -1,8 +1,7 @@
-#!/usr/bin/env node
-'use strict';
+#!/usr/bin/env node'use strict';
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 const ROOT = process.argv[2] || path.join(process.cwd(), 'src');
 const EXT = new Set(['.js', '.ts', '.cjs', '.mjs', '.jsx', '.tsx']);

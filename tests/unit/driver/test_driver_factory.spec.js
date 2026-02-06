@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: Driver Factory
- * @module tests/unit/driver/test_driver_factory.spec.js
- * @description Valida criação, registro e seleção de drivers
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('Driver Factory - Fábrica de Drivers', () => {
     describe('1. Registro de Drivers', () => {

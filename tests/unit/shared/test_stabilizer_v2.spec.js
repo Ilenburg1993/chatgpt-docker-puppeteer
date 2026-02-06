@@ -1,14 +1,5 @@
-/**
- * Testes Unitários: stabilizer.js v2.0
- * @module tests/unit/shared/test_stabilizer_v2.spec.js
- * @description Valida todas as funcionalidades do stabilizer.js v2.0 (8 bugs + 14 melhorias)
- * @version 2.0
- * @audit-level 35
- */
-
-require('module-alias/register');
-const { describe, it, mock, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert');
+import { describe, it, mock, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert';
 
 describe('stabilizer.js v2.0 - Unit Tests', () => {
     let mockDriver;
@@ -37,7 +28,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
         // Import module fresh for each test
         delete require.cache[require.resolve('@shared/page_stability/stabilizer')];
-        stabilizerModule = require('@shared/page_stability/stabilizer');
+        stabilizerModule = require('#shared/page_stability/stabilizer');
     });
 
     afterEach(() => {

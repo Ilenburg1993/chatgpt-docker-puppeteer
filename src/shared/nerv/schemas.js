@@ -1,17 +1,4 @@
-/* ==========================================================================
-   src/shared/nerv/schemas.js
-   Subsistema: NERV — Neural Event Relay Vector
-   Módulo: Protocol (Linguagem Universal)
-   Audit Level: 520 — NERV Protocol Constitutional Validation
-   Status: CONSTITUTIONALLY EXECUTABLE (Singularity Edition)
-
-   Responsabilidade: Impedir envelopes ontologicamente inválidos
-   - Validação estrutural: protocol/identity/causality/type/payload
-   - Validação ontológica: MessageType, ActionCode, ActorRole
-   - Guardas de imutabilidade e consistência
-========================================================================== */
-
-const { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } = require('./constants');
+import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from './constants.js';
 
 /* --------------------------------------------------------------------------
  * INTERNAL GUARDS
@@ -191,8 +178,4 @@ function validateIPCEnvelope(envelope) {
     return validateEnvelope(envelope);
 }
 
-module.exports = {
-    validateEnvelope,
-    validateRobotIdentity,
-    validateIPCEnvelope
-};
+export { validateEnvelope, validateRobotIdentity, validateIPCEnvelope };

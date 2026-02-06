@@ -5,19 +5,21 @@
     // ============================================================
     // [A] PLATAFORMA E MÓDULOS — Node.js 20+ (CommonJS)
     // ============================================================
-    "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "lib": ["ES2022"],
+    "target": "ES2024",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": [
+      "ES2024"
+    ],
 
     // ============================================================
     // [B] JAVASCRIPT PURO (SEM TYPESCRIPT)
     // ============================================================
-    "checkJs": false,
     "allowJs": true,
-    "maxNodeModuleJsDepth": 1,
 
-    // Projeto deliberadamente NÃO-STRICT (JS dinâmico)
+    // ATIVE se você quer maximizar diagnóstico e IntelliSense:
+    "checkJs": true,
+    // Mantém JS dinâmico permissivo
     "strict": false,
     "noImplicitAny": false,
     "noImplicitThis": false,
@@ -35,15 +37,26 @@
     // ============================================================
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@core/*": ["src/core/*"],
-      "@shared/*": ["src/shared/*"],
-      "@nerv/*": ["src/nerv/*"],
-      "@kernel/*": ["src/kernel/*"],
-      "@driver/*": ["src/driver/*"],
-      "@infra/*": ["src/infra/*"],
-      "@server/*": ["src/server/*"],
-      "@logic/*": ["src/logic/*"]
+      "#/*": ["src/*"],
+      "#core/*": ["src/core/*"],
+      "#shared/*": ["src/shared/*"],
+      "#nerv/*": ["src/nerv/*"],
+      "#kernel/*": ["src/kernel/*"],
+      "#driver/*": ["src/driver/*"],
+      "#infra/*": ["src/infra/*"],
+      "#server/*": ["src/server/*"],
+      "#logic/*": [
+        "src/logic/*"
+      ],
+      "#orchestrator/*": [
+        "src/orchestrator/*"
+      ],
+      "#missions/*": [
+        "src/missions/*"
+      ],
+      "#validation/*": [
+        "src/validation/*"
+      ]
     },
 
     // ============================================================
@@ -53,7 +66,7 @@
     "types": ["node"],
 
     // ============================================================
-    // [F] VERIFICAÇÕES E SUGESTÕES DE CÓDIGO
+    // [F] QUALIDADE (diagnósticos úteis sem "punição" excessiva)
     // ============================================================
     "skipLibCheck": true,
 
@@ -61,11 +74,10 @@
     "allowUnusedLabels": false,
     "noFallthroughCasesInSwitch": true,
 
-    // Mantidos permissivos por design (JS exploratório)
+    // Mantidos permissivos por design
     "noImplicitReturns": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-
     // ============================================================
     // [G] PERFORMANCE DO LANGUAGE SERVICE
     // ============================================================
@@ -111,8 +123,6 @@
     "DOCUMENTAÇÃO",
 
     ".git",
-    ".vscode",
-    ".devcontainer",
 
     ".tmp.drivedownload",
     ".tmp.driveupload",

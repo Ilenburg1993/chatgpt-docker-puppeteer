@@ -1,34 +1,6 @@
-/**
- * @fileoverview DriverReadinessGuard - Pre-Execution Readiness Validation System
- *
- * RESPONSABILIDADE:
- * - Validar readiness de driver ANTES de execute()
- * - Integrar: Stabilizer (page stability), Triage (diagnostics), Domain validation
- * - Prevenir execuções falhas por página não pronta
- * - Detectar problemas ANTES de executar (CAPTCHA, login, errors, etc)
- *
- * INTEGRAÇÃO:
- * - Usado por: BaseDriver.execute() (pre-execution check)
- * - Tools: Stabilizer, Triage, PageSessionTracker
- * - Impact: Reduce execution failures by 10%, early problem detection
- *
- * VALIDATION CHECKS (5):
- * 1. Page Alive - Página não null/closed
- * 2. Page Stable - Stabilizer check (network, spinner, entropy)
- * 3. Triage Clean - Diagnostics scan (9 patterns)
- * 4. Domain Valid - Current URL matches expected domain
- * 5. Session Healthy - Turn count, response times
- *
- * @version 1.0.0
- * @since 2026-02-03
- */
-
-/* eslint-disable no-unused-vars */
-// ^ Exports usados externamente
-
-const { log } = require('@core/logger');
-const stabilizer = require('@shared/page_stability/stabilizer');
-const Triage = require('../modules/triage');
+import { log } from '#core/logger';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import * as Triage from '../modules/triage.js';
 
 /**
  * Check types para readiness validation.
@@ -391,7 +363,7 @@ class DriverReadinessGuard {
             });
 
             return result.ready;
-        } catch (err) {
+        } catch (_) {
             return false;
         }
     }
@@ -414,9 +386,4 @@ class DriverReadinessGuard {
     }
 }
 
-module.exports = {
-    DriverReadinessGuard,
-    CHECK_TYPES,
-    SEVERITY,
-    FATAL_TRIAGE_PATTERNS,
-};
+export { DriverReadinessGuard, CHECK_TYPES, SEVERITY, FATAL_TRIAGE_PATTERNS };

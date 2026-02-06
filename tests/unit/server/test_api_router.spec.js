@@ -1,12 +1,5 @@
-/**
- * Testes Unitários: API Router
- * @module tests/unit/server/test_api_router.spec.js
- * @description Valida rotas HTTP e controllers
- * @audit-level 32
- */
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 
 describe('API Router - Rotas e Controllers', () => {
     describe('1. Rotas de Tarefas (Tasks)', () => {

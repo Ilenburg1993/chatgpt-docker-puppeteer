@@ -1,11 +1,5 @@
-#!/usr/bin/env node
-/**
- * Script para corrigir imports relativos após migração de testes
- * Converte require('../src/...') para require('../../...src/...') baseado na nova localização
- */
-
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env nodeimport fs from 'node:fs';
+import path from 'node:path';
 
 // Mapeamento: padrão antigo -> quantos níveis subir
 const correcoes = {
@@ -33,7 +27,7 @@ function corrigirArquivo(caminhoArquivo) {
     let alterado = false;
 
     // Detectar diretório relativo ao projeto
-    const dirRelativo = path.dirname(path.relative(__dirname, caminhoArquivo));
+    const dirRelativo = path.dirname(path.relative(import.meta.dirname, caminhoArquivo));
     const prefixo = correcoes[dirRelativo];
 
     if (!prefixo) {
@@ -76,7 +70,7 @@ function corrigirTodos() {
     let totalCorrigidos = 0;
 
     for (const dir of Object.keys(correcoes)) {
-        const caminhoDiretorio = path.join(__dirname, dir);
+        const caminhoDiretorio = path.join(import.meta.dirname, dir);
         if (!fs.existsSync(caminhoDiretorio)) {
             continue;
         }

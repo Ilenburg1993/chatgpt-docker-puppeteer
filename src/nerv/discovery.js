@@ -1,12 +1,6 @@
-/*
- * src/nerv/discovery.js
- * Helper para descoberta de serviços: publica/escuta o evento SERVER_READY via NERV.
- * Fornece fallback opcional por arquivo apenas se ENABLE_STATE_FILE=true (compatibilidade).
- */
-
-const { log } = require('@core/logger');
-const HighLevelNERV = require('@nerv/adapters/high_level_adapter');
-const { ActionCode, ActorRole } = require('@shared/nerv/constants');
+import { log } from '#core/logger';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
  * Publica SERVER_READY.
@@ -96,9 +90,4 @@ function listenForServerReady(nerv, handler) {
     return unsub;
 }
 
-module.exports = {
-    publishServerReady,
-    unpublishServerReady,
-    waitForServerReady,
-    listenForServerReady
-};
+export { publishServerReady, unpublishServerReady, waitForServerReady, listenForServerReady };

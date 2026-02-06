@@ -1,18 +1,4 @@
-/**
- * @fileoverview DNA System V2.0 - Integration Tests
- *
- * Testes end-to-end do fluxo completo:
- * 1. SADI descobre selector
- * 2. Auto-evolution persiste no DNA
- * 3. Próxima execução usa DNA (priority)
- * 4. API endpoints funcionam corretamente
- *
- * @version 2.0.0
- * @since 2026-02-04
- */
-
-require('module-alias/register');
-const io = require('@infra/io');
+import * as io from '#infra/io';
 
 /* ==========================================================================
    TEST SUITE CONFIGURATION

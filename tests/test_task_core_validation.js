@@ -1,10 +1,3 @@
-/**
- * Tests: Task System Core Validation
- * Testa os componentes críticos sem depender de filesystem mocking
- */
-
-require('module-alias/register');
-
 let passed = 0;
 let failed = 0;
 

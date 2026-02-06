@@ -1,30 +1,10 @@
-/* ==========================================================================
-   src/infra/browser_pool/pool_manager.js
-   Subsistema: INFRA — Browser Pool Manager
-   Audit Level: 800 — Critical Resource Manager (Singularity Edition)
-
-   Responsabilidade:
-    - Gerenciar pool de 3 instâncias Chrome remotas (acessadas via proxy quando aplicável)
-   - Alocar páginas (tabs) para tasks com estratégias: round-robin, least-loaded, target-affinity
-   - Health checks periódicos (heartbeat, crash detection)
-   - Auto-restart de instâncias crashed
-   - Isolamento entre tasks (diferentes contexts quando necessário)
-
-    Princípios:
-     - NÃO cria processos Chrome (assume browsers disponíveis via `browserEndpoint`; este processo não inicia/gerencia browsers).
-     - Conexões do container geralmente passam por um **Chrome Proxy** exposto na porta `9224` (container-facing); detalhes de reencaminhamento no mundo externo são responsabilidade operacional.
-   - NÃO decide lógica de negócio (apenas aloca/libera recursos)
-   - Pool size configurável (padrão: 3 instâncias)
-   - Graceful degradation: se 1 instância falhar, pool continua com 2
-========================================================================== */
-
-const { STATUS_VALUES: STATUS_VALUES } = require('@core/constants/tasks.js');
-const { log } = require('@core/logger');
-const { ConnectionOrchestrator } = require('../ConnectionOrchestrator');
-const { CircuitBreakerManager, FailureCause } = require('./circuit_breaker');
-const { PageValidator } = require('./PageValidator');
-const { PageLifecycleMonitor } = require('./PageLifecycleMonitor');
-const PeriodicHealthMonitor = require('./PeriodicHealthMonitor');
+import { STATUS_VALUES } from '#core/constants/tasks';
+import { log } from '#core/logger';
+import { ConnectionOrchestrator } from '../ConnectionOrchestrator.js';
+import { CircuitBreakerManager, FailureCause } from './circuit_breaker.js';
+import { PageValidator } from './PageValidator.js';
+import { PageLifecycleMonitor } from './PageLifecycleMonitor.js';
+import PeriodicHealthMonitor from './PeriodicHealthMonitor.js';
 
 class BrowserPoolManager {
     /**
@@ -131,7 +111,7 @@ class BrowserPoolManager {
         }
 
         // ✅ Bug #3: Validar proxy ANTES de tentar conectar
-        const CONFIG = require('@core/config');
+        const CONFIG = await import('#core/config').then(m => m.default ?? m);
         if (CONFIG.CHROME_PROXY_ENABLED !== false) {
             await this._validateProxyAvailability();
         }
@@ -597,7 +577,7 @@ class BrowserPoolManager {
      * @throws {Error} Se proxy não estiver disponível ou unhealthy
      */
     async _validateProxyAvailability() {
-        const CONFIG = require('@core/config');
+        const CONFIG = await import('#core/config').then(m => m.default ?? m);
 
         /*
          * CONTRATO DE TOPOLOGIA (CANÔNICO):
@@ -718,12 +698,12 @@ class BrowserPoolManager {
      * Anexa event handlers do PeriodicHealthMonitor.
      * @private
      */
-    _attachHealthMonitorEvents() {
+    async _attachHealthMonitorEvents() {
         if (!this.healthMonitor) {
             return;
         }
 
-        const { MONITOR_EVENTS } = require('./PeriodicHealthMonitor');
+        const { MONITOR_EVENTS } = await import('./PeriodicHealthMonitor.js');
 
         // Status changes
         this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
@@ -794,14 +774,14 @@ class BrowserPoolManager {
      *
      * @private
      */
-    _bridgeCircuitBreakerAndMonitor() {
+    async _bridgeCircuitBreakerAndMonitor() {
         if (!this.circuitBreaker || !this.healthMonitor) {
             log('WARN', '[BrowserPool] Bridge CB ↔ Monitor skipped (components not available)');
             return;
         }
 
-        const { MONITOR_EVENTS } = require('./PeriodicHealthMonitor');
-        const { HEALTH_STATUS, CHECK_TYPES } = require('./PeriodicHealthMonitor');
+        const { MONITOR_EVENTS } = await import('./PeriodicHealthMonitor.js');
+        const { HEALTH_STATUS, CHECK_TYPES } = await import('./PeriodicHealthMonitor.js');
 
         // Bridge 1: Monitor → CircuitBreaker (Recovery Notification)
         this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
@@ -878,7 +858,7 @@ class BrowserPoolManager {
 
         log('INFO', '[BrowserPool] Starting ConnectionRecoveryStrategy...');
 
-        const { MONITOR_CONFIG } = require('./PeriodicHealthMonitor');
+        const { MONITOR_CONFIG } = await import('./PeriodicHealthMonitor.js');
 
         const maxAttempts = MONITOR_CONFIG.RECONNECT_MAX_ATTEMPTS;
         const baseBackoff = MONITOR_CONFIG.RECONNECT_BACKOFF_BASE_MS;
@@ -1089,4 +1069,4 @@ class BrowserPoolManager {
     }
 }
 
-module.exports = BrowserPoolManager;
+export default BrowserPoolManager;

@@ -1,15 +1,6 @@
-/* ==========================================================================
-   src/core/schemas/shared_types.js
-   Audit Level: 100 — Industrial Hardening (Atomic Type Definitions - Platinum)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Definição de tipos primitivos universais e regras de
-                     sanitização atômica para todo o ecossistema.
-   Sincronizado com: fs_utils.js (V2.5), task_healer.js (V1.1).
-========================================================================== */
-
-const { z } = require('zod');
-const { cleanText } = require('@infra/fs/fs_utils');
-const { STATUS_VALUES, STATUS_VALUES_ARRAY } = require('../constants/tasks.js');
+import { z } from 'zod';
+import { cleanText } from '#infra/fs/fs_utils';
+import { STATUS_VALUES, STATUS_VALUES_ARRAY } from '../constants/tasks.js';
 
 /**
  * ID_SCHEMA: Regra estrita para identificadores.
@@ -61,11 +52,4 @@ const SOURCE_SCHEMA = z
  */
 const STATUS_SCHEMA = z.enum(STATUS_VALUES_ARRAY).default(STATUS_VALUES.PENDING);
 
-module.exports = {
-    ID_SCHEMA,
-    TIMESTAMP_SCHEMA,
-    CLEAN_STRING_SCHEMA,
-    PRIORITY_SCHEMA,
-    SOURCE_SCHEMA,
-    STATUS_SCHEMA
-};
+export { ID_SCHEMA, TIMESTAMP_SCHEMA, CLEAN_STRING_SCHEMA, PRIORITY_SCHEMA, SOURCE_SCHEMA, STATUS_SCHEMA };

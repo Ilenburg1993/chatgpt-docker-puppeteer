@@ -1,9 +1,8 @@
-/* tests/test_schema_validation.js (Audit Level 15 - Deep Validation) */
-const { startAgent, stopAgent, waitForCondition, removeRunLock, cleanTmp } = require('./helpers');
-const fs = require('fs');
-const path = require('path');
+import { startAgent, stopAgent, waitForCondition, removeRunLock, cleanTmp } from './helpers.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const CORRUPT_DIR = path.join(QUEUE_DIR, 'corrupted');
 

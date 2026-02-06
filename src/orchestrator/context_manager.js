@@ -1,17 +1,5 @@
-/* ==========================================================================
-   src/orchestrator/context_manager.js
-   Context Manager - Gerenciamento de Contexto para Missões Longas
-   Status: NEW (V2.0)
-
-   Responsabilidade:
-     - Acumular outputs de steps anteriores (context accumulation)
-     - Dividir contexto em chunks quando necessário (chunking)
-     - Resumir contexto via LLM quando ultrapassa limites (summarization)
-     - Gerenciar memory store (patterns aprendidos)
-========================================================================== */
-
-const { log } = require('@core/logger');
-const MemoryStore = require('./memory_store');
+import { log } from '#core/logger';
+import MemoryStore from './memory_store.js';
 
 /**
  * Estratégias de chunking disponíveis
@@ -376,8 +364,4 @@ class ContextManager {
     }
 }
 
-module.exports = {
-    ContextManager,
-    CHUNKING_STRATEGY,
-    SUMMARIZATION_POLICY
-};
+export { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY };

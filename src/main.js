@@ -35,34 +35,19 @@
 // ARCHITECTURAL GUARDS (process-wide, non-negotiable)
 // =========================================================================
 // Importa o guard correto que impede chamadas a `puppeteer.launch()` em runtime
-require('./infra/browser_pool/puppeteer_guard');
-//
-
-const { log } = require('./core/logger');
-
-const { ActorRole, ActionCode, MessageType } = require('./shared/nerv/constants');
-
-const { CONNECTION_MODES: CONNECTION_MODES } = require('./core/constants/browser.js');
-
-const { STATUS_VALUES: STATUS_VALUES } = require('./core/constants/tasks.js');
-
-const CONFIG = require('./core/config');
-const identityManager = require('./core/identity_manager');
-
-// Subsistemas Core
-const { createNERV } = require('./nerv/nerv');
-const { createKernel } = require('./kernel/kernel');
-// const BrowserPoolManager = require('./infra/browser_pool/pool_manager');
-const { ConnectionOrchestrator } = require('./infra/ConnectionOrchestrator');
-
-// Mission Orchestration (V2.0)
-const { MissionManager } = require('./missions/mission_manager');
-
-// Módulos ONDA 2 (requerem NERV injection)
-const forensics = require('./core/forensics');
-
-// Adapters (Pontes NERV)
-const DriverNERVAdapter = require('./driver/nerv_adapter/driver_nerv_adapter');
+await import('./infra/browser_pool/puppeteer_guard.js');
+import { log } from './core/logger.js';
+import { ActorRole, ActionCode, MessageType } from './shared/nerv/constants.js';
+import { CONNECTION_MODES } from './core/constants/browser.js';
+import { STATUS_VALUES } from './core/constants/tasks.js';
+import CONFIG from './core/config.js';
+import identityManager from './core/identity_manager.js';
+import { createNERV } from './nerv/nerv.js';
+import { createKernel } from './kernel/kernel.js';
+import { ConnectionOrchestrator } from './infra/ConnectionOrchestrator.js';
+import { MissionManager } from './missions/mission_manager.js';
+import * as forensics from './core/forensics.js';
+import * as DriverNERVAdapter from './driver/nerv_adapter/driver_nerv_adapter.js';
 // ServerNERVAdapter is lazy-loaded when the server/socket hub is available
 
 // ============================================================================
@@ -83,7 +68,7 @@ const SERVER_MODES = Object.freeze({
  * @returns {Promise<boolean>}
  */
 async function checkPortInUse(port) {
-    const net = require('net');
+    const net = await import('node:net').then(m => m.default ?? m);
 
     return new Promise(resolve => {
         const server = net.createServer();
@@ -269,7 +254,7 @@ async function boot() {
 
         // Injeta NERV nos módulos ONDA 2
         forensics.setNERV(nerv);
-        const { setNERV: setInfraPolicyNERV } = require('./core/infra_failure_policy');
+        const { setNERV: setInfraPolicyNERV } = await import('./core/infra_failure_policy.js');
         setInfraPolicyNERV(nerv); // Injeta NERV no módulo (função, não método)
         // Nota: não instanciamos InfraFailurePolicy aqui (evita side-effects desnecessários)
         log('DEBUG', '[BOOT] NERV injetado em forensics e infra_failure_policy');
@@ -280,9 +265,9 @@ async function boot() {
             log('INFO', '[BOOT] Fase 2.5/6: Inicializando Chrome Proxy Service');
 
             try {
-                const ChromeProxyService = require('./infra/proxy/chromeProxyService');
-                const { sendEvent } = require('@nerv/adapters/high_level_adapter');
-                const { ActionCode, ActorRole } = require('@shared/nerv/constants');
+                const ChromeProxyService = await import('./infra/proxy/chromeProxyService.js').then(m => m.default ?? m);
+                const { sendEvent } = await import('#nerv/adapters/high_level_adapter');
+                const { ActionCode, ActorRole } = await import('#shared/nerv/constants');
 
                 // ===== VALIDAÇÃO: PROXY DUPLICADO =====
                 // Verifica se porta do proxy já está em uso (PM2 pode ter iniciado processo separado)
@@ -390,7 +375,7 @@ async function boot() {
         // ===== FASE 3: BROWSER POOL (COM RESILIÊNCIA) =====
         log('INFO', '[BOOT] Fase 3/6: Inicializando Browser Pool (modo resiliente)');
 
-        const { initializeBrowserPoolResilient, getBrowserEndpoint } = require('./core/boot_resilience_manager');
+        const { initializeBrowserPoolResilient, getBrowserEndpoint } = await import('./core/boot_resilience_manager.js');
         const browserEndpoint = getBrowserEndpoint();
         log('INFO', `[BOOT] Chrome endpoint resolvido: ${browserEndpoint.url}`);
         if (!browserEndpoint.url) {
@@ -435,7 +420,7 @@ async function boot() {
         // ===== FASE 3.5: CONTEXT MANAGER (COMPARTILHADO) =====
         log('INFO', '[BOOT] Fase 3.5/6: Inicializando ContextManager compartilhado');
 
-        const { ContextManager } = require('./orchestrator/context_manager');
+        const { ContextManager } = await import('./orchestrator/context_manager.js');
         const contextManager = new ContextManager({
             strategy: process.env.CONTEXT_STRATEGY || CONFIG.CONTEXT_STRATEGY || 'sliding_window',
             maxTokens: process.env.CONTEXT_MAX_TOKENS || CONFIG.CONTEXT_MAX_TOKENS || 100000,
@@ -501,8 +486,8 @@ async function boot() {
         // Apenas logamos aqui para clareza
         log('INFO', `[BOOT] Server mode (determinístico): ${SERVER_MODE}`);
 
-        const serverEngine = require('./server/engine/server');
-        const socketModule = require('./server/engine/socket');
+        const serverEngine = await import('./server/engine/server.js').then(m => m.default ?? m);
+        const socketModule = await import('./server/engine/socket.js').then(m => m.default ?? m);
 
         let socketHub = null;
         let serverAdapter = null;
@@ -570,7 +555,7 @@ async function boot() {
             // assegura que o contexto exporte o wrapper com sendToClient
             socketHub = socketHubWrapper;
 
-            const ServerNERVAdapter = require('./server/nerv_adapter/server_nerv_adapter');
+            const ServerNERVAdapter = await import('./server/nerv_adapter/server_nerv_adapter.js').then(m => m.default ?? m);
             serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
             httpAuthority = false;
         }
@@ -624,7 +609,7 @@ async function boot() {
             // assegura que o contexto exporte o wrapper com sendToClient
             socketHub = socketHubWrapper;
 
-            const ServerNERVAdapter = require('./server/nerv_adapter/server_nerv_adapter');
+            const ServerNERVAdapter = await import('./server/nerv_adapter/server_nerv_adapter.js').then(m => m.default ?? m);
             serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
             httpAuthority = true;
 
@@ -669,7 +654,7 @@ async function boot() {
         // ----------------------------------------------------------------------
         // FeedbackProcessor — usa ContextManager compartilhado
         // ----------------------------------------------------------------------
-        const { FeedbackProcessor } = require('./missions/feedback_processor');
+        const { FeedbackProcessor } = await import('./missions/feedback_processor.js');
 
         const feedbackProcessor = new FeedbackProcessor({
             contextManager
@@ -680,7 +665,7 @@ async function boot() {
         // ----------------------------------------------------------------------
         // CheckpointManager
         // ----------------------------------------------------------------------
-        const { CheckpointManager } = require('./orchestrator/checkpoint_manager');
+        const { CheckpointManager } = await import('./orchestrator/checkpoint_manager.js');
 
         const checkpointManager = new CheckpointManager({
             baseDir: process.env.MISSIONS_DIR || CONFIG.MISSIONS_DIR || 'missions',
@@ -719,7 +704,7 @@ async function boot() {
         // REST Controller injection — somente se server ativo
         // ----------------------------------------------------------------------
         if (serverAdapter) {
-            const missionsController = require('./server/api/controllers/missions');
+            const missionsController = await import('./server/api/controllers/missions.js').then(m => m.default ?? m);
             missionsController.setMissionManager(missionManager);
             log('DEBUG', '[BOOT] MissionManager injetado no controller REST');
         }
@@ -746,7 +731,7 @@ async function boot() {
         try {
             if (httpServer) {
                 try {
-                    const serverApp = require('./server/engine/app');
+                    const serverApp = await import('./server/engine/app.js').then(m => m.default ?? m);
                     serverApp.locals = serverApp.locals || {};
                     serverApp.locals.runtimeReadiness = {
                         nerv: Boolean(nerv),
@@ -849,7 +834,7 @@ async function shutdown(context) {
 
                 // auxiliares — best effort
                 try {
-                    const reconciler = require('./server/supervisor/reconcilier');
+                    const reconciler = await import('./server/supervisor/reconcilier.js').then(m => m.default ?? m);
                     if (typeof reconciler?.stop === 'function') {
                         try {
                             await reconciler.stop();
@@ -865,7 +850,7 @@ async function shutdown(context) {
                 }
 
                 try {
-                    const hardwareTelemetry = require('./server/realtime/telemetry/hardware');
+                    const hardwareTelemetry = await import('./server/realtime/telemetry/hardware.js').then(m => m.default ?? m);
                     if (typeof hardwareTelemetry?.stop === 'function') {
                         try {
                             await hardwareTelemetry.stop();
@@ -895,8 +880,8 @@ async function shutdown(context) {
 
                         // ✅ Emite evento NERV: Proxy encerrado
                         if (nerv && typeof nerv.emitEvent === 'function') {
-                            const { sendEvent } = require('@nerv/adapters/high_level_adapter');
-                            const { ActionCode, ActorRole } = require('@shared/nerv/constants');
+                            const { sendEvent } = await import('#nerv/adapters/high_level_adapter');
+                            const { ActionCode, ActorRole } = await import('#shared/nerv/constants');
 
                             sendEvent(
                                 nerv,
@@ -1217,12 +1202,8 @@ async function main() {
    EXECUÇÃO CONDICIONAL
 ========================================================================== */
 
-if (require.main === module) {
+if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-module.exports = {
-    boot,
-    shutdown,
-    main
-};
+export { boot, shutdown, main };

@@ -1,27 +1,7 @@
-/* ==========================================================================
-   src/driver/core/BaseDriver.js v2.0
-   Audit Level: 800 — Sovereign Modular Orchestrator (Telemetry Edition)
-   Status: PRODUCTION (Protocol 12 - Full Instrumentation)
-   Responsabilidade: Coordenar subsistemas de execução física e emitir telemetria
-                     sensorial de alta fidelidade via barramento de eventos.
-   Sincronizado com: ExecutionEngine V1.6.0, DriverLifecycleManager V70,
-                     TelemetryBridge V500, InputResolver V700.
-
-   Changelog v2.0:
-   - 18+ eventos de telemetria (vs 1 em v1.1)
-   - Error classification (5 categorias)
-   - Timing metrics por etapa
-   - Signal propagation completa
-   - Correlation ID auto-generation e propagação total
-   - Retry backoff configurável
-   - Module health checks
-   - Cleanup garantido com error collection
-========================================================================== */
-
-const TargetDriver = require('./TargetDriver');
-const { log } = require('@core/logger');
-const DriverReadinessGuard = require('../guards/DriverReadinessGuard');
-const PageSessionTracker = require('../trackers/PageSessionTracker');
+import TargetDriver from './TargetDriver.js';
+import { log } from '#core/logger';
+import * as DriverReadinessGuard from '../guards/DriverReadinessGuard.js';
+import PageSessionTracker from '../trackers/PageSessionTracker.js';
 
 /* ==========================================================================
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
@@ -65,13 +45,12 @@ const ERROR_PATTERNS = Object.freeze({
     [ERROR_CLASSES.SELECTOR]: ['No node found', 'selector', 'querySelector', 'failed to find element']
 });
 
-// Subsistemas Modulares (Músculos e Sentidos Físicos)
-const RecoverySystem = require('../modules/recovery_system');
-const HandleManager = require('../modules/handle_manager');
-const InputResolver = require('../modules/input_resolver');
-const FrameNavigator = require('../modules/frame_navigator');
-const BiomechanicsEngine = require('../modules/biomechanics_engine');
-const SubmissionController = require('../modules/submission_controller');
+import { RecoverySystem } from '../modules/recovery_system.js';
+import { HandleManager } from '../modules/handle_manager.js';
+import { InputResolver } from '../modules/input_resolver.js';
+import { FrameNavigator } from '../modules/frame_navigator.js';
+import { BiomechanicsEngine } from '../modules/biomechanics_engine.js';
+import { SubmissionController } from '../modules/submission_controller.js';
 
 class BaseDriver extends TargetDriver {
     /**
@@ -459,7 +438,7 @@ class BaseDriver extends TargetDriver {
         // ====================================================================
         stepStart = Date.now();
 
-        const { validateLLMPage } = require('@core/validators/prerequisite_validator');
+        const { validateLLMPage } = await import('#core/validators/prerequisite_validator');
         const pageValidation = await validateLLMPage(this.page);
 
         timings.prerequisite = Date.now() - stepStart;
@@ -780,8 +759,7 @@ class BaseDriver extends TargetDriver {
     }
 }
 
-module.exports = BaseDriver;
+export default BaseDriver;
 
-// ✅ v2.0: Export config for testing/introspection
-module.exports.BASEDRIVER_CONFIG = BASEDRIVER_CONFIG;
-module.exports.ERROR_CLASSES = ERROR_CLASSES;
+export { BASEDRIVER_CONFIG };
+export { ERROR_CLASSES };

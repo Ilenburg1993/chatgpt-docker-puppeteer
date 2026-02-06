@@ -1,24 +1,13 @@
-/* ==========================================================================
-   src/server/engine/lifecycle.js
-   Audit Level: 600 — Sovereign Lifecycle & Shutdown (IPC 2.0 Singularity)
-   Status: CONSOLIDATED (Protocol 11 - Zero-Bug Tolerance)
-   Responsabilidade: Orquestrar o encerramento atômico e ordenado de todos
-                     os componentes do subsistema Server e limpeza de estado.
-   Sincronizado com: main.js V51, server.js V100, socket.js V600.
-========================================================================== */
-
-// filesystem access delegated to @nerv/discovery
-const server = require('./server');
-const socketHub = require('./socket');
-const pm2Bridge = require('../realtime/bus/pm2_bridge');
-const logTail = require('../realtime/streams/log_tail');
-const hardwareTelemetry = require('../realtime/telemetry/hardware');
-// const snapshot = require('../telemetry/snapshot');  // TODO: Module not found - telemetry directory missing
-const fsWatcher = require('../watchers/fs_watcher');
-const logWatcher = require('../watchers/log_watcher');
-const { log } = require('@core/logger');
-const CONFIG = require('@core/config');
-const Discovery = require('@nerv/discovery');
+import * as server from './server.js';
+import * as socketHub from './socket.js';
+import * as pm2Bridge from '../realtime/bus/pm2_bridge.js';
+import * as logTail from '../realtime/streams/log_tail.js';
+import * as hardwareTelemetry from '../realtime/telemetry/hardware.js';
+import * as fsWatcher from '../watchers/fs_watcher.js';
+import * as logWatcher from '../watchers/log_watcher.js';
+import { log } from '#core/logger';
+import CONFIG from '#core/config';
+import * as Discovery from '#nerv/discovery';
 
 /**
  * Legacy: file-based discovery handled by `@nerv/discovery`.
@@ -170,8 +159,4 @@ function listenToSignals() {
     });
 }
 
-module.exports = {
-    gracefulShutdown,
-    listenToSignals,
-    setAllowProcessExit
-};
+export { gracefulShutdown, listenToSignals, setAllowProcessExit };

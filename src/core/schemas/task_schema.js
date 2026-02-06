@@ -1,31 +1,14 @@
-/* ==========================================================================
-   src/core/schemas/task_schema.js
-   Audit Level: 100 — Task Schema (V4 Legacy + V5 Forward)
-   Status: CONSOLIDATED (Protocol 11 - V5 Migration Layer)
-   Responsabilidade: Export layer com backward compatibility V4 + forward V5.
+import { z } from 'zod';
+import { CONNECTION_MODES } from '../constants/browser.js';
 
-   ESTRATÉGIA V5 (Fevereiro 2026):
-   - TaskSchema V4 mantido (backward compatibility)
-   - TaskSchemaV5 exportado (novo default)
-   - parseTask() detecta versão e usa schema apropriado
-   - Código antigo continua funcionando (imports V4)
-   - Código novo usa V5
-========================================================================== */
-
-const { z } = require('zod');
-
-const {
-    CONNECTION_MODES: CONNECTION_MODES
-} = require('../constants/browser.js');
-
-const {
+import {
     ID_SCHEMA,
     TIMESTAMP_SCHEMA,
     CLEAN_STRING_SCHEMA,
     PRIORITY_SCHEMA,
     SOURCE_SCHEMA,
-    STATUS_SCHEMA
-} = require('./shared_types');
+    STATUS_SCHEMA,
+} from './shared_types.js';
 
 /**
  * 1. MetaSchema: Identidade e Rastreabilidade.
@@ -150,30 +133,7 @@ const TaskSchema = z
     })
     .passthrough();
 
-// ==========================================
-// V5 IMPORTS (Forward Compatibility)
-// ==========================================
-const {
-    TaskSchemaV5,
-    MetaSchemaV5,
-    SpecSchemaV5,
-    PolicySchemaV5,
-    ExecutionSchemaV5,
-    MissionSchemaV5,
-    StateSchemaV5,
-    ResultSchemaV5
-} = require('./task_schema_v5');
-
-module.exports = {
-    // V4 Schemas (backward compatibility)
-    TaskSchema,
-    MetaSchema,
-    SpecSchema,
-    PolicySchema,
-    StateSchema,
-    ResultSchema,
-
-    // V5 Schemas (forward compatibility)
+import {
     TaskSchemaV5,
     MetaSchemaV5,
     SpecSchemaV5,
@@ -182,4 +142,6 @@ module.exports = {
     MissionSchemaV5,
     StateSchemaV5,
     ResultSchemaV5,
-};
+} from './task_schema_v5.js';
+
+export { TaskSchema, MetaSchema, SpecSchema, PolicySchema, StateSchema, ResultSchema, TaskSchemaV5, MetaSchemaV5, SpecSchemaV5, PolicySchemaV5, ExecutionSchemaV5, MissionSchemaV5, StateSchemaV5, ResultSchemaV5 };

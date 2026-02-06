@@ -1,10 +1,5 @@
-/**
- * Teste de integração completo
- * Valida: ConnectionOrchestrator + BrowserPoolManager + Cache + Limpeza
- */
-
-const { ConnectionOrchestrator } = require('../../src/infra/ConnectionOrchestrator');
-const BrowserPoolManager = require('../../src/infra/browser_pool/pool_manager');
+import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
+import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
 console.log('🔬 Teste de Integração Completo\n');
 
