@@ -4,7 +4,10 @@ export const SCHEMA_VERSION = 1;
 export const CHUNKER_VERSION = 'v1';
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text:latest';
 export const DEFAULT_OLLAMA_BASE_URL = 'http://host.docker.internal:11434/v1';
-export const MAX_CHUNK_CHARS = 1500; // Conservative limit for nomic-embed-text (8192 token context)
+// Chunking limits optimized by file type
+export const MAX_CHUNK_CHARS_CODE = 800;  // Code: smaller chunks for precision
+export const MAX_CHUNK_CHARS_DOCS = 1200; // Docs: larger chunks for context
+export const MAX_CHUNK_CHARS = MAX_CHUNK_CHARS_CODE; // Default (backward compat)
 
 export function sha256Hex(input) {
     return crypto.createHash('sha256').update(input).digest('hex');

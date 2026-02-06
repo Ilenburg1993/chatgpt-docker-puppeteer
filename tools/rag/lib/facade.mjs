@@ -9,6 +9,7 @@ import { buildChunkId, buildFileId, sha256HexForString, normalizeRelPath, CHUNKE
 import { chunkByType, detectLanguage, buildTags } from './chunking/chunk_dispatcher.mjs';
 import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
 import { EmbeddingCache } from './embeddings/embed_cache.mjs';
+import { AdaptiveThrottler } from './adaptive_throttler.mjs';
 import { openDb, ensureTable, deleteByPath, addChunks, search } from './storage/lancedb.mjs';
 import { formatMarkdownResults } from './format.mjs';
 
@@ -149,6 +150,15 @@ export async function ragIndex(options = {}) {
 
         const db = await openDb(paths.dbDir);
 
+        // Adaptive throttler to prevent CPU overload
+        const throttler = new AdaptiveThrottler({
+            targetCPU: 40,      // Target 40% CPU (safe for most systems)
+            minDelay: 100,      // Min 100ms between embeddings
+            maxDelay: 5000,     // Max 5s (if CPU very high)
+            initialDelay: 500,  // Start conservative
+            enabled: true       // Enable adaptive throttling
+        });
+
         const report = {
             root,
             scanned_files: files.length,
@@ -227,10 +237,9 @@ export async function ragIndex(options = {}) {
                 );
                 report.embedded_chunks++;
 
-                // Throttle: Small delay between embeddings to avoid overwhelming Ollama (CPU-heavy)
-                if (report.embedded_chunks % 5 === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 200)); // 200ms pause every 5 embeddings
-                }
+                // Adaptive throttling: automatically adjusts delay based on CPU usage
+                // Speeds up when CPU < 30%, slows down when CPU > 50%
+                await throttler.throttle();
 
                 if (!manifest.embedding.dim) {
                     manifest.embedding.dim = vector.length;

@@ -15,7 +15,8 @@ const DENY_DIR_PREFIXES = [
     'respostas/',
     'coverage/',
     '.vscode-server/',
-    '.devcontainer/state/'
+    '.devcontainer/state/',
+    'analysis/' // Exclude heavy analysis docs (1.1MB+) to reduce indexing load
 ];
 
 function isAllowedByExt(relPath) {
@@ -34,6 +35,13 @@ function isDenied(relPath) {
     if (base === '.env') return true;
     if (base.endsWith('.env.example')) return false;
     if (base.startsWith('.env.')) return true;
+
+    // CRITICAL: Deny node_modules ANYWHERE in path (not just root)
+    // Fixes: dashboard-ui/node_modules/, tests/fixtures/node_modules/, etc.
+    if (p.includes('/node_modules/') || p.startsWith('node_modules/')) {
+        return true;
+    }
+
     for (const pref of DENY_DIR_PREFIXES) {
         if (p.startsWith(pref)) return true;
     }

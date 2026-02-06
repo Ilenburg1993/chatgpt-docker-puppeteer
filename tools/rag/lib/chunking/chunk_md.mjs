@@ -1,9 +1,9 @@
-import { MAX_CHUNK_CHARS } from '../contract.mjs';
+import { MAX_CHUNK_CHARS_DOCS } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
 import { mergeSmallRanges } from './merge_ranges.mjs';
 
-export function chunkMarkdown({ lines, maxChunkChars = MAX_CHUNK_CHARS, minChunkChars = 200 }) {
+export function chunkMarkdown({ lines, maxChunkChars = MAX_CHUNK_CHARS_DOCS, minChunkChars = 200 }) {
     if (!lines || lines.length === 0) return [];
 
     const headingStarts = new Set([0]);
