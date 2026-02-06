@@ -1,0 +1,40 @@
+{
+  "name": "rag-test-fixture",
+  "version": "1.0.0",
+  "description": "Large JSON file for testing plain chunking",
+  "config": {
+    "embedding": {
+      "model": "qwen3-embedding:4b",
+      "dimension": 1024,
+      "provider": "ollama"
+    },
+    "storage": {
+      "type": "lancedb",
+      "path": "/data/rag-db",
+      "compression": true
+    },
+    "chunking": {
+      "maxSize": 4000,
+      "minSize": 200,
+      "overlap": 0
+    }
+  },
+  "features": [
+    "semantic-search",
+    "incremental-indexing",
+    "query-caching",
+    "retry-logic",
+    "progress-reporting"
+  ],
+  "dependencies": {
+    "@lancedb/lancedb": "^0.18.0",
+    "ignore": "^5.3.2",
+    "xxhash-wasm": "^1.1.0"
+  },
+  "metadata": {
+    "author": "RAG Team",
+    "license": "MIT",
+    "repository": "https://github.com/example/rag",
+    "tags": ["rag", "embeddings", "search", "llm"]
+  }
+}

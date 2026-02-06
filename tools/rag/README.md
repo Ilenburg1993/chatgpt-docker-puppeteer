@@ -182,6 +182,167 @@ Além disso:
 - ✅ **Indexing Summary**: Estatísticas visuais ao final (arquivos, chunks, taxa de skip)
 - ✅ **Script Rebuild**: `npm run rag:full-rebuild` para reset + index em um comando
 
+## Extensibilidade
+
+O sistema RAG foi projetado para ser extensível. Aqui estão os principais pontos de extensão:
+
+### Adicionar Suporte para Novo Tipo de Arquivo
+
+Para adicionar chunking customizado para um novo tipo de arquivo (ex: Python, SQL, etc.):
+
+1. **Criar novo chunker** em `tools/rag/lib/chunking/chunk_<tipo>.mjs`:
+
+```javascript
+/**
+ * Chunker customizado para arquivos <tipo>
+ * @param {string[]} lines - Linhas do arquivo
+ * @param {Object} options - Opções de chunking
+ * @returns {Array<{start_line, end_line, start_byte, end_byte, text}>}
+ */
+export function chunk<Tipo>(lines, options = {}) {
+  const { maxChunkChars = 4000 } = options;
+  const ranges = [];
+
+  // Implementar lógica de chunking baseada em estrutura do arquivo
+  // Exemplo: detectar âncoras específicas da linguagem
+
+  return ranges;
+}
+```
+
+2. **Registrar no dispatcher** em `tools/rag/lib/chunking/chunk_dispatcher.mjs`:
+
+```javascript
+const CHUNKERS_BY_LANG = {
+  javascript: chunkCode,
+  python: chunkPython,  // Adicionar aqui
+  // ...
+};
+```
+
+### Trocar o Backend de Embeddings
+
+Para usar outro provedor de embeddings além do Ollama:
+
+1. **Criar novo provider** em `tools/rag/lib/embeddings/<nome>.mjs`:
+
+```javascript
+export class CustomEmbeddingsProvider {
+  constructor(options = {}) {
+    this.model = options.model || 'default-model';
+    // Configuração específica
+  }
+
+  async health() {
+    // Verificar disponibilidade do serviço
+    return { ok: true, hasModel: true, models: [this.model] };
+  }
+
+  async embed(text) {
+    // Gerar embedding do texto
+    // Deve retornar number[] (vetor de floats)
+    return vectorArray;
+  }
+}
+```
+
+2. **Usar no facade** passando `embeddingsProvider`:
+
+```javascript
+import { CustomEmbeddingsProvider } from './embeddings/custom.mjs';
+
+await ragIndex({
+  root: '/path/to/workspace',
+  embeddingsProvider: new CustomEmbeddingsProvider({ model: 'my-model' })
+});
+```
+
+### Trocar o Backend de Vector Database
+
+Para usar outro vector DB além do LanceDB:
+
+1. **Implementar interface** em `tools/rag/lib/storage/<nome>.mjs`:
+
+```javascript
+// Funções obrigatórias:
+export async function openDb(dbDir) { /* ... */ }
+export async function ensureTable(db, dim) { /* ... */ }
+export async function deleteByPath(table, path) { /* ... */ }
+export async function addChunks(table, rows) { /* ... */ }
+export async function search(table, vector, options) { /* ... */ }
+```
+
+2. **Atualizar imports** em `tools/rag/lib/facade.mjs`:
+
+```javascript
+import * as storage from './storage/milvus.mjs';  // Novo backend
+```
+
+### Migrar Schema Entre Versões
+
+Quando o schema do manifesto precisa evoluir (v1 → v2 → v3...):
+
+1. **Definir migração** em `tools/rag/lib/migrations/schema_v2.mjs`:
+
+```javascript
+export const MIGRATIONS = {
+  '1->2': async (manifest, paths, db) => {
+    // Adicionar novos campos
+    manifest.new_field = 'default_value';
+
+    // Modificar estrutura existente
+    if (manifest.old_field) {
+      manifest.renamed_field = manifest.old_field;
+      delete manifest.old_field;
+    }
+
+    // Atualizar versão
+    manifest.schema_version = 2;
+
+    return manifest;
+  }
+};
+```
+
+2. **Atualizar SCHEMA_VERSION** em `tools/rag/lib/contract.mjs`:
+
+```javascript
+export const SCHEMA_VERSION = 2;  // Era 1
+```
+
+3. A migração será **aplicada automaticamente** no próximo `rag:index`.
+
+### Customizar Scan e Filtering
+
+Para alterar quais arquivos são indexados:
+
+- **Denylist**: Editar `DENY_PATTERNS` em `tools/rag/lib/scan.mjs`
+- **Extensões permitidas**: Modificar `ALLOWED_EXTS`
+- **Detecção de binários**: Ajustar `isBinaryBuffer()` se necessário
+
+### Adicionar Novos CLI Commands
+
+Para criar um novo comando RAG (ex: `rag:stats`):
+
+1. **Criar script** em `tools/rag/stats.mjs`:
+
+```javascript
+import { ragStats } from './lib/facade.mjs';
+
+const stats = await ragStats();
+console.log(JSON.stringify(stats, null, 2));
+```
+
+2. **Adicionar ao package.json**:
+
+```json
+{
+  "scripts": {
+    "rag:stats": "node tools/rag/stats.mjs"
+  }
+}
+```
+
 ## Referência de arquivos
 
 - CLI: `tools/rag/health.mjs`, `tools/rag/index.mjs`, `tools/rag/ask.mjs`, `tools/rag/reset.mjs`
@@ -190,3 +351,4 @@ Além disso:
 - Scan: `tools/rag/lib/scan.mjs`
 - Chunking: `tools/rag/lib/chunking/*`
 - Embeddings: `tools/rag/lib/embeddings/ollama.mjs`, `tools/rag/lib/embeddings/embed_cache.mjs`
+- Migrations: `tools/rag/lib/migrations/schema_v2.mjs`

@@ -15,6 +15,35 @@ import { formatMarkdownResults } from './format.mjs';
 // Singleton query embedding cache
 const queryEmbedCache = new EmbeddingCache(100);
 
+/**
+ * Retry wrapper for embedding operations
+ * Applies exponential backoff to any embedding provider
+ *
+ * @param {Function} fn - Async function to retry
+ * @param {Object} options - Retry options
+ * @returns {Promise<any>} Result from fn
+ */
+async function retryWithBackoff(fn, options = {}) {
+    const { maxRetries = 3, initialDelay = 1000, maxDelay = 10000, onRetry } = options;
+    let lastError;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxRetries - 1) {
+                const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
+                if (onRetry) {
+                    onRetry(error, attempt + 1, maxRetries, delay);
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    throw lastError;
+}
+
 export async function ragHealth(options = {}) {
     const paths = getRagPaths(options.paths);
     await ensureDirs(paths);
@@ -183,7 +212,18 @@ export async function ragIndex(options = {}) {
                     chunkerVersion: manifest.chunker_version
                 });
 
-                const vector = await embeddings.embed(text);
+                // Embed with retry logic (handles transient failures)
+                const vector = await retryWithBackoff(
+                    () => embeddings.embed(text),
+                    {
+                        maxRetries: 3,
+                        initialDelay: 1000,
+                        maxDelay: 10000,
+                        onRetry: (err, attempt, max, delay) => {
+                            console.warn(`[RAG] Embed retry ${attempt}/${max} after ${delay}ms: ${err.message}`);
+                        }
+                    }
+                );
                 report.embedded_chunks++;
 
                 if (!manifest.embedding.dim) {
@@ -323,7 +363,10 @@ export async function ragAsk(options = {}) {
 export async function ragReset(options = {}) {
     const paths = getRagPaths(options.paths);
     if (!options.yes) {
-        throw new Error('RAG_RESET_REQUIRES_YES');
+        throw new Error(
+            'RAG_RESET_REQUIRES_YES: This operation will delete all indexed data.\n' +
+            'To confirm, run: npm run rag:reset -- --yes'
+        );
     }
     await ensureDirs(paths);
     await rmContents(paths.dbDir);
