@@ -96,11 +96,14 @@ function applyRoutes(app) {
      * Namespace: /api/rag
      * Responsável por busca semântica no codebase via LanceDB + Ollama.
      * Permite que LLMs externas (OpenCode, Claude, Copilot) acessem o código.
-     * Inclui: Semantic search, health check, indexing trigger.
+     * Inclui: Semantic search, hybrid search (vector + FTS + reranking + MMR),
+     * health check, indexing trigger, cache statistics.
      */
     app.post('/api/rag/ask', apiLimiter, ragController.handleRagAsk);
     app.post('/api/rag/query', apiLimiter, ragController.handleRagQuery);
+    app.post('/api/rag/hybrid', apiLimiter, ragController.handleRagHybridSearch);
     app.get('/api/rag/health', apiLimiter, ragController.handleRagHealth);
+    app.get('/api/rag/stats', apiLimiter, ragController.handleRagStats);
     app.post('/api/rag/index', apiLimiter, ragController.handleRagIndex);
 
     /* --------------------------------------------------------------------------

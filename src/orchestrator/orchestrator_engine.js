@@ -376,8 +376,8 @@ class OrchestratorEngine {
             total_steps: workflowState.steps.length
         });
 
-        // Prepara prompt do próximo step (injeta contexto acumulado)
-        const nextStepPrompt = this._buildStepPrompt(nextStep, workflowState.accumulated_context, workflow_id);
+        // Prepara prompt do próximo step (injeta contexto acumulado + RAG auto-injection)
+        const nextStepPrompt = await this._buildStepPrompt(nextStep, workflowState.accumulated_context, workflow_id);
 
         return {
             action: 'NEXT_STEP',
@@ -414,7 +414,7 @@ class OrchestratorEngine {
     /**
      * Constrói prompt para step de workflow.
      */
-    _buildStepPrompt(step, accumulated_context, workflow_id = null) {
+    async _buildStepPrompt(step, accumulated_context, workflow_id = null) {
         let prompt = step.config.prompt || step.description || '';
 
         // Substitui placeholders {step-id} com outputs anteriores (backward compatible)
@@ -441,7 +441,101 @@ class OrchestratorEngine {
             }
         }
 
+        // AUTO-RAG: Auto-inject código relevante se task mencionar keywords
+        const ragQuery = this._extractRagQuery(prompt);
+        if (ragQuery) {
+            try {
+                // Lazy import para evitar circular dependency
+                const { ragHybridSearch } = await import('../../../tools/rag/lib/facade.mjs');
+
+                logger.debug(`[OrchestratorEngine] Auto-injecting RAG context for query: "${ragQuery}"`);
+
+                // Buscar contexto (hybrid search com reranking + MMR)
+                const ragResult = await ragHybridSearch({
+                    query: ragQuery,
+                    topK: 3,  // Limit to 3 chunks to avoid token bloat
+                    rerank: true,
+                    mmr: true,
+                    mmrLambda: 0.7
+                });
+
+                if (ragResult.results && ragResult.results.length > 0) {
+                    // Formatar contexto como markdown
+                    const contextMd = ragResult.results
+                        .map((r, i) => {
+                            const preview = r.text.length > 400 ? r.text.substring(0, 400) + '...' : r.text;
+                            return `### [${i + 1}] ${r.path}:${r.start_line}-${r.end_line}\n\`\`\`${r.language || 'text'}\n${preview}\n\`\`\``;
+                        })
+                        .join('\n\n');
+
+                    // Injetar no início do prompt
+                    prompt = `[Auto-injected RAG Context - ${ragResult.results.length} relevant code chunks]\n\n${contextMd}\n\n---\n\n${prompt}`;
+
+                    logger.info(`[OrchestratorEngine] ✓ RAG context injected (${ragResult.results.length} chunks)`);
+                }
+            } catch (err) {
+                logger.warn(`[OrchestratorEngine] RAG auto-injection failed: ${err.message}`);
+                // Continuar sem RAG se falhar (graceful degradation)
+            }
+        }
+
         return prompt;
+    }
+
+    /**
+     * Extrai query RAG do prompt usando heurística de keywords
+     * Retorna null se não detectar keywords relevantes
+     */
+    _extractRagQuery(prompt) {
+        // Keywords que indicam necessidade de contexto de código
+        const CODE_KEYWORDS = [
+            'função', 'function', 'classe', 'class', 'método', 'method',
+            'arquivo', 'file', 'código', 'code', 'implementação', 'implementation',
+            'CHROME_PROXY', 'kernel', 'driver', 'adaptive', 'config',
+            'orchestrator', 'NERV', 'context', 'error', 'handler',
+            'module', 'import', 'export', 'interface', 'type'
+        ];
+
+        const promptLower = prompt.toLowerCase();
+
+        // Verifica se contém alguma keyword
+        const hasCodeKeyword = CODE_KEYWORDS.some(kw => promptLower.includes(kw.toLowerCase()));
+
+        if (!hasCodeKeyword) {
+            return null;  // Não precisa de RAG
+        }
+
+        // Extrair query: procura por nomes específicos após keywords
+        const patterns = [
+            /(?:função|function|class|classe|method|método|arquivo|file)\s+(\w+)/gi,
+            /(?:implementa(?:r|ção)?|code|código)\s+(?:de|do|da)?\s*(\w+)/gi,
+            /(CHROME_\w+|[A-Z_]{5,})/g,  // UPPERCASE constants
+            /(\w+(?:Engine|Manager|Service|Controller|Driver|Handler))/gi  // Class patterns
+        ];
+
+        const matches = new Set();
+        for (const pattern of patterns) {
+            let match;
+            while ((match = pattern.exec(prompt)) !== null) {
+                if (match[1] && match[1].length > 3) {
+                    matches.add(match[1]);
+                }
+            }
+        }
+
+        if (matches.size > 0) {
+            // Retorna primeiros 3 matches como query
+            return Array.from(matches).slice(0, 3).join(' ');
+        }
+
+        // Fallback: primeiros 80 chars do prompt (limpo)
+        const fallback = prompt
+            .replace(/\{[^}]+\}/g, '')  // Remove placeholders
+            .replace(/\[.*?\]/g, '')     // Remove markdown links
+            .substring(0, 80)
+            .trim();
+
+        return fallback.length > 15 ? fallback : null;
     }
 
     /**

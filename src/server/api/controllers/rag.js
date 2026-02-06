@@ -11,7 +11,14 @@
  * - POST /api/rag/index - Trigger reindexação em background
  */
 
-import { ragHealth, ragQuery, ragAsk, ragIndex } from '../../../../tools/rag/lib/facade.mjs';
+import {
+    ragHealth,
+    ragQuery,
+    ragAsk,
+    ragIndex,
+    ragHybridSearch,
+    getRagCacheStats
+} from '../../../../tools/rag/lib/facade.mjs';
 
 /**
  * POST /api/rag/ask
@@ -170,6 +177,136 @@ export async function handleRagIndex(req, res) {
       success: false,
       error: error.message,
       code: error.code || 'RAG_INDEX_ERROR'
+    });
+  }
+}
+
+/**
+ * POST /api/rag/hybrid
+ * Hybrid search (Vector + FTS + Reranking + MMR)
+ *
+ * Body: {
+ *   query: string,
+ *   topK?: number,
+ *   pathPrefix?: string,
+ *   ext?: string,
+ *   tags?: string[],
+ *   rerank?: boolean,
+ *   rerankWeights?: object,
+ *   mmr?: boolean,
+ *   mmrLambda?: number
+ * }
+ *
+ * Response: {
+ *   success: boolean,
+ *   results: Array<{
+ *     path, score, distance, rerank_score?, rerank_signals?,
+ *     start_line, end_line, text, language, tags
+ *   }>,
+ *   metadata: { topK, dim, model, query, hybridMode, rerank, mmr, mmrLambda }
+ * }
+ */
+export async function handleRagHybridSearch(req, res) {
+  try {
+    const {
+      query,
+      topK = 8,
+      pathPrefix,
+      ext,
+      tags,
+      rerank = true,
+      rerankWeights,
+      mmr = true,
+      mmrLambda = 0.7
+    } = req.body;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing or invalid "query" parameter (string required)'
+      });
+    }
+
+    const result = await ragHybridSearch({
+      query,
+      topK: Number(topK),
+      pathPrefix,
+      ext,
+      tags: tags ? (Array.isArray(tags) ? tags : [tags]) : undefined,
+      rerank,
+      rerankWeights,
+      mmr,
+      mmrLambda: mmrLambda ? Number(mmrLambda) : 0.7
+    });
+
+    return res.json({
+      success: true,
+      results: result.results.map(r => ({
+        path: r.path,
+        score: r.score,
+        distance: r.distance,
+        rerank_score: r.rerank_score,
+        rerank_signals: r.rerank_signals,
+        start_line: r.start_line,
+        end_line: r.end_line,
+        text: r.text,
+        language: r.language || null,
+        tags: r.tags || [],
+        ext: r.ext
+      })),
+      metadata: {
+        query: result.query,
+        topK: result.topK,
+        dim: result.dim,
+        model: result.model,
+        hybridMode: result.hybridMode,
+        rerank: result.rerank,
+        mmr: result.mmr,
+        mmrLambda: result.mmrLambda,
+        timestamp: Date.now()
+      }
+    });
+  } catch (error) {
+    console.error('[RAG API] handleRagHybridSearch error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'RAG_HYBRID_SEARCH_ERROR'
+    });
+  }
+}
+
+/**
+ * GET /api/rag/stats
+ * Estatísticas do cache de embeddings
+ *
+ * Response: {
+ *   success: boolean,
+ *   stats: { size, maxSize, hits, misses, hitRate },
+ *   timestamp: number
+ * }
+ */
+export async function handleRagStats(req, res) {
+  try {
+    const stats = getRagCacheStats();
+
+    return res.json({
+      success: true,
+      stats: {
+        ...stats,
+        hitRate: (stats.hitRate * 100).toFixed(2) + '%',
+        efficiency: stats.hits > 0
+          ? `Saved ${stats.hits} embedding calls (~${(stats.hits * 200).toFixed(0)}ms)`
+          : 'No cache hits yet'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('[RAG API] handleRagStats error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'RAG_STATS_ERROR'
     });
   }
 }
