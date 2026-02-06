@@ -12,6 +12,7 @@ import { EmbeddingCache } from './embeddings/embed_cache.mjs';
 import { AdaptiveThrottler } from './adaptive_throttler.mjs';
 import { openDb, ensureTable, deleteByPath, addChunks, search, hybridSearch } from './storage/lancedb.mjs';
 import { formatMarkdownResults } from './format.mjs';
+import { normalizeQuery } from './text/query_normalizer.mjs';
 
 // Singleton query embedding cache
 const queryEmbedCache = new EmbeddingCache(100);
@@ -323,10 +324,13 @@ export async function ragQuery(options = {}) {
         model: options.model || manifest.embedding.model
     });
 
+    // Normalize query for better cache hits (same query variations → same cache key)
+    const normalizedQuery = normalizeQuery(options.query);
+
     // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
     let vector;
     if (!options.embeddingsProvider) {
-        vector = queryEmbedCache.get(options.query, embeddings.model);
+        vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
         if (vector) {
             console.log('[RAG] Query embedding: cache hit');
         }
@@ -336,9 +340,11 @@ export async function ragQuery(options = {}) {
         if (!options.embeddingsProvider) {
             console.log('[RAG] Query embedding: cache miss, generating...');
         }
+        // Use original query for embedding (not normalized, to preserve semantic nuances)
         vector = await embeddings.embed(options.query);
         if (!options.embeddingsProvider) {
-            queryEmbedCache.set(options.query, embeddings.model, vector);
+            // But store with normalized key for better cache reuse
+            queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
         }
     }
 
@@ -409,10 +415,13 @@ export async function ragHybridSearch(options = {}) {
         mmrLambda = 0.7        // MMR lambda (0.7 = 70% relevance, 30% diversity)
     } = options;
 
+    // Normalize query for better cache hits (same query variations → same cache key)
+    const normalizedQuery = normalizeQuery(query);
+
     // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
     let vector;
     if (!options.embeddingsProvider) {
-        vector = queryEmbedCache.get(query, embeddings.model);
+        vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
         if (vector) {
             console.log('[RAG] Query embedding: cache hit ✅');
         }
@@ -422,9 +431,11 @@ export async function ragHybridSearch(options = {}) {
         if (!options.embeddingsProvider) {
             console.log('[RAG] Query embedding: cache miss, generating...');
         }
+        // Use original query for embedding (not normalized, to preserve semantic nuances)
         vector = await embeddings.embed(query);
         if (!options.embeddingsProvider) {
-            queryEmbedCache.set(query, embeddings.model, vector);
+            // But store with normalized key for better cache reuse
+            queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
         }
     }
 
@@ -483,6 +494,20 @@ export async function ragReset(options = {}) {
     await ensureDirs(paths);
     await rmContents(paths.dbDir);
     await rmContents(paths.indexDir);
+}
+
+/**
+ * Get query embedding cache statistics
+ * Useful for monitoring cache performance and hit rates
+ * @returns {object} - Cache stats { size, maxSize, hits, misses, hitRate }
+ *
+ * @example
+ * const stats = getRagCacheStats();
+ * console.log(`Cache hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
+ * console.log(`Cache size: ${stats.size}/${stats.maxSize}`);
+ */
+export function getRagCacheStats() {
+    return queryEmbedCache.getStats();
 }
 
 async function canWrite(dirPath) {
