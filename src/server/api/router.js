@@ -9,6 +9,7 @@ import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
 import * as healthController from './controllers/health.js';
 import * as metricsController from './controllers/metrics.js';
+import * as ragController from './controllers/rag.js';
 
 /**
  * Aplica a malha de rotas à instância do Express.
@@ -89,6 +90,18 @@ function applyRoutes(app) {
      * Inclui: TaskSyncBridge, TelemetryAggregator, Sistema de Alertas.
      */
     app.use('/api/dashboard', apiLimiter, dashboardController);
+
+    /**
+     * DOMÍNIO RAG (Retrieval-Augmented Generation)
+     * Namespace: /api/rag
+     * Responsável por busca semântica no codebase via LanceDB + Ollama.
+     * Permite que LLMs externas (OpenCode, Claude, Copilot) acessem o código.
+     * Inclui: Semantic search, health check, indexing trigger.
+     */
+    app.post('/api/rag/ask', apiLimiter, ragController.handleRagAsk);
+    app.post('/api/rag/query', apiLimiter, ragController.handleRagQuery);
+    app.get('/api/rag/health', apiLimiter, ragController.handleRagHealth);
+    app.post('/api/rag/index', apiLimiter, ragController.handleRagIndex);
 
     /* --------------------------------------------------------------------------
        2. ESCUDOS DE PROTEÇÃO (ERROR BOUNDARY)
