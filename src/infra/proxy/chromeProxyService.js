@@ -1008,6 +1008,48 @@ class ChromeProxyService {
                 }
             });
 
+            // Health check endpoint (for PM2 readiness checks and external monitoring)
+            this.app.get('/health', (req, res) => {
+                try {
+                    const health = {
+                        status: 'ok',
+                        timestamp: Date.now(),
+                        uptime: process.uptime(),
+                        config: {
+                            proxyPort: this.config.PROXY_PORT,
+                            chromeHost: this.config.CHROME_HOST,
+                            chromePort: this.config.CHROME_PORT
+                        },
+                        circuitBreaker: {
+                            state: this.circuitBreaker.state,
+                            failures: this.circuitBreaker.failures
+                        },
+                        connections: {
+                            active: this.activeConnections.size,
+                            total: this.stats.wsUpgrades
+                        },
+                        stats: {
+                            httpRequests: this.stats.httpRequests,
+                            wsUpgrades: this.stats.wsUpgrades,
+                            errors: this.stats.errors
+                        }
+                    };
+
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(health, null, 2));
+                } catch (err) {
+                    this.log('error', 'Health check endpoint error', { error: err.message });
+                    res.statusCode = 500;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                        status: 'error',
+                        error: err.message,
+                        timestamp: Date.now()
+                    }));
+                }
+            });
+
             // Default route (proxy all other requests)
             this.app.use((req, res) => this.handleHTTPRequest(req, res));
 
@@ -1023,6 +1065,13 @@ class ChromeProxyService {
                 this.log('info', `   Public URL: http://${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`);
                 this.log('info', `   Idle timeout: ${this._idleTimeoutMs}ms`);
                 this.log('info', `   CORS origins: ${this.config.ALLOWED_ORIGINS.length} allowed`);
+
+                // Signal to PM2 that process is ready (prevents race condition)
+                if (process.send) {
+                    process.send('ready');
+                    this.log('debug', '   PM2 readiness signal sent');
+                }
+
                 resolve();
             });
 

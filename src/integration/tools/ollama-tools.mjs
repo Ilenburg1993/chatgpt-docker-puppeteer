@@ -10,7 +10,38 @@
  * - ollama_models: List all available Ollama models
  */
 
+import { z } from 'zod';
 import { ollama } from '../../../tools/ollama/client.mjs';
+
+/**
+ * Input validation schemas (prevents DoS attacks)
+ */
+const OllamaGenerateSchema = z.object({
+    prompt: z.string()
+        .min(1, 'Prompt cannot be empty')
+        .max(10000, 'Prompt too long (max 10000 chars) - potential DoS attack'),
+    model: z.string()
+        .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .optional(),
+    temperature: z.number()
+        .min(0, 'Temperature must be >= 0')
+        .max(2, 'Temperature must be <= 2')
+        .optional(),
+    max_tokens: z.number()
+        .int('max_tokens must be an integer')
+        .min(1, 'max_tokens must be >= 1')
+        .max(4000, 'max_tokens cannot exceed 4000 - potential DoS attack')
+        .optional()
+});
+
+const OllamaEmbedSchema = z.object({
+    text: z.string()
+        .min(1, 'Text cannot be empty')
+        .max(8000, 'Text too long (max 8000 chars) - potential DoS attack'),
+    model: z.string()
+        .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .optional()
+});
 
 /**
  * ollama_generate tool: Text generation using local Ollama models
@@ -34,20 +65,25 @@ import { ollama } from '../../../tools/ollama/client.mjs';
  * @param {number} params.max_tokens - Max tokens to generate (default: 1000 from ENV)
  * @returns {Promise<string>} Generated text formatted as Markdown
  */
-async function ollamaGenerateHandler({
-    prompt,
-    model,
-    temperature = 0.7,
-    max_tokens
-}, options = {}) {
+async function ollamaGenerateHandler(params, options = {}) {
+    // Validate input (prevents DoS attacks with huge prompts/tokens)
+    let validated;
+    try {
+        validated = OllamaGenerateSchema.parse(params);
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            const issues = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+            throw new Error(`Invalid input: ${issues}`);
+        }
+        throw error;
+    }
+
+    const { prompt, model, temperature = 0.7, max_tokens } = validated;
+
     // Use ENV defaults for CPU optimization
     const selectedModel = model || process.env.OLLAMA_DEFAULT_MODEL || 'qwen2.5-coder:3b';
     const selectedMaxTokens = max_tokens || Number(process.env.OLLAMA_MAX_TOKENS || 1000);
     console.error(`[Ollama Tool] ollama_generate with model=${selectedModel}, max_tokens=${selectedMaxTokens}`);
-
-    if (!prompt || typeof prompt !== 'string') {
-        throw new Error('Prompt must be a non-empty string');
-    }
 
     // Check if already aborted before starting
     if (options.signal?.aborted) {
@@ -90,12 +126,22 @@ async function ollamaGenerateHandler({
  * @param {string} params.model - Embedding model (default: nomic-embed-text)
  * @returns {Promise<string>} Embedding info formatted as Markdown
  */
-async function ollamaEmbedHandler({ text, model = 'nomic-embed-text' }, options = {}) {
-    console.error(`[Ollama Tool] ollama_embed with model=${model}`);
-
-    if (!text || typeof text !== 'string') {
-        throw new Error('Text must be a non-empty string');
+async function ollamaEmbedHandler(params, options = {}) {
+    // Validate input (prevents DoS attacks with huge text)
+    let validated;
+    try {
+        validated = OllamaEmbedSchema.parse(params);
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            const issues = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+            throw new Error(`Invalid input: ${issues}`);
+        }
+        throw error;
     }
+
+    const { text, model = 'nomic-embed-text' } = validated;
+
+    console.error(`[Ollama Tool] ollama_embed with model=${model}`);
 
     // Check if already aborted before starting
     if (options.signal?.aborted) {
