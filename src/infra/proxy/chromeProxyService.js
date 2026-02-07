@@ -15,17 +15,18 @@
  */
 
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import http from 'node:http';
-import net from 'node:net';
-import os from 'node:os';
+import * as http from 'node:http';
+import * as net from 'node:net';
+import * as os from 'node:os';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
+// @ts-ignore - ESM subpath imports not recognized by TypeScript
 import * as logger from '#core/logger';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { v4 as uuidv4 } from 'uuid';
-import promClient from 'prom-client';
+import * as promClient from 'prom-client';
 
 /**
  * @typedef {Object} ChromeProxyServiceConfig
@@ -61,6 +62,7 @@ let HighLevelNERV = null;
 let ActionCode = null;
 let ActorRole = null;
 
+// @ts-ignore - ESM subpath imports not recognized by TypeScript
 import CONFIG from '#core/config';
 
 // Configurações locais do proxy (sobrescrevem CONFIG se fornecidas via env)
@@ -641,7 +643,8 @@ class ChromeProxyService {
     ====================================================================== */
     _cleanupStaleIPEntries() {
         // Remove IPs with 0 connections
-        for (const [ip, count] of this.wsConnectionsPerIP.entries()) {
+        // Use Array.from() for TypeScript iterator compatibility
+        for (const [ip, count] of Array.from(this.wsConnectionsPerIP.entries())) {
             if (count <= 0) {
                 this.wsConnectionsPerIP.delete(ip);
             }
@@ -1225,6 +1228,7 @@ class ChromeProxyService {
         socket.setTimeout(idleTimeout);
 
         socket.on('timeout', () => {
+            // @ts-ignore - Custom __lastActivity property added by markActive
             const inactiveMs = Date.now() - (socket.__lastActivity || Date.now());
             this.log('warn', 'WebSocket idle timeout', {
                 idleMs: inactiveMs,
@@ -1415,9 +1419,12 @@ class ChromeProxyService {
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
+                // @ts-ignore - ESM subpath imports not recognized by TypeScript
                 const nervModule = await import('#nerv/nerv');
                 createNERV = nervModule?.createNERV || null;
+                // @ts-ignore - ESM subpath imports not recognized by TypeScript
                 HighLevelNERV = await import('#nerv/adapters/high_level_adapter');
+                // @ts-ignore - ESM subpath imports not recognized by TypeScript
                 const nervConsts = await import('#shared/nerv/constants');
                 ActionCode = nervConsts?.ActionCode || null;
                 ActorRole = nervConsts?.ActorRole || {};
@@ -1584,6 +1591,7 @@ class ChromeProxyService {
             });
 
             this.server.on('error', err => {
+                // @ts-ignore - Node.js system errors have 'code' property
                 if (err.code === 'EADDRINUSE') {
                     reject(
                         new Error(
