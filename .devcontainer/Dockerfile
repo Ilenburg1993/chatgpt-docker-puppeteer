@@ -25,6 +25,7 @@
 # + Cache layers reorganizadas (build incremental 2-3x mais rápido)
 # + HEALTHCHECK implementado
 # + BUILD_ARGs usados em mensagens
+# + Adicionado bubblewrap (sandbox isolation para GitHub Copilot Agent)
 # ✅ v5.1 (anteriormente):
 # + GitHub CLI (gh) + git-lfs
 # + Network debugging (socat, mtr-tiny)
@@ -463,9 +464,11 @@ RUN apt-get update \
     # ---------------------------------------------------------------------
     # • Busca rápida de código e arquivos
     # • UX CLI moderna, sem sobreposição com VS Code
+    # • Sandbox container (bubblewrap) para isolamento de comandos
     # =====================================================================
     bat \
     ripgrep \
+    bubblewrap \
     fd-find \
     fzf \
     sqlite3 \
