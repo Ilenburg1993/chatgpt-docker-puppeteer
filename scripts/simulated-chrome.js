@@ -3,8 +3,19 @@
 import http from 'node:http';
 import WebSocket from 'ws';
 
-const HOST = process.env.CHROME_HOST || '127.0.0.1';
-const PORT = Number(process.env.CHROME_PORT || process.argv[2] || 9225);
+// ✅ Padronizado: host.docker.internal (Docker/WSL-friendly)
+// Para uso local direto (fora de Docker): CHROME_HOST=127.0.0.1 node scripts/simulated-chrome.js
+const HOST = process.env.CHROME_HOST || 'host.docker.internal';
+
+// ✅ Validação de porta (0-65535)
+const rawPort = process.env.CHROME_PORT || process.argv[2] || '9225';
+const parsedPort = Number(rawPort);
+const PORT = (Number.isFinite(parsedPort) && parsedPort >= 0 && parsedPort <= 65535) ? parsedPort : 9225;
+
+if (parsedPort !== PORT) {
+    console.warn(`[WARN] Invalid port "${rawPort}", using default: ${PORT}`);
+}
+
 const PATH = process.env.CHROME_WS_PATH || '/devtools/page/1';
 
 const server = http.createServer((req, res) => {

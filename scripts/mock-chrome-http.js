@@ -1,8 +1,20 @@
-#!/usr/bin/env nodeimport http from 'node:http';
+#!/usr/bin/env node
+import http from 'node:http';
 import { v4 as uuidv4 } from 'uuid';
 
-const port = parseInt(process.env.MOCK_CHROME_PORT || process.env.CHROME_PORT || '9225', 10);
-const host = process.env.MOCK_CHROME_HOST || process.env.CHROME_HOST || '127.0.0.1';
+// ✅ Padronizado: host.docker.internal (Docker/WSL-friendly)
+// Para uso local direto (fora de Docker): CHROME_HOST=127.0.0.1 node scripts/mock-chrome-http.js
+const host = process.env.MOCK_CHROME_HOST || process.env.CHROME_HOST || 'host.docker.internal';
+
+// ✅ Validação de porta (0-65535)
+const rawPort = process.env.MOCK_CHROME_PORT || process.env.CHROME_PORT || '9225';
+const parsedPort = parseInt(rawPort, 10);
+const port = (Number.isFinite(parsedPort) && parsedPort >= 0 && parsedPort <= 65535) ? parsedPort : 9225;
+
+if (parsedPort !== port) {
+    console.warn(`[WARN] Invalid port "${rawPort}", using default: ${port}`);
+}
+
 const wsUrl = `ws://${host}:${port}/devtools/browser/${uuidv4()}`;
 
 const server = http.createServer((req, res) => {
