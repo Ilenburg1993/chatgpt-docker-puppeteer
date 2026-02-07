@@ -547,6 +547,83 @@ class BrowserPoolManager {
             log('WARN', '[BrowserPool] ⏸️  Sistema deve PAUSAR devido ao Circuit Breaker');
             // TODO: Emitir evento NERV para Kernel pausar
         }
+
+        // ✅ Phase 2 Fix #19: Cleanup zombie pages (TTL expiration)
+        await this._cleanupZombiePages();
+    }
+
+    /**
+     * ✅ Phase 2 Fix #19: Cleanup zombie browser contexts (TTL expiration)
+     *
+     * Closes pages that have been allocated for longer than TTL without being
+     * explicitly released. Prevents memory leaks from forgotten contexts.
+     *
+     * Called automatically during health checks (every 30s by default).
+     *
+     * TTL: 1 hour (3600000ms) - configurable via BROWSER_PAGE_TTL_MS
+     */
+    async _cleanupZombiePages() {
+        const CONFIG = await import('#core/config').then(m => m.default ?? m);
+        const ttlMs = Number(CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000);
+        const now = Date.now();
+        let zombieCount = 0;
+
+        for (const poolEntry of this.pool) {
+            const zombiePages = [];
+
+            // Find pages that exceeded TTL
+            for (const [taskId, page] of poolEntry.pages.entries()) {
+                try {
+                    const allocatedAt = page._poolMetadata?.allocatedAt;
+
+                    if (!allocatedAt) {
+                        // Missing metadata - mark as zombie (safety)
+                        log('WARN', `[BrowserPool] Page ${taskId} missing allocatedAt metadata - marking as zombie`);
+                        zombiePages.push({ taskId, page, reason: 'MISSING_METADATA', age: 'unknown' });
+                        continue;
+                    }
+
+                    const age = now - allocatedAt;
+
+                    if (age > ttlMs) {
+                        zombiePages.push({ taskId, page, reason: 'TTL_EXCEEDED', age });
+                    }
+                } catch (error) {
+                    log('ERROR', `[BrowserPool] Error checking page TTL for ${taskId}: ${error.message}`);
+                }
+            }
+
+            // Close zombie pages
+            for (const zombie of zombiePages) {
+                try {
+                    const ageMinutes = zombie.age === 'unknown' ? 'unknown' : Math.floor(zombie.age / 60000);
+
+                    log('WARN', `[BrowserPool] Closing zombie page: ${zombie.taskId} (age: ${ageMinutes}min, reason: ${zombie.reason})`);
+
+                    // Close page
+                    await zombie.page.close();
+
+                    // Remove from pool entry
+                    poolEntry.pages.delete(zombie.taskId);
+                    poolEntry.stats.activeTasks = Math.max(0, poolEntry.stats.activeTasks - 1);
+
+                    // Cleanup lifecycle monitor
+                    const monitor = this.lifecycleMonitors.get(zombie.taskId);
+                    if (monitor) {
+                        monitor.cleanup();
+                        this.lifecycleMonitors.delete(zombie.taskId);
+                    }
+
+                    zombieCount++;
+                } catch (error) {
+                    log('ERROR', `[BrowserPool] Error closing zombie page ${zombie.taskId}: ${error.message}`);
+                }
+            }
+        }
+
+        if (zombieCount > 0) {
+            log('WARN', `[BrowserPool] ✅ Cleaned up ${zombieCount} zombie page(s) (TTL: ${ttlMs / 60000}min)`);
+        }
     }
 
     /**

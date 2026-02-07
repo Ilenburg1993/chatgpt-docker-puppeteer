@@ -35,16 +35,36 @@ async function safeReadJSON(filepath) {
                 continue; // Tenta novamente no próximo ciclo do loop
             }
 
-            // Tratamento de integridade (JSON malformado ou gigante)
+            // Tratamento de integridade (JSON malformado, gigante, ou vazio)
             const fileName = path.basename(filepath);
+            const errorType = readErr.message || 'UNKNOWN';
+            const isJSONError = readErr instanceof SyntaxError || errorType.includes('JSON');
+            const isIntegrityError = errorType === 'FILE_TOO_LARGE' || errorType === 'EMPTY_FILE';
+
+            // Log detalhado do erro
+            if (isJSONError) {
+                console.error(`[FS] JSON corrupted: ${fileName} - ${errorType} (quarantining)`);
+            } else if (isIntegrityError) {
+                console.warn(`[FS] File integrity issue: ${fileName} - ${errorType} (quarantining)`);
+            } else {
+                console.error(`[FS] Read error: ${fileName} - ${errorType} (quarantining)`);
+            }
+
+            // Quarentena: move para pasta CORRUPT com timestamp
             const badFile = path.join(CORRUPT, `${fileName}.${Date.now()}.bad`);
 
             try {
                 await fs.rename(filepath, badFile);
-                console.error(`[FS] Quarentena: ${fileName} isolado por erro de integridade.`);
-            } catch (_) {
+                console.error(`[FS] ✅ Quarantine successful: ${fileName} → ${path.basename(badFile)}`);
+            } catch (renameErr) {
+                console.error(`[FS] ❌ Quarantine failed: ${renameErr.message} - attempting deletion`);
                 // Fallback: Se não puder mover, tenta deletar para não travar o sistema
-                await fs.unlink(filepath).catch(() => {});
+                try {
+                    await fs.unlink(filepath);
+                    console.error(`[FS] ✅ Deleted corrupted file: ${fileName}`);
+                } catch (unlinkErr) {
+                    console.error(`[FS] ❌ Cannot delete corrupted file: ${fileName} - ${unlinkErr.message}`);
+                }
             }
             return null;
         }

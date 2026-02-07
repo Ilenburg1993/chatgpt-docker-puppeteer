@@ -180,6 +180,22 @@ async function boot() {
     const bootStartTime = Date.now();
 
     try {
+        // ===== FASE 0: ENV VALIDATION (FAIL-FAST) =====
+        log('INFO', '[BOOT] Fase 0/6: Validação de variáveis de ambiente');
+
+        const { validateEnv } = await import('./core/env_validator.js');
+        const envResult = validateEnv({
+            throwOnError: true,  // Fail-fast on critical errors
+            applyDefaults: true, // Apply defaults for missing vars
+            verbose: false       // Only show errors/warnings
+        });
+
+        if (envResult.warnings.length > 0) {
+            log('WARN', `[BOOT] ENV validation warnings: ${envResult.warnings.length}`);
+        }
+
+        log('DEBUG', '[BOOT] ENV validation passed');
+
         // ===== FASE 1: CONFIGURAÇÃO E IDENTIDADE =====
         log('INFO', '[BOOT] Fase 1/6: Configuração e Identidade');
 

@@ -122,13 +122,38 @@ export class ToolRegistry {
 
         console.error(`[Tool Registry] Executing tool: ${name}`);
 
+        // Layer 2 timeout: Tool execution wrapper (75s by default)
+        // This sits between MCP handler (90s) and Ollama client (60s)
+        const toolTimeout = Number(process.env.TOOL_EXECUTION_TIMEOUT || 75000);
+        const internalController = new AbortController();
+        const timeoutId = setTimeout(() => internalController.abort(), toolTimeout);
+
         try {
-            // Pass both params and options to handler
-            const result = await tool.handler(params, options);
+            // Combine external signal (if any) with internal timeout signal
+            const combinedSignal = options.signal
+                ? AbortSignal.any([options.signal, internalController.signal])
+                : internalController.signal;
+
+            // Pass combined signal to handler
+            const result = await tool.handler(params, {
+                ...options,
+                signal: combinedSignal
+            });
+
+            clearTimeout(timeoutId);
             console.error(`[Tool Registry] Tool execution completed: ${name}`);
             return result;
+
         } catch (error) {
-            // Check if this is an abort error
+            clearTimeout(timeoutId);
+
+            // Check if internal timeout fired (Layer 2)
+            if (internalController.signal.aborted && !options.signal?.aborted) {
+                console.error(`[Tool Registry] Tool '${name}' exceeded execution timeout (${toolTimeout}ms)`);
+                throw new Error(`Tool '${name}' exceeded execution timeout (${toolTimeout}ms)`);
+            }
+
+            // Check if external signal aborted (from MCP handler or user)
             if (error.name === 'AbortError' || options.signal?.aborted) {
                 console.error(`[Tool Registry] Tool execution cancelled: ${name}`);
                 throw new Error(`Tool ${name} was cancelled`);
