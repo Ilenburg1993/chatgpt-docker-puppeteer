@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';

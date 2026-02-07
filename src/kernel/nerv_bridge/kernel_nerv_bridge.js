@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
@@ -437,7 +438,7 @@ class KernelNERVBridge {
     /**
      * Handler interno: RETRY action
      */
-    async _handleRetryAction(task, feedback, correlationId) {
+	async _handleRetryAction(task, feedback, correlationId) {
         this.telemetry.info('nerv_bridge_orchestration_retry', {
             taskId: task.meta.id,
             iteration: task.state?.iteration_state?.current_iteration,
@@ -446,12 +447,13 @@ class KernelNERVBridge {
             at: Date.now()
         });
 
-        // Injeta feedback no prompt original
-        const retryTask = { ...task };
-        if (retryTask.spec && retryTask.spec.payload) {
-            const originalPrompt = retryTask.spec.payload.user_message || retryTask.spec.prompt || '';
-            retryTask.spec.payload.user_message = originalPrompt + '\n\n' + feedback;
-        }
+		// Injeta feedback no prompt original (imutável: payload pode estar congelado)
+		const prevSpec = task && typeof task.spec === 'object' && task.spec !== null ? task.spec : null;
+		const prevPayload = prevSpec && typeof prevSpec.payload === 'object' && prevSpec.payload !== null ? prevSpec.payload : null;
+		const originalPrompt = prevPayload?.user_message || prevPayload?.prompt || '';
+		const nextPayload = prevPayload ? { ...prevPayload, user_message: originalPrompt + '\n\n' + feedback } : prevPayload;
+		const nextSpec = prevSpec ? { ...prevSpec, payload: nextPayload } : prevSpec;
+		const retryTask = { ...task, spec: nextSpec };
 
         // Emite comando para re-executar task com feedback
         this.emitCommand({

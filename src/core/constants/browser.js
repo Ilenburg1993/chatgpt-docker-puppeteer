@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * Browser and connection-related constants
  * Centralized definitions for browser pool, connection modes, and orchestration

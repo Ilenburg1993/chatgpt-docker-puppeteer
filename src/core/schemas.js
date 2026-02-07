@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as schemaCore from './schemas/schema_core.js';
 
 export const TaskSchema = schemaCore.TaskSchema;

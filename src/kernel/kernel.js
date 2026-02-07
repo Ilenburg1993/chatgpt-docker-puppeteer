@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActorRole } from '#shared/nerv/constants';
 import { KernelLoop } from './kernel_loop/kernel_loop.js';
 import { TaskRuntime } from './task_runtime/task_runtime.js';
@@ -16,8 +17,9 @@ import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
 /**
  * Cria e compõe o Kernel de forma explícita e determinística.
  *
- * @param {Object} config - Configurações estruturais do Kernel
- * @param {Object} config.nerv - Instância do NERV já configurada e conectada (obrigatório)
+ * @param {Object} [config] - Configurações estruturais do Kernel
+ * @param {Object} [config.nerv] - Instância do NERV já configurada e conectada (obrigatório)
+ * @param {Object} [config.contextManager] - Context manager opcional (injeção externa)
  * @param {Object} [config.telemetry] - Opções da telemetria do Kernel
  * @param {string} [config.telemetry.source='kernel'] - Identificador da fonte de telemetria
  * @param {number} [config.telemetry.retention=1000] - Número de eventos a reter em memória
@@ -28,9 +30,11 @@ import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
  * @param {number} [config.loop.interval] - Intervalo do loop em ms
  *
  * @returns {Object} Interface pública do Kernel
- * @returns {Function} returns.start - Inicia o Kernel
- * @returns {Function} returns.stop - Para o Kernel graciosamente
- * @returns {Object} returns.telemetry - Acesso à telemetria
+ *
+ * Propriedades do objeto retornado:
+ *   - start (Function): Inicia o Kernel
+ *   - stop (Function): Para o Kernel graciosamente
+ *   - telemetry (Object): Acesso à telemetria
  *
  * @throws {Error} Se NERV não for fornecido
  *

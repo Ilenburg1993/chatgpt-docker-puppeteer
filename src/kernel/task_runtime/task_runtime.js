@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 
 /* ===========================
@@ -10,6 +11,10 @@ const TaskState = Object.freeze({
     SUSPENDED: 'SUSPENDED',
     TERMINATED: 'TERMINATED'
 });
+
+/**
+ * @typedef {(typeof TaskState)[keyof typeof TaskState]} TaskStateValue
+ */
 
 /* ===========================
    Transições permitidas
@@ -129,7 +134,7 @@ class TaskRuntime extends EventEmitter {
      *
      * @param {Object} params
      * @param {string} params.taskId
-     * @param {string} params.newState
+     * @param {TaskStateValue} params.newState
      * Estado alvo.
      *
      * @param {string} params.reason

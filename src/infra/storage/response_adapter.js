@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { saveResponseV2, loadResponseV2 } from './response_store_v2.js';
 import * as logger from '#core/logger';
 import { promises as fs } from 'node:fs';

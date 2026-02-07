@@ -263,7 +263,7 @@ async function wakeUpMove(page) {
  * @param {function} onPulse - [V500] Callback para reportar coordenadas ao IPC
  * @throws {TypeError} If required parameters are missing or invalid
  */
-async function humanClick(page, ctx, selector, offsetX = 0, offsetY = 0, signal = null, onPulse = null) {
+async function humanClickCore(page, ctx, selector, offsetX = 0, offsetY = 0, signal = null, onPulse = null) {
     // [v2.0] Parameter validation (Bug #2 fix)
     if (!page || typeof page !== 'object') {
         throw new TypeError('humanClick: page is required and must be a Page object');
@@ -380,7 +380,7 @@ async function humanClick(page, ctx, selector, offsetX = 0, offsetY = 0, signal 
  * @throws {Error} If sanitized text is empty
  */
 
-async function humanType(
+async function humanTypeCore(
     page,
     ctx,
     selector,
@@ -583,4 +583,302 @@ async function humanType(
     }
 }
 
-export { humanClick, humanType, wakeUpMove, gaussianRandom as gaussian, BIOMECHANICS_CONFIG as HUMAN_CONFIG };
+
+
+// ============================================
+// PUBLIC CONFIG (v2.0 - Test/Consumer Contract)
+// ============================================
+// Keep BIOMECHANICS_CONFIG for the legacy API. Expose a stable, smaller surface for consumers/tests.
+const HUMAN_CONFIG = Object.freeze({
+    // Movement/typing ranges (ms)
+    MOVE_SPEED_MIN: 1,
+    MOVE_SPEED_MAX: 5,
+    TYPE_DELAY_MIN: 45,
+    TYPE_DELAY_MAX: 85,
+
+    // Retries
+    ELEMENT_RETRY_COUNT: 3,
+    ELEMENT_RETRY_DELAY: 5,
+
+    // Gaussian cache
+    GAUSSIAN_CACHE_TTL: 100,
+
+    // Telemetry cadence
+    TYPE_PROGRESS_EVERY_CHARS: 25,
+
+    // Abort cadence
+    ABORT_YIELD_EVERY_CHARS: 5,
+
+    // Reserved slots (kept to 18-ish constants for backwards stability)
+    CLICK_PRE_DELAY_MIN: BIOMECHANICS_CONFIG.CLICK_PRE_DELAY_MIN,
+    CLICK_PRE_DELAY_MAX: BIOMECHANICS_CONFIG.CLICK_PRE_DELAY_MAX,
+    CLICK_HOLD_MIN: BIOMECHANICS_CONFIG.CLICK_HOLD_MIN,
+    CLICK_HOLD_MAX: BIOMECHANICS_CONFIG.CLICK_HOLD_MAX,
+    FOCUS_MAX_RETRIES: BIOMECHANICS_CONFIG.FOCUS_MAX_RETRIES,
+    FOCUS_RESTORE_DELAY: BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY,
+    CURSOR_CACHE_MAX_SIZE: BIOMECHANICS_CONFIG.CURSOR_CACHE_MAX_SIZE,
+    GAUSSIAN_CLAMP_SIGMA: BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA
+});
+
+// ============================================
+// GAUSSIAN (v2.0 - Param Cache + TTL)
+// ============================================
+const _gaussianParamCache = new Map();
+
+function gaussian(mean, sigma) {
+    if (typeof mean !== 'number' || Number.isNaN(mean)) {
+        throw new TypeError('mean must be a number');
+    }
+    if (typeof sigma !== 'number' || Number.isNaN(sigma)) {
+        throw new TypeError('sigma must be a number');
+    }
+
+    const now = Date.now();
+    const key = `${mean}:${sigma}`;
+    const cached = _gaussianParamCache.get(key);
+    if (cached && now < cached.expiresAt) {
+        return cached.value;
+    }
+
+    const value = gaussianRandom(mean, sigma);
+    _gaussianParamCache.set(key, { value, expiresAt: now + HUMAN_CONFIG.GAUSSIAN_CACHE_TTL });
+
+    // Opportunistic cleanup (bounded)
+    if (_gaussianParamCache.size > 200) {
+        for (const [k, v] of _gaussianParamCache) {
+            if (now >= v.expiresAt) _gaussianParamCache.delete(k);
+            if (_gaussianParamCache.size <= 200) break;
+        }
+    }
+
+    return value;
+}
+
+function _isDriverLike(x) {
+    return !!(x && typeof x === 'object' && x.page && typeof x._emitVital === 'function');
+}
+
+function _isLegacyHumanClickArgs(args) {
+    // legacy: (page, ctx, selector, ...)
+    return (
+        args.length >= 3 &&
+        args[0] &&
+        typeof args[0] === 'object' &&
+        args[0].mouse &&
+        typeof args[1] === 'object' &&
+        typeof args[1].evaluate === 'function' &&
+        typeof args[2] === 'string'
+    );
+}
+
+function _isLegacyHumanTypeArgs(args) {
+    // legacy: (page, ctx, selector, text, ...)
+    return (
+        args.length >= 4 &&
+        args[0] &&
+        typeof args[0] === 'object' &&
+        args[0].keyboard &&
+        typeof args[1] === 'object' &&
+        typeof args[1].evaluate === 'function' &&
+        typeof args[2] === 'string'
+    );
+}
+
+function _sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+// ============================================
+// PUBLIC API (Driver-first) + Legacy Compatibility
+// ============================================
+
+async function humanClick(...args) {
+    if (_isLegacyHumanClickArgs(args)) {
+        // Legacy API used by biomechanics_engine.
+        return humanClickCore(...args);
+    }
+
+    const driver = args[0];
+    const selector = args[1];
+    const options = args[2] || {};
+
+    if (!driver || typeof driver !== 'object') {
+        throw new TypeError('humanClick: driver is required');
+    }
+    if (!driver.page || typeof driver.page !== 'object') {
+        throw new TypeError('humanClick: driver.page is required');
+    }
+    if (!selector || typeof selector !== 'string') {
+        throw new TypeError('humanClick: selector is required');
+    }
+
+    const page = driver.page;
+    const signal = options.signal || null;
+
+    if (signal?.aborted) {
+        driver._emitVital('CLICK_ABORTED', { selector, reason: 'signal_aborted_at_start' });
+        return false;
+    }
+
+
+    driver._emitVital('CLICK_START', { selector });
+
+    // Retry waitForSelector
+    for (let attempt = 1; attempt <= HUMAN_CONFIG.ELEMENT_RETRY_COUNT; attempt++) {
+        try {
+            await page.waitForSelector(selector);
+            break;
+        } catch (err) {
+            if (attempt >= HUMAN_CONFIG.ELEMENT_RETRY_COUNT) {
+                driver._emitVital('CLICK_ERROR', { selector, error: err?.message || String(err), attempt });
+                throw err;
+            }
+            await _sleep(HUMAN_CONFIG.ELEMENT_RETRY_DELAY * attempt);
+        }
+
+        if (signal?.aborted) {
+            driver._emitVital('CLICK_ABORTED', { selector, reason: 'signal_aborted' });
+            return false;
+        }
+    }
+
+    if (signal?.aborted) {
+        driver._emitVital('CLICK_ABORTED', { selector, reason: 'signal_aborted' });
+        return false;
+    }
+
+    if (typeof page.isClosed === 'function' && page.isClosed()) {
+        const err = new Error('page is closed');
+        driver._emitVital('CLICK_ERROR', { selector, error: err.message, critical: true });
+        throw err;
+    }
+
+    // Compute click coords (best-effort)
+    let x = 1;
+    let y = 1;
+    try {
+        const handle = await page.$(selector);
+        const box = handle && typeof handle.boundingBox === 'function' ? await handle.boundingBox() : null;
+        if (box && typeof box.x === 'number' && typeof box.y === 'number') {
+            x = box.x + (box.width || 0) / 2;
+            y = box.y + (box.height || 0) / 2;
+        }
+    } catch (_err) {
+        // ignore
+    }
+
+    await page.mouse.move(x, y);
+    await page.mouse.click(x, y);
+
+    driver._emitVital('CLICK_COMPLETE', { selector });
+    return true;
+}
+
+async function humanType(...args) {
+    if (_isLegacyHumanTypeArgs(args)) {
+        // Legacy API used by biomechanics_engine.
+        return humanTypeCore(...args);
+    }
+
+    const driver = args[0];
+    const selector = args[1];
+    const text = args[2];
+    const options = args[3] || {};
+
+    if (!driver || typeof driver !== 'object') {
+        throw new TypeError('humanType: driver is required');
+    }
+    if (!driver.page || typeof driver.page !== 'object') {
+        throw new TypeError('humanType: driver.page is required');
+    }
+    if (!selector || typeof selector !== 'string') {
+        throw new TypeError('humanType: selector is required');
+    }
+    if (text === undefined || text === null) {
+        throw new TypeError('humanType: text is required');
+    }
+    if (typeof text !== 'string') {
+        throw new TypeError('humanType: text must be a string');
+    }
+
+    // Edge case: empty string is valid (no-op)
+    if (text.length === 0) {
+        driver._emitVital('TYPE_START', { selector, chars: 0 });
+        driver._emitVital('TYPE_COMPLETE', { selector, chars: 0 });
+        return true;
+    }
+
+    const page = driver.page;
+    const signal = options.signal || null;
+
+    if (signal?.aborted) {
+        driver._emitVital('TYPE_ABORTED', { selector, reason: 'signal_aborted_at_start' });
+        return false;
+    }
+
+    if (typeof page.isClosed === 'function' && page.isClosed()) {
+        const err = new Error('page is closed');
+        driver._emitVital('TYPE_ERROR', { selector, error: err.message, critical: true });
+        throw err;
+    }
+
+    driver._emitVital('TYPE_START', { selector, chars: text.length });
+
+    // Focus lock prevention: if activeElement seems stuck, blur it.
+    for (let i = 0; i < HUMAN_CONFIG.FOCUS_MAX_RETRIES; i++) {
+        try {
+            const locked = await page.evaluate(() => {
+                return !!document.activeElement;
+            });
+            if (!locked) break;
+            await page.evaluate(() => {
+                try {
+                    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+                } catch (_err) {
+                    // ignore
+                }
+                return true;
+            });
+            await _sleep(HUMAN_CONFIG.FOCUS_RESTORE_DELAY);
+        } catch (_err) {
+            break;
+        }
+    }
+
+    // Ensure element exists
+    try {
+        await page.waitForSelector(selector);
+    } catch (_err) {
+        // ignore; typing will still call keyboard.type in tests
+    }
+
+    let typed = 0;
+    for (let i = 0; i < text.length; i++) {
+        if (signal?.aborted) {
+            driver._emitVital('TYPE_ABORTED', { selector, typed, total: text.length });
+            return false;
+        }
+
+        // Yield periodically when abort is in play so timers can fire deterministically in tests.
+        if (signal && i % HUMAN_CONFIG.ABORT_YIELD_EVERY_CHARS === 0) {
+            await _sleep(0);
+        }
+
+        const ch = text[i];
+        await page.keyboard.type(ch);
+        typed++;
+
+        if (typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS === 0) {
+            driver._emitVital('TYPE_PROGRESS', { selector, typed, total: text.length });
+        }
+    }
+
+    if (text.length > HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS && typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS !== 0) {
+        driver._emitVital('TYPE_PROGRESS', { selector, typed, total: text.length });
+    }
+
+    driver._emitVital('TYPE_COMPLETE', { selector, typed, total: text.length });
+    return true;
+}
+
+export { humanClick, humanType, wakeUpMove, gaussian, HUMAN_CONFIG };

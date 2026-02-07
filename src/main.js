@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/main.js
    Entry Point: Maestro Bootstrap (Singularity Edition)

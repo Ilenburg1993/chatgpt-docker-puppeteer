@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
@@ -19,8 +20,8 @@ const TelemetrySeverity = Object.freeze({
 
 class KernelTelemetry {
     /**
-     * @param {Object} config
-     * @param {Object} config.nerv
+     * @param {Object} [config]
+     * @param {Object} [config.nerv]
      * Instância do NERV para emissão de eventos (OBRIGATÓRIO após ONDA 2).
      *
      * @param {string} [config.source]
@@ -33,7 +34,8 @@ class KernelTelemetry {
      * @param {boolean} [config.enabled]
      * Habilita/desabilita telemetria (default: true).
      */
-    constructor({ nerv = null, source = 'kernel', retention = 5000, enabled = true } = {}) {
+    constructor(config = {}) {
+        const { nerv = null, source = 'kernel', retention = 5000, enabled = true } = config;
         // ONDA 2.5: NERV obrigatório para desacoplamento
         if (!nerv) {
             throw new Error('KernelTelemetry requer instância do NERV (config.nerv)');

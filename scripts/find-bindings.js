@@ -9,7 +9,7 @@ let issues = [];
 
 function walk(dir) {
   let entries;
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch(e) { return; }
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch(_) { return; }
   for (const e of entries) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
@@ -18,8 +18,7 @@ function walk(dir) {
     } else {
       if (!EXT.has(path.extname(e.name))) continue;
       let content;
-      try { content = fs.readFileSync(full, 'utf8'); } catch(e) { continue; }
-      const lines = content.split('\n');
+      try { content = fs.readFileSync(full, 'utf8'); } catch(_) { continue; }
 
       // Patterns: .listen(..., '127.0.0.1'|'localhost')
       const regex = /\.listen\s*\([^)]*['\"`](127\\.0\\.0\\.1|localhost)['\"`]/g;

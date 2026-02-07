@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
 /**
@@ -167,7 +168,9 @@ class MemoryStore {
      * Retorna patterns mais recentes
      */
     _getMostRecent(limit) {
-        return [...this.patterns].sort((a, b) => b.created_at - a.created_at).slice(0, limit);
+        // Stable ordering: insertion order is the source of truth for most-recent.
+        // Using created_at can be non-deterministic when multiple patterns share the same ms timestamp.
+        return this.patterns.slice(-limit).reverse();
     }
 
     /**

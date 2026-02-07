@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { v4 as uuidv4 } from 'uuid';
 
 function createMockPage() {

@@ -43,7 +43,7 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
     });
 
     it('should have missions REST API controller available', async () => {
-        const missionsController = await import('#server/api/controllers/missions').then(m => m.default ?? m);
+        const missionsController = await import('#server/api/controllers/missions');
         assert.ok(missionsController, 'Missions controller deveria estar disponível');
         assert.strictEqual(
             typeof missionsController.setMissionManager,

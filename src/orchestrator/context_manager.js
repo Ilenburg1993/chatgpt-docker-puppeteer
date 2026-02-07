@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import MemoryStore from './memory_store.js';
 

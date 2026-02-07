@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import EventEmitter from 'node:events';
@@ -247,7 +248,9 @@ function sendCommand(command, payload, robotId = null) {
         header: {
             version: PROTOCOL_VERSION,
             timestamp: Date.now(),
-            source: ActorRole.MISSION_CONTROL
+            // ActorRole.MISSION_CONTROL is not part of the canonical vocabulary.
+            // This command is emitted by the SERVER hub.
+            source: ActorRole.SERVER
         },
         ids: {
             msg_id: msgId,
@@ -303,6 +306,18 @@ function notify(event, data) {
 }
 
 /**
+ * Notify agents (system room) with a lightweight signal event.
+ * Used for wake-ups (e.g. cache invalidation) without a full IPC envelope.
+ */
+function notifyAgent(event, data = {}) {
+    if (!ioInstance) {
+        return false;
+    }
+    ioInstance.to('system_agents').emit(event, data);
+    return true;
+}
+
+/**
  * P9.8: Broadcast de task update com debouncing de 50ms.
  * Acumula updates em buffer e envia em batch para reduzir overhead.
  *
@@ -331,12 +346,16 @@ function broadcastTaskUpdate(taskId, data) {
     }, 50); // 50ms debounce window
 }
 
-export const getRegistry = () => Array.from(agentRegistry.values());
+export const getRegistry = () =>
+    Array.from(agentRegistry.entries()).map(([robot_id, entry]) => ({
+        robot_id,
+        ...entry
+    }));
 export const getIO = () => ioInstance;
-export const on = (...args) => internalEmitter.on(...args);
-export const once = (...args) => internalEmitter.once(...args);
-export const off = (...args) => internalEmitter.off(...args);
-export const emit = (...args) => internalEmitter.emit(...args);
+export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
+export const once = (eventName, handler) => internalEmitter.once(eventName, handler);
+export const off = (eventName, handler) => internalEmitter.off(eventName, handler);
+export const emit = (eventName, ...args) => /** @type {any} */ (internalEmitter).emit(eventName, ...args);
 
 export const sendToClient = (clientId, eventName, data) => {
     if (!ioInstance) {
@@ -394,4 +413,4 @@ export const connectExternal = async (port = 3008) => {
     };
 };
 
-export { init, sendCommand, notify, stop, broadcastTaskUpdate };
+export { init, sendCommand, notify, notifyAgent, stop, broadcastTaskUpdate };

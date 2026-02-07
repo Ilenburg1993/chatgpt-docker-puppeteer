@@ -1,5 +1,6 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
+import 'dotenv/config';
 import { log } from '#core/logger';
-import CONFIG from '#core/config';
 import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from '#shared/nerv/constants';
 import { CONNECTION_MODES } from '#core/constants/browser';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
@@ -34,6 +35,7 @@ import * as NERV from '#nerv/nerv';
  *   ✔ Nunca retorna estado parcialmente gravado
  *
  * @param {number} port Porta efetivamente bound pelo HTTP engine
+ * @param {'standalone'|'delegated'} [authority]
  */
 function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
     // Legacy compatibility hook: discovery is now canonical via NERV (SERVER_READY).
@@ -106,7 +108,7 @@ async function bootstrap(options = {}) {
            FASE 2 — Fundação HTTP
            Único ponto de bind de rede.
         -------------------------------------------------------------- */
-        const basePort = process.env.SERVER_PORT || process.env.PORT || CONFIG.SERVER_PORT || 3008;
+        const basePort = Number(process.env.SERVER_PORT || process.env.PORT || 3008);
         const { server: httpServer, port } = await serverEngine.start(basePort);
 
         /* --------------------------------------------------------------
@@ -141,7 +143,7 @@ async function bootstrap(options = {}) {
             /* noop */
         }
 
-        router.applyRoutes(app);
+        await router.applyRoutes(app);
         log('DEBUG', '[BOOT] Rotas HTTP consolidadas');
 
         /* --------------------------------------------------------------

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import puppeteerCore from 'puppeteer-core';
@@ -44,6 +45,13 @@ const ISSUE_TYPES = Object.freeze({
 const DEFAULTS = {
     // Connection mode: 'wsEndpoint' | 'connect' | 'auto'
     mode: process.env.BROWSER_MODE || 'wsEndpoint',
+
+    // Optional explicit endpoint override (fast-path).
+    // Keep keys present so @ts-check can type-narrow correctly.
+    browserEndpoint: {
+        url: '',
+        wsEndpoint: ''
+    },
 
     // Connection targets (DevContainer: localhost:9224 = Chrome Proxy)
     // ARCHITECTURE: Puppeteer → localhost:9224 (Proxy) → host.docker.internal:9225 (Chrome)
@@ -177,7 +185,12 @@ class ConnectionOrchestrator {
         } // Evita spam de estado igual
         this.state = next;
         this._pushStateHistory(next, meta);
-        log('INFO', `[ORCH] State: ${next}`, meta);
+        const metaObj =
+            typeof meta === 'object' && meta !== null ? /** @type {Record<string, unknown>} */ (meta) : {};
+        const correlationIdRaw =
+            metaObj['correlation_id'] || metaObj['correlationId'] || metaObj['taskId'] || metaObj['task_id'] || null;
+        const correlationId = correlationIdRaw ? String(correlationIdRaw) : '-';
+        log('INFO', { event: 'ORCH_STATE', state: next, meta }, correlationId);
     }
 
     _pushStateHistory(state, meta) {
@@ -253,7 +266,7 @@ class ConnectionOrchestrator {
                 return await puppeteerCore.connect({
                     browserURL: this.config.browserEndpoint.url,
                     defaultViewport: null,
-                    timeout: 5000
+                    protocolTimeout: 5000
                 });
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
@@ -277,7 +290,7 @@ class ConnectionOrchestrator {
                     return await puppeteerCore.connect({
                         browserURL,
                         defaultViewport: null,
-                        timeout: 5000
+                        protocolTimeout: 5000
                     });
                 } catch (e) {
                     errors.push(`${host}:${port} - ${e.message}`);
@@ -312,7 +325,7 @@ class ConnectionOrchestrator {
                 return await puppeteerCore.connect({
                     browserWSEndpoint: this.config.browserEndpoint.wsEndpoint,
                     defaultViewport: null,
-                    timeout: 10000
+                    protocolTimeout: 10000
                 });
             } catch (e) {
                 const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${e.message}`;
@@ -337,6 +350,7 @@ class ConnectionOrchestrator {
                     throw new Error(`HTTP ${res.status}`);
                 }
 
+                /** @type {{ webSocketDebuggerUrl?: string }} */
                 const json = await res.json();
                 if (!json.webSocketDebuggerUrl) {
                     throw new Error('No webSocketDebuggerUrl in response');
@@ -346,7 +360,7 @@ class ConnectionOrchestrator {
                 return await puppeteerCore.connect({
                     browserWSEndpoint: json.webSocketDebuggerUrl,
                     defaultViewport: null,
-                    timeout: 10000
+                    protocolTimeout: 10000
                 });
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
@@ -380,6 +394,7 @@ class ConnectionOrchestrator {
                         continue;
                     }
 
+                    /** @type {{ webSocketDebuggerUrl?: string }} */
                     const json = await res.json();
                     if (json.webSocketDebuggerUrl) {
                         // ✅ LOG DE SUCESSO: Indica claramente se conectou via proxy
@@ -393,7 +408,7 @@ class ConnectionOrchestrator {
                         return await puppeteerCore.connect({
                             browserWSEndpoint: json.webSocketDebuggerUrl,
                             defaultViewport: null,
-                            timeout: 10000
+                            protocolTimeout: 10000
                         });
                     }
                     errors.push(`${host}:${port} - No WS URL in response`);
@@ -566,7 +581,7 @@ class ConnectionOrchestrator {
         return this.config.pageSelectionPolicy === 'MOST_RECENT' ? candidates[candidates.length - 1] : candidates[0];
     }
 
-    async ensurePage() {
+    async ensurePage(maxRetries = 60, maxWaitMs = 120000) {
         this.setState(STATES.WAITING_FOR_PAGE);
 
         // Se já temos página válida, retorna
@@ -575,7 +590,15 @@ class ConnectionOrchestrator {
             return this.page;
         }
 
-        while (true) {
+        const startTime = Date.now();
+        let attempt = 0;
+
+        while (attempt < maxRetries) {
+            // Check global timeout
+            if (Date.now() - startTime > maxWaitMs) {
+                throw new Error(`ensurePage timed out after ${maxWaitMs}ms (${attempt} attempts)`);
+            }
+
             try {
                 // Verifica se browser ainda está vivo antes de buscar página
                 if (!this.browser || !this.browser.isConnected()) {
@@ -598,11 +621,19 @@ class ConnectionOrchestrator {
                     // Joga erro para cima para reiniciar o ciclo do browser
                     throw e;
                 }
+
+                attempt++;
+                if (attempt >= maxRetries) {
+                    throw new Error(`Failed to ensure page after ${maxRetries} attempts: ${e.message}`);
+                }
+
                 await new Promise(r => {
                     setTimeout(r, 1000);
                 });
             }
         }
+
+        throw new Error(`Failed to ensure page after ${maxRetries} attempts`);
     }
 
     async validatePage(page) {
@@ -633,11 +664,19 @@ class ConnectionOrchestrator {
         return this.browser;
     }
 
-    async acquireContext() {
+    async acquireContext({ timeout = 30000, maxRetries = 30 } = {}) {
         this.detectEnvironment();
 
-        // Loop infinito de recuperação
-        while (true) {
+        const startTime = Date.now();
+        let attempt = 0;
+
+        // Loop de recuperação com timeout e max retries
+        while (attempt < maxRetries) {
+            // Check global timeout
+            if (Date.now() - startTime > timeout) {
+                throw new Error(`acquireContext timed out after ${timeout}ms (${attempt} attempts)`);
+            }
+
             try {
                 await this.ensureBrowser();
                 const page = await this.ensurePage();
@@ -647,12 +686,20 @@ class ConnectionOrchestrator {
                     return { browser: this.browser, page: this.page };
                 }
             } catch (e) {
-                log('WARN', `[ORCH] Ciclo de recuperação: ${e.message}`);
+                attempt++;
+                log('WARN', `[ORCH] Ciclo de recuperação (attempt ${attempt}/${maxRetries}): ${e.message}`);
+
+                if (attempt >= maxRetries) {
+                    throw new Error(`Failed to acquire context after ${maxRetries} attempts: ${e.message}`);
+                }
+
                 await new Promise(r => {
                     setTimeout(r, 1000);
                 });
             }
         }
+
+        throw new Error(`Failed to acquire context after ${maxRetries} attempts`);
     }
 
     getStatus() {
@@ -703,6 +750,7 @@ class ConnectionOrchestrator {
                         continue;
                     }
 
+                    /** @type {{ webSocketDebuggerUrl?: string }} */
                     const json = await res.json();
                     entry.ok = true;
                     entry.ws = json.webSocketDebuggerUrl || null;

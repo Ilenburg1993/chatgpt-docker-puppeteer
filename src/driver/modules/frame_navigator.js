@@ -124,14 +124,13 @@ class FrameNavigator extends EventEmitter {
      * Cria uma instância do FrameNavigator.
      *
      * @param {Object} driver - Instância do BaseDriver
-     * @param {Object} driver.page - Puppeteer Page instance
+     * @param {Object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
      * @param {Function} driver._emitVital - Método IPC para telemetria vital
      * @param {Object} driver.handles - HandleManager para cleanup
      * @param {Function} driver.handles.register - Método para registrar handles
      * @param {string} driver.correlationId - ID de correlação para logs
      *
      * @throws {Error} Se driver não for fornecido
-     * @throws {Error} Se driver.page não existir
      * @throws {Error} Se driver._emitVital não for uma função
      * @throws {Error} Se driver.handles não existir
      *
@@ -144,10 +143,6 @@ class FrameNavigator extends EventEmitter {
         // ✅ Validação completa de parâmetros (BUG #3 fix)
         if (!driver) {
             throw new Error('[FrameNavigator] Driver is required');
-        }
-
-        if (!driver.page) {
-            throw new Error('[FrameNavigator] Driver must have page property');
         }
 
         if (typeof driver._emitVital !== 'function') {
@@ -401,10 +396,11 @@ class FrameNavigator extends EventEmitter {
      * @param {string} protocol.context - Contexto ('root' ou 'frame')
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
      * @returns {Promise<Object>} Contexto de execução
-     * @returns {Object} return.ctx - Context (page ou frame)
-     * @returns {number} return.offsetX - Offset horizontal acumulado
-     * @returns {number} return.offsetY - Offset vertical acumulado
-     * @returns {Array} return.frameStack - Stack de frame handles
+     * Propriedades do objeto retornado:
+     *   - ctx (Object): Context (page ou frame)
+     *   - offsetX (number): Offset horizontal acumulado
+     *   - offsetY (number): Offset vertical acumulado
+     *   - frameStack (Array): Stack de frame handles
      *
      * @throws {FrameNavError} Se navegação abortada (type: ABORTED)
      * @throws {FrameNavError} Se max depth atingido (type: MAX_DEPTH)
@@ -502,20 +498,21 @@ class FrameNavigator extends EventEmitter {
      * Retorna estatísticas de navegação de frames.
      *
      * @returns {Object} Objeto com métricas de navegação
-     * @returns {number} return.totalNavigations - Total de navegações
-     * @returns {number} return.successfulNavigations - Navegações bem-sucedidas
-     * @returns {number} return.failedNavigations - Navegações que falharam
-     * @returns {number} return.totalFramesTraversed - Total de frames atravessados
-     * @returns {number} return.maxDepthReached - Profundidade máxima alcançada
-     * @returns {number} return.totalBarriersDetected - Total de barreiras detectadas
-     * @returns {number} return.totalSecurityBarriers - Barreiras de segurança (CORS/CSP)
-     * @returns {number} return.totalInfraBarriers - Barreiras de infraestrutura (SADI)
-     * @returns {number} return.totalNavigationDuration - Duração total (ms)
-     * @returns {number} return.maxNavigationDuration - Duração máxima (ms)
-     * @returns {string} return.avgNavigationDuration - Duração média
-     * @returns {string} return.successRate - Taxa de sucesso (%)
-     * @returns {string} return.avgDepth - Profundidade média
-     * @returns {Object} return.config - Configuração atual (FRAME_NAV_CONFIG)
+     * Propriedades do objeto retornado:
+     *   - totalNavigations (number): Total de navegações
+     *   - successfulNavigations (number): Navegações bem-sucedidas
+     *   - failedNavigations (number): Navegações que falharam
+     *   - totalFramesTraversed (number): Total de frames atravessados
+     *   - maxDepthReached (number): Profundidade máxima alcançada
+     *   - totalBarriersDetected (number): Total de barreiras detectadas
+     *   - totalSecurityBarriers (number): Barreiras de segurança (CORS/CSP)
+     *   - totalInfraBarriers (number): Barreiras de infraestrutura (SADI)
+     *   - totalNavigationDuration (number): Duração total (ms)
+     *   - maxNavigationDuration (number): Duração máxima (ms)
+     *   - avgNavigationDuration (string): Duração média
+     *   - successRate (string): Taxa de sucesso (%)
+     *   - avgDepth (string): Profundidade média
+     *   - config (Object): Configuração atual (FRAME_NAV_CONFIG)
      *
      * @example
      * const stats = navigator.getStats();

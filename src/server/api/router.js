@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import tasksController from './controllers/tasks.js';
 import dashboardController from './controllers/dashboard.js';
 import missionsController from './controllers/missions.js';
@@ -6,6 +7,7 @@ import dnaController from './controllers/dna.js';
 import { notFound, errorHandler } from '../middleware/error_handler.js';
 import denyIfDelegated from '../middleware/deny_if_delegated.js';
 import { log } from '#core/logger';
+import { probeChromeConnection } from '#core/doctor';
 import { apiLimiter } from '#server/engine/app';
 import * as healthController from './controllers/health.js';
 import * as metricsController from './controllers/metrics.js';
@@ -17,7 +19,7 @@ import * as ragController from './controllers/rag.js';
  *
  * @param {object} app - Instância do Express vinda de engine/app.js.
  */
-function applyRoutes(app) {
+async function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');
     // Bloqueio global para métodos mutantes quando o server roda em modo delegated.
     // Evita duplicar checks em todos os controllers: usa o middleware central `denyIfDelegated`.
@@ -37,8 +39,21 @@ function applyRoutes(app) {
        Nota: lógica pesada foi extraída para controllers/infra para melhorar testabilidade
     -------------------------------------------------------------------------- */
 
-    // Health endpoints (delegam toda a lógica a `controllers/health.js`)
-    app.get('/api/health', healthController.getHealth);
+    // Health endpoints
+    // GET /api/health
+    app.get('/api/health', async (req, res) => {
+        try {
+            const chrome = await probeChromeConnection();
+            res.json({ success: true, ts: Date.now(), chrome, request_id: req.id });
+        } catch (err) {
+            res.status(503).json({
+                success: false,
+                ts: Date.now(),
+                chrome: { connected: false, error: err?.message || String(err) },
+                request_id: req.id
+            });
+        }
+    });
     app.get('/api/health/chrome', healthController.getChromeHealth);
     app.get('/api/health/pm2', healthController.getPm2Health);
     app.get('/api/health/kernel', healthController.getKernelHealth);
@@ -105,6 +120,48 @@ function applyRoutes(app) {
     app.get('/api/rag/health', apiLimiter, ragController.handleRagHealth);
     app.get('/api/rag/stats', apiLimiter, ragController.handleRagStats);
     app.post('/api/rag/index', apiLimiter, ragController.handleRagIndex);
+
+    /**
+     * MCP INTEGRATION (Model Context Protocol - Multi-LLM Tool Server)
+     * Namespace: /api/mcp
+     * Expõe Tool Registry via MCP Streamable HTTP para todas as LLMs:
+     * - Claude Desktop
+     * - GitHub Copilot
+     * - OpenCode CLI
+     * - Cursor/Codex (via HTTP fallback)
+     *
+     * Tools disponíveis:
+     * - rag_search: Hybrid semantic search (Vector + FTS + Reranking + MMR)
+     * - rag_health: RAG system health check
+     * - ollama_generate: Text generation using local Ollama models
+     * - ollama_embed: Generate embeddings for arbitrary text
+     * - ollama_models: List all available Ollama models
+     *
+     * Protocolo: MCP Streamable HTTP (JSON-RPC 2.0 over HTTP)
+     */
+    if (process.env.MCP_ENABLED === 'true') {
+        log('INFO', '[MCP] MCP_ENABLED=true, setting up MCP handler...');
+        try {
+            // Dynamic import to avoid loading if MCP is disabled
+            const { setupMCPHandler } = await import('../handlers/mcp-handler.js');
+            const { registry, initialize } = await import('../../../src/integration/tool-registry.mjs');
+
+            // Wait for registry initialization (prevents race condition)
+            log('INFO', '[MCP] Waiting for Tool Registry initialization...');
+            await initialize();
+
+            // Setup MCP handler with Tool Registry (now guaranteed to be initialized)
+            setupMCPHandler(app, registry);
+
+            log('INFO', '[MCP] Handler registered at POST/GET /api/mcp');
+        } catch (error) {
+            log('ERROR', `[MCP] Failed to setup MCP handler: ${error.message}`);
+            log('WARN', '[MCP] MCP features will be unavailable');
+            // Don't crash server, just disable MCP
+        }
+    } else {
+        log('INFO', '[MCP] MCP_ENABLED=false, skipping MCP handler setup');
+    }
 
     /* --------------------------------------------------------------------------
        2. ESCUDOS DE PROTEÇÃO (ERROR BOUNDARY)

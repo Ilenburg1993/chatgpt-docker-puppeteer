@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
@@ -103,12 +104,12 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @abstract
  * @extends EventEmitter
  *
- * @property {object|null} page - Puppeteer page instance (null se UNATTACHED)
+ * @property {import('puppeteer-core').Page|null} page - Puppeteer page instance (null se UNATTACHED)
  * @property {object} config - Driver configuration (immutable)
  * @property {AbortSignal|null} signal - Cancellation signal (null se UNATTACHED)
  * @property {string} name - Driver name
  * @property {boolean} destroyed - Destruction flag
- * @property {string|null} correlationId - Correlation ID for tracing
+ * @property {string} correlationId - Correlation ID for tracing
  *
  * @fires TargetDriver#STATE_CHANGE - State transitions
  * @fires TargetDriver#STATE_ENTERED - Entering new state
@@ -124,6 +125,15 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @fires TargetDriver#CONTEXT_DETACHED - Context detached
  */
 class TargetDriver extends EventEmitter {
+    /** @type {Record<string, any>} */
+    config;
+
+    /** @type {number} */
+    _createdAt;
+
+    /** @type {string} */
+    _state;
+
     /**
      * Construtor do TargetDriver - Classe abstrata base.
      *
@@ -152,6 +162,7 @@ class TargetDriver extends EventEmitter {
         }
 
         // ✅ v3.0: page e signal são NULL inicialmente (estado UNATTACHED)
+        /** @type {import('puppeteer-core').Page|null} */
         this.page = null;
         this.signal = null;
 
@@ -170,10 +181,13 @@ class TargetDriver extends EventEmitter {
 
         this.name = 'Generic';
         this.destroyed = false;
-        this.correlationId = null;
+        // Always initialize with a string so typed code doesn't need null-guards.
+        // BaseDriver may overwrite with its own correlationId generator.
+        this.correlationId = `drv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
         // Propriedades da Máquina de Estados
         // ✅ v3.0: Estado inicial UNATTACHED (sem context)
+        /** @type {string} */
         this._state = STATES.UNATTACHED;
         this.stateUpdated = Date.now();
 
@@ -315,7 +329,7 @@ class TargetDriver extends EventEmitter {
      * - Signal attached + listener configurado
      * - Evento CONTEXT_ATTACHED emitido
      *
-     * @param {import('puppeteer').Page} page - Puppeteer page instance
+     * @param {import('puppeteer-core').Page} page - Puppeteer page instance
      * @param {AbortSignal} signal - Cancellation signal
      * @param {string} [correlationId] - Correlation ID para tracing
      *
@@ -367,7 +381,7 @@ class TargetDriver extends EventEmitter {
         // Attach page + signal
         this.page = page;
         this.signal = signal;
-        this.correlationId = correlationId;
+        this.correlationId = correlationId || this.correlationId;
 
         // Setup AbortSignal listener
         this._setupAbortListener();

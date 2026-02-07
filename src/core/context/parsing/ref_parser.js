@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/core/context/parsing/ref_parser.js
    Audit Level: 100 — Industrial Hardening

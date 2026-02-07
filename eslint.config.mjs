@@ -138,8 +138,7 @@ export default [
         ignores: ['node_modules/**'],
         languageOptions: {
             globals: {
-                ...globals.node,
-                ...globals.nodeTest
+                ...globals.node
             }
         },
         rules: {

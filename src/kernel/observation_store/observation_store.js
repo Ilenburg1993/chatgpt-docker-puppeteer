@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 
 /* ===========================
@@ -184,7 +185,7 @@ class ObservationStore extends EventEmitter {
      * Retorna todas as observações de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Array<Object>}
+     * @returns {ReadonlyArray<Object>}
      * Lista imutável de observações.
      */
     getByCorrelation(correlationId) {
@@ -202,7 +203,7 @@ class ObservationStore extends EventEmitter {
      * @param {Object} params
      * @param {number} params.startAt
      * @param {number} params.endAt
-     * @returns {Array<Object>}
+     * @returns {ReadonlyArray<Object>}
      */
     getByTimeRange({ startAt, endAt }) {
         const results = [];
@@ -256,7 +257,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Lista todas as observações (uso em auditoria).
      *
-     * @returns {Array<Object>}
+     * @returns {ReadonlyArray<Object>}
      */
     listAll() {
         const all = [];

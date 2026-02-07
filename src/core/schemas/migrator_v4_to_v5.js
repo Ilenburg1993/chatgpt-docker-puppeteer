@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { TaskSchemaV5 } from './task_schema_v5.js';
 import * as logger from '../logger.js';
 

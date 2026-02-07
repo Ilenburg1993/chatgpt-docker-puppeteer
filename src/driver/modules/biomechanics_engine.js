@@ -156,11 +156,11 @@ class BiomechanicsEngine extends EventEmitter {
      * Cria uma instância do BiomechanicsEngine.
      *
      * @param {Object} driver - Instância do BaseDriver
-     * @param {Object} driver.page - Puppeteer Page instance
+     * @param {Object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
      * @param {Function} driver._emitVital - Método IPC para telemetria vital
      * @param {Function} driver._assertPageAlive - Validação de page alive
      * @param {string} driver.correlationId - ID de correlação para logs
-     * @param {AbortSignal} driver.signal - AbortSignal para cancelamento
+     * @param {AbortSignal} [driver.signal] - AbortSignal para cancelamento (pode ser null até attachContext)
      *
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver.page não existir
@@ -176,10 +176,6 @@ class BiomechanicsEngine extends EventEmitter {
         // ✅ Validação completa de parâmetros (BUG #3 fix)
         if (!driver) {
             throw new Error('[BiomechanicsEngine] Driver is required');
-        }
-
-        if (!driver.page) {
-            throw new Error('[BiomechanicsEngine] Driver must have page property');
         }
 
         if (typeof driver._emitVital !== 'function') {
@@ -753,20 +749,21 @@ class BiomechanicsEngine extends EventEmitter {
      * Retorna estatísticas de biomechanics.
      *
      * @returns {Object} Objeto com métricas de biomechanics
-     * @returns {number} return.totalClicks - Total de cliques executados
-     * @returns {number} return.totalTyping - Total de digitações
-     * @returns {number} return.zenModeActivations - Ativações de zen mode
-     * @returns {number} return.humanModeActivations - Ativações de human mode
-     * @returns {number} return.totalScrolls - Total de scrolls
-     * @returns {number} return.modifierDetections - Detecções de modifier
-     * @returns {number} return.waitCycles - Ciclos de wait
-     * @returns {number} return.keepAliveTriggered - Keep-alive triggers
-     * @returns {number} return.totalTypingDuration - Duração total de digitação (ms)
-     * @returns {number} return.maxTypingDuration - Duração máxima de digitação (ms)
-     * @returns {number} return.totalCharsTyped - Total de caracteres digitados
-     * @returns {string} return.avgTypingDuration - Duração média de digitação
-     * @returns {string} return.zenModeUsageRate - Taxa de uso de zen mode (%)
-     * @returns {Object} return.config - Configuração atual (BIOMECH_CONFIG)
+     * Propriedades do objeto retornado:
+     *   - totalClicks (number): Total de cliques executados
+     *   - totalTyping (number): Total de digitações
+     *   - zenModeActivations (number): Ativações de zen mode
+     *   - humanModeActivations (number): Ativações de human mode
+     *   - totalScrolls (number): Total de scrolls
+     *   - modifierDetections (number): Detecções de modifier
+     *   - waitCycles (number): Ciclos de wait
+     *   - keepAliveTriggered (number): Keep-alive triggers
+     *   - totalTypingDuration (number): Duração total de digitação (ms)
+     *   - maxTypingDuration (number): Duração máxima de digitação (ms)
+     *   - totalCharsTyped (number): Total de caracteres digitados
+     *   - avgTypingDuration (string): Duração média de digitação
+     *   - zenModeUsageRate (string): Taxa de uso de zen mode (%)
+     *   - config (Object): Configuração atual (BIOMECH_CONFIG)
      *
      * @example
      * const stats = engine.getStats();

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/core/context/limits/guardrails.js
    Audit Level: 100 — Industrial Hardening

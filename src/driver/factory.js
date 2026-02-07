@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -377,7 +378,7 @@ class DriverFactory extends EventEmitter {
      *
      * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt', 'gemini')
      * @param {Object} config - Configuração do driver
-     * @param {string} config.target - Target específico
+     * @param {string} [config.target] - Target específico (auto preenchido pelo factory)
      * @param {number} [config.timeout] - Timeout em milissegundos
      *
      * @returns {Promise<TargetDriver>} Driver em estado UNATTACHED
@@ -523,7 +524,7 @@ class DriverFactory extends EventEmitter {
      * POOL EXHAUSTED: Lança erro se todos drivers busy
      *
      * @param {string} targetName - Nome da IA alvo
-     * @returns {TargetDriver} Driver em estado UNATTACHED (ready para attachContext)
+     * @returns {Promise<TargetDriver>} Driver em estado UNATTACHED (ready para attachContext)
      * @throws {Error} Se pool exhausted ou target não existe
      *
      * @emits factory:pool_hit - Quando driver reutilizado
@@ -620,8 +621,8 @@ class DriverFactory extends EventEmitter {
                             `[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)`
                         );
 
-                        const tempDriver = this.createDriver(key, this.config);
-                        tempDriver._isTemporary = true; // Flag para não adicionar ao pool
+                        const tempDriver = await this.createDriver(key, this.config);
+                        /** @type {any} */ (tempDriver)._isTemporary = true; // Flag para não adicionar ao pool
 
                         this.metrics.temporaryDriversCreated++;
 
@@ -1105,5 +1106,5 @@ export const hasTarget = factory.hasTarget.bind(factory);
 export const getDefaultTarget = factory.getDefaultTarget.bind(factory);
 export const getHealth = factory.getHealth.bind(factory);
 export const getMetrics = factory.getMetrics.bind(factory);
-export const availableTargets = Object.keys(factory.registry);
+export const availableTargets = Object.keys(factory.getAllDriversMetadata());
 export { FACTORY_CONFIG, FACTORY_EVENTS, factory };

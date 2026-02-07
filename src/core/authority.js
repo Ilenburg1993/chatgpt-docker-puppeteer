@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/core/authority.js
    Módulo auxiliar para resolução e validação de autoridade do processo
@@ -9,15 +10,24 @@ const SERVER_AUTHORITIES = Object.freeze({
     DELEGATED: 'delegated'
 });
 
+/**
+ * @typedef {(typeof SERVER_AUTHORITIES)[keyof typeof SERVER_AUTHORITIES]} AuthorityMode
+ */
+
+/**
+ * @param {unknown} [explicitAuthority]
+ * @returns {AuthorityMode}
+ */
 function resolveAuthority(explicitAuthority = null) {
     const raw = explicitAuthority ?? process.env.SERVER_AUTHORITY ?? SERVER_AUTHORITIES.STANDALONE;
     const authority = String(raw).toLowerCase().trim();
 
-    if (!Object.values(SERVER_AUTHORITIES).includes(authority)) {
+    const known = /** @type {string[]} */ (Object.values(SERVER_AUTHORITIES));
+    if (!known.includes(authority)) {
         throw new Error(`Invalid SERVER_AUTHORITY: ${raw}`);
     }
 
-    return authority;
+    return /** @type {AuthorityMode} */ (authority);
 }
 
 function isDelegated(authority) {

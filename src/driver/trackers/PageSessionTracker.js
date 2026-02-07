@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
 /**
@@ -489,6 +490,7 @@ class PageSessionTracker {
     _calculateTimeoutMultiplier() {
         const config = TRACKER_CONFIG;
         const multipliers = TIMEOUT_MULTIPLIERS;
+        /** @type {number} */
         let totalMultiplier = multipliers.BASE;
 
         const avgResponseTime = this._calculateAverageResponseTime();

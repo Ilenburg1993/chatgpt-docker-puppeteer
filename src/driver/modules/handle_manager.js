@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
 
@@ -237,10 +238,12 @@ class HandleManager extends EventEmitter {
      *
      * @async
      * @returns {Promise<Object>} Resultado do cleanup
-     * @returns {number} .cleaned - Handles limpos com sucesso
-     * @returns {number} .errors - Erros durante cleanup
-     * @returns {boolean} .timeout - Se timeout ocorreu
-     * @returns {number} .duration - Duração total (ms)
+     *
+     * Propriedades do objeto retornado:
+     *   - cleaned (number): Handles limpos com sucesso
+     *   - errors (number): Erros durante cleanup
+     *   - timeout (boolean): Se timeout ocorreu
+     *   - duration (number): Duração total (ms)
      *
      * @emits HANDLE_EVENTS.HANDLE_CLEARED - Cada handle limpo
      * @emits HANDLE_EVENTS.HANDLES_CLEARED_ALL - Cleanup completo
@@ -452,15 +455,17 @@ class HandleManager extends EventEmitter {
      * v2.0 New Method - introspection completa para debugging/monitoring.
      *
      * @returns {Object} Stats object com todas as métricas
-     * @returns {number} .handlesRegistered - Total registrados (histórico)
-     * @returns {number} .handlesCleared - Total limpos
-     * @returns {number} .timeoutsOccurred - Total de timeouts
-     * @returns {number} .errorsOccurred - Total de erros
-     * @returns {number} .totalClearAllCalls - Total de clearAll chamadas
-     * @returns {number} .lastClearAllDuration - Duração última clearAll (ms)
-     * @returns {number} .maxClearAllDuration - Duração máxima clearAll (ms)
-     * @returns {number} .activeHandles - Handles atualmente ativos
-     * @returns {Object} .config - Configuração atual
+     *
+     * Propriedades do objeto retornado:
+     *   - handlesRegistered (number): Total registrados (histórico)
+     *   - handlesCleared (number): Total limpos
+     *   - timeoutsOccurred (number): Total de timeouts
+     *   - errorsOccurred (number): Total de erros
+     *   - totalClearAllCalls (number): Total de clearAll chamadas
+     *   - lastClearAllDuration (number): Duração última clearAll (ms)
+     *   - maxClearAllDuration (number): Duração máxima clearAll (ms)
+     *   - activeHandles (number): Handles atualmente ativos
+     *   - config (Object): Configuração atual
      *
      * @example
      * const stats = manager.getStats();

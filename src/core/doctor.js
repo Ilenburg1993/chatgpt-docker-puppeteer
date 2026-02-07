@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'node:fs';
 import { STATUS_VALUES } from './constants/tasks.js';
 import { promises as fsp } from 'node:fs';
@@ -239,7 +240,7 @@ async function runFullCheck() {
     // Estatísticas da fila
     let queueStats = { pending: 0, running: 0, total: 0 };
     try {
-        const tasks = await io.loadAllTasks();
+        const tasks = /** @type {any[]} */ (await io.loadAllTasks());
         queueStats = {
             pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
             running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length,

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "chatgpt-docker": {
+      "url": "http://localhost:3008/api/mcp",
+      "transport": "http"
+    }
+  }
+}

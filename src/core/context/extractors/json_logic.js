@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/core/context/extractors/json_logic.js
    Audit Level: 100 — Industrial Hardening

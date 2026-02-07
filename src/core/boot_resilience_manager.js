@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from './logger.js';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -81,12 +82,12 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
  * @returns {Promise<Object>} BrowserPoolManager inicializado
  */
 async function createBrowserPool(config, nerv = null) {
-    const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
+    const { default: BrowserPoolManager } = await import('#infra/browser_pool/pool_manager');
     const pool = new BrowserPoolManager(config);
 
     // ✅ Injeta NERV no Circuit Breaker
     if (nerv && pool.circuitBreaker) {
-        pool.circuitBreaker.nerv = nerv;
+        /** @type {any} */ (pool.circuitBreaker).nerv = nerv;
         log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
     }
 
@@ -255,14 +256,15 @@ async function handleBrowserPoolFailure(error, options = {}) {
                 if (chromeStarted) {
                     // Chrome iniciado! Tenta reconectar Browser Pool usando createBrowserPool
                     try {
-                        const CONFIG = await import('./config.js').then(m => m.default ?? m);
+                        const { default: CONFIG } = await import('./config.js');
+                        const all = /** @type {any} */ (CONFIG).all || {};
 
                         const browserPool = await createBrowserPool({
-                            poolSize: process.env.BROWSER_POOL_SIZE || CONFIG.BROWSER_POOL_SIZE || 3,
+                            poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
                             allocationStrategy:
-                                process.env.ALLOCATION_STRATEGY || CONFIG.ALLOCATION_STRATEGY || 'round-robin',
+                                process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
                             healthCheckInterval:
-                                process.env.HEALTH_CHECK_INTERVAL || CONFIG.HEALTH_CHECK_INTERVAL || 30000,
+                                process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
                             browserEndpoint: getBrowserEndpoint()
                         });
 
@@ -341,13 +343,14 @@ async function handleBrowserPoolFailure(error, options = {}) {
                 log('INFO', '[RESILIENCE] Tentando reconectar...');
 
                 try {
-                    const CONFIG = await import('./config.js').then(m => m.default ?? m);
+                    const { default: CONFIG } = await import('./config.js');
+                    const all = /** @type {any} */ (CONFIG).all || {};
 
                     const browserPool = await createBrowserPool({
-                        poolSize: process.env.BROWSER_POOL_SIZE || CONFIG.BROWSER_POOL_SIZE || 3,
+                        poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
                         allocationStrategy:
-                            process.env.ALLOCATION_STRATEGY || CONFIG.ALLOCATION_STRATEGY || 'round-robin',
-                        healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || CONFIG.HEALTH_CHECK_INTERVAL || 30000,
+                            process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
+                        healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
                         browserEndpoint: getBrowserEndpoint()
                     });
 
@@ -400,14 +403,14 @@ async function handleBrowserPoolFailure(error, options = {}) {
  */
 async function initializeBrowserPoolResilient(config, options = {}) {
     const { nerv = null, ...resilienceOptions } = options;
-    const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
+    const { default: BrowserPoolManager } = await import('#infra/browser_pool/pool_manager');
 
     try {
         const browserPool = new BrowserPoolManager(config);
 
         // ✅ Injeta NERV no Circuit Breaker
         if (nerv && browserPool.circuitBreaker) {
-            browserPool.circuitBreaker.nerv = nerv;
+            /** @type {any} */ (browserPool.circuitBreaker).nerv = nerv;
             log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
         }
 

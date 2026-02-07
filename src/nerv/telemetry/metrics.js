@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/nerv/telemetry/metrics.js
    Subsistema: NERV — Neural Event Relay Vector

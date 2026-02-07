@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
 const router = express.Router();
 import { promises as fs } from 'node:fs';
@@ -197,9 +198,11 @@ router.get('/locks', async (req, res) => {
                 if (!content) {
                     return null;
                 }
+                const safeContent =
+                    typeof content === 'object' && content !== null ? /** @type {Record<string, unknown>} */ (content) : {};
                 return {
                     target: f.replace('RUNNING_', '').replace('.lock', ''),
-                    ...content
+                    ...safeContent
                 };
             })
         );

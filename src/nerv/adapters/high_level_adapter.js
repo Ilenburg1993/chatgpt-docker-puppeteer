@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { createEnvelope } from '#shared/nerv/envelope';
 import { MessageType } from '#shared/nerv/constants';
 

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as cache from './cache.js';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { getNextEligible } from './scheduler.js';
@@ -40,7 +41,7 @@ async function loadNextTask(targetFilter = null) {
         // A. Auto-Cura de Zumbis (Tarefas presas em RUNNING por crash do sistema)
         if (task.state.status === STATUS_VALUES.RUNNING && task.state.started_at) {
             const startedAt = Date.parse(task.state.started_at);
-            const recoveryThreshold = CONFIG.RUNNING_RECOVERY_MS || 600000; // Default 10min
+            const recoveryThreshold = Number(CONFIG.RUNNING_RECOVERY_MS) || 600000; // Default 10min
 
             if (!isNaN(startedAt) && now - startedAt > recoveryThreshold) {
                 // Clone-on-Write: Isolamento para não sujar o cache prematuramente

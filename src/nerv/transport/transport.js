@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import createConnection from './connection.js';
 import createReconnect from './reconnect.js';
 import * as framing from './framing.js';

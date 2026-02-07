@@ -1,10 +1,11 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log, audit } from '#core/logger';
 
 /**
  * Factory de Validação: Cria um middleware Express para um Schema específico.
  * Atua como o "Guarda de Fronteira" para as intenções de negócio.
  *
- * @param {z.ZodSchema} schema - O Schema Zod (ex: TaskSchema) para validação.
+ * @param {import('zod').ZodType} schema - O Schema Zod (ex: TaskSchema) para validação.
  * @returns {Function} Middleware Express (req, res, next).
  */
 const schemaGuard = schema => (req, res, next) => {
@@ -22,7 +23,7 @@ const schemaGuard = schema => (req, res, next) => {
 
     // 2. Execução da Validação "Safe"
     // safeParse não lança exceções, permitindo controle total sobre o fluxo de erro.
-    const result = schema.safeParse(req.body);
+    const result = /** @type {any} */ (schema.safeParse(req.body));
 
     if (!result.success) {
         // 3. Formatação Amigável de Erros

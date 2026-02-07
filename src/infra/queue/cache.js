@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'node:fs';
 import path from 'node:path';
 import pLimit from 'p-limit';
@@ -142,7 +143,7 @@ function markDirty() {
  */
 function getCacheMetrics() {
     const total = cacheHits + cacheMisses;
-    const hitRate = total > 0 ? ((cacheHits / total) * 100).toFixed(2) : 0;
+    const hitRate = total > 0 ? ((cacheHits / total) * 100).toFixed(2) : '0';
 
     return {
         hits: cacheHits,

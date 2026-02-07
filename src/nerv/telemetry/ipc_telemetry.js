@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/nerv/telemetry/ipc_telemetry.js
    Subsistema: NERV — Neural Event Relay Vector

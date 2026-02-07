@@ -142,7 +142,7 @@ class DriverNERVAdapter extends EventEmitter {
      *
      * @param {Object} nerv - Instância do NERV (IPC transport)
      * @param {Object} [browserPool=null] - Gerenciador do pool de conexões Chrome (pode ser null em modo degradado)
-     * @param {Object} config - Configuração do sistema
+     * @param {Object} [config={}] - Configuração do sistema (opcional)
      *
      * @throws {Error} Se NERV instance não fornecido
      *

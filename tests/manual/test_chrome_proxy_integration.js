@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -20,7 +21,7 @@ const log = {
     section: msg => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`)
 };
 
-import GLOBAL_CONFIG from '/workspaces/chatgpt-docker-puppeteer/config.json';
+import GLOBAL_CONFIG from '/workspaces/chatgpt-docker-puppeteer/config.json' with { type: 'json' };
 const PROXY_PORT = GLOBAL_CONFIG.CHROME_PROXY_PORT || 9224;
 const CHROME_PORT = GLOBAL_CONFIG.CHROME_PORT || 9225;
 

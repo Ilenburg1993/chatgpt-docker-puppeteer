@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import readline from 'node:readline';

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/shared/nerv/constants.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -49,6 +50,8 @@ const ActionCode = Object.freeze({
     TASK_RETRY: 'TASK_RETRY',
     TASK_FAILED: 'TASK_FAILED', // Task execution failed
     TASK_REJECTED: 'TASK_REJECTED', // Task rejected by policy
+    TASK_OBSERVED: 'TASK_OBSERVED', // Task observation event
+
 
     // ---- PROPOSAL / POLICY ----
     PROPOSE_TASK: 'PROPOSE_TASK', // Policy engine task proposal
@@ -103,6 +106,9 @@ const ActionCode = Object.freeze({
 
     // ---- SYSTEM (Server / Process) ----
     SERVER_READY: 'SERVER_READY', // Server process ready (published via NERV)
+
+    // ---- ACK / TRANSPORT ----
+    ACK_RECEIVED: 'ACK_RECEIVED', // Transport-level acknowledgment received
 
     // ---- ITERATION (Iterative Execution) ----
     ITERATION_STARTED: 'ITERATION_STARTED', // Iteration attempt started

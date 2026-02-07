@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as envelopesModule from '#shared/nerv/envelope';
 import { CONNECTION_MODES } from '#core/constants/browser';
 import createCorrelation from './correlation/correlation_store.js';
@@ -17,7 +18,7 @@ import createHealth from './health/health.js';
  * Bootstrap: Socket.io adapter para modo híbrido
  */
 async function bootstrapSocketAdapter(config) {
-    const createSocketAdapter = await import('#infra/transport/socket_io_adapter').then(m => m.default ?? m);
+    const { default: createSocketAdapter } = await import('#infra/transport/socket_io_adapter');
 
     const socketAdapter = createSocketAdapter({
         url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3008',
@@ -193,8 +194,7 @@ async function createNERV(config = {}) {
         envelopes,
         buffers,
         correlation,
-        telemetry,
-        transport
+        telemetry
     });
 
     /* 8. Recepção */

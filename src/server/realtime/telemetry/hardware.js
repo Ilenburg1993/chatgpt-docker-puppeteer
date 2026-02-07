@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as doctor from '#core/doctor';
 import { notify } from '#server/engine/socket';
 import { log } from '#core/logger';

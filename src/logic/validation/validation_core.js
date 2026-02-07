@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as i18n from '#core/i18n';
 import { runSinglePassValidation } from './scan_engine.js';
 import { log } from '#core/logger';

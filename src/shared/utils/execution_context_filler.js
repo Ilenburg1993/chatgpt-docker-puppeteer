@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import os from 'node:os';
 import * as logger from '#core/logger';
 import fs from 'node:fs';
@@ -117,7 +118,7 @@ function _detectContainer() {
 /**
  * Obtém versão do Chrome do BrowserPool.
  * @param {object} browserPool - BrowserPool manager
- * @returns {string} Chrome version ou 'unknown'
+ * @returns {Promise<string>} Chrome version ou 'unknown'
  * @private
  */
 async function _getChromeVersion(browserPool) {

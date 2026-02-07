@@ -1,6 +1,6 @@
 import { log } from '#core/logger';
 import * as stabilizer from '#shared/page_stability/stabilizer';
-import * as Triage from '../modules/triage.js';
+import { Triage } from '../modules/triage.js';
 
 /**
  * Check types para readiness validation.

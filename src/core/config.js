@@ -1,3 +1,5 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
+import 'dotenv/config';
 import { z } from 'zod';
 import EventEmitter from 'node:events';
 import { log } from './logger.js';
@@ -214,6 +216,11 @@ class ConfigurationManager extends EventEmitter {
     // --- Getters Adicionais (Novos Parâmetros) ---
     get BROWSER_MODE() {
         return this.currentConfig.BROWSER_MODE;
+    }
+
+    // Compat: expose DEBUG_PORT (historical name) directly.
+    get DEBUG_PORT() {
+        return this.currentConfig.DEBUG_PORT || null;
     }
     // Compatibilidade: retorna BROWSER_URL se definido, senão utiliza DEBUG_PORT
     get BROWSER_URL() {

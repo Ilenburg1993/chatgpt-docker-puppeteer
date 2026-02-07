@@ -25,7 +25,7 @@ function parseEnvFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const env = {};
 
-    content.split('\n').forEach((line, index) => {
+    content.split('\n').forEach((line, _) => {
         // Ignorar comentários e linhas vazias
         if (!line.trim() || line.trim().startsWith('#')) return;
 

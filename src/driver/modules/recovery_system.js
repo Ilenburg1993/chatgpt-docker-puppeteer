@@ -62,8 +62,8 @@ class RecoverySystem extends EventEmitter {
      * Cria RecoverySystem instance v2.0
      *
      * @constructor
-     * @param {Object} driver - Driver Puppeteer (BaseDriver instance)
-     * @throws {Error} Se driver inválido ou missing methods
+ * @param {Object} driver - Driver Puppeteer (BaseDriver instance)
+ * @throws {Error} Se driver inválido ou missing methods
      *
      * @example
      * const recovery = new RecoverySystem(driver);
@@ -83,10 +83,6 @@ class RecoverySystem extends EventEmitter {
 
         if (!driver.inputResolver) {
             throw new Error('[RecoverySystem] Driver must have inputResolver');
-        }
-
-        if (!driver.page) {
-            throw new Error('[RecoverySystem] Driver must have page instance');
         }
 
         this.driver = driver;
@@ -497,16 +493,18 @@ class RecoverySystem extends EventEmitter {
      * v2.0 Feature (BUG #5 fix)
      *
      * @returns {Object} Stats completas
-     * @returns {number} stats.tier0Applied - Tier 0 aplicados
-     * @returns {number} stats.tier1Applied - Tier 1 aplicados
-     * @returns {number} stats.tier2Applied - Tier 2 aplicados
-     * @returns {number} stats.tier3Applied - Tier 3 aplicados
-     * @returns {number} stats.totalRecoveries - Total recoveries
-     * @returns {number} stats.successfulRecoveries - Recoveries com sucesso
-     * @returns {number} stats.failedRecoveries - Recoveries falhados
-     * @returns {number} stats.totalRecoveryDuration - Tempo total (ms)
-     * @returns {number} stats.maxRecoveryDuration - Tempo máximo (ms)
-     * @returns {Object} stats.config - Configuração atual (RECOVERY_CONFIG)
+     *
+     * Propriedades do objeto retornado:
+     *   - tier0Applied (number): Tier 0 aplicados
+     *   - tier1Applied (number): Tier 1 aplicados
+     *   - tier2Applied (number): Tier 2 aplicados
+     *   - tier3Applied (number): Tier 3 aplicados
+     *   - totalRecoveries (number): Total recoveries
+     *   - successfulRecoveries (number): Recoveries com sucesso
+     *   - failedRecoveries (number): Recoveries falhados
+     *   - totalRecoveryDuration (number): Tempo total (ms)
+     *   - maxRecoveryDuration (number): Tempo máximo (ms)
+     *   - config (Object): Configuração atual (RECOVERY_CONFIG)
      *
      * @example
      * const stats = recovery.getStats();

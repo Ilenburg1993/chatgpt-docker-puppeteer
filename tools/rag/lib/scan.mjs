@@ -3,9 +3,9 @@ import path from 'node:path';
 import ignore from 'ignore';
 import { isProbablyBinary } from './text.mjs';
 
-// Exclude .md files for first indexing (heavy, many docs)
+// Allow .md files (tests and many projects rely on README/docs scanning)
 // Can be re-enabled later with: analysis/ excluded + selective indexing
-const ALLOW_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.json', '.yml', '.yaml', '.sh', '.ps1']);
+const ALLOW_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.json', '.yml', '.yaml', '.sh', '.ps1', '.md', '.mdx']);
 const ALWAYS_ALLOW_BASENAMES = new Set(['Dockerfile', 'Makefile']);
 const ALWAYS_DENY_BASENAMES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']);
 

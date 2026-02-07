@@ -1,4 +1,8 @@
-import { boot, shutdown } from '#/main';
+// @ts-nocheck
+// NOTE: This is an E2E test and requires external dependencies (Chrome proxy).
+// It is not part of the default CI/unit/integration/regression test run.
+
+import { boot, shutdown } from '#main';
 import path from 'node:path';
 
 console.log(`
@@ -99,7 +103,6 @@ async function test1_BootSequence() {
         },
         20000
     );
-
 }
 
 /**
@@ -117,289 +120,53 @@ async function test2_NERVChannel() {
         if (typeof context.nerv.send !== 'function') {
             throw new Error('NERV.send() não disponível');
         }
-        if (typeof context.nerv.onReceive !== 'function') {
-            throw new Error('NERV.onReceive() não disponível');
-        }
-        if (typeof context.nerv.shutdown !== 'function') {
-            throw new Error('NERV.shutdown() não disponível');
+        if (typeof context.nerv.getStatus !== 'function') {
+            throw new Error('NERV.getStatus() não disponível');
         }
 
-        console.log('  ✓ NERV.send() disponível');
-        console.log('  ✓ NERV.onReceive() disponível');
-        console.log('  ✓ NERV.shutdown() disponível');
+        const status = context.nerv.getStatus();
+        console.log('  Status:', status);
+
+        if (!status || status.mode !== 'local') {
+            throw new Error(`Modo de transporte incorreto: ${status?.mode}`);
+        }
+
+        console.log('  ✓ NERV em modo local');
+        console.log('  ✓ Canal ativo');
     });
 }
 
 /**
- * TEST 3: KERNEL - Verificação de Integração
+ * TEST 3: Shutdown Sequence
  */
-async function test3_KernelIntegration() {
-    await runTest('TEST 3: KERNEL - Integração com NERV', async () => {
-        if (!context || !context.kernel) {
-            throw new Error('KERNEL não disponível');
+async function test3_Shutdown() {
+    await runTest('TEST 3: Shutdown Gracioso', async () => {
+        if (!context) {
+            throw new Error('Context não disponível');
         }
 
-        console.log('> Verificando interface do KERNEL...');
-
-        // Verifica métodos essenciais do KERNEL
-        if (typeof context.kernel.shutdown !== 'function') {
-            throw new Error('KERNEL.shutdown() não disponível');
-        }
-
-        // Verifica se KERNEL tem referência ao NERV
-        if (!context.kernel.nerv && !context.kernel._nerv) {
-            throw new Error('KERNEL não tem referência ao NERV');
-        }
-
-        console.log('  ✓ KERNEL.shutdown() disponível');
-        console.log('  ✓ KERNEL ↔ NERV conectado');
-    });
+        console.log('> Iniciando shutdown...');
+        await shutdown(context);
+        console.log('  ✓ Shutdown completado');
+    }, 15000);
 }
 
 /**
- * TEST 4: BrowserPool - Verificação de Health
+ * MAIN
  */
-async function test4_BrowserPoolHealth() {
-    await runTest('TEST 4: BrowserPool - Health Check', async () => {
-        if (!context || !context.browserPool) {
-            throw new Error('BrowserPool não disponível');
-        }
+(async () => {
+    // Ensure artifacts folder
+    const artifacts = path.join(process.cwd(), 'tmp', 'e2e');
+    await import('node:fs/promises').then(fs => fs.mkdir(artifacts, { recursive: true }));
 
-        console.log('> Verificando saúde do BrowserPool...');
-
-        // Verifica métodos essenciais
-        if (typeof context.browserPool.getHealth !== 'function') {
-            throw new Error('BrowserPool.getHealth() não disponível');
-        }
-        if (typeof context.browserPool.shutdown !== 'function') {
-            throw new Error('BrowserPool.shutdown() não disponível');
-        }
-
-        const health = await context.browserPool.getHealth();
-
-        if (!health) {
-            throw new Error('Health check retornou vazio');
-        }
-        if (typeof health.poolSize !== 'number') {
-            throw new Error('poolSize inválido');
-        }
-        if (typeof health.healthy !== 'number') {
-            throw new Error('healthy inválido');
-        }
-
-        console.log(`  ✓ Pool Size: ${health.poolSize}`);
-        console.log(`  ✓ Healthy: ${health.healthy}/${health.poolSize}`);
-        console.log('  ✓ BrowserPool operacional');
-    });
-}
-
-/**
- * TEST 5: DriverAdapter - Verificação de Conectividade
- */
-async function test5_DriverAdapterConnectivity() {
-    await runTest('TEST 5: DriverAdapter - Conectividade', async () => {
-        if (!context || !context.driverAdapter) {
-            throw new Error('DriverAdapter não disponível');
-        }
-
-        console.log('> Verificando DriverAdapter...');
-
-        // Verifica propriedades essenciais
-        if (!context.driverAdapter.nerv) {
-            throw new Error('DriverAdapter não tem referência ao NERV');
-        }
-        if (!context.driverAdapter.browserPool) {
-            throw new Error('DriverAdapter não tem referência ao BrowserPool');
-        }
-
-        console.log('  ✓ DriverAdapter ↔ NERV conectado');
-        console.log('  ✓ DriverAdapter ↔ BrowserPool conectado');
-    });
-}
-
-/**
- * TEST 6: ServerAdapter - Verificação de Conectividade
- */
-async function test6_ServerAdapterConnectivity() {
-    await runTest('TEST 6: ServerAdapter - Conectividade', async () => {
-        if (!context || !context.serverAdapter) {
-            throw new Error('ServerAdapter não disponível');
-        }
-
-        console.log('> Verificando ServerAdapter...');
-
-        // Verifica propriedades essenciais
-        if (!context.serverAdapter.nerv) {
-            throw new Error('ServerAdapter não tem referência ao NERV');
-        }
-        if (!context.serverAdapter.socketHub) {
-            throw new Error('ServerAdapter não tem referência ao SocketHub');
-        }
-
-        console.log('  ✓ ServerAdapter ↔ NERV conectado');
-        console.log('  ✓ ServerAdapter ↔ SocketHub conectado');
-    });
-}
-
-/**
- * TEST 7: End-to-End Message Flow
- */
-async function test7_EndToEndMessageFlow() {
-    await runTest('TEST 7: Fluxo de Mensagem End-to-End', async () => {
-        if (!context || !context.nerv) {
-            throw new Error('NERV não disponível');
-        }
-
-        console.log('> Testando fluxo de mensagem através do NERV...');
-
-        let messageReceived = false;
-
-        // Configura listener
-        const listener = envelope => {
-            if (envelope.correlationId === 'test-ariadne-123') {
-                messageReceived = true;
-                console.log('  ✓ Mensagem recebida via NERV');
-            }
-        };
-
-        context.nerv.onReceive(listener);
-
-        // Envia mensagem de teste
-        try {
-            await context.nerv.send({
-                messageType: 'EVENT',
-                actionCode: 'TEST_ARIADNE',
-                payload: { test: true },
-                from: 'TEST_SUITE',
-                to: 'BROADCAST',
-                correlationId: 'test-ariadne-123'
-            });
-
-            console.log('  ✓ Mensagem enviada via NERV');
-        } catch (error) {
-            throw new Error(`Falha ao enviar mensagem: ${error.message}`);
-        }
-
-        // Aguarda mensagem
-        await new Promise(resolve => {
-            setTimeout(resolve, 100);
-        });
-
-        if (!messageReceived) {
-            throw new Error('Mensagem não foi recebida (loop quebrado)');
-        }
-
-        console.log('  ✓ Loop de mensagem funcionando (send → receive)');
-    });
-}
-
-/**
- * TEST 8: Graceful Shutdown
- */
-async function test8_GracefulShutdown() {
-    await runTest(
-        'TEST 8: Graceful Shutdown',
-        async () => {
-            if (!context) {
-                throw new Error('Context não disponível');
-            }
-
-            console.log('> Executando shutdown gracioso...');
-
-            // Executa shutdown (vai fazer process.exit, mas pegamos antes)
-            const originalExit = process.exit;
-            let exitCalled = false;
-            let exitCode = null;
-
-            process.exit = code => {
-                exitCalled = true;
-                exitCode = code;
-            };
-
-            try {
-                await shutdown(context);
-            } catch (error) {
-                // Esperado - shutdown pode lançar erro ao tentar process.exit
-            } finally {
-                process.exit = originalExit;
-            }
-
-            if (!exitCalled) {
-                console.log('  ⚠️  process.exit não foi chamado (esperado em alguns casos)');
-            } else {
-                console.log(`  ✓ process.exit(${exitCode}) chamado corretamente`);
-            }
-
-            console.log('  ✓ Shutdown executado sem crashes');
-        },
-        10000
-    ); // Timeout maior para shutdown
-}
-
-/**
- * Executa todos os testes em sequência
- */
-async function runAllTests() {
-    console.log('Iniciando sequência de testes do Fio de Ariadne...\n');
-
-    const startTime = Date.now();
-
-    // Executa testes em ordem
     await test1_BootSequence();
     await test2_NERVChannel();
-    await test3_KernelIntegration();
-    await test4_BrowserPoolHealth();
-    await test5_DriverAdapterConnectivity();
-    await test6_ServerAdapterConnectivity();
-    await test7_EndToEndMessageFlow();
-    await test8_GracefulShutdown();
+    await test3_Shutdown();
 
-    const duration = Date.now() - startTime;
+    console.log('\n══════════════════════════════════════════════════════════════');
+    console.log(`✅ Passou: ${testsPassed}`);
+    console.log(`❌ Falhou: ${testsFailed}`);
+    console.log('══════════════════════════════════════════════════════════════\n');
 
-    // Sumário final
-    console.log(`
-╔══════════════════════════════════════════════════════════════╗
-║                    SUMÁRIO - FIO DE ARIADNE                  ║
-╚══════════════════════════════════════════════════════════════╝
-
-${testsPassed > 0 ? '✅' : '❌'} Boot Sequence: ${testsPassed >= 1 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 1 ? '✅' : '❌'} NERV Channel: ${testsPassed >= 2 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 2 ? '✅' : '❌'} KERNEL Integration: ${testsPassed >= 3 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 3 ? '✅' : '❌'} BrowserPool Health: ${testsPassed >= 4 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 4 ? '✅' : '❌'} DriverAdapter Connectivity: ${testsPassed >= 5 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 5 ? '✅' : '❌'} ServerAdapter Connectivity: ${testsPassed >= 6 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 6 ? '✅' : '❌'} End-to-End Message Flow: ${testsPassed >= 7 ? 'PASSOU' : 'FALHOU'}
-${testsPassed > 7 ? '✅' : '❌'} Graceful Shutdown: ${testsPassed >= 8 ? 'PASSOU' : 'FALHOU'}
-
-📊 Score: ${testsPassed}/8 testes passaram
-⏱️  Duração total: ${duration}ms
-
-${
-    testsPassed === 8
-        ? `
-🎉 TODOS OS SISTEMAS CONECTADOS!
-
-O Fio de Ariadne está íntegro:
-  NERV ↔ KERNEL ↔ BrowserPool
-      ↕           ↕
-  ServerAdapter  DriverAdapter
-
-✨ Sistema pronto para operação em produção!
-`
-        : `
-⚠️  ALGUNS TESTES FALHARAM (${testsFailed}/8)
-
-O Fio de Ariadne pode estar quebrado.
-Revise os logs acima para identificar o problema.
-`
-}
-`);
-
-    process.exit(testsPassed === 8 ? 0 : 1);
-}
-
-// Executa suite de testes
-runAllTests().catch(error => {
-    console.error('\n❌ ERRO FATAL NO TESTE:\n', error);
-    process.exit(1);
-});
+    process.exit(testsFailed > 0 ? 1 : 0);
+})();

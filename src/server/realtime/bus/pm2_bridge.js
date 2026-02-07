@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { pm2Raw } from '#infra/system';
 import { notify } from '#server/engine/socket';
 import { log } from '#core/logger';
@@ -152,7 +153,7 @@ function _startHealthCheck() {
         clearInterval(healthCheckInterval);
     }
 
-    const checkIntervalMs = CONFIG.get('SERVER_PM2_HEALTH_CHECK_INTERVAL_MS', 30000);
+    const checkIntervalMs = Number(CONFIG.get('SERVER_PM2_HEALTH_CHECK_INTERVAL_MS', 30000)) || 30000;
     healthCheckInterval = setInterval(() => {
         if (!isBusActive) {
             return;

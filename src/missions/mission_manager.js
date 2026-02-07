@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { v4 as uuidv4 } from 'uuid';
 import * as logger from '#core/logger';
 import { MissionStateManager, MISSION_STATUS } from './mission_state_manager.js';

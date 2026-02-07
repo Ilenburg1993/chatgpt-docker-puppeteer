@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import createEmitCommand from './emit_command.js';
 import createEmitEvent from './emit_event.js';
 import createEmitAck from './emit_ack.js';

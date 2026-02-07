@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import http from 'node:http';
 import app from './app.js';
 import { log } from '#core/logger';
@@ -54,6 +55,12 @@ function start(port, attempt = 0) {
         }
 
         httpServer = http.createServer(app);
+
+        // Configure HTTP server timeouts (prevent hanging connections)
+        const requestTimeout = Number(process.env.SERVER_REQUEST_TIMEOUT || 120000);
+        httpServer.setTimeout(requestTimeout);
+
+        console.error(`[Server] Request timeout set to ${requestTimeout}ms`);
 
         httpServer.listen(port, HOST, () => {
 

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/kernel/policy_engine/policy_engine.js
    Subsistema: KERNEL — Núcleo Soberano de Decisão

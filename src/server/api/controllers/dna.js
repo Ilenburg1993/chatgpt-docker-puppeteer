@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
 const router = express.Router();
 import path from 'node:path';
@@ -146,7 +147,7 @@ router.put('/dna', denyIfDelegated, async (req, res) => {
  */
 router.get('/dna/history', async (req, res) => {
     try {
-        const history = io.getDnaHistory();
+        const history = await io.getDnaHistory();
 
         res.json({
             success: true,

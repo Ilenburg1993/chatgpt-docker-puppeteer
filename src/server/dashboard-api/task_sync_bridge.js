@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
 
@@ -69,11 +70,12 @@ class TaskSyncBridge extends EventEmitter {
      * Inicializa o bridge com dependências.
      * Deve ser chamado após boot do sistema.
      *
-     * @param {Object} options
-     * @param {Object} options.socketHub - Socket.io Hub para notificações
-     * @param {Object} options.nervClient - Cliente NERV para eventos
+     * @param {Object} [options]
+     * @param {Object} [options.socketHub] - Socket.io Hub para notificações
+     * @param {Object} [options.nervClient] - Cliente NERV para eventos
      */
-    initialize({ socketHub, nervClient } = {}) {
+    initialize(options = {}) {
+        const { socketHub, nervClient } = options;
         if (this._initialized) {
             log('WARN', '[TaskSyncBridge] Já inicializado, ignorando');
             return;
@@ -98,7 +100,7 @@ class TaskSyncBridge extends EventEmitter {
     async getQueueCache() {
         if (!this._queueCache) {
             try {
-                this._queueCache = await import('#infra/queue/cache').then(m => m.default ?? m);
+                this._queueCache = await import('#infra/queue/cache');
             } catch (err) {
                 log('WARN', `[TaskSyncBridge] Queue cache não disponível: ${err.message}`);
                 return null;

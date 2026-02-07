@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as io from '#infra/io';
 import { parseReferences } from '../parsing/ref_parser.js';
 import { assertSafetyDepth } from '../limits/guardrails.js';
@@ -114,8 +115,10 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
                 continue;
             }
 
+            const tt = /** @type {any} */ (targetTask);
+
             // Proteção contra auto-referência (Prevenção de paradoxo recursivo)
-            if (currentTask && targetTask.meta?.id === currentTask.meta?.id) {
+            if (currentTask && tt.meta?.id === currentTask.meta?.id) {
                 resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO: AUTO_REFERENCIA]`);
                 continue;
             }
@@ -125,13 +128,13 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
 
             // Caso A: Referência ao PROMPT original (Metadado da Spec)
             if (ref.transform === 'PROMPT') {
-                injectedContent = targetTask.spec?.payload?.user_message || '';
+                injectedContent = tt.spec?.payload?.user_message || '';
             }
             // Caso B: Referência ao RESULTADO (I/O de arquivo físico)
             else {
                 // O io.loadResponse já respeita o sinal de aborto e o teto de 1MB
-                const rawResponse = await io.loadResponse(targetTask.meta.id, signal);
-                injectedContent = await applyTransform(rawResponse, ref.transform, targetTask);
+                const rawResponse = await io.loadResponse(tt.meta.id, signal);
+                injectedContent = await applyTransform(rawResponse, ref.transform, tt);
             }
 
             // 6. BUDGET MANAGEMENT: Controle de volume final e truncamento

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/infra/storage/dna_evolution.js
    Audit Level: 750 — Automatic DNA Evolution Engine
@@ -11,7 +12,7 @@
 let dnaStore = null;
 const getDnaStore = async () => {
     if (!dnaStore) {
-        dnaStore = await import('./dna_store.js').then(m => m.default ?? m);
+        dnaStore = await import('./dna_store.js');
     }
     return dnaStore;
 };
@@ -44,7 +45,7 @@ const evolutionCounter = new Map();
  * @param {object} protocol - Protocolo SADI com selector descoberto
  * @param {string} domain - Domínio (ex: 'chatgpt.com')
  * @param {string} intent - Intenção (ex: 'input_box', 'send_button')
- * @returns {Promise<boolean>} - true se evoluiu, false se rejeitou
+ * @returns {Promise<{accepted: boolean, reason?: string, stats?: object, error?: string}>}
  */
 async function evolveWithSadiProtocol(protocol, domain, intent) {
     try {

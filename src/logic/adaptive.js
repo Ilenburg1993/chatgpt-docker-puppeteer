@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { promises as fs } from 'node:fs';
 import fss from 'node:fs';
 import path from 'node:path';
@@ -144,7 +145,7 @@ function updateStats(stats, value, label) {
         return;
     }
 
-    const alpha = stats.count < 20 ? 0.4 : CONFIG.ADAPTIVE_ALPHA || 0.15;
+    const alpha = stats.count < 20 ? 0.4 : Number(CONFIG.ADAPTIVE_ALPHA || 0.15);
     const diff = value - stats.avg;
     const oldAvg = stats.avg;
 

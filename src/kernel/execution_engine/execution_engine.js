@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/kernel/execution_engine/execution_engine.js
    Subsistema: KERNEL — Núcleo Soberano de Decisão

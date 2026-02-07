@@ -1,6 +1,7 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import TargetDriver from './TargetDriver.js';
 import { log } from '#core/logger';
-import * as DriverReadinessGuard from '../guards/DriverReadinessGuard.js';
+import { DriverReadinessGuard } from '../guards/DriverReadinessGuard.js';
 import PageSessionTracker from '../trackers/PageSessionTracker.js';
 
 /* ==========================================================================
@@ -84,9 +85,11 @@ class BaseDriver extends TargetDriver {
         // [V800] Instanciação da Malha Modular de Execução
         // ✅ v3.0: Módulos instanciados IMEDIATAMENTE (não precisam de page)
         try {
-            this.recovery = new RecoverySystem(this);
-            this.handles = new HandleManager(this);
+            // ✅ BUG FIX: InputResolver DEVE ser criado ANTES de RecoverySystem
+            // RecoverySystem.constructor() valida que driver.inputResolver existe
             this.inputResolver = new InputResolver(this);
+            this.handles = new HandleManager(this);
+            this.recovery = new RecoverySystem(this);
             this.frameNavigator = new FrameNavigator(this);
             this.biomechanics = new BiomechanicsEngine(this);
             this.submission = new SubmissionController(this);
@@ -163,7 +166,7 @@ class BaseDriver extends TargetDriver {
 
         modules.forEach(module => {
             if (module) {
-                module.driver = this;
+                /** @type {any} */ (module).driver = this;
             }
         });
     }
@@ -198,7 +201,7 @@ class BaseDriver extends TargetDriver {
     async _applyBackoff(attempt) {
         const { RETRY_BACKOFF_TYPE, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS } = BASEDRIVER_CONFIG;
 
-        let delay = RETRY_BASE_DELAY_MS;
+        let delay = Number(RETRY_BASE_DELAY_MS);
 
         if (RETRY_BACKOFF_TYPE === 'exponential') {
             delay = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, attempt), RETRY_MAX_DELAY_MS);
@@ -284,7 +287,6 @@ class BaseDriver extends TargetDriver {
     /**
      * Verifica se página ainda está ativa.
      * @throws {Error} TARGET_CLOSED - Se página foi fechada
-     * @private
      */
     _assertPageAlive() {
         if (!this.page || this.page.isClosed()) {
@@ -329,7 +331,7 @@ class BaseDriver extends TargetDriver {
      * Retorna status de saúde de todos os módulos.
      * ✅ v2.0: NEW - Module health diagnostics
      *
-     * @returns {object} Health status de cada módulo
+     * @returns {Promise<object>} Health status de cada módulo
      */
     async getModuleHealth() {
         return {
@@ -338,7 +340,7 @@ class BaseDriver extends TargetDriver {
             inputResolver: this.inputResolver
                 ? {
                       status: 'healthy',
-                      cacheSize: this.inputResolver.cacheSize || 0,
+                      cacheSize: this.inputResolver.protocolCache?.size || 0,
                   }
                 : 'missing',
             frameNavigator: this.frameNavigator ? 'healthy' : 'missing',
@@ -387,6 +389,7 @@ class BaseDriver extends TargetDriver {
         // ✅ v2.0: Timing metrics
         const startTime = Date.now();
         const timings = {};
+        let stepStart;  // ✅ BUG FIX: Declare stepStart to avoid global implicit variable
 
         // ✅ Phase 2 (P1-U1): Record turn start
         const turnNumber = this.sessionTracker.recordTurn();
@@ -416,11 +419,16 @@ class BaseDriver extends TargetDriver {
 
         timings.readinessCheck = Date.now() - stepStart;
 
+        const checksObj = readiness && typeof readiness.checks === 'object' && readiness.checks !== null ? readiness.checks : {};
+        const checksValues = Object.values(checksObj);
+        const checksPass = checksValues.filter(Boolean).length;
+        const checksFail = checksValues.length - checksPass;
+
         // ✅ Phase 1: Emit readiness check result
         this._emitVital('READINESS_CHECK', {
             ready: readiness.ready,
-            checksPass: readiness.checks.filter(c => c.passed).length,
-            checksFail: readiness.checks.filter(c => !c.passed).length,
+            checksPass,
+            checksFail,
             issues: readiness.issues,
             duration: timings.readinessCheck,
         });

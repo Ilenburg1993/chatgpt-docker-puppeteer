@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import path from 'node:path';
 
 // Cálculo da Raiz do Projeto (Agnóstico ao local de execução)

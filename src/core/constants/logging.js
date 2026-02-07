@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * Logging categories constants
  * Centralized definitions for logger categories throughout the application

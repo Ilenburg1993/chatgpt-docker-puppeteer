@@ -16,7 +16,7 @@ function walk(dir) {
     let entries;
     try {
         entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch (e) {
+    } catch (_) {
         return;
     }
     for (const e of entries) {
@@ -35,10 +35,10 @@ function processFile(file) {
     let content;
     try {
         content = fs.readFileSync(file, 'utf8');
-    } catch (e) {
+    } catch (_) {
         return;
     }
-    const original = content;
+    const _original = content;
     let changed = false;
     const changesHere = [];
 
@@ -102,7 +102,7 @@ walk(ROOT);
 if (!fs.existsSync(REPORT_DIR)) {
     try {
         fs.mkdirSync(REPORT_DIR, { recursive: true });
-    } catch (e) {
+    } catch (_) {
         /* ignore */
     }
 }

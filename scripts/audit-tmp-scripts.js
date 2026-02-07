@@ -1,4 +1,5 @@
 #!/usr/bin/env nodeimport fs from 'node:fs';
+// @ts-nocheck
 import path from 'node:path';
 import { execSync as _execSync } from 'node:child_process';
 

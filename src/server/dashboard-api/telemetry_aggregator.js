@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import * as hardware from '#core/hardware';
 
@@ -121,11 +122,12 @@ class TelemetryAggregator {
     /**
      * Inicializa o agregador e começa coleta.
      *
-     * @param {Object} options
-     * @param {Object} options.socketHub - Socket.io Hub para broadcast
-     * @param {number} options.intervalMs - Intervalo de coleta em ms (default: 1000)
+     * @param {Object} [options]
+     * @param {Object} [options.socketHub] - Socket.io Hub para broadcast
+     * @param {number} [options.intervalMs] - Intervalo de coleta em ms (default: 1000)
      */
-    start({ socketHub, intervalMs = 1000 } = {}) {
+    start(options = {}) {
+        const { socketHub, intervalMs = 1000 } = options;
         if (this.collectionInterval) {
             log('WARN', '[TelemetryAggregator] Já está rodando');
             return;
@@ -162,7 +164,7 @@ class TelemetryAggregator {
     async getQueueCache() {
         if (!this._queueCache) {
             try {
-                this._queueCache = await import('#infra/queue/cache').then(m => m.default ?? m);
+                this._queueCache = await import('#infra/queue/cache');
             } catch (err) {
                 log('DEBUG', `[TelemetryAggregator] Queue cache não disponível`);
                 return null;

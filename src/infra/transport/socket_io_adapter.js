@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 
 import { io } from 'socket.io-client';
 import EventEmitter from 'node:events';

@@ -6,7 +6,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
     let mockPage;
     let stabilizerModule;
 
-    beforeEach(async () => {
+	beforeEach(async () => {
         // Mock page object
         mockPage = {
             evaluate: mock.fn(async () => true),
@@ -26,10 +26,9 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             }))
         };
 
-        // Import module fresh for each test
-        delete require.cache[require.resolve('@shared/page_stability/stabilizer')];
-        stabilizerModule = require('#shared/page_stability/stabilizer');
-    });
+		// Import module fresh for each test (ESM)
+		stabilizerModule = await import('#shared/page_stability/stabilizer');
+	});
 
     afterEach(() => {
         mock.restoreAll();

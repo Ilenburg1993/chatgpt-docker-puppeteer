@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as cache from './cache.js';
 import { STATUS_VALUES } from '#core/constants/tasks';
 

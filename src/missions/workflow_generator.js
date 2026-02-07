@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'fs/promises';
 import path from 'node:path';
 import * as logger from '#core/logger';

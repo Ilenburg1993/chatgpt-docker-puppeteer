@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as driverFactory from '#driver/factory';
 
 class EnvironmentResolver {

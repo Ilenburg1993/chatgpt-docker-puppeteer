@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as logger from '#core/logger';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
@@ -139,9 +140,7 @@ class ValidationService {
      * Valida output usando múltiplos validadores.
      *
      * @param {string} output - Output do LLM
-     * @param {object} options - Opções de validação
-     * @param {Array} options.validators - Array de validadores { type, config }
-     * @param {object} options.criteria - Critérios de validação (min_quality_score, etc)
+     * @param {{ validators?: Array, criteria?: object }} [options] - Opções de validação
      * @returns {Promise<object>} - { passed, overall_score, validation_results, feedback, issues }
      */
     async validate(output, options = {}) {

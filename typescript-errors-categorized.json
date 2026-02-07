@@ -1,0 +1,4852 @@
+{
+  "timestamp": "2026-02-06T22:02:38.001Z",
+  "total": 537,
+  "summary": {
+    "runtimeBugs": 14,
+    "typeWarnings": 507,
+    "configIssues": 0,
+    "falsePositives": 16
+  },
+  "categories": {
+    "runtimeBugs": [
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 582,
+        "column": 63,
+        "code": 2554,
+        "message": "Expected 1 arguments, but got 3.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 586,
+        "column": 39,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(options: string | URL | RequestOptions, callback?: (res: IncomingMessage) => void): ClientRequest', gave the following error.\n    Argument of type '{ hostname: unknown; port: number; path: any; method: any; headers: any; }' is not assignable to parameter of type 'string | URL | RequestOptions'.\n      Type '{ hostname: unknown; port: number; path: any; method: any; headers: any; }' is not assignable to type 'RequestOptions'.\n        Types of property 'hostname' are incompatible.\n          Type 'unknown' is not assignable to type 'string'.\n  Overload 2 of 2, '(url: string | URL, options: RequestOptions, callback?: (res: IncomingMessage) => void): ClientRequest', gave the following error.\n    Argument of type '{ hostname: unknown; port: number; path: any; method: any; headers: any; }' is not assignable to parameter of type 'string | URL'.\n      Type '{ hostname: unknown; port: number; path: any; method: any; headers: any; }' is missing the following properties from type 'URL': hash, host, href, origin, and 7 more.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 1002,
+        "column": 56,
+        "code": 2769,
+        "message": "No overload matches this call.\n  The last overload gave the following error.\n    Argument of type 'unknown' is not assignable to parameter of type 'number'.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/infra/storage/response_store_v2.js",
+        "line": 32,
+        "column": 71,
+        "code": 2554,
+        "message": "Expected 2 arguments, but got 3.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/infra/storage/response_store_v2.js",
+        "line": 35,
+        "column": 74,
+        "code": 2554,
+        "message": "Expected 2 arguments, but got 3.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/infra/storage/response_store_v2.js",
+        "line": 38,
+        "column": 84,
+        "code": 2554,
+        "message": "Expected 2 arguments, but got 3.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/infra/storage/response_store_v2.js",
+        "line": 41,
+        "column": 90,
+        "code": 2554,
+        "message": "Expected 2 arguments, but got 3.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/orchestrator/orchestrator_engine.js",
+        "line": 450,
+        "column": 58,
+        "code": 2307,
+        "message": "Cannot find module '../../../tools/rag/lib/facade.mjs' or its corresponding type declarations.",
+        "category": "error",
+        "reason": "Módulo não encontrado - import quebrado"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 272,
+        "column": 66,
+        "code": 2554,
+        "message": "Expected 1 arguments, but got 3.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 95,
+        "column": 36,
+        "code": 2554,
+        "message": "Expected 0 arguments, but got 1.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 119,
+        "column": 36,
+        "code": 2554,
+        "message": "Expected 0 arguments, but got 1.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 177,
+        "column": 39,
+        "code": 2554,
+        "message": "Expected 0 arguments, but got 1.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 197,
+        "column": 36,
+        "code": 2554,
+        "message": "Expected 0 arguments, but got 1.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 283,
+        "column": 72,
+        "code": 2554,
+        "message": "Expected 0 arguments, but got 1.",
+        "category": "error",
+        "reason": "Argumentos incorretos - pode causar erro"
+      }
+    ],
+    "typeWarnings": [
+      {
+        "file": "src/core/authority.js",
+        "line": 17,
+        "column": 53,
+        "code": 2345,
+        "message": "Argument of type 'string' is not assignable to parameter of type '\"standalone\" | \"delegated\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 86,
+        "column": 22,
+        "code": 2351,
+        "message": "This expression is not constructable.\n  Not all constituents of type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/browser_pool/pool_manager\", { with: { \"resolution-mode\": \"import\" } }) | typeof BrowserPoolManager' are constructable.\n    Type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/browser_pool/pool_manager\", { with: { \"resolution-mode\": \"import\" } })' has no construct signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 407,
+        "column": 33,
+        "code": 2351,
+        "message": "This expression is not constructable.\n  Not all constituents of type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/browser_pool/pool_manager\", { with: { \"resolution-mode\": \"import\" } }) | typeof BrowserPoolManager' are constructable.\n    Type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/browser_pool/pool_manager\", { with: { \"resolution-mode\": \"import\" } })' has no construct signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 2,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 48,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 52,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 55,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 62,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 65,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 68,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 71,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 74,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 77,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 79,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 82,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 83,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 84,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 85,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 88,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 89,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 92,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 93,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 94,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 95,
+        "column": 34,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 96,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 99,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 100,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 101,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 102,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 105,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 106,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 107,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 108,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 111,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 112,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 113,
+        "column": 39,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 114,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 117,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 117,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 120,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 121,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/config.js",
+        "line": 124,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/context/engine/context_engine.js",
+        "line": 119,
+        "column": 43,
+        "code": 2339,
+        "message": "Property 'meta' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/context/engine/context_engine.js",
+        "line": 129,
+        "column": 46,
+        "code": 2339,
+        "message": "Property 'spec' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/context/engine/context_engine.js",
+        "line": 134,
+        "column": 70,
+        "code": 2339,
+        "message": "Property 'meta' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/doctor.js",
+        "line": 245,
+        "column": 42,
+        "code": 2339,
+        "message": "Property 'status' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/doctor.js",
+        "line": 246,
+        "column": 42,
+        "code": 2339,
+        "message": "Property 'status' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/identity_manager.js",
+        "line": 65,
+        "column": 25,
+        "code": 2339,
+        "message": "Property 'robot_id' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/identity_manager.js",
+        "line": 66,
+        "column": 39,
+        "code": 2339,
+        "message": "Property 'robot_id' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 2,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 5,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 7,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 8,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 10,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 11,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/bootstrap_state_schema.js",
+        "line": 12,
+        "column": 15,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 2,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 9,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 10,
+        "column": 15,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 11,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 12,
+        "column": 15,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 13,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 14,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 17,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 23,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 27,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 29,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 30,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 31,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 31,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 38,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 40,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 41,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 42,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 51,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 53,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 55,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 57,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 58,
+        "column": 34,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 70,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 70,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 74,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 74,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 74,
+        "column": 48,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/dna_schema.js",
+        "line": 74,
+        "column": 56,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 2,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 11,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 26,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 35,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 41,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 46,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/shared_types.js",
+        "line": 54,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 2,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 17,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 22,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 26,
+        "column": 11,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 26,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 32,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 33,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 34,
+        "column": 12,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 36,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 39,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 42,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 44,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 45,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 46,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 47,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 47,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 52,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 54,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 55,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 56,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 57,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 57,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 61,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 63,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 64,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 65,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 73,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 74,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 75,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 75,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 75,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 76,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 78,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 84,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 86,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 87,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 88,
+        "column": 15,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 91,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 93,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 95,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 96,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 97,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 102,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 104,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 106,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 107,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 108,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 117,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 118,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 119,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 120,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 121,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema.js",
+        "line": 127,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 2,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 17,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 24,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 28,
+        "column": 11,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 28,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 37,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 39,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 40,
+        "column": 15,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 41,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 42,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 43,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 47,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 48,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 49,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 50,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 51,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 55,
+        "column": 12,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 56,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 57,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 58,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 58,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 59,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 69,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 70,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 71,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 72,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 73,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 73,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 74,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 75,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 81,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 82,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 83,
+        "column": 12,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 85,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 88,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 91,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 93,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 94,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 95,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 96,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 97,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 98,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 98,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 105,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 107,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 118,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 120,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 121,
+        "column": 42,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 123,
+        "column": 41,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 123,
+        "column": 49,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 124,
+        "column": 48,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 125,
+        "column": 47,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 128,
+        "column": 44,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 133,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 135,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 136,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 137,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 138,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 139,
+        "column": 42,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 140,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 147,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 148,
+        "column": 43,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 148,
+        "column": 51,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 149,
+        "column": 41,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 152,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 153,
+        "column": 42,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 158,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 160,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 161,
+        "column": 42,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 162,
+        "column": 41,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 171,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 173,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 175,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 176,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 184,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 188,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 191,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 192,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 193,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 194,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 194,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 201,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 203,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 204,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 205,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 206,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 206,
+        "column": 34,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 211,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 213,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 214,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 215,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 223,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 224,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 225,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 225,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 225,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 226,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 228,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 233,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 235,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 236,
+        "column": 31,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 237,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 245,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 247,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 248,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 249,
+        "column": 15,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 253,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 258,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 260,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 261,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 261,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 262,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 262,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 263,
+        "column": 34,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 270,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 272,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 273,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 275,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 276,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 277,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 278,
+        "column": 40,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 279,
+        "column": 44,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 289,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 291,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 292,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 293,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 294,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 295,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 302,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 304,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 305,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 306,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 307,
+        "column": 23,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 308,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 315,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 318,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 319,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 320,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 323,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 325,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 326,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 327,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 328,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 333,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 335,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 336,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 337,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 338,
+        "column": 44,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 347,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 349,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 351,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 353,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 354,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 355,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 361,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 363,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 364,
+        "column": 35,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 365,
+        "column": 37,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 366,
+        "column": 34,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 367,
+        "column": 38,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 367,
+        "column": 47,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 377,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 381,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 383,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 384,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 385,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 386,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 393,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 395,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 398,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 399,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 400,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 401,
+        "column": 36,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 402,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 409,
+        "column": 17,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 411,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 412,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 413,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 414,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 416,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 417,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 418,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 419,
+        "column": 30,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 421,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 422,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 423,
+        "column": 28,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 424,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 426,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 434,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 436,
+        "column": 19,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 437,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 438,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 439,
+        "column": 26,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 440,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 447,
+        "column": 16,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 448,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 449,
+        "column": 20,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 450,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 455,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 457,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 459,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 460,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 461,
+        "column": 32,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 469,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 471,
+        "column": 13,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 472,
+        "column": 33,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 473,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 474,
+        "column": 24,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 475,
+        "column": 27,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/core/schemas/task_schema_v5.js",
+        "line": 489,
+        "column": 22,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 98,
+        "column": 39,
+        "code": 2351,
+        "message": "This expression is not constructable.\n  Type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/driver/guards/DriverReadinessGuard\", { with: { \"resolution-mode\": \"import\" } })' has no construct signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 207,
+        "column": 13,
+        "code": 2322,
+        "message": "Type 'number' is not assignable to type '1000'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 209,
+        "column": 13,
+        "code": 2322,
+        "message": "Type 'number' is not assignable to type '1000'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 293,
+        "column": 37,
+        "code": 2349,
+        "message": "This expression is not callable.\n  Type '{}' has no call signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 335,
+        "column": 18,
+        "code": 1064,
+        "message": "The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<any>'?",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 517,
+        "column": 37,
+        "code": 2339,
+        "message": "Property 'selector' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 518,
+        "column": 39,
+        "code": 2339,
+        "message": "Property 'confidence' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 552,
+        "column": 75,
+        "code": 2339,
+        "message": "Property 'selector' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 559,
+        "column": 75,
+        "code": 2339,
+        "message": "Property 'selector' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 569,
+        "column": 73,
+        "code": 2339,
+        "message": "Property 'selector' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/BaseDriver.js",
+        "line": 582,
+        "column": 69,
+        "code": 2339,
+        "message": "Property 'selector' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 63,
+        "column": 28,
+        "code": 2339,
+        "message": "Property 'STALLED' does not exist on type '{ PENDING: string; RUNNING: string; HEALTHY: string; FAILED: string; IDLE: string; SUCCESS: string; ACCEPTED: string; REJECTED: string; UNHEALTHY: string; CRASHED: string; SKIPPED: string; }'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 250,
+        "column": 17,
+        "code": 2322,
+        "message": "Type 'string' is not assignable to type '\"UNATTACHED\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 348,
+        "column": 35,
+        "code": 2349,
+        "message": "This expression is not callable.\n  Type '{}' has no call signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 357,
+        "column": 18,
+        "code": 2339,
+        "message": "Property 'config' does not exist on type 'TargetDriver'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 361,
+        "column": 96,
+        "code": 2339,
+        "message": "Property 'config' does not exist on type 'TargetDriver'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 363,
+        "column": 70,
+        "code": 2339,
+        "message": "Property 'config' does not exist on type 'TargetDriver'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 551,
+        "column": 13,
+        "code": 2322,
+        "message": "Type 'string' is not assignable to type '\"UNATTACHED\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 634,
+        "column": 56,
+        "code": 2349,
+        "message": "This expression is not callable.\n  Type '{}' has no call signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 636,
+        "column": 42,
+        "code": 2339,
+        "message": "Property '_createdAt' does not exist on type 'TargetDriver'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/core/TargetDriver.js",
+        "line": 942,
+        "column": 16,
+        "code": 2300,
+        "message": "Duplicate identifier 'TargetDriver'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/factory.js",
+        "line": 396,
+        "column": 36,
+        "code": 2741,
+        "message": "Property 'target' is missing in type '{}' but required in type '{ target: string; timeout?: number; }'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/factory.js",
+        "line": 527,
+        "column": 18,
+        "code": 1064,
+        "message": "The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<TargetDriver>'?",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/factory.js",
+        "line": 625,
+        "column": 36,
+        "code": 2339,
+        "message": "Property '_isTemporary' does not exist on type 'Promise<TargetDriver>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/factory.js",
+        "line": 859,
+        "column": 50,
+        "code": 2339,
+        "message": "Property 'then' does not exist on type 'TargetDriver'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/factory.js",
+        "line": 1109,
+        "column": 53,
+        "code": 2341,
+        "message": "Property 'registry' is private and only accessible within class 'DriverFactory'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/modules/handle_manager.js",
+        "line": 524,
+        "column": 10,
+        "code": 2300,
+        "message": "Duplicate identifier 'HandleManager'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 16,
+        "column": 73,
+        "code": 2339,
+        "message": "Property 'INPUT_CACHE_TTL' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 301,
+        "column": 22,
+        "code": 2339,
+        "message": "Property 'selectors' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 302,
+        "column": 73,
+        "code": 2339,
+        "message": "Property 'selectors' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 318,
+        "column": 38,
+        "code": 2339,
+        "message": "Property 'protocol' does not exist on type 'string'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 324,
+        "column": 41,
+        "code": 2339,
+        "message": "Property 'protocol' does not exist on type 'string'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 327,
+        "column": 41,
+        "code": 2339,
+        "message": "Property 'confidence' does not exist on type 'string'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/driver/modules/input_resolver.js",
+        "line": 609,
+        "column": 10,
+        "code": 2300,
+        "message": "Duplicate identifier 'InputResolver'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/driver/trackers/PageSessionTracker.js",
+        "line": 520,
+        "column": 9,
+        "code": 2322,
+        "message": "Type 'number' is not assignable to type '1'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 181,
+        "column": 46,
+        "code": 2345,
+        "message": "Argument of type '{}' is not assignable to parameter of type 'string'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 251,
+        "column": 25,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 251,
+        "column": 56,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 253,
+        "column": 90,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 255,
+        "column": 45,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 257,
+        "column": 21,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'timeout' does not exist in type 'ConnectOptions'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 260,
+        "column": 67,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 281,
+        "column": 25,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'timeout' does not exist in type 'ConnectOptions'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 310,
+        "column": 25,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 310,
+        "column": 56,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 312,
+        "column": 90,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 314,
+        "column": 52,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 316,
+        "column": 21,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'timeout' does not exist in type 'ConnectOptions'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 319,
+        "column": 74,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 326,
+        "column": 25,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 326,
+        "column": 56,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 328,
+        "column": 44,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 342,
+        "column": 27,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 346,
+        "column": 71,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 348,
+        "column": 45,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 350,
+        "column": 21,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'timeout' does not exist in type 'ConnectOptions'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 353,
+        "column": 67,
+        "code": 2339,
+        "message": "Property 'browserEndpoint' does not exist on type '{ mode: string; ports: number[]; hosts: string[]; connectionStrategies: string[]; retryDelayMs: number; maxRetryDelayMs: number; maxConnectionAttempts: number; connectionTimeout: number; pageScanIntervalMs: number; allowedDomains: string[]; pageSelectionPolicy: string; stateHistorySize: number; autoFallback: boolean...'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 385,
+        "column": 30,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 389,
+        "column": 74,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 395,
+        "column": 53,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 397,
+        "column": 29,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'timeout' does not exist in type 'ConnectOptions'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/ConnectionOrchestrator.js",
+        "line": 709,
+        "column": 37,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/browser_pool/circuit_breaker.js",
+        "line": 141,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '\"CIRCUIT_OPEN\"' is not assignable to type '\"OPERATIONAL\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/browser_pool/circuit_breaker.js",
+        "line": 143,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '\"DEGRADED\"' is not assignable to type '\"OPERATIONAL\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/browser_pool/circuit_breaker.js",
+        "line": 258,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '\"DEGRADED\"' is not assignable to type '\"OPERATIONAL\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/browser_pool/circuit_breaker.js",
+        "line": 275,
+        "column": 13,
+        "code": 2367,
+        "message": "This comparison appears to be unintentional because the types '\"OPERATIONAL\"' and '\"CIRCUIT_OPEN\"' have no overlap.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/browser_pool/puppeteer_guard.js",
+        "line": 109,
+        "column": 19,
+        "code": 2540,
+        "message": "Cannot assign to 'launch' because it is a read-only property.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/fs/control_store.js",
+        "line": 8,
+        "column": 60,
+        "code": 2339,
+        "message": "Property 'PAUSED' does not exist on type '{ PENDING: string; RUNNING: string; HEALTHY: string; FAILED: string; IDLE: string; SUCCESS: string; ACCEPTED: string; REJECTED: string; UNHEALTHY: string; CRASHED: string; SKIPPED: string; }'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 24,
+        "column": 26,
+        "code": 2345,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'string'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 26,
+        "column": 27,
+        "code": 2345,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'string'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 127,
+        "column": 48,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'timeout' does not exist in type 'DefaultMetricsCollectorConfiguration<RegistryContentType>'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 502,
+        "column": 31,
+        "code": 2339,
+        "message": "Property 'Browser' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 504,
+        "column": 44,
+        "code": 2339,
+        "message": "Property 'webSocketDebuggerUrl' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 823,
+        "column": 66,
+        "code": 2345,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'string'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/queue/cache.js",
+        "line": 152,
+        "column": 29,
+        "code": 2345,
+        "message": "Argument of type 'string | 0' is not assignable to parameter of type 'string'.\n  Type 'number' is not assignable to type 'string'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/queue/query_engine.js",
+        "line": 19,
+        "column": 66,
+        "code": 2339,
+        "message": "Property 'DONE' does not exist on type '{ PENDING: string; RUNNING: string; HEALTHY: string; FAILED: string; IDLE: string; SUCCESS: string; ACCEPTED: string; REJECTED: string; UNHEALTHY: string; CRASHED: string; SKIPPED: string; }'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/queue/scheduler.js",
+        "line": 79,
+        "column": 47,
+        "code": 2339,
+        "message": "Property 'DONE' does not exist on type '{ PENDING: string; RUNNING: string; HEALTHY: string; FAILED: string; IDLE: string; SUCCESS: string; ACCEPTED: string; REJECTED: string; UNHEALTHY: string; CRASHED: string; SKIPPED: string; }'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/infra/queue/task_loader.js",
+        "line": 46,
+        "column": 38,
+        "code": 2365,
+        "message": "Operator '>' cannot be applied to types 'number' and 'unknown'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 58,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '{ accepted: boolean; reason: string; }' is not assignable to type 'boolean'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 68,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '{ accepted: boolean; reason: string; }' is not assignable to type 'boolean'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 83,
+        "column": 17,
+        "code": 2322,
+        "message": "Type '{ accepted: boolean; reason: string; }' is not assignable to type 'boolean'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 89,
+        "column": 17,
+        "code": 2322,
+        "message": "Type '{ accepted: boolean; reason: string; }' is not assignable to type 'boolean'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 129,
+        "column": 9,
+        "code": 2322,
+        "message": "Type '{ accepted: boolean; stats: { domain: string; total_rules: number; session_evolutions: any; }; }' is not assignable to type 'boolean'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 141,
+        "column": 9,
+        "code": 2322,
+        "message": "Type '{ accepted: boolean; reason: string; error: any; }' is not assignable to type 'boolean'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/kernel.js",
+        "line": 48,
+        "column": 23,
+        "code": 2741,
+        "message": "Property 'nerv' is missing in type '{}' but required in type '{ nerv: any; telemetry?: { source?: string; retention?: number; }; policy?: { maxConcurrentTasks?: number; taskTimeout?: number; }; loop?: { interval?: number; }; }'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/kernel.js",
+        "line": 50,
+        "column": 5,
+        "code": 2339,
+        "message": "Property 'contextManager' does not exist on type '{ nerv: any; telemetry?: { source?: string; retention?: number; }; policy?: { maxConcurrentTasks?: number; taskTimeout?: number; }; loop?: { interval?: number; }; }'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 105,
+        "column": 13,
+        "code": 2367,
+        "message": "This comparison appears to be unintentional because the types '\"INACTIVE\"' and '\"ACTIVE\"' have no overlap.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 112,
+        "column": 9,
+        "code": 2322,
+        "message": "Type '\"ACTIVE\"' is not assignable to type '\"INACTIVE\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 133,
+        "column": 9,
+        "code": 2322,
+        "message": "Type '\"STOPPING\"' is not assignable to type '\"INACTIVE\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 218,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '\"DEGRADED\"' is not assignable to type '\"INACTIVE\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 249,
+        "column": 28,
+        "code": 2367,
+        "message": "This comparison appears to be unintentional because the types '\"INACTIVE\"' and '\"PAUSED\"' have no overlap.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 250,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '\"PAUSED\"' is not assignable to type '\"INACTIVE\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 255,
+        "column": 36,
+        "code": 2367,
+        "message": "This comparison appears to be unintentional because the types '\"INACTIVE\"' and '\"PAUSED\"' have no overlap.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 256,
+        "column": 13,
+        "code": 2322,
+        "message": "Type '\"ACTIVE\"' is not assignable to type '\"INACTIVE\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/kernel_loop/kernel_loop.js",
+        "line": 469,
+        "column": 13,
+        "code": 2367,
+        "message": "This comparison appears to be unintentional because the types '\"INACTIVE\"' and '\"DEGRADED\"' have no overlap.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/observation_store/observation_store.js",
+        "line": 194,
+        "column": 13,
+        "code": 4104,
+        "message": "The type 'readonly any[]' is 'readonly' and cannot be assigned to the mutable type 'any[]'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/observation_store/observation_store.js",
+        "line": 197,
+        "column": 9,
+        "code": 4104,
+        "message": "The type 'readonly any[]' is 'readonly' and cannot be assigned to the mutable type 'any[]'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/observation_store/observation_store.js",
+        "line": 218,
+        "column": 9,
+        "code": 4104,
+        "message": "The type 'readonly any[]' is 'readonly' and cannot be assigned to the mutable type 'any[]'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/observation_store/observation_store.js",
+        "line": 267,
+        "column": 9,
+        "code": 4104,
+        "message": "The type 'readonly any[]' is 'readonly' and cannot be assigned to the mutable type 'any[]'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/kernel/task_runtime/task_runtime.js",
+        "line": 148,
+        "column": 48,
+        "code": 2345,
+        "message": "Argument of type 'string' is not assignable to parameter of type '\"ACTIVE\" | \"CREATED\" | \"SUSPENDED\" | \"TERMINATED\"'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/kernel/telemetry/kernel_telemetry.js",
+        "line": 37,
+        "column": 17,
+        "code": 2741,
+        "message": "Property 'nerv' is missing in type '{}' but required in type '{ nerv: any; source?: string; retention?: number; enabled?: boolean; }'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 5,
+        "column": 10,
+        "code": 18042,
+        "message": "'z' is a type and cannot be imported in JavaScript files. Use 'import(\"zod\").z' in a JSDoc type annotation.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 26,
+        "column": 21,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 27,
+        "column": 10,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 28,
+        "column": 10,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 29,
+        "column": 12,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 32,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 36,
+        "column": 18,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 39,
+        "column": 29,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 40,
+        "column": 14,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 42,
+        "column": 25,
+        "code": 2708,
+        "message": "Cannot use namespace 'z' as a value.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 153,
+        "column": 26,
+        "code": 2362,
+        "message": "The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 155,
+        "column": 22,
+        "code": 2363,
+        "message": "The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/logic/adaptive.js",
+        "line": 155,
+        "column": 43,
+        "code": 2362,
+        "message": "The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/missions/mission_state_manager.js",
+        "line": 158,
+        "column": 37,
+        "code": 2362,
+        "message": "The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/missions/mission_state_manager.js",
+        "line": 158,
+        "column": 62,
+        "code": 2363,
+        "message": "The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/nerv/nerv.js",
+        "line": 23,
+        "column": 27,
+        "code": 2349,
+        "message": "This expression is not callable.\n  Not all constituents of type '((config: { url: string; options?: any; }) => { start: () => void; stop: () => void; send: (frame: any) => void; onReceive: (handler: Function) => void; events: EventEmitter<any>; }) | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/transport/socket_io_adapter\", { with: { \"resolution-mode\": \"import\" } })' are callable.\n    Type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/transport/socket_io_adapter\", { with: { \"resolution-mode\": \"import\" } })' has no call signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/nerv/nerv.js",
+        "line": 198,
+        "column": 9,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'transport' does not exist in type '{ envelopes: any; buffers: any; correlation: any; telemetry: any; }'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/nerv/transport/hybrid_transport.js",
+        "line": 122,
+        "column": 32,
+        "code": 2345,
+        "message": "Argument of type 'Function' is not assignable to parameter of type '(...args: any[]) => void'.\n  Type 'Function' provides no match for the signature '(...args: any[]): void'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/nerv/transport/hybrid_transport.js",
+        "line": 127,
+        "column": 37,
+        "code": 2345,
+        "message": "Argument of type 'Function' is not assignable to parameter of type '(...args: any[]) => void'.\n  Type 'Function' provides no match for the signature '(...args: any[]): void'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/orchestrator/validation/validation_service.js",
+        "line": 148,
+        "column": 28,
+        "code": 2739,
+        "message": "Type '{}' is missing the following properties from type '{ validators: any[]; criteria: any; }': validators, criteria",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 155,
+        "column": 28,
+        "code": 2339,
+        "message": "Property 'length' does not exist on type 'Promise<unknown[]>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 200,
+        "column": 34,
+        "code": 2339,
+        "message": "Property 'version' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 228,
+        "column": 28,
+        "code": 2339,
+        "message": "Property 'evolution_count' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 229,
+        "column": 30,
+        "code": 2339,
+        "message": "Property 'version' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 230,
+        "column": 42,
+        "code": 2339,
+        "message": "Property 'targets' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 274,
+        "column": 20,
+        "code": 2339,
+        "message": "Property 'accepted' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 278,
+        "column": 31,
+        "code": 2339,
+        "message": "Property 'stats' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/dna.js",
+        "line": 284,
+        "column": 54,
+        "code": 2339,
+        "message": "Property 'reason' does not exist on type 'unknown'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/api/controllers/rag.js",
+        "line": 231,
+        "column": 42,
+        "code": 2345,
+        "message": "Argument of type '{ query: string; topK: number; pathPrefix: any; ext: any; tags: any[]; rerank: any; rerankWeights: any; mmr: any; mmrLambda: number; }' is not assignable to parameter of type '{ query: string; topK: number; pathPrefix: string; ext: string; tags: string[]; distanceRange: any; rerank: boolean; rerankWeights: any; mmr: boolean; mmrLambda: number; }'.\n  Property 'distanceRange' is missing in type '{ query: string; topK: number; pathPrefix: any; ext: any; tags: any[]; rerank: any; rerankWeights: any; mmr: any; mmrLambda: number; }' but required in type '{ query: string; topK: number; pathPrefix: string; ext: string; tags: string[]; distanceRange: any; rerank: boolean; rerankWeights: any; mmr: boolean; mmrLambda: number; }'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/server/api/controllers/system.js",
+        "line": 203,
+        "column": 21,
+        "code": 2698,
+        "message": "Spread types may only be created from object types.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/api/controllers/tasks.js",
+        "line": 158,
+        "column": 38,
+        "code": 2698,
+        "message": "Spread types may only be created from object types.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/api/controllers/tasks.js",
+        "line": 161,
+        "column": 13,
+        "code": 2698,
+        "message": "Spread types may only be created from object types.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/dashboard-api/task_sync_bridge.js",
+        "line": 77,
+        "column": 16,
+        "code": 2739,
+        "message": "Type '{}' is missing the following properties from type '{ socketHub: any; nervClient: any; }': socketHub, nervClient",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/dashboard-api/telemetry_aggregator.js",
+        "line": 129,
+        "column": 11,
+        "code": 2739,
+        "message": "Type '{}' is missing the following properties from type '{ socketHub: any; intervalMs: number; }': socketHub, intervalMs",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/engine/lifecycle.js",
+        "line": 47,
+        "column": 38,
+        "code": 2349,
+        "message": "This expression is not callable.\n  Type '{}' has no call signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 122,
+        "column": 24,
+        "code": 2339,
+        "message": "Property 'robot_id' does not exist on type 'Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 123,
+        "column": 45,
+        "code": 2339,
+        "message": "Property 'robot_id' does not exist on type 'Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 124,
+        "column": 53,
+        "code": 2339,
+        "message": "Property 'robot_id' does not exist on type 'Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 127,
+        "column": 90,
+        "code": 2339,
+        "message": "Property 'robot_id' does not exist on type 'Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 251,
+        "column": 31,
+        "code": 2339,
+        "message": "Property 'MISSION_CONTROL' does not exist on type 'Readonly<{ KERNEL: \"KERNEL\"; SERVER: \"SERVER\"; INFRA: \"INFRA\"; OBSERVER: \"OBSERVER\"; MAESTRO: \"MAESTRO\"; DRIVER: \"DRIVER\"; }>'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 337,
+        "column": 51,
+        "code": 2556,
+        "message": "A spread argument must either have a tuple type or be passed to a rest parameter.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 338,
+        "column": 55,
+        "code": 2556,
+        "message": "A spread argument must either have a tuple type or be passed to a rest parameter.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 339,
+        "column": 53,
+        "code": 2556,
+        "message": "A spread argument must either have a tuple type or be passed to a rest parameter.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/engine/socket.js",
+        "line": 340,
+        "column": 55,
+        "code": 2556,
+        "message": "A spread argument must either have a tuple type or be passed to a rest parameter.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 39,
+        "column": 57,
+        "code": 2339,
+        "message": "Property 'SERVER_AUTHORITIES' does not exist on type 'typeof import(\"#core/authority\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 86,
+        "column": 33,
+        "code": 2339,
+        "message": "Property 'resolveAuthority' does not exist on type 'typeof import(\"#core/authority\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "Propriedade pode não existir - verificar em runtime"
+      },
+      {
+        "file": "src/server/main.js",
+        "line": 111,
+        "column": 71,
+        "code": 2345,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'number'.",
+        "category": "error",
+        "reason": "Type mismatch - revisar lógica"
+      },
+      {
+        "file": "src/server/middleware/schema_guard.js",
+        "line": 8,
+        "column": 12,
+        "code": 2503,
+        "message": "Cannot find namespace 'z'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/realtime/bus/pm2_bridge.js",
+        "line": 156,
+        "column": 36,
+        "code": 2349,
+        "message": "This expression is not callable.\n  Type '{}' has no call signatures.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/server/watchers/fs_watcher.js",
+        "line": 5,
+        "column": 18,
+        "code": 2305,
+        "message": "Module '\"#server/engine/socket\"' has no exported member 'notifyAgent'.",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      },
+      {
+        "file": "src/shared/utils/execution_context_filler.js",
+        "line": 121,
+        "column": 14,
+        "code": 1064,
+        "message": "The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<string>'?",
+        "category": "error",
+        "reason": "Outro erro de tipo"
+      }
+    ],
+    "falsPositives": [
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 262,
+        "column": 79,
+        "code": 2339,
+        "message": "Property 'BROWSER_POOL_SIZE' does not exist on type 'ConfigurationManager | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/core/config\", { with: { \"resolution-mode\": \"import\" } })'.\n  Property 'BROWSER_POOL_SIZE' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 264,
+        "column": 75,
+        "code": 2339,
+        "message": "Property 'ALLOCATION_STRATEGY' does not exist on type 'ConfigurationManager | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/core/config\", { with: { \"resolution-mode\": \"import\" } })'.\n  Property 'ALLOCATION_STRATEGY' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 266,
+        "column": 77,
+        "code": 2339,
+        "message": "Property 'HEALTH_CHECK_INTERVAL' does not exist on type 'ConfigurationManager | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/core/config\", { with: { \"resolution-mode\": \"import\" } })'.\n  Property 'HEALTH_CHECK_INTERVAL' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 348,
+        "column": 75,
+        "code": 2339,
+        "message": "Property 'BROWSER_POOL_SIZE' does not exist on type 'ConfigurationManager | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/core/config\", { with: { \"resolution-mode\": \"import\" } })'.\n  Property 'BROWSER_POOL_SIZE' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 350,
+        "column": 71,
+        "code": 2339,
+        "message": "Property 'ALLOCATION_STRATEGY' does not exist on type 'ConfigurationManager | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/core/config\", { with: { \"resolution-mode\": \"import\" } })'.\n  Property 'ALLOCATION_STRATEGY' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/core/boot_resilience_manager.js",
+        "line": 351,
+        "column": 90,
+        "code": 2339,
+        "message": "Property 'HEALTH_CHECK_INTERVAL' does not exist on type 'ConfigurationManager | typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/core/config\", { with: { \"resolution-mode\": \"import\" } })'.\n  Property 'HEALTH_CHECK_INTERVAL' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/core/doctor.js",
+        "line": 24,
+        "column": 89,
+        "code": 2339,
+        "message": "Property 'DEBUG_PORT' does not exist on type 'ConfigurationManager'.",
+        "category": "error",
+        "reason": "Propriedade dinâmica - TS não consegue inferir"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 900,
+        "column": 75,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/nerv/nerv\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 902,
+        "column": 95,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/nerv/adapters/high_level_adapter\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/infra/proxy/chromeProxyService.js",
+        "line": 903,
+        "column": 87,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/shared/nerv/constants\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/infra/storage/dna_evolution.js",
+        "line": 15,
+        "column": 63,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/storage/dna_store\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/kernel/policies/policy_engine.js",
+        "line": 104,
+        "column": 93,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/nerv/adapters/high_level_adapter\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/kernel/policies/policy_engine.js",
+        "line": 118,
+        "column": 93,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/nerv/adapters/high_level_adapter\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/server/api/controllers/health.js",
+        "line": 65,
+        "column": 87,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/server/realtime/bus/pm2_bridge\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/server/dashboard-api/task_sync_bridge.js",
+        "line": 102,
+        "column": 83,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/queue/cache\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      },
+      {
+        "file": "src/server/dashboard-api/telemetry_aggregator.js",
+        "line": 166,
+        "column": 83,
+        "code": 2339,
+        "message": "Property 'default' does not exist on type 'typeof import(\"/workspaces/chatgpt-docker-puppeteer/src/infra/queue/cache\", { with: { \"resolution-mode\": \"import\" } })'.",
+        "category": "error",
+        "reason": "ESM import - TS não infere .default corretamente"
+      }
+    ],
+    "configIssues": []
+  }
+}

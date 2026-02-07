@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from './constants.js';
 import { v4 as uuidv4 } from 'uuid';
 

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as system from '#infra/system';
 import { log, audit } from './logger.js';
 import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';

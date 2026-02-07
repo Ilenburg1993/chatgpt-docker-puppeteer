@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { z } from 'zod';
 import { cleanText } from '#infra/fs/fs_utils';
 import { STATUS_VALUES, STATUS_VALUES_ARRAY } from '../constants/tasks.js';
@@ -50,6 +51,7 @@ const SOURCE_SCHEMA = z
  * STATUS_SCHEMA: Estados permitidos no ciclo de vida.
  * Utiliza constantes centralizadas de STATUS_VALUES.
  */
-const STATUS_SCHEMA = z.enum(STATUS_VALUES_ARRAY).default(STATUS_VALUES.PENDING);
+// z.enum() (Zod v4) requer tuple readonly [string, ...string[]]
+const STATUS_SCHEMA = z.enum(/** @type {[string, ...string[]]} */ (STATUS_VALUES_ARRAY)).default(STATUS_VALUES.PENDING);
 
 export { ID_SCHEMA, TIMESTAMP_SCHEMA, CLEAN_STRING_SCHEMA, PRIORITY_SCHEMA, SOURCE_SCHEMA, STATUS_SCHEMA };

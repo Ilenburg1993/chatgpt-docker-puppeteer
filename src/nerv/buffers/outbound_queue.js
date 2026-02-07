@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/nerv/buffers/outbound_queue.js
    Subsistema: NERV — Neural Event Relay Vector

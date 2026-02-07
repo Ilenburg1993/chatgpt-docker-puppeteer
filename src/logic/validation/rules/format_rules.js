@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/logic/validation/rules/format_rules.js
    Audit Level: 100 — Industrial Hardening (Structural Integrity - Platinum)

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import createOutboundQueue from './outbound_queue.js';
 import createInboundQueue from './inbound_queue.js';
 import createBackpressure from './backpressure.js';

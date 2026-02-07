@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { CONTROL, safeReadJSON } from './fs_core.js';
 import { STATUS_VALUES } from '#core/constants/tasks';
 

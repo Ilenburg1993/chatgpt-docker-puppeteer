@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * Task-related constants
  * Centralized definitions for task states and status values
@@ -49,6 +50,9 @@ const STATUS_VALUES = {
     /** Task completed successfully */
     SUCCESS: 'SUCCESS',
 
+    /** Task completed successfully (canonical queue status) */
+    DONE: 'DONE',
+
     /** Task was accepted for processing */
     ACCEPTED: 'ACCEPTED',
 
@@ -62,7 +66,13 @@ const STATUS_VALUES = {
     CRASHED: 'CRASHED',
 
     /** Task was skipped */
-    SKIPPED: 'SKIPPED'
+    SKIPPED: 'SKIPPED',
+
+    /** Task is paused (circuit breaker / manual pause) */
+    PAUSED: 'PAUSED',
+
+    /** Driver/component is stalled (progress stopped but not failed) */
+    STALLED: 'STALLED'
 };
 
 /**

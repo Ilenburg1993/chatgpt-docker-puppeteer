@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
 /**
@@ -30,6 +31,7 @@ class CircuitBreakerManager {
         this.nerv = nerv; // NERV bus para emitir eventos
 
         // Estado atual
+        /** @type {string} */
         this.state = CircuitState.OPERATIONAL;
         this.lastStateChange = Date.now();
 

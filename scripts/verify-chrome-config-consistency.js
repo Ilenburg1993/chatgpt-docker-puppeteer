@@ -1,4 +1,4 @@
-import config from '../config.json';
+import config from '../config.json' with { type: 'json' };
 
 console.log('🔍 VERIFICAÇÃO DE CONFIGURAÇÃO');
 console.log('=' .repeat(70));

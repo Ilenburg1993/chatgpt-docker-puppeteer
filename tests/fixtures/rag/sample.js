@@ -40,11 +40,12 @@ export class DataProcessor {
     }
 }
 
-export interface ConfigOptions {
-    maxSize?: number;
-    enabled?: boolean;
-    timeout?: number;
-}
+/**
+ * @typedef {Object} ConfigOptions
+ * @property {number} [maxSize] - Maximum size
+ * @property {boolean} [enabled] - Enable/disable flag
+ * @property {number} [timeout] - Timeout in milliseconds
+ */
 
 function internalHelper() {
     return 'helper';

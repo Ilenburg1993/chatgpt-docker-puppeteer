@@ -34,7 +34,7 @@ wss.on('connection', (ws, req) => {
       const id = parsed && parsed.id ? parsed.id : null;
       const resp = { id, result: { echo: parsed } };
       ws.send(JSON.stringify(resp));
-    } catch (e) {
+    } catch (_) {
       ws.send(JSON.stringify({ error: 'invalid json', raw: String(message) }));
     }
   });

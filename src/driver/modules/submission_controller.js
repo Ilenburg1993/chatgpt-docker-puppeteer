@@ -482,14 +482,15 @@ class SubmissionController extends EventEmitter {
      * Retorna estatísticas de submission.
      * 
      * @returns {Object} Objeto com métricas de submission
-     * @returns {number} return.totalSubmissions - Total de submissions executadas
-     * @returns {number} return.successfulSubmissions - Submissions bem-sucedidas
-     * @returns {number} return.failedSubmissions - Submissions que falharam
-     * @returns {number} return.syntheticSubmissions - Fallbacks sintéticos acionados
-     * @returns {number} return.lockBlockedAttempts - Tentativas bloqueadas por lock
-     * @returns {number} return.totalSubmissionDuration - Duração total acumulada (ms)
-     * @returns {number} return.maxSubmissionDuration - Duração máxima individual (ms)
-     * @returns {Object} return.config - Configuração atual (SUBMISSION_CONFIG)
+     * Propriedades do objeto retornado:
+     *   - totalSubmissions (number): Total de submissions executadas
+     *   - successfulSubmissions (number): Submissions bem-sucedidas
+     *   - failedSubmissions (number): Submissions que falharam
+     *   - syntheticSubmissions (number): Fallbacks sintéticos acionados
+     *   - lockBlockedAttempts (number): Tentativas bloqueadas por lock
+     *   - totalSubmissionDuration (number): Duração total acumulada (ms)
+     *   - maxSubmissionDuration (number): Duração máxima individual (ms)
+     *   - config (Object): Configuração atual (SUBMISSION_CONFIG)
      * 
      * @example
      * const stats = controller.getStats();

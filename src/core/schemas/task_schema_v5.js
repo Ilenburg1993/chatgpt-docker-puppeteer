@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { z } from 'zod';
 import { CONNECTION_MODES } from '../constants/browser.js';
 
@@ -357,17 +358,18 @@ const StateSchemaV5 = z.object({
                 .default([]),
 
             // NOVO V5: Summary (agregações úteis para análise rápida)
-            summary: z
-                .object({
-                    total_events: z.number().int().default(0),
-                    errors_count: z.number().int().default(0),
-                    warnings_count: z.number().int().default(0),
-                    retry_count: z.number().int().default(0),
-                    phase_durations: z.record(z.number()).default({}), // { 'preparation': 1200, 'execution': 3400, ... }
-                })
-                .default({}),
-        })
-        .default({ events: [], summary: {} }),
+	            summary: z
+	                .object({
+	                    total_events: z.number().int().default(0),
+	                    errors_count: z.number().int().default(0),
+	                    warnings_count: z.number().int().default(0),
+	                    retry_count: z.number().int().default(0),
+	                    // Zod v4: record(keyType, valueType)
+	                    phase_durations: z.record(z.string(), z.number()).default(/** @type {any} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
+	                })
+	                .default({}),
+	        })
+	        .default({ events: [], summary: {} }),
 });
 
 /**

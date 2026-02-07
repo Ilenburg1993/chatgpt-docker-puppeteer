@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
@@ -20,10 +21,10 @@ import CONFIG from '#core/config';
 
 // Configurações locais do proxy (sobrescrevem CONFIG se fornecidas via env)
 const LOCAL_CONFIG = {
-    PROXY_PORT: parseInt(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || '9224', 10),
-    CHROME_HOST: process.env.CHROME_HOST || CONFIG.CHROME_HOST || 'host.docker.internal',
-    CHROME_PORT: parseInt(process.env.CHROME_PORT || CONFIG.CHROME_PORT || '9225', 10),
-    PROXY_BIND: process.env.CHROME_PROXY_BIND || CONFIG.CHROME_PROXY_BIND || '0.0.0.0',
+    PROXY_PORT: parseInt(String(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || '9224'), 10),
+    CHROME_HOST: String(process.env.CHROME_HOST || CONFIG.CHROME_HOST || 'host.docker.internal'),
+    CHROME_PORT: parseInt(String(process.env.CHROME_PORT || CONFIG.CHROME_PORT || '9225'), 10),
+    PROXY_BIND: String(process.env.CHROME_PROXY_BIND || CONFIG.CHROME_PROXY_BIND || '0.0.0.0'),
     PUBLIC_IP: process.env.PUBLIC_IP || null,
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
@@ -123,7 +124,8 @@ class ChromeProxyService {
 
         // Prometheus metrics with labels
         try {
-            promClient.collectDefaultMetrics({ timeout: 5000 });
+            // Default metrics are collected on scrape; no interval/timeout config needed.
+            promClient.collectDefaultMetrics();
         } catch (err) {
             this.log('warn', 'Failed to collect default metrics', { error: err.message });
         }
@@ -495,6 +497,7 @@ class ChromeProxyService {
                 return { healthy: false, error: `HTTP ${res.status}` };
             }
 
+            /** @type {{ Browser?: string, 'Protocol-Version'?: string, webSocketDebuggerUrl?: string }} */
             const json = await res.json();
             return {
                 healthy: true,
@@ -534,8 +537,8 @@ class ChromeProxyService {
         this.stats.httpRequests++;
 
         const clientIP = req.socket.remoteAddress;
-        const method = req.method;
-        const url = req.url;
+        const method = req.method || 'GET';
+        const url = req.url || '/';
 
         this.log('info', `HTTP ${method} ${url}`, { from: clientIP });
 
@@ -574,6 +577,7 @@ class ChromeProxyService {
         }
 
         const needsRewrite = url && url.startsWith('/json');
+        /** @type {import('node:http').RequestOptions} */
         const options = {
             hostname: this.config.CHROME_HOST,
             port: this.config.CHROME_PORT,
@@ -762,20 +766,29 @@ class ChromeProxyService {
             }
         }, 30000); // 30s ping interval
 
+        // Cleanup function to prevent resource leaks
+        let cleanupDone = false;
+        const cleanup = () => {
+            if (cleanupDone) return;
+            cleanupDone = true;
+
+            // Clear ping interval
+            clearInterval(pingInterval);
+
+            // Remove from active connections
+            this.activeConnections.delete(socket);
+            this._setMetric(this.metrics.activeConnections, this.activeConnections.size);
+
+            this.log('debug', 'WebSocket cleanup complete');
+        };
+
         socket.on('pong', () => markActive(socket));
-        socket.on('close', () => clearInterval(pingInterval));
+        socket.on('close', cleanup);
 
         // Use http-proxy if available
         if (this.wsProxy) {
             try {
                 this.activeConnections.add(socket);
-
-                socket.on('close', () => {
-                    this.log('debug', 'WebSocket closed');
-                    this.activeConnections.delete(socket);
-                    this._setMetric(this.metrics.activeConnections, this.activeConnections.size);
-                    clearInterval(pingInterval);
-                });
 
                 this.wsProxy.ws(req, socket, head);
 
@@ -809,6 +822,9 @@ class ChromeProxyService {
                     );
                 }
 
+                // Cleanup before destroying socket (prevents resource leak)
+                cleanup();
+
                 try {
                     socket.destroy();
                 } catch (destroyErr) {
@@ -819,7 +835,7 @@ class ChromeProxyService {
         }
 
         // Fallback: raw socket proxying
-        const proxySocket = net.connect(this.config.CHROME_PORT, this.config.CHROME_HOST, () => {
+        const proxySocket = net.connect(Number(this.config.CHROME_PORT), String(this.config.CHROME_HOST), () => {
             this.log('debug', 'Chrome WebSocket connected');
             proxySocket.write(`${req.method} ${url} HTTP/${req.httpVersion}\r\n`);
             Object.entries(req.headers).forEach(([key, value]) => {
@@ -847,10 +863,8 @@ class ChromeProxyService {
 
         socket.on('close', () => {
             this.log('debug', 'WebSocket closed');
-            this.activeConnections.delete(socket);
             proxySocket.destroy();
-            this._setMetric(this.metrics.activeConnections, this.activeConnections.size);
-            clearInterval(pingInterval);
+            cleanup();
         });
 
         proxySocket.on('error', err => {
@@ -867,6 +881,8 @@ class ChromeProxyService {
                 );
             }
 
+            // Cleanup before destroying socket (prevents resource leak)
+            cleanup();
             socket.destroy();
         });
 
@@ -884,6 +900,8 @@ class ChromeProxyService {
                 );
             }
 
+            // Cleanup before destroying proxySocket (prevents resource leak)
+            cleanup();
             proxySocket.destroy();
         });
     }
@@ -896,11 +914,11 @@ class ChromeProxyService {
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
-                const nervModule = await import('#nerv/nerv').then(m => m.default ?? m);
+                const nervModule = await import('#nerv/nerv');
                 createNERV = nervModule?.createNERV || null;
-                HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
-                const nervConsts = await import('#shared/nerv/constants').then(m => m.default ?? m);
-                ActionCode = nervConsts?.ActionCode || nervConsts;
+                HighLevelNERV = await import('#nerv/adapters/high_level_adapter');
+                const nervConsts = await import('#shared/nerv/constants');
+                ActionCode = nervConsts?.ActionCode || null;
                 ActorRole = nervConsts?.ActorRole || {};
 
                 if (typeof createNERV === 'function') {
@@ -998,7 +1016,7 @@ class ChromeProxyService {
             this.server.on('upgrade', this.handleWebSocketUpgrade.bind(this));
 
             // Start listening
-            this.server.listen(this.config.PROXY_PORT, this.config.PROXY_BIND, () => {
+            this.server.listen(Number(this.config.PROXY_PORT), String(this.config.PROXY_BIND), () => {
                 this.log('info', '✅ Chrome Proxy Service v2.0 started');
                 this.log('info', `   Listening: ${this.config.PROXY_BIND}:${this.config.PROXY_PORT}`);
                 this.log('info', `   Forwarding to: ${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`);

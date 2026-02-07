@@ -37,23 +37,8 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
     await browser2.close();
     console.log('  ✅ Browser fechado\n');
 
-    // TESTE 3: Cache Info
-    console.log('TESTE 3: Informações de Cache');
-    const cacheInfo = ConnectionOrchestrator.getCacheInfo();
-    console.log('  Cache dir:', cacheInfo.path);
-    console.log('  Existe:', cacheInfo.exists);
-    console.log('  Chrome:', cacheInfo.chrome ? '✅' : '❌');
-    console.log('  Chrome Headless:', cacheInfo.chromeHeadless ? '✅' : '❌');
-    console.log();
-
-    // TESTE 4: Limpeza de profiles temporários
-    console.log('TESTE 4: Limpeza de Profiles Temporários');
-    const cleaned = await ConnectionOrchestrator.cleanupTempProfiles();
-    console.log('  Profiles limpos:', cleaned);
-    console.log();
-
-    // TESTE 5: Reutilização de instância (cache)
-    console.log('TESTE 5: Reutilização de Browser (cache interno)');
+    // TESTE 3: Reutilização de instância (cache)
+    console.log('TESTE 3: Reutilização de Browser (cache interno)');
     const orch3 = new ConnectionOrchestrator({ mode: 'launcher' });
 
     const browser3a = await orch3.connect();
@@ -66,8 +51,8 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
     await browser3a.close();
     console.log('  ✅ Browser fechado\n');
 
-    // TESTE 6: Argumentos customizados
-    console.log('TESTE 6: Argumentos Customizados');
+    // TESTE 4: Argumentos customizados
+    console.log('TESTE 4: Argumentos Customizados');
     const orch4 = new ConnectionOrchestrator({
         mode: 'launcher',
         headless: 'new',
@@ -89,8 +74,6 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
     console.log('📊 Resumo:');
     console.log('  ✅ Modo Launcher');
     console.log('  ✅ Modo Auto (fallback)');
-    console.log('  ✅ Cache persistente');
-    console.log('  ✅ Limpeza de temporários');
     console.log('  ✅ Reutilização de instâncias');
     console.log('  ✅ Argumentos customizados');
     console.log('  ✅ Estado e diagnóstico');

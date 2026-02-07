@@ -8,17 +8,19 @@
     "target": "ES2024",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "lib": [
-      "ES2024"
-    ],
+    "lib": ["ES2024"],
 
     // ============================================================
     // [B] JAVASCRIPT PURO (SEM TYPESCRIPT)
     // ============================================================
     "allowJs": true,
 
-    // ATIVE se você quer maximizar diagnóstico e IntelliSense:
-    "checkJs": true,
+    // ✅ ESTRATÉGIA: Type checking seletivo
+    // - checkJs: false → Desabilita checking global (evita 600+ falsos positivos)
+    // - IntelliSense continua funcionando 100% (autocomplete, navegação, refactor)
+    // - Use // @ts-check em arquivos CORE críticos para habilitar checking seletivo
+    "checkJs": false,
+
     // Mantém JS dinâmico permissivo
     "strict": false,
     "noImplicitAny": false,
@@ -37,38 +39,32 @@
     // ============================================================
     "baseUrl": ".",
     "paths": {
-      "#/*": ["src/*"],
-      "#core/*": ["src/core/*"],
+            "#core/*": ["src/core/*"],
       "#shared/*": ["src/shared/*"],
       "#nerv/*": ["src/nerv/*"],
       "#kernel/*": ["src/kernel/*"],
       "#driver/*": ["src/driver/*"],
       "#infra/*": ["src/infra/*"],
       "#server/*": ["src/server/*"],
-      "#logic/*": [
-        "src/logic/*"
-      ],
-      "#orchestrator/*": [
-        "src/orchestrator/*"
-      ],
-      "#missions/*": [
-        "src/missions/*"
-      ],
-      "#validation/*": [
-        "src/validation/*"
-      ]
+      "#logic/*": ["src/logic/*"],
+      "#orchestrator/*": ["src/orchestrator/*"],
+      "#missions/*": ["src/missions/*"],
+      "#validation/*": ["src/validation/*"]
     },
 
     // ============================================================
-    // [E] TIPOS (APENAS NODE)
+    // [E] TIPOS (NODE + CUSTOM DECLARATIONS)
     // ============================================================
-    "typeRoots": ["./node_modules/@types"],
+    // typeRoots aponta para pastas com index.d.ts ou package.json
+    // Inclui node_modules/@types E src/types para custom declarations
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "types": ["node"],
 
     // ============================================================
     // [F] QUALIDADE (diagnósticos úteis sem "punição" excessiva)
     // ============================================================
     "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0,
 
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
@@ -90,6 +86,7 @@
   // ==============================================================
   "include": [
     "src/**/*.js",
+    "src/**/*.d.ts",
     "scripts/**/*.js",
     "tests/**/*.js",
 
@@ -121,6 +118,8 @@
     "analysis",
     "local-login",
     "DOCUMENTAÇÃO",
+
+    "src/dashboard-ui",
 
     ".git",
 

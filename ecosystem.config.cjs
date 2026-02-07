@@ -154,7 +154,8 @@ module.exports = {
                 NODE_ENV: 'development',
                 DAEMON_MODE: 'true',
                 SERVER_AUTHORITY: 'standalone', // PM2 SOBERANO: Processo autônomo
-                ENABLE_STATE_FILE: 'false'      // Usa NERV SERVER_READY (não estado.json)
+                ENABLE_STATE_FILE: 'false',     // Usa NERV SERVER_READY (não estado.json)
+                MCP_ENABLED: 'true'             // Habilita MCP handler (v4.1)
             },
 
             env_production: {
@@ -162,7 +163,8 @@ module.exports = {
                 NODE_ENV: 'production',
                 DAEMON_MODE: 'true',
                 SERVER_AUTHORITY: 'standalone',
-                ENABLE_STATE_FILE: 'false'
+                ENABLE_STATE_FILE: 'false',
+                MCP_ENABLED: 'true'
             }
         },
 

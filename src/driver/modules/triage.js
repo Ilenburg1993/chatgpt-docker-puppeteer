@@ -543,10 +543,11 @@ class Triage extends EventEmitter {
      * 
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
      * @returns {Promise<Object>} Diagnóstico estruturado
-     * @returns {string} return.type - Tipo de diagnóstico
-     * @returns {string} return.severity - Severidade (CRITICAL, HIGH, MEDIUM, NONE)
-     * @returns {Object} return.evidence - Evidências coletadas
-     * @returns {number} return.ts - Timestamp
+     * Propriedades do objeto retornado:
+     *   - type (string): Tipo de diagnóstico
+     *   - severity (string): Severidade (CRITICAL, HIGH, MEDIUM, NONE)
+     *   - evidence (Object): Evidências coletadas
+     *   - ts (number): Timestamp
      * 
      * @throws {TriageError} Se diagnóstico abortado (type: ABORTED)
      * @throws {TriageError} Se timeout exceder (type: TIMEOUT)
@@ -629,22 +630,23 @@ class Triage extends EventEmitter {
      * Retorna estatísticas de diagnóstico.
      * 
      * @returns {Object} Objeto com métricas de diagnóstico
-     * @returns {number} return.totalDiagnoses - Total de diagnósticos
-     * @returns {number} return.successfulDiagnoses - Diagnósticos bem-sucedidos
-     * @returns {number} return.failedDiagnoses - Diagnósticos que falharam
-     * @returns {number} return.timeoutDiagnoses - Diagnósticos com timeout
-     * @returns {Object} return.patternsDetected - Contadores por padrão
-     * @returns {number} return.totalDiagnosisTime - Tempo total (ms)
-     * @returns {number} return.maxDiagnosisTime - Tempo máximo (ms)
-     * @returns {number} return.totalScanTime - Tempo total de scan (ms)
-     * @returns {number} return.totalLagMeasurements - Total de medições de lag
-     * @returns {number} return.totalLag - Lag total acumulado (ms)
-     * @returns {number} return.maxLag - Lag máximo (ms)
-     * @returns {string} return.avgDiagnosisTime - Tempo médio de diagnóstico
-     * @returns {string} return.successRate - Taxa de sucesso (%)
-     * @returns {string} return.avgLag - Lag médio
-     * @returns {string} return.mostCommonPattern - Padrão mais comum
-     * @returns {Object} return.config - Configuração atual (TRIAGE_CONFIG)
+     * Propriedades do objeto retornado:
+     *   - totalDiagnoses (number): Total de diagnósticos
+     *   - successfulDiagnoses (number): Diagnósticos bem-sucedidos
+     *   - failedDiagnoses (number): Diagnósticos que falharam
+     *   - timeoutDiagnoses (number): Diagnósticos com timeout
+     *   - patternsDetected (Object): Contadores por padrão
+     *   - totalDiagnosisTime (number): Tempo total (ms)
+     *   - maxDiagnosisTime (number): Tempo máximo (ms)
+     *   - totalScanTime (number): Tempo total de scan (ms)
+     *   - totalLagMeasurements (number): Total de medições de lag
+     *   - totalLag (number): Lag total acumulado (ms)
+     *   - maxLag (number): Lag máximo (ms)
+     *   - avgDiagnosisTime (string): Tempo médio de diagnóstico
+     *   - successRate (string): Taxa de sucesso (%)
+     *   - avgLag (string): Lag médio
+     *   - mostCommonPattern (string): Padrão mais comum
+     *   - config (Object): Configuração atual (TRIAGE_CONFIG)
      * 
      * @example
      * const stats = triage.getStats();

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
 /**
@@ -61,8 +62,8 @@ async function getChromeHealth(req, res) {
  */
 async function getPm2Health(req, res) {
     try {
-        const pm2Bridge = await import('#server/realtime/bus/pm2_bridge').then(m => m.default ?? m);
-        const snapshot = pm2Bridge.getSnapshot();
+        const pm2Bridge = await import('#server/realtime/bus/pm2_bridge');
+        const snapshot = await pm2Bridge.refreshSnapshot();
 
         res.json({
             status: 'ok',

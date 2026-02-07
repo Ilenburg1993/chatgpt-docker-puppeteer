@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'fs/promises';
 import path from 'node:path';
 import * as logger from '#core/logger';
@@ -154,7 +155,7 @@ class MissionStateManager {
             }
 
             // Ordena por created_at (mais recentes primeiro)
-            missions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            missions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
             return missions;
         } catch (error) {

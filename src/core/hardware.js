@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import v8 from 'node:v8';
 import os from 'node:os';
 

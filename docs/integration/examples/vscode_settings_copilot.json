@@ -1,0 +1,9 @@
+{
+  "github.copilot.chat.mcpServers": {
+    "chatgpt-docker": {
+      "url": "http://localhost:3008/api/mcp",
+      "transport": "http"
+    }
+  },
+  "github.copilot.chat.githubMcpServer.enabled": true
+}

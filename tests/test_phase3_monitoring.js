@@ -1,4 +1,5 @@
 #!/usr/bin/env nodeimport assert from 'node:assert';
+// @ts-nocheck
 import EventEmitter from 'node:events';
 
 /* ==========================================================================

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ValidationService } from './validation/validation_service.js';
 import { ContextManager } from './context_manager.js';
 import * as logger from '#core/logger';
@@ -45,8 +46,8 @@ class OrchestratorEngine {
      * @param {object} task - Task V5
      * @returns {object} - Task modificada
      */
-    beforeExecution(task) {
-        const strategy = task.spec?.execution?.strategy || 'SINGLE_SHOT';
+	beforeExecution(task) {
+		const strategy = task.spec?.execution?.strategy || 'SINGLE_SHOT';
 
         // Emite evento NERV
         this._emitNervEvent('ORCHESTRATION_STARTED', {
@@ -56,18 +57,56 @@ class OrchestratorEngine {
             mission_id: task.meta.mission_id
         });
 
-        // Se é ITERATIVE, inicializa iteration state
-        if (strategy === 'ITERATIVE') {
-            this._initializeIterationState(task);
-        }
+		// Important: tasks can be frozen snapshots (queue/cache). Treat them as immutable.
+		let nextTask = task;
 
-        // Se é MULTI_STEP, inicializa workflow state
-        if (strategy === 'MULTI_STEP') {
-            this._initializeWorkflowState(task);
-        }
+		// Se é ITERATIVE, inicializa iteration state
+		if (strategy === 'ITERATIVE') {
+			nextTask = this._initializeIterationState(nextTask);
+		}
 
-        return task;
-    }
+		// Se é MULTI_STEP, inicializa workflow state
+		if (strategy === 'MULTI_STEP') {
+			nextTask = this._initializeWorkflowState(nextTask);
+		}
+
+		return nextTask;
+	}
+
+	/**
+	 * Retorna uma nova task com `state` atualizado, sem mutar o objeto original.
+	 * (algumas tasks chegam como snapshots congelados)
+	 *
+	 * @param {object} task
+	 * @param {object} statePatch
+	 * @returns {object}
+	 */
+
+	_withState(task, statePatch) {
+		// Prefer in-place updates when safe (tests and many callers expect mutation),
+		// but fall back to immutable copies for frozen snapshot tasks.
+		const canMutateTask = !!(task && typeof task === 'object' && !Object.isFrozen(task));
+		if (canMutateTask) {
+			const prevStateOk = task.state && typeof task.state === 'object' && task.state !== null;
+			const stateFrozen = prevStateOk && Object.isFrozen(task.state);
+			if (!prevStateOk || stateFrozen) {
+				// Replace state container if missing/frozen (property assignment is allowed if task isn't frozen).
+				task.state = prevStateOk && stateFrozen ? { ...task.state } : {};
+			}
+			Object.assign(task.state, statePatch);
+			return task;
+		}
+
+		const prevState =
+			task && typeof task.state === 'object' && task.state !== null ? /** @type {Record<string, unknown>} */ (task.state) : {};
+		return {
+			...task,
+			state: {
+				...prevState,
+				...statePatch
+			}
+		};
+	}
 
     /**
      * Processa resultado após execução e decide próxima ação.
@@ -118,29 +157,32 @@ class OrchestratorEngine {
     /**
      * Inicializa estado de iteração para task ITERATIVE.
      */
-    _initializeIterationState(task) {
-        const iterationState = {
-            task_id: task.meta.id,
-            current_iteration: 0,
-            max_iterations: task.spec.execution.iterative_config?.max_iterations || 3,
-            iterations_history: []
-        };
+	_initializeIterationState(task) {
+		const iterationState = {
+			task_id: task.meta.id,
+			current_iteration: 0,
+			max_iterations: task.spec.execution.iterative_config?.max_iterations || 3,
+			iterations_history: []
+		};
 
         this.activeIterations.set(task.meta.id, iterationState);
 
-        // Atualiza task state
-        if (!task.state.iteration_state) {
-            task.state.iteration_state = {
-                current_iteration: 0,
-                iterations_history: []
-            };
-        }
-    }
+		// Atualiza task state (imutável)
+		if (task?.state?.iteration_state) {
+			return task;
+		}
+		return this._withState(task, {
+			iteration_state: {
+				current_iteration: 0,
+				iterations_history: []
+			}
+		});
+	}
 
     /**
      * Inicializa estado de workflow para task MULTI_STEP.
      */
-    _initializeWorkflowState(task) {
+	_initializeWorkflowState(task) {
         const workflow_id = task.meta.workflow_id || task.meta.id;
         const steps = task.spec.execution.workflow_config?.steps || [];
 
@@ -165,26 +207,29 @@ class OrchestratorEngine {
             }
         });
 
-        // Atualiza task state
-        if (!task.state.workflow_state) {
-            task.state.workflow_state = {
-                current_step_index: 0,
-                completed_steps: [],
-                failed_steps: [],
-                accumulated_context: {}
-            };
-        }
-    }
+		// Atualiza task state (imutável)
+		if (task?.state?.workflow_state) {
+			return task;
+		}
+		return this._withState(task, {
+			workflow_state: {
+				current_step_index: 0,
+				completed_steps: [],
+				failed_steps: [],
+				accumulated_context: {}
+			}
+		});
+	}
 
     /**
      * Estratégia ITERATIVE: Executa → Valida → Retry com feedback.
      */
     async _handleIterativeStrategy(task, executionResult) {
         const iterationState = this.activeIterations.get(task.meta.id);
-        if (!iterationState) {
-            logger.error(`[OrchestratorEngine] Iteration state not found for task ${task.meta.id}`);
-            return { action: 'DONE', task, feedback: null };
-        }
+		if (!iterationState) {
+			logger.error(`[OrchestratorEngine] Iteration state not found for task ${task.meta.id}`);
+			return { action: 'DONE', task, feedback: null };
+		}
 
         iterationState.current_iteration++;
 
@@ -215,16 +260,16 @@ class OrchestratorEngine {
             validation_result: validationResult
         });
 
-        // Atualiza task state
-        task.state.iteration_state = {
-            current_iteration: iterationState.current_iteration,
-            iterations_history: iterationState.iterations_history
-        };
-
-        task.state.quality_metrics = {
-            overall_score: validationResult.overall_score,
-            validation_passed: validationResult.passed
-        };
+		const nextTask = this._withState(task, {
+			iteration_state: {
+				current_iteration: iterationState.current_iteration,
+				iterations_history: iterationState.iterations_history
+			},
+			quality_metrics: {
+				overall_score: validationResult.overall_score,
+				validation_passed: validationResult.passed
+			}
+		});
 
         // Emite evento de iteração completada
         this._emitNervEvent('ITERATION_COMPLETED', {
@@ -250,12 +295,12 @@ class OrchestratorEngine {
                 final_score: validationResult.overall_score
             });
 
-            return {
-                action: 'DONE',
-                task,
-                feedback: validationResult.feedback
-            };
-        }
+			return {
+				action: 'DONE',
+				task: nextTask,
+				feedback: validationResult.feedback
+			};
+		}
 
         // Não passou: Verificar se pode iterar
         if (iterationState.current_iteration >= iterationState.max_iterations) {
@@ -274,12 +319,12 @@ class OrchestratorEngine {
                 converged: false
             });
 
-            return {
-                action: 'DONE',
-                task,
-                feedback: `Max iterations reached. Best score: ${validationResult.overall_score}/100`
-            };
-        }
+			return {
+				action: 'DONE',
+				task: nextTask,
+				feedback: `Max iterations reached. Best score: ${validationResult.overall_score}/100`
+			};
+		}
 
         // Pode iterar: Injeta feedback no prompt
         logger.info(
@@ -289,12 +334,12 @@ class OrchestratorEngine {
         // Prepara feedback para próxima iteração
         const feedbackPrompt = this._buildIterationFeedback(iterationState, validationResult);
 
-        return {
-            action: 'RETRY',
-            task,
-            feedback: feedbackPrompt
-        };
-    }
+		return {
+			action: 'RETRY',
+			task: nextTask,
+			feedback: feedbackPrompt
+		};
+	}
 
     /**
      * Estratégia MULTI_STEP: Executa workflow com múltiplos steps.
@@ -303,10 +348,10 @@ class OrchestratorEngine {
         const workflow_id = task.meta.workflow_id || task.meta.id;
         const workflowState = this.activeWorkflows.get(workflow_id);
 
-        if (!workflowState) {
-            logger.error(`[OrchestratorEngine] Workflow state not found for ${workflow_id}`);
-            return { action: 'DONE', task, feedback: null };
-        }
+		if (!workflowState) {
+			logger.error(`[OrchestratorEngine] Workflow state not found for ${workflow_id}`);
+			return { action: 'DONE', task, feedback: null };
+		}
 
         const currentStepIndex = workflowState.current_step_index;
         const currentStep = workflowState.steps[currentStepIndex];
@@ -321,13 +366,14 @@ class OrchestratorEngine {
         // Adiciona output ao ContextManager (para contexto avançado)
         await this.contextManager.addStepOutput(workflow_id, currentStep.id, output);
 
-        // Atualiza task state
-        task.state.workflow_state = {
-            current_step_index: currentStepIndex + 1,
-            completed_steps: workflowState.completed_steps,
-            failed_steps: workflowState.failed_steps,
-            accumulated_context: workflowState.accumulated_context
-        };
+		const nextTask = this._withState(task, {
+			workflow_state: {
+				current_step_index: currentStepIndex + 1,
+				completed_steps: workflowState.completed_steps,
+				failed_steps: workflowState.failed_steps,
+				accumulated_context: workflowState.accumulated_context
+			}
+		});
 
         this._emitNervEvent('WORKFLOW_STEP_COMPLETED', {
             workflow_id,
@@ -354,11 +400,11 @@ class OrchestratorEngine {
                 total_steps: workflowState.steps.length
             });
 
-            return {
-                action: 'DONE',
-                task,
-                feedback: `Workflow completed: ${workflowState.completed_steps.length} steps`
-            };
+		return {
+			action: 'DONE',
+			task: nextTask,
+			feedback: `Workflow completed: ${workflowState.completed_steps.length} steps`
+		};
         }
 
         // Tem próximo step: Prepara next step task
@@ -379,12 +425,12 @@ class OrchestratorEngine {
         // Prepara prompt do próximo step (injeta contexto acumulado + RAG auto-injection)
         const nextStepPrompt = await this._buildStepPrompt(nextStep, workflowState.accumulated_context, workflow_id);
 
-        return {
-            action: 'NEXT_STEP',
-            task,
-            feedback: nextStepPrompt,
-            nextStep
-        };
+		return {
+			action: 'NEXT_STEP',
+			task: nextTask,
+			feedback: nextStepPrompt,
+			nextStep
+		};
     }
 
     /**
@@ -446,7 +492,7 @@ class OrchestratorEngine {
         if (ragQuery) {
             try {
                 // Lazy import para evitar circular dependency
-                const { ragHybridSearch } = await import('../../../tools/rag/lib/facade.mjs');
+                const { ragHybridSearch } = await import('../../tools/rag/lib/facade.mjs');
 
                 logger.debug(`[OrchestratorEngine] Auto-injecting RAG context for query: "${ragQuery}"`);
 
@@ -542,9 +588,19 @@ class OrchestratorEngine {
      * Emite evento NERV.
      */
     _emitNervEvent(actionCode, payload) {
-        if (this.nerv) {
+        if (!this.nerv) return;
+
+        // Unit tests and some adapters use a simple `nerv.emit(event, payload)` API.
+        if (typeof this.nerv.emit === 'function') {
+            this.nerv.emit(actionCode, payload);
+            return;
+        }
+
+        // Production adapters: emit canonical envelopes.
+        if (typeof this.nerv.emitEvent === 'function') {
             try {
-                HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, actionCode, payload);
+                const code = ActionCode[actionCode] || actionCode;
+                HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload);
             } catch (e) {
                 logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', e.message);
             }

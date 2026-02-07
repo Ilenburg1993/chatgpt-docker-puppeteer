@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { CONNECTION_MODES } from '#core/constants/browser';
 
@@ -103,10 +104,10 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         });
     }
 
-    /**
+     /**
      * Registra handler para receber mensagens.
      *
-     * @param {Function} handler - (envelope) => void
+     * @param {(envelope: any) => void} handler - (envelope) => void
      * @returns {Function} Unsubscribe function
      */
     function onReceive(handler) {
@@ -127,11 +128,11 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         };
     }
 
-    /**
+     /**
      * Registra listener para actionCode específico.
      *
      * @param {string} actionCode - Código de ação (ex: 'TASK_START')
-     * @param {Function} handler - (envelope) => void
+     * @param {(envelope: any) => void} handler - (envelope) => void
      * @returns {Function} Unsubscribe function
      */
     function onEvent(actionCode, handler) {

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import * as analyzer from '#shared/sadi/analyzer';
 import * as io from '#infra/io';
@@ -12,7 +13,11 @@ import { log } from '#core/logger';
  */
 const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
-    CACHE_TTL_MS: parseInt(process.env.RESOLVER_CACHE_TTL || CONFIG.all.INPUT_CACHE_TTL || '60000'),
+    CACHE_TTL_MS: parseInt(
+        process.env.RESOLVER_CACHE_TTL ||
+            /** @type {any} */ (CONFIG).all?.INPUT_CACHE_TTL ||
+            '60000'
+    ),
     
     /** Timeout para resolve completo (ms) - Default: 15s */
     RESOLVE_TIMEOUT_MS: parseInt(process.env.RESOLVER_TIMEOUT || '15000'),
@@ -110,9 +115,9 @@ class InputResolver extends EventEmitter {
      * @param {Function} driver._emitVital - Método IPC para telemetria vital
      * @param {Function} driver._assertPageAlive - Validação de page alive
      * @param {string} driver.correlationId - ID de correlação para logs
-     * @param {Object} driver.page - Instância Puppeteer Page
-     * @param {string} driver.currentDomain - Domain atual
-     * @param {Object} driver.handles - HandleManager para cleanup
+     * @param {Object} [driver.page] - Instância Puppeteer Page (pode ser null até attachContext)
+     * @param {string} [driver.currentDomain] - Domain atual
+     * @param {Object} [driver.handles] - HandleManager para cleanup (injetado após instanciar)
      * 
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver._emitVital não for uma função
@@ -132,14 +137,6 @@ class InputResolver extends EventEmitter {
         
         if (typeof driver._emitVital !== 'function') {
             throw new Error('[InputResolver] Driver must have _emitVital method');
-        }
-        
-        if (!driver.page) {
-            throw new Error('[InputResolver] Driver must have page property');
-        }
-        
-        if (!driver.handles) {
-            throw new Error('[InputResolver] Driver must have handles manager');
         }
         
         this.driver = driver;
@@ -172,11 +169,12 @@ class InputResolver extends EventEmitter {
      * 5. Finalize discovery (resolve sendButton + cache update)
      * 
      * @returns {Promise<Object>} Protocolo resolvido
-     * @returns {string} return.selector - Seletor CSS do input
-     * @returns {string} return.context - Contexto do seletor ('root' ou frame)
-     * @returns {boolean} return.hasSendButton - Se possui botão de envio
-     * @returns {string} return.source - Fonte da resolução ('CACHE_HIT', 'DNA_MATCH', 'HEURISTIC_MATCH')
-     * @returns {number} return.confidence - Nível de confiança (0-1)
+     * Propriedades do objeto retornado:
+     *   - selector (string): Seletor CSS do input
+     *   - context (string): Contexto do seletor ('root' ou frame)
+     *   - hasSendButton (boolean): Se possui botão de envio
+     *   - source (string): Fonte da resolução ('CACHE_HIT', 'DNA_MATCH', 'HEURISTIC_MATCH')
+     *   - confidence (number): Nível de confiança (0-1)
      * 
      * @throws {Error} Se input não for encontrado (INPUT_NOT_FOUND)
      * @throws {Error} Se timeout exceder RESOLVE_TIMEOUT_MS
@@ -294,7 +292,8 @@ class InputResolver extends EventEmitter {
         
         // 2. CONSULTA À CONSTITUIÇÃO (DNA First)
         this.driver._emitVital('SADI_PERCEPTION', { status: 'CONSULTING_DNA', domain });
-        const dnaRules = await io.getTargetRules(domain);
+        /** @type {{ selectors?: { input_box?: string[] | string } }} */
+        const dnaRules = (await io.getTargetRules(domain)) || {};
         
         if (dnaRules.selectors?.input_box) {
             const dnaCandidate = await this._tryKnownSelectors(dnaRules.selectors.input_box);
@@ -351,7 +350,7 @@ class InputResolver extends EventEmitter {
      * Suporta polimorfismo: aceita Array de strings ou objetos de protocolo SADI.
      * 
      * @private
-     * @param {Array<string|Object>} inputRules - Lista de seletores ou protocolos
+     * @param {string | Object | Array<string|Object>} inputRules - Lista de seletores ou protocolos
      * @returns {Promise<Object|null>} Protocolo válido ou null
      * 
      * @example
@@ -542,17 +541,18 @@ class InputResolver extends EventEmitter {
      * Retorna estatísticas de resolution.
      * 
      * @returns {Object} Objeto com métricas de resolution
-     * @returns {number} return.totalResolutions - Total de resoluções executadas
-     * @returns {number} return.successfulResolutions - Resoluções bem-sucedidas
-     * @returns {number} return.failedResolutions - Resoluções que falharam
-     * @returns {number} return.cacheHits - Cache hits
-     * @returns {number} return.cacheMisses - Cache misses
-     * @returns {number} return.dnaMatches - DNA matches
-     * @returns {number} return.heuristicMatches - Heuristic matches
-     * @returns {number} return.totalResolutionDuration - Duração total acumulada (ms)
-     * @returns {number} return.maxResolutionDuration - Duração máxima individual (ms)
-     * @returns {string} return.cacheHitRate - Taxa de cache hit (%)
-     * @returns {Object} return.config - Configuração atual (RESOLVER_CONFIG)
+     * Propriedades do objeto retornado:
+     *   - totalResolutions (number): Total de resoluções executadas
+     *   - successfulResolutions (number): Resoluções bem-sucedidas
+     *   - failedResolutions (number): Resoluções que falharam
+     *   - cacheHits (number): Cache hits
+     *   - cacheMisses (number): Cache misses
+     *   - dnaMatches (number): DNA matches
+     *   - heuristicMatches (number): Heuristic matches
+     *   - totalResolutionDuration (number): Duração total acumulada (ms)
+     *   - maxResolutionDuration (number): Duração máxima individual (ms)
+     *   - cacheHitRate (string): Taxa de cache hit (%)
+     *   - config (Object): Configuração atual (RESOLVER_CONFIG)
      * 
      * @example
      * const stats = resolver.getStats();

@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as shared from './shared_types.js';
 import { DnaSchema, SelectorProtocolSchema } from './dna_schema.js';
 import { TaskSchema } from './task_schema.js';

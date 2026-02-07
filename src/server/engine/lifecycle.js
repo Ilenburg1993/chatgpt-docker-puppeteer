@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as server from './server.js';
 import * as socketHub from './socket.js';
 import * as pm2Bridge from '../realtime/bus/pm2_bridge.js';
@@ -43,7 +44,7 @@ async function gracefulShutdown(signal) {
     log('WARN', `[LIFECYCLE] Sinal ${signal} detectado. Iniciando Protocolo de Encerramento...`);
 
     // 0. WATCHDOG DE SEGURANÇA: Impede que o processo fique "pendurado" no SO.
-    const shutdownTimeoutMs = CONFIG.get('SERVER_SHUTDOWN_TIMEOUT_MS', 5000);
+    const shutdownTimeoutMs = Number(CONFIG.get('SERVER_SHUTDOWN_TIMEOUT_MS', 5000)) || 5000;
     const forceExitTimeout = setTimeout(() => {
         log('FATAL', `[LIFECYCLE] Shutdown excedeu o tempo limite de ${shutdownTimeoutMs}ms.`);
         if (allowProcessExit) {

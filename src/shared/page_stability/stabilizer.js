@@ -61,6 +61,14 @@ const STABILIZER_CONFIG = {
 // HELPER FUNCTIONS (v2.0 - Enhanced)
 // ============================================
 
+class StabilizerAbortError extends Error {
+    constructor(message, phase = null) {
+        super(message);
+        this.name = 'StabilizerAbortError';
+        this.phase = phase;
+    }
+}
+
 /**
  * Mede o atraso (lag) do Event Loop no contexto do Browser.
  * v2.0: Added retry logic and error logging.
@@ -72,17 +80,20 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
     for (let i = 0; i < retries; i++) {
         try {
             return await page.evaluate(() => {
-                // Measure event loop lag
-                return new Promise(resolve => {
-                    const channel = new MessageChannel();
-                    const t0 = performance.now();
-                    channel.port1.onmessage = () => {
-                        channel.port1.close();
-                        channel.port2.close();
-                        resolve(performance.now() - t0);
-                    };
-                    channel.port2.postMessage(null);
-                });
+                // NOTE: the identifier name `eventLoopLag` is intentional; unit tests stub by fn.toString().
+                const eventLoopLag = () =>
+                    new Promise(resolve => {
+                        const channel = new MessageChannel();
+                        const t0 = performance.now();
+                        channel.port1.onmessage = () => {
+                            channel.port1.close();
+                            channel.port2.close();
+                            resolve(performance.now() - t0);
+                        };
+                        channel.port2.postMessage(null);
+                    });
+
+                return eventLoopLag();
             });
         } catch (err) {
             if (i === retries - 1) {
@@ -105,8 +116,8 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
 async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
     for (let i = 0; i < retries; i++) {
         try {
-            return await page.evaluate(config => {
-                // Check for loading indicators with false positive filter
+            const busy = await page.evaluate(config => {
+                // Returns true when the page still appears "busy" (spinner OR recent network).
                 const checkSpinnersDeep = (root = document) => {
                     const selector =
                         '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
@@ -116,31 +127,20 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                     while (node) {
                         if (node.nodeType === 1) {
                             if (node.matches(selector)) {
-                                // [v2.0] False positive filter
+                                // False positive filter: must be visible and have non-zero rects.
                                 const rects = node.getClientRects();
                                 if (rects.length > 0 && node.offsetParent !== null) {
-                                    const s = window.getComputedStyle(node);
-                                    if (
-                                        s.display !== 'none' &&
-                                        s.visibility !== 'hidden' &&
-                                        parseFloat(s.opacity || '1') > 0.1
-                                    ) {
-                                        // Check if actually has dimensions
+                                    const st = window.getComputedStyle(node);
+                                    if (st.display !== 'none' && st.visibility !== 'hidden' && parseFloat(st.opacity || '1') > 0.1) {
                                         const hasSize = Array.from(rects).some(r => r.width > 0 && r.height > 0);
-                                        if (hasSize) {
-                                            return true;
-                                        }
+                                        if (hasSize) return true;
                                     }
                                 }
                             }
-                            if (node.shadowRoot && checkSpinnersDeep(node.shadowRoot)) {
-                                return true;
-                            }
+                            if (node.shadowRoot && checkSpinnersDeep(node.shadowRoot)) return true;
                             if (node.tagName === 'IFRAME') {
                                 try {
-                                    if (node.contentDocument && checkSpinnersDeep(node.contentDocument)) {
-                                        return true;
-                                    }
+                                    if (node.contentDocument && checkSpinnersDeep(node.contentDocument)) return true;
                                 } catch (_err) {
                                     // Ignore cross-origin iframe access errors
                                 }
@@ -152,28 +152,32 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                 };
 
                 if (checkSpinnersDeep()) {
-                    return 'BUSY_SPINNER';
+                    return true;
                 }
 
                 const entries = performance.getEntriesByType('resource');
                 if (entries.length > 0) {
                     const latest = entries.reduce((a, b) => (b.responseEnd > a.responseEnd ? b : a), entries[0]);
                     if (performance.now() - latest.responseEnd < config.RECENT_NETWORK_THRESHOLD) {
-                        return 'BUSY_NETWORK';
+                        return true;
                     }
                 }
-                return 'IDLE';
+
+                return false;
             }, STABILIZER_CONFIG);
+
+            return busy === true;
         } catch (err) {
             if (i === retries - 1) {
                 log('DEBUG', `[STABILIZER] Page load status check failed after ${retries} retries: ${err.message}`);
-                return 'UNKNOWN';
+                return false;
             }
             await new Promise(r => setTimeout(r, STABILIZER_CONFIG.HELPER_RETRY_DELAY * (i + 1)));
         }
     }
-    return 'UNKNOWN';
+    return false;
 }
+
 
 // ============================================
 // MAIN STABILIZATION FUNCTION (v2.0 - Complete)
@@ -221,9 +225,26 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
     // Make result coercible to boolean for backward compatibility
     result.valueOf = () => result.success;
 
+    let abortVitalEmitted = false;
+
+    const isPageClosed = () => (typeof page.isClosed === 'function' ? page.isClosed() : false);
+
+    const assertPageOpen = () => {
+        if (isPageClosed()) {
+            throw new Error('page is closed');
+        }
+    };
+
+    const throwIfAborted = (phase = null) => {
+        if (signal?.aborted) {
+            throw new StabilizerAbortError('stabilization aborted', phase);
+        }
+    };
+
     // [v2.0] Abort check at start
     if (signal?.aborted) {
         driver._emitVital('STABILITY_ABORTED', { reason: 'signal_aborted_at_start' });
+        abortVitalEmitted = true;
         result.duration = Date.now() - start;
         return result;
     }
@@ -255,6 +276,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_SKIP', { phase: 'NETWORK_IDLE', reason: 'global_timeout_or_abort' });
             result.phasesSkipped.push('NETWORK_IDLE');
         } else {
+            assertPageOpen();
+            throwIfAborted('NETWORK_IDLE');
             driver._emitVital('PHASE_START', { phase: 'NETWORK_IDLE' });
 
             try {
@@ -263,12 +286,14 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                     timeout: Math.max(1000, phase1Deadline - Date.now())
                 });
 
+                throwIfAborted('NETWORK_IDLE');
+
                 const phase1Duration = Date.now() - phase1Start;
                 driver._emitVital('PHASE_SUCCESS', { phase: 'NETWORK_IDLE', duration: phase1Duration });
                 result.phasesCompleted.push('NETWORK_IDLE');
             } catch (err) {
-                if (page.isClosed()) {
-                    throw new Error('Page closed during network idle wait');
+                if (isPageClosed()) {
+                    throw new Error('page is closed');
                 }
                 log('DEBUG', `[STABILIZER] Network idle failed: ${err.message}`, correlationId);
                 driver._emitVital('PHASE_FAILURE', {
@@ -289,20 +314,22 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_SKIP', { phase: 'SPINNER_CHECK', reason: 'global_timeout_or_abort' });
             result.phasesSkipped.push('SPINNER_CHECK');
         } else {
+            assertPageOpen();
+            throwIfAborted('SPINNER_CHECK');
             driver._emitVital('PHASE_START', { phase: 'SPINNER_CHECK' });
 
             let iterations = 0;
             let spinnerDetected = false;
 
             while (iterations < STABILIZER_CONFIG.SPINNER_MAX_ITERATIONS && Date.now() < deadline && !signal?.aborted) {
-                const status = await getPageLoadStatus(page);
+                const busy = await getPageLoadStatus(page);
 
-                if (status === 'BUSY_SPINNER' && !spinnerDetected) {
+                if (busy && !spinnerDetected) {
                     driver._emitVital('SPINNER_DETECTED', { iteration: iterations });
                     spinnerDetected = true;
                 }
 
-                if (status === 'IDLE' || status === 'UNKNOWN') {
+                if (!busy) {
                     if (spinnerDetected) {
                         driver._emitVital('SPINNER_CLEARED', { iterations });
                     }
@@ -333,6 +360,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_SKIP', { phase: 'DOM_ENTROPY', reason: 'global_timeout_or_abort' });
             result.phasesSkipped.push('DOM_ENTROPY');
         } else {
+            assertPageOpen();
+            throwIfAborted('DOM_ENTROPY');
             driver._emitVital('PHASE_START', { phase: 'DOM_ENTROPY' });
 
             // [v2.0] Adaptive silence window (Improvement #9)
@@ -454,13 +483,15 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                     STABILIZER_CONFIG
                 );
 
+                throwIfAborted('DOM_ENTROPY');
+
                 const phase3Duration = Date.now() - phase3Start;
                 driver._emitVital('DOM_STABLE', { silenceWindow, duration: phase3Duration });
                 driver._emitVital('PHASE_SUCCESS', { phase: 'DOM_ENTROPY', duration: phase3Duration });
                 result.phasesCompleted.push('DOM_ENTROPY');
             } catch (evaluateErr) {
-                if (page.isClosed()) {
-                    throw new Error('Page closed during DOM entropy analysis');
+                if (isPageClosed()) {
+                    throw new Error('page is closed');
                 }
                 log('WARN', `[STABILIZER] DOM entropy failed: ${evaluateErr.message}`, correlationId);
                 driver._emitVital('PHASE_FAILURE', {
@@ -497,6 +528,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_SKIP', { phase: 'HYDRATION', reason: 'global_timeout_or_abort' });
             result.phasesSkipped.push('HYDRATION');
         } else {
+            assertPageOpen();
+            throwIfAborted('HYDRATION');
             driver._emitVital('PHASE_START', { phase: 'HYDRATION' });
 
             try {
@@ -519,6 +552,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                     });
                 }, STABILIZER_CONFIG);
 
+                throwIfAborted('HYDRATION');
+
                 const phase4Duration = Date.now() - phase4Start;
                 driver._emitVital('HYDRATION_COMPLETE', { duration: phase4Duration });
                 driver._emitVital('PHASE_SUCCESS', { phase: 'HYDRATION', duration: phase4Duration });
@@ -539,6 +574,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_SKIP', { phase: 'FRAME_SYNC', reason: 'global_timeout_or_abort' });
             result.phasesSkipped.push('FRAME_SYNC');
         } else {
+            assertPageOpen();
+            throwIfAborted('FRAME_SYNC');
             driver._emitVital('PHASE_START', { phase: 'FRAME_SYNC' });
 
             try {
@@ -551,6 +588,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                     ),
                     new Promise(r => setTimeout(r, STABILIZER_CONFIG.FRAME_SYNC_TIMEOUT))
                 ]);
+
+                throwIfAborted('FRAME_SYNC');
 
                 const phase5Duration = Date.now() - phase5Start;
                 driver._emitVital('FRAME_SYNC_COMPLETE', { duration: phase5Duration });
@@ -573,6 +612,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_SKIP', { phase: 'CPU_LAG', reason: 'global_timeout_or_abort' });
             result.phasesSkipped.push('CPU_LAG');
         } else {
+            assertPageOpen();
+            throwIfAborted('CPU_LAG');
             driver._emitVital('PHASE_START', { phase: 'CPU_LAG' });
 
             let lag = 999;
@@ -591,6 +632,11 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 }
             }
 
+            throwIfAborted('CPU_LAG');
+
+            lag = Number(lag);
+            if (!Number.isFinite(lag)) lag = STABILIZER_CONFIG.DEFAULT_LAG_FALLBACK;
+
             result.finalLag = lag;
 
             if (lag <= STABILIZER_CONFIG.CPU_LAG_THRESHOLD) {
@@ -608,6 +654,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
         }
 
         // Success!
+        throwIfAborted('FINALIZE');
+
         result.success = true;
         result.duration = Date.now() - start;
         driver._emitVital('STABILITY_COMPLETE', {
@@ -622,27 +670,52 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
         // [v2.0] Consistent error propagation (Improvement #14)
         result.duration = Date.now() - start;
 
-        if (page.isClosed()) {
-            log('ERROR', `[STABILIZER] Page closed during stabilization: ${e.message}`, correlationId);
+        // Abort is not an error: return a failure result and emit STABILITY_ABORTED.
+        if (e?.name === 'StabilizerAbortError') {
+            result.success = false;
+
+            const phase = e.phase || null;
+            if (phase && !result.phasesCompleted.includes(phase) && !result.phasesFailed.includes(phase)) {
+                result.phasesFailed.push(phase);
+            }
+
+            if (!abortVitalEmitted) {
+                driver._emitVital('STABILITY_ABORTED', { reason: 'signal_aborted', phase });
+                abortVitalEmitted = true;
+            }
+
+            return result;
+        }
+
+        // Critical: page closed. Must propagate and emit STABILITY_ERROR.
+        if (isPageClosed()) {
+            const message = 'page is closed';
+            log('ERROR', `[STABILIZER] Page closed during stabilization: ${e?.message || message}`, correlationId);
             driver._emitVital('STABILITY_ERROR', {
-                error: e.message,
+                error: message,
                 critical: true,
                 duration: result.duration
             });
-            throw e; // Critical error - propagate
+
+            if (e?.message && /page is closed/i.test(e.message)) {
+                throw e;
+            }
+            throw new Error(message);
         }
 
+        const msg = e?.message || String(e);
+
         if (Date.now() >= deadline) {
-            log('WARN', `[STABILIZER] Stabilization timeout (${result.duration}ms): ${e.message}`, correlationId);
+            log('WARN', `[STABILIZER] Stabilization timeout (${result.duration}ms): ${msg}`, correlationId);
             result.timeout = true;
             driver._emitVital('STABILITY_TIMEOUT', {
                 duration: result.duration,
-                error: e.message
+                error: msg
             });
         } else {
-            log('WARN', `[STABILIZER] Stabilization error (${result.duration}ms): ${e.message}`, correlationId);
+            log('WARN', `[STABILIZER] Stabilization error (${result.duration}ms): ${msg}`, correlationId);
             driver._emitVital('STABILITY_ERROR', {
-                error: e.message,
+                error: msg,
                 critical: false,
                 duration: result.duration
             });

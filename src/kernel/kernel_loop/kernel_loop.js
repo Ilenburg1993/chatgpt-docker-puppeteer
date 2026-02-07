@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /* ==========================================================================
    src/kernel/kernel_loop/kernel_loop.js
    Subsistema: KERNEL — Núcleo Soberano de Decisão
@@ -86,6 +87,7 @@ class KernelLoop {
         this.scheduler = scheduler;
         this.baseIntervalMs = baseIntervalMs;
 
+        /** @type {string} */
         this.state = KernelLoopState.INACTIVE;
         this._timer = null;
         this._tickCounter = 0;

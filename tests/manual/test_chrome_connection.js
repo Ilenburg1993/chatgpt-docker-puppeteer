@@ -1,3 +1,4 @@
+/* global document, window, CSS, Node, NodeFilter, MutationObserver, navigator, HTMLElement */
 import puppeteer from 'puppeteer-core';
 
 const CHROME_URL = process.env.CHROME_REMOTE_URL || 'http://host.docker.internal:9225';

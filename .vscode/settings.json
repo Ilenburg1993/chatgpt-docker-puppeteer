@@ -124,43 +124,200 @@
   "editor.wordBasedSuggestionsMode": "currentDocument",
   // ============================================================
   // 7. LINGUAGENS — JAVASCRIPT / TYPESCRIPT / JSON
+  // (LIMPO: duplicações removidas + contradições eliminadas)
   // ============================================================
-  "javascript.validate.enable": false,
+
+  // ============================================================
+  // 7.1 JAVASCRIPT — Validação / Formatação
+  // ============================================================
+  "javascript.validate.enable": true,
   "javascript.format.enable": false,
+
+  // ============================================================
+  // 7.2 JAVASCRIPT — Sugestões / IntelliSense
+  // ============================================================
   "javascript.suggest.enabled": true,
   "javascript.suggest.autoImports": true,
   "javascript.suggest.completeFunctionCalls": true,
   "javascript.suggest.completeJSDocs": true,
   "javascript.suggest.names": true,
   "javascript.suggest.paths": true,
+
+  // ============================================================
+  // 7.3 JAVASCRIPT — Imports / Movimentação de Arquivos
+  // ============================================================
   "javascript.updateImportsOnFileMove.enabled": "always",
+
+  // ============================================================
+  // 7.4 JAVASCRIPT — Preferências de Estilo / Imports (ESM)
+  // ============================================================
   "javascript.preferences.quoteStyle": "single",
-  "javascript.preferences.importModuleSpecifier": "shortest",
-  "editor.codeLens": false,
-  "javascript.referencesCodeLens.enabled": false,
-  "javascript.referencesCodeLens.showOnAllFunctions": false,
+  "javascript.preferences.importModuleSpecifier": "relative",
+  "javascript.preferences.importModuleSpecifierEnding": "js",
+
+  // ============================================================
+  // 7.5 JAVASCRIPT — Inlay Hints
+  // ============================================================
   "javascript.inlayHints.parameterNames.enabled": "literals",
   "javascript.inlayHints.functionLikeReturnTypes.enabled": false,
   "javascript.inlayHints.variableTypes.enabled": false,
-  "typescript.validate.enable": false,
+
+  // ============================================================
+  // 7.6 TYPESCRIPT — Validação / Aquisição Automática
+  // ============================================================
+  "typescript.validate.enable": true,
   "typescript.disableAutomaticTypeAcquisition": true,
+
+  // ============================================================
+  // 7.7 TYPESCRIPT — TS Server (Performance / Watchers)
+  // ============================================================
+  "typescript.tsserver.maxTsServerMemory": 4096,
+  "typescript.tsserver.useSeparateSyntaxServer": true,
   "typescript.tsserver.watchOptions": {
     "watchFile": "useFsEvents",
     "watchDirectory": "useFsEvents",
-    "fallbackPolling": "priorityPollingInterval"
+    "fallbackPolling": "dynamicPriorityPolling"
   },
+
+  // ============================================================
+  // 7.8 TYPESCRIPT — TS Server (Experimental)
+  // ============================================================
+  // enableProjectDiagnostics: Analisa TODO o projeto (não só arquivos abertos)
+  // ✅ HABILITADO: Agora que dashboard-ui e node_modules estão excluídos,
+  //    deve mostrar apenas erros reais sem ruído.
+  // ⚠️  Se VSCode ficar lento ou mostrar muitos erros, mude para false.
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "typescript.tsserver.experimental.useVsCodeWatcher": true,
+
+  // ============================================================
+  // 7.9 TYPESCRIPT — Preferências de Imports / ESM
+  // ============================================================
   "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.preferences.importModuleSpecifierEnding": "js",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+
+  // ============================================================
+  // 7.10 TYPESCRIPT — Diagnósticos / Estilo
+  // ============================================================
   "typescript.reportStyleChecksAsWarnings": false,
-  "typescript.tsserver.maxTsServerMemory": 4096,
-  "typescript.tsserver.useSeparateSyntaxServer": false,
+
+  // ============================================================
+  // 7.11 TYPESCRIPT — Inlay Hints
+  // ============================================================
   "typescript.inlayHints.parameterNames.enabled": "literals",
   "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
   "typescript.inlayHints.variableTypes.enabled": false,
-  "json.format.enable": true,
-  "json.validate.enable": true,
-  "json.schemaDownload.enable": true,
-  "json.maxItemsComputed": 10000,
-  "json.trace.server": "off",
+
+  // ============================================================
+  // 7.12 JS/TS — Implicit Project Config (quando não há jsconfig/tsconfig)
+  // ============================================================
+  "js/ts.implicitProjectConfig.checkJs": true,
+  "js/ts.implicitProjectConfig.module": "NodeNext",
+
+  // ============================================================
+// 7.13 JSON — Formatação / Validação / Schemas
+// ============================================================
+"json.format.enable": true,
+"json.validate.enable": true,
+
+// Autocomplete inteligente
+"json.suggest.enable": true,
+
+// Schemas
+"json.schemaDownload.enable": true,
+"json.schemas": [
+  // Node / TypeScript / JS tooling
+  {
+    "fileMatch": ["package.json"],
+    "url": "https://json.schemastore.org/package"
+  },
+  {
+    "fileMatch": ["tsconfig.json", "tsconfig.*.json"],
+    "url": "https://json.schemastore.org/tsconfig"
+  },
+  {
+    "fileMatch": ["jsconfig.json"],
+    "url": "https://json.schemastore.org/jsconfig"
+  },
+  {
+    "fileMatch": [".eslintrc", ".eslintrc.json"],
+    "url": "https://json.schemastore.org/eslintrc"
+  },
+  {
+    "fileMatch": [".prettierrc", ".prettierrc.json"],
+    "url": "https://json.schemastore.org/prettierrc"
+  },
+
+  // VS Code / DevContainer
+  {
+    "fileMatch": [".vscode/settings.json"],
+    "url": "https://json.schemastore.org/vscode-settings"
+  },
+  {
+    "fileMatch": [".vscode/extensions.json"],
+    "url": "https://json.schemastore.org/vscode-extensions"
+  },
+  {
+    "fileMatch": [".vscode/launch.json"],
+    "url": "https://json.schemastore.org/launch"
+  },
+  {
+    "fileMatch": [".vscode/tasks.json"],
+    "url": "https://json.schemastore.org/tasks"
+  },
+  {
+    "fileMatch": [".devcontainer/devcontainer.json"],
+    "url": "https://json.schemastore.org/devcontainer"
+  },
+
+  // Docker (somente se você realmente usar docker-compose.json)
+  {
+    "fileMatch": ["docker-compose.json", "docker-compose.*.json"],
+    "url": "https://json.schemastore.org/docker-compose"
+  },
+
+  // GitHub
+  {
+    "fileMatch": [".github/dependabot.yml"],
+    "url": "https://json.schemastore.org/dependabot-2.0"
+  },
+
+  // Common configs
+  {
+    "fileMatch": ["nodemon.json"],
+    "url": "https://json.schemastore.org/nodemon"
+  },
+  {
+    "fileMatch": ["lerna.json"],
+    "url": "https://json.schemastore.org/lerna"
+  },
+  {
+    "fileMatch": ["turbo.json"],
+    "url": "https://json.schemastore.org/turbo"
+  },
+  {
+    "fileMatch": ["biome.json", "biome.jsonc"],
+    "url": "https://json.schemastore.org/biome"
+  }
+],
+
+// Performance / Debug
+"json.maxItemsComputed": 10000,
+"json.trace.server": "off",
+
+
+  // ============================================================
+  // 7.14 EDITOR — CodeLens (global)
+  // ============================================================
+  "editor.codeLens": false,
+
+  // ============================================================
+  // 7.15 TYPESCRIPT — Logging / Tracing (Debug)
+  // ============================================================
+  // 🔍 MODO DEBUG: Logs verbosos para diagnosticar todos os problemas
+  "typescript.tsserver.enableTracing": true,
+  "typescript.tsserver.log": "verbose",
+
   // ============================================================
   // 8. FORMATTERS POR LINGUAGEM
   // ============================================================
@@ -240,7 +397,6 @@
   "terminal.integrated.shellIntegration.decorationsEnabled": "both",
   "terminal.integrated.shellIntegration.history": 1000,
   "terminal.integrated.suggest.enabled": true,
-  "terminal.integrated.suggest.quickSuggestions": true,
   "terminal.integrated.smoothScrolling": true,
   "terminal.integrated.gpuAcceleration": "auto",
   "terminal.integrated.tabs.enabled": true,
@@ -434,4 +590,15 @@
 "editor.autoIndentOnPaste": true,
 "editor.occurrencesHighlightDelay": 100,
 "workbench.externalBrowser": "chrome",
+"windowsaistudio.openAIInferencePort": 11434,
+"cSpell.enabled": false,
+"github.copilot.chat.agent.autoFix": true,
+"github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
+"github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
+"github.copilot.chat.copilotMemory.enabled": true,
+"github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
+"github.copilot.chat.switchAgent.enabled": true,
+"remote.SSH.defaultForwardedPorts": [
+
+],
 }

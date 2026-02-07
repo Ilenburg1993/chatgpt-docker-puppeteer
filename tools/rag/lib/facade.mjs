@@ -353,26 +353,34 @@ export async function ragQuery(options = {}) {
     }
 
     const db = await openDb(paths.dbDir);
-    const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-
-    const results = await search(table, vector, {
-        topK: options.topK ?? 8,
-        filters: options.filters || {}
-    });
+    let dbClosed = false;
 
     try {
-        await db.close();
-    } catch (_) {
-        // ignore
-    }
+        const table = await ensureTable(db, manifest.embedding.dim || vector.length);
 
-    return {
-        query: options.query,
-        embedding_model: embeddings.model,
-        topK: options.topK ?? 8,
-        filters: options.filters || {},
-        results
-    };
+        const results = await search(table, vector, {
+            topK: options.topK ?? 8,
+            filters: options.filters || {}
+        });
+
+        return {
+            query: options.query,
+            embedding_model: embeddings.model,
+            topK: options.topK ?? 8,
+            filters: options.filters || {},
+            results
+        };
+    } finally {
+        // Always close database connection, even on error (prevents resource leak)
+        if (!dbClosed) {
+            try {
+                await db.close();
+                dbClosed = true;
+            } catch (_) {
+                // ignore close errors
+            }
+        }
+    }
 }
 
 /**
@@ -381,15 +389,15 @@ export async function ragQuery(options = {}) {
  * multi-signal reranking, and MMR diversity algorithm
  * @param {object} options - Search options
  * @param {string} options.query - Query text
- * @param {number} options.topK - Number of results (default: 8)
- * @param {string} options.pathPrefix - Filter by path prefix
- * @param {string} options.ext - Filter by file extension
- * @param {string[]} options.tags - Filter by tags
- * @param {object|array} options.distanceRange - Min/max distance range
- * @param {boolean} options.rerank - Enable reranking (default: true)
- * @param {object} options.rerankWeights - Custom rerank weights
- * @param {boolean} options.mmr - Enable MMR diversity (default: true)
- * @param {number} options.mmrLambda - MMR lambda (default: 0.7)
+ * @param {number} [options.topK] - Number of results (default: 8)
+ * @param {string} [options.pathPrefix] - Filter by path prefix
+ * @param {string} [options.ext] - Filter by file extension
+ * @param {string[]} [options.tags] - Filter by tags
+ * @param {object|array} [options.distanceRange] - Min/max distance range
+ * @param {boolean} [options.rerank] - Enable reranking (default: true)
+ * @param {object} [options.rerankWeights] - Custom rerank weights
+ * @param {boolean} [options.mmr] - Enable MMR diversity (default: true)
+ * @param {number} [options.mmrLambda] - MMR lambda (default: 0.7)
  * @returns {Promise<object>} - Search results + metadata
  */
 export async function ragHybridSearch(options = {}) {
@@ -444,37 +452,45 @@ export async function ragHybridSearch(options = {}) {
     }
 
     const db = await openDb(paths.dbDir);
-    const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-
-    console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
-
-    const results = await hybridSearch(table, vector, query, {
-        topK,
-        filters: { pathPrefix, ext, tags },
-        distanceRange,
-        rerank,
-        rerankWeights,
-        mmr,
-        mmrLambda
-    });
+    let dbClosed = false;
 
     try {
-        await db.close();
-    } catch (_) {
-        // ignore
-    }
+        const table = await ensureTable(db, manifest.embedding.dim || vector.length);
 
-    return {
-        results,
-        topK,
-        dim: manifest.embedding.dim,
-        model: manifest.embedding.model || embeddings.model,
-        query,
-        hybridMode: true,
-        rerank,
-        mmr,
-        mmrLambda
-    };
+        console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
+
+        const results = await hybridSearch(table, vector, query, {
+            topK,
+            filters: { pathPrefix, ext, tags },
+            distanceRange,
+            rerank,
+            rerankWeights,
+            mmr,
+            mmrLambda
+        });
+
+        return {
+            results,
+            topK,
+            dim: manifest.embedding.dim,
+            model: manifest.embedding.model || embeddings.model,
+            query,
+            hybridMode: true,
+            rerank,
+            mmr,
+            mmrLambda
+        };
+    } finally {
+        // Always close database connection, even on error (prevents resource leak)
+        if (!dbClosed) {
+            try {
+                await db.close();
+                dbClosed = true;
+            } catch (_) {
+                // ignore close errors
+            }
+        }
+    }
 }
 
 export async function ragAsk(options = {}) {

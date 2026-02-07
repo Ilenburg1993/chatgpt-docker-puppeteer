@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { z } from 'zod';
 import { TIMESTAMP_SCHEMA } from './shared_types.js';
 
@@ -70,10 +71,12 @@ const DnaSchema = z
 
         // Regras globais de fallback (Padrões universais de chat)
         // [FIX] z.record precisa de key schema explícito
-        global_selectors: z.record(z.string(), z.array(z.string())).default({
-            input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
-            send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
-        })
+        global_selectors: z.record(z.string(), z.array(z.string())).default(
+            /** @type {any} */ ({
+                input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
+                send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
+            })
+        )
     })
     .passthrough();
 

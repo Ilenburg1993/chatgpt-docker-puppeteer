@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'node:fs';
 import { STATUS_VALUES } from '#core/constants/tasks';
 

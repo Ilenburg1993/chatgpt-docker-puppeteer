@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
 
