@@ -174,15 +174,18 @@ module.exports = {
         {
             name: 'chrome-proxy',
             script: './scripts/chrome-proxy-service.js',
+            exec_mode: 'fork',
             instances: 1,
             autorestart: true,
             watch: false,
             max_memory_restart: '500M',
 
-            // Node arguments (minimal to avoid NODE_OPTIONS conflicts)
+            // Node arguments (aligned with other processes)
             node_args: [
-                '--expose-gc',
-                '--unhandled-rejections=strict'
+                '--expose-gc',                  // Manual GC control
+                '--unhandled-rejections=strict', // Crash on unhandled promises
+                '--enable-source-maps',          // Correct stack traces
+                '--trace-warnings'               // Never silent warnings
             ],
 
             // Environment variables
@@ -191,7 +194,14 @@ module.exports = {
                 CHROME_HOST: 'host.docker.internal',  // Docker Desktop → Windows
                 CHROME_PORT: '9225',                  // Chrome debugging port
                 CHROME_PROXY_PORT: '9224',            // Proxy listen port
-                LOG_LEVEL: 'info'
+                LOG_LEVEL: 'info',
+                // v3.0 - Rate Limiting & Security
+                CHROME_PROXY_MAX_WS_GLOBAL: '200',    // Global WS connection limit
+                CHROME_PROXY_MAX_WS_PER_IP: '20',     // Per-IP WS connection limit
+                CHROME_PROXY_MAX_JSON_BUFFER: '10485760',  // 10MB buffer limit
+                WS_IDLE_TIMEOUT_MS: '300000',         // 5 min idle timeout
+                CHROME_CB_THRESHOLD: '5',             // Circuit breaker threshold
+                CHROME_CB_TIMEOUT: '30000'            // Circuit breaker timeout (30s)
             },
 
             env_production: {
@@ -199,19 +209,29 @@ module.exports = {
                 CHROME_HOST: 'host.docker.internal',
                 CHROME_PORT: '9225',
                 CHROME_PROXY_PORT: '9224',
-                LOG_LEVEL: 'warn'
+                LOG_LEVEL: 'warn',
+                // v3.0 - Rate Limiting & Security
+                CHROME_PROXY_MAX_WS_GLOBAL: '200',
+                CHROME_PROXY_MAX_WS_PER_IP: '20',
+                CHROME_PROXY_MAX_JSON_BUFFER: '10485760',
+                WS_IDLE_TIMEOUT_MS: '300000',
+                CHROME_CB_THRESHOLD: '5',
+                CHROME_CB_TIMEOUT: '30000'
             },
 
-            // Logging
+            // Logging (consistent with other processes)
+            merge_logs: false,              // Separate stdout/stderr
+            time: true,                     // Add timestamps to each log line
+            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
             error_file: './logs/chrome-proxy-error.log',
             out_file: './logs/chrome-proxy-out.log',
-            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-            combine_logs: true,
+            log_rotate_interval: '1d',      // Rotate daily
+            log_rotate_max: 7,              // Keep last 7 days
 
-            // Timing
-            min_uptime: '10s',
-            listen_timeout: 8000,
-            kill_timeout: 5000
+            // PM2 Runtime Timing
+            kill_timeout: 8000,             // Graceful shutdown timeout
+            listen_timeout: 8000,           // Startup timeout
+            min_uptime: '10s'               // Minimum uptime before considering stable
         }
     ]
 };
