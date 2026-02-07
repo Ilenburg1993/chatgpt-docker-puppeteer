@@ -91,11 +91,17 @@ function parseIntSafe(value, defaultValue, varName, range = {}) {
 }
 
 /**
- * Parse and validate bind address (IPv4 or IPv6)
+ * Parse and validate bind address (IPv4 or IPv6) with strict validation
  *
  * Validates that the address is a valid IP format. Accepts:
- * - IPv4: 0.0.0.0, 127.0.0.1, 192.168.1.1, etc.
- * - IPv6: ::, ::ffff:192.168.1.1, fe80::1, etc.
+ * - IPv4: 0.0.0.0, 127.0.0.1, 192.168.1.1 (each octet 0-255, no leading zeros except "0")
+ * - IPv6: ::, ::1, ::ffff:192.168.1.1, fe80::1, 2001:db8::1 (proper hex format, valid :: compression)
+ *
+ * Rejects:
+ * - IPv4 out of range (256.1.1.1, 999.999.999.999)
+ * - IPv4 with leading zeros (01.02.03.04)
+ * - IPv6 malformed (:::1, ::1::2, groups > 4 hex digits)
+ * - Hostnames (localhost) and random strings
  *
  * @param {string | undefined} value - Raw bind address value
  * @param {string} defaultValue - Fallback address if invalid
@@ -103,15 +109,66 @@ function parseIntSafe(value, defaultValue, varName, range = {}) {
  *
  * @example
  * const bind = parseBindSafe(process.env.BIND_ADDR, '0.0.0.0');
+ * // Valid: '0.0.0.0', '127.0.0.1', '::', '::1', 'fe80::1'
+ * // Invalid: '256.1.1.1', ':::1', 'localhost' → returns '0.0.0.0'
  */
 function parseBindSafe(value, defaultValue) {
     const v = (value ?? '').trim();
     if (!v) return defaultValue;
 
-    // ✅ P1 FIX: Validate IP format (basic check)
-    // Valid: 0.0.0.0, 127.0.0.1, IPv4, ::, ::ffff:x.x.x.x
-    const isIPv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(v);
-    const isIPv6 = v === '::' || /^::ffff:/.test(v) || /^[0-9a-fA-F:]+$/.test(v);
+    // ✅ ROBUST IPv4 validation: strict octet range (0-255), no leading zeros
+    const isIPv4 = (() => {
+        const parts = v.split('.');
+        if (parts.length !== 4) return false;
+
+        return parts.every(part => {
+            const num = parseInt(part, 10);
+            // Validate: is numeric, no leading zeros (except "0" itself), range 0-255
+            return (
+                /^\d+$/.test(part) &&
+                (part === '0' || !part.startsWith('0')) &&
+                num >= 0 &&
+                num <= 255
+            );
+        });
+    })();
+
+    // ✅ ROBUST IPv6 validation: proper format, no malformed addresses
+    const isIPv6 = (() => {
+        // Special cases: unspecified (::) and loopback (::1)
+        if (v === '::' || v === '::1') return true;
+
+        // IPv6-mapped IPv4: ::ffff:x.x.x.x (validate IPv4 part)
+        if (v.startsWith('::ffff:')) {
+            const ipv4Part = v.substring(7);
+            const parts = ipv4Part.split('.');
+            if (parts.length === 4) {
+                return parts.every(part => {
+                    const num = parseInt(part, 10);
+                    return /^\d+$/.test(part) && num >= 0 && num <= 255;
+                });
+            }
+            return false;
+        }
+
+        // Standard IPv6 format validation
+        // Must have 2-7 colons (at least :: or x:x, max 7 for 8 groups)
+        const colonCount = (v.match(/:/g) || []).length;
+        if (colonCount < 2 || colonCount > 7) return false;
+
+        // Reject multiple :: compressions (only one allowed)
+        const doubleColonCount = (v.match(/::/g) || []).length;
+        if (doubleColonCount > 1) return false;
+
+        // Reject malformed patterns like :::, ::::, etc.
+        if (/:{3,}/.test(v)) return false;
+
+        // Validate hex groups: each must be 1-4 hex digits
+        const groups = v.split(':').filter(g => g !== ''); // Empty groups from :: are ok
+        if (groups.length === 0 && v !== '::') return false; // ":" alone is invalid
+
+        return groups.every(group => /^[0-9a-fA-F]{1,4}$/.test(group));
+    })();
 
     if (!isIPv4 && !isIPv6) {
         console.warn(`[WARN] Invalid CHROME_PROXY_BIND="${v}", using default: ${defaultValue}`);
