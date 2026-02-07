@@ -52,7 +52,7 @@ sudo apt-get install -y ripgrep bubblewrap socat
 {
   // Habilita o sandbox (requer todas as 3 dependências)
   "chat.tools.terminal.sandbox.enabled": true,
-  
+
   // Desabilita o sandbox (modo compatibilidade)
   "chat.tools.terminal.sandbox.enabled": false
 }
