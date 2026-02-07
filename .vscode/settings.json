@@ -584,7 +584,7 @@
 "chat.includeReferencedInstructions": true,
 "chat.mcp.assisted.nuget.enabled": true,
 "chat.tips.enabled": true,
-"chat.tools.terminal.sandbox.enabled": true,
+"chat.tools.terminal.sandbox.enabled": false,
 "terminal.integrated.shellIntegration.environmentReporting": true,
 "windowsaistudio.enableRemoteFine-tuningAndInference": true,
 "editor.autoIndentOnPaste": true,
