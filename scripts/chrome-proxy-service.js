@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport _Impl from '#infra/proxy/chromeProxyService';
+#!/usr/bin/env node
+import _Impl from '#infra/proxy/chromeProxyService';
 
 // Wrapper class - re-exposes important method names for static checks
 // and delegates to the real implementation.
@@ -44,6 +45,7 @@ async function main() {
     }
 }
 
-if (import.meta.filename === process.argv[1]) main();
+// Always call main() - PM2 modifies process.argv[1], breaking the condition
+await main();
 
 export default ChromeProxyService;

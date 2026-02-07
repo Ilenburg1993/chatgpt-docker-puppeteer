@@ -76,10 +76,30 @@ function rotateFile(filePath, prefix, maxSize) {
    API PÚBLICA DE REGISTRO
 ========================================================================== */
 
+// Log level hierarchy (lower number = more verbose)
+const LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+    FATAL: 4
+};
+
+// Read LOG_LEVEL from environment (default: INFO)
+const configuredLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
+let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS.INFO;
+
 /**
  * Log Operacional: Registra eventos do fluxo de trabalho.
+ * Agora com filtragem por nível baseada em LOG_LEVEL environment variable.
  */
 function log(level, msg, taskId = '-') {
+    // Filter: Only log if level >= configured threshold
+    const levelValue = LOG_LEVELS[level.toUpperCase()] ?? LOG_LEVELS.INFO;
+    if (levelValue < minLevel) {
+        return; // Skip this log
+    }
+
     rotateFile(LOG_FILE, 'agente_', MAX_LOG_SIZE);
 
     const ts = new Date().toISOString();
@@ -102,6 +122,24 @@ function log(level, msg, taskId = '-') {
         // Silent failure - console.log already logged
     }
 }
+
+/**
+ * Get current configured log level.
+ */
+log.getLevel = () => configuredLevel;
+
+/**
+ * Set log level dynamically at runtime.
+ */
+log.setLevel = (newLevel) => {
+    const upperLevel = newLevel.toUpperCase();
+    if (LOG_LEVELS[upperLevel] !== undefined) {
+        minLevel = LOG_LEVELS[upperLevel];
+        log('INFO', `Log level changed to: ${upperLevel}`);
+    } else {
+        log('WARN', `Invalid log level: ${newLevel}. Valid levels: DEBUG, INFO, WARN, ERROR, FATAL`);
+    }
+};
 
 /**
  * Auditoria Governamental: Registra ações administrativas e mudanças de estado.
@@ -154,11 +192,13 @@ function metric(name, payload) {
  *   log.info('Mensagem', taskId)
  *   log.warn('Mensagem', taskId)
  *   log.error('Mensagem', taskId)
+ *   log.fatal('Mensagem', taskId)
  */
 log.debug = (msg, taskId) => log('DEBUG', msg, taskId);
 log.info = (msg, taskId) => log('INFO', msg, taskId);
 log.warn = (msg, taskId) => log('WARN', msg, taskId);
 log.error = (msg, taskId) => log('ERROR', msg, taskId);
+log.fatal = (msg, taskId) => log('FATAL', msg, taskId);
 
 // --- INICIALIZAÇÃO (HYGIENE CHECK) ---
 cleanOldFiles('agente_');
@@ -169,4 +209,5 @@ export const debug = log.debug;
 export const info = log.info;
 export const warn = log.warn;
 export const error = log.error;
+export const fatal = log.fatal;
 export { log, audit, metric, metric as logMetric, LOG_DIR };
