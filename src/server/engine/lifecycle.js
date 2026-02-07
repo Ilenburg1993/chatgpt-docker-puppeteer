@@ -117,7 +117,9 @@ async function gracefulShutdown(signal) {
         // 5. DESATIVAÇÃO DA FUNDAÇÃO HTTP
         // Libera o bind da porta no Sistema Operacional.
         log('DEBUG', '[LIFECYCLE] Encerrando servidor HTTP...');
-        await server.stop();
+        // Pass shorter timeout to prevent watchdog force-exit
+        const serverTimeout = Math.max(1000, shutdownTimeoutMs - 1000); // Reserve 1s for cleanup
+        await server.stop(serverTimeout);
 
         log('INFO', '[LIFECYCLE] Subsistema Mission Control encerrado com sucesso.');
 

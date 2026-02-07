@@ -110,23 +110,64 @@ function start(port, attempt = 0) {
 
 /**
  * Encerra servidor HTTP e libera porta.
- * Operação idempotente.
+ * Operação idempotente com timeout para force-close.
  *
+ * @param {number} gracefulTimeout - Timeout em ms para esperar conexões fecharem (padrão: 30s)
  * @returns {Promise<void>}
  */
-async function stop() {
-    return new Promise(resolve => {
+async function stop(gracefulTimeout = 30000) {
+    log('INFO', `[ENGINE] Iniciando shutdown gracioso (timeout: ${gracefulTimeout}ms)...`);
 
-        if (httpServer && httpServer.listening) {
-            httpServer.close(() => {
-                log('INFO', '[ENGINE] HTTP encerrado.');
-                httpServer = null;
-                resolve();
-            });
-        } else {
+    // Notificar clientes Socket.IO sobre shutdown iminente
+    try {
+        const { notifyShutdown } = await import('./socket.js');
+        if (typeof notifyShutdown === 'function') {
+            notifyShutdown(gracefulTimeout);
+        }
+    } catch (err) {
+        // Socket.IO pode não estar inicializado
+        log('DEBUG', '[ENGINE] Socket.IO shutdown notification skipped (not initialized)');
+    }
+
+    return new Promise((resolve, reject) => {
+        if (!httpServer || !httpServer.listening) {
+            log('INFO', '[ENGINE] Servidor já encerrado.');
             httpServer = null;
             resolve();
+            return;
         }
+
+        // Timeout para force-close
+        const forceTimeout = setTimeout(() => {
+            log('WARN', `[ENGINE] Forçando shutdown após ${gracefulTimeout}ms...`);
+
+            // Force close all active connections (Node.js 18.2+)
+            if (typeof httpServer.closeAllConnections === 'function') {
+                httpServer.closeAllConnections();
+                log('INFO', '[ENGINE] Todas conexões forçadamente fechadas.');
+            } else {
+                log('WARN', '[ENGINE] closeAllConnections() não disponível (Node.js < 18.2)');
+            }
+
+            // Resolve anyway (force completion)
+            httpServer = null;
+            resolve();
+        }, gracefulTimeout);
+
+        // Graceful close
+        httpServer.close((err) => {
+            clearTimeout(forceTimeout);
+
+            if (err) {
+                log('ERROR', `[ENGINE] Erro durante shutdown: ${err.message}`);
+                httpServer = null;
+                reject(err);
+            } else {
+                log('INFO', '[ENGINE] HTTP encerrado graciosamente.');
+                httpServer = null;
+                resolve();
+            }
+        });
     });
 }
 
