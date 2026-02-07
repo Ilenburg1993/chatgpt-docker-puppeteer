@@ -219,8 +219,8 @@ class ChromeProxyService {
         this.MAX_WS_PER_IP = parseInt(process.env.CHROME_PROXY_MAX_WS_PER_IP || '20', 10);
         this.WS_IP_CLEANUP_INTERVAL = 60000;  // Clean stale entries every 60s
 
-        // Cleanup stale IP entries periodically
-        setInterval(() => {
+        // ✅ P1.5: Store cleanup interval handle for graceful shutdown
+        this._ipCleanupInterval = setInterval(() => {
             this._cleanupStaleIPEntries();
         }, this.WS_IP_CLEANUP_INTERVAL);
     }
@@ -509,6 +509,15 @@ class ChromeProxyService {
     }
 
     /* ======================================================================
+       IP Normalization (P1.6 - IPv6-mapped canonicalization)
+    ====================================================================== */
+    _normalizeIP(ip) {
+        if (!ip) return '0.0.0.0';
+        // Remove IPv6-mapped IPv4 prefix (::ffff:192.168.1.1 → 192.168.1.1)
+        return ip.replace(/^::ffff:/i, '');
+    }
+
+    /* ======================================================================
        WebSocket Rate Limiting Helpers
     ====================================================================== */
     _cleanupStaleIPEntries() {
@@ -600,40 +609,6 @@ class ChromeProxyService {
         // Health check endpoints (skip circuit breaker)
         if (url === '/health' || url === '/healthz') {
             this._handleHealthCheck(req, res);
-            return;
-        }
-
-        // ✅ Circuit Breaker Check - Fail fast if Chrome is down
-        if (this.circuitBreaker.state === 'OPEN') {
-            const cbState = this.circuitBreaker.getState();
-            const waitMs = cbState.nextAttempt - Date.now();
-
-            this.log('warn', 'Circuit breaker OPEN, rejecting request', {
-                path: url,
-                waitMs: Math.max(0, waitMs)
-            });
-
-            this._incrementMetric(this.metrics.httpRequests, {
-                method,
-                path: url,
-                status: '503'
-            });
-
-            res.writeHead(503, {
-                'Content-Type': 'application/json',
-                'Retry-After': Math.ceil(Math.max(0, waitMs) / 1000),
-                ...this._getCORSHeaders(req)
-            });
-
-            res.end(
-                JSON.stringify({
-                    error: 'Chrome temporarily unavailable',
-                    circuitBreaker: 'OPEN',
-                    retryAfter: `${Math.ceil(Math.max(0, waitMs) / 1000)}s`,
-                    hint: 'Check Chrome is running with --remote-debugging-port'
-                })
-            );
-
             return;
         }
 
@@ -762,6 +737,22 @@ class ChromeProxyService {
 
                     proxyRes.pipe(res);
 
+                    // ✅ P2.7: Handle streaming errors (count failures in circuit breaker)
+                    proxyRes.on('error', streamErr => {
+                        this.circuitBreaker.onFailure(); // Count failure in circuit breaker
+                        this.stats.errors++;
+                        this._incrementMetric(this.metrics.proxyErrors, { type: 'stream_error' });
+                        this.log('error', 'Proxy response stream error', { error: streamErr.message });
+
+                        if (!res.headersSent) {
+                            res.writeHead(502, {
+                                'Content-Type': 'text/plain',
+                                ...this._getCORSHeaders(req)
+                            });
+                            res.end('Stream error');
+                        }
+                    });
+
                     this.log('debug', 'HTTP response streaming', {
                         status: proxyRes.statusCode,
                         streaming: true
@@ -800,37 +791,72 @@ class ChromeProxyService {
                 this._observeMetric(this.metrics.requestDuration, duration, { method, path: url });
             })
             .catch(err => {
-                this.stats.errors++;
-                this._incrementMetric(this.metrics.proxyErrors, { type: 'http_request' });
-                this._incrementMetric(this.metrics.httpRequests, { method, path: url, status: '502' });
+                // ✅ P0.1 FIX: Detect circuit breaker rejection (let breaker manage state transition)
+                const isCircuitBreakerError = err.message && err.message.includes('Circuit breaker');
 
-                this.log('error', 'Chrome unreachable', { error: err.message });
+                if (isCircuitBreakerError) {
+                    // Circuit breaker is OPEN - return 503 with Retry-After
+                    const cbState = this.circuitBreaker.getState();
+                    const retryInMs = cbState.nextAttempt;  // ✅ P0.2 FIX: Already "ms remaining", not timestamp
 
-                if (!res.headersSent) {
-                    res.writeHead(502, {
-                        'Content-Type': 'application/json',
-                        ...this._getCORSHeaders(req)
+                    this.log('warn', 'Circuit breaker OPEN, rejecting HTTP request', {
+                        path: url,
+                        retryInMs
                     });
 
-                    res.end(
-                        JSON.stringify({
-                            error: 'Chrome unreachable',
-                            message: err.message,
-                            hint: `Ensure Chrome is running with --remote-debugging-port=${this.config.CHROME_PORT}`
-                        })
-                    );
-                }
+                    this._incrementMetric(this.metrics.httpRequests, { method, path: url, status: '503' });
+                    this._incrementMetric(this.metrics.proxyErrors, { type: 'circuit_breaker_open' });
 
-                // NERV error event (optional)
-                const store = this.asyncLocalStorage.getStore();
-                const correlationId = store?.correlationId || req.headers?.['x-request-id'] || null;
+                    if (!res.headersSent) {
+                        res.writeHead(503, {
+                            'Content-Type': 'application/json',
+                            'Retry-After': Math.ceil(retryInMs / 1000),
+                            ...this._getCORSHeaders(req)
+                        });
 
-                if (ActionCode) {
-                    this._emitNervEvent(
-                        ActionCode.DRIVER_ERROR,
-                        { event: 'proxy.http.error', error: err.message, path: url, method },
-                        correlationId
-                    );
+                        res.end(
+                            JSON.stringify({
+                                error: 'Chrome temporarily unavailable',
+                                circuitBreaker: 'OPEN',
+                                retryAfter: `${Math.ceil(retryInMs / 1000)}s`,
+                                hint: 'Chrome circuit breaker is protecting against cascading failures'
+                            })
+                        );
+                    }
+                } else {
+                    // Regular connection error - return 502
+                    this.stats.errors++;
+                    this._incrementMetric(this.metrics.proxyErrors, { type: 'http_request' });
+                    this._incrementMetric(this.metrics.httpRequests, { method, path: url, status: '502' });
+
+                    this.log('error', 'Chrome unreachable', { error: err.message });
+
+                    if (!res.headersSent) {
+                        res.writeHead(502, {
+                            'Content-Type': 'application/json',
+                            ...this._getCORSHeaders(req)
+                        });
+
+                        res.end(
+                            JSON.stringify({
+                                error: 'Chrome unreachable',
+                                message: err.message,
+                                hint: `Ensure Chrome is running with --remote-debugging-port=${this.config.CHROME_PORT}`
+                            })
+                        );
+                    }
+
+                    // NERV error event (optional)
+                    const store = this.asyncLocalStorage.getStore();
+                    const correlationId = store?.correlationId || req.headers?.['x-request-id'] || null;
+
+                    if (ActionCode) {
+                        this._emitNervEvent(
+                            ActionCode.DRIVER_ERROR,
+                            { event: 'proxy.http.error', error: err.message, path: url, method },
+                            correlationId
+                        );
+                    }
                 }
             });
     }
@@ -901,26 +927,60 @@ class ChromeProxyService {
     handleWebSocketUpgrade(req, socket, head) {
         this.stats.wsUpgrades++;
 
-        const clientIP = socket.remoteAddress;
+        const rawIP = socket.remoteAddress;
+        const clientIP = this._normalizeIP(rawIP);  // ✅ P1.6: Normalize IPv6-mapped addresses
         const url = req.url;
 
         this.log('info', `WebSocket upgrade: ${url}`, { from: clientIP });
 
-        // ✅ Circuit Breaker Check - Reject WS upgrades when Chrome is down
-        if (this.circuitBreaker.state === 'OPEN') {
-            this.log('warn', 'Circuit breaker OPEN, rejecting WS upgrade', { url });
+        // ✅ P1.3: Origin Validation (CORS doesn't protect WebSocket)
+        const origin = req.headers.origin;
+        if (origin && !this.config.ALLOWED_ORIGINS.includes(origin)) {
+            this.log('warn', 'WebSocket upgrade rejected: Origin not in whitelist', {
+                origin,
+                url
+            });
 
             this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
-            this._incrementMetric(this.metrics.proxyErrors, { type: 'circuit_breaker_open' });
+            this._incrementMetric(this.metrics.proxyErrors, { type: 'origin_rejected' });
 
-            // Send HTTP 503 response before upgrade attempt
-            socket.write('HTTP/1.1 503 Service Unavailable\r\n');
+            socket.write('HTTP/1.1 403 Forbidden\r\n');
             socket.write('Content-Type: text/plain\r\n');
             socket.write('\r\n');
-            socket.write('Chrome circuit breaker OPEN\r\n');
+            socket.write('Origin not allowed\r\n');
             socket.destroy();
 
             return;
+        }
+
+        // ✅ P1.4 FIX: Circuit Breaker - Allow HALF_OPEN transition based on time
+        if (this.circuitBreaker.state === 'OPEN') {
+            // Check if it's time to attempt recovery (transition to HALF_OPEN)
+            if (Date.now() < this.circuitBreaker.nextAttempt) {
+                const cbState = this.circuitBreaker.getState();
+                const retryInMs = cbState.nextAttempt;  // Already "ms remaining"
+
+                this.log('warn', 'Circuit breaker OPEN, rejecting WS upgrade', {
+                    url,
+                    retryInMs
+                });
+
+                this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
+                this._incrementMetric(this.metrics.proxyErrors, { type: 'circuit_breaker_open' });
+
+                socket.write('HTTP/1.1 503 Service Unavailable\r\n');
+                socket.write('Content-Type: text/plain\r\n');
+                socket.write(`Retry-After: ${Math.ceil(retryInMs / 1000)}\r\n`);
+                socket.write('\r\n');
+                socket.write('Chrome circuit breaker OPEN\r\n');
+                socket.destroy();
+
+                return;
+            } else {
+                // Time to try recovery - transition to HALF_OPEN
+                this.circuitBreaker.state = 'HALF_OPEN';
+                this.log('info', 'Circuit breaker transitioning to HALF_OPEN (WS upgrade)', { url });
+            }
         }
 
         // ✅ Global WS Limit Check
@@ -1315,7 +1375,7 @@ class ChromeProxyService {
 
             // Start listening
             this.server.listen(Number(this.config.PROXY_PORT), String(this.config.PROXY_BIND), () => {
-                this.log('info', '✅ Chrome Proxy Service v3.0 started');
+                this.log('info', '✅ Chrome Proxy Service v3.1 started');
                 this.log('info', `   Listening: ${this.config.PROXY_BIND}:${this.config.PROXY_PORT}`);
                 this.log('info', `   Forwarding to: ${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`);
                 this.log('info', `   Public URL: http://${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`);
@@ -1376,6 +1436,11 @@ class ChromeProxyService {
         // Clear idle check interval
         if (this._idleCheckInterval) {
             clearInterval(this._idleCheckInterval);
+        }
+
+        // ✅ P1.5: Clear IP cleanup interval
+        if (this._ipCleanupInterval) {
+            clearInterval(this._ipCleanupInterval);
         }
 
         // Gracefully close active connections (10s timeout)
