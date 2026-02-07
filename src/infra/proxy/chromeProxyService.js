@@ -1,3 +1,19 @@
+/**
+ * @fileoverview Chrome Proxy Service v3.1 - Production-grade HTTP/WebSocket proxy for Chrome DevTools Protocol
+ *
+ * Features:
+ * - Circuit breaker pattern for fault tolerance
+ * - Rate limiting (per-IP and global WebSocket limits)
+ * - Origin validation (CORS + WebSocket security)
+ * - Prometheus metrics exposure
+ * - PM2 integration with graceful shutdown
+ * - Idle connection timeout with keep-alive
+ * - IPv6-mapped IP normalization
+ *
+ * @version 3.1.0
+ * @author Claude Sonnet 4.5
+ */
+
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import http from 'node:http';
 import net from 'node:net';
@@ -10,6 +26,34 @@ import * as logger from '#core/logger';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { v4 as uuidv4 } from 'uuid';
 import promClient from 'prom-client';
+
+/**
+ * @typedef {Object} ChromeProxyServiceConfig
+ * @property {number} PROXY_PORT - Proxy listening port (default: 9224)
+ * @property {string} CHROME_HOST - Chrome host address (default: host.docker.internal)
+ * @property {number} CHROME_PORT - Chrome debugging port (default: 9225)
+ * @property {string} PROXY_BIND - Proxy bind address (default: 0.0.0.0)
+ * @property {string | null} [PUBLIC_IP] - Public IP for external access (auto-detect if null)
+ * @property {string} [LOG_LEVEL] - Logging level (default: 'info')
+ * @property {string[]} [ALLOWED_ORIGINS] - CORS allowed origins
+ */
+
+/**
+ * @typedef {Object} CircuitBreakerState
+ * @property {'CLOSED' | 'OPEN' | 'HALF_OPEN'} state - Current circuit breaker state
+ * @property {number} failures - Number of consecutive failures
+ * @property {number} nextAttempt - Milliseconds remaining until next attempt (0 if not waiting)
+ */
+
+/**
+ * @typedef {Object} ProxyStats
+ * @property {number} httpRequests - Total HTTP requests proxied
+ * @property {number} wsUpgrades - Total WebSocket upgrades
+ * @property {number} errors - Total errors encountered
+ * @property {number} startTime - Service start timestamp
+ * @property {number} cacheHits - Cache hits
+ * @property {number} cacheMisses - Cache misses
+ */
 
 // NERV integration (optional) - lazy loaded
 let createNERV = null;
@@ -35,17 +79,48 @@ const LOCAL_CONFIG = {
 /* ==========================================================================
    CircuitBreaker - Prevents cascading failures when Chrome is down
 ========================================================================== */
+
+/**
+ * Circuit breaker pattern implementation for fault tolerance
+ *
+ * States:
+ * - CLOSED: Normal operation, allows all requests
+ * - OPEN: Too many failures, rejects all requests for timeout period
+ * - HALF_OPEN: Testing if service recovered, allows limited requests
+ *
+ * @class
+ */
 class CircuitBreaker {
+    /**
+     * Create a circuit breaker
+     * @param {number} [threshold=5] - Number of failures before opening circuit
+     * @param {number} [timeout=30000] - Milliseconds to wait before attempting recovery
+     * @param {string} [name='default'] - Circuit breaker identifier for logging
+     */
     constructor(threshold = 5, timeout = 30000, name = 'default') {
+        /** @type {number} */
         this.failures = 0;
+        /** @type {number} */
         this.threshold = threshold;
+        /** @type {number} */
         this.timeout = timeout;
-        this.state = 'CLOSED';  // CLOSED, OPEN, HALF_OPEN
+        /** @type {'CLOSED' | 'OPEN' | 'HALF_OPEN'} */
+        this.state = 'CLOSED';
+        /** @type {number} */
         this.nextAttempt = 0;
+        /** @type {string} */
         this.name = name;
+        /** @type {number} */
         this.successCount = 0;
     }
 
+    /**
+     * Execute function with circuit breaker protection
+     * @template T
+     * @param {() => Promise<T>} fn - Async function to execute
+     * @returns {Promise<T>} Result of function execution
+     * @throws {Error} If circuit is OPEN and waiting period not elapsed
+     */
     async call(fn) {
         if (this.state === 'OPEN') {
             if (Date.now() < this.nextAttempt) {
@@ -65,6 +140,11 @@ class CircuitBreaker {
         }
     }
 
+    /**
+     * Record successful execution
+     * Resets failure count and transitions HALF_OPEN → CLOSED after 3 successes
+     * @returns {void}
+     */
     onSuccess() {
         this.failures = 0;
         if (this.state === 'HALF_OPEN') {
@@ -79,6 +159,11 @@ class CircuitBreaker {
         }
     }
 
+    /**
+     * Record failed execution
+     * Opens circuit after threshold failures
+     * @returns {void}
+     */
     onFailure() {
         this.failures++;
         this.successCount = 0;
@@ -88,6 +173,10 @@ class CircuitBreaker {
         }
     }
 
+    /**
+     * Get current circuit breaker state
+     * @returns {CircuitBreakerState} Current state with failure count and time remaining
+     */
     getState() {
         return {
             state: this.state,
@@ -100,8 +189,38 @@ class CircuitBreaker {
 /* ==========================================================================
    ChromeProxyService - Main Class
 ========================================================================== */
+
+/**
+ * Production-grade HTTP/WebSocket proxy for Chrome DevTools Protocol
+ *
+ * Features:
+ * - Circuit breaker for fault tolerance
+ * - Per-IP and global WebSocket rate limiting
+ * - Origin validation (CORS + WebSocket security)
+ * - Prometheus metrics
+ * - Graceful shutdown with PM2 integration
+ * - Idle connection timeout
+ * - IPv6-mapped IP normalization
+ *
+ * @class
+ */
 class ChromeProxyService {
+    /**
+     * Create Chrome Proxy Service instance
+     *
+     * @param {Partial<ChromeProxyServiceConfig>} [config={}] - Service configuration (merges with defaults)
+     *
+     * @example
+     * const proxy = new ChromeProxyService({
+     *   PROXY_PORT: 9224,
+     *   CHROME_HOST: 'host.docker.internal',
+     *   CHROME_PORT: 9225,
+     *   PROXY_BIND: '0.0.0.0'
+     * });
+     * await proxy.start();
+     */
     constructor(config = {}) {
+        /** @type {ChromeProxyServiceConfig} */
         this.config = { ...LOCAL_CONFIG, ...config };
 
         // Validate config
@@ -595,6 +714,26 @@ class ChromeProxyService {
     /* ======================================================================
        HTTP Request Handler
     ====================================================================== */
+
+    /**
+     * Handle HTTP request proxying to Chrome DevTools Protocol
+     *
+     * Features:
+     * - Circuit breaker protection
+     * - Conditional buffering (/json/* paths for URL rewriting)
+     * - Response streaming for non-JSON paths
+     * - Cache for /json/version (30s TTL)
+     * - CORS headers (whitelist-based)
+     * - Prometheus metrics
+     *
+     * @param {import('http').IncomingMessage} req - Incoming HTTP request
+     * @param {import('http').ServerResponse} res - HTTP response
+     * @returns {void}
+     *
+     * @example
+     * // Express integration
+     * app.use((req, res) => proxy.handleHTTPRequest(req, res));
+     */
     handleHTTPRequest(req, res) {
         this.stats.httpRequests++;
 
@@ -924,6 +1063,34 @@ class ChromeProxyService {
     /* ======================================================================
        WebSocket Upgrade Handler
     ====================================================================== */
+
+    /**
+     * Handle WebSocket upgrade for Chrome DevTools Protocol connections
+     *
+     * Security & Rate Limiting:
+     * - Origin validation (whitelist-based, CORS doesn't protect WebSocket)
+     * - Circuit breaker protection
+     * - Global WebSocket connection limit (MAX_WS_GLOBAL)
+     * - Per-IP connection limit (MAX_WS_PER_IP)
+     * - IPv6-mapped IP normalization
+     *
+     * Connection Management:
+     * - TCP keep-alive (30s initial delay)
+     * - Idle timeout detection
+     * - Automatic cleanup on close/error
+     * - Graceful degradation (fallback to raw socket if http-proxy fails)
+     *
+     * @param {import('http').IncomingMessage} req - HTTP upgrade request
+     * @param {import('net').Socket} socket - TCP socket
+     * @param {Buffer} head - First packet of upgraded stream
+     * @returns {void}
+     *
+     * @example
+     * // HTTP server integration
+     * server.on('upgrade', (req, socket, head) => {
+     *   proxy.handleWebSocketUpgrade(req, socket, head);
+     * });
+     */
     handleWebSocketUpgrade(req, socket, head) {
         this.stats.wsUpgrades++;
 
@@ -1035,6 +1202,10 @@ class ChromeProxyService {
             globalConnections: this.activeConnections.size + 1
         });
 
+        /**
+         * Mark socket as active (tracks last activity timestamp)
+         * @param {import('net').Socket & {__lastActivity?: number}} s - Socket with custom property
+         */
         const markActive = s => {
             try {
                 s.__lastActivity = Date.now();
@@ -1207,6 +1378,27 @@ class ChromeProxyService {
     /* ======================================================================
        Start Server
     ====================================================================== */
+
+    /**
+     * Start the proxy server
+     *
+     * Responsibilities:
+     * - Initialize http-proxy module
+     * - Load NERV integration (optional)
+     * - Setup Express middleware (helmet, compression, rate limiting)
+     * - Configure health and metrics endpoints
+     * - Create HTTP server with WebSocket upgrade support
+     * - Register graceful shutdown handlers (SIGINT/SIGTERM)
+     * - Send PM2 ready signal when listening
+     *
+     * @returns {Promise<void>} Resolves when server is listening
+     * @throws {Error} If port is already in use or binding fails
+     *
+     * @example
+     * const proxy = new ChromeProxyService(config);
+     * await proxy.start();
+     * console.log('Proxy listening on port', config.PROXY_PORT);
+     */
     async start() {
         // ✅ Wait for http-proxy to be ready (initialized in constructor)
         try {
@@ -1413,12 +1605,34 @@ class ChromeProxyService {
     /* ======================================================================
        Graceful Shutdown
     ====================================================================== */
+
+    /**
+     * Handle OS signals for graceful shutdown
+     * @param {string} signal - Signal name (SIGINT, SIGTERM, etc.)
+     * @returns {Promise<void>}
+     * @private
+     */
     async _handleShutdown(signal) {
         this.log('warn', `Received ${signal}, shutting down gracefully...`);
         await this.stop();
         process.exit(0);
     }
 
+    /**
+     * Gracefully stop the proxy server
+     *
+     * Shutdown procedure:
+     * 1. Log final statistics (uptime, requests, errors, connections)
+     * 2. Clear idle check and IP cleanup intervals
+     * 3. Close all active WebSocket connections (10s timeout per connection)
+     * 4. Close HTTP server (5s force timeout)
+     *
+     * @returns {Promise<void>} Resolves when server is fully stopped
+     *
+     * @example
+     * await proxy.stop();
+     * console.log('Proxy stopped gracefully');
+     */
     async stop() {
         this.log('info', 'Shutting down proxy...');
 
