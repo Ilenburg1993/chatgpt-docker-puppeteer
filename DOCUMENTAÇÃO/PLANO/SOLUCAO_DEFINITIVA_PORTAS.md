@@ -1,8 +1,8 @@
 # Solução Definitiva para Gerenciamento de Portas
 
-> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Este documento descreve uma solução planejada mas **NUNCA IMPLEMENTADA**.  
-> Os arquivos `config/ports.json` e `scripts/port-manager.js` foram **REMOVIDOS** (código morto).  
-> O sistema atual usa **port hunting nativo** implementado em `src/main.js` (função `checkPortInUse()`).  
+> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Este documento descreve uma solução planejada mas **NUNCA IMPLEMENTADA**.
+> Os arquivos `config/ports.json` e `scripts/port-manager.js` foram **REMOVIDOS** (código morto).
+> O sistema atual usa **port hunting nativo** implementado em `src/main.js` (função `checkPortInUse()`).
 > Documento preservado para referência histórica e contexto arquitetural.
 
 ---

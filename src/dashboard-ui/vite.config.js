@@ -17,8 +17,8 @@ export default defineConfig({
 
     server: {
         port: 5173,
-        host: '127.0.0.1', // CRITICAL: VS Code port forwarding does not support IPv6
-        strictPort: false,
+        host: '0.0.0.0', // Docker-compatible: accepts external connections (container → host)
+        strictPort: true, // Fail-fast if port occupied (DevContainer expects 5173)
         // HMR Configuration for DevContainer
         hmr: {
             clientPort: 5173,
@@ -48,12 +48,27 @@ export default defineConfig({
         sourcemap: false,
         minify: 'esbuild',
         chunkSizeWarningLimit: 1000,
+        cssCodeSplit: true, // Separate CSS per chunk for better caching
         rollupOptions: {
             output: {
                 manualChunks: {
+                    // Only libs actually installed (verified in package.json)
                     'vue-vendor': ['vue', 'vue-router', 'pinia'],
-                    charts: ['chart.js', 'vue-chartjs', 'd3'],
-                    ui: ['element-plus'],
+                    'charts': ['chart.js'],
+                    'ui': ['radix-vue', 'lucide-vue-next', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+                    'vis': ['vis-timeline', 'vis-data'],
+                    'utils': ['axios', 'lodash-es', 'date-fns', 'uuid'],
+                },
+                assetFileNames: (assetInfo) => {
+                    const info = assetInfo.name.split('.');
+                    const extType = info[info.length - 1];
+                    if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {
+                        return `assets/images/[name]-[hash][extname]`;
+                    }
+                    if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
+                        return `assets/fonts/[name]-[hash][extname]`;
+                    }
+                    return `assets/[name]-[hash][extname]`;
                 },
             },
         },
