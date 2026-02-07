@@ -18,24 +18,47 @@ class ChromeProxyService extends _Impl {
     }
 }
 
+/**
+ * Parse and validate integer from environment variable
+ * @param {string} value - Raw environment variable value
+ * @param {number} defaultValue - Fallback value
+ * @param {string} varName - Variable name (for error messages)
+ * @returns {number} Valid integer or default
+ */
+function parseIntSafe(value, defaultValue, varName) {
+    if (!value) return defaultValue;
+
+    const parsed = parseInt(value, 10);
+
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 65535) {
+        console.warn(`[WARN] Invalid ${varName}="${value}", using default: ${defaultValue}`);
+        return defaultValue;
+    }
+
+    return parsed;
+}
+
 async function main() {
-    let PUBLIC_IP = process.env.PUBLIC_IP || null;
-    const CHROME_PORT = process.env.CHROME_PORT ? parseInt(process.env.CHROME_PORT, 10) : 9225;
-    const PROXY_PORT = process.env.CHROME_PROXY_PORT ? parseInt(process.env.CHROME_PROXY_PORT, 10) : 9224;
-    const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
-    const CHROME_HOST = process.env.CHROME_HOST || '127.0.0.1';
+    // ✅ P0.1 FIX: Align CHROME_HOST default with implementation (Docker-friendly)
+    const CHROME_HOST = process.env.CHROME_HOST || 'host.docker.internal';
 
-    // Support positional args: [PUBLIC_IP] [LOG_LEVEL]
-    if (process.argv.length >= 3 && !process.env.PUBLIC_IP) {
-        if (!(process.argv[2] && process.argv[2].startsWith('--'))) {
-            PUBLIC_IP = PUBLIC_IP || process.argv[2];
-        }
-    }
-    if (process.argv.length >= 4 && !process.env.LOG_LEVEL) {
-        if (process.argv[3] && !process.env.LOG_LEVEL) process.env.LOG_LEVEL = process.argv[3];
-    }
+    // ✅ P0.2 FIX: Validate parseInt to prevent NaN
+    const CHROME_PORT = parseIntSafe(process.env.CHROME_PORT, 9225, 'CHROME_PORT');
+    const PROXY_PORT = parseIntSafe(process.env.CHROME_PROXY_PORT, 9224, 'CHROME_PROXY_PORT');
 
-    const svc = new ChromeProxyService({ PUBLIC_IP, CHROME_PORT, PROXY_PORT, LOG_LEVEL, CHROME_HOST });
+    // ✅ P1.1 FIX: Remove LOG_LEVEL from config (logger reads env directly)
+    // ✅ P1.2 FIX: Remove fragile positional args (env-only interface)
+    const PUBLIC_IP = process.env.PUBLIC_IP || null;
+
+    // Diagnostic output (config effective values)
+    console.log('[INFO] Chrome Proxy Service - Configuration:');
+    console.log(`  PROXY_PORT: ${PROXY_PORT}`);
+    console.log(`  CHROME_HOST: ${CHROME_HOST}`);
+    console.log(`  CHROME_PORT: ${CHROME_PORT}`);
+    console.log(`  PUBLIC_IP: ${PUBLIC_IP || '(auto-detect)'}`);
+    console.log(`  LOG_LEVEL: ${process.env.LOG_LEVEL || 'info'} (from env)`);
+
+    const svc = new ChromeProxyService({ PUBLIC_IP, CHROME_PORT, PROXY_PORT, CHROME_HOST });
     try {
         await svc.start();
     } catch (err) {
