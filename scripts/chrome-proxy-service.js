@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
+// @ts-ignore - ESM subpath imports not recognized by TypeScript
 import _Impl from '#infra/proxy/chromeProxyService';
 import * as fs from 'node:fs';
 import * as dns from 'node:dns/promises';
@@ -365,7 +366,9 @@ function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
 
         try {
             // ✅ P1 FIX: Properly await svc.stop() with null-safe fallback
+            // @ts-ignore - ChromeProxyService.stop() exists but TypeScript can't infer from ESM subpath import
             const stopPromise = typeof svc.stop === 'function'
+                // @ts-ignore - ChromeProxyService.stop() exists
                 ? svc.stop()
                 : Promise.resolve();
 
@@ -502,6 +505,7 @@ async function main() {
     };
 
     try {
+        // @ts-ignore - ChromeProxyService.start() exists but TypeScript can't infer from ESM subpath import
         await svc.start();
         sendReady();
         console.log(`[INFO][pm2:${tag}] ChromeProxyService started successfully`);
@@ -524,6 +528,7 @@ async function main() {
 }
 
 // Always call main() - PM2 modifies process.argv[1], breaking main-module checks
+// @ts-ignore - Top-level await is supported in ESM (package.json has "type": "module")
 await main();
 
 export default ChromeProxyService;
