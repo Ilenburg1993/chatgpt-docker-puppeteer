@@ -1,5 +1,12 @@
 # 🔌 Auditoria Transversal: Portas e Networking
 
+> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Sistema de port-manager mencionado neste documento foi **REMOVIDO**.  
+> Arquivos deletados: `config/ports.json`, `scripts/port-manager.js` (código morto, nunca integrado).  
+> Sistema atual: **Port hunting nativo** em `src/main.js`.  
+> Documento preservado para referência histórica.
+
+---
+
 **Data**: 2026-01-21
 **Tipo**: Auditoria Cross-Cutting (Transversal)
 **Status**: ✅ Completa

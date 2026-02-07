@@ -3,6 +3,9 @@
 **Status**: ANÁLISE COMPLETA + CORREÇÕES APLICADAS
 **Contexto**: Auditoria de portas configuradas no `.devcontainer/devcontainer.json` vs uso real
 
+> **📝 Update (2026-02-07)**: Sistema de port-manager mencionado em outras docs foi removido (código morto).  
+> Sistema atual usa **port hunting nativo** em `src/main.js`.
+
 ---
 
 ## 📊 QUICK REFERENCE (Portas Ativas)
