@@ -2,7 +2,7 @@
 import { log } from '#core/logger';
 import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
+import { getActionCode, getCorrelationId, getMessageType, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
 
 /* ==========================================================================
    CONSTANTES DE SEGURANÇA
@@ -175,16 +175,59 @@ class ServerNERVAdapter {
 ========================================================================== */
 
     /**
+     * @param {string} prefix
+     * @param {string|null|undefined} preferred
+     * @returns {string}
+     */
+    _buildCorrelationId(prefix, preferred) {
+        if (typeof preferred === 'string' && preferred.trim()) {
+            return preferred.trim();
+        }
+        return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    /**
+     * @param {unknown} payload
+     * @returns {{normalizedPayload: Record<string, unknown>, taskId: string|null, payloadCorrelationId: string|null}}
+     */
+    _normalizeDashboardPayload(payload) {
+        const normalizedPayload = payload && typeof payload === 'object' ? { ...payload } : {};
+
+        const taskId =
+            typeof normalizedPayload.taskId === 'string'
+                ? normalizedPayload.taskId
+                : typeof normalizedPayload.task_id === 'string'
+                    ? normalizedPayload.task_id
+                    : normalizedPayload.task && typeof normalizedPayload.task === 'object'
+                        ? (normalizedPayload.task.meta?.id || normalizedPayload.task.id || null)
+                        : null;
+
+        if (taskId && typeof normalizedPayload.taskId !== 'string') {
+            normalizedPayload.taskId = taskId;
+        }
+
+        const payloadCorrelationId =
+            typeof normalizedPayload.correlationId === 'string'
+                ? normalizedPayload.correlationId
+                : typeof normalizedPayload.correlation_id === 'string'
+                    ? normalizedPayload.correlation_id
+                    : null;
+
+        return { normalizedPayload, taskId, payloadCorrelationId };
+    }
+
+    /**
      * Traduz comando dashboard → ActionCode NERV.
      */
     async _handleDashboardCommand(data = {}) {
 
-        const { command, payload, clientId } = data;
+        const { command, payload, clientId, correlationId: requestedCorrelationId } = data;
 
         if (!command) return;
 
-        const correlationId =
-            `dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        const { normalizedPayload: nervPayload, taskId, payloadCorrelationId } = this._normalizeDashboardPayload(payload);
+
+        const correlationId = this._buildCorrelationId('dashboard', requestedCorrelationId || payloadCorrelationId);
 
         let actionCode;
 
@@ -205,13 +248,29 @@ class ServerNERVAdapter {
                 return;
         }
 
-        /* ----- ponto de extensão: validação de schema ----- */
-        const nervPayload = payload || {};
+        const commandsRequiringTaskId = new Set(['task:cancel', 'driver:abort']);
+        if (commandsRequiringTaskId.has(command) && !taskId) {
+            this.socketHub.sendToClient(clientId, 'command:error', {
+                error: 'TASK_ID_REQUIRED',
+                command,
+                correlationId
+            });
+            return;
+        }
 
-        this._emitCommand(actionCode, nervPayload, correlationId);
+        const emitted = this._emitCommand(actionCode, nervPayload, correlationId);
+        if (!emitted) {
+            this.socketHub.sendToClient(clientId, 'command:error', {
+                error: 'NERV_EMIT_FAILED',
+                command,
+                correlationId
+            });
+            return;
+        }
 
         this.socketHub.sendToClient(clientId, 'command:ack', {
             command,
+            taskId,
             correlationId,
             timestamp: new Date().toISOString()
         });
@@ -257,12 +316,15 @@ class ServerNERVAdapter {
 
         const socketEvent = this._translateEventName(actionCode);
         const payload = getPayload(envelope);
+        const taskId = getTaskIdFromPayload(payload);
+        const correlationId = getCorrelationId(envelope) || payload?.correlationId || payload?.correlation_id || null;
 
         this.socketHub.emit(socketEvent, {
             messageType: getMessageType(envelope),
             actionCode,
             payload,
-            correlationId: getCorrelationId(envelope),
+            taskId,
+            correlationId,
             msgId: envelope?.causality?.msg_id || null,
             actor: envelope?.identity?.actor || null,
             target: envelope?.identity?.target || null,
@@ -286,8 +348,10 @@ class ServerNERVAdapter {
     _emitCommand(actionCode, payload, correlationId) {
         try {
             HighLevelNERV.sendCommand(this.nerv, ActorRole.SERVER, actionCode, payload, correlationId);
+            return true;
         } catch (err) {
             log('ERROR', `[ServerNERVAdapter] Falha ao emitir comando: ${err.message}`, correlationId);
+            return false;
         }
     }
 

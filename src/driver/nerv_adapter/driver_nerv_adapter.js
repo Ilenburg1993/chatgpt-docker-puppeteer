@@ -38,6 +38,9 @@ const ADAPTER_CONFIG = {
     /** Tamanho do buffer de telemetria para batch emit - Default: 1000 */
     TELEMETRY_BUFFER_SIZE: parseInt(process.env.ADAPTER_TELEMETRY_BUFFER || '1000', 10),
 
+    /** Intervalo de flush de telemetria (ms) - Default: 1000 (env: ADAPTER_TELEMETRY_FLUSH_INTERVAL) */
+    TELEMETRY_FLUSH_INTERVAL_MS: parseInt(process.env.ADAPTER_TELEMETRY_FLUSH_INTERVAL || '1000', 10),
+
     /** Intervalo para warning de modo degradado (ms) - Default: 1 minuto */
     DEGRADED_MODE_WARNING_INTERVAL_MS: parseInt(process.env.ADAPTER_DEGRADED_WARNING || '60000', 10),
 
@@ -82,6 +85,7 @@ const ADAPTER_EVENTS = {
     TASK_ABORTED: 'adapter:task_aborted',
     TASK_QUEUED: 'adapter:task_queued',
     TASK_RETRYING: 'adapter:task_retrying',
+    TASK_STATE_OBSERVED: 'adapter:task_state_observed',
 
     DRIVER_ATTACHED: 'adapter:driver_attached',
     DRIVER_DETACHED: 'adapter:driver_detached',
@@ -208,7 +212,8 @@ class DriverNERVAdapter extends EventEmitter {
                 let taskId;
                 try {
                     taskId = getTaskIdFromPayload(getPayload(envelope));
-                } catch (_) {
+                } catch (taskIdError) {
+                    log('WARN', `[DriverNERVAdapter] Falha ao extrair taskId do comando: ${taskIdError?.message || String(taskIdError)}`, correlationId);
                     taskId = undefined;
                 }
 
@@ -243,7 +248,8 @@ class DriverNERVAdapter extends EventEmitter {
         let taskId = null;
         try {
             taskId = getTaskIdFromPayload(payload);
-        } catch (_) {
+        } catch (taskIdError) {
+            log('DEBUG', `[DriverNERVAdapter] getTaskIdFromPayload falhou, aplicando fallback: ${taskIdError?.message || String(taskIdError)}`, correlationId);
             taskId = payload?.taskId || payload?.task?.meta?.id || payload?.task?.id || null;
         }
 
@@ -346,7 +352,8 @@ class DriverNERVAdapter extends EventEmitter {
             externalAbortForwarder = () => {
                 try {
                     abortController.abort(externalSignal.reason);
-                } catch (_) {
+                } catch (abortReasonError) {
+                    log('DEBUG', `[DriverNERVAdapter] Abort reason inválido para ${taskId}, usando abort sem reason: ${abortReasonError?.message || String(abortReasonError)}`, correlationId);
                     abortController.abort();
                 }
             };
@@ -554,7 +561,8 @@ class DriverNERVAdapter extends EventEmitter {
             let pageUrl = null;
             try {
                 pageUrl = driver.page.url();
-            } catch (_) {
+            } catch (pageUrlError) {
+                log('DEBUG', `[DriverNERVAdapter] Não foi possível obter URL da página para ${taskId}: ${pageUrlError?.message || String(pageUrlError)}`, correlationId);
                 pageUrl = null;
             }
 
@@ -718,14 +726,18 @@ class DriverNERVAdapter extends EventEmitter {
                 if (signal && abortHandler) {
                     signal.removeEventListener('abort', abortHandler);
                 }
-            } catch (_) {}
+            } catch (removeAbortListenerError) {
+                log('WARN', `[DriverNERVAdapter] Falha ao remover listener de abort interno para ${taskId}: ${removeAbortListenerError?.message || String(removeAbortListenerError)}`, correlationId);
+            }
 
             // Remove forwarder do signal externo (evita leak)
             try {
                 if (externalSignal && externalAbortForwarder) {
                     externalSignal.removeEventListener('abort', externalAbortForwarder);
                 }
-            } catch (_) {}
+            } catch (removeExternalAbortError) {
+                log('WARN', `[DriverNERVAdapter] Falha ao remover listener de abort externo para ${taskId}: ${removeExternalAbortError?.message || String(removeExternalAbortError)}`, correlationId);
+            }
 
             this.abortedTasks.delete(taskId);
 
@@ -763,10 +775,13 @@ class DriverNERVAdapter extends EventEmitter {
 
         try {
             active.abortController?.abort(reason);
-        } catch (_) {
+        } catch (abortError) {
+            log('WARN', `[DriverNERVAdapter] Abort com reason falhou para ${taskId}: ${abortError?.message || String(abortError)}`, correlationId);
             try {
                 active.abortController?.abort();
-            } catch (_) {}
+            } catch (fallbackAbortError) {
+                log('WARN', `[DriverNERVAdapter] Abort fallback também falhou para ${taskId}: ${fallbackAbortError?.message || String(fallbackAbortError)}`, correlationId);
+            }
         }
 
         await this._emitBoth(
@@ -887,7 +902,7 @@ class DriverNERVAdapter extends EventEmitter {
 
         const stateChangeListener = data => {
             void this._emitBoth(
-                ADAPTER_EVENTS.TASK_STARTED,
+                ADAPTER_EVENTS.TASK_STATE_OBSERVED,
                 ActionCode.DRIVER_STATE_OBSERVED,
                 {
                     taskId,
@@ -1325,9 +1340,9 @@ class DriverNERVAdapter extends EventEmitter {
             if (this.telemetryBuffer.length > 0) {
                 this._flushTelemetry();
             }
-        }, 1000);
+        }, ADAPTER_CONFIG.TELEMETRY_FLUSH_INTERVAL_MS);
 
-        log('DEBUG', '[DriverNERVAdapter] Telemetry flush interval started (1s)');
+        log('DEBUG', `[DriverNERVAdapter] Telemetry flush interval started (${ADAPTER_CONFIG.TELEMETRY_FLUSH_INTERVAL_MS}ms)`);
     }
 
     _startDegradedModeWarning() {

@@ -2,7 +2,7 @@
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
 import { ActionCode } from '#shared/nerv/constants';
-import { getActionCode, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
+import { getActionCode, getCorrelationId, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
 
 /**
  * Estados unificados para visualização no dashboard.
@@ -16,6 +16,33 @@ const UnifiedStatus = Object.freeze({
     FAILED: 'FAILED',         // Falhou após retries
     CANCELLED: 'CANCELLED'    // Cancelado pelo usuário
 });
+
+
+/** Debounce de broadcast para atualização de dashboard (ms). */
+const BROADCAST_DEBOUNCE_MS = 50;
+
+/**
+ * @typedef {{
+ *   status?: string,
+ *   worker_id?: string|null,
+ *   started_at?: number,
+ *   updated_at?: number,
+ *   progress_percent?: number,
+ *   completed_at?: number,
+ *   failed_at?: number,
+ *   cancelled_at?: number,
+ *   error?: string,
+ *   reason_code?: string,
+ *   retryable?: boolean,
+ *   next_action?: string|null,
+ *   queue_position?: number|null,
+ *   queue_size?: number|null,
+ *   active_drivers?: number|null,
+ *   event_timestamp?: number,
+ *   last_correlation_id?: string|null,
+ *   [key: string]: unknown
+ * }} KernelRuntimeState
+ */
 
 /**
  * TaskSyncBridge - Ponte de Sincronização de Tasks
@@ -37,6 +64,7 @@ class TaskSyncBridge extends EventEmitter {
          * Cache de estado runtime do Kernel.
          * Map: taskId → { status, worker_id, started_at, progress, ... }
          */
+        /** @type {Map<string, KernelRuntimeState>} */
         this.kernelStateCache = new Map();
 
         /**
@@ -98,8 +126,8 @@ class TaskSyncBridge extends EventEmitter {
             // Force re-init (useful for controlled test environments)
             try {
                 this.clearAll();
-            } catch (e) {
-                // ignore
+            } catch (clearError) {
+                log('WARN', `[TaskSyncBridge] Falha em clearAll durante force initialize: ${clearError?.message || String(clearError)}`);
             }
             this._initialized = false;
         }
@@ -149,6 +177,26 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
+     * Extrai contexto normalizado de envelope NERV.
+     * @param {Object} envelope
+     * @returns {{payload: Record<string, unknown>, taskId: string|null, correlationId: string|null, eventTimestamp: number}}
+     */
+    _extractEnvelopeContext(envelope) {
+        const payload = /** @type {Record<string, unknown>} */ (getPayload(envelope));
+        const taskId = getTaskIdFromPayload(payload);
+        const correlationId =
+            getCorrelationId(envelope) ||
+            (typeof payload.correlationId === 'string' ? payload.correlationId : null) ||
+            (typeof payload.correlation_id === 'string' ? payload.correlation_id : null) ||
+            null;
+        const rawTimestamp = envelope?.protocol?.timestamp;
+        const parsedTimestamp = Number(rawTimestamp);
+        const eventTimestamp = Number.isFinite(parsedTimestamp) && parsedTimestamp > 0 ? parsedTimestamp : Date.now();
+
+        return { payload, taskId, correlationId, eventTimestamp };
+    }
+
+    /**
      * Configura listeners para eventos NERV relevantes.
      * Atualiza cache local e notifica dashboards.
      */
@@ -161,17 +209,25 @@ class TaskSyncBridge extends EventEmitter {
         }
 
         const register = (actionCode, handler) => {
+            const wrappedHandler = envelope => {
+                try {
+                    handler(envelope);
+                } catch (handlerError) {
+                    log('ERROR', `[TaskSyncBridge] Handler NERV falhou para ${actionCode}: ${handlerError?.message || String(handlerError)}`);
+                }
+            };
+
             // Prefer onEvent (quando disponível e correto); fallback para onReceive.
             const canUseOnEvent = typeof nerv.onEvent === 'function' && nerv.onEvent.length >= 2;
             if (canUseOnEvent) {
                 try {
-                    const unsub = nerv.onEvent(actionCode, handler);
+                    const unsub = nerv.onEvent(actionCode, wrappedHandler);
                     if (typeof unsub === 'function') {
                         this._nervUnsubscribers.push(unsub);
                     }
                     return;
-                } catch (err) {
-                    // fallback abaixo
+                } catch (onEventError) {
+                    log('DEBUG', `[TaskSyncBridge] onEvent indisponível para ${actionCode}, usando onReceive fallback: ${onEventError?.message || String(onEventError)}`);
                 }
             }
 
@@ -181,7 +237,7 @@ class TaskSyncBridge extends EventEmitter {
                 if (envelopeActionCode !== actionCode) {
                     return;
                 }
-                handler(envelope);
+                wrappedHandler(envelope);
             });
 
             if (typeof unsub === 'function') {
@@ -190,8 +246,7 @@ class TaskSyncBridge extends EventEmitter {
         };
 
         register(ActionCode.DRIVER_TASK_STARTED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             void this._updateKernelState(taskId, {
@@ -199,13 +254,14 @@ class TaskSyncBridge extends EventEmitter {
                 started_at: Date.now(),
                 worker_id: payload.worker_id || payload.workerId || null,
                 target: payload.target || null,
-                progress_percent: 0
+                progress_percent: 0,
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
         register(ActionCode.DRIVER_TASK_COMPLETED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             const result = payload.result;
@@ -218,13 +274,14 @@ class TaskSyncBridge extends EventEmitter {
                     : result
                         ? JSON.stringify(result).substring(0, 500)
                         : null,
-                timings: payload.timings || null
+                timings: payload.timings || null,
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
         register(ActionCode.DRIVER_TASK_FAILED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             const err = payload.error || payload.reason || payload.err || null;
@@ -245,26 +302,28 @@ class TaskSyncBridge extends EventEmitter {
                 error: errorText.substring(0, 2000),
                 reason_code: reason,
                 retryable,
-                next_action: nextAction
+                next_action: nextAction,
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
         register(ActionCode.DRIVER_TASK_ABORTED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.CANCELLED,
                 cancelled_at: Date.now(),
-                reason: payload.reason || payload.abortReason || 'USER_ABORT'
+                reason: payload.reason || payload.abortReason || 'USER_ABORT',
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
         // Kernel/Policy failures that can be surfaced as FAILED
         register(ActionCode.TASK_FAILED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             const err = payload.error || payload.reason || payload.err || null;
@@ -279,49 +338,20 @@ class TaskSyncBridge extends EventEmitter {
             const nextAction = payload.next_action || null;
             const retryable = Boolean(payload.retryable);
 
-            this._updateKernelState(taskId, {
+            void this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
                 failed_at: Date.now(),
                 error: errorText.substring(0, 2000),
                 reason_code: reason,
                 retryable,
-                next_action: nextAction
+                next_action: nextAction,
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
         register(ActionCode.DRIVER_TASK_QUEUED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
-            if (!taskId) return;
-
-            this._updateKernelState(taskId, {
-                status: UnifiedStatus.PENDING,
-                queued_at: Date.now(),
-                queue_position: payload.queuePosition || null,
-                queue_size: payload.queueSize || null,
-                active_drivers: payload.activeDrivers || null,
-                next_action: payload.next_action || 'RETRY_LATER'
-            });
-        });
-
-        register(ActionCode.DRIVER_ERROR, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
-            if (!taskId) return;
-
-            const err = payload.error || payload.err || payload.reason || 'Driver error';
-            const errorText = typeof err === 'string' ? err : JSON.stringify(err);
-
-            void this._updateKernelState(taskId, {
-                status: UnifiedStatus.FAILED,
-                failed_at: Date.now(),
-                error: errorText.substring(0, 2000)
-            });
-        });
-
-        register(ActionCode.DRIVER_TASK_QUEUED, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             void this._updateKernelState(taskId, {
@@ -330,13 +360,14 @@ class TaskSyncBridge extends EventEmitter {
                 queue_position: payload.queuePosition || null,
                 queue_size: payload.queueSize || null,
                 active_drivers: payload.activeDrivers || null,
-                next_action: payload.next_action || 'RETRY_LATER'
+                next_action: payload.next_action || 'RETRY_LATER',
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
         register(ActionCode.DRIVER_ERROR, (envelope) => {
-            const payload = getPayload(envelope);
-            const taskId = getTaskIdFromPayload(payload);
+            const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
             const err = payload.error || payload.reason || payload.err || 'Driver error';
@@ -345,7 +376,9 @@ class TaskSyncBridge extends EventEmitter {
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
                 failed_at: Date.now(),
-                error: errorText.substring(0, 2000)
+                error: errorText.substring(0, 2000),
+                last_correlation_id: correlationId,
+                event_timestamp: eventTimestamp
             });
         });
 
@@ -356,12 +389,20 @@ class TaskSyncBridge extends EventEmitter {
      * Atualiza o cache de estado do kernel e agenda broadcast.
      *
      * @param {string} taskId - ID da task
-     * @param {Object} stateUpdate - Campos a atualizar
+     * @param {KernelRuntimeState} stateUpdate - Campos a atualizar
      */
     async _updateKernelState(taskId, stateUpdate) {
         if (!taskId) return;
 
         const existing = this.kernelStateCache.get(taskId) || {};
+
+        const existingEventTimestamp = Number(existing.event_timestamp || 0);
+        const incomingEventTimestamp = Number(stateUpdate.event_timestamp || 0);
+        if (existingEventTimestamp > 0 && incomingEventTimestamp > 0 && incomingEventTimestamp < existingEventTimestamp) {
+            log('DEBUG', `[TaskSyncBridge] Evento stale ignorado para ${taskId} (incoming=${incomingEventTimestamp}, current=${existingEventTimestamp})`);
+            return;
+        }
+
         const updated = {
             ...existing,
             ...stateUpdate,
@@ -420,7 +461,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Agenda broadcast para dashboards com debounce de 50ms.
+     * Agenda broadcast para dashboards com debounce configurável.
      * Evita flood de mensagens em updates rápidos.
      */
     _scheduleBroadcast(taskId, state) {
@@ -431,7 +472,7 @@ class TaskSyncBridge extends EventEmitter {
         this._broadcastTimer = setTimeout(() => {
             this._broadcastTimer = null;
             this._flushBroadcasts();
-        }, 50); // 50ms debounce (P9.8)
+        }, BROADCAST_DEBOUNCE_MS);
     }
 
     /**
@@ -598,12 +639,12 @@ class TaskSyncBridge extends EventEmitter {
             for (const unsub of this._nervUnsubscribers) {
                 try {
                     unsub();
-                } catch (e) {
-                    // ignore
+                } catch (unsubscribeError) {
+                    log('WARN', `[TaskSyncBridge] Falha ao executar unsubscribe NERV: ${unsubscribeError?.message || String(unsubscribeError)}`);
                 }
             }
-        } catch (e) {
-            // ignore
+        } catch (unsubscribeBatchError) {
+            log('WARN', `[TaskSyncBridge] Falha ao limpar subscribers NERV: ${unsubscribeBatchError?.message || String(unsubscribeBatchError)}`);
         }
         this._nervUnsubscribers = [];
 

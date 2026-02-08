@@ -42,7 +42,9 @@ class MockSocketHub {
         this.handlers.delete(name);
     }
 
-    sendToClient() {}
+    sendToClient(clientId, event, payload) {
+        this.events.push({ name: event, payload, clientId });
+    }
 }
 
 describe('ServerNERVAdapter runtime behavior', () => {
@@ -77,4 +79,48 @@ describe('ServerNERVAdapter runtime behavior', () => {
         assert.ok(emitted.payload.msgId);
         assert.ok(emitted.payload.protocolVersion);
     });
+
+    it('should reject commands that require taskId when missing', async () => {
+        await adapter._handleDashboardCommand({
+            command: 'driver:abort',
+            clientId: 'client-1',
+            payload: {}
+        });
+
+        const commandError = socketHub.events.find(evt => evt.name === 'command:error');
+        assert.ok(commandError);
+        assert.strictEqual(commandError.payload.error, 'TASK_ID_REQUIRED');
+    });
+
+    it('should include taskId in dashboard command ack and preserve provided correlationId', async () => {
+        await adapter._handleDashboardCommand({
+            command: 'task:cancel',
+            clientId: 'client-2',
+            correlationId: 'corr-client-123',
+            payload: { task_id: 'task-xyz' }
+        });
+
+        const ack = socketHub.events.find(evt => evt.name === 'command:ack');
+        assert.ok(ack);
+        assert.strictEqual(ack.payload.taskId, 'task-xyz');
+        assert.strictEqual(ack.payload.correlationId, 'corr-client-123');
+    });
+
+    it('should expose taskId in broadcast payload when envelope has task metadata', () => {
+        const envelope = {
+            protocol: { version: '1.0', timestamp: Date.now() },
+            identity: { actor: ActorRole.DRIVER, target: ActorRole.SERVER },
+            causality: { msg_id: 'msg-2', correlation_id: 'corr-2' },
+            type: { message_type: MessageType.EVENT, action_code: ActionCode.DRIVER_TASK_FAILED },
+            payload: { task_id: 'task-failed-1', error: 'boom' }
+        };
+
+        nerv.receiveHandlers[0](envelope);
+
+        const emitted = socketHub.events.find(evt => evt.name === 'driver:task_failed');
+        assert.ok(emitted);
+        assert.strictEqual(emitted.payload.taskId, 'task-failed-1');
+        assert.strictEqual(emitted.payload.correlationId, 'corr-2');
+    });
+
 });
