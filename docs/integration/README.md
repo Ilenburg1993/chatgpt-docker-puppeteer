@@ -13,6 +13,16 @@ This project exposes a **unified MCP (Model Context Protocol) server** that prov
 - MCP Streamable HTTP: `http://localhost:3008/api/mcp` (Claude, OpenCode, Copilot)
 - REST API: `http://localhost:3008/api/rag/*` (Cursor, generic HTTP clients)
 
+### 🔗 GitHub MCP Integration
+
+Este servidor pode ser **combinado com o GitHub MCP Server** para acesso completo à API do GitHub. Veja o guia completo: **[GITHUB_MCP_INTEGRATION.md](./GITHUB_MCP_INTEGRATION.md)**
+
+**Combinação poderosa:**
+- 🔍 Nosso MCP: Busca semântica no codebase + Ollama local
+- 🐙 GitHub MCP: Criar issues/PRs, buscar repositórios, code review
+
+**Setup rápido:** Ambos os servidores rodam lado a lado - veja exemplos em [examples/claude_desktop_config_with_github.json](./examples/claude_desktop_config_with_github.json)
+
 ---
 
 ## 🛠️ Available Tools
@@ -109,6 +119,18 @@ For detailed CPU optimization, model removal instructions, timeout configuration
    # Should output: MCP_ENABLED=true
    ```
 
+4. **(Optional) Import tools from an existing MCP server (upstream):**
+   ```bash
+   # Enable upstream import
+   MCP_UPSTREAM_ENABLED=true
+   MCP_UPSTREAM_URL=http://localhost:4000/api/mcp
+   MCP_UPSTREAM_ALIAS=core
+   # Optional: MCP_UPSTREAM_HEADERS_JSON={"Authorization":"Bearer ..."}
+   ```
+
+   Upstream tools are registered locally with a prefix to avoid collisions:
+   - Example: `mcp_core__<upstreamToolName>`
+
 ---
 
 ## 1️⃣ Claude Desktop Setup
@@ -171,6 +193,12 @@ Claude should automatically discover and use the `rag_search` tool.
 ## 2️⃣ GitHub Copilot Setup (VS Code)
 
 **Platform:** VS Code (Dev Container or local)
+
+### Option A (recommended): Repo-level auto config
+
+This repo includes a workspace MCP config at `.vscode/mcp.json` pointing to `http://localhost:3008/api/mcp`.
+
+Open the workspace and Copilot should discover the server automatically (you may need to reload VS Code once).
 
 ### Step 1: Open VS Code in Dev Container
 
@@ -304,6 +332,23 @@ curl http://localhost:3008/api/rag/stats
 
 ---
 
+## 🔌 Optional: Integrate with an Existing MCP Server (Upstream)
+
+If you already have an MCP server and want this project to **consume its tools** and expose them
+through the same Tool Registry (and `/api/mcp`), enable the upstream importer:
+
+**ENV:**
+- `MCP_UPSTREAM_ENABLED=true`
+- `MCP_UPSTREAM_URL=http://localhost:4000/api/mcp`
+- `MCP_UPSTREAM_ALIAS=core` (optional)
+- `MCP_UPSTREAM_TOOL_PREFIX=mcp_core__` (optional)
+- `MCP_UPSTREAM_HEADERS_JSON={"Authorization":"Bearer ..."}`
+
+**Naming:** upstream tools are registered with a prefix to avoid collisions:
+- Upstream tool `tools_list` → local tool `mcp_core__tools_list`
+
+---
+
 ## 🧪 Testing Your Setup
 
 ### Quick Test: MCP Discovery
@@ -320,7 +365,7 @@ curl http://localhost:3008/api/mcp
   "version": "4.0.0",
   "protocol": "MCP/JSON-RPC 2.0",
   "endpoint": "/api/mcp",
-  "methods": ["tools/list", "tools/call", "resources/list", "resources/read"],
+  "methods": ["initialize", "notifications/initialized", "ping", "tools/list", "tools/call", "resources/list", "resources/read"],
   "tools": ["rag_search", "rag_health", "ollama_generate", "ollama_embed", "ollama_models"],
   "toolCount": 5,
   "status": "ready"

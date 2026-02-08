@@ -1,0 +1,119 @@
+// @ts-check
+/**
+ * MCP upstream client over stdio using the official MCP SDK.
+ *
+ * This spawns an MCP server process (e.g. GitHub MCP) and talks JSON-RPC over stdio.
+ * It is intended to be used by the upstream manager to import tools and proxy calls.
+ */
+
+import { Client } from '@modelcontextprotocol/sdk/client';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+function withTimeout(promise, timeoutMs, label) {
+    const ms = Number(timeoutMs);
+    if (!Number.isFinite(ms) || ms <= 0) return promise;
+
+    /** @type {NodeJS.Timeout} */
+    let t;
+    const timeoutPromise = new Promise((_, reject) => {
+        t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(t));
+}
+
+export class MCPStdioUpstreamClient {
+    /**
+     * @param {{ alias: string, command: string, args: string[], env?: Record<string,string>, initTimeoutMs?: number, callTimeoutMs?: number }} opts
+     */
+    constructor(opts) {
+        this.alias = opts.alias;
+        this.command = opts.command;
+        this.args = Array.isArray(opts.args) ? opts.args : [];
+        this.env = opts.env || undefined;
+        this.initTimeoutMs = Number(opts.initTimeoutMs || 30000);
+        this.callTimeoutMs = Number(opts.callTimeoutMs || 90000);
+
+        /** @type {import('@modelcontextprotocol/sdk/client').Client | null} */
+        this.client = null;
+        /** @type {import('@modelcontextprotocol/sdk/client/stdio.js').StdioClientTransport | null} */
+        this.transport = null;
+        this.connected = false;
+    }
+
+    async connect() {
+        if (this.connected && this.client && this.transport) return;
+
+        const transport = new StdioClientTransport({
+            command: this.command,
+            args: this.args,
+            env: this.env,
+            stderr: 'pipe'
+        });
+
+        const client = new Client(
+            { name: 'chatgpt-docker-upstream', version: '1.0.0' },
+            { capabilities: { tools: {} } }
+        );
+
+        try {
+            await withTimeout(client.connect(transport), this.initTimeoutMs, `[MCP stdio:${this.alias}] connect`);
+            this.client = client;
+            this.transport = transport;
+            this.connected = true;
+        } catch (err) {
+            try {
+                await client.close();
+            } catch (e) {
+                // ignore
+            }
+            try {
+                await transport.close();
+            } catch (e) {
+                // ignore
+            }
+            throw err;
+        }
+    }
+
+    async listTools() {
+        if (!this.connected) await this.connect();
+        return this.client.listTools();
+    }
+
+    async callTool({ name, arguments: args = {}, signal } = {}) {
+        if (signal?.aborted) {
+            throw new Error(`[MCP stdio:${this.alias}] call aborted before start`);
+        }
+        if (!this.connected) await this.connect();
+
+        // NOTE: MCP SDK does not currently accept AbortSignal for stdio calls.
+        // We enforce an upper bound via timeout, and if it fires, we tear down the connection.
+        try {
+            return await withTimeout(
+                this.client.callTool({ name, arguments: args }),
+                this.callTimeoutMs,
+                `[MCP stdio:${this.alias}] tools/call(${name})`
+            );
+        } catch (err) {
+            // If call timed out or any transport error occurred, mark connection dead.
+            await this.close().catch(() => {});
+            throw err;
+        }
+    }
+
+    async close() {
+        const transport = this.transport;
+        const client = this.client;
+        this.transport = null;
+        this.client = null;
+        this.connected = false;
+
+        try {
+            if (client) await client.close();
+        } finally {
+            if (transport) await transport.close();
+        }
+    }
+}
+

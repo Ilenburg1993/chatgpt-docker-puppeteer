@@ -4,8 +4,7 @@
  *
  * Exposes multiple tools to Claude Desktop:
  * - RAG search (local codebase)
- * - GitHub integration (search, PRs, issues)
- * - Future: Code graph, workspace context, etc.
+ * - Future: GitHub integration, code graph, workspace context, etc.
  *
  * Usage:
  * node tools/mcp/unified-server.mjs
@@ -33,7 +32,6 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 // Tool handlers
 import { ragTools, handleRagTool } from './tools/rag-tools.mjs';
-import { githubTools, handleGitHubTool } from './tools/github-tools.mjs';
 
 const server = new Server(
   {
@@ -51,7 +49,6 @@ const server = new Server(
 // Combine all tools
 const ALL_TOOLS = [
   ...ragTools,
-  ...githubTools,
 ];
 
 /**
@@ -73,13 +70,8 @@ server.setRequestHandler('tools/call', async (request) => {
 
   try {
     // Route to appropriate handler
-    if (toolName.startsWith('rag_')) {
-      return await handleRagTool(toolName, args);
-    } else if (toolName.startsWith('github_')) {
-      return await handleGitHubTool(toolName, args);
-    } else {
-      throw new Error(`Unknown tool: ${toolName}`);
-    }
+    if (toolName.startsWith('rag_')) return await handleRagTool(toolName, args);
+    throw new Error(`Unknown tool: ${toolName}`);
   } catch (error) {
     console.error(`[MCP] Tool error:`, error);
     return {

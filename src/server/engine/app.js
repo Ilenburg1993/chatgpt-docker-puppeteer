@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
 import path from 'node:path';
+import fs from 'node:fs';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
@@ -146,9 +147,57 @@ app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
 
 const dashboardV2Path = path.join(ROOT, 'src', 'dashboard-ui', 'dist');
-app.use('/dashboard', express.static(dashboardV2Path));
+const dashboardAssetsPath = path.join(dashboardV2Path, 'assets');
+
+// Serve precompressed dashboard assets when available (.br / .gz) + long-term caching.
+// The Vite build generates hashed asset filenames, making them safe for immutable caching.
+app.use('/dashboard/assets', (req, res, next) => {
+    const accept = String(req.headers['accept-encoding'] || '');
+    const urlPath = req.path; // mounted path (ex: /index-abc.js)
+    const rel = urlPath.replace(/^\/+/, '');
+    const abs = path.join(dashboardAssetsPath, rel);
+
+    if (accept.includes('br') && fs.existsSync(`${abs}.br`)) {
+        req.url = `${req.url}.br`;
+    } else if (accept.includes('gzip') && fs.existsSync(`${abs}.gz`)) {
+        req.url = `${req.url}.gz`;
+    }
+
+    next();
+});
+
+app.use('/dashboard/assets', express.static(dashboardAssetsPath, {
+    immutable: true,
+    maxAge: '365d',
+    setHeaders(res, filePath) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Vary', 'Accept-Encoding');
+
+        if (filePath.endsWith('.br')) {
+            res.setHeader('Content-Encoding', 'br');
+            res.type(filePath.slice(0, -3));
+        } else if (filePath.endsWith('.gz')) {
+            res.setHeader('Content-Encoding', 'gzip');
+            res.type(filePath.slice(0, -3));
+        }
+    }
+}));
+
+// Serve non-asset dashboard files (index.html, icons, etc.) without aggressive caching.
+app.use('/dashboard', express.static(dashboardV2Path, {
+    etag: true,
+    maxAge: 0,
+    setHeaders(res, filePath) {
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-store');
+        } else {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    }
+}));
 
 app.get(/^\/dashboard($|\/.*)/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(dashboardV2Path, 'index.html'));
 });
 
@@ -168,21 +217,48 @@ app.get('/health', (req, res) => {
 app.get('/ready', (req, res) => {
     try {
         const runtime = app.locals && app.locals.runtimeReadiness ? app.locals.runtimeReadiness : null;
+        const mcpBase = app.locals && app.locals.mcp ? app.locals.mcp : null;
         const hardwareMetrics = typeof hardware.getAllMetrics === 'function' ? hardware.getAllMetrics() : {};
 
         let status = 'ready';
+
+        // MCP upstreams (dynamic) - avoid stale snapshots.
+        let mcp = mcpBase;
+        try {
+            const getter = app.locals && typeof app.locals.getMcpUpstreamsStatus === 'function'
+                ? app.locals.getMcpUpstreamsStatus
+                : null;
+            const upstreams = getter ? getter() : null;
+            if (upstreams && Array.isArray(upstreams)) {
+                mcp = Object.assign({}, mcpBase || {}, { upstreams });
+            }
+        } catch (e) {
+            // ignore
+        }
 
         if (runtime) {
             const requiredKeys = app.locals && Array.isArray(app.locals.requiredReadiness)
                 ? app.locals.requiredReadiness
                 : Object.keys(runtime);
 
+            // Non-required readiness hints
+            try {
+                if (mcp && Array.isArray(mcp.upstreams)) {
+                    const requiredUpstreams = mcp.upstreams.filter(u => u?.required);
+                    runtime.mcp_upstreams = requiredUpstreams.length === 0
+                        ? true
+                        : requiredUpstreams.every(u => !u?.enabled || u?.ready);
+                }
+            } catch (e) {
+                // ignore
+            }
+
             const allReady = requiredKeys.length > 0 ? requiredKeys.every(k => runtime[k] === true) : true;
 
             status = allReady ? 'ready' : 'not-ready';
         }
 
-        const payload = Object.assign({ status, ts: Date.now(), runtime }, hardwareMetrics || {});
+        const payload = Object.assign({ status, ts: Date.now(), runtime, mcp }, hardwareMetrics || {});
         res.json(payload);
     } catch (err) {
         res.status(500).json({ status: 'unknown', error: err && err.message ? err.message : String(err) });

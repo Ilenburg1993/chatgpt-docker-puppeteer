@@ -96,6 +96,139 @@ const ENV_SCHEMA = {
         validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0,
         default: '120000',
         message: 'Must be a positive number (milliseconds)'
+    },
+
+    // [4] MCP (Interop)
+    MCP_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    MCP_UPSTREAM_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'false',
+        message: 'Must be true or false'
+    },
+    MCP_UPSTREAM_URL: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: '',
+        message: 'Must be a string URL (required when MCP_UPSTREAM_ENABLED=true)'
+    },
+    MCP_UPSTREAM_ALIAS: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: 'upstream',
+        message: 'Must be a string'
+    },
+    MCP_UPSTREAM_TOOL_PREFIX: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: '',
+        message: 'Must be a string'
+    },
+    MCP_UPSTREAM_HEADERS_JSON: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: '',
+        message: 'Must be a JSON string (object) or empty'
+    },
+
+    // [5] GitHub MCP (Optional)
+    // NOTE: This token is typically consumed by the GitHub MCP server process
+    // (stdio) configured in the client. We keep it here for validation and
+    // future upstream/bridge modes.
+    GITHUB_PERSONAL_ACCESS_TOKEN: {
+        level: 'WARN',
+        validator: (val) => {
+            const token = String(val || '').trim();
+            return token.length === 0 || token.length >= 20;
+        },
+        default: '',
+        message: 'Must be empty or look like a real token (>= 20 chars)'
+    },
+
+    // [6] MCP - Advanced Upstreams / GitHub Proxy Preset
+    MCP_UPSTREAMS_JSON: {
+        level: 'WARN',
+        validator: (val) => {
+            const raw = String(val || '').trim();
+            if (!raw) return true;
+            try {
+                return Array.isArray(JSON.parse(raw));
+            } catch {
+                return false;
+            }
+        },
+        default: '',
+        message: 'Must be empty or a valid JSON array string'
+    },
+    MCP_UPSTREAM_REFRESH: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'false',
+        message: 'Must be true or false'
+    },
+    MCP_UPSTREAM_INIT_TIMEOUT_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1000,
+        default: '30000',
+        message: 'Must be an integer >= 1000 (milliseconds)'
+    },
+    MCP_GITHUB_PROXY_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'false',
+        message: 'Must be true or false'
+    },
+    MCP_GITHUB_TOOL_PREFIX: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: 'mcp_github__',
+        message: 'Must be a string'
+    },
+    MCP_GITHUB_COMMAND: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string' && String(val).trim().length > 0,
+        default: 'npx',
+        message: 'Must be a non-empty string'
+    },
+    MCP_GITHUB_ARGS_JSON: {
+        level: 'WARN',
+        validator: (val) => {
+            const raw = String(val || '').trim();
+            if (!raw) return true;
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) && parsed.every(x => typeof x === 'string');
+            } catch {
+                return false;
+            }
+        },
+        default: '["-y","@modelcontextprotocol/server-github"]',
+        message: 'Must be empty or a valid JSON array of strings'
+    },
+
+    // [7] MCP - Upstream restart / retry (best-effort)
+    MCP_UPSTREAM_RESTART_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'false',
+        message: 'Must be true or false'
+    },
+    MCP_UPSTREAM_RESTART_BACKOFF_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 100,
+        default: '5000',
+        message: 'Must be an integer >= 100 (milliseconds)'
+    },
+    MCP_UPSTREAM_RESTART_MAX: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 0,
+        default: '10',
+        message: 'Must be an integer >= 0 (0 = unlimited retries)'
     }
 };
 
@@ -222,6 +355,32 @@ export function validateEnv(options = {}) {
             level: 'WARN',
             message: `SERVER_REQUEST_TIMEOUT (${serverTimeout}ms) should be > MCP_TOOL_TIMEOUT (${mcpTimeout}ms) for proper timeout cascade`
         });
+    }
+
+    // Upstream MCP dependency validation
+    const upstreamsJson = String(resolvedEnv.MCP_UPSTREAMS_JSON || '').trim();
+
+    if (!upstreamsJson && resolvedEnv.MCP_UPSTREAM_ENABLED === 'true') {
+        const url = String(resolvedEnv.MCP_UPSTREAM_URL || '').trim();
+        if (!url) {
+            errors.push({
+                key: 'MCP_UPSTREAM_URL',
+                level: 'ERROR',
+                message: 'MCP_UPSTREAM_ENABLED=true but MCP_UPSTREAM_URL is missing'
+            });
+        }
+    }
+
+    // GitHub proxy preset validation
+    if (resolvedEnv.MCP_GITHUB_PROXY_ENABLED === 'true') {
+        const token = String(resolvedEnv.GITHUB_PERSONAL_ACCESS_TOKEN || '').trim();
+        if (!token) {
+            warnings.push({
+                key: 'GITHUB_PERSONAL_ACCESS_TOKEN',
+                level: 'WARN',
+                message: 'MCP_GITHUB_PROXY_ENABLED=true but GITHUB_PERSONAL_ACCESS_TOKEN is missing (GitHub upstream will be not-ready)'
+            });
+        }
     }
 
     // Log results

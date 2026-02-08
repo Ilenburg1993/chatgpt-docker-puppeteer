@@ -295,6 +295,21 @@ export async function initialize() {
             const { registerOllamaTools } = await import('./tools/ollama-tools.mjs');
             await registerOllamaTools(registry);
 
+            // Optional: import upstream MCP tools (generic HTTP + stdio, plus GitHub preset).
+            // This is designed to be best-effort: failures should degrade, not crash the server.
+            try {
+                const { registerUpstreams, getUpstreamStatus } = await import('./mcp/upstream-manager.mjs');
+                await registerUpstreams(registry);
+                const st = getUpstreamStatus();
+                const readyCount = st.upstreams.filter(u => u.ready).length;
+                const totalCount = st.upstreams.length;
+                if (totalCount > 0) {
+                    console.error(`[Tool Registry] Upstreams: ${readyCount}/${totalCount} ready`);
+                }
+            } catch (error) {
+                console.error('[Tool Registry] Upstream manager failed (continuing without upstreams):', error);
+            }
+
             initialized = true;
 
             const stats = registry.getStats();

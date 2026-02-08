@@ -15,9 +15,60 @@
  */
 
 /**
+ * Lightweight, compatible MCP-ish HTTP endpoint.
+ *
+ * Notes:
+ * - Supports core MCP initialization methods enough for common clients.
+ * - Does NOT implement SSE streaming, but returns 405 for SSE GET requests
+ *   so Streamable HTTP clients can fall back to plain JSON responses.
+ */
+
+/**
  * Handler map for MCP methods
  */
 const handlers = {
+    /**
+     * initialize: MCP protocol handshake
+     *
+     * Minimal implementation: advertises tools/resources capabilities.
+     */
+    'initialize': async (params, registry) => {
+        const clientProtocolVersion = params?.protocolVersion;
+        const protocolVersion =
+            typeof clientProtocolVersion === 'string' && clientProtocolVersion.trim()
+                ? clientProtocolVersion
+                : '2024-11-05';
+
+        return {
+            protocolVersion,
+            capabilities: {
+                tools: {},
+                resources: {}
+            },
+            serverInfo: {
+                name: 'chatgpt-docker-unified',
+                version: '4.0.0'
+            },
+            instructions: `Tools: ${registry.getToolNames().join(', ')}`
+        };
+    },
+
+    /**
+     * notifications/initialized: client indicates init is complete
+     * Notification (no response expected).
+     */
+    'notifications/initialized': async () => {
+        console.error('[MCP Handler] notifications/initialized');
+        return {};
+    },
+
+    /**
+     * ping: liveness check
+     */
+    'ping': async () => {
+        return {};
+    },
+
     /**
      * tools/list: Return all available tools from registry
      */
@@ -50,6 +101,11 @@ const handlers = {
             });
 
             clearTimeout(timeoutId);
+
+            // If tool already returns MCP tool result shape, preserve it.
+            if (result && typeof result === 'object' && Array.isArray(result.content)) {
+                return result;
+            }
 
             // MCP expects content array format
             return {
@@ -165,51 +221,77 @@ export function setupMCPHandler(app, registry) {
         try {
             console.error('[MCP Handler] POST /api/mcp received');
 
-            // Parse JSON-RPC request
-            const { jsonrpc, id, method, params = {} } = req.body;
+            const payload = req.body;
 
-            // Validate JSON-RPC version
-            if (jsonrpc !== '2.0') {
-                return res.status(400).json({
-                    jsonrpc: '2.0',
-                    id,
-                    error: {
-                        code: -32600,
-                        message: 'Invalid Request: jsonrpc must be "2.0"'
-                    }
-                });
+            const handleOne = async (msg) => {
+                const { jsonrpc, id, method, params = {} } = msg || {};
+
+                // Validate JSON-RPC version
+                if (jsonrpc !== '2.0') {
+                    return {
+                        httpStatus: 400,
+                        json: {
+                            jsonrpc: '2.0',
+                            id,
+                            error: {
+                                code: -32600,
+                                message: 'Invalid Request: jsonrpc must be "2.0"'
+                            }
+                        }
+                    };
+                }
+
+                // Find handler for method
+                const handler = handlers[method];
+                if (!handler) {
+                    return {
+                        httpStatus: 404,
+                        json: {
+                            jsonrpc: '2.0',
+                            id,
+                            error: {
+                                code: -32601,
+                                message: `Method not found: ${method}`
+                            }
+                        }
+                    };
+                }
+
+                // Notifications (no id) should not return a JSON-RPC response
+                const isNotification = id === undefined || id === null;
+                if (isNotification) {
+                    await handler(params, registry);
+                    return { httpStatus: 202, json: null };
+                }
+
+                const result = await handler(params, registry);
+                return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
+            };
+
+            // Batch support
+            if (Array.isArray(payload)) {
+                const results = (await Promise.all(payload.map(handleOne)))
+                    .map((r) => r?.json)
+                    .filter(Boolean);
+                if (results.length === 0) {
+                    return res.status(202).end();
+                }
+                return res.json(results);
             }
 
-            // Find handler for method
-            const handler = handlers[method];
-
-            if (!handler) {
-                return res.status(404).json({
-                    jsonrpc: '2.0',
-                    id,
-                    error: {
-                        code: -32601,
-                        message: `Method not found: ${method}`
-                    }
-                });
+            const single = await handleOne(payload);
+            if (!single?.json) {
+                return res.status(202).end();
             }
 
-            // Execute handler
-            const result = await handler(params, registry);
-
-            // Return JSON-RPC response
-            res.json({
-                jsonrpc: '2.0',
-                id,
-                result
-            });
+            res.status(single.httpStatus || 200).json(single.json);
 
         } catch (error) {
             console.error('[MCP Handler] Error:', error);
 
             res.status(500).json({
                 jsonrpc: '2.0',
-                id: req.body?.id,
+                id: Array.isArray(req.body) ? null : req.body?.id,
                 error: {
                     code: -32603,
                     message: 'Internal error',
@@ -225,6 +307,13 @@ export function setupMCPHandler(app, registry) {
      * Returns server info, available tools, and methods
      */
     app.get('/api/mcp', (req, res) => {
+        // Streamable HTTP clients may probe a GET SSE stream with Accept: text/event-stream.
+        // We do not currently support SSE; return 405 so clients can fall back to plain JSON.
+        const accept = String(req.headers?.accept || '');
+        if (accept.includes('text/event-stream')) {
+            return res.status(405).send('SSE stream not supported on this endpoint');
+        }
+
         res.json({
             name: 'chatgpt-docker-unified',
             version: '4.0.0',

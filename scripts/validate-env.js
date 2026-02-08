@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport fs from 'node:fs';
+#!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 
 // ============================================================================
@@ -67,6 +68,12 @@ class EnvValidator {
 
         // Validar variáveis OPERATIONAL
         this.validateCategory('OPERATIONAL', envData);
+
+        // Validar variáveis TUNING
+        this.validateCategory('TUNING', envData);
+
+        // Validar variáveis FEATURE_FLAGS
+        this.validateCategory('FEATURE_FLAGS', envData);
 
         // Validar constraints
         this.validateConstraints(envData);
@@ -207,6 +214,32 @@ class EnvValidator {
             if (envData.LOG_LEVEL === 'debug') {
                 this.warnings.push('CONSTRAINT: LOG_LEVEL=debug não recomendado em production');
                 console.log(`  ${colors.yellow}!${colors.reset} Production constraints: LOG_LEVEL=debug (warning)`);
+            }
+        }
+
+        // MCP_UPSTREAM_ENABLED=true → requires MCP_UPSTREAM_URL (legacy single-upstream mode only)
+        // If MCP_UPSTREAMS_JSON is set, the legacy URL is not required.
+        if (String(envData.MCP_UPSTREAM_ENABLED || '').toLowerCase() === 'true') {
+            const upstreamsJson = String(envData.MCP_UPSTREAMS_JSON || '').trim();
+            const legacyRequired = !upstreamsJson;
+
+            if (legacyRequired && !String(envData.MCP_UPSTREAM_URL || '').trim()) {
+                this.errors.push('CONSTRAINT: MCP_UPSTREAM_ENABLED=true requer MCP_UPSTREAM_URL (quando MCP_UPSTREAMS_JSON está vazio)');
+                console.log(`  ${colors.red}✗${colors.reset} MCP upstream (legacy): FALHOU (falta: MCP_UPSTREAM_URL)`);
+            } else {
+                console.log(`  ${colors.green}✓${colors.reset} MCP upstream: OK`);
+            }
+        }
+
+        // MCP_GITHUB_PROXY_ENABLED=true → recommends/needs GITHUB_PERSONAL_ACCESS_TOKEN
+        // This is a best-effort readiness requirement: missing token should not block process boot.
+        if (String(envData.MCP_GITHUB_PROXY_ENABLED || '').toLowerCase() === 'true') {
+            const token = String(envData.GITHUB_PERSONAL_ACCESS_TOKEN || '').trim();
+            if (!token) {
+                this.warnings.push('CONSTRAINT: MCP_GITHUB_PROXY_ENABLED=true mas GITHUB_PERSONAL_ACCESS_TOKEN está vazio (upstream GitHub ficará not-ready)');
+                console.log(`  ${colors.yellow}!${colors.reset} GitHub proxy: WARNING (token ausente)`);
+            } else {
+                console.log(`  ${colors.green}✓${colors.reset} GitHub proxy: OK`);
             }
         }
     }

@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "chatgpt-docker-puppeteer": {
+      "type": "http",
+      "url": "http://localhost:3008/api/mcp"
+    }
+  }
+}
+

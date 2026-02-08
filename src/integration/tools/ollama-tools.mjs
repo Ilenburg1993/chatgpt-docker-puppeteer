@@ -72,8 +72,12 @@ async function ollamaGenerateHandler(params, options = {}) {
         validated = OllamaGenerateSchema.parse(params);
     } catch (error) {
         if (error instanceof z.ZodError) {
-            const issues = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
-            throw new Error(`Invalid input: ${issues}`);
+            const issues = error.issues ?? error.errors ?? [];
+            const message =
+                Array.isArray(issues) && issues.length > 0
+                    ? issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
+                    : 'validation failed';
+            throw new Error(`Invalid input: ${message}`);
         }
         throw error;
     }
@@ -133,8 +137,12 @@ async function ollamaEmbedHandler(params, options = {}) {
         validated = OllamaEmbedSchema.parse(params);
     } catch (error) {
         if (error instanceof z.ZodError) {
-            const issues = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
-            throw new Error(`Invalid input: ${issues}`);
+            const issues = error.issues ?? error.errors ?? [];
+            const message =
+                Array.isArray(issues) && issues.length > 0
+                    ? issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
+                    : 'validation failed';
+            throw new Error(`Invalid input: ${message}`);
         }
         throw error;
     }

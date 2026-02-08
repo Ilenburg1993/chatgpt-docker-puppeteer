@@ -153,14 +153,68 @@ async function applyRoutes(app) {
             // Setup MCP handler with Tool Registry (now guaranteed to be initialized)
             setupMCPHandler(app, registry);
 
+            // Observability hooks for /ready and troubleshooting.
+            try {
+                const toolCount = typeof registry?.getToolNames === 'function' ? registry.getToolNames().length : null;
+                app.locals = app.locals || {};
+                app.locals.mcp = {
+                    enabled: true,
+                    ready: true,
+                    toolCount,
+                    lastInitAt: new Date().toISOString(),
+                    lastInitError: null
+                };
+
+                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: true });
+            } catch (e) {
+                // Non-fatal observability failure
+            }
+
+            // Expose upstream status dynamically (if upstream-manager is present).
+            try {
+                const { getUpstreamStatus } = await import('../../integration/mcp/upstream-manager.mjs').catch(() => ({}));
+                if (typeof getUpstreamStatus === 'function') {
+                    app.locals = app.locals || {};
+                    app.locals.getMcpUpstreamsStatus = () => getUpstreamStatus().upstreams;
+                }
+            } catch (e) {
+                // noop
+            }
+
             log('INFO', '[MCP] Handler registered at POST/GET /api/mcp');
         } catch (error) {
             log('ERROR', `[MCP] Failed to setup MCP handler: ${error.message}`);
             log('WARN', '[MCP] MCP features will be unavailable');
             // Don't crash server, just disable MCP
+            try {
+                app.locals = app.locals || {};
+                app.locals.mcp = {
+                    enabled: true,
+                    ready: false,
+                    toolCount: null,
+                    lastInitAt: new Date().toISOString(),
+                    lastInitError: error && error.message ? error.message : String(error)
+                };
+                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
+            } catch (e) {
+                // noop
+            }
         }
     } else {
         log('INFO', '[MCP] MCP_ENABLED=false, skipping MCP handler setup');
+        try {
+            app.locals = app.locals || {};
+            app.locals.mcp = {
+                enabled: false,
+                ready: false,
+                toolCount: null,
+                lastInitAt: new Date().toISOString(),
+                lastInitError: null
+            };
+            app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
+        } catch (e) {
+            // noop
+        }
     }
 
     /* --------------------------------------------------------------------------

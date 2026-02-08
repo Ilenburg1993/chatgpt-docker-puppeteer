@@ -9,6 +9,8 @@ import * as logWatcher from '../watchers/log_watcher.js';
 import { log } from '#core/logger';
 import CONFIG from '#core/config';
 import * as Discovery from '#nerv/discovery';
+import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
+import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
 
 /**
  * Legacy: file-based discovery handled by `@nerv/discovery`.
@@ -85,6 +87,36 @@ async function gracefulShutdown(signal) {
         }
         if (pm2Bridge && typeof pm2Bridge.stop === 'function') {
             pm2Bridge.stop();
+        }
+
+        // 2.25. MCP UPSTREAMS (stdio child processes)
+        // Ensure no orphan child processes remain when shutting down Mission Control.
+        try {
+            const { shutdownUpstreams } = await import('../../integration/mcp/upstream-manager.mjs');
+            if (typeof shutdownUpstreams === 'function') {
+                await shutdownUpstreams();
+                log('DEBUG', '[LIFECYCLE] MCP upstreams encerrados');
+            }
+        } catch (e) {
+            log('DEBUG', `[LIFECYCLE] shutdownUpstreams skipped: ${e && e.message ? e.message : String(e)}`);
+        }
+
+        // 2.5. DASHBOARD AGGREGATORS (realtime)
+        // Para timers internos antes de desconectar o Hub.
+        try {
+            if (telemetryAggregator && typeof telemetryAggregator.stop === 'function') {
+                telemetryAggregator.stop();
+            }
+        } catch (e) {
+            log('DEBUG', `[LIFECYCLE] TelemetryAggregator.stop() skipped: ${e && e.message ? e.message : String(e)}`);
+        }
+
+        try {
+            if (taskSyncBridge && typeof taskSyncBridge.clearAll === 'function') {
+                taskSyncBridge.clearAll();
+            }
+        } catch (e) {
+            log('DEBUG', `[LIFECYCLE] TaskSyncBridge.clearAll() skipped: ${e && e.message ? e.message : String(e)}`);
         }
 
         // 3. DESATIVAÇÃO DO HUB DE EVENTOS (SOCKET.IO)
