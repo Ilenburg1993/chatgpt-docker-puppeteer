@@ -428,25 +428,56 @@ class RecoverySystem extends EventEmitter {
 
         const browser = this.driver.page.browser();
 
-        // ✅ v3.0: External mode - graceful disconnect
-        try {
-            if (browser && browser.isConnected()) {
-                log('DEBUG', '[RECOVERY] Tier 3: Disconnecting Puppeteer gracefully...', correlationId);
-                await browser.disconnect(); // Graceful disconnect (não close)
+        // ✅ v3.0: Internal mode (local/child process) -> try kill with timeout
+        const KILL_TIMEOUT = RECOVERY_CONFIG.KILL_TIMEOUT_MS;
+        const proc = browser && typeof browser.process === 'function' ? browser.process() : null;
 
-                // ✅ EventEmitter telemetry
-                this.emit(RECOVERY_EVENTS.BROWSER_DISCONNECTED, {
-                    mode: 'EXTERNAL',
-                    reason: 'TIER3_RECOVERY',
-                    timestamp: Date.now(),
-                });
+        if (proc && typeof proc.kill === 'function') {
+            try {
+                log('DEBUG', `[RECOVERY] Tier 3: Killing browser process with timeout=${KILL_TIMEOUT}ms...`, correlationId);
 
-                log('DEBUG', `[RECOVERY] Tier 3: Browser disconnected successfully`, correlationId);
-            } else {
-                log('DEBUG', `[RECOVERY] Tier 3: Browser already disconnected`, correlationId);
+                await Promise.race([
+                    new Promise((resolve, reject) => {
+                        try {
+                            proc.kill('SIGKILL');
+                            resolve();
+                        } catch (err) {
+                            reject(err);
+                        }
+                    }),
+                    this._timeout(KILL_TIMEOUT, 'browser_kill')
+                ]);
+
+                log('DEBUG', `[RECOVERY] Tier 3: Browser process kill issued`, correlationId);
+            } catch (killErr) {
+                // Importante: kill pode falhar/timeoutar, mas o recovery precisa seguir para escalar.
+                log(
+                    'WARN',
+                    `[RECOVERY] Tier 3: Kill failed/timeout: ${killErr.message}. Continua o fluxo...`,
+                    correlationId
+                );
             }
-        } catch (disconnectErr) {
-            log('WARN', `[RECOVERY] Tier 3: Disconnect error: ${disconnectErr.message}`, correlationId);
+        } else {
+            // ✅ External/remote mode -> graceful disconnect (browser.process() == null)
+            try {
+                if (browser && browser.isConnected()) {
+                    log('DEBUG', '[RECOVERY] Tier 3: Disconnecting Puppeteer gracefully...', correlationId);
+                    await browser.disconnect(); // Graceful disconnect (não close)
+
+                    // ✅ EventEmitter telemetry
+                    this.emit(RECOVERY_EVENTS.BROWSER_DISCONNECTED, {
+                        mode: 'EXTERNAL',
+                        reason: 'TIER3_RECOVERY',
+                        timestamp: Date.now(),
+                    });
+
+                    log('DEBUG', `[RECOVERY] Tier 3: Browser disconnected successfully`, correlationId);
+                } else {
+                    log('DEBUG', `[RECOVERY] Tier 3: Browser already disconnected`, correlationId);
+                }
+            } catch (disconnectErr) {
+                log('WARN', `[RECOVERY] Tier 3: Disconnect error: ${disconnectErr.message}`, correlationId);
+            }
         }
 
         // ✅ User notification via NERV

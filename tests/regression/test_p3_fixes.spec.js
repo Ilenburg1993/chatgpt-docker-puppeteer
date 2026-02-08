@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 // Cores para output
 const colors = {
@@ -93,12 +94,12 @@ async function test1_FastKill() {
     const recovery = new MockRecoverySystem(mockDriver, mockSystem);
 
     log('INFO', 'Executando kill com delay de 500ms...');
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     const result = await recovery.applyTier3Kill(12345, 'test-001');
 
-    const elapsed = Date.now() - startTime;
-    log('INFO', `Completado em ${elapsed}ms`);
+    const elapsed = performance.now() - startTime;
+    log('INFO', `Completado em ${Math.round(elapsed)}ms`);
 
     // Validações
     const checks = [
@@ -129,12 +130,12 @@ async function test2_SlowKillTimeout() {
     const recovery = new MockRecoverySystem(mockDriver, mockSystem);
 
     log('INFO', 'Executando kill com delay de 7s (deve abortar em 5s)...');
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     const result = await recovery.applyTier3Kill(12345, 'test-002');
 
-    const elapsed = Date.now() - startTime;
-    log('INFO', `Abortado em ${elapsed}ms`);
+    const elapsed = performance.now() - startTime;
+    log('INFO', `Abortado em ${Math.round(elapsed)}ms`);
 
     // Validações
     const checks = [
@@ -165,12 +166,12 @@ async function test3_BorderlineKill() {
     const recovery = new MockRecoverySystem(mockDriver, mockSystem);
 
     log('INFO', 'Executando kill com delay de 4.9s...');
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     const result = await recovery.applyTier3Kill(12345, 'test-003');
 
-    const elapsed = Date.now() - startTime;
-    log('INFO', `Resultado: ${result.status} em ${elapsed}ms`);
+    const elapsed = performance.now() - startTime;
+    log('INFO', `Resultado: ${result.status} em ${Math.round(elapsed)}ms`);
 
     // Validações (aceita tanto SUCCESS quanto TIMEOUT no limite)
     const checks = [

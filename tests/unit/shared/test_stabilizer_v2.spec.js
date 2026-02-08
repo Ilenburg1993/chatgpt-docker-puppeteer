@@ -484,7 +484,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve registrar fases puladas por timeout', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                // Mock timeout curto para forçar skips
+                // Força o deadline global expirar antes da fase 2 iniciar.
                 mockPage.evaluate = mock.fn(async () => {
                     await new Promise(r => setTimeout(r, 200)); // Delay longo
                     return false;
@@ -493,7 +493,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                     await new Promise(r => setTimeout(r, 200));
                 });
 
-                const result = await waitForStability(mockDriver, 500); // Timeout curto
+                const result = await waitForStability(mockDriver, 100); // Timeout bem curto
 
                 // Deve ter fases puladas
                 assert.ok(result.phasesSkipped.length > 0, 'Deve ter fases puladas');

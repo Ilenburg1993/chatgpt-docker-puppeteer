@@ -1,5 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { HandleManager } from '#driver/modules/handle_manager';
 
 // ============================================================================
@@ -156,11 +157,11 @@ async function testHandleManagerAbort() {
         console.log('> Iniciando cleanup com timeout de 3s...');
         console.log('> (10 handles × 500ms = 5s total, deve abortar em 3s)');
 
-        const startTime = Date.now();
+        const startTime = performance.now();
         await manager.clearAll();
-        const duration = Date.now() - startTime;
+        const duration = performance.now() - startTime;
 
-        console.log(`> Cleanup concluído em ${duration}ms`);
+        console.log(`> Cleanup concluído em ${Math.round(duration)}ms`);
 
         // Valida que cleanup abortou antes de 5s
         if (duration >= 5000) {
@@ -172,7 +173,7 @@ async function testHandleManagerAbort() {
 
         // Valida que levou ~3s (timeout)
         if (duration < 2900 || duration > 3500) {
-            console.error(`❌ Tempo inesperado: ${duration}ms (esperado: ~3000ms)`);
+            console.error(`❌ Tempo inesperado: ${Math.round(duration)}ms (esperado: ~3000ms)`);
             return false;
         }
 
@@ -222,11 +223,11 @@ async function testHandleManagerComplete() {
         console.log(`> ${manager.getActiveCount()} handles registrados`);
         console.log('> Iniciando cleanup rápido (5 × 50ms = 250ms)...');
 
-        const startTime = Date.now();
+        const startTime = performance.now();
         await manager.clearAll();
-        const duration = Date.now() - startTime;
+        const duration = performance.now() - startTime;
 
-        console.log(`> Cleanup concluído em ${duration}ms`);
+        console.log(`> Cleanup concluído em ${Math.round(duration)}ms`);
 
         // Valida que completou antes do timeout
         if (duration >= 3000) {

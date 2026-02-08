@@ -1,5 +1,6 @@
 import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
+import { performance } from 'node:perf_hooks';
 
 describe('human.js v2.0 - Unit Tests', () => {
     let mockDriver;
@@ -369,27 +370,32 @@ describe('human.js v2.0 - Unit Tests', () => {
 
     describe('Phase 3: Polish', () => {
         describe('Improvement #2: Gaussian Speedup', () => {
-            it('gaussian com cache deve ser ~2x mais rápido (100 calls)', () => {
+            it('gaussian deve evitar Math.random em cache hit', () => {
                 const { gaussian } = humanModule;
 
-                const iterations = 100;
+                // Use parâmetros únicos para evitar interferência com outros testes.
+                const mean = 1234.5;
+                const sigma = 6.7;
 
-                // Primeira rodada (sem cache)
-                const start1 = Date.now();
-                for (let i = 0; i < iterations; i++) {
-                    gaussian(10 + (i % 5), 2); // 5 params diferentes
+                const originalRandom = Math.random;
+                let randomCalls = 0;
+                Math.random = () => {
+                    randomCalls++;
+                    return originalRandom();
+                };
+
+                try {
+                    gaussian(mean, sigma); // cache miss/hit (não garantimos quantos randoms)
+                    const callsAfterFirst = randomCalls;
+                    gaussian(mean, sigma); // cache hit -> não deve chamar Math.random
+                    assert.strictEqual(
+                        randomCalls,
+                        callsAfterFirst,
+                        `Cache hit não deveria chamar Math.random (calls=${randomCalls} vs ${callsAfterFirst})`
+                    );
+                } finally {
+                    Math.random = originalRandom;
                 }
-                const duration1 = Date.now() - start1;
-
-                // Segunda rodada (com cache)
-                const start2 = Date.now();
-                for (let i = 0; i < iterations; i++) {
-                    gaussian(10 + (i % 5), 2); // Mesmos params - deve usar cache
-                }
-                const duration2 = Date.now() - start2;
-
-                // Segunda rodada deve ser <= primeira (cache hit)
-                assert.ok(duration2 <= duration1 * 1.2, `Cache não acelerou: ${duration2}ms vs ${duration1}ms`);
             });
         });
 
@@ -522,9 +528,9 @@ describe('human.js v2.0 - Unit Tests', () => {
 
             const longText = 'A'.repeat(1000);
 
-            const start = Date.now();
+            const start = performance.now();
             const result = await humanType(mockDriver, '#input', longText);
-            const duration = Date.now() - start;
+            const duration = performance.now() - start;
 
             assert.strictEqual(result, true);
 
@@ -564,33 +570,33 @@ describe('human.js v2.0 - Unit Tests', () => {
     // ======================
 
     describe('Performance Tests', () => {
-        it('gaussian cache deve reduzir tempo de execução', async () => {
-            const { gaussian } = humanModule;
-
-            // Reimport module fresh
+        it('gaussian cache deve manter valor estável dentro do TTL', async () => {
+            // Reimport (Node ESM cacheia módulos; então use params únicos para isolar estado)
             const freshHuman = await import('#shared/biomechanics/human').then(m => m.default ?? m);
 
-            const iterations = 1000;
-            const params = [10, 2];
+            const params = [1234.5, 6.7];
+            const ttlMs = Number(freshHuman.HUMAN_CONFIG?.GAUSSIAN_CACHE_TTL || 0);
 
-            // Primeira rodada (populate cache)
-            const start1 = Date.now();
-            for (let i = 0; i < iterations; i++) {
-                freshHuman.gaussian(...params);
+            const first = freshHuman.gaussian(...params);
+
+            // Dentro do TTL, deve retornar exatamente o mesmo valor (cache hit determinístico)
+            for (let i = 0; i < 20; i++) {
+                assert.strictEqual(freshHuman.gaussian(...params), first);
             }
-            const duration1 = Date.now() - start1;
 
-            // Segunda rodada (cache hits)
-            const start2 = Date.now();
-            for (let i = 0; i < iterations; i++) {
-                freshHuman.gaussian(...params);
+            // Após expirar, é esperado que eventualmente retorne um valor diferente (cache miss)
+            // Evitamos flakiness: damos folga e tentamos algumas vezes.
+            await new Promise(r => setTimeout(r, Math.max(1, ttlMs + 50)));
+
+            let changed = false;
+            for (let i = 0; i < 25; i++) {
+                const v = freshHuman.gaussian(...params);
+                if (v !== first) {
+                    changed = true;
+                    break;
+                }
             }
-            const duration2 = Date.now() - start2;
-
-            console.log(`  ⏱️  No cache: ${duration1}ms | Cache: ${duration2}ms`);
-
-            // Cache deve ser significativamente mais rápido (ou pelo menos igual)
-            assert.ok(duration2 <= duration1, `Cache deve ser <= sem cache: ${duration2}ms vs ${duration1}ms`);
+            assert.ok(changed, 'Após TTL, gaussian deve eventualmente gerar novo valor (cache miss)');
         });
     });
 });

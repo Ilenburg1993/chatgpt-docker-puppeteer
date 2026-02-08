@@ -10,7 +10,15 @@ const IDENTITY_FILE = path.join(io.ROOT, 'src/infra/storage/robot_identity.json'
 async function runIdentityTest() {
     console.log(`\n🧪 [TEST] Iniciando Auditoria de Ciclo de Vida de Identidade\n`);
 
+    let hadOriginal = false;
+    let originalContent = null;
+
     try {
+        if (fs.existsSync(IDENTITY_FILE)) {
+            hadOriginal = true;
+            originalContent = fs.readFileSync(IDENTITY_FILE);
+        }
+
         // --- PASSO 1: SIMULAR NASCIMENTO (DELEÇÃO) ---
         if (fs.existsSync(IDENTITY_FILE)) {
             fs.unlinkSync(IDENTITY_FILE);
@@ -56,8 +64,19 @@ async function runIdentityTest() {
         console.log(`--------------------------------------------------\n`);
     } catch (err) {
         console.error(`\n❌ [FAIL] Colapso na Identidade: ${err.message}`);
-        process.exit(1);
+        process.exitCode = 1;
+    } finally {
+        try {
+            if (hadOriginal) {
+                fs.writeFileSync(IDENTITY_FILE, originalContent);
+            } else {
+                fs.rmSync(IDENTITY_FILE, { force: true });
+            }
+        } catch (restoreErr) {
+            console.error(`\n❌ [FAIL] Não foi possível restaurar o arquivo de identidade: ${restoreErr.message}`);
+            process.exitCode = 1;
+        }
     }
 }
 
-runIdentityTest();
+await runIdentityTest();
