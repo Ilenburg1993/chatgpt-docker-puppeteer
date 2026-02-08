@@ -27,8 +27,11 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Prepare npm cache directory
+        run: mkdir -p "$HOME/.npm"
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-online --no-audit
 
       - name: Validate Node runtime
         run: node scripts/ci/check-node-version.mjs
@@ -59,8 +62,11 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Prepare npm cache directory
+        run: mkdir -p "$HOME/.npm"
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-online --no-audit
 
       - name: Integration tests
         run: npm run test:integration
