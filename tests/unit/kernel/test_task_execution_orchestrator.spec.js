@@ -126,6 +126,47 @@ describe('TaskExecutionOrchestrator', () => {
         assert.strictEqual(eventPayload.retriesAttempted, 0);
     });
 
+
+
+    it('should ignore completed event when correlationId is missing for active execution', async () => {
+        const task = {
+            meta: { id: 'task-missing-corr' },
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+        };
+
+        await orchestrator.executeTask(task, 'corr-required');
+
+        nerv.receive({
+            messageType: MessageType.EVENT,
+            actionCode: ActionCode.DRIVER_TASK_COMPLETED,
+            payload: { taskId: 'task-missing-corr', result: { output: 'ok' } }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        assert.strictEqual(nervBridge.decisions, 0, 'evento sem correlationId deve ser descartado');
+    });
+
+    it('should ignore failed event when correlationId mismatches active execution', async () => {
+        const task = {
+            meta: { id: 'task-stale-fail' },
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+        };
+
+        await orchestrator.executeTask(task, 'corr-current');
+
+        nerv.receive({
+            messageType: MessageType.EVENT,
+            actionCode: ActionCode.DRIVER_TASK_FAILED,
+            correlationId: 'corr-stale',
+            payload: { taskId: 'task-stale-fail', reason: 'STALE', error: 'stale event' }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        assert.strictEqual(nervBridge.emitEventCalls.length, 0, 'falha stale não deve emitir TASK_FAILED');
+    });
+
     it('should unsubscribe listener on cleanup', () => {
         assert.strictEqual(nerv.receiveHandlers.length, 1);
         orchestrator.cleanup();

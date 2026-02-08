@@ -4,6 +4,20 @@ import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 
 /**
+ * @typedef {{ meta: { id: string }, spec?: Record<string, unknown> }} TaskV5
+ * @typedef {{ action?: string, [key: string]: unknown }} OrchestrationDecision
+ * @typedef {{ taskId?: string, result?: unknown }} DriverTaskCompletedPayload
+ * @typedef {{ taskId?: string, error?: string, reason?: string, retryable?: boolean, suggestedDelayMs?: number, retryDelayMs?: number, next_action?: string, [key: string]: unknown }} DriverTaskFailedPayload
+ * @typedef {{ task: TaskV5, correlationId: string|null, startedAt: number }} ActiveExecutionEntry
+ * @typedef {'COMPLETED'|'FAILED'} ProcessedEventType
+ * @typedef {{ correlationId: string|null, processed: Set<ProcessedEventType> }} ExecutionIdempotencyState
+ * @typedef {(input: { taskId: string, correlationId: string|null, delayMs?: number, reason: string, nextAction?: string, payload?: Record<string, unknown> }) => Promise<void>|void} TaskRetryRequestedCallback
+ * @typedef {(input: { taskId: string, correlationId: string|null, reason: string, payload?: Record<string, unknown> }) => Promise<void>|void} TaskPermanentFailureCallback
+ * @typedef {(input: { taskId: string, correlationId: string|null, decision: OrchestrationDecision }) => Promise<void>|void} TaskCompletedCallback
+ */
+
+
+/**
  * TaskExecutionOrchestrator - Orquestra execução de tasks V5.
  *
  * Fluxo:
@@ -22,9 +36,9 @@ class TaskExecutionOrchestrator {
      * @param {Object} params
      * @param {Object} params.nerv - Instância do NERV
      * @param {Object} params.nervBridge - KernelNERVBridge
-     * @param {Function|null} [params.onTaskRetryRequested] - callback retry
-     * @param {Function|null} [params.onTaskPermanentFailure] - callback failure permanente
-     * @param {Function|null} [params.onTaskCompleted] - callback conclusão
+     * @param {TaskRetryRequestedCallback|null} [params.onTaskRetryRequested] - callback retry
+     * @param {TaskPermanentFailureCallback|null} [params.onTaskPermanentFailure] - callback failure permanente
+     * @param {TaskCompletedCallback|null} [params.onTaskCompleted] - callback conclusão
      */
     constructor({
         nerv,
@@ -47,13 +61,14 @@ class TaskExecutionOrchestrator {
         this.onTaskPermanentFailure = onTaskPermanentFailure;
         this.onTaskCompleted = onTaskCompleted;
 
-        // Cache de execuções em andamento: taskId → { task, correlationId, startedAt }
+        /** @type {Map<string, ActiveExecutionEntry>} Cache de execuções em andamento */
         this.activeExecutions = new Map();
 
         /**
          * Idempotência por execução:
          * taskId → { correlationId: string|null, processed: Set<'COMPLETED'|'FAILED'> }
          */
+        /** @type {Map<string, ExecutionIdempotencyState>} */
         this.processedExecutionEvents = new Map();
 
         this.unsubscribeNerv = null;
@@ -65,8 +80,8 @@ class TaskExecutionOrchestrator {
 
     /**
      * Executa uma task (ponto de entrada).
-     * @param {Object} task - Task V5
-     * @param {string} correlationId - ID de correlação NERV
+     * @param {TaskV5} task - Task V5
+     * @param {string|null} correlationId - ID de correlação NERV
      */
     async executeTask(task, correlationId) {
         if (!task?.meta?.id) {
@@ -163,7 +178,9 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (_) {}
+            } catch (unsubscribeError) {
+                logger.log('WARN', `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`);
+            }
             this.unsubscribeNerv = null;
         }
 
@@ -178,17 +195,22 @@ class TaskExecutionOrchestrator {
             let correlationId = null;
             try {
                 correlationId = getCorrelationId(envelope) || null;
-            } catch (_) {
+            } catch (correlationReadError) {
+                logger.log('DEBUG', `[TaskExecutionOrchestrator] Falha ao ler correlationId do envelope: ${correlationReadError?.message || String(correlationReadError)}`);
                 correlationId = envelope?.correlationId || envelope?.causality?.correlation_id || null;
             }
 
             if (actionCode === ActionCode.DRIVER_TASK_COMPLETED) {
-                void this._handleTaskCompleted(payload, correlationId);
+                this._handleTaskCompleted(/** @type {DriverTaskCompletedPayload} */ (payload), correlationId).catch(err => {
+                    logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_COMPLETED falhou: ${err?.message || String(err)}`, correlationId);
+                });
                 return;
             }
 
             if (actionCode === ActionCode.DRIVER_TASK_FAILED) {
-                void this._handleTaskFailed(payload, correlationId);
+                this._handleTaskFailed(/** @type {DriverTaskFailedPayload} */ (payload), correlationId).catch(err => {
+                    logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_FAILED falhou: ${err?.message || String(err)}`, correlationId);
+                });
                 return;
             }
 
@@ -206,6 +228,8 @@ class TaskExecutionOrchestrator {
 
     /**
      * Handler: Task completada com sucesso.
+     * @param {DriverTaskCompletedPayload} payload
+     * @param {string|null} correlationId
      */
     async _handleTaskCompleted(payload, correlationId) {
         const safePayload = payload && typeof payload === 'object' ? payload : {};
@@ -222,11 +246,11 @@ class TaskExecutionOrchestrator {
             return;
         }
 
-        // Ignora eventos atrasados/stale: correlationId divergente do dispatch corrente
-        if (cached.correlationId && correlationId && cached.correlationId !== correlationId) {
+        // Ignora eventos atrasados/stale/malformados: correlationId é obrigatório quando há dispatch com correlationId
+        if (cached.correlationId && cached.correlationId !== correlationId) {
             logger.log(
-                'DEBUG',
-                `[TaskExecutionOrchestrator] Evento COMPLETED stale ignorado para ${taskId} (corr=${correlationId}, expected=${cached.correlationId})`,
+                'WARN',
+                `[TaskExecutionOrchestrator] Evento COMPLETED inválido/stale ignorado para ${taskId} (corr=${correlationId || 'missing'}, expected=${cached.correlationId})`,
                 correlationId
             );
             return;
@@ -237,8 +261,12 @@ class TaskExecutionOrchestrator {
             processed: new Set()
         };
 
-        if (idempotency.correlationId && correlationId && idempotency.correlationId !== correlationId) {
-            // janela de idempotência corresponde a outro dispatch (stale)
+        if (idempotency.correlationId && idempotency.correlationId !== correlationId) {
+            logger.log(
+                'WARN',
+                `[TaskExecutionOrchestrator] Janela de idempotência bloqueou COMPLETED para ${taskId} (corr=${correlationId || 'missing'}, expected=${idempotency.correlationId})`,
+                correlationId
+            );
             return;
         }
 
@@ -322,6 +350,8 @@ class TaskExecutionOrchestrator {
 
     /**
      * Handler: Task falhou.
+     * @param {DriverTaskFailedPayload} payload
+     * @param {string|null} correlationId
      */
     async _handleTaskFailed(payload, correlationId) {
         const safePayload = payload && typeof payload === 'object' ? payload : {};
@@ -336,11 +366,11 @@ class TaskExecutionOrchestrator {
             return;
         }
 
-        // Ignora eventos atrasados/stale: correlationId divergente do dispatch corrente
-        if (cached.correlationId && correlationId && cached.correlationId !== correlationId) {
+        // Ignora eventos atrasados/stale/malformados: correlationId é obrigatório quando há dispatch com correlationId
+        if (cached.correlationId && cached.correlationId !== correlationId) {
             logger.log(
-                'DEBUG',
-                `[TaskExecutionOrchestrator] Evento FAILED stale ignorado para ${taskId} (corr=${correlationId}, expected=${cached.correlationId})`,
+                'WARN',
+                `[TaskExecutionOrchestrator] Evento FAILED inválido/stale ignorado para ${taskId} (corr=${correlationId || 'missing'}, expected=${cached.correlationId})`,
                 correlationId
             );
             return;
@@ -351,7 +381,12 @@ class TaskExecutionOrchestrator {
             processed: new Set()
         };
 
-        if (idempotency.correlationId && correlationId && idempotency.correlationId !== correlationId) {
+        if (idempotency.correlationId && idempotency.correlationId !== correlationId) {
+            logger.log(
+                'WARN',
+                `[TaskExecutionOrchestrator] Janela de idempotência bloqueou FAILED para ${taskId} (corr=${correlationId || 'missing'}, expected=${idempotency.correlationId})`,
+                correlationId
+            );
             return;
         }
 
@@ -396,24 +431,32 @@ class TaskExecutionOrchestrator {
 
         // Emite evento de falha padronizado para consumidores de domínio TASK
         // (mantém superset de campos para observabilidade, sem quebrar consumidores legados)
-        this.nervBridge.emitEvent({
-            target: null, // broadcast
-            correlationId,
-            payload: {
-                actionCode: ActionCode.TASK_FAILED,
-                taskId,
-                error: errorText,
-                reason,
-                retryable,
-                next_action: nextAction,
-                suggestedDelayMs,
-                errorType: safePayload.errorType || safePayload.error_type || null,
-                operation: safePayload.operation || null,
-                isTimeout: safePayload.isTimeout ?? null,
-                errorClassification: safePayload.errorClassification || null,
-                retriesAttempted: safePayload.retriesAttempted ?? null
-            }
-        });
+        try {
+            this.nervBridge.emitEvent({
+                target: null, // broadcast
+                correlationId,
+                payload: {
+                    actionCode: ActionCode.TASK_FAILED,
+                    taskId,
+                    error: errorText,
+                    reason,
+                    retryable,
+                    next_action: nextAction,
+                    suggestedDelayMs,
+                    errorType: safePayload.errorType || safePayload.error_type || null,
+                    operation: safePayload.operation || null,
+                    isTimeout: safePayload.isTimeout ?? null,
+                    errorClassification: safePayload.errorClassification || null,
+                    retriesAttempted: safePayload.retriesAttempted ?? null
+                }
+            });
+        } catch (emitError) {
+            logger.log(
+                'ERROR',
+                `[TaskExecutionOrchestrator] emitEvent TASK_FAILED falhou para ${taskId}: ${emitError?.message || String(emitError)}`,
+                correlationId
+            );
+        }
     }
 
     _handleTaskQueued(payload, correlationId) {
@@ -434,7 +477,9 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (_) {}
+            } catch (unsubscribeError) {
+                logger.log('WARN', `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`);
+            }
             this.unsubscribeNerv = null;
         }
 
