@@ -141,6 +141,8 @@ src/dashboard-ui/node_modules/
 # Mission runtime state
 missions/
 !missions/.gitkeep
+missions-test-boot/
+!missions-test-boot/.gitkeep
 missions/**/state.json
 missions-test-boot/**/checkpoints/
 missions-test-boot/**/state.json
