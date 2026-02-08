@@ -16,7 +16,8 @@
 
 - **[Architecture Guide](ARCHITECTURE.md)** ⭐ - Visão técnica detalhada
 - **[Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md)** ✨ **NOVO** - 11 diagramas visuais
-- **[Mission Orchestration Plan](MISSION_ORCHESTRATION_PLAN.md)** 🚀 **v2.0** - Plano de orquestração autônoma
+- **[Mission Orchestration Plan](MISSION_ORCHESTRATION_PLAN.md)** 🚀 **v2.0** - Plano de
+  orquestração autônoma
 - **[Roadmap](ROADMAP.md)** ✨ **NOVO** - Planejamento até v1.0
 - **[Gap Analysis](GAP_ANALYSIS.md)** ✨ **NOVO** - Análise crítica e plano de ação
 
@@ -33,6 +34,8 @@
 
 ### 📋 Outros
 
+- **[Organização da Documentação](ORGANIZACAO_DOCUMENTACAO.md)** - Inventário por última edição e
+  estrutura de arquivamento
 - **[Summary](SUMMARY.md)** ✨ **NOVO** - Resumo executivo da Fase 1
 - **[Contributing](../CONTRIBUTING.md)** - Como contribuir
 - **[Changelog](../CHANGELOG.md)** - Histórico de versões
@@ -183,6 +186,5 @@ A: Leia [CONTRIBUTING.md](../CONTRIBUTING.md) e escolha uma issue para trabalhar
 
 ---
 
-**Última atualização**: 28 de Janeiro de 2026
-**Mantido por**: Equipe de Desenvolvimento
+**Última atualização**: 28 de Janeiro de 2026 **Mantido por**: Equipe de Desenvolvimento
 **Licença**: MIT
