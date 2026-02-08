@@ -1,10 +1,10 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
 import { createKernel } from '#kernel/kernel';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
 
-// Mock NERV simple
+// Mock NERV simple (compatível com nerv.onReceive + nerv.emitCommand/emitEvent)
 class MockNERV extends EventEmitter {
     constructor() {
         super();
@@ -42,13 +42,20 @@ class MockNERV extends EventEmitter {
     }
 }
 
-describe('Kernel Orchestration Integration (V2.0)', async () => {
+describe('Kernel Orchestration Integration (V2.0)', () => {
     let nerv;
     let kernel;
 
     beforeEach(() => {
         nerv = new MockNERV();
         kernel = createKernel({ nerv });
+    });
+
+    afterEach(() => {
+        // Evita vazamento de intervalos/listeners caso um teste falhe antes do stop()
+        try {
+            kernel?.stop?.();
+        } catch (_) {}
     });
 
     describe('1. Kernel composition', () => {
@@ -60,17 +67,15 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
         });
 
         it('should include TaskExecutionOrchestrator in subsystems', () => {
-            // Verifica que orchestrator foi incluído na composição
+            // Smoke test: kernel composto
             assert.ok(kernel, 'Kernel foi composto com todos subsistemas');
         });
     });
 
-    describe('2. Task execution flow (SINGLE_SHOT strategy)', async () => {
+    describe('2. Task execution flow (SINGLE_SHOT strategy)', () => {
         it('should execute task V5 with SINGLE_SHOT strategy end-to-end', async () => {
-            // Inicia kernel antes de executar tasks
             kernel.start();
 
-            // Task V5 simples (SINGLE_SHOT)
             const taskV5 = {
                 meta: {
                     id: 'task-single-shot',
@@ -81,34 +86,28 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
                 },
                 spec: {
                     target: 'chatgpt',
-                    payload: {
-                        user_message: 'Test prompt'
-                    },
-                    execution: {
-                        strategy: 'SINGLE_SHOT'
-                    },
-                    validation: {
-                        validators: []
-                    }
+                    payload: { user_message: 'Test prompt' },
+                    execution: { strategy: 'SINGLE_SHOT' },
+                    validation: { validators: [] }
                 },
                 state: {
                     status: 'pending',
                     created_at: new Date().toISOString(),
                     history: []
                 },
-                policy: {
-                    max_cost_cents: 100,
-                    dependencies: []
-                }
+                policy: { max_cost_cents: 100, dependencies: [] }
             };
 
-            // Executa task
             await kernel.executeTask(taskV5, 'corr-001');
 
-            // Verifica que comando foi emitido para driver
+            // Verifica comando emitido para driver
             const commands = nerv.emittedCommands;
             assert.strictEqual(commands.length, 1, 'Um comando foi emitido');
-            assert.strictEqual(commands[0].payload.actionCode, ActionCode.DRIVER_EXECUTE_TASK, 'Comando é DRIVER_EXECUTE_TASK');
+            assert.strictEqual(
+                commands[0].payload.actionCode,
+                ActionCode.DRIVER_EXECUTE_TASK,
+                'Comando é DRIVER_EXECUTE_TASK'
+            );
             assert.strictEqual(commands[0].payload.task.meta.id, 'task-single-shot', 'Task ID correto');
 
             const runtimeTask = kernel.getTask('task-single-shot');
@@ -117,7 +116,6 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
 
             kernel.stop();
         });
-
     });
 
     describe('2b. Retry scheduling', () => {
@@ -134,42 +132,36 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
                 },
                 spec: {
                     target: 'chatgpt',
-                    payload: {
-                        user_message: 'Trigger retry path'
-                    },
-                    execution: {
-                        strategy: 'SINGLE_SHOT'
-                    },
-                    validation: {
-                        validators: []
-                    }
+                    payload: { user_message: 'Trigger retry path' },
+                    execution: { strategy: 'SINGLE_SHOT' },
+                    validation: { validators: [] }
                 },
                 state: {
                     status: 'pending',
                     created_at: new Date().toISOString(),
                     history: []
                 },
-                policy: {
-                    max_cost_cents: 100,
-                    dependencies: []
-                }
+                policy: { max_cost_cents: 100, dependencies: [] }
             };
 
             await kernel.executeTask(retryableTask, 'corr-retry-001');
             assert.strictEqual(nerv.emittedCommands.length, 1, 'Primeiro dispatch enviado ao driver');
 
+            // Simula falha retryable do driver
             nerv.receive({
-                kind: MessageType.EVENT,
+                messageType: MessageType.EVENT,
                 actionCode: ActionCode.DRIVER_TASK_FAILED,
                 correlationId: 'corr-retry-001',
                 payload: {
                     taskId: 'task-retry-payload',
                     retryable: true,
                     suggestedDelayMs: 0,
-                    reason: 'driver transient failure'
+                    reason: 'driver transient failure',
+                    error: 'transient'
                 }
             });
 
+            // Aguarda o setTimeout do retry (delayMs=0 ainda agenda em outro tick)
             await new Promise(resolve => setTimeout(resolve, 25));
 
             assert.strictEqual(nerv.emittedCommands.length, 2, 'Kernel deve reenviar task no caminho de retry');
@@ -178,11 +170,10 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
         });
     });
 
-    describe('3. Task execution flow (ITERATIVE strategy)', async () => {
+    describe('3. Task execution flow (ITERATIVE strategy)', () => {
         it('should execute task V5 with ITERATIVE strategy and handle RETRY', async () => {
             kernel.start();
 
-            // Task V5 com estratégia ITERATIVE
             const taskV5 = {
                 meta: {
                     id: 'task-iterative',
@@ -193,25 +184,16 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
                 },
                 spec: {
                     target: 'chatgpt',
-                    payload: {
-                        user_message: 'Write a good essay'
-                    },
+                    payload: { user_message: 'Write a good essay' },
                     execution: {
                         strategy: 'ITERATIVE',
                         iterative_config: {
                             max_iterations: 3,
-                            validation_criteria: {
-                                min_quality_score: 75
-                            }
+                            validation_criteria: { min_quality_score: 75 }
                         }
                     },
                     validation: {
-                        validators: [
-                            {
-                                type: 'length',
-                                config: { min_length: 500 }
-                            }
-                        ]
+                        validators: [{ type: 'length', config: { min_length: 500 } }]
                     }
                 },
                 state: {
@@ -219,49 +201,38 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
                     created_at: new Date().toISOString(),
                     history: []
                 },
-                policy: {
-                    max_cost_cents: 300,
-                    dependencies: []
-                }
+                policy: { max_cost_cents: 300, dependencies: [] }
             };
 
-            // Executa task
             await kernel.executeTask(taskV5, 'corr-002');
 
-            // Verifica que comando foi emitido
             const commands = nerv.emittedCommands;
             assert.ok(commands.length >= 1, 'Pelo menos um comando foi emitido');
 
             // Simula completion do driver com output que falha validação
-            const completionEvent = {
-                kind: MessageType.EVENT,
+            nerv.receive({
+                messageType: MessageType.EVENT,
                 actionCode: ActionCode.DRIVER_TASK_COMPLETED,
                 correlationId: 'corr-002',
                 payload: {
                     taskId: 'task-iterative',
                     result: {
-                        output: 'Short text', // Falhará validação de length (< 500)
+                        output: 'Short text',
                         raw_output_preview: 'Short text'
                     }
                 }
-            };
+            });
 
-            // Injeta evento no NERV (simula driver completando)
-            nerv.receive(completionEvent);
-
-            // Aguarda processamento assíncrono
             await new Promise(resolve => setTimeout(resolve, 100));
-
-            // NOTA: Por ora, não testamos RETRY completo pois depende de cache de tasks
-            // que ainda não está implementado. Teste validará quando implementação estiver completa.
 
             kernel.stop();
         });
     });
 
-    describe('4. beforeExecution/afterExecution hooks', async () => {
+    describe('4. beforeExecution/afterExecution hooks', () => {
         it('should call beforeExecution before sending to driver', async () => {
             kernel.start();
+
             const taskV5 = {
                 meta: {
                     id: 'task-with-hooks',
@@ -290,15 +261,11 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
                     created_at: new Date().toISOString(),
                     history: []
                 },
-                policy: {
-                    max_cost_cents: 200,
-                    dependencies: []
-                }
+                policy: { max_cost_cents: 200, dependencies: [] }
             };
 
             await kernel.executeTask(taskV5, 'corr-003');
 
-            // Verifica que task foi enviada (beforeExecution foi chamado)
             assert.ok(nerv.emittedCommands.length > 0, 'Comando foi emitido após beforeExecution');
 
             kernel.stop();
@@ -316,7 +283,7 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
             assert.ok(status.loop, 'Status inclui loop');
             assert.ok(status.tasks, 'Status inclui tasks');
 
-            // Verifica status do nervBridge (deve incluir orchestrator)
+            // Observação: depende do formato implementado em KernelNERVBridge.getStatus()
             const nervStatus = status.nerv;
             assert.ok(nervStatus.orchestrator !== undefined, 'Status NERV inclui info do orchestrator');
 
@@ -324,19 +291,18 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
         });
     });
 
-    describe('6. shutdown() cleanup', async () => {
+    describe('6. shutdown() cleanup', () => {
         it('should cleanup taskExecutor on shutdown', async () => {
             kernel.start();
 
             await kernel.shutdown();
 
-            // Verifica que shutdown não lança erro
             assert.ok(true, 'Shutdown executado sem erros');
         });
     });
 });
 
-describe('TaskExecutionOrchestrator (standalone)', async () => {
+describe('TaskExecutionOrchestrator (standalone)', () => {
     let nerv;
     let nervBridge;
     let orchestrator;
@@ -346,27 +312,18 @@ describe('TaskExecutionOrchestrator (standalone)', async () => {
 
         // Mock simplificado do nervBridge
         nervBridge = {
-            beforeTaskExecution: (task) => task,
-            afterTaskExecution: async (task, result) => {
-                return { action: 'DONE', task, feedback: null };
-            },
-            processOrchestrationDecision: async (decision, correlationId) => {
-                // Mock: apenas registra decisão
-            },
-            emitCommand: (params) => {
-                nerv.emitCommand(params);
-            },
-            emitEvent: (params) => {
-                nerv.emitEvent(params);
-            }
+            beforeTaskExecution: task => task,
+            afterTaskExecution: async (task, result) => ({ action: 'DONE', task, feedback: null }),
+            processOrchestrationDecision: async (decision, correlationId) => {},
+            emitCommand: params => nerv.emitCommand(params),
+            emitEvent: params => nerv.emitEvent(params)
         };
 
-        // Importa TaskExecutionOrchestrator
         const { TaskExecutionOrchestrator } = await import('#kernel/task_execution_orchestrator');
         orchestrator = new TaskExecutionOrchestrator({ nerv, nervBridge });
     });
 
-    describe('executeTask()', async () => {
+    describe('executeTask()', () => {
         it('should call beforeTaskExecution and emit DRIVER_EXECUTE_TASK', async () => {
             const task = {
                 meta: { id: 'task-001', version: '5.0' },
@@ -375,7 +332,6 @@ describe('TaskExecutionOrchestrator (standalone)', async () => {
 
             await orchestrator.executeTask(task, 'corr-test');
 
-            // Verifica que comando foi emitido
             assert.strictEqual(nerv.emittedCommands.length, 1, 'Comando emitido');
             assert.strictEqual(nerv.emittedCommands[0].payload.actionCode, ActionCode.DRIVER_EXECUTE_TASK);
         });
@@ -388,13 +344,12 @@ describe('TaskExecutionOrchestrator (standalone)', async () => {
 
             await orchestrator.executeTask(task, 'corr-tracked');
 
-            // Verifica que execução está sendo rastreada
             assert.strictEqual(orchestrator.activeExecutions.size, 1, 'Execução ativa rastreada');
             assert.ok(orchestrator.activeExecutions.has('task-tracked'), 'Task ID no cache');
         });
     });
 
-    describe('cleanup()', async () => {
+    describe('cleanup()', () => {
         it('should clear active executions', async () => {
             const task = {
                 meta: { id: 'task-cleanup', version: '5.0' },

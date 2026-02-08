@@ -37,7 +37,12 @@ class MissionManager {
         this.workflowGenerator = workflowGenerator || new WorkflowGenerator();
         this.contextManager = contextManager || new ContextManager();
         this.feedbackProcessor = feedbackProcessor || new FeedbackProcessor({ contextManager: this.contextManager });
-        this.checkpointManager = checkpointManager || new CheckpointManager();
+        // IMPORTANT: Mantenha checkpoint baseDir alinhado ao stateManager baseDir.
+        // Caso contrário, testes/instâncias com baseDir customizado acabam poluindo ./missions no root do repo.
+        const checkpointBaseDir = checkpointManager
+            ? null
+            : (this.stateManager && typeof this.stateManager.baseDir === 'string' ? this.stateManager.baseDir : 'missions');
+        this.checkpointManager = checkpointManager || new CheckpointManager({ baseDir: checkpointBaseDir });
 
         // Cache de missões em execução: mission_id → { currentStepIndex, taskIds }
         this.activeMissions = new Map();

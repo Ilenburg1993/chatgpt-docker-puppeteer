@@ -53,10 +53,14 @@ class MockKernel {
     }
 }
 
-function buildTaskEnvelope({ actionCode, missionId, taskId, stepId, result = null, error = null }) {
+// Helper: envelope do driver → mission manager (formato resiliente)
+function buildTaskEnvelope({ actionCode, missionId, taskId, stepId, result = null, error = null, correlationId = null }) {
     return {
+        // aceita os dois nomes (alguns consumidores usam kind; outros messageType)
         kind: MessageType.EVENT,
+        messageType: MessageType.EVENT,
         actionCode,
+        correlationId,
         payload: {
             task: {
                 meta: {
@@ -71,6 +75,18 @@ function buildTaskEnvelope({ actionCode, missionId, taskId, stepId, result = nul
     };
 }
 
+// Helper anti-flake: espera condição com timeout
+async function waitForCondition(predicate, { timeoutMs = 1500, intervalMs = 10 } = {}) {
+    const start = Date.now();
+    while (true) {
+        if (predicate()) return;
+        if (Date.now() - start >= timeoutMs) {
+            throw new Error('Timed out waiting for condition');
+        }
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+}
+
 describe('MissionStateManager (filesystem persistence)', () => {
     let stateManager;
 
@@ -80,11 +96,10 @@ describe('MissionStateManager (filesystem persistence)', () => {
     });
 
     afterEach(async () => {
-        // Limpa diretório de teste
         try {
             await fs.rm(TEST_MISSIONS_DIR, { recursive: true, force: true });
-        } catch (err) {
-            // Ignora se não existir
+        } catch (_) {
+            // ignore
         }
     });
 
@@ -111,7 +126,6 @@ describe('MissionStateManager (filesystem persistence)', () => {
             assert.strictEqual(state.status, MISSION_STATUS.PENDING);
             assert.strictEqual(state.progress.total_steps, 2);
 
-            // Verifica estrutura de diretórios
             const missionDir = path.join(TEST_MISSIONS_DIR, 'test-mission-001');
             const statePath = path.join(missionDir, 'state.json');
             const outputsDir = path.join(missionDir, 'outputs');
@@ -146,12 +160,11 @@ describe('MissionStateManager (filesystem persistence)', () => {
         });
 
         it('should list missions with filters', async () => {
-            // Cria 3 missões
             await stateManager.createMission({
                 id: 'mission-a',
                 title: 'A',
                 description: 'A',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-a', steps: [] },
                 config: {}
             });
 
@@ -159,20 +172,17 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-b',
                 title: 'B',
                 description: 'B',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-b', steps: [] },
                 config: {}
             });
 
-            // Atualiza uma para RUNNING
             await stateManager.updateMission('mission-b', {
                 status: MISSION_STATUS.RUNNING
             });
 
-            // Lista todas
             const all = await stateManager.listMissions();
             assert.strictEqual(all.length, 2);
 
-            // Filtra por status
             const running = await stateManager.listMissions({ status: MISSION_STATUS.RUNNING });
             assert.strictEqual(running.length, 1);
             assert.strictEqual(running[0].id, 'mission-b');
@@ -183,7 +193,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-update',
                 title: 'Test',
                 description: 'Test',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-update', steps: [] },
                 config: {}
             });
 
@@ -194,7 +204,6 @@ describe('MissionStateManager (filesystem persistence)', () => {
             assert.strictEqual(updated.status, MISSION_STATUS.RUNNING);
             assert.ok(updated.updated_at !== updated.created_at);
 
-            // Verifica histórico
             const hasStatusChange = updated.history.some(
                 h => h.event === 'STATUS_CHANGED' && h.msg.includes('pending → running')
             );
@@ -206,7 +215,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-delete',
                 title: 'Delete me',
                 description: 'Test',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-delete', steps: [] },
                 config: {}
             });
 
@@ -223,7 +232,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-output',
                 title: 'Test',
                 description: 'Test',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-output', steps: [] },
                 config: {}
             });
 
@@ -239,7 +248,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-no-output',
                 title: 'Test',
                 description: 'Test',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-no-output', steps: [] },
                 config: {}
             });
 
@@ -252,7 +261,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-checkpoint',
                 title: 'Test',
                 description: 'Test',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-checkpoint', steps: [] },
                 config: {}
             });
 
@@ -275,7 +284,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
                 id: 'mission-feedback',
                 title: 'Test',
                 description: 'Test',
-                workflow: { steps: [] },
+                workflow: { id: 'wf-feedback', steps: [] },
                 config: {}
             });
 
@@ -285,7 +294,6 @@ describe('MissionStateManager (filesystem persistence)', () => {
             assert.strictEqual(state.feedback.length, 1);
             assert.strictEqual(state.feedback[0].content, 'Please add more examples');
 
-            // Verifica histórico
             const hasFeedback = state.history.some(h => h.event === 'FEEDBACK_ADDED');
             assert.ok(hasFeedback);
         });
@@ -310,10 +318,7 @@ describe('WorkflowGenerator (template → workflow)', () => {
         });
 
         it('should throw error for non-existent template', async () => {
-            await assert.rejects(
-                generator.loadTemplate('does_not_exist'),
-                /ENOENT/
-            );
+            await assert.rejects(generator.loadTemplate('does_not_exist'), /ENOENT/);
         });
     });
 
@@ -327,19 +332,15 @@ describe('WorkflowGenerator (template → workflow)', () => {
             assert.ok(workflow.id);
             assert.strictEqual(workflow.template_id, 'book_writing');
 
-            // Valida que steps foram expandidos
-            // Template tem repeat_for_each para chapters → deve expandir para num_chapters
-            // Default: 15 chapters + outline + consistency = 17 steps
             assert.strictEqual(workflow.steps.length, 17, 'Workflow deve ter 17 steps');
         });
 
         it('should expand repeat_for_each steps', async () => {
             const workflow = await generator.generateWorkflow('book_writing', {
                 topic: 'Python',
-                num_chapters: 5 // Sobrescreve default de 15
+                num_chapters: 5
             });
 
-            // 5 chapters + outline + consistency = 7 steps
             assert.strictEqual(workflow.steps.length, 7);
         });
 
@@ -350,24 +351,20 @@ describe('WorkflowGenerator (template → workflow)', () => {
                 target_audience: 'beginners'
             });
 
-            // Verifica step 0 (outline)
             const outlineStep = workflow.steps[0];
             assert.ok(outlineStep.prompt_template.includes('JavaScript'), 'Prompt deve conter topic');
             assert.ok(outlineStep.prompt_template.includes('beginners'), 'Prompt deve conter target_audience');
         });
 
         it('should validate required params', async () => {
-            await assert.rejects(
-                generator.generateWorkflow('book_writing', {}), // Falta 'topic' que é required
-                /Parâmetro obrigatório ausente: topic/
-            );
+            await assert.rejects(generator.generateWorkflow('book_writing', {}), /Parâmetro obrigatório ausente: topic/);
         });
 
         it('should validate param ranges', async () => {
             await assert.rejects(
                 generator.generateWorkflow('book_writing', {
                     topic: 'Rust',
-                    num_chapters: 100 // Excede max: 50
+                    num_chapters: 100
                 }),
                 /deve ser <= 50/
             );
@@ -407,12 +404,14 @@ describe('MissionManager (end-to-end)', () => {
     });
 
     afterEach(async () => {
-        missionManager.cleanup();
+        try {
+            missionManager.cleanup();
+        } catch (_) {}
 
         try {
             await fs.rm(TEST_MISSIONS_DIR, { recursive: true, force: true });
-        } catch (err) {
-            // Ignora
+        } catch (_) {
+            // ignore
         }
     });
 
@@ -432,7 +431,7 @@ describe('MissionManager (end-to-end)', () => {
             assert.ok(mission);
             assert.ok(mission.id.startsWith('mission-'));
             assert.strictEqual(mission.status, MISSION_STATUS.PENDING);
-            assert.strictEqual(mission.workflow.steps.length, 7); // 5 chapters + outline + consistency
+            assert.strictEqual(mission.workflow.steps.length, 7);
         });
     });
 
@@ -496,17 +495,14 @@ describe('MissionManager (end-to-end)', () => {
 
             await missionManager.executeMission(created.id);
 
-            // Aguarda processamento assíncrono
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await waitForCondition(() => kernel.executedTasks.length >= 1, { timeoutMs: 2000 });
 
-            // Verifica que task foi enviada ao Kernel
             assert.strictEqual(kernel.executedTasks.length, 1);
 
             const executedTask = kernel.executedTasks[0].task;
             assert.strictEqual(executedTask.meta.mission_id, created.id);
-            assert.strictEqual(executedTask.meta.step_id, 'step-1-outline'); // Primeiro step
+            assert.strictEqual(executedTask.meta.step_id, 'step-1-outline');
 
-            // Verifica que status foi atualizado para RUNNING
             const state = await missionManager.getMission(created.id);
             assert.strictEqual(state.status, MISSION_STATUS.RUNNING);
         });
@@ -520,7 +516,8 @@ describe('MissionManager (end-to-end)', () => {
             });
 
             await missionManager.executeMission(created.id);
-            await new Promise(resolve => setTimeout(resolve, 20));
+
+            await waitForCondition(() => kernel.executedTasks.length >= 1, { timeoutMs: 2000 });
 
             const firstTask = kernel.executedTasks[0].task;
 
@@ -533,9 +530,10 @@ describe('MissionManager (end-to-end)', () => {
             });
 
             nerv.receive(envelope);
-            nerv.receive(envelope); // evento duplicado
+            nerv.receive(envelope); // duplicado
 
-            await new Promise(resolve => setTimeout(resolve, 30));
+            // Espera o próximo step disparar (apenas 1 vez)
+            await waitForCondition(() => kernel.executedTasks.length >= 2, { timeoutMs: 2000 });
 
             const state = await missionManager.getMission(created.id);
             assert.strictEqual(state.progress.current_step, 1, 'Step deve avançar apenas uma vez');
@@ -552,21 +550,24 @@ describe('MissionManager (end-to-end)', () => {
             });
 
             await missionManager.executeMission(created.id);
-            await new Promise(resolve => setTimeout(resolve, 20));
+
+            await waitForCondition(() => kernel.executedTasks.length >= 1, { timeoutMs: 2000 });
 
             const firstTask = kernel.executedTasks[0].task;
 
             await missionManager.pauseMission(created.id);
 
-            nerv.receive(buildTaskEnvelope({
-                actionCode: ActionCode.DRIVER_TASK_COMPLETED,
-                missionId: created.id,
-                taskId: firstTask.meta.id,
-                stepId: firstTask.meta.step_id,
-                result: { output: 'should be ignored' }
-            }));
+            nerv.receive(
+                buildTaskEnvelope({
+                    actionCode: ActionCode.DRIVER_TASK_COMPLETED,
+                    missionId: created.id,
+                    taskId: firstTask.meta.id,
+                    stepId: firstTask.meta.step_id,
+                    result: { output: 'should be ignored' }
+                })
+            );
 
-            await new Promise(resolve => setTimeout(resolve, 20));
+            await new Promise(resolve => setTimeout(resolve, 50));
 
             const state = await missionManager.getMission(created.id);
             assert.strictEqual(state.progress.current_step, 0, 'Progresso não deve avançar com missão pausada');
