@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
+import { ActionCode } from '#shared/nerv/constants';
 
 /**
  * Estados unificados para visualização no dashboard.
@@ -53,6 +54,12 @@ class TaskSyncBridge extends EventEmitter {
         this._nervClient = null;
 
         /**
+         * Unsubscribers NERV (para cleanup/robustez em testes).
+         * @type {Array<Function>}
+         */
+        this._nervUnsubscribers = [];
+
+        /**
          * Flag de inicialização
          */
         this._initialized = false;
@@ -75,10 +82,20 @@ class TaskSyncBridge extends EventEmitter {
      * @param {Object} [options.nervClient] - Cliente NERV para eventos
      */
     initialize(options = {}) {
-        const { socketHub, nervClient } = options;
+        const { socketHub, nervClient, force = false } = options;
         if (this._initialized) {
-            log('WARN', '[TaskSyncBridge] Já inicializado, ignorando');
-            return;
+            if (!force) {
+                log('WARN', '[TaskSyncBridge] Já inicializado, ignorando');
+                return;
+            }
+
+            // Force re-init (useful for controlled test environments)
+            try {
+                this.clearAll();
+            } catch (e) {
+                // ignore
+            }
+            this._initialized = false;
         }
 
         this.socketHub = socketHub;
@@ -116,67 +133,142 @@ class TaskSyncBridge extends EventEmitter {
     _setupNervListeners() {
         const nerv = this._nervClient;
 
-        // Task iniciou execução
-        nerv.on('task:started', (envelope) => {
-            const { task_id, worker_id } = envelope.payload || envelope;
-            this._updateKernelState(task_id, {
+        if (!nerv || typeof nerv.onReceive !== 'function') {
+            log('WARN', '[TaskSyncBridge] NERV client inválido (onReceive ausente), realtime desativado');
+            return;
+        }
+
+        const getTaskId = (payload) =>
+            payload?.taskId ||
+            payload?.task_id ||
+            payload?.meta?.id ||
+            payload?.task?.meta?.id ||
+            payload?.task?.id ||
+            null;
+
+        const register = (actionCode, handler) => {
+            // Prefer onEvent (quando disponível e correto); fallback para onReceive.
+            const canUseOnEvent = typeof nerv.onEvent === 'function' && nerv.onEvent.length >= 2;
+            if (canUseOnEvent) {
+                try {
+                    const unsub = nerv.onEvent(actionCode, handler);
+                    if (typeof unsub === 'function') {
+                        this._nervUnsubscribers.push(unsub);
+                    }
+                    return;
+                } catch (err) {
+                    // fallback abaixo
+                }
+            }
+
+            const unsub = nerv.onReceive((envelope) => {
+                const envelopeActionCode =
+                    envelope?.actionCode ||
+                    envelope?.type?.action_code ||
+                    envelope?.type?.actionCode ||
+                    envelope?.payload?.actionCode ||
+                    null;
+
+                if (envelopeActionCode !== actionCode) {
+                    return;
+                }
+                handler(envelope);
+            });
+
+            if (typeof unsub === 'function') {
+                this._nervUnsubscribers.push(unsub);
+            }
+        };
+
+        register(ActionCode.DRIVER_TASK_STARTED, (envelope) => {
+            const payload = envelope?.payload || {};
+            const taskId = getTaskId(payload);
+            if (!taskId) return;
+
+            this._updateKernelState(taskId, {
                 status: UnifiedStatus.RUNNING,
-                worker_id,
                 started_at: Date.now(),
+                worker_id: payload.worker_id || payload.workerId || null,
+                target: payload.target || null,
                 progress_percent: 0
             });
         });
 
-        // Task completou com sucesso
-        nerv.on('task:completed', (envelope) => {
-            const { task_id, result } = envelope.payload || envelope;
-            this._updateKernelState(task_id, {
+        register(ActionCode.DRIVER_TASK_COMPLETED, (envelope) => {
+            const payload = envelope?.payload || {};
+            const taskId = getTaskId(payload);
+            if (!taskId) return;
+
+            const result = payload.result;
+
+            this._updateKernelState(taskId, {
                 status: UnifiedStatus.DONE,
                 completed_at: Date.now(),
                 result_preview: typeof result === 'string'
                     ? result.substring(0, 500)
-                    : null
+                    : result
+                        ? JSON.stringify(result).substring(0, 500)
+                        : null,
+                timings: payload.timings || null
             });
         });
 
-        // Task falhou
-        nerv.on('task:failed', (envelope) => {
-            const { task_id, error } = envelope.payload || envelope;
-            this._updateKernelState(task_id, {
+        register(ActionCode.DRIVER_TASK_FAILED, (envelope) => {
+            const payload = envelope?.payload || {};
+            const taskId = getTaskId(payload);
+            if (!taskId) return;
+
+            const err = payload.error || payload.err || payload.reason || null;
+            const errorText = typeof err === 'string'
+                ? err
+                : err && typeof err.message === 'string'
+                    ? err.message
+                    : err
+                        ? JSON.stringify(err)
+                        : 'Unknown error';
+
+            this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
                 failed_at: Date.now(),
-                error: error?.message || error || 'Unknown error'
+                error: errorText.substring(0, 2000)
             });
         });
 
-        // Progresso da task
-        nerv.on('task:progress', (envelope) => {
-            const { task_id, progress_percent, current_step } = envelope.payload || envelope;
-            this._updateKernelState(task_id, {
-                progress_percent,
-                current_step
+        register(ActionCode.DRIVER_TASK_ABORTED, (envelope) => {
+            const payload = envelope?.payload || {};
+            const taskId = getTaskId(payload);
+            if (!taskId) return;
+
+            this._updateKernelState(taskId, {
+                status: UnifiedStatus.CANCELLED,
+                cancelled_at: Date.now(),
+                reason: payload.reason || payload.abortReason || 'USER_ABORT'
             });
         });
 
-        // Task pausada
-        nerv.on('task:paused', (envelope) => {
-            const { task_id } = envelope.payload || envelope;
-            this._updateKernelState(task_id, {
-                status: UnifiedStatus.PAUSED,
-                paused_at: Date.now()
+        // Kernel/Policy failures that can be surfaced as FAILED
+        register(ActionCode.TASK_FAILED, (envelope) => {
+            const payload = envelope?.payload || {};
+            const taskId = getTaskId(payload);
+            if (!taskId) return;
+
+            const err = payload.error || payload.err || payload.reason || null;
+            const errorText = typeof err === 'string'
+                ? err
+                : err && typeof err.message === 'string'
+                    ? err.message
+                    : err
+                        ? JSON.stringify(err)
+                        : 'Task failed';
+
+            this._updateKernelState(taskId, {
+                status: UnifiedStatus.FAILED,
+                failed_at: Date.now(),
+                error: errorText.substring(0, 2000)
             });
         });
 
-        // Task retomada
-        nerv.on('task:resumed', (envelope) => {
-            const { task_id } = envelope.payload || envelope;
-            this._updateKernelState(task_id, {
-                status: UnifiedStatus.RUNNING,
-                resumed_at: Date.now()
-            });
-        });
-
-        log('DEBUG', '[TaskSyncBridge] Listeners NERV configurados');
+        log('DEBUG', '[TaskSyncBridge] Listeners NERV configurados (ActionCode-based)');
     }
 
     /**
@@ -378,12 +470,29 @@ class TaskSyncBridge extends EventEmitter {
      * Usado em shutdown ou reset.
      */
     clearAll() {
+        // Cleanup listeners NERV (se presentes)
+        try {
+            for (const unsub of this._nervUnsubscribers) {
+                try {
+                    unsub();
+                } catch (e) {
+                    // ignore
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+        this._nervUnsubscribers = [];
+
         this.kernelStateCache.clear();
         this._pendingBroadcasts.clear();
         if (this._broadcastTimer) {
             clearTimeout(this._broadcastTimer);
             this._broadcastTimer = null;
         }
+        this.socketHub = null;
+        this._nervClient = null;
+        this._initialized = false;
         log('INFO', '[TaskSyncBridge] Cache limpo');
     }
 }

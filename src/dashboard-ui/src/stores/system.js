@@ -8,7 +8,7 @@
  */
 
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import { formatHttpError, http } from '@/lib/http';
 
 export const useSystemStore = defineStore('system', {
     state: () => ({
@@ -115,7 +115,7 @@ export const useSystemStore = defineStore('system', {
             this.error = null;
 
             try {
-                const response = await axios.get('/api/dashboard/system/health');
+                const response = await http.get('/api/dashboard/system/health');
                 const data = response.data;
 
                 this.overallStatus = data.status || 'unknown';
@@ -127,7 +127,7 @@ export const useSystemStore = defineStore('system', {
 
                 this.lastUpdate = Date.now();
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 this.overallStatus = 'error';
                 console.error('[SystemStore] Erro ao carregar health:', error);
             } finally {
@@ -140,7 +140,7 @@ export const useSystemStore = defineStore('system', {
          */
         async fetchAlerts() {
             try {
-                const response = await axios.get('/api/dashboard/alerts');
+                const response = await http.get('/api/dashboard/alerts');
                 this.alerts = response.data.alerts || [];
             } catch (error) {
                 console.error('[SystemStore] Erro ao carregar alertas:', error);
@@ -152,7 +152,7 @@ export const useSystemStore = defineStore('system', {
          */
         async fetchSystemInfo() {
             try {
-                const response = await axios.get('/api/dashboard/system/info');
+                const response = await http.get('/api/dashboard/system/info');
                 this.systemInfo = {
                     ...this.systemInfo,
                     ...response.data.system,
@@ -168,11 +168,11 @@ export const useSystemStore = defineStore('system', {
          */
         async updateAlertThresholds(thresholds) {
             try {
-                await axios.put('/api/dashboard/alerts/thresholds', thresholds);
+                await http.put('/api/dashboard/alerts/thresholds', thresholds);
                 // Recarrega alertas
                 await this.fetchAlerts();
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             }
         },

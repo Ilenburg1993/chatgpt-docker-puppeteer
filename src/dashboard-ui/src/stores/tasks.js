@@ -8,7 +8,7 @@
  */
 
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import { formatHttpError, http } from '@/lib/http';
 
 export const useTaskStore = defineStore('tasks', {
     state: () => ({
@@ -112,11 +112,12 @@ export const useTaskStore = defineStore('tasks', {
          * Contadores por status
          */
         statusCounts: (state) => ({
-            running: state.tasks.filter(t => t.unified_status === 'RUNNING').length,
-            pending: state.tasks.filter(t => t.unified_status === 'PENDING').length,
-            done: state.tasks.filter(t => t.unified_status === 'DONE').length,
-            failed: state.tasks.filter(t => t.unified_status === 'FAILED').length,
-            paused: state.tasks.filter(t => t.unified_status === 'PAUSED').length
+            RUNNING: state.tasks.filter(t => t.unified_status === 'RUNNING').length,
+            PENDING: state.tasks.filter(t => t.unified_status === 'PENDING').length,
+            DONE: state.tasks.filter(t => t.unified_status === 'DONE').length,
+            FAILED: state.tasks.filter(t => t.unified_status === 'FAILED').length,
+            PAUSED: state.tasks.filter(t => t.unified_status === 'PAUSED').length,
+            CANCELLED: state.tasks.filter(t => t.unified_status === 'CANCELLED').length
         })
     },
 
@@ -129,11 +130,11 @@ export const useTaskStore = defineStore('tasks', {
             this.error = null;
 
             try {
-                const response = await axios.get('/api/dashboard/tasks');
+                const response = await http.get('/api/dashboard/tasks');
                 this.tasks = response.data.tasks || [];
                 this.lastUpdate = Date.now();
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 console.error('[TaskStore] Erro ao carregar tasks:', error);
             } finally {
                 this.loading = false;
@@ -147,7 +148,7 @@ export const useTaskStore = defineStore('tasks', {
             this.loadingTask = true;
 
             try {
-                const response = await axios.get(`/api/dashboard/tasks/${taskId}`);
+                const response = await http.get(`/api/dashboard/tasks/${taskId}`);
                 const task = response.data.task;
 
                 // Atualiza na lista local
@@ -160,7 +161,7 @@ export const useTaskStore = defineStore('tasks', {
 
                 return task;
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             } finally {
                 this.loadingTask = false;
@@ -172,7 +173,7 @@ export const useTaskStore = defineStore('tasks', {
          */
         async fetchStats() {
             try {
-                const response = await axios.get('/api/dashboard/tasks-stats');
+                const response = await http.get('/api/dashboard/tasks-stats');
                 this.stats = response.data.stats || this.stats;
             } catch (error) {
                 console.error('[TaskStore] Erro ao carregar stats:', error);
@@ -184,12 +185,12 @@ export const useTaskStore = defineStore('tasks', {
          */
         async createTask(taskData) {
             try {
-                const response = await axios.post('/api/tasks', taskData);
+                const response = await http.post('/api/tasks', taskData);
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             }
         },
@@ -199,7 +200,7 @@ export const useTaskStore = defineStore('tasks', {
          */
         async updateTask(taskId, taskData) {
             try {
-                const response = await axios.put(`/api/tasks/${taskId}`, taskData);
+                const response = await http.put(`/api/tasks/${taskId}`, taskData);
 
                 // Atualiza na lista local
                 const index = this.tasks.findIndex(t => t.meta?.id === taskId);
@@ -209,7 +210,7 @@ export const useTaskStore = defineStore('tasks', {
 
                 return response.data;
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             }
         },
@@ -219,10 +220,10 @@ export const useTaskStore = defineStore('tasks', {
          */
         async deleteTask(taskId) {
             try {
-                await axios.delete(`/api/tasks/${taskId}`);
+                await http.delete(`/api/tasks/${taskId}`);
                 this.tasks = this.tasks.filter(t => t.meta?.id !== taskId);
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             }
         },
@@ -232,12 +233,12 @@ export const useTaskStore = defineStore('tasks', {
          */
         async retryFailed() {
             try {
-                const response = await axios.post('/api/tasks/retry-failed');
+                const response = await http.post('/api/tasks/retry-failed');
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             }
         },
@@ -247,12 +248,12 @@ export const useTaskStore = defineStore('tasks', {
          */
         async clearQueue() {
             try {
-                const response = await axios.post('/api/tasks/clear');
+                const response = await http.post('/api/tasks/clear');
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
             } catch (error) {
-                this.error = error.response?.data?.error || error.message;
+                this.error = formatHttpError(error).message;
                 throw error;
             }
         },

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Plus } from 'lucide-vue-next';
-import axios from 'axios';
+import { formatHttpError, http } from '@/lib/http';
 import { useSocket } from '../composables/useSocket';
 import Button from '../components/ui/Button.vue';
 import TaskList from '../components/tasks/TaskList.vue';
@@ -60,10 +60,10 @@ const fetchTasks = async () => {
     error.value = null;
 
     try {
-        const response = await axios.get('/api/dashboard/tasks');
+        const response = await http.get('/api/dashboard/tasks');
         tasks.value = response.data.tasks || [];
     } catch (err) {
-        error.value = err.message;
+        error.value = formatHttpError(err).message;
         console.error('[Tasks] Failed to fetch tasks:', err);
     } finally {
         loading.value = false;
@@ -72,7 +72,7 @@ const fetchTasks = async () => {
 
 const createTask = async taskData => {
     try {
-        await axios.post('/api/tasks', taskData);
+        await http.post('/api/tasks', taskData);
         await fetchTasks();
     } catch (err) {
         console.error('[Tasks] Failed to create task:', err);
@@ -81,7 +81,7 @@ const createTask = async taskData => {
 
 const updateTask = async (taskId, updates) => {
     try {
-        await axios.patch(`/api/tasks/${taskId}`, updates);
+        await http.patch(`/api/tasks/${taskId}`, updates);
         await fetchTasks();
     } catch (err) {
         console.error('[Tasks] Failed to update task:', err);
@@ -92,7 +92,7 @@ const deleteTask = async taskId => {
     if (!confirm('Are you sure you want to delete this task?')) return;
 
     try {
-        await axios.delete(`/api/tasks/${taskId}`);
+        await http.delete(`/api/tasks/${taskId}`);
         await fetchTasks();
     } catch (err) {
         console.error('[Tasks] Failed to delete task:', err);
@@ -103,7 +103,7 @@ const cancelTask = async taskId => {
     if (!confirm('Are you sure you want to cancel this task?')) return;
 
     try {
-        await axios.patch(`/api/tasks/${taskId}`, {
+        await http.patch(`/api/tasks/${taskId}`, {
             unified_status: 'CANCELLED',
         });
         await fetchTasks();

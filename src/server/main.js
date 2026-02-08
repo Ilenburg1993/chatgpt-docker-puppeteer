@@ -14,11 +14,15 @@ import * as router from './api/router.js';
 import * as pm2Bridge from './realtime/bus/pm2_bridge.js';
 import * as logTail from './realtime/streams/log_tail.js';
 import * as hardwareTelemetry from './realtime/telemetry/hardware.js';
+import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
+import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
 import * as fsWatcher from './watchers/fs_watcher.js';
 import * as logWatcher from './watchers/log_watcher.js';
 import reconciler from './supervisor/reconcilier.js';
 import ServerNERVAdapter from './nerv_adapter/server_nerv_adapter.js';
 import * as NERV from '#nerv/nerv';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 
 /* ==========================================================================
@@ -130,6 +134,15 @@ async function bootstrap(options = {}) {
         socketHub.init(httpServer);
         log('DEBUG', '[BOOT] Socket hub acoplado');
 
+        // Dashboard V2: TelemetryAggregator (realtime metrics)
+        try {
+            const intervalMs = Number(process.env.DASHBOARD_TELEMETRY_INTERVAL_MS || 1000) || 1000;
+            telemetryAggregator.start({ socketHub, intervalMs });
+            log('INFO', `[BOOT] Dashboard telemetry aggregator ativo (interval=${intervalMs}ms)`);
+        } catch (err) {
+            log('WARN', `[BOOT] Falha ao iniciar TelemetryAggregator: ${err.message}`);
+        }
+
         /* --------------------------------------------------------------
          FASE 5 — API Gateway
          Router injeta rotas — não cria servidor.
@@ -194,6 +207,14 @@ async function bootstrap(options = {}) {
             log('DEBUG', '[BOOT] NERV injetado (delegated)');
         }
 
+        // Dashboard V2: TaskSyncBridge (realtime task updates via NERV)
+        try {
+            taskSyncBridge.initialize({ socketHub, nervClient: nerv });
+            log('INFO', '[BOOT] TaskSyncBridge inicializado (NERV → Dashboard)');
+        } catch (err) {
+            log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
+        }
+
         // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)
         if (Authority.isStandalone(authority)) {
             try {
@@ -250,16 +271,26 @@ async function bootstrap(options = {}) {
 
         log('INFO', `[BOOT] Server pronto na porta ${port}`);
 
+        // PM2 readiness gate: prevents "online but not listening" situations.
+        try {
+            if (typeof process.send === 'function') {
+                process.send('ready');
+                log('DEBUG', '[BOOT] PM2 ready signal sent');
+            }
+        } catch (e) {
+            // noop
+        }
+
         // Atualiza readiness do app HTTP para consumo do endpoint /ready
         try {
             try {
                 const app = await import('./engine/app.js').then(m => m.default ?? m);
                 app.locals = app.locals || {};
-                app.locals.runtimeReadiness = {
+                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, {
                     nerv: Boolean(nerv),
                     serverAdapter: Boolean(serverAdapter),
                     httpServer: Boolean(httpServer)
-                };
+                });
                 app.locals.requiredReadiness = app.locals.requiredReadiness || ['nerv'];
                 log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
             } catch (err) {
@@ -293,15 +324,33 @@ async function bootstrap(options = {}) {
    ENTRYPOINT CONTROL
 ========================================================================== */
 
-if (import.meta.filename === process.argv[1]) {
-   (async () => {
-       try {
-           await bootstrap();
-       } catch (err) {
-           log('FATAL', `[BOOT] Entrypoint bootstrap falhou: ${err.message}`);
-           process.exit(1);
-       }
-   })();
+const __entryFile = fileURLToPath(import.meta.url);
+let __isDirectRun = false;
+try {
+    const argvFile = process.argv[1];
+    if (argvFile) {
+        __isDirectRun = fs.realpathSync(argvFile) === fs.realpathSync(__entryFile);
+    }
+} catch (err) {
+    __isDirectRun = false;
+}
+
+const __isPm2Managed =
+    typeof process.env.NODE_APP_INSTANCE !== 'undefined' ||
+    (process.env.PM2_JSON_PROCESSING === 'true' && Boolean(process.env.PM2_HOME));
+
+const __shouldBootstrap = __isDirectRun || __isPm2Managed || process.env.DAEMON_MODE === 'true';
+
+if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
+    globalThis.__MISSION_CONTROL_BOOTSTRAPPED__ = true;
+    (async () => {
+        try {
+            await bootstrap();
+        } catch (err) {
+            log('FATAL', `[BOOT] Entrypoint bootstrap falhou: ${err.message}`);
+            process.exit(1);
+        }
+    })();
 }
 
 export default bootstrap;

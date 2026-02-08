@@ -1,10 +1,27 @@
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
+import { compression } from 'vite-plugin-compression2';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 export default defineConfig({
-    plugins: [vue()],
+    plugins: [
+        vue(),
+        // Precompressed assets for production (served by the server when available)
+        compression({
+            algorithms: ['brotliCompress', 'gzip'],
+            exclude: [/\.(br)$/, /\.(gz)$/]
+        }),
+        process.env.ANALYZE === 'true'
+            ? visualizer({
+                open: false,
+                filename: 'dist/stats.html',
+                gzipSize: true,
+                brotliSize: true,
+            })
+            : null
+    ].filter(Boolean),
 
     // Base path para servir em /dashboard
     base: '/dashboard/',

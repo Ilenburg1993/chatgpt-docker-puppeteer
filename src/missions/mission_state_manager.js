@@ -177,17 +177,24 @@ class MissionStateManager {
             throw new Error(`Mission ${missionId} não encontrada`);
         }
 
+        const nowMs = Date.now();
+        const createdAtMs = Date.parse(state.created_at) || 0;
+        const previousUpdatedAtMs = Date.parse(state.updated_at) || createdAtMs;
+        const minUpdatedAtMs = Math.max(createdAtMs, previousUpdatedAtMs);
+        const updatedAtMs = nowMs <= minUpdatedAtMs ? minUpdatedAtMs + 1 : nowMs;
+        const updatedAtIso = new Date(updatedAtMs).toISOString();
+
         // Merge updates
         const updatedState = {
             ...state,
             ...updates,
-            updated_at: new Date().toISOString()
+            updated_at: updatedAtIso
         };
 
         // Adiciona evento ao histórico se status mudou
         if (updates.status && updates.status !== state.status) {
             updatedState.history.push({
-                ts: new Date().toISOString(),
+                ts: updatedAtIso,
                 event: 'STATUS_CHANGED',
                 msg: `Status: ${state.status} → ${updates.status}`
             });

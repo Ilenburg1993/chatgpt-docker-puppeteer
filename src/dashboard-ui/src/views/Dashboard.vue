@@ -152,7 +152,16 @@ export default {
             queueSize: telemetryStore.queueSize
         }));
 
-        const taskCounts = computed(() => taskStore.statusCounts);
+        const taskCounts = computed(() => {
+            const c = taskStore.statusCounts || {};
+            return {
+                running: c.RUNNING || 0,
+                pending: c.PENDING || 0,
+                done: c.DONE || 0,
+                failed: c.FAILED || 0,
+                paused: c.PAUSED || 0,
+            };
+        });
         const tasks = computed(() => taskStore.tasks);
         const alerts = computed(() => systemStore.alerts);
         const components = computed(() => systemStore.componentsList);

@@ -1,169 +1,200 @@
 <template>
-    <div class="task-queue">
-        <div class="header">
-            <h1>Task Queue</h1>
-            <div class="header-actions">
-                <el-button type="primary" @click="refreshTasks" :loading="loading">
+    <div class="max-w-6xl mx-auto p-6 space-y-6">
+        <div class="flex items-center justify-between gap-4">
+            <div class="space-y-1">
+                <h1 class="text-2xl font-semibold text-foreground">Task Queue (Legacy)</h1>
+                <p class="text-sm text-foreground-muted">
+                    Showing {{ filteredTasks.length }} of {{ tasks.length }} tasks
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <Button variant="secondary" :loading="loading" @click="refreshTasks">
                     Refresh
-                </el-button>
+                </Button>
+            </div>
+        </div>
+
+        <div v-if="notice" class="rounded-lg border p-4" :class="noticeClass">
+            <div class="flex items-start justify-between gap-4">
+                <div class="text-sm text-foreground">
+                    {{ notice.message }}
+                </div>
+                <button class="text-foreground-muted hover:text-foreground transition-colors" @click="clearNotice">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        <div v-if="error" class="rounded-lg border border-error/50 bg-error-muted/30 p-4">
+            <div class="flex items-start justify-between gap-4">
+                <div class="text-sm text-error">
+                    {{ error }}
+                </div>
+                <button class="text-foreground-muted hover:text-foreground transition-colors" @click="clearError">
+                    ✕
+                </button>
             </div>
         </div>
 
         <!-- Filters -->
-        <div class="filters">
-            <el-select
-                v-model="statusFilter"
-                placeholder="Filter by Status"
-                clearable
-                style="width: 150px"
-            >
-                <el-option label="Pending" value="PENDING" />
-                <el-option label="Running" value="RUNNING" />
-                <el-option label="Done" value="DONE" />
-                <el-option label="Failed" value="FAILED" />
-                <el-option label="Paused" value="PAUSED" />
-            </el-select>
+        <div class="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background-secondary p-4">
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-foreground-muted">Status</label>
+                <select
+                    v-model="statusFilter"
+                    class="h-10 rounded-lg border border-border bg-background-tertiary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                    <option :value="null">All</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="RUNNING">Running</option>
+                    <option value="DONE">Done</option>
+                    <option value="FAILED">Failed</option>
+                    <option value="PAUSED">Paused</option>
+                    <option value="CANCELLED">Cancelled</option>
+                </select>
+            </div>
 
-            <el-input
-                v-model="searchFilter"
-                placeholder="Search by ID or prompt..."
-                clearable
-                style="width: 300px"
-            >
-                <template #prefix>
-                    <span>🔍</span>
-                </template>
-            </el-input>
+            <div class="flex-1 min-w-[260px]">
+                <Input v-model="searchFilter" placeholder="Search by ID or prompt..." />
+            </div>
 
-            <el-button @click="clearFilters" :disabled="!hasActiveFilters">
+            <Button variant="ghost" :disabled="!hasActiveFilters" @click="clearFilters">
                 Clear Filters
-            </el-button>
+            </Button>
+        </div>
 
-            <div class="filter-stats">
-                Showing {{ filteredTasks.length }} of {{ tasks.length }} tasks
+        <!-- Loading -->
+        <div v-if="loading" class="rounded-xl border border-border bg-background-secondary p-6">
+            <div class="space-y-3 animate-pulse">
+                <div class="h-4 bg-background-tertiary rounded w-1/3"></div>
+                <div class="h-4 bg-background-tertiary rounded w-2/3"></div>
+                <div class="h-4 bg-background-tertiary rounded w-1/2"></div>
+                <div class="h-4 bg-background-tertiary rounded w-3/4"></div>
             </div>
         </div>
 
-        <!-- Error message -->
-        <el-alert
-            v-if="error"
-            :title="error"
-            type="error"
-            show-icon
-            closable
-            @close="clearError"
-            style="margin-bottom: 16px"
-        />
-
-        <!-- Loading -->
-        <div v-if="loading" class="loading">
-            <el-skeleton :rows="5" animated />
-        </div>
-
         <!-- Task List -->
-        <div v-else class="task-list">
+        <div v-else class="space-y-3">
             <div
                 v-for="task in filteredTasks"
                 :key="task.meta?.id || task.id"
-                class="task-card"
-                :class="getStatusClass(task.unified_status)"
+                class="rounded-xl border border-border bg-background-secondary p-4 hover:bg-background-tertiary/40 transition-colors cursor-pointer"
                 @click="viewTask(task)"
             >
-                <div class="task-header">
-                    <div class="task-id">{{ task.meta?.id || task.id }}</div>
-                    <el-tag :type="getTagType(task.unified_status)" size="small">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="space-y-1 min-w-0">
+                        <div class="font-mono text-xs text-foreground-muted truncate">
+                            {{ task.meta?.id || task.id }}
+                        </div>
+                        <div class="text-sm text-foreground truncate">
+                            {{ truncatePrompt(task.spec?.payload?.user_message || 'No prompt') }}
+                        </div>
+                    </div>
+                    <Badge :variant="getBadgeVariant(task.unified_status)" size="sm">
                         {{ task.unified_status }}
-                    </el-tag>
+                    </Badge>
                 </div>
 
-                <div class="task-body">
-                    <div class="task-prompt">
-                        {{ truncatePrompt(task.spec?.payload?.user_message || 'No prompt') }}
-                    </div>
-
-                    <div class="task-meta">
-                        <span class="meta-item">
-                            <span class="meta-icon">🎯</span>
-                            {{ task.spec?.target || 'auto' }}
-                        </span>
-                        <span class="meta-item">
-                            <span class="meta-icon">⭐</span>
-                            Priority: {{ task.meta?.priority || 50 }}
-                        </span>
-                        <span v-if="task.runtime_state?.progress_percent" class="meta-item">
-                            <span class="meta-icon">📊</span>
-                            {{ task.runtime_state.progress_percent }}%
-                        </span>
-                    </div>
-                </div>
-
-                <div class="task-footer">
-                    <span class="task-date">
+                <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-foreground-muted">
+                    <span class="inline-flex items-center gap-1">
+                        <span>🎯</span>
+                        <span>{{ task.spec?.target || 'auto' }}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                        <span>⭐</span>
+                        <span>Priority: {{ task.meta?.priority || 50 }}</span>
+                    </span>
+                    <span v-if="task.runtime_state?.progress_percent" class="inline-flex items-center gap-1">
+                        <span>📊</span>
+                        <span>{{ task.runtime_state.progress_percent }}%</span>
+                    </span>
+                    <span class="ml-auto">
                         {{ formatDate(task.meta?.created_at) }}
                     </span>
-                    <div class="task-actions">
-                        <el-button
-                            v-if="task.unified_status === 'FAILED'"
-                            size="small"
-                            type="warning"
-                            @click.stop="retryTask(task)"
-                        >
-                            Retry
-                        </el-button>
-                        <el-button
-                            size="small"
-                            type="danger"
-                            @click.stop="deleteTask(task)"
-                        >
-                            Delete
-                        </el-button>
-                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center justify-end gap-2">
+                    <Button
+                        v-if="task.unified_status === 'FAILED'"
+                        size="sm"
+                        variant="outline"
+                        @click.stop="retryTask(task)"
+                    >
+                        Retry
+                    </Button>
+                    <Button size="sm" variant="danger" @click.stop="confirmDelete(task)">
+                        Delete
+                    </Button>
                 </div>
             </div>
 
             <!-- Empty state -->
-            <div v-if="filteredTasks.length === 0" class="empty-state">
-                <div class="empty-icon">📭</div>
-                <div class="empty-text">No tasks found</div>
-                <div class="empty-hint">
-                    {{ hasActiveFilters ? 'Try adjusting your filters' : 'Create a new task to get started' }}
+            <div v-if="filteredTasks.length === 0" class="rounded-xl border border-border bg-background-secondary p-10 text-center">
+                <div class="text-4xl mb-3">📭</div>
+                <div class="text-base font-medium text-foreground">No tasks found</div>
+                <div class="mt-1 text-sm text-foreground-muted">
+                    {{ hasActiveFilters ? 'Try adjusting your filters.' : 'Create a new task to get started.' }}
                 </div>
             </div>
         </div>
 
         <!-- Bulk Actions -->
-        <div v-if="tasks.length > 0" class="bulk-actions">
-            <el-button @click="retryAllFailed" :disabled="failedCount === 0">
+        <div v-if="tasks.length > 0" class="flex flex-wrap items-center gap-3 pt-2">
+            <Button variant="outline" :disabled="failedCount === 0" @click="retryAllFailed">
                 Retry All Failed ({{ failedCount }})
-            </el-button>
-            <el-popconfirm
-                title="Are you sure you want to clear the queue?"
-                @confirm="clearQueue"
-            >
-                <template #reference>
-                    <el-button type="danger">Clear Queue</el-button>
-                </template>
-            </el-popconfirm>
+            </Button>
+            <Button variant="danger" @click="confirmClearQueue">
+                Clear Queue
+            </Button>
         </div>
+
+        <Modal
+            v-model:open="confirmOpen"
+            :title="confirmTitle"
+            :description="confirmDescription"
+            size="sm"
+        >
+            <template #footer>
+                <Button variant="ghost" :disabled="confirmLoading" @click="confirmOpen = false">Cancel</Button>
+                <Button
+                    :variant="confirmVariant"
+                    :loading="confirmLoading"
+                    @click="runConfirm"
+                >
+                    Confirm
+                </Button>
+            </template>
+        </Modal>
     </div>
 </template>
 
 <script>
 import { useRealtime } from '@/composables/useRealtime';
+import Badge from '@/components/ui/Badge.vue';
+import Button from '@/components/ui/Button.vue';
+import Input from '@/components/ui/Input.vue';
+import Modal from '@/components/ui/Modal.vue';
 import { useTaskStore } from '@/stores/tasks';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-// TODO: Substituir por componentes customizados
-// import { ElMessage, ElMessageBox } from 'element-plus';
 
 export default {
     name: 'TaskQueue',
+    components: {
+        Badge,
+        Button,
+        Input,
+        Modal,
+    },
     setup() {
         const router = useRouter();
         const taskStore = useTaskStore();
 
         // Real-time integration
         useRealtime();
+
+        const notice = ref(null); // { type: 'success'|'info'|'error', message: string }
+        let noticeTimer = null;
 
         // Local filter state
         const statusFilter = ref(null);
@@ -183,10 +214,64 @@ export default {
             tasks.value.filter(t => t.unified_status === 'FAILED').length
         );
 
+        const confirmOpen = ref(false);
+        const confirmTitle = ref('');
+        const confirmDescription = ref('');
+        const confirmVariant = ref('primary');
+        const confirmLoading = ref(false);
+        /** @type {import('vue').Ref<null|(() => Promise<void>)>} */
+        const confirmAction = ref(null);
+
+        const showNotice = (type, message) => {
+            notice.value = { type, message };
+            if (noticeTimer) {
+                clearTimeout(noticeTimer);
+            }
+            noticeTimer = setTimeout(() => {
+                notice.value = null;
+                noticeTimer = null;
+            }, 4000);
+        };
+
+        const clearNotice = () => {
+            if (noticeTimer) {
+                clearTimeout(noticeTimer);
+                noticeTimer = null;
+            }
+            notice.value = null;
+        };
+
+        const noticeClass = computed(() => {
+            const type = notice.value?.type;
+            if (type === 'success') return 'border-success/40 bg-success-muted/20';
+            if (type === 'error') return 'border-error/40 bg-error-muted/20';
+            return 'border-info/40 bg-info-muted/20';
+        });
+
+        const openConfirm = ({ title, description, variant = 'primary', action }) => {
+            confirmTitle.value = title;
+            confirmDescription.value = description;
+            confirmVariant.value = variant;
+            confirmAction.value = action;
+            confirmOpen.value = true;
+        };
+
+        const runConfirm = async () => {
+            if (!confirmAction.value) return;
+            confirmLoading.value = true;
+            try {
+                await confirmAction.value();
+                confirmOpen.value = false;
+            } finally {
+                confirmLoading.value = false;
+                confirmAction.value = null;
+            }
+        };
+
         // Methods
         const refreshTasks = async () => {
             await taskStore.fetchTasks();
-            ElMessage.success('Tasks refreshed');
+            showNotice('success', 'Tasks refreshed');
         };
 
         const clearFilters = () => {
@@ -206,68 +291,56 @@ export default {
 
         const retryTask = async (task) => {
             try {
-                ElMessage.info('Retry not implemented yet');
+                showNotice('info', 'Retry is not implemented yet.');
             } catch (err) {
-                ElMessage.error(`Failed to retry: ${err.message}`);
+                showNotice('error', `Failed to retry: ${err.message}`);
             }
         };
 
-        const deleteTask = async (task) => {
-            try {
-                await ElMessageBox.confirm(
-                    'Are you sure you want to delete this task?',
-                    'Confirm Delete',
-                    { type: 'warning' }
-                );
-
-                const taskId = task.meta?.id || task.id;
-                await taskStore.deleteTask(taskId);
-                ElMessage.success('Task deleted');
-            } catch (err) {
-                if (err !== 'cancel') {
-                    ElMessage.error(`Failed to delete: ${err.message}`);
+        const confirmDelete = (task) => {
+            const taskId = task.meta?.id || task.id;
+            openConfirm({
+                title: 'Delete task',
+                description: `Delete task ${taskId}? This cannot be undone.`,
+                variant: 'danger',
+                action: async () => {
+                    await taskStore.deleteTask(taskId);
+                    showNotice('success', 'Task deleted');
                 }
-            }
+            });
         };
 
         const retryAllFailed = async () => {
             try {
                 await taskStore.retryFailed();
-                ElMessage.success('Retry initiated for all failed tasks');
+                showNotice('success', 'Retry initiated for all failed tasks');
             } catch (err) {
-                ElMessage.error(`Failed to retry: ${err.message}`);
+                showNotice('error', `Failed to retry: ${err.message}`);
             }
         };
 
-        const clearQueue = async () => {
-            try {
-                await taskStore.clearQueue();
-                ElMessage.success('Queue cleared');
-            } catch (err) {
-                ElMessage.error(`Failed to clear queue: ${err.message}`);
-            }
+        const confirmClearQueue = () => {
+            openConfirm({
+                title: 'Clear queue',
+                description: 'Are you sure you want to clear the queue? This affects all pending tasks.',
+                variant: 'danger',
+                action: async () => {
+                    await taskStore.clearQueue();
+                    showNotice('success', 'Queue cleared');
+                }
+            });
         };
 
-        const getStatusClass = (status) => {
-            const classes = {
-                RUNNING: 'running',
-                PENDING: 'pending',
-                DONE: 'done',
-                FAILED: 'failed',
-                PAUSED: 'paused'
-            };
-            return classes[status] || '';
-        };
-
-        const getTagType = (status) => {
-            const types = {
+        const getBadgeVariant = (status) => {
+            const variants = {
                 RUNNING: 'warning',
                 PENDING: 'info',
                 DONE: 'success',
-                FAILED: 'danger',
-                PAUSED: ''
+                FAILED: 'error',
+                PAUSED: 'info',
+                CANCELLED: 'default'
             };
-            return types[status] || 'info';
+            return variants[status] || 'default';
         };
 
         const truncatePrompt = (prompt, maxLength = 150) => {
@@ -301,192 +374,27 @@ export default {
             error,
             hasActiveFilters,
             failedCount,
+            notice,
+            noticeClass,
+            clearNotice,
             refreshTasks,
             clearFilters,
             clearError,
             viewTask,
             retryTask,
-            deleteTask,
+            confirmDelete,
             retryAllFailed,
-            clearQueue,
-            getStatusClass,
-            getTagType,
+            confirmClearQueue,
+            confirmOpen,
+            confirmTitle,
+            confirmDescription,
+            confirmVariant,
+            confirmLoading,
+            runConfirm,
+            getBadgeVariant,
             truncatePrompt,
             formatDate
         };
     }
 };
 </script>
-
-<style scoped>
-.task-queue {
-    padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.header h1 {
-    margin: 0;
-    color: #2c3e50;
-}
-
-/* Filters */
-.filters {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-}
-
-.filter-stats {
-    margin-left: auto;
-    color: #64748b;
-    font-size: 0.9rem;
-}
-
-/* Loading */
-.loading {
-    padding: 20px;
-}
-
-/* Task List */
-.task-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.task-card {
-    background: white;
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border-left: 4px solid #94a3b8;
-}
-
-.task-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-    transform: translateY(-2px);
-}
-
-.task-card.running {
-    border-left-color: #f59e0b;
-}
-
-.task-card.pending {
-    border-left-color: #94a3b8;
-}
-
-.task-card.done {
-    border-left-color: #22c55e;
-}
-
-.task-card.failed {
-    border-left-color: #ef4444;
-}
-
-.task-card.paused {
-    border-left-color: #8b5cf6;
-}
-
-.task-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.task-id {
-    font-family: monospace;
-    font-size: 0.9rem;
-    color: #64748b;
-}
-
-.task-body {
-    margin-bottom: 12px;
-}
-
-.task-prompt {
-    color: #1e293b;
-    line-height: 1.5;
-    margin-bottom: 8px;
-}
-
-.task-meta {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.85rem;
-    color: #64748b;
-}
-
-.meta-icon {
-    font-size: 1rem;
-}
-
-.task-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 12px;
-    border-top: 1px solid #f1f5f9;
-}
-
-.task-date {
-    font-size: 0.8rem;
-    color: #94a3b8;
-}
-
-.task-actions {
-    display: flex;
-    gap: 8px;
-}
-
-/* Empty state */
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #64748b;
-}
-
-.empty-icon {
-    font-size: 4rem;
-    margin-bottom: 16px;
-}
-
-.empty-text {
-    font-size: 1.2rem;
-    font-weight: 500;
-    margin-bottom: 8px;
-}
-
-.empty-hint {
-    font-size: 0.9rem;
-    color: #94a3b8;
-}
-
-/* Bulk actions */
-.bulk-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #e2e8f0;
-}
-</style>

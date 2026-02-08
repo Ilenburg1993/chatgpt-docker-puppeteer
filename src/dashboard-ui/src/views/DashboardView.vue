@@ -1,5 +1,5 @@
 <script setup>
-import axios from 'axios';
+import { http } from '@/lib/http';
 import { Activity, AlertCircle, BarChart3, CheckCircle, Clock, ListTodo, TrendingUp } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -61,8 +61,8 @@ const fetchDashboardData = async () => {
 
     try {
         const [tasksResponse, metricsResponse] = await Promise.all([
-            axios.get('/api/dashboard/tasks'),
-            axios.get('/api/dashboard/metrics'),
+            http.get('/api/dashboard/tasks'),
+            http.get('/api/dashboard/metrics'),
         ]);
 
         tasks.value = tasksResponse.data.tasks || [];
@@ -104,12 +104,14 @@ onMounted(() => {
 
     connect();
     subscribe('task:updated', handleTaskUpdated);
+    subscribe('task:updates_batch', handleTaskUpdated);
     subscribe('task:created', handleTaskUpdated);
     subscribe('task:completed', handleTaskUpdated);
 });
 
 onUnmounted(() => {
     unsubscribe('task:updated', handleTaskUpdated);
+    unsubscribe('task:updates_batch', handleTaskUpdated);
     unsubscribe('task:created', handleTaskUpdated);
     unsubscribe('task:completed', handleTaskUpdated);
     disconnect();

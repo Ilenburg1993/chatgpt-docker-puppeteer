@@ -11,6 +11,41 @@ import { PROTOCOL_VERSION, ActorRole } from '#shared/nerv/constants';
  */
 let ioInstance = null;
 
+/* ==========================================================================
+   CORS (Dashboard) — Política conservadora
+========================================================================== */
+
+const DASHBOARD_ALLOWED_ORIGINS = new Set(
+    [
+        // Production-like (served from the same server)
+        'http://localhost:3008',
+        'http://127.0.0.1:3008',
+
+        // Vite dev server
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:5175',
+        'http://localhost:5176',
+        'http://127.0.0.1:5176',
+
+        // Docker network access (best-effort; origin varies by setup)
+        'http://172.17.0.2:5173',
+        'http://172.17.0.2:5174',
+        'http://172.17.0.2:5175',
+        'http://172.17.0.2:5176',
+
+        process.env.DASHBOARD_ORIGIN,
+    ].filter(Boolean)
+);
+
+function isDashboardOriginAllowed(origin) {
+    if (!origin) return true;
+    return DASHBOARD_ALLOWED_ORIGINS.has(origin);
+}
+
 /**
  * Internal EventEmitter for bridging Socket.io events to other parts of the system.
  * Allows ServerNERVAdapter and other components to listen to dashboard events.
@@ -38,10 +73,18 @@ function flushTaskUpdates() {
         return;
     }
 
-    const updates = Array.from(taskUpdateBuffer.values()).map(entry => entry.data);
+    const updates = Array.from(taskUpdateBuffer.values()).map(entry => ({
+        taskId: entry.taskId,
+        state: entry.state
+    }));
 
     if (ioInstance) {
         ioInstance.to('dashboards').emit('task:updates_batch', { updates, count: updates.length });
+        // Compat/ergonomia: também emite evento individual para consumers legados.
+        // O dashboard V2 prefere o batch, mas algumas views ainda escutam 'task:updated'.
+        for (const update of updates) {
+            ioInstance.to('dashboards').emit('task:updated', update);
+        }
         log('DEBUG', `[HUB] Flushed ${updates.length} batched task updates`);
     }
 
@@ -67,8 +110,14 @@ function init(httpServer) {
 
     ioInstance = new Server(httpServer, {
         cors: {
-            origin: '*',
-            methods: ['GET', 'POST']
+            origin(origin, callback) {
+                if (isDashboardOriginAllowed(origin)) {
+                    return callback(null, true);
+                }
+                return callback(new Error(`Socket CORS blocked for origin: ${origin}`), false);
+            },
+            methods: ['GET', 'POST'],
+            credentials: true
         },
         transports: ['websocket'],
         pingTimeout: 10000,
@@ -84,21 +133,6 @@ function init(httpServer) {
             log('DEBUG', `[HUB] Tentativa de acoplamento de agente (ID: ${socket.id}).`);
             _setupMaestroProtocol(socket);
         } else {
-            // [P8.4] SECURITY: Dashboard authentication (optional but recommended)
-            const dashboardPassword = process.env.DASHBOARD_PASSWORD || null;
-
-            if (dashboardPassword) {
-                const userPassword = socket.handshake.auth?.password;
-
-                if (userPassword !== dashboardPassword) {
-                    log('WARN', `[HUB] Dashboard authentication failed for ${socket.id}`);
-                    socket.emit('auth_required', { message: 'Password required for dashboard access' });
-                    socket.disconnect(true);
-                    return;
-                }
-                log('DEBUG', `[HUB] Dashboard authenticated: ${socket.id}`);
-            }
-
             // Terminais de visualização (Dashboard) entram na sala de broadcast de telemetria
             socket.join('dashboards');
             log('DEBUG', `[HUB] Terminal Dashboard conectado: ${socket.id}`);
@@ -329,10 +363,24 @@ function broadcastTaskUpdate(taskId, data) {
         return;
     }
 
+    // Normaliza payload para contrato canônico: { taskId, state }
+    let normalizedTaskId = taskId;
+    let normalizedState = data;
+
+    if (taskId && typeof taskId === 'object' && data === undefined) {
+        // Suporta chamada acidental broadcastTaskUpdate({ taskId, state })
+        normalizedTaskId = taskId.taskId;
+        normalizedState = taskId.state;
+    }
+
+    if (!normalizedTaskId) {
+        return;
+    }
+
     // Adiciona ao buffer
-    taskUpdateBuffer.set(taskId, {
-        taskId,
-        data,
+    taskUpdateBuffer.set(normalizedTaskId, {
+        taskId: normalizedTaskId,
+        state: normalizedState || {},
         timestamp: Date.now()
     });
 

@@ -8,7 +8,7 @@
  */
 
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import { formatHttpError, http } from '@/lib/http';
 
 /**
  * Ring buffer simples para histórico de métricas
@@ -173,14 +173,14 @@ export const useTelemetryStore = defineStore('telemetry', {
          */
         async fetchCurrent() {
             try {
-                const response = await axios.get('/api/dashboard/telemetry/current');
+                const response = await http.get('/api/dashboard/telemetry/current');
                 const metrics = response.data.metrics;
 
                 if (metrics) {
                     this.updateMetrics(metrics);
                 }
             } catch (error) {
-                this.error = error.message;
+                this.error = formatHttpError(error).message;
                 console.error('[TelemetryStore] Erro ao carregar métricas:', error);
             }
         },
@@ -190,7 +190,7 @@ export const useTelemetryStore = defineStore('telemetry', {
          */
         async fetchHistory() {
             try {
-                const response = await axios.get('/api/dashboard/telemetry/history');
+                const response = await http.get('/api/dashboard/telemetry/history');
                 const data = response.data;
 
                 // Popula buffers com histórico do servidor
@@ -229,7 +229,7 @@ export const useTelemetryStore = defineStore('telemetry', {
                     });
                 }
             } catch (error) {
-                this.error = error.message;
+                this.error = formatHttpError(error).message;
                 console.error('[TelemetryStore] Erro ao carregar histórico:', error);
             }
         },

@@ -13,6 +13,7 @@ import { io } from 'socket.io-client';
 // Singleton da conexão Socket.io
 let socketInstance = null;
 let connectionCount = 0;
+let handlersInitialized = false;
 
 /**
  * Cria ou retorna instância existente do Socket.io
@@ -25,6 +26,7 @@ function getSocketInstance(url = '', options = {}) {
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
             ...options
         });
     }
@@ -83,33 +85,58 @@ export function useSocket(options = {}) {
 
     // Setup event handlers
     const setupHandlers = () => {
+        if (handlersInitialized) {
+            return;
+        }
+        handlersInitialized = true;
+
         socket.on('connect', () => {
             isConnected.value = true;
             error.value = null;
             reconnectAttempts.value = 0;
-            console.log('[Socket.io] Connected');
+            if (import.meta.env.DEV) {
+                console.log('[Socket.io] Connected');
+            }
         });
 
         socket.on('disconnect', (reason) => {
             isConnected.value = false;
-            console.log('[Socket.io] Disconnected:', reason);
+            if (import.meta.env.DEV) {
+                console.log('[Socket.io] Disconnected:', reason);
+            }
         });
 
         socket.on('connect_error', (err) => {
             error.value = err.message;
-            console.error('[Socket.io] Connection error:', err);
+            if (import.meta.env.DEV) {
+                console.error('[Socket.io] Connection error:', err);
+            }
         });
 
         socket.on('reconnect_attempt', (attempt) => {
             reconnectAttempts.value = attempt;
-            console.log('[Socket.io] Reconnect attempt:', attempt);
+            if (import.meta.env.DEV) {
+                console.log('[Socket.io] Reconnect attempt:', attempt);
+            }
         });
 
         socket.on('reconnect', () => {
             isConnected.value = true;
             error.value = null;
-            console.log('[Socket.io] Reconnected');
+            if (import.meta.env.DEV) {
+                console.log('[Socket.io] Reconnected');
+            }
         });
+    };
+
+    const teardownHandlers = () => {
+        if (!handlersInitialized) return;
+        handlersInitialized = false;
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.off('connect_error');
+        socket.off('reconnect_attempt');
+        socket.off('reconnect');
     };
 
     // Lifecycle
@@ -125,6 +152,7 @@ export function useSocket(options = {}) {
         connectionCount--;
         if (connectionCount === 0) {
             disconnect();
+            teardownHandlers();
         }
     });
 

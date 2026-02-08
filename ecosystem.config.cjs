@@ -112,6 +112,7 @@ module.exports = {
 
             cwd: __dirname,
             script: './src/server/main.js',
+            wait_ready: true,
 
             // Runtime Node explícito (sem GC manual necessário)
             node_args: [
