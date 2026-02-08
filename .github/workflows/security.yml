@@ -17,10 +17,15 @@ jobs:
     name: NPM audit (prod)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: "24"
+          cache: "npm"
+
       - name: Prepare npm environment
         run: |
           mkdir -p "$HOME/.npm"
@@ -42,15 +47,24 @@ jobs:
             fi
           done
           exit 1
-      - run: npm audit --omit=dev --audit-level=high
+
+      - name: NPM audit (prod only)
+        run: npm audit --omit=dev --audit-level=high
 
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
