@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Pergunta geral / discussão
+    url: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/discussions
+    about: Use Discussions para perguntas abertas e ideias.

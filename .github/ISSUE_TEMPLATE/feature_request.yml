@@ -1,0 +1,31 @@
+name: Feature request
+description: Proponha uma melhoria de produto, arquitetura ou DX.
+title: "[feat]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema atual
+      description: Qual dor real esta melhoria resolve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposta
+      description: Especifique solução, escopo e impacto.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Compatível com Node 24 ESM
+        - label: Considera impacto em missão/task orchestration
+        - label: Inclui plano de validação
