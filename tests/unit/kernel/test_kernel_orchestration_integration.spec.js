@@ -111,8 +111,13 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
             assert.strictEqual(commands[0].payload.actionCode, ActionCode.DRIVER_EXECUTE_TASK, 'Comando é DRIVER_EXECUTE_TASK');
             assert.strictEqual(commands[0].payload.task.meta.id, 'task-single-shot', 'Task ID correto');
 
+            const runtimeTask = kernel.getTask('task-single-shot');
+            assert.ok(runtimeTask, 'Task deve existir no runtime');
+            assert.strictEqual(runtimeTask.state, 'ACTIVE', 'Task deve ser ativada pelo Kernel');
+
             kernel.stop();
         });
+
     });
 
     describe('3. Task execution flow (ITERATIVE strategy)', async () => {

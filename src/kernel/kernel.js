@@ -9,6 +9,7 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
 import { KernelNERVBridge } from './nerv_bridge/kernel_nerv_bridge.js';
 import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
 import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
+import { TaskState } from './task_runtime/task_runtime.js';
 
 /* ===========================
    Fábrica do Kernel
@@ -138,9 +139,122 @@ function createKernel({
      8. TASK EXECUTION ORCHESTRATOR — Orquestração V5 (V2.0)
   ========================================================= */
 
-    const taskExecutor = new TaskExecutionOrchestrator({
+    /** @type {Map<string, {task: Object, correlationId: string}>} */
+    const pendingDispatch = new Map();
+    /** @type {Map<string, number>} */
+    const retryCounts = new Map();
+    const MAX_KERNEL_RETRIES = Number(process.env.KERNEL_MAX_RETRIES || 3);
+
+    let taskExecutor = null;
+
+    const activateRuntimeTask = async ({ taskId, reason }) => {
+        const runtime = taskRuntime.getTask(taskId);
+        if (!runtime) {
+            telemetry.warning('kernel_activate_missing_runtime_task', { taskId, at: Date.now() });
+            return;
+        }
+
+        if (runtime.state === TaskState.ACTIVE || runtime.state === TaskState.TERMINATED) {
+            return;
+        }
+
+        taskRuntime.applyStateTransition({
+            taskId,
+            newState: TaskState.ACTIVE,
+            reason: reason || 'Task activated by kernel policy'
+        });
+
+        const queued = pendingDispatch.get(taskId);
+        if (!queued) {
+            return;
+        }
+
+        if (taskExecutor) {
+            await taskExecutor.executeTask(queued.task, queued.correlationId);
+        }
+        pendingDispatch.delete(taskId);
+    };
+
+    const terminateRuntimeTask = async ({ taskId, reason }) => {
+        const runtime = taskRuntime.getTask(taskId);
+        if (!runtime || runtime.state === TaskState.TERMINATED) {
+            pendingDispatch.delete(taskId);
+            return;
+        }
+
+        taskRuntime.applyStateTransition({
+            taskId,
+            newState: TaskState.TERMINATED,
+            reason: reason || 'Task terminated by kernel decision'
+        });
+
+        pendingDispatch.delete(taskId);
+    };
+
+    const suspendRuntimeTask = async ({ taskId, reason }) => {
+        const runtime = taskRuntime.getTask(taskId);
+        if (!runtime || runtime.state === TaskState.TERMINATED || runtime.state === TaskState.SUSPENDED) {
+            return;
+        }
+
+        taskRuntime.applyStateTransition({
+            taskId,
+            newState: TaskState.SUSPENDED,
+            reason: reason || 'Task suspended by kernel decision'
+        });
+    };
+
+    const scheduleRetry = async ({ taskId, delayMs = 0, reason }) => {
+        const queued = pendingDispatch.get(taskId);
+        if (!queued) {
+            return;
+        }
+
+        const retries = retryCounts.get(taskId) || 0;
+        if (retries >= MAX_KERNEL_RETRIES) {
+            await terminateRuntimeTask({ taskId, reason: `Retry budget exceeded: ${reason || 'driver failure'}` });
+            return;
+        }
+
+        retryCounts.set(taskId, retries + 1);
+        await suspendRuntimeTask({ taskId, reason: `Retry scheduled (${retries + 1}/${MAX_KERNEL_RETRIES})` });
+
+        setTimeout(async () => {
+            try {
+                const current = taskRuntime.getTask(taskId);
+                if (!current || current.state === TaskState.TERMINATED) {
+                    return;
+                }
+
+                taskRuntime.applyStateTransition({
+                    taskId,
+                    newState: TaskState.ACTIVE,
+                    reason: 'Retry execution resumed'
+                });
+
+                const currentQueued = pendingDispatch.get(taskId);
+                if (currentQueued && taskExecutor) {
+                    await taskExecutor.executeTask(currentQueued.task, currentQueued.correlationId);
+                }
+            } catch (error) {
+                telemetry.warning('kernel_retry_schedule_failed', {
+                    taskId,
+                    error: error.message,
+                    at: Date.now()
+                });
+            }
+        }, Math.max(0, delayMs));
+    };
+
+    taskExecutor = new TaskExecutionOrchestrator({
         nerv,
-        nervBridge
+        nervBridge,
+        onTaskRetryRequested: async ({ taskId, delayMs, reason }) => {
+            await scheduleRetry({ taskId, delayMs, reason });
+        },
+        onTaskPermanentFailure: async ({ taskId, reason }) => {
+            await terminateRuntimeTask({ taskId, reason: reason || 'Permanent driver failure' });
+        }
     });
 
     /* =========================================================
@@ -151,6 +265,9 @@ function createKernel({
         executionEngine,
         nervBridge,
         telemetry,
+        onActivateTask: activateRuntimeTask,
+        onTerminateTask: terminateRuntimeTask,
+        onSuspendTask: suspendRuntimeTask,
         baseIntervalMs: 50,
         ...loopOptions
     });
@@ -201,6 +318,8 @@ function createKernel({
 
             // Para ponte NERV
             nervBridge.stop();
+
+            retryCounts.clear();
 
             telemetry.info('kernel_stopped', { at: Date.now() });
         },
@@ -259,7 +378,30 @@ function createKernel({
          * @returns {Promise<void>}
          */
         async executeTask(task, correlationId) {
-            return taskExecutor.executeTask(task, correlationId);
+            if (!task || !task.meta || !task.meta.id) {
+                throw new Error('executeTask requer task.meta.id válido');
+            }
+
+            const taskId = task.meta.id;
+
+            if (!taskRuntime.getTask(taskId)) {
+                taskRuntime.createTask({
+                    taskId,
+                    metadata: {
+                        correlationId,
+                        source: task.meta.source || 'kernel.executeTask',
+                        target: task.spec?.target || null
+                    }
+                });
+            }
+
+            pendingDispatch.set(taskId, { task, correlationId });
+
+            // Fast path: ativa imediatamente, mantendo compatibilidade com integração atual
+            await activateRuntimeTask({
+                taskId,
+                reason: 'Immediate activation on executeTask'
+            });
         },
 
         /**
@@ -276,6 +418,9 @@ function createKernel({
             if (taskExecutor && typeof taskExecutor.cleanup === 'function') {
                 taskExecutor.cleanup();
             }
+
+            pendingDispatch.clear();
+            retryCounts.clear();
 
             telemetry.info('kernel_shutdown_complete', { at: Date.now() });
         }

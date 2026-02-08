@@ -7,6 +7,7 @@ import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { ContextManager } from '#orchestrator/context_manager';
 import { FeedbackProcessor } from './feedback_processor.js';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
+import { getActionCode, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 
 /**
  * MissionManager - Gerencia ciclo de vida de missões.
@@ -40,6 +41,12 @@ class MissionManager {
 
         // Cache de missões em execução: mission_id → { currentStepIndex, taskIds }
         this.activeMissions = new Map();
+
+        // Guardas para idempotência: taskIds já processados por missão
+        this.processedMissionTasks = new Map();
+
+        // Handle de unsubscribe dos listeners NERV
+        this.unsubscribeNerv = null;
 
         // Setup listeners NERV
         this._setupListeners();
@@ -189,6 +196,7 @@ class MissionManager {
         // Registra no cache de missões ativas
         this.activeMissions.set(missionId, {
             currentStepIndex: state.progress.current_step,
+            steps: state.workflow.steps,
             taskIds: []
         });
 
@@ -246,6 +254,7 @@ class MissionManager {
 
         this.activeMissions.set(missionId, {
             currentStepIndex: state.progress.current_step,
+            steps: state.workflow.steps,
             taskIds: []
         });
 
@@ -353,6 +362,7 @@ class MissionManager {
         // Cacheia taskId para tracking
         const missionCache = this.activeMissions.get(missionId);
         if (missionCache) {
+            missionCache.currentStepIndex = currentStepIndex;
             missionCache.taskIds.push(taskV5.meta.id);
         }
 
@@ -493,6 +503,11 @@ class MissionManager {
             progress: updatedProgress
         });
 
+        const missionCache = this.activeMissions.get(missionId);
+        if (missionCache) {
+            missionCache.currentStepIndex = stepIndex + 1;
+        }
+
         // Salva checkpoint completo da missão (crash recovery)
         const updatedState = await this.getMission(missionId);
         await this.checkpointManager.saveCheckpoint(missionId, stepIndex + 1, updatedState, {
@@ -571,6 +586,7 @@ class MissionManager {
         });
 
         this.activeMissions.delete(missionId);
+        this.processedMissionTasks.delete(missionId);
 
         // Limpa contexto (mas mantém memory store)
         this.contextManager.clearContext(missionId);
@@ -591,6 +607,7 @@ class MissionManager {
         });
 
         this.activeMissions.delete(missionId);
+        this.processedMissionTasks.delete(missionId);
 
         // Limpa contexto
         this.contextManager.clearContext(missionId);
@@ -605,12 +622,13 @@ class MissionManager {
      * Setup listeners NERV para eventos de conclusão de tasks.
      */
     _setupListeners() {
-        this.nerv.onReceive(envelope => {
-            if (envelope.kind !== MessageType.EVENT) {
+        this.unsubscribeNerv = this.nerv.onReceive(async envelope => {
+            if (getMessageType(envelope) !== MessageType.EVENT) {
                 return;
             }
 
-            const { actionCode, payload } = envelope;
+            const actionCode = getActionCode(envelope);
+            const payload = getPayload(envelope);
 
             // Filtra apenas tasks que pertencem a missões
             if (!payload || !payload.task || !payload.task.meta || !payload.task.meta.mission_id) {
@@ -619,6 +637,18 @@ class MissionManager {
 
             const missionId = payload.task.meta.mission_id;
             const taskId = payload.task.meta.id;
+
+            // Só processa eventos de missões atualmente ativas
+            if (!this.activeMissions.has(missionId)) {
+                return;
+            }
+
+            // Evita processar evento duplicado (retries/reemit no barramento)
+            const processedTaskIds = this.processedMissionTasks.get(missionId) || new Set();
+            if (processedTaskIds.has(taskId)) {
+                logger.log('WARN', `[MissionManager] Evento duplicado ignorado: task=${taskId} mission=${missionId}`);
+                return;
+            }
 
             // Identifica step index (parse de step_id)
             // Ex: step_id = "step-2-chapter-5" → pega índice do workflow
@@ -632,12 +662,16 @@ class MissionManager {
 
             // DRIVER_TASK_COMPLETED
             if (actionCode === ActionCode.DRIVER_TASK_COMPLETED) {
-                this._handleTaskCompleted(missionId, stepIndex, taskId, payload.result);
+                processedTaskIds.add(taskId);
+                this.processedMissionTasks.set(missionId, processedTaskIds);
+                await this._handleTaskCompleted(missionId, stepIndex, taskId, payload.result);
             }
 
             // DRIVER_TASK_FAILED
             if (actionCode === ActionCode.DRIVER_TASK_FAILED) {
-                this._handleTaskFailed(missionId, stepIndex, taskId, payload.error);
+                processedTaskIds.add(taskId);
+                this.processedMissionTasks.set(missionId, processedTaskIds);
+                await this._handleTaskFailed(missionId, stepIndex, taskId, payload.error);
             }
         });
 
@@ -671,6 +705,11 @@ class MissionManager {
      */
     cleanup() {
         this.activeMissions.clear();
+        this.processedMissionTasks.clear();
+        if (this.unsubscribeNerv) {
+            this.unsubscribeNerv();
+            this.unsubscribeNerv = null;
+        }
         this.contextManager.cleanup();
         logger.log('INFO', '[MissionManager] Cleanup completo');
     }

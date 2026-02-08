@@ -100,7 +100,8 @@ async function loadNextTask(targetFilter = null) {
 
     // 4. SELEÇÃO ALGORÍTMICA
     // Delega ao Scheduler a decisão final baseada em prioridade e agendamento
-    const eligibleQueue = getNextEligible(allTasks, targetFilter);
+    const queueForSelection = queueWasMutated ? await cache.getQueue() : allTasks;
+    const eligibleQueue = getNextEligible(queueForSelection, targetFilter);
     return eligibleQueue[0] || null;
 }
 

@@ -4,6 +4,7 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
 import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { getActionCode, getCorrelationId, getMessageType, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
 
 // ============================================================================
 // ADAPTER_CONFIG - Zero Magic Numbers
@@ -267,16 +268,20 @@ class DriverNERVAdapter extends EventEmitter {
     _setupListeners() {
         // Escuta comandos do tipo DRIVER_* vindos do KERNEL
         this.nerv.onReceive(envelope => {
+            const messageType = getMessageType(envelope);
+            const actionCode = getActionCode(envelope);
+            const correlationId = getCorrelationId(envelope);
+
             // Filtra apenas mensagens para o domínio DRIVER
-            if (envelope.messageType !== MessageType.COMMAND) {
+            if (messageType !== MessageType.COMMAND) {
                 return;
             }
-            if (!envelope.actionCode.startsWith('DRIVER_')) {
+            if (!actionCode || !actionCode.startsWith('DRIVER_')) {
                 return;
             }
 
             this._handleDriverCommand(envelope).catch(err => {
-                log('ERROR', `[DriverNERVAdapter] Erro ao processar comando: ${err.message}`, envelope.correlationId);
+                log('ERROR', `[DriverNERVAdapter] Erro ao processar comando: ${err.message}`, correlationId);
 
                 // Emite evento de falha (duplo canal)
                 this._emitBoth(
@@ -284,10 +289,10 @@ class DriverNERVAdapter extends EventEmitter {
                     ActionCode.DRIVER_ERROR,
                     {
                         error: err.message,
-                        taskId: envelope.payload?.taskId,
-                        originalCommand: envelope.actionCode,
+                        taskId: getTaskIdFromPayload(getPayload(envelope)),
+                        originalCommand: actionCode,
                     },
-                    envelope.correlationId
+                    correlationId
                 );
             });
         });
@@ -311,7 +316,9 @@ class DriverNERVAdapter extends EventEmitter {
      * @throws {Error} Se comando desconhecido ou falha na execução
      */
     async _handleDriverCommand(envelope) {
-        const { actionCode, payload, correlationId } = envelope;
+        const actionCode = getActionCode(envelope);
+        const payload = getPayload(envelope);
+        const correlationId = getCorrelationId(envelope);
 
         log('DEBUG', `[DriverNERVAdapter] Recebido comando: ${actionCode}`, correlationId);
 
@@ -324,14 +331,17 @@ class DriverNERVAdapter extends EventEmitter {
             );
 
             this._emitBoth(
-                ADAPTER_EVENTS.ERROR,
-                ActionCode.DRIVER_ERROR,
+                ADAPTER_EVENTS.TASK_FAILED,
+                ActionCode.DRIVER_TASK_FAILED,
                 {
-                    taskId: payload?.taskId,
+                    taskId: getTaskIdFromPayload(payload),
                     error: 'Sistema em modo degradado - Browser Pool não disponível',
                     reason: 'DEGRADED_MODE',
                     suggestion:
                         'Configure o browserEndpoint/proxy com remote debugging exposto ao container (ver CONFIG.DEBUG_PORT ou CHROME_WS_ENDPOINT) e reinicie o sistema',
+                    retryable: true,
+                    next_action: 'RETRY_LATER',
+                    suggestedDelayMs: 1000
                 },
                 correlationId
             );
@@ -349,12 +359,15 @@ class DriverNERVAdapter extends EventEmitter {
 
                     this._emitBoth(
                         ADAPTER_EVENTS.TASK_FAILED,
-                        ActionCode.DRIVER_ERROR,
+                        ActionCode.DRIVER_TASK_FAILED,
                         {
-                            taskId: payload?.taskId,
+                            taskId: getTaskIdFromPayload(payload),
                             error: poolValidation.details.message,
                             reason: poolValidation.reason,
                             suggestion: poolValidation.details.suggestion,
+                            retryable: true,
+                            next_action: 'RETRY_LATER',
+                            suggestedDelayMs: 1000
                         },
                         correlationId
                     );
@@ -476,6 +489,9 @@ class DriverNERVAdapter extends EventEmitter {
                     error,
                     reason: 'CIRCUIT_BREAKER_OPEN',
                     suggestion: `Aguarde ${Math.floor(breaker.timeout / 1000)}s para circuit breaker recovery`,
+                    retryable: true,
+                    next_action: 'RETRY_LATER',
+                    suggestedDelayMs: breaker.timeout
                 },
                 correlationId
             );
@@ -500,6 +516,9 @@ class DriverNERVAdapter extends EventEmitter {
                         error,
                         reason: 'QUEUE_FULL',
                         suggestion: 'Aguarde tasks ativas completarem ou aumente MAX_QUEUE_SIZE',
+                        retryable: true,
+                        next_action: 'RETRY_LATER',
+                        suggestedDelayMs: 750
                     },
                     correlationId
                 );
@@ -523,6 +542,21 @@ class DriverNERVAdapter extends EventEmitter {
                 queueSize: this.taskQueue.length,
                 activeDrivers: this.activeDrivers.size,
             });
+
+            this._emitBoth(
+                ADAPTER_EVENTS.TASK_QUEUED,
+                ActionCode.DRIVER_TASK_QUEUED,
+                {
+                    taskId,
+                    queueSize: this.taskQueue.length,
+                    activeDrivers: this.activeDrivers.size,
+                    queuePosition: this.taskQueue.length,
+                    retryable: true,
+                    next_action: 'RETRY_LATER',
+                    suggestedDelayMs: 500
+                },
+                correlationId
+            );
 
             return;
         }
@@ -779,6 +813,9 @@ class DriverNERVAdapter extends EventEmitter {
                         operation: error.operation || 'unknown',
                         errorClassification: errorType, // U5
                         retriesAttempted: retryCount, // U5
+                        retryable: errorType === 'TRANSIENT',
+                        next_action: errorType === 'TRANSIENT' ? 'RETRY_LATER' : 'ABORT',
+                        suggestedDelayMs: errorType === 'TRANSIENT' ? ADAPTER_CONFIG.RETRY_BACKOFF_MS : 0
                     },
                     correlationId
                 );
