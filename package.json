@@ -14,6 +14,7 @@
     "#kernel/*": "./src/kernel/*.js",
     "#driver/*": "./src/driver/*.js",
     "#infra/*": "./src/infra/*.js",
+    "#integration/*": "./src/integration/*.mjs",
     "#server/*": "./src/server/*.js",
     "#logic/*": "./src/logic/*.js",
     "#orchestrator/*": "./src/orchestrator/*.js",
@@ -26,6 +27,9 @@
     "scripts": "scripts",
     "doc": "DOCUMENTAÇÃO"
   },
+  "workspaces": [
+    "src/dashboard-ui"
+  ],
   "files": [
     "src/",
     "scripts/",
@@ -43,6 +47,9 @@
     "start": "node index.js",
     "start:container": "NODE_ENV=development NODE_OPTIONS='--inspect=0.0.0.0:9229 --enable-source-maps --trace-warnings --trace-uncaught --unhandled-rejections=strict' node index.js",
     "dev": "nodemon --exec \"node --inspect=0.0.0.0:9229\" index.js --ignore fila/ --ignore logs/ --ignore respostas/",
+    "dashboard:dev": "npm --workspace dashboard-ui run dev",
+    "dashboard:build": "npm --workspace dashboard-ui run build",
+    "dashboard:preview": "npm --workspace dashboard-ui run preview",
     "daemon:start": "npx pm2 start ecosystem.config.cjs",
     "daemon:stop": "npx pm2 stop agente-gpt dashboard-web chrome-proxy",
     "daemon:restart": "npx pm2 restart agente-gpt dashboard-web chrome-proxy",
@@ -84,6 +91,7 @@
     "profiles:rotate": "node scripts/rotate-profiles.js",
     "profiles:stats": "node --input-type=module -e \"import('./scripts/rotate-profiles.js').then(m=>m.getBackupStats()).then(s=>console.log(JSON.stringify(s,null,2)))\"",
     "diagnose": "node scripts/analisar_crash.js",
+    "mcp:diagnose": "node scripts/diagnose-mcp.mjs",
     "check:chrome": "node scripts/check-chrome.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:regression",
     "test:unit": "node --test 'tests/unit/**/*.spec.js'",
@@ -97,8 +105,9 @@
     "postinstall": "echo '✅ Dependencies installed successfully'",
     "prepare": "NODE_OPTIONS= node --input-type=module -e \"try{await import('husky')}catch(e){}\"",
     "validate": "node scripts/validate_config.js",
-    "validate:all": "npm run lint:quiet && npm run format:check && npm test",
+    "validate:all": "npm run check:envlocal && npm run lint:quiet && npm run format:check && npm test",
     "check:forbidden": "node scripts/check_forbidden_patterns.js",
+    "check:envlocal": "node scripts/check-env-local.mjs",
     "check": "npm run validate:all",
     "summarize-code": "python3 agents/code_explainer/generate_summary.py",
     "rag:health": "node tools/rag/health.mjs",
