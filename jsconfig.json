@@ -3,7 +3,7 @@
 
   "compilerOptions": {
     // ============================================================
-    // [A] PLATAFORMA E MÓDULOS — Node.js 20+ (CommonJS)
+    // [A] PLATAFORMA E MÓDULOS — Node.js 24+ (ESM)
     // ============================================================
     "target": "ES2024",
     "module": "nodenext",
@@ -45,6 +45,9 @@
       "#kernel/*": ["src/kernel/*"],
       "#driver/*": ["src/driver/*"],
       "#infra/*": ["src/infra/*"],
+      "#integration/*": ["src/integration/*"],
+      "#types/*": ["src/types/*"],
+      "#main": ["src/main.js"],
       "#server/*": ["src/server/*"],
       "#logic/*": ["src/logic/*"],
       "#orchestrator/*": ["src/orchestrator/*"],
@@ -86,8 +89,10 @@
   // ==============================================================
   "include": [
     "src/**/*.js",
+    "src/**/*.mjs",
     "src/**/*.d.ts",
     "scripts/**/*.js",
+    "scripts/**/*.mjs",
     "tests/**/*.js",
 
     "*.js",

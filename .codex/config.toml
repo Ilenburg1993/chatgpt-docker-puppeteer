@@ -1,0 +1,19 @@
+# Codex project-scoped overrides (per-repo)
+#
+# How this is applied:
+# - When running `codex` in a shell, export: `CODEX_HOME=$PWD/.codex`
+# - In VS Code integrated terminal, we set `CODEX_HOME` via `.vscode/settings.json`
+#
+# Goal: keep good quality while reducing latency/overhead for day-to-day work.
+
+model_reasoning_effort = "medium"
+web_search = "cached"
+suppress_unstable_features_warning = true
+
+[features]
+shell_snapshot = true
+unified_exec = true
+apply_patch_freeform = false
+exec_policy = true
+remote_compaction = true
+remote_models = false

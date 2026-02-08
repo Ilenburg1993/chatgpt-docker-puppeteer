@@ -12,6 +12,17 @@ src/dashboard-ui/node_modules/**
 .env.local
 .env.*.local
 
+# Codex project home (keep config committed; ignore runtime state)
+.codex/*
+!.codex/config.toml
+!.codex/README.md
+
+# Local assistant notes/config (keep an example committed)
+/assistant/perf-notes.toml
+
+# Legacy local assistant config (deprecated; kept ignored to avoid accidental commits)
+/config.toml
+
 # Logs
 logs/
 *.log

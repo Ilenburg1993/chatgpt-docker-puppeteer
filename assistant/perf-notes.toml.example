@@ -1,0 +1,51 @@
+# Local assistant performance notes (Codex/Copilot/OpenCode workflows)
+#
+# This file is safe to commit as an example.
+# For your machine, copy it to `assistant/perf-notes.toml` (which is git-ignored) and adjust.
+#
+# Goal: maximize assistant throughput by reducing unnecessary I/O and repo-wide scans.
+
+[agent]
+# Preferred communication language for prompts/notes you write to the assistant.
+language = "pt-BR"
+
+# Response style hint for day-to-day work.
+# Values: "concise" | "normal" | "detailed"
+response_style = "concise"
+
+# Prefer parallel exploration (multiple targeted reads/searches) over sequential digging.
+prefer_parallel_tool_calls = true
+
+# Prefer ripgrep-based searches instead of full file reads.
+prefer_search_over_cat = true
+
+# When searching, scope to these roots by default (faster + less noise).
+default_search_roots = ["src", "scripts", "tests", ".vscode", "docs/integration"]
+
+# Avoid scanning these paths unless explicitly requested.
+avoid_search_roots = [
+  "node_modules",
+  "src/dashboard-ui/node_modules",
+  "src/dashboard-ui/dist",
+  "analysis",
+  "DOCUMENTAÇÃO",
+  "logs",
+  "fila",
+  "respostas",
+]
+
+# Soft cap for reading individual files (bytes). Prefer searching if above this.
+max_single_file_read_bytes = 200000
+
+[tests]
+# “Fast gate” when you ask to run tests without specifying which ones.
+fast_gate = ["npm run -s lint:quiet", "npm run -s test:unit"]
+
+# Full validation command (slower).
+full_validation = "npm run -s validate:all"
+
+[mcp]
+# Helpful defaults for MCP troubleshooting (optional).
+ready_endpoint = "http://localhost:3008/ready"
+mcp_http_endpoint = "http://localhost:3008/api/mcp"
+

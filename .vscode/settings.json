@@ -306,33 +306,46 @@
 "json.trace.server": "off",
 
 
-  // ============================================================
-  // 7.14 EDITOR — CodeLens (global)
-  // ============================================================
-  "editor.codeLens": false,
+	  // ============================================================
+	  // 7.14 EDITOR — CodeLens (global)
+	  // ============================================================
+	  // Performance: mantenha CodeLens desligado globalmente e habilite
+	  // apenas nas linguagens onde você realmente usa (JS/TS + Copilot).
+	  "editor.codeLens": true,
+
+	  // Desliga CodeLens "pesados" do TS/JS (referências/implementações).
+	  // Mantém o Copilot CodeLens (ex.: "Generate tests") quando CodeLens estiver ligado no arquivo.
+	  "javascript.referencesCodeLens.enabled": false,
+	  "typescript.referencesCodeLens.enabled": false,
+	  "typescript.implementationsCodeLens.enabled": false,
+	  "gitlens.codeLens.enabled": true,
 
   // ============================================================
-  // 7.15 TYPESCRIPT — Logging / Tracing (Debug)
-  // ============================================================
-  // 🔍 MODO DEBUG: Logs verbosos para diagnosticar todos os problemas
-  "typescript.tsserver.enableTracing": true,
-  "typescript.tsserver.log": "verbose",
+	  // 7.15 TYPESCRIPT — Logging / Tracing (Debug)
+	  // ============================================================
+	  // 🔍 MODO DEBUG (desligado por padrão): tracing/log verboso degrada performance (inclui CodeLens/IntelliSense)
+	  "typescript.tsserver.enableTracing": false,
+	  "typescript.tsserver.log": "off",
 
   // ============================================================
   // 8. FORMATTERS POR LINGUAGEM
   // ============================================================
-  "[javascript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[javascriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
+	  "[javascript]": {
+	    "editor.codeLens": true,
+	    "editor.defaultFormatter": "esbenp.prettier-vscode"
+	  },
+	  "[javascriptreact]": {
+	    "editor.codeLens": true,
+	    "editor.defaultFormatter": "esbenp.prettier-vscode"
+	  },
+	  "[typescript]": {
+	    "editor.codeLens": true,
+	    "editor.defaultFormatter": "esbenp.prettier-vscode"
+	  },
+	  "[typescriptreact]": {
+	    "editor.codeLens": true,
+	    "editor.defaultFormatter": "esbenp.prettier-vscode"
+	  },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
   },
@@ -499,7 +512,15 @@
   "github.copilot.chat.localeOverride": "pt-br",
   "github.copilot.chat.welcomeMessage": "once",
   "github.copilot.advanced": { /* intact */},
-  "chat.mcp.serverSampling": { /* intact */},
+  "chat.mcp.serverSampling": {
+    "chatgpt-docker-puppeteer/.vscode/mcp.json: chatgpt-docker-puppeteer": {
+      "allowedModels": [
+        "copilot/gpt-5-mini",
+        "copilot/auto",
+        "copilot/claude-sonnet-4.5"
+      ]
+    }
+  },
   "claudeCodeChat.permissions.yoloMode": false,
   "[markdown]": {
     "editor.defaultFormatter": "yzhang.markdown-all-in-one",
@@ -586,6 +607,9 @@
 "chat.tips.enabled": true,
 "chat.tools.terminal.sandbox.enabled": false,
 "terminal.integrated.shellIntegration.environmentReporting": true,
+"terminal.integrated.env.linux": {
+  "CODEX_HOME": "${workspaceFolder}/.codex"
+},
 "windowsaistudio.enableRemoteFine-tuningAndInference": true,
 "editor.autoIndentOnPaste": true,
 "editor.occurrencesHighlightDelay": 100,
@@ -596,9 +620,22 @@
 "github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
 "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
 "github.copilot.chat.copilotMemory.enabled": true,
+"github.copilot.chat.advanced.workspace.codeSearchExternalIngest.enabled": true,
+"terminal.integrated.enableKittyKeyboardProtocol": true,
+"chat.tools.terminal.enableAutoApprove": true,
 "github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
 "github.copilot.chat.switchAgent.enabled": true,
+"claude-code.autosave": true,
+"claude-code.useTerminal": true,
+"claude-code.selectedModel": "sonnet",
+"claude-code.autoCloseDiffTabs": true,
+"github.copilot.chat.claudeAgent.enabled": true,
+"github.copilot.chat.anthropic.toolSearchTool.enabled": true,
 "remote.SSH.defaultForwardedPorts": [
 
 ],
+"github.copilot.chat.anthropic.contextEditing.enabled": true,
+"python.analysis.aiHoverSummaries": true,
+"chatgpt.runCodexInWindowsSubsystemForLinux": true,
+
 }
