@@ -1,41 +1,22 @@
-# Code Owners - Automatic review requests
-# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-# Version: 2.0 (Module Alias Support - 22/01/2026)
-
-# Default owner for everything
+# Global owner
 * @Ilenburg1993
 
-
-# Critical core files (Module Alias: @core, @shared)
+# Core runtime
 /src/core/ @Ilenburg1993
-/src/shared/ @Ilenburg1993
 /src/kernel/ @Ilenburg1993
 /src/nerv/ @Ilenburg1993
-
-# Infrastructure and deployment (Module Alias: @infra, @server)
+/src/driver/ @Ilenburg1993
+/src/orchestrator/ @Ilenburg1993
 /src/infra/ @Ilenburg1993
 /src/server/ @Ilenburg1993
-.devcontainer/Dockerfile @Ilenburg1993
-/ecosystem.config.js @Ilenburg1993
 
-# CI/CD and GitHub workflows
-/.github/workflows/ @Ilenburg1993
-/.github/workflows/ci.yml @Ilenburg1993
-/scripts/validate-ci.js @Ilenburg1993
+# CI/CD and automation
+/.github/ @Ilenburg1993
+/scripts/ @Ilenburg1993
 
-# Configuration files (CRITICAL - affects module resolution)
+# Project-level configuration
+/package.json @Ilenburg1993
+/package-lock.json @Ilenburg1993
 /config.json @Ilenburg1993
 /dynamic_rules.json @Ilenburg1993
-/package.json @Ilenburg1993
-/jsconfig.json @Ilenburg1993
-/index.js @Ilenburg1993
-
-# Module Alias configuration (CRITICAL)
-/.puppeteerrc.cjs @Ilenburg1993
-/chrome-config.json @Ilenburg1993
-
-# Documentation (Module Alias guides)
-/DOCUMENTAÇÃO/MODULE_ALIASES.md @Ilenburg1993
-/DOCUMENTAÇÃO/ALIAS_VALIDATION_REPORT.md @Ilenburg1993
-/DOCUMENTAÇÃO/DEVELOPER_WORKFLOW.md @Ilenburg1993
-/DOCUMENTAÇÃO/CONTRIBUTING.md @Ilenburg1993
+/ecosystem.config.cjs @Ilenburg1993

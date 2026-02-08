@@ -1,0 +1,24 @@
+name: Mission/workflow improvement
+description: Melhorias na automação de missões, tasks e orquestração.
+title: "[mission]: "
+labels: [mission, enhancement]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto da missão
+      description: Objetivo da missão e estado atual.
+    validations:
+      required: true
+  - type: textarea
+    id: gaps
+    attributes:
+      label: Gaps observados
+      description: Quais etapas do fluxo atual falham ou degradam?
+  - type: textarea
+    id: success
+    attributes:
+      label: Critérios de sucesso
+      description: Métricas ou sinais de sucesso esperados.
+    validations:
+      required: true

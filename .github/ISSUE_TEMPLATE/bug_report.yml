@@ -1,0 +1,43 @@
+name: Bug report
+description: Reporte um problema reproduzível no projeto.
+title: "[bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: O que aconteceu?
+      description: Descreva comportamento atual e esperado.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Ambiente
+      options:
+        - Local Linux
+        - Local Windows
+        - Docker
+        - CI (GitHub Actions)
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Versão do Node
+      placeholder: "24.x"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / evidências
+      description: Cole logs relevantes (sem segredos).
