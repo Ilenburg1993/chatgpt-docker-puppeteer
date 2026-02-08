@@ -1147,7 +1147,19 @@ class DriverNERVAdapter extends EventEmitter {
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                HighLevelNERV.sendEvent(this.nerv, ActorRole.DRIVER, actionCode, payload, correlationId);
+                const envelope = HighLevelNERV.makeEnvelope({
+                    actor: ActorRole.DRIVER,
+                    messageType: MessageType.EVENT,
+                    actionCode,
+                    payload,
+                    correlationId,
+                });
+
+                if (!this.nerv || typeof this.nerv.emitEvent !== 'function') {
+                    throw new Error('NERV instance with emitEvent required');
+                }
+
+                this.nerv.emitEvent(envelope);
 
                 log('DEBUG', `[DriverNERVAdapter] Evento NERV emitido: ${actionCode}`, correlationId);
 

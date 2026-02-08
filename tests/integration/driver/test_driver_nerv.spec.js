@@ -9,6 +9,7 @@ console.log(`
 
 let testsPassed = 0;
 let testsFailed = 0;
+const results = [];
 
 /**
  * Helper para executar testes
@@ -20,10 +21,12 @@ function runTest(name, testFn) {
         testFn();
         console.log('✅ PASSOU\n');
         testsPassed++;
+        results.push({ name, passed: true });
         return true;
     } catch (error) {
         console.log(`❌ FALHOU: ${error.message}\n`);
         testsFailed++;
+        results.push({ name, passed: false, error });
         return false;
     }
 }
@@ -144,12 +147,19 @@ runTest('TEST 4: DriverNERVAdapter - Comunicação 100% via NERV', () => {
     console.log('  ✓ Usa nerv.onReceive() para comandos');
 
     // Deve usar nerv.emitEvent para emitir eventos
-    if (!content.includes('nerv.emitEvent') && !content.includes('this.nerv.emit')) {
+    const emitsViaNerv =
+        content.includes('this.nerv.emitEvent(') ||
+        content.includes('nerv.emitEvent(') ||
+        content.includes('this.nerv.emit(') ||
+        content.includes('HighLevelNERV.sendEvent(') ||
+        content.includes('sendEvent(');
+
+    if (!emitsViaNerv) {
         throw new Error('DriverNERVAdapter não emite eventos via NERV');
     }
     console.log('  ✓ Usa nerv.emitEvent() para telemetria');
 
-    // NÃO deve fazer log.emit ou outras emissões diretas
+    // NÃO deve fazer emissões externas diretas (fora do NERV)
     const lines = content.split('\n');
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -162,12 +172,11 @@ runTest('TEST 4: DriverNERVAdapter - Comunicação 100% via NERV', () => {
             continue;
         }
 
-        // Verifica emissões não autorizadas
-        if (line.match(/\.emit\(/i) && !line.includes('nerv.emit') && !line.includes('driver.emit')) {
-            // Pode ter EventEmitter interno para drivers, mas não para comunicação externa
-            if (line.includes('EventEmitter')) {
-                continue;
-            }
+        const hasForbiddenEmit = /\b(socket|io|socketHub)\.emit\s*\(/.test(line);
+        if (hasForbiddenEmit) {
+            throw new Error(
+                `Emissão externa direta detectada (fora do NERV) em driver_nerv_adapter.js:${i + 1}: ${line}`
+            );
         }
     }
     console.log('  ✓ Sem emissões diretas fora do NERV');
@@ -306,19 +315,19 @@ console.log(`
 ║               SUMÁRIO - DRIVER NERV INTEGRATION              ║
 ╚══════════════════════════════════════════════════════════════╝
 
-✅ Imports: Driver não importa KERNEL: ${testsPassed >= 1 ? 'PASSOU' : 'FALHOU'}
-✅ Imports: Driver não importa SERVER: ${testsPassed >= 2 ? 'PASSOU' : 'FALHOU'}
-✅ Filesystem: Driver não acessa filesystem: ${testsPassed >= 3 ? 'PASSOU' : 'FALHOU'}
-✅ Adapter: Comunicação 100% via NERV: ${testsPassed >= 4 ? 'PASSOU' : 'FALHOU'}
-✅ Telemetria: Fluxo via NERV: ${testsPassed >= 5 ? 'PASSOU' : 'FALHOU'}
-✅ Comandos: Recepção via NERV: ${testsPassed >= 6 ? 'PASSOU' : 'FALHOU'}
-✅ Lifecycle: Conformidade NERV: ${testsPassed >= 7 ? 'PASSOU' : 'FALHOU'}
-✅ TODOs: Análise de débitos: ${testsPassed >= 8 ? 'PASSOU' : 'FALHOU'}
+✅ Imports: Driver não importa KERNEL: ${results[0]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ Imports: Driver não importa SERVER: ${results[1]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ Filesystem: Driver não acessa filesystem: ${results[2]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ Adapter: Comunicação 100% via NERV: ${results[3]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ Telemetria: Fluxo via NERV: ${results[4]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ Comandos: Recepção via NERV: ${results[5]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ Lifecycle: Conformidade NERV: ${results[6]?.passed ? 'PASSOU' : 'FALHOU'}
+✅ TODOs: Análise de débitos: ${results[7]?.passed ? 'PASSOU' : 'FALHOU'}
 
 📊 Score: ${testsPassed}/8 testes passaram
 
 ${
-    testsPassed === 8
+    results.length === 8 && results.every(r => r.passed)
         ? `
 🎉 DRIVER COMPLETAMENTE INTEGRADO VIA NERV!
 
@@ -340,4 +349,4 @@ dos princípios NERV.
 }
 `);
 
-process.exit(testsPassed === 8 ? 0 : 1);
+process.exit(results.length === 8 && results.every(r => r.passed) ? 0 : 1);
