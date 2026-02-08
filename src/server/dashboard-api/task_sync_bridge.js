@@ -2,6 +2,7 @@
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
 import { ActionCode } from '#shared/nerv/constants';
+import { getActionCode, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
 
 /**
  * Estados unificados para visualização no dashboard.
@@ -138,14 +139,6 @@ class TaskSyncBridge extends EventEmitter {
             return;
         }
 
-        const getTaskId = (payload) =>
-            payload?.taskId ||
-            payload?.task_id ||
-            payload?.meta?.id ||
-            payload?.task?.meta?.id ||
-            payload?.task?.id ||
-            null;
-
         const register = (actionCode, handler) => {
             // Prefer onEvent (quando disponível e correto); fallback para onReceive.
             const canUseOnEvent = typeof nerv.onEvent === 'function' && nerv.onEvent.length >= 2;
@@ -162,12 +155,7 @@ class TaskSyncBridge extends EventEmitter {
             }
 
             const unsub = nerv.onReceive((envelope) => {
-                const envelopeActionCode =
-                    envelope?.actionCode ||
-                    envelope?.type?.action_code ||
-                    envelope?.type?.actionCode ||
-                    envelope?.payload?.actionCode ||
-                    null;
+                const envelopeActionCode = getActionCode(envelope);
 
                 if (envelopeActionCode !== actionCode) {
                     return;
@@ -181,8 +169,8 @@ class TaskSyncBridge extends EventEmitter {
         };
 
         register(ActionCode.DRIVER_TASK_STARTED, (envelope) => {
-            const payload = envelope?.payload || {};
-            const taskId = getTaskId(payload);
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
             if (!taskId) return;
 
             this._updateKernelState(taskId, {
@@ -195,8 +183,8 @@ class TaskSyncBridge extends EventEmitter {
         });
 
         register(ActionCode.DRIVER_TASK_COMPLETED, (envelope) => {
-            const payload = envelope?.payload || {};
-            const taskId = getTaskId(payload);
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
             if (!taskId) return;
 
             const result = payload.result;
@@ -214,8 +202,8 @@ class TaskSyncBridge extends EventEmitter {
         });
 
         register(ActionCode.DRIVER_TASK_FAILED, (envelope) => {
-            const payload = envelope?.payload || {};
-            const taskId = getTaskId(payload);
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
             if (!taskId) return;
 
             const err = payload.error || payload.err || payload.reason || null;
@@ -226,17 +214,23 @@ class TaskSyncBridge extends EventEmitter {
                     : err
                         ? JSON.stringify(err)
                         : 'Unknown error';
+            const reason = payload.reason || 'UNKNOWN';
+            const nextAction = payload.next_action || null;
+            const retryable = Boolean(payload.retryable);
 
             this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
                 failed_at: Date.now(),
-                error: errorText.substring(0, 2000)
+                error: errorText.substring(0, 2000),
+                reason_code: reason,
+                retryable,
+                next_action: nextAction
             });
         });
 
         register(ActionCode.DRIVER_TASK_ABORTED, (envelope) => {
-            const payload = envelope?.payload || {};
-            const taskId = getTaskId(payload);
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
             if (!taskId) return;
 
             this._updateKernelState(taskId, {
@@ -248,8 +242,8 @@ class TaskSyncBridge extends EventEmitter {
 
         // Kernel/Policy failures that can be surfaced as FAILED
         register(ActionCode.TASK_FAILED, (envelope) => {
-            const payload = envelope?.payload || {};
-            const taskId = getTaskId(payload);
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
             if (!taskId) return;
 
             const err = payload.error || payload.err || payload.reason || null;
@@ -260,6 +254,42 @@ class TaskSyncBridge extends EventEmitter {
                     : err
                         ? JSON.stringify(err)
                         : 'Task failed';
+            const reason = payload.reason || 'UNKNOWN';
+            const nextAction = payload.next_action || null;
+            const retryable = Boolean(payload.retryable);
+
+            this._updateKernelState(taskId, {
+                status: UnifiedStatus.FAILED,
+                failed_at: Date.now(),
+                error: errorText.substring(0, 2000),
+                reason_code: reason,
+                retryable,
+                next_action: nextAction
+            });
+        });
+
+        register(ActionCode.DRIVER_TASK_QUEUED, (envelope) => {
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
+            if (!taskId) return;
+
+            this._updateKernelState(taskId, {
+                status: UnifiedStatus.PENDING,
+                queued_at: Date.now(),
+                queue_position: payload.queuePosition || null,
+                queue_size: payload.queueSize || null,
+                active_drivers: payload.activeDrivers || null,
+                next_action: payload.next_action || 'RETRY_LATER'
+            });
+        });
+
+        register(ActionCode.DRIVER_ERROR, (envelope) => {
+            const payload = getPayload(envelope);
+            const taskId = getTaskIdFromPayload(payload);
+            if (!taskId) return;
+
+            const err = payload.error || payload.err || payload.reason || 'Driver error';
+            const errorText = typeof err === 'string' ? err : JSON.stringify(err);
 
             this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,

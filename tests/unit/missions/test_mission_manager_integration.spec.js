@@ -53,6 +53,37 @@ class MockKernel {
     }
 }
 
+function buildTaskEnvelope({ actionCode, missionId, taskId, stepId, result = null, error = null }) {
+    return {
+        kind: MessageType.EVENT,
+        actionCode,
+        payload: {
+            task: {
+                meta: {
+                    mission_id: missionId,
+                    id: taskId,
+                    step_id: stepId
+                }
+            },
+            result,
+            error
+        }
+    };
+}
+
+async function waitForCondition(predicate, { timeoutMs = 1000, intervalMs = 10 } = {}) {
+    const start = Date.now();
+    while (true) {
+        if (predicate()) {
+            return;
+        }
+        if (Date.now() - start >= timeoutMs) {
+            throw new Error('Timed out waiting for condition');
+        }
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+}
+
 describe('MissionStateManager (filesystem persistence)', () => {
     let stateManager;
 
@@ -491,6 +522,68 @@ describe('MissionManager (end-to-end)', () => {
             // Verifica que status foi atualizado para RUNNING
             const state = await missionManager.getMission(created.id);
             assert.strictEqual(state.status, MISSION_STATUS.RUNNING);
+        });
+
+        it('should ignore duplicate completion events for same task', async () => {
+            const created = await missionManager.createMission({
+                title: 'Dedup Test',
+                description: 'Ensure same event is processed once',
+                templateId: 'book_writing',
+                params: { topic: 'Node.js', num_chapters: 5 }
+            });
+
+            await missionManager.executeMission(created.id);
+            await new Promise(resolve => setTimeout(resolve, 20));
+
+            const firstTask = kernel.executedTasks[0].task;
+
+            const envelope = buildTaskEnvelope({
+                actionCode: ActionCode.DRIVER_TASK_COMPLETED,
+                missionId: created.id,
+                taskId: firstTask.meta.id,
+                stepId: firstTask.meta.step_id,
+                result: { output: 'step result' }
+            });
+
+            nerv.receive(envelope);
+            nerv.receive(envelope); // evento duplicado
+
+            await waitForCondition(() => kernel.executedTasks.length >= 2, { timeoutMs: 1500 });
+
+            const state = await missionManager.getMission(created.id);
+            assert.strictEqual(state.progress.current_step, 1, 'Step deve avançar apenas uma vez');
+            assert.strictEqual(state.progress.completed_tasks, 1, 'Task completada contabilizada apenas uma vez');
+            assert.strictEqual(kernel.executedTasks.length, 2, 'Somente próximo step deve ser disparado uma vez');
+        });
+
+        it('should ignore late events after mission is paused', async () => {
+            const created = await missionManager.createMission({
+                title: 'Late Event Test',
+                description: 'Ignore events when inactive',
+                templateId: 'book_writing',
+                params: { topic: 'Kotlin', num_chapters: 5 }
+            });
+
+            await missionManager.executeMission(created.id);
+            await new Promise(resolve => setTimeout(resolve, 20));
+
+            const firstTask = kernel.executedTasks[0].task;
+
+            await missionManager.pauseMission(created.id);
+
+            nerv.receive(buildTaskEnvelope({
+                actionCode: ActionCode.DRIVER_TASK_COMPLETED,
+                missionId: created.id,
+                taskId: firstTask.meta.id,
+                stepId: firstTask.meta.step_id,
+                result: { output: 'should be ignored' }
+            }));
+
+            await new Promise(resolve => setTimeout(resolve, 20));
+
+            const state = await missionManager.getMission(created.id);
+            assert.strictEqual(state.progress.current_step, 0, 'Progresso não deve avançar com missão pausada');
+            assert.strictEqual(kernel.executedTasks.length, 1, 'Nenhum novo step deve ser disparado');
         });
     });
 

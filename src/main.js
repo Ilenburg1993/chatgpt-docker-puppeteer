@@ -457,7 +457,7 @@ async function boot() {
             },
             policy: {},
             loop: {
-                cycleInterval: process.env.KERNEL_CYCLE_INTERVAL || CONFIG.KERNEL_CYCLE_INTERVAL || 50 // 50ms = 20 Hz
+                baseIntervalMs: process.env.KERNEL_CYCLE_INTERVAL || CONFIG.KERNEL_CYCLE_INTERVAL || 50 // 50ms = 20 Hz
             }
         });
 

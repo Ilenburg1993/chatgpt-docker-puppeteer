@@ -66,7 +66,10 @@ class KernelLoop {
         telemetry,
         browserPool = null,
         scheduler = global,
-        baseIntervalMs = 50
+        baseIntervalMs = 50,
+        onActivateTask = null,
+        onTerminateTask = null,
+        onSuspendTask = null
     }) {
         if (!executionEngine || typeof executionEngine.evaluate !== 'function') {
             throw new Error('KernelLoop requer executionEngine.evaluate()');
@@ -86,6 +89,9 @@ class KernelLoop {
         this.browserPool = browserPool; // ✅ Opcional: para checar Circuit Breaker
         this.scheduler = scheduler;
         this.baseIntervalMs = baseIntervalMs;
+        this.onActivateTask = onActivateTask;
+        this.onTerminateTask = onTerminateTask;
+        this.onSuspendTask = onSuspendTask;
 
         /** @type {string} */
         this.state = KernelLoopState.INACTIVE;
@@ -411,7 +417,7 @@ class KernelLoop {
     /**
      * Aplica uma única decisão.
      */
-    _applyDecision(proposal, context) {
+    async _applyDecision(proposal, context) {
         const { kind, taskId, reason } = proposal;
 
         this.telemetry.info('kernel_loop_decision_applied', {
@@ -424,14 +430,34 @@ class KernelLoop {
 
         // Exemplo de decisão implementada
         switch (kind) {
+            case DecisionKind.PROPOSE_ACTIVATE_TASK:
+                if (typeof this.onActivateTask === 'function') {
+                    await this.onActivateTask({ taskId, reason, proposal, context });
+                } else {
+                    this.telemetry.warning('kernel_loop_activate_handler_not_configured', {
+                        taskId,
+                        at: context.at
+                    });
+                }
+                break;
+
+            case DecisionKind.PROPOSE_TERMINATE_TASK:
+                if (typeof this.onTerminateTask === 'function') {
+                    await this.onTerminateTask({ taskId, reason, proposal, context });
+                } else {
+                    this.telemetry.warning('kernel_loop_terminate_handler_not_configured', {
+                        taskId,
+                        at: context.at
+                    });
+                }
+                break;
+
             case DecisionKind.PROPOSE_SUSPEND_TASK:
-                // Aqui seria implementada a suspensão da tarefa
-                // Por ora, apenas registramos a intenção
-                this.telemetry.warning('kernel_loop_task_suspension_proposed', {
-                    taskId,
-                    reason,
-                    at: context.at
-                });
+                if (typeof this.onSuspendTask === 'function') {
+                    await this.onSuspendTask({ taskId, reason, proposal, context });
+                } else {
+                    this.telemetry.warning('kernel_loop_task_suspension_proposed', { taskId, reason, at: context.at });
+                }
                 break;
 
             default:

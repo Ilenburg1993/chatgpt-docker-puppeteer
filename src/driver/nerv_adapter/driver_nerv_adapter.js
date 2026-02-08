@@ -284,8 +284,8 @@ class DriverNERVAdapter extends EventEmitter {
                     ActionCode.DRIVER_ERROR,
                     {
                         error: err.message,
-                        taskId: envelope.payload?.taskId,
                         originalCommand: envelope.actionCode,
+                        reason: 'INFRASTRUCTURE_ERROR',
                     },
                     envelope.correlationId
                 );
@@ -312,6 +312,7 @@ class DriverNERVAdapter extends EventEmitter {
      */
     async _handleDriverCommand(envelope) {
         const { actionCode, payload, correlationId } = envelope;
+        const taskId = payload?.taskId || payload?.task?.meta?.id || payload?.task?.id || null;
 
         log('DEBUG', `[DriverNERVAdapter] Recebido comando: ${actionCode}`, correlationId);
 
@@ -324,12 +325,14 @@ class DriverNERVAdapter extends EventEmitter {
             );
 
             this._emitBoth(
-                ADAPTER_EVENTS.ERROR,
-                ActionCode.DRIVER_ERROR,
+                ADAPTER_EVENTS.TASK_FAILED,
+                ActionCode.DRIVER_TASK_FAILED,
                 {
-                    taskId: payload?.taskId,
-                    error: 'Sistema em modo degradado - Browser Pool não disponível',
+                    taskId,
                     reason: 'DEGRADED_MODE',
+                    error: 'Sistema em modo degradado - Browser Pool não disponível',
+                    retryable: true,
+                    next_action: 'RETRY_LATER',
                     suggestion:
                         'Configure o browserEndpoint/proxy com remote debugging exposto ao container (ver CONFIG.DEBUG_PORT ou CHROME_WS_ENDPOINT) e reinicie o sistema',
                 },
@@ -349,11 +352,13 @@ class DriverNERVAdapter extends EventEmitter {
 
                     this._emitBoth(
                         ADAPTER_EVENTS.TASK_FAILED,
-                        ActionCode.DRIVER_ERROR,
+                        ActionCode.DRIVER_TASK_FAILED,
                         {
-                            taskId: payload?.taskId,
-                            error: poolValidation.details.message,
+                            taskId,
                             reason: poolValidation.reason,
+                            error: poolValidation.details.message,
+                            retryable: false,
+                            next_action: 'ABORT',
                             suggestion: poolValidation.details.suggestion,
                         },
                         correlationId
@@ -467,18 +472,21 @@ class DriverNERVAdapter extends EventEmitter {
 
             log('WARN', `[DriverNERVAdapter] U2: ${error}`, correlationId);
 
-            this._emitBoth(
-                ADAPTER_EVENTS.TASK_FAILED,
-                ActionCode.DRIVER_TASK_FAILED,
-                {
-                    taskId,
-                    target,
-                    error,
-                    reason: 'CIRCUIT_BREAKER_OPEN',
-                    suggestion: `Aguarde ${Math.floor(breaker.timeout / 1000)}s para circuit breaker recovery`,
-                },
-                correlationId
-            );
+	            this._emitBoth(
+	                ADAPTER_EVENTS.TASK_FAILED,
+	                ActionCode.DRIVER_TASK_FAILED,
+	                {
+	                    taskId,
+	                    target,
+	                    error,
+	                    reason: 'CIRCUIT_BREAKER_OPEN',
+	                    retryable: true,
+	                    next_action: 'RETRY_LATER',
+	                    suggestion: `Aguarde ${Math.floor(breaker.timeout / 1000)}s para circuit breaker recovery`,
+	                    suggestedDelayMs: breaker.timeout
+	                },
+	                correlationId
+	            );
 
             this.stats.tasksRejected++;
             return;
@@ -492,17 +500,20 @@ class DriverNERVAdapter extends EventEmitter {
 
                 log('WARN', `[DriverNERVAdapter] ${error}`, correlationId);
 
-                this._emitBoth(
-                    ADAPTER_EVENTS.TASK_FAILED,
-                    ActionCode.DRIVER_TASK_FAILED,
-                    {
-                        taskId,
-                        error,
-                        reason: 'QUEUE_FULL',
-                        suggestion: 'Aguarde tasks ativas completarem ou aumente MAX_QUEUE_SIZE',
-                    },
-                    correlationId
-                );
+	                this._emitBoth(
+	                    ADAPTER_EVENTS.TASK_FAILED,
+	                    ActionCode.DRIVER_TASK_FAILED,
+	                    {
+	                        taskId,
+	                        error,
+	                        reason: 'QUEUE_FULL',
+	                        retryable: true,
+	                        next_action: 'RETRY_LATER',
+	                        suggestion: 'Aguarde tasks ativas completarem ou aumente MAX_QUEUE_SIZE',
+	                        suggestedDelayMs: 750
+	                    },
+	                    correlationId
+	                );
 
                 this.stats.tasksRejected++;
                 return;
@@ -523,6 +534,21 @@ class DriverNERVAdapter extends EventEmitter {
                 queueSize: this.taskQueue.length,
                 activeDrivers: this.activeDrivers.size,
             });
+
+            this._emitBoth(
+                ADAPTER_EVENTS.TASK_QUEUED,
+                ActionCode.DRIVER_TASK_QUEUED,
+                {
+                    taskId,
+                    queueSize: this.taskQueue.length,
+                    activeDrivers: this.activeDrivers.size,
+                    queuePosition: this.taskQueue.length,
+                    retryable: true,
+                    next_action: 'RETRY_LATER',
+                    suggestedDelayMs: 500
+                },
+                correlationId
+            );
 
             return;
         }
@@ -768,20 +794,24 @@ class DriverNERVAdapter extends EventEmitter {
                     this.stats.tasksTimedOut++;
                 }
 
-                this._emitBoth(
-                    ADAPTER_EVENTS.TASK_FAILED,
-                    ActionCode.DRIVER_TASK_FAILED,
-                    {
-                        taskId,
-                        error: error.message,
-                        errorType: error.constructor.name,
-                        isTimeout,
-                        operation: error.operation || 'unknown',
-                        errorClassification: errorType, // U5
-                        retriesAttempted: retryCount, // U5
-                    },
-                    correlationId
-                );
+	                this._emitBoth(
+	                    ADAPTER_EVENTS.TASK_FAILED,
+	                    ActionCode.DRIVER_TASK_FAILED,
+	                    {
+	                        taskId,
+	                        error: error.message,
+	                        reason: isTimeout ? 'EXECUTION_TIMEOUT' : 'TASK_EXECUTION_ERROR',
+	                        errorType: error.constructor.name,
+	                        isTimeout,
+	                        operation: error.operation || 'unknown',
+	                        errorClassification: errorType, // U5
+	                        retriesAttempted: retryCount, // U5
+	                        retryable: errorType === 'TRANSIENT',
+	                        next_action: errorType === 'TRANSIENT' ? 'RETRY_LATER' : 'ABORT',
+	                        suggestedDelayMs: errorType === 'TRANSIENT' ? ADAPTER_CONFIG.RETRY_BACKOFF_MS : 0
+	                    },
+	                    correlationId
+	                );
 
                 this.stats.driversCrashed++;
 
@@ -1301,13 +1331,17 @@ class DriverNERVAdapter extends EventEmitter {
         });
 
         // 2. Emite local + NERV
+        const isTaskScoped = Boolean(taskId);
         await this._emitBoth(
-            ADAPTER_EVENTS.ERROR,
-            ActionCode.DRIVER_ERROR,
+            isTaskScoped ? ADAPTER_EVENTS.TASK_FAILED : ADAPTER_EVENTS.ERROR,
+            isTaskScoped ? ActionCode.DRIVER_TASK_FAILED : ActionCode.DRIVER_ERROR,
             {
-                taskId,
+                ...(isTaskScoped ? { taskId } : {}),
                 operation,
                 error: error.message,
+                reason: isTaskScoped ? 'INFRASTRUCTURE_ERROR' : 'DRIVER_INFRASTRUCTURE_ERROR',
+                retryable: isTaskScoped,
+                next_action: isTaskScoped ? 'RETRY_LATER' : 'CHECK_INFRA',
                 errorType: error.constructor.name,
                 stack: error.stack,
                 phase,
