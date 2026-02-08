@@ -30,8 +30,9 @@ describe('TaskExecutionOrchestrator', () => {
 
     beforeEach(() => {
         nerv = new MockNERV();
+
         nervBridge = {
-            beforeTaskExecution: (task) => task,
+            beforeTaskExecution: task => task,
             emitCommandCalls: [],
             emitEventCalls: [],
             decisions: 0,
@@ -61,7 +62,7 @@ describe('TaskExecutionOrchestrator', () => {
         assert.strictEqual(nervBridge.emitCommandCalls.length, 1);
 
         const completion = {
-            kind: MessageType.EVENT,
+            messageType: MessageType.EVENT,
             actionCode: ActionCode.DRIVER_TASK_COMPLETED,
             payload: { taskId: 'task-dup', result: { output: 'ok' } },
             correlationId: 'corr-dup'
@@ -73,6 +74,56 @@ describe('TaskExecutionOrchestrator', () => {
         await new Promise(resolve => setTimeout(resolve, 20));
 
         assert.strictEqual(nervBridge.decisions, 1, 'afterTaskExecution deve rodar uma vez');
+    });
+
+    it('should forward driver failure metadata when emitting TASK_FAILED', async () => {
+        const task = {
+            meta: { id: 'task-fail-meta' },
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+        };
+
+        await orchestrator.executeTask(task, 'corr-fail-meta');
+
+        // Envelope no formato "novo" (messageType/correlationId), alinhado com os outros testes
+        nerv.receive({
+            messageType: MessageType.EVENT,
+            actionCode: ActionCode.DRIVER_TASK_FAILED,
+            correlationId: 'corr-fail-meta',
+            payload: {
+                taskId: 'task-fail-meta',
+                error: 'queue full',
+                reason: 'QUEUE_FULL',
+                retryable: true,
+                next_action: 'RETRY_LATER',
+                suggestedDelayMs: 750,
+                errorType: 'OperationalError',
+                operation: 'execute',
+                isTimeout: false,
+                errorClassification: 'TRANSIENT',
+                retriesAttempted: 0
+            }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        assert.strictEqual(nervBridge.emitEventCalls.length, 1);
+        const emitted = nervBridge.emitEventCalls[0];
+        assert.ok(emitted && emitted.payload, 'emitEvent deve receber payload');
+
+        const eventPayload = emitted.payload;
+        assert.strictEqual(eventPayload.actionCode, ActionCode.TASK_FAILED);
+        assert.strictEqual(eventPayload.taskId, 'task-fail-meta');
+        assert.strictEqual(eventPayload.reason, 'QUEUE_FULL');
+        assert.strictEqual(eventPayload.retryable, true);
+        assert.strictEqual(eventPayload.next_action, 'RETRY_LATER');
+        assert.strictEqual(eventPayload.suggestedDelayMs, 750);
+
+        // Metadata preservada (observabilidade)
+        assert.strictEqual(eventPayload.errorType, 'OperationalError');
+        assert.strictEqual(eventPayload.operation, 'execute');
+        assert.strictEqual(eventPayload.isTimeout, false);
+        assert.strictEqual(eventPayload.errorClassification, 'TRANSIENT');
+        assert.strictEqual(eventPayload.retriesAttempted, 0);
     });
 
     it('should unsubscribe listener on cleanup', () => {

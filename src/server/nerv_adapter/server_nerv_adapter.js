@@ -2,6 +2,7 @@
 import { log } from '#core/logger';
 import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 
 /* ==========================================================================
    CONSTANTES DE SEGURANÇA
@@ -110,13 +111,13 @@ class ServerNERVAdapter {
 
             if (this._shutdown) return;
 
-            if (envelope.messageType !== MessageType.EVENT) return;
+            if (getMessageType(envelope) !== MessageType.EVENT) return;
 
             this._broadcastEvent(envelope)
                 .catch(err => {
                     log('ERROR',
                         `[ServerNERVAdapter] broadcast falhou: ${err.message}`,
-                        envelope.correlationId
+                        getCorrelationId(envelope)
                     );
                 });
         };
@@ -251,15 +252,22 @@ class ServerNERVAdapter {
 
     async _broadcastEvent(envelope) {
 
-        if (PRIVATE_EVENTS.has(envelope.actionCode)) return;
+        const actionCode = getActionCode(envelope);
+        if (!actionCode || PRIVATE_EVENTS.has(actionCode)) return;
 
-        const socketEvent = this._translateEventName(envelope.actionCode);
+        const socketEvent = this._translateEventName(actionCode);
+        const payload = getPayload(envelope);
 
         this.socketHub.emit(socketEvent, {
-            actionCode: envelope.actionCode,
-            payload: envelope.payload,
-            correlationId: envelope.correlationId,
-            timestamp: envelope.timestamp || new Date().toISOString()
+            messageType: getMessageType(envelope),
+            actionCode,
+            payload,
+            correlationId: getCorrelationId(envelope),
+            msgId: envelope?.causality?.msg_id || null,
+            actor: envelope?.identity?.actor || null,
+            target: envelope?.identity?.target || null,
+            protocolVersion: envelope?.protocol?.version || null,
+            timestamp: envelope?.protocol?.timestamp || Date.now()
         });
 
         this.stats.eventsBroadcasted++;

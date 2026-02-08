@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActorRole } from '#shared/nerv/constants';
 import { KernelLoop } from './kernel_loop/kernel_loop.js';
-import { TaskRuntime } from './task_runtime/task_runtime.js';
+import { TaskRuntime, TaskState } from './task_runtime/task_runtime.js';
 import { ObservationStore } from './observation_store/observation_store.js';
 import { PolicyEngine } from './policy_engine/policy_engine.js';
 import { ExecutionEngine } from './execution_engine/execution_engine.js';
@@ -9,7 +9,6 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
 import { KernelNERVBridge } from './nerv_bridge/kernel_nerv_bridge.js';
 import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
 import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
-import { TaskState } from './task_runtime/task_runtime.js';
 
 /* ===========================
    Fábrica do Kernel
@@ -32,20 +31,7 @@ import { TaskState } from './task_runtime/task_runtime.js';
  *
  * @returns {Object} Interface pública do Kernel
  *
- * Propriedades do objeto retornado:
- *   - start (Function): Inicia o Kernel
- *   - stop (Function): Para o Kernel graciosamente
- *   - telemetry (Object): Acesso à telemetria
- *
  * @throws {Error} Se NERV não for fornecido
- *
- * @example
- * const kernel = createKernel({
- *   nerv: nervInstance,
- *   policy: { maxConcurrentTasks: 5 },
- *   loop: { interval: 1000 }
- * });
- * await kernel.start();
  */
 function createKernel({
     nerv,
@@ -63,31 +49,25 @@ function createKernel({
   ========================================================= */
 
     const telemetry = new KernelTelemetry({
-        nerv, // Passa NERV para telemetria
+        nerv,
         source: ActorRole.KERNEL.toLowerCase(),
         retention: 1000,
         ...telemetryOptions
     });
 
-    telemetry.info('kernel_initializing', {
-        at: Date.now()
-    });
+    telemetry.info('kernel_initializing', { at: Date.now() });
 
     /* =========================================================
      2. TASK RUNTIME — Vida lógica das tarefas
   ========================================================= */
 
-    const taskRuntime = new TaskRuntime({
-        telemetry
-    });
+    const taskRuntime = new TaskRuntime({ telemetry });
 
     /* =========================================================
      3. OBSERVATION STORE — Registro factual de EVENTs
   ========================================================= */
 
-    const observationStore = new ObservationStore({
-        telemetry
-    });
+    const observationStore = new ObservationStore({ telemetry });
 
     /* =========================================================
      4. POLICY ENGINE — Normatividade consultiva
@@ -109,7 +89,7 @@ function createKernel({
 
     const orchestrator = new OrchestratorEngine({
         nerv,
-        contextManager // V2.0: Compartilha ContextManager com MissionManager
+        contextManager
     });
 
     /* =========================================================
@@ -132,7 +112,7 @@ function createKernel({
         taskRuntime,
         observationStore,
         telemetry,
-        orchestrator  // V2.0: Injeta orchestrator para interceptar execuções
+        orchestrator
     });
 
     /* =========================================================
@@ -141,44 +121,25 @@ function createKernel({
 
     /** @type {Map<string, {task: Object, correlationId: string}>} */
     const pendingDispatch = new Map();
+
     /** @type {Map<string, number>} */
     const retryCounts = new Map();
+
     const MAX_KERNEL_RETRIES = Number(process.env.KERNEL_MAX_RETRIES || 3);
 
+    /** @type {TaskExecutionOrchestrator|null} */
     let taskExecutor = null;
 
-    const activateRuntimeTask = async ({ taskId, reason }) => {
-        const runtime = taskRuntime.getTask(taskId);
-        if (!runtime) {
-            telemetry.warning('kernel_activate_missing_runtime_task', { taskId, at: Date.now() });
-            return;
-        }
-
-        if (runtime.state === TaskState.ACTIVE || runtime.state === TaskState.TERMINATED) {
-            return;
-        }
-
-        taskRuntime.applyStateTransition({
-            taskId,
-            newState: TaskState.ACTIVE,
-            reason: reason || 'Task activated by kernel policy'
-        });
-
-        const queued = pendingDispatch.get(taskId);
-        if (!queued) {
-            return;
-        }
-
-        if (taskExecutor) {
-            await taskExecutor.executeTask(queued.task, queued.correlationId);
-        }
+    const cleanupTaskDispatchState = taskId => {
         pendingDispatch.delete(taskId);
+        retryCounts.delete(taskId);
     };
 
     const terminateRuntimeTask = async ({ taskId, reason }) => {
         const runtime = taskRuntime.getTask(taskId);
+
         if (!runtime || runtime.state === TaskState.TERMINATED) {
-            pendingDispatch.delete(taskId);
+            cleanupTaskDispatchState(taskId);
             return;
         }
 
@@ -188,7 +149,7 @@ function createKernel({
             reason: reason || 'Task terminated by kernel decision'
         });
 
-        pendingDispatch.delete(taskId);
+        cleanupTaskDispatchState(taskId);
     };
 
     const suspendRuntimeTask = async ({ taskId, reason }) => {
@@ -212,12 +173,19 @@ function createKernel({
 
         const retries = retryCounts.get(taskId) || 0;
         if (retries >= MAX_KERNEL_RETRIES) {
-            await terminateRuntimeTask({ taskId, reason: `Retry budget exceeded: ${reason || 'driver failure'}` });
+            await terminateRuntimeTask({
+                taskId,
+                reason: `Retry budget exceeded: ${reason || 'driver failure'}`
+            });
             return;
         }
 
         retryCounts.set(taskId, retries + 1);
-        await suspendRuntimeTask({ taskId, reason: `Retry scheduled (${retries + 1}/${MAX_KERNEL_RETRIES})` });
+
+        await suspendRuntimeTask({
+            taskId,
+            reason: `Retry scheduled (${retries + 1}/${MAX_KERNEL_RETRIES})`
+        });
 
         setTimeout(async () => {
             try {
@@ -239,11 +207,59 @@ function createKernel({
             } catch (error) {
                 telemetry.warning('kernel_retry_schedule_failed', {
                     taskId,
-                    error: error.message,
+                    error: error?.message || String(error),
                     at: Date.now()
                 });
             }
         }, Math.max(0, delayMs));
+    };
+
+    const activateRuntimeTask = async ({ taskId, reason }) => {
+        const runtime = taskRuntime.getTask(taskId);
+        if (!runtime) {
+            telemetry.warning('kernel_activate_missing_runtime_task', { taskId, at: Date.now() });
+            return;
+        }
+
+        if (runtime.state === TaskState.ACTIVE || runtime.state === TaskState.TERMINATED) {
+            return;
+        }
+
+        taskRuntime.applyStateTransition({
+            taskId,
+            newState: TaskState.ACTIVE,
+            reason: reason || 'Task activated by kernel policy'
+        });
+
+        const queued = pendingDispatch.get(taskId);
+        if (!queued) {
+            return;
+        }
+
+        if (!taskExecutor) {
+            telemetry.warning('kernel_activate_missing_task_executor', { taskId, at: Date.now() });
+            // mantém pendingDispatch para execução futura
+            return;
+        }
+
+        // CRÍTICO: NÃO apagar pendingDispatch aqui.
+        // Ele é a fonte do retry e da reexecução. A limpeza deve ocorrer em "terminate"/"completed".
+        try {
+            await taskExecutor.executeTask(queued.task, queued.correlationId);
+        } catch (error) {
+            telemetry.warning('kernel_activate_dispatch_failed', {
+                taskId,
+                error: error?.message || String(error),
+                at: Date.now()
+            });
+
+            // Fail-safe: não deixa task “ACTIVE e abandonada” se a dispatch falhar.
+            await scheduleRetry({
+                taskId,
+                delayMs: 250,
+                reason: `Dispatch failed: ${error?.message || String(error)}`
+            });
+        }
     };
 
     taskExecutor = new TaskExecutionOrchestrator({
@@ -254,6 +270,9 @@ function createKernel({
         },
         onTaskPermanentFailure: async ({ taskId, reason }) => {
             await terminateRuntimeTask({ taskId, reason: reason || 'Permanent driver failure' });
+        },
+        onTaskCompleted: async ({ taskId }) => {
+            await terminateRuntimeTask({ taskId, reason: 'Task completed successfully' });
         }
     });
 
@@ -278,10 +297,10 @@ function createKernel({
             'TaskRuntime',
             'ObservationStore',
             'PolicyEngine',
-            'OrchestratorEngine',          // V2.0: Estratégias de execução
+            'OrchestratorEngine',
             'ExecutionEngine',
             'KernelNERVBridge',
-            'TaskExecutionOrchestrator',   // V2.0: Orquestração V5
+            'TaskExecutionOrchestrator',
             'KernelLoop'
         ],
         at: Date.now()
@@ -292,41 +311,28 @@ function createKernel({
   ========================================================= */
 
     const kernelInterface = Object.freeze({
-        /**
-         * Inicia o ciclo executivo do Kernel.
-         */
         start() {
             telemetry.info('kernel_start_requested', { at: Date.now() });
 
-            // Inicia ponte NERV (registra handlers)
             nervBridge.start();
-
-            // Inicia ciclo lógico
             kernelLoop.start();
 
             telemetry.info('kernel_started', { at: Date.now() });
         },
 
-        /**
-         * Para o ciclo executivo do Kernel.
-         */
         stop() {
             telemetry.info('kernel_stop_requested', { at: Date.now() });
 
-            // Para ciclo lógico
             kernelLoop.stop();
-
-            // Para ponte NERV
             nervBridge.stop();
 
+            // Limpa buffers de dispatch/retry para evitar reexecução “fantasma”
+            pendingDispatch.clear();
             retryCounts.clear();
 
             telemetry.info('kernel_stopped', { at: Date.now() });
         },
 
-        /**
-         * Retorna status técnico completo do Kernel.
-         */
         getStatus() {
             return Object.freeze({
                 loop: kernelLoop.getStatus(),
@@ -337,48 +343,23 @@ function createKernel({
             });
         },
 
-        /**
-         * Acesso à telemetria (somente leitura).
-         */
         telemetry,
-
-        /**
-         * Referência ao NERV (somente leitura).
-         */
         nerv,
 
-        /**
-         * Cria uma nova tarefa no Kernel.
-         * Retorna snapshot imutável da tarefa criada.
-         */
         createTask({ taskId, metadata = {} }) {
             return taskRuntime.createTask({ taskId, metadata });
         },
 
-        /**
-         * Retorna snapshot de uma tarefa específica.
-         */
         getTask(taskId) {
             return taskRuntime.getTask(taskId);
         },
 
-        /**
-         * Lista todas as tarefas existentes.
-         */
         listTasks() {
             return taskRuntime.listTasks();
         },
 
-        /**
-         * Executa uma task V5 (NOVO em V2.0).
-         * Integra com OrchestratorEngine para suportar strategies (ITERATIVE, MULTI_STEP, etc).
-         *
-         * @param {Object} task - Task V5
-         * @param {string} correlationId - ID de correlação NERV
-         * @returns {Promise<void>}
-         */
         async executeTask(task, correlationId) {
-            if (!task || !task.meta || !task.meta.id) {
+            if (!task?.meta?.id) {
                 throw new Error('executeTask requer task.meta.id válido');
             }
 
@@ -397,17 +378,12 @@ function createKernel({
 
             pendingDispatch.set(taskId, { task, correlationId });
 
-            // Fast path: ativa imediatamente, mantendo compatibilidade com integração atual
             await activateRuntimeTask({
                 taskId,
                 reason: 'Immediate activation on executeTask'
             });
         },
 
-        /**
-         * Shutdown gracioso do KERNEL.
-         * Para o loop de execução e limpa recursos.
-         */
         async shutdown() {
             telemetry.info('kernel_shutting_down', { at: Date.now() });
 
@@ -426,9 +402,7 @@ function createKernel({
         }
     });
 
-    telemetry.info('kernel_ready', {
-        at: Date.now()
-    });
+    telemetry.info('kernel_ready', { at: Date.now() });
 
     return kernelInterface;
 }
