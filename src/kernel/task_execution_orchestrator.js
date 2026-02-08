@@ -18,7 +18,13 @@ class TaskExecutionOrchestrator {
      * @param {Object} params.nerv - Instância do NERV
      * @param {Object} params.nervBridge - KernelNERVBridge
      */
-    constructor({ nerv, nervBridge, onTaskRetryRequested = null, onTaskPermanentFailure = null }) {
+    constructor({
+        nerv,
+        nervBridge,
+        onTaskRetryRequested = null,
+        onTaskPermanentFailure = null,
+        onTaskCompleted = null
+    }) {
         if (!nerv) {
             throw new Error('TaskExecutionOrchestrator requer NERV');
         }
@@ -30,6 +36,7 @@ class TaskExecutionOrchestrator {
         this.nervBridge = nervBridge;
         this.onTaskRetryRequested = onTaskRetryRequested;
         this.onTaskPermanentFailure = onTaskPermanentFailure;
+        this.onTaskCompleted = onTaskCompleted;
 
         // Cache de execuções em andamento: task_id → { task, correlationId, startedAt }
         this.activeExecutions = new Map();
@@ -154,6 +161,13 @@ class TaskExecutionOrchestrator {
 
         // Remove do cache se DONE
         if (decision.action === 'DONE') {
+            if (typeof this.onTaskCompleted === 'function') {
+                await this.onTaskCompleted({
+                    taskId,
+                    correlationId,
+                    decision
+                });
+            }
             this.activeExecutions.delete(taskId);
             this.processedExecutionEvents.delete(taskId);
         }

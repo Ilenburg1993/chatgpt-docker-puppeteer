@@ -172,7 +172,6 @@ function createKernel({
         if (taskExecutor) {
             await taskExecutor.executeTask(queued.task, queued.correlationId);
         }
-        pendingDispatch.delete(taskId);
     };
 
     const terminateRuntimeTask = async ({ taskId, reason }) => {
@@ -254,6 +253,9 @@ function createKernel({
         },
         onTaskPermanentFailure: async ({ taskId, reason }) => {
             await terminateRuntimeTask({ taskId, reason: reason || 'Permanent driver failure' });
+        },
+        onTaskCompleted: async ({ taskId }) => {
+            await terminateRuntimeTask({ taskId, reason: 'Task completed successfully' });
         }
     });
 

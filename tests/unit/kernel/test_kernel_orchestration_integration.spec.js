@@ -120,6 +120,64 @@ describe('Kernel Orchestration Integration (V2.0)', async () => {
 
     });
 
+    describe('2b. Retry scheduling', () => {
+        it('should keep dispatch payload available until retry handler consumes it', async () => {
+            kernel.start();
+
+            const retryableTask = {
+                meta: {
+                    id: 'task-retry-payload',
+                    version: '5.0',
+                    created_at: new Date().toISOString(),
+                    priority: 5,
+                    source: 'manual'
+                },
+                spec: {
+                    target: 'chatgpt',
+                    payload: {
+                        user_message: 'Trigger retry path'
+                    },
+                    execution: {
+                        strategy: 'SINGLE_SHOT'
+                    },
+                    validation: {
+                        validators: []
+                    }
+                },
+                state: {
+                    status: 'pending',
+                    created_at: new Date().toISOString(),
+                    history: []
+                },
+                policy: {
+                    max_cost_cents: 100,
+                    dependencies: []
+                }
+            };
+
+            await kernel.executeTask(retryableTask, 'corr-retry-001');
+            assert.strictEqual(nerv.emittedCommands.length, 1, 'Primeiro dispatch enviado ao driver');
+
+            nerv.receive({
+                kind: MessageType.EVENT,
+                actionCode: ActionCode.DRIVER_TASK_FAILED,
+                correlationId: 'corr-retry-001',
+                payload: {
+                    taskId: 'task-retry-payload',
+                    retryable: true,
+                    suggestedDelayMs: 0,
+                    reason: 'driver transient failure'
+                }
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 25));
+
+            assert.strictEqual(nerv.emittedCommands.length, 2, 'Kernel deve reenviar task no caminho de retry');
+
+            kernel.stop();
+        });
+    });
+
     describe('3. Task execution flow (ITERATIVE strategy)', async () => {
         it('should execute task V5 with ITERATIVE strategy and handle RETRY', async () => {
             kernel.start();
