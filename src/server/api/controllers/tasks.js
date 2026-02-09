@@ -968,6 +968,13 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                     failed.push({ id, error: 'Task RUNNING: ação não permitida' });
                     continue;
                 }
+
+                // If task is actively claimed (lock lease), block edits that would race with imminent execution.
+                const lockSnapshot = _getLockSnapshot(id);
+                if (status === 'PENDING' && _isTaskActivelyClaimed(lockSnapshot, now) && ['set_stage', 'set_target', 'set_priority', 'set_execute_after'].includes(action)) {
+                    failed.push({ id, error: 'Task em processamento (claim): pause/cancel antes de editar' });
+                    continue;
+                }
                 if (action === 'approve' && String(existing.stage || '').toUpperCase().trim() !== 'PROPOSED') {
                     failed.push({ id, error: 'Task não está em PROPOSED' });
                     continue;
