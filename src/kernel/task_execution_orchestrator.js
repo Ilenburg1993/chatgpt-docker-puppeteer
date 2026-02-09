@@ -106,20 +106,18 @@ class TaskExecutionOrchestrator {
             const msg = err?.message || String(err);
             logger.log('ERROR', `[TaskExecutionOrchestrator] beforeTaskExecution falhou: ${taskId} - ${msg}`, correlationId);
 
-            // Trata como falha permanente (pré-dispatch)
-            if (typeof this.onTaskPermanentFailure === 'function') {
-                await this.onTaskPermanentFailure({
-                    taskId,
-                    correlationId,
-                    reason: `beforeTaskExecution failed: ${msg}`,
-                    payload: { taskId, error: msg, reason: 'BEFORE_EXECUTION_FAILED', retryable: false }
-                });
-            }
-
             // Não mantém estado ativo (evita leak)
             this.activeExecutions.delete(taskId);
             this.processedExecutionEvents.delete(taskId);
-            return;
+
+            const error = new Error(`beforeTaskExecution failed: ${msg}`);
+            // @ts-ignore - attach structured metadata for SSOT worker
+            error.retryable = false;
+            // @ts-ignore
+            error.delayMs = 0;
+            // @ts-ignore
+            error.reason = 'BEFORE_EXECUTION_FAILED';
+            throw error;
         }
 
         // Cacheia task completa + correlationId para afterExecution
@@ -143,28 +141,20 @@ class TaskExecutionOrchestrator {
             const msg = err?.message || String(err);
             logger.log('ERROR', `[TaskExecutionOrchestrator] emitCommand falhou: ${taskId} - ${msg}`, correlationId);
 
-            if (typeof this.onTaskRetryRequested === 'function') {
-                await this.onTaskRetryRequested({
-                    taskId,
-                    correlationId,
-                    delayMs: 250,
-                    reason: `emitCommand failed: ${msg}`,
-                    nextAction: 'RETRY_LATER',
-                    payload: { taskId, error: msg, reason: 'EMIT_COMMAND_FAILED', retryable: true, suggestedDelayMs: 250 }
-                });
-            } else if (typeof this.onTaskPermanentFailure === 'function') {
-                await this.onTaskPermanentFailure({
-                    taskId,
-                    correlationId,
-                    reason: `emitCommand failed: ${msg}`,
-                    payload: { taskId, error: msg, reason: 'EMIT_COMMAND_FAILED', retryable: false }
-                });
-            }
-
             // Limpa estado para evitar “execução fantasma”
             this.activeExecutions.delete(taskId);
             this.processedExecutionEvents.delete(taskId);
-            return;
+
+            const error = new Error(`emitCommand failed: ${msg}`);
+            // @ts-ignore - attach structured metadata for SSOT worker
+            error.retryable = true;
+            // @ts-ignore
+            error.delayMs = 250;
+            // @ts-ignore
+            error.reason = 'EMIT_COMMAND_FAILED';
+            // @ts-ignore
+            error.nextAction = 'RETRY_LATER';
+            throw error;
         }
 
         logger.log('DEBUG', `[TaskExecutionOrchestrator] Task enviada para driver: ${taskId}`, correlationId);
@@ -210,6 +200,25 @@ class TaskExecutionOrchestrator {
             if (actionCode === ActionCode.DRIVER_TASK_FAILED) {
                 this._handleTaskFailed(/** @type {DriverTaskFailedPayload} */ (payload), correlationId).catch(err => {
                     logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_FAILED falhou: ${err?.message || String(err)}`, correlationId);
+                });
+                return;
+            }
+
+            if (actionCode === ActionCode.DRIVER_TASK_ABORTED) {
+                // Treat abort as a non-retryable terminal failure for kernel lifecycle purposes.
+                const safePayload = payload && typeof payload === 'object' ? payload : {};
+                const taskId = safePayload.taskId;
+                this._handleTaskFailed(
+                    /** @type {DriverTaskFailedPayload} */ ({
+                        taskId,
+                        error: safePayload?.message || 'Task aborted',
+                        reason: safePayload?.reason || 'ABORTED',
+                        retryable: false,
+                        next_action: 'ABORT',
+                    }),
+                    correlationId
+                ).catch(err => {
+                    logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_ABORTED falhou: ${err?.message || String(err)}`, correlationId);
                 });
                 return;
             }

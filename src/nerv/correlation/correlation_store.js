@@ -25,6 +25,8 @@
    Utilitários internos
 =========================== */
 
+import { getMessageType, getMsgId } from '#shared/nerv/envelope_reader';
+
 /**
  * Retorna timestamp técnico de chegada.
  */
@@ -118,16 +120,15 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * P9.5: Adiciona memoization de JSON serialization
      */
     function createRecord(envelope) {
-        // P9.5: Lazy init de serialização cacheada
-        if (!envelope._serialized) {
-            envelope._serialized = JSON.stringify(envelope);
-        }
+        const messageType = getMessageType(envelope);
+        const msgId = getMsgId(envelope);
+        const cachedJson = JSON.stringify(envelope);
 
         return Object.freeze({
             timestamp: now(),
-            kind: envelope.kind,
-            msg_id: envelope.ids ? envelope.ids.msg_id : null,
-            _cached_json: envelope._serialized
+            kind: messageType,
+            msg_id: msgId,
+            _cached_json: cachedJson
         });
     }
 

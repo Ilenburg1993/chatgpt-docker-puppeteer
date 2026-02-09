@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActorRole } from '#shared/nerv/constants';
+import { ActorRole, ActionCode } from '#shared/nerv/constants';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { KernelLoop } from './kernel_loop/kernel_loop.js';
 import { TaskRuntime, TaskState } from './task_runtime/task_runtime.js';
 import { ObservationStore } from './observation_store/observation_store.js';
@@ -13,6 +14,187 @@ import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
 /* ===========================
    Fábrica do Kernel
 =========================== */
+
+function _makeRetryableEmitError(err) {
+    const message = err?.message || String(err);
+    const error = new Error(`emitCommand failed: ${message}`);
+    // @ts-ignore - structured metadata for SSOT workers
+    error.retryable = true;
+    // @ts-ignore
+    error.delayMs = 250;
+    // @ts-ignore
+    error.reason = 'EMIT_COMMAND_FAILED';
+    // @ts-ignore
+    error.nextAction = 'RETRY_LATER';
+    return error;
+}
+
+function createSsotGatewayKernel({
+    nerv,
+    telemetry: telemetryOptions = {},
+    pump: pumpOptions = {}
+} = {}) {
+    if (!nerv) {
+        throw new Error('Kernel requer instância do NERV configurada');
+    }
+
+    const telemetry = new KernelTelemetry({
+        nerv,
+        source: ActorRole.KERNEL.toLowerCase(),
+        retention: 1000,
+        ...telemetryOptions
+    });
+
+    const baseIntervalMs = Math.max(10, Number(pumpOptions.baseIntervalMs ?? 50) || 50);
+
+    let running = false;
+    let timer = null;
+    let tickCounter = 0;
+    let lastTickAt = null;
+
+    async function step() {
+        if (!running) return;
+
+        tickCounter += 1;
+        lastTickAt = Date.now();
+
+        const buffers = nerv?.buffers;
+        const transport = nerv?.transport;
+
+        // Inbound drain (optional): processes raw frames/envelopes placed into NERV inbound buffer.
+        if (buffers && typeof buffers.dequeueInbound === 'function' && typeof nerv.receive === 'function') {
+            let drained = 0;
+            while (drained < 100) {
+                const raw = buffers.dequeueInbound();
+                if (!raw) break;
+                try {
+                    nerv.receive(raw);
+                } catch (err) {
+                    telemetry.warning('kernel_ssot_gateway_inbound_receive_failed', {
+                        error: err?.message || String(err),
+                        at: Date.now()
+                    });
+                }
+                drained += 1;
+            }
+        }
+
+        // Outbound drain: sends envelopes to transport. In HYBRID mode, transport.send(envelope) is the right contract.
+        if (buffers && typeof buffers.dequeueOutbound === 'function') {
+            let drained = 0;
+            while (drained < 100) {
+                const envelope = buffers.dequeueOutbound();
+                if (!envelope) break;
+
+                if (transport && typeof transport.send === 'function') {
+                    try {
+                        transport.send(envelope);
+                    } catch (err) {
+                        try {
+                            const serialized = JSON.stringify(envelope);
+                            const buffer = Buffer.from(serialized, 'utf8');
+                            transport.send(buffer);
+                        } catch (fallbackError) {
+                            telemetry.critical('kernel_ssot_gateway_outbound_send_failed', {
+                                error: fallbackError?.message || err?.message || String(fallbackError || err),
+                                at: Date.now()
+                            });
+                        }
+                    }
+                } else if (typeof nerv.receive === 'function') {
+                    // Local fallback: deliver directly to NERV reception in-process.
+                    try {
+                        nerv.receive(envelope);
+                    } catch (err) {
+                        telemetry.warning('kernel_ssot_gateway_outbound_loopback_failed', {
+                            error: err?.message || String(err),
+                            at: Date.now()
+                        });
+                    }
+                }
+
+                drained += 1;
+            }
+        }
+    }
+
+    function start({ autoLoop = true } = {}) {
+        telemetry.info('kernel_start_requested', { at: Date.now(), mode: 'ssot_gateway' });
+        running = true;
+
+        if (autoLoop) {
+            timer = setInterval(() => {
+                void step();
+            }, baseIntervalMs);
+        }
+
+        telemetry.info('kernel_started', { at: Date.now(), mode: 'ssot_gateway' });
+    }
+
+    function stop() {
+        telemetry.info('kernel_stop_requested', { at: Date.now(), mode: 'ssot_gateway' });
+        running = false;
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+        telemetry.info('kernel_stopped', { at: Date.now(), mode: 'ssot_gateway' });
+    }
+
+    async function executeTask(task, correlationId) {
+        if (!task?.meta?.id) {
+            throw new Error('executeTask requer task.meta.id válido');
+        }
+
+        try {
+            HighLevelNERV.sendCommand(
+                nerv,
+                ActorRole.KERNEL,
+                ActionCode.DRIVER_EXECUTE_TASK,
+                {
+                    actionCode: ActionCode.DRIVER_EXECUTE_TASK,
+                    task
+                },
+                correlationId || null,
+                ActorRole.DRIVER
+            );
+        } catch (err) {
+            throw _makeRetryableEmitError(err);
+        }
+    }
+
+    const kernelInterface = Object.freeze({
+        start,
+        stop,
+        step,
+        executeTask,
+        getStatus() {
+            const status = {
+                mode: 'ssot_gateway',
+                pump: {
+                    running,
+                    ticks: tickCounter,
+                    lastTickAt,
+                    baseIntervalMs
+                },
+                nerv: {
+                    hasBuffers: Boolean(nerv?.buffers),
+                    hasTransport: Boolean(nerv?.transport)
+                },
+                telemetry: telemetry.getStats()
+            };
+            return Object.freeze(status);
+        },
+        telemetry,
+        nerv,
+        async shutdown() {
+            stop();
+        }
+    });
+
+    telemetry.info('kernel_ready', { at: Date.now(), mode: 'ssot_gateway' });
+    return kernelInterface;
+}
 
 /**
  * Cria e compõe o Kernel de forma explícita e determinística.
@@ -33,7 +215,7 @@ import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
  *
  * @throws {Error} Se NERV não for fornecido
  */
-function createKernel({
+function createLegacyKernel({
     nerv,
     contextManager = null,
     telemetry: telemetryOptions = {},
@@ -122,17 +304,11 @@ function createKernel({
     /** @type {Map<string, {task: Object, correlationId: string}>} */
     const pendingDispatch = new Map();
 
-    /** @type {Map<string, number>} */
-    const retryCounts = new Map();
-
-    const MAX_KERNEL_RETRIES = Number(process.env.KERNEL_MAX_RETRIES || 3);
-
     /** @type {TaskExecutionOrchestrator|null} */
     let taskExecutor = null;
 
     const cleanupTaskDispatchState = taskId => {
         pendingDispatch.delete(taskId);
-        retryCounts.delete(taskId);
     };
 
     const terminateRuntimeTask = async ({ taskId, reason }) => {
@@ -140,6 +316,11 @@ function createKernel({
 
         if (!runtime || runtime.state === TaskState.TERMINATED) {
             cleanupTaskDispatchState(taskId);
+            try {
+                taskRuntime.forgetTask(taskId);
+            } catch (_) {
+                /* ignore */
+            }
             return;
         }
 
@@ -150,6 +331,11 @@ function createKernel({
         });
 
         cleanupTaskDispatchState(taskId);
+        try {
+            taskRuntime.forgetTask(taskId);
+        } catch (_) {
+            /* ignore */
+        }
     };
 
     const suspendRuntimeTask = async ({ taskId, reason }) => {
@@ -163,55 +349,6 @@ function createKernel({
             newState: TaskState.SUSPENDED,
             reason: reason || 'Task suspended by kernel decision'
         });
-    };
-
-    const scheduleRetry = async ({ taskId, delayMs = 0, reason }) => {
-        const queued = pendingDispatch.get(taskId);
-        if (!queued) {
-            return;
-        }
-
-        const retries = retryCounts.get(taskId) || 0;
-        if (retries >= MAX_KERNEL_RETRIES) {
-            await terminateRuntimeTask({
-                taskId,
-                reason: `Retry budget exceeded: ${reason || 'driver failure'}`
-            });
-            return;
-        }
-
-        retryCounts.set(taskId, retries + 1);
-
-        await suspendRuntimeTask({
-            taskId,
-            reason: `Retry scheduled (${retries + 1}/${MAX_KERNEL_RETRIES})`
-        });
-
-        setTimeout(async () => {
-            try {
-                const current = taskRuntime.getTask(taskId);
-                if (!current || current.state === TaskState.TERMINATED) {
-                    return;
-                }
-
-                taskRuntime.applyStateTransition({
-                    taskId,
-                    newState: TaskState.ACTIVE,
-                    reason: 'Retry execution resumed'
-                });
-
-                const currentQueued = pendingDispatch.get(taskId);
-                if (currentQueued && taskExecutor) {
-                    await taskExecutor.executeTask(currentQueued.task, currentQueued.correlationId);
-                }
-            } catch (error) {
-                telemetry.warning('kernel_retry_schedule_failed', {
-                    taskId,
-                    error: error?.message || String(error),
-                    at: Date.now()
-                });
-            }
-        }, Math.max(0, delayMs));
     };
 
     const activateRuntimeTask = async ({ taskId, reason }) => {
@@ -243,7 +380,7 @@ function createKernel({
         }
 
         // CRÍTICO: NÃO apagar pendingDispatch aqui.
-        // Ele é a fonte do retry e da reexecução. A limpeza deve ocorrer em "terminate"/"completed".
+        // A limpeza deve ocorrer em "terminate"/"completed".
         try {
             await taskExecutor.executeTask(queued.task, queued.correlationId);
         } catch (error) {
@@ -253,12 +390,13 @@ function createKernel({
                 at: Date.now()
             });
 
-            // Fail-safe: não deixa task “ACTIVE e abandonada” se a dispatch falhar.
-            await scheduleRetry({
+            // SSOT (SQLite) é o único dono de retry/scheduling.
+            // O Kernel encerra o runtime e deixa o worker decidir reschedule.
+            await terminateRuntimeTask({
                 taskId,
-                delayMs: 250,
-                reason: `Dispatch failed: ${error?.message || String(error)}`
+                reason: `Dispatch failed (SSOT will reschedule): ${error?.message || String(error)}`
             });
+            throw error;
         }
     };
 
@@ -266,7 +404,11 @@ function createKernel({
         nerv,
         nervBridge,
         onTaskRetryRequested: async ({ taskId, delayMs, reason }) => {
-            await scheduleRetry({ taskId, delayMs, reason });
+            // SSOT handles retry scheduling (execute_after_ms). Kernel only terminates runtime.
+            await terminateRuntimeTask({
+                taskId,
+                reason: `Retry requested (SSOT will reschedule, delayMs=${Number(delayMs) || 0}): ${reason || 'driver retry'}`
+            });
         },
         onTaskPermanentFailure: async ({ taskId, reason }) => {
             await terminateRuntimeTask({ taskId, reason: reason || 'Permanent driver failure' });
@@ -311,11 +453,11 @@ function createKernel({
   ========================================================= */
 
     const kernelInterface = Object.freeze({
-        start() {
+        start({ autoLoop = true } = {}) {
             telemetry.info('kernel_start_requested', { at: Date.now() });
 
             nervBridge.start();
-            kernelLoop.start();
+            kernelLoop.start({ autoSchedule: Boolean(autoLoop) });
 
             telemetry.info('kernel_started', { at: Date.now() });
         },
@@ -328,7 +470,6 @@ function createKernel({
 
             // Limpa buffers de dispatch/retry para evitar reexecução “fantasma”
             pendingDispatch.clear();
-            retryCounts.clear();
 
             telemetry.info('kernel_stopped', { at: Date.now() });
         },
@@ -341,6 +482,10 @@ function createKernel({
                 nerv: nervBridge.getStatus(),
                 telemetry: telemetry.getStats()
             });
+        },
+
+        async step() {
+            await kernelLoop.step();
         },
 
         telemetry,
@@ -364,6 +509,16 @@ function createKernel({
             }
 
             const taskId = task.meta.id;
+
+            const existingRuntime = taskRuntime.getTask(taskId);
+            if (existingRuntime && existingRuntime.state === TaskState.TERMINATED) {
+                // Allow SSOT to re-dispatch the same taskId after terminal by forgetting runtime state.
+                try {
+                    taskRuntime.forgetTask(taskId);
+                } catch (_) {
+                    /* ignore */
+                }
+            }
 
             if (!taskRuntime.getTask(taskId)) {
                 taskRuntime.createTask({
@@ -396,7 +551,6 @@ function createKernel({
             }
 
             pendingDispatch.clear();
-            retryCounts.clear();
 
             telemetry.info('kernel_shutdown_complete', { at: Date.now() });
         }
@@ -405,6 +559,19 @@ function createKernel({
     telemetry.info('kernel_ready', { at: Date.now() });
 
     return kernelInterface;
+}
+
+/**
+ * createKernel (vNext)
+ * - default: SSOT-first execution gateway + NERV pump
+ * - optional: legacy "decisor soberano" kernel (mode='legacy')
+ */
+function createKernel(config = {}) {
+    const mode = config?.mode || 'ssot_gateway';
+    if (mode === 'legacy') {
+        return createLegacyKernel(config);
+    }
+    return createSsotGatewayKernel(config);
 }
 
 export { createKernel };

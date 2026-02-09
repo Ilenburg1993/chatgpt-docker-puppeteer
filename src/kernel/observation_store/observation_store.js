@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
+import { getCorrelationId, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
 
 /* ===========================
    Estrutura de Registro de Observação
@@ -13,9 +14,11 @@ import EventEmitter from 'node:events';
  * @returns {Object}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {
-    // P9.5: Lazy init de serialização cacheada para payload
-    if (payload && typeof payload === 'object' && !payload._serialized) {
-        payload._serialized = JSON.stringify(payload);
+    let payloadSerialized = null;
+    try {
+        payloadSerialized = JSON.stringify(payload ?? null);
+    } catch (_) {
+        payloadSerialized = JSON.stringify({ error: 'payload_json_stringify_failed' });
     }
 
     return Object.freeze({
@@ -23,6 +26,7 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
         correlationId,
         source,
         payload: Object.freeze(payload),
+        payloadSerialized,
         originalTimestamp: originalTimestamp ?? null,
         ingestedAt: Date.now()
     });
@@ -93,16 +97,15 @@ class ObservationStore extends EventEmitter {
             throw new Error('ingestEvent requer envelope válido');
         }
 
-        const { ids, header, payload } = eventEnvelope;
-
-        if (!ids || !ids.msg_id || !ids.correlation_id) {
-            throw new Error('EVENT inválido: ids ausentes');
+        const msgId = getMsgId(eventEnvelope);
+        const correlationId = getCorrelationId(eventEnvelope);
+        if (!msgId || !correlationId) {
+            throw new Error('EVENT inválido: msg_id/correlation_id ausentes');
         }
 
-        const msgId = ids.msg_id;
-        const correlationId = ids.correlation_id;
-        const source = header?.source ?? 'unknown';
-        const originalTimestamp = header?.timestamp ?? null;
+        const payload = getPayload(eventEnvelope);
+        const source = eventEnvelope?.identity?.actor || eventEnvelope?.header?.source || 'unknown';
+        const originalTimestamp = eventEnvelope?.protocol?.timestamp ?? eventEnvelope?.header?.timestamp ?? null;
 
         const isDuplicate = this.seenMsgIds.has(msgId);
 

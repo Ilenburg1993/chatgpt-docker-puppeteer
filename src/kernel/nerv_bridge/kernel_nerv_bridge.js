@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { getCorrelationId, getMessageType, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
 
 /* ===========================
    Utilitários internos
@@ -10,7 +11,11 @@ import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
  * Valida envelope recebido do NERV.
  */
 function isValidEnvelope(envelope) {
-    return envelope && envelope.header && envelope.ids && envelope.kind && envelope.payload;
+    if (!envelope || typeof envelope !== 'object') return false;
+    const kind = getMessageType(envelope);
+    const correlationId = getCorrelationId(envelope);
+    const payload = getPayload(envelope);
+    return Boolean(kind && correlationId && payload && typeof payload === 'object');
 }
 
 /**
@@ -18,12 +23,12 @@ function isValidEnvelope(envelope) {
  */
 function extractEnvelopeData(envelope) {
     return {
-        msgId: envelope.ids?.msg_id ?? null,
-        correlationId: envelope.ids?.correlation_id ?? null,
-        source: envelope.header?.source ?? 'unknown',
-        timestamp: envelope.header?.timestamp ?? Date.now(),
-        kind: envelope.kind,
-        payload: envelope.payload
+        msgId: getMsgId(envelope),
+        correlationId: getCorrelationId(envelope),
+        source: envelope?.identity?.actor || envelope?.header?.source || 'unknown',
+        timestamp: envelope?.protocol?.timestamp ?? envelope?.header?.timestamp ?? Date.now(),
+        kind: getMessageType(envelope),
+        payload: getPayload(envelope)
     };
 }
 

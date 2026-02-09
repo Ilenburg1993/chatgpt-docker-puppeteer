@@ -26,6 +26,8 @@
    Utilitários internos
 =========================== */
 
+import { getCorrelationId, getMessageType } from '#shared/nerv/envelope_reader';
+
 /**
  * Executa handlers de forma isolada.
  * Falhas são capturadas e observadas.
@@ -105,12 +107,11 @@ function createReception({ envelopes, correlation, telemetry }) {
         }
 
         // 4. Registro histórico de correlação
-        if (normalized.ids && normalized.ids.correlation_id) {
-            correlation.append(normalized.ids.correlation_id, normalized);
-        }
+        const correlationId = getCorrelationId(normalized);
+        if (correlationId) correlation.append(correlationId, normalized);
 
         telemetry.emit('nerv:reception:accepted', {
-            kind: normalized.kind
+            kind: getMessageType(normalized)
         });
 
         // 5. Notificação de handlers

@@ -125,6 +125,26 @@ class TaskRuntime extends EventEmitter {
         return this._snapshot(task);
     }
 
+    /**
+     * Remove completamente uma task do runtime (esquecimento).
+     * Útil para permitir re-execução pós-terminal quando o SSOT (DB)
+     * decide rearmar a mesma taskId.
+     *
+     * @param {string} taskId
+     * @returns {boolean} true se removeu
+     */
+    forgetTask(taskId) {
+        if (!taskId || typeof taskId !== 'string') {
+            throw new Error('forgetTask requer taskId válido');
+        }
+        const existed = this.tasks.delete(taskId);
+        if (existed) {
+            this.telemetry.info('task_runtime_task_forgotten', { taskId, at: Date.now() });
+            this.emit('task_forgotten', { taskId });
+        }
+        return existed;
+    }
+
     /* ===========================
      TRANSIÇÕES DE ESTADO
   =========================== */

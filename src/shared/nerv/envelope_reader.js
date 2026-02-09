@@ -30,6 +30,16 @@ function getCorrelationId(envelope) {
     );
 }
 
+function getMsgId(envelope) {
+    return (
+        envelope?.msgId ||
+        envelope?.ids?.msg_id ||
+        envelope?.ids?.msgId ||
+        envelope?.causality?.msg_id ||
+        null
+    );
+}
+
 function getPayload(envelope) {
     return envelope?.payload || {};
 }
@@ -38,4 +48,4 @@ function getTaskIdFromPayload(payload) {
     return payload?.taskId || payload?.task_id || payload?.task?.meta?.id || payload?.task?.id || null;
 }
 
-export { getMessageType, getActionCode, getCorrelationId, getPayload, getTaskIdFromPayload };
+export { getMessageType, getActionCode, getCorrelationId, getMsgId, getPayload, getTaskIdFromPayload };

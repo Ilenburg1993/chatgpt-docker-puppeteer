@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { MessageType } from '#shared/nerv/constants';
+import { getCorrelationId } from '#shared/nerv/envelope_reader';
 
 /* ===========================
    Fábrica do emissor de ACK
@@ -59,9 +60,8 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
         }
 
         // 3. Registro histórico (ACK também é fato)
-        if (normalized.ids && normalized.ids.correlation_id) {
-            correlation.append(normalized.ids.correlation_id, normalized);
-        }
+        const correlationId = getCorrelationId(normalized);
+        if (correlationId) correlation.append(correlationId, normalized);
 
         // 4. Enfileiramento outbound
         const accepted = buffers.enqueueOutbound(normalized);

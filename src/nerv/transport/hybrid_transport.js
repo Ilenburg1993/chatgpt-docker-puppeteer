@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { CONNECTION_MODES } from '#core/constants/browser';
+import { getActionCode, getCorrelationId, getMessageType, getMsgId } from '#shared/nerv/envelope_reader';
 
 /**
  * Cria transporte híbrido com suporte local + remoto.
@@ -98,8 +99,11 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         }
 
         telemetry.emit('hybrid_transport_sent', {
-            actor: envelope.actor,
-            actionCode: envelope.actionCode,
+            actor: envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null,
+            actionCode: getActionCode(envelope),
+            msgId: getMsgId(envelope),
+            correlationId: getCorrelationId(envelope),
+            messageType: getMessageType(envelope),
             mode: mode === CONNECTION_MODES.HYBRID ? 'local+remote' : CONNECTION_MODES.LOCAL
         });
     }
@@ -136,12 +140,16 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
      * @returns {Function} Unsubscribe function
      */
     function onEvent(actionCode, handler) {
+        if (typeof actionCode !== 'string' || !actionCode.trim()) {
+            throw new Error('onEvent requer actionCode string');
+        }
         if (typeof handler !== 'function') {
             throw new Error('onEvent requer função');
         }
 
         const wrappedHandler = envelope => {
-            if (envelope.actionCode === actionCode) {
+            if (getMessageType(envelope) !== 'EVENT') return;
+            if (getActionCode(envelope) === actionCode) {
                 handler(envelope);
             }
         };
@@ -162,7 +170,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         }
 
         const wrappedHandler = envelope => {
-            if (envelope.actor === actor) {
+            const a = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
+            if (a === actor) {
                 handler(envelope);
             }
         };

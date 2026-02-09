@@ -108,7 +108,7 @@ class KernelLoop {
     /**
      * Inicia o ciclo executivo do Kernel.
      */
-    start() {
+    start({ autoSchedule = true } = {}) {
         if (this.state === KernelLoopState.ACTIVE) {
             this.telemetry.warning('kernel_loop_already_active', {
                 at: Date.now()
@@ -123,7 +123,9 @@ class KernelLoop {
             at: Date.now()
         });
 
-        this._scheduleNextTick();
+        if (autoSchedule) {
+            this._scheduleNextTick();
+        }
     }
 
     /**
@@ -183,17 +185,6 @@ class KernelLoop {
         const startedAt = Date.now();
         this._lastTickAt = startedAt;
 
-        // ✅ 0. Verifica Circuit Breaker ANTES de executar
-        if (this._checkCircuitBreaker()) {
-            // Sistema pausado - pula execução mas mantém loop ativo
-            this.telemetry.info('kernel_loop_paused', {
-                tickId,
-                reason: 'Circuit Breaker OPEN',
-                at: startedAt
-            });
-            return;
-        }
-
         this.telemetry.info('kernel_loop_tick_start', {
             tickId,
             state: this.state,
@@ -208,6 +199,20 @@ class KernelLoop {
 
             // 1. Drenagem de buffer inbound (EVENTs recebidos)
             this._drainInbound();
+
+            // ✅ 1.5. Circuit Breaker gate (mas mantém drenagem de NERV)
+            if (this._checkCircuitBreaker()) {
+                // Sistema pausado - não avalia nem aplica decisões, mas continua permitindo
+                // controle/observação via NERV (inbound/outbound).
+                this.telemetry.info('kernel_loop_paused', {
+                    tickId,
+                    reason: 'Circuit Breaker OPEN',
+                    at: startedAt
+                });
+
+                this._drainOutbound();
+                return;
+            }
 
             // 2. Avaliação semântica (produz propostas de decisão)
             const proposals = this.executionEngine.evaluate({
@@ -330,17 +335,24 @@ class KernelLoop {
                 break;
             }
 
-            // Serializa e envia via transporte
+            // Envia via transporte.
+            // Em modo HYBRID (EventEmitter + Socket.io), o contrato é transport.send(envelope).
+            // Em transportes legados/frame-based, pode ser necessário enviar Buffer.
             try {
-                const serialized = JSON.stringify(envelope);
-                const buffer = Buffer.from(serialized, 'utf8');
-                transport.send(buffer);
+                transport.send(envelope);
                 drained++;
             } catch (error) {
-                this.telemetry.critical('kernel_loop_outbound_send_failed', {
-                    error: error.message,
-                    at: Date.now()
-                });
+                try {
+                    const serialized = JSON.stringify(envelope);
+                    const buffer = Buffer.from(serialized, 'utf8');
+                    transport.send(buffer);
+                    drained++;
+                } catch (fallbackError) {
+                    this.telemetry.critical('kernel_loop_outbound_send_failed', {
+                        error: fallbackError?.message || error?.message || String(fallbackError || error),
+                        at: Date.now()
+                    });
+                }
             }
         }
 

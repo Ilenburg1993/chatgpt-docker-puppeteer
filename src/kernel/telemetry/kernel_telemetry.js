@@ -302,7 +302,8 @@ class KernelTelemetry {
 
         // ONDA 2.5: Delega para NERV, filtra apenas eventos KERNEL_TELEMETRY
         return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            if (envelope.actor === ActorRole.KERNEL) {
+            const actor = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
+            if (actor === ActorRole.KERNEL) {
                 handler(envelope.payload);
             }
         });
@@ -318,7 +319,8 @@ class KernelTelemetry {
         }
 
         return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            if (envelope.actor === ActorRole.KERNEL && envelope.payload.type === type) {
+            const actor = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
+            if (actor === ActorRole.KERNEL && envelope.payload.type === type) {
                 handler(envelope.payload);
             }
         });
@@ -334,7 +336,8 @@ class KernelTelemetry {
         }
 
         return this.nerv.onEvent('KERNEL_TELEMETRY', envelope => {
-            if (envelope.actor === ActorRole.KERNEL && envelope.payload.severity === severity) {
+            const actor = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
+            if (actor === ActorRole.KERNEL && envelope.payload.severity === severity) {
                 handler(envelope.payload);
             }
         });

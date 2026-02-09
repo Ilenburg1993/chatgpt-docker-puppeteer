@@ -9,6 +9,7 @@ import createHybridTransport from './transport/hybrid_transport.js';
 import createEmission from './emission/emission.js';
 import createReception from './reception/reception.js';
 import createHealth from './health/health.js';
+import { getActionCode, getMessageType } from '#shared/nerv/envelope_reader';
 
 /* ===========================
    Funções auxiliares de bootstrap
@@ -80,6 +81,8 @@ function buildPublicAPI({
     telemetry,
     socketAdapter
 }) {
+    const baseOnReceive = hybridTransport ? hybridTransport.onReceive : reception.onReceive;
+
     return {
         /* Emissão */
         emit: envelope => {
@@ -102,10 +105,43 @@ function buildPublicAPI({
 
         /* Recepção */
         receive: reception.receive,
-        onReceive: hybridTransport ? hybridTransport.onReceive : reception.onReceive,
-        onEvent: hybridTransport ? hybridTransport.onEvent : reception.onEvent || reception.onReceive,
+        onReceive: baseOnReceive,
+        onEvent: (actionCodeOrHandler, maybeHandler) => {
+            // overload:
+            // - onEvent(handler) => all EVENT envelopes
+            // - onEvent(actionCode, handler) => EVENT envelopes with action_code == actionCode
+            if (typeof actionCodeOrHandler === 'function') {
+                const handler = actionCodeOrHandler;
+                return baseOnReceive(envelope => {
+                    if (getMessageType(envelope) === 'EVENT') handler(envelope);
+                });
+            }
+
+            if (typeof actionCodeOrHandler === 'string' && typeof maybeHandler === 'function') {
+                const actionCode = actionCodeOrHandler;
+                const handler = maybeHandler;
+                return baseOnReceive(envelope => {
+                    if (getMessageType(envelope) !== 'EVENT') return;
+                    if (getActionCode(envelope) !== actionCode) return;
+                    handler(envelope);
+                });
+            }
+
+            throw new Error('onEvent requer (handler) ou (actionCode, handler)');
+        },
         onCommand: reception.onCommand || reception.onReceive,
-        onActor: hybridTransport ? hybridTransport.onActor : reception.onReceive,
+        onActor: (actor, handler) => {
+            if (typeof actor !== 'string' || !actor.trim()) {
+                throw new Error('onActor requer actor string');
+            }
+            if (typeof handler !== 'function') {
+                throw new Error('onActor requer função');
+            }
+            return baseOnReceive(envelope => {
+                const a = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
+                if (a === actor) handler(envelope);
+            });
+        },
 
         /* Buffers (exposição explícita; sem auto-drain) */
         buffers,
