@@ -544,7 +544,10 @@ class DriverFactory extends EventEmitter {
         const pool = this.pool.get(key);
 
         if (!pool) {
-            throw new Error(`[FACTORY] Invalid target: ${key}`);
+            const err = new Error(`[FACTORY] Invalid target: ${key}`);
+            err.code = 'INVALID_TARGET';
+            err.details = { target: key };
+            throw err;
         }
 
         // 1. Busca driver disponível (não busy, estado UNATTACHED)
@@ -631,10 +634,18 @@ class DriverFactory extends EventEmitter {
                     }
 
                     // ✅ C1: REJECT como último recurso
-                    throw new Error(
+                    const err = new Error(
                         `[FACTORY] POOL_EXHAUSTED: All ${FACTORY_CONFIG.MAX_POOL_SIZE} drivers for ${key} are busy ` +
                             `(timeout waiting for release: ${FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS}ms)`
                     );
+                    err.code = 'DRIVER_POOL_EXHAUSTED';
+                    err.details = {
+                        target: key,
+                        poolSize: pool.length,
+                        maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
+                        timeoutMs: FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS,
+                    };
+                    throw err;
                 }
             }
         }
@@ -1044,9 +1055,17 @@ class DriverFactory extends EventEmitter {
 
         for (const [target, pool] of this.pool.entries()) {
             for (const entry of pool) {
-                if (!entry.driver.destroyed) {
+                const driver = entry?.driver;
+                if (!driver) {
+                    continue;
+                }
+                if (typeof driver.destroy !== 'function') {
+                    log('WARN', `[FACTORY] Driver entry for '${target}' has no destroy() function. Skipping.`);
+                    continue;
+                }
+                if (!driver.destroyed) {
                     destroyPromises.push(
-                        entry.driver.destroy().catch(err => {
+                        driver.destroy().catch(err => {
                             log('WARN', `[FACTORY] Error destroying driver ${target}: ${err.message}`);
                         })
                     );

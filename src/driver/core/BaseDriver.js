@@ -69,12 +69,8 @@ class BaseDriver extends TargetDriver {
     constructor(config) {
         super(config);
 
-        // ✅ v2.0: Readonly properties
-        Object.defineProperty(this, 'name', {
-            value: 'BaseUniversalDriver',
-            writable: false,
-            enumerable: true,
-        });
+        // Driver identification (writable so target drivers can override)
+        this.name = 'BaseUniversalDriver';
 
         // ✅ v3.0: currentDomain será atualizado quando page for attached
         this.currentDomain = null;

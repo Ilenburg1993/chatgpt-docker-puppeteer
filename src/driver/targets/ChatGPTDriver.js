@@ -112,10 +112,43 @@ class ChatGPTDriver extends BaseDriver {
     // ========================================================================
 
     /**
+     * Executa 1 prompt → 1 resposta (contrato do TargetDriver).
+     *
+     * @param {string} prompt
+     * @returns {Promise<string>}
+     * @override
+     */
+    async execute(prompt) {
+        if (!this.isContextAttached()) {
+            throw new Error('CONTEXT_NOT_ATTACHED');
+        }
+
+        const text = typeof prompt === 'string' ? prompt : String(prompt ?? '');
+        if (!text.trim()) {
+            throw new Error('PROMPT_EMPTY');
+        }
+
+        // Preflight: valida página/interface e falha com reason codes úteis para o SSOT.
+        await this.validatePage();
+
+        if (this.signal?.aborted) {
+            throw new Error('OPERATION_ABORTED');
+        }
+
+        const startSnapshot = await this.captureState();
+        await this.prepareContext({ model: this.config?.model, config: this.config });
+        await this.sendPrompt(text, { humanTyping: true });
+        const result = await this.waitForCompletion(startSnapshot, this.signal);
+
+        this.setState(STATUS_VALUES.IDLE);
+        return result;
+    }
+
+    /**
      * Valida se a página está em estado utilizável.
      * Verifica URL válida + Interface LLM carregada.
      *
-     * @returns {Promise<boolean>} true se página válida, false caso contrário
+     * @returns {Promise<boolean>} true se página válida
      * @override
      */
     async validatePage() {
@@ -124,15 +157,17 @@ class ChatGPTDriver extends BaseDriver {
         // Valida URL
         const pageValidation = await validateLLMPage(this.page);
         if (!pageValidation.valid) {
-            log('WARN', `[ChatGPTDriver] Página inválida: ${pageValidation.reason}`);
-            return false;
+            const err = new Error(`PREREQUISITE_FAILED: ${pageValidation.reason}`);
+            err.details = pageValidation.details;
+            throw err;
         }
 
         // Valida interface carregada
         const interfaceValidation = await validateLLMInterface(this.page);
         if (!interfaceValidation.valid) {
-            log('WARN', `[ChatGPTDriver] Interface não carregada: ${interfaceValidation.reason}`);
-            return false;
+            const err = new Error(`PREREQUISITE_FAILED: ${interfaceValidation.reason}`);
+            err.details = interfaceValidation.details;
+            throw err;
         }
 
         return true;

@@ -128,22 +128,24 @@ class DriverReadinessGuard {
             // CHECK 2: Page Stable (Stabilizer)
             // ============================================
             try {
-                const stabilityResult = await stabilizer.waitForStability(this.driver.page, {
-                    timeout: opts.stabilityTimeout,
-                    phases: ['network_idle', 'spinner_check', 'dom_entropy'],
-                });
+                const stabilityResult = await stabilizer.waitForStability(
+                    this.driver,
+                    Number(opts.stabilityTimeout) || 10000,
+                    this.driver.signal || null
+                );
 
-                if (!stabilityResult.stable) {
+                if (!stabilityResult?.success) {
+                    const reason = stabilityResult?.timeout ? 'timeout' : 'unstable';
                     issues.push({
                         check: CHECK_TYPES.PAGE_STABLE,
                         severity: SEVERITY.WARNING,
-                        message: `Page not stable: ${stabilityResult.reason || 'unknown'}`,
+                        message: `Page not stable: ${reason}`,
                         details: stabilityResult,
                     });
 
                     log(
                         'WARN',
-                        `[DriverReadinessGuard] Page not stable: ${stabilityResult.reason}`,
+                        `[DriverReadinessGuard] Page not stable: ${reason}`,
                         this.driver.correlationId
                     );
                 } else {

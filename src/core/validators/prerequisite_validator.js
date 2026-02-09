@@ -149,21 +149,27 @@ function validateBrowserPool(browserPool) {
     if (!browserPool) {
         return ValidationResult.fail('BROWSER_POOL_NULL', {
             message: 'Browser Pool não inicializado',
-            suggestion: 'Sistema em modo degradado - inicialize Chrome e reinicie'
+            suggestion: 'Sistema em modo degradado - inicialize Chrome e reinicie',
+            retryable: true,
+            suggestedDelayMs: 5000
         });
     }
 
     if (!browserPool.initialized) {
         return ValidationResult.fail('BROWSER_POOL_NOT_INITIALIZED', {
             message: 'Browser Pool não foi inicializado',
-            suggestion: 'Aguarde boot completo do sistema'
+            suggestion: 'Aguarde boot completo do sistema',
+            retryable: true,
+            suggestedDelayMs: 2000
         });
     }
 
     if (browserPool.shuttingDown) {
         return ValidationResult.fail('BROWSER_POOL_SHUTTING_DOWN', {
             message: 'Browser Pool está sendo desligado',
-            suggestion: 'Operação não pode ser executada durante shutdown'
+            suggestion: 'Operação não pode ser executada durante shutdown',
+            retryable: true,
+            suggestedDelayMs: 5000
         });
     }
 
@@ -178,7 +184,9 @@ function validateBrowserPool(browserPool) {
                 suggestion:
                     status.lastCause === 'USER_CLOSED'
                         ? 'Reabra o Chrome com START-CHROME-SIMPLE.bat'
-                        : 'Aguarde auto-recovery ou investigue causa'
+                        : 'Aguarde auto-recovery ou investigue causa',
+                retryable: true,
+                suggestedDelayMs: 10000
             });
         }
     }

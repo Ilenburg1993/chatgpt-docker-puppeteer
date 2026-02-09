@@ -717,7 +717,11 @@ class BrowserPoolManager {
             log('ERROR', `[BrowserPool]    curl http://localhost:${port}/health`);
             log('ERROR', '[BrowserPool]');
 
-            throw new Error(`Chrome Proxy Service não está disponível em ${host}:${port} - ${errorMsg}`);
+            const err = new Error(`Chrome Proxy Service não está disponível em ${host}:${port} - ${errorMsg}`);
+            // Stable code for SSOT classification (avoid substring heuristics downstream).
+            err.code = 'CHROME_PROXY_UNAVAILABLE';
+            err.details = { host, port, url, error: errorMsg };
+            throw err;
         }
     }
     /**
