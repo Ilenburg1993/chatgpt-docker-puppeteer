@@ -1,5 +1,5 @@
 <script setup>
-import { Activity, BarChart3, ChevronLeft, LayoutDashboard, ListTodo } from 'lucide-vue-next';
+import { Activity, ChevronLeft, LayoutDashboard, ListTodo, ScrollText, Target } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 const props = defineProps({
@@ -14,10 +14,11 @@ const emit = defineEmits(['toggle']);
 const route = useRoute();
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: ListTodo, label: 'Tasks', path: '/tasks' },
-  { icon: BarChart3, label: 'Metrics', path: '/metrics' },
-  { icon: Activity, label: 'System Health', path: '/health' },
+  { icon: LayoutDashboard, label: 'Visão geral', path: '/dashboard' },
+  { icon: ListTodo, label: 'Tarefas', path: '/tasks' },
+  { icon: Target, label: 'Missões', path: '/missions' },
+  { icon: ScrollText, label: 'Eventos', path: '/events' },
+  { icon: Activity, label: 'Saúde', path: '/health' },
 ];
 
 const isActive = (path) => {
@@ -81,7 +82,7 @@ const handleToggle = () => {
           :size="20"
           :class="['transition-all duration-300 group-hover:scale-110', collapsed && 'rotate-180']"
         />
-        <span v-if="!collapsed" class="text-sm font-medium">Collapse</span>
+        <span v-if="!collapsed" class="text-sm font-medium">Recolher</span>
       </button>
     </div>
   </aside>

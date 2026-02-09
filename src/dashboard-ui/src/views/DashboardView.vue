@@ -1,329 +1,160 @@
 <script setup>
-import { http } from '@/lib/http';
-import { Activity, AlertCircle, BarChart3, CheckCircle, Clock, ListTodo, TrendingUp } from 'lucide-vue-next';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import TaskCard from '../components/tasks/TaskCard.vue';
-import { useSocket } from '../composables/useSocket';
+import { http } from '@/lib/http';
+import { formatHttpError } from '@/lib/http';
+import Card from '@/components/ui/Card.vue';
+import Button from '@/components/ui/Button.vue';
+import Badge from '@/components/ui/Badge.vue';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { useSocket } from '@/composables/useSocket';
 
 const router = useRouter();
-
-const tasks = ref([]);
-const metrics = ref({
-    totalTasks: 0,
-    runningTasks: 0,
-    completedTasks: 0,
-    failedTasks: 0,
-    avgExecutionTime: 0,
-    successRate: 0,
-});
+const tasks = useTasksVNextStore();
+const missions = useMissionsVNextStore();
+const { isConnected } = useSocket();
 
 const loading = ref(false);
-const { isConnected, connect, disconnect, subscribe, unsubscribe } = useSocket();
+const error = ref(null);
+const stats = ref({ total: 0, by_status: {} });
 
-const recentTasks = computed(() => {
-    return tasks.value.slice(0, 6);
-});
+const pending = computed(() => Number(stats.value.by_status?.PENDING || 0));
+const running = computed(() => Number(stats.value.by_status?.RUNNING || 0));
+const blocked = computed(() => Number(stats.value.by_status?.BLOCKED || 0));
+const proposed = computed(() => Number(stats.value.by_status?.PROPOSED || 0)); // usually 0 (stage)
+const failed = computed(() => Number(stats.value.by_status?.FAILED || 0));
+const done = computed(() => Number(stats.value.by_status?.DONE || 0));
 
-const statsCards = computed(() => [
-    {
-        title: 'Running',
-        value: metrics.value.runningTasks,
-        icon: Clock,
-        variant: 'info',
-        trend: null,
-    },
-    {
-        title: 'Completed',
-        value: metrics.value.completedTasks,
-        icon: CheckCircle,
-        variant: 'success',
-        trend: null,
-    },
-    {
-        title: 'Failed',
-        value: metrics.value.failedTasks,
-        icon: AlertCircle,
-        variant: 'error',
-        trend: null,
-    },
-    {
-        title: 'Success Rate',
-        value: `${metrics.value.successRate.toFixed(1)}%`,
-        icon: TrendingUp,
-        variant: 'default',
-        trend: null,
-    },
-]);
-
-const fetchDashboardData = async () => {
+async function refresh() {
     loading.value = true;
-
+    error.value = null;
     try {
-        const [tasksResponse, metricsResponse] = await Promise.all([
-            http.get('/api/dashboard/tasks'),
-            http.get('/api/dashboard/metrics'),
+        const [tasksStatsRes] = await Promise.all([
+            http.get('/api/dashboard/tasks-stats'),
+            missions.fetchFirstPage({ limit: 20 }),
+            tasks.fetchFirstPage({ limit: 50 }),
         ]);
-
-        tasks.value = tasksResponse.data.tasks || [];
-
-        const tasksData = tasksResponse.data.tasks || [];
-        const completed = tasksData.filter(t => t.unified_status === 'DONE').length;
-        const failed = tasksData.filter(t => t.unified_status === 'FAILED').length;
-        const total = completed + failed;
-
-        metrics.value = {
-            totalTasks: tasksData.length,
-            runningTasks: tasksData.filter(t => t.unified_status === 'RUNNING').length,
-            completedTasks: completed,
-            failedTasks: failed,
-            avgExecutionTime: metricsResponse.data.avgExecutionTime || 0,
-            successRate: total > 0 ? (completed / total) * 100 : 0,
-        };
+        stats.value = tasksStatsRes.data?.data || { total: 0, by_status: {} };
     } catch (err) {
-        console.error('[Dashboard] Failed to fetch data:', err);
+        error.value = formatHttpError(err).message;
     } finally {
         loading.value = false;
     }
-};
+}
 
-const handleTaskUpdated = () => {
-    fetchDashboardData();
-};
+function statusVariant(status) {
+    const s = String(status || '').toUpperCase();
+    if (s === 'RUNNING') return 'info';
+    if (s === 'PAUSED') return 'warning';
+    if (s === 'DONE') return 'success';
+    if (s === 'FAILED') return 'error';
+    if (s === 'CANCELLED') return 'warning';
+    return 'default';
+}
 
-const handleViewTask = task => {
-    router.push(`/tasks/${task.meta?.id}`);
-};
-
-const navigateToTasks = () => {
-    router.push('/tasks');
-};
-
-onMounted(() => {
-    fetchDashboardData();
-
-    connect();
-    subscribe('task:updated', handleTaskUpdated);
-    subscribe('task:updates_batch', handleTaskUpdated);
-    subscribe('task:created', handleTaskUpdated);
-    subscribe('task:completed', handleTaskUpdated);
-});
-
-onUnmounted(() => {
-    unsubscribe('task:updated', handleTaskUpdated);
-    unsubscribe('task:updates_batch', handleTaskUpdated);
-    unsubscribe('task:created', handleTaskUpdated);
-    unsubscribe('task:completed', handleTaskUpdated);
-    disconnect();
-});
+onMounted(refresh);
 </script>
 
 <template>
-    <div class="space-y-8 pb-8">
-        <!-- Hero Header -->
-        <div
-            class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-8 shadow-2xl"
-        >
-            <div
-                class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"
-            ></div>
-            <div class="relative">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Mission Control</h1>
-                        <p class="text-blue-100 text-lg">
-                            Dashboard overview
-                            <span
-                                v-if="isConnected"
-                                class="inline-flex items-center gap-2 ml-3 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm"
-                            >
-                                <span
-                                    class="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"
-                                ></span>
-                                <span class="text-sm font-medium">Live</span>
-                            </span>
-                        </p>
-                    </div>
-                    <div class="hidden md:flex items-center gap-3">
-                        <div class="text-right">
-                            <div class="text-3xl font-bold text-white">{{ metrics.totalTasks }}</div>
-                            <div class="text-sm text-blue-200">Total Tasks</div>
-                        </div>
-                    </div>
-                </div>
+    <div class="space-y-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Visão geral</h1>
+                <p class="text-sm text-slate-300 mt-1">
+                    SSOT (SQLite) + realtime
+                    <span v-if="isConnected" class="ml-2 text-xs text-emerald-300">• conectado</span>
+                    <span v-else class="ml-2 text-xs text-slate-400">• desconectado</span>
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <Button variant="secondary" size="sm" @click="refresh" :disabled="loading">Atualizar</Button>
+                <Button variant="primary" size="sm" @click="router.push('/tasks')">Ir para tarefas</Button>
             </div>
         </div>
 
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div
-                v-for="stat in statsCards"
-                :key="stat.title"
-                class="group relative overflow-hidden rounded-xl bg-gradient-to-br border border-white/10 p-6 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer"
-                :class="[
-                    stat.variant === 'info' &&
-                        'from-blue-600/20 to-blue-800/20 hover:from-blue-600/30 hover:to-blue-800/30 hover:border-blue-500/50',
-                    stat.variant === 'success' &&
-                        'from-emerald-600/20 to-emerald-800/20 hover:from-emerald-600/30 hover:to-emerald-800/30 hover:border-emerald-500/50',
-                    stat.variant === 'error' &&
-                        'from-red-600/20 to-red-800/20 hover:from-red-600/30 hover:to-red-800/30 hover:border-red-500/50',
-                    stat.variant === 'default' &&
-                        'from-violet-600/20 to-violet-800/20 hover:from-violet-600/30 hover:to-violet-800/30 hover:border-violet-500/50',
-                ]"
-            >
-                <div
-                    class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                ></div>
-                <div class="relative flex items-start justify-between">
-                    <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">{{ stat.title }}</p>
-                        <p class="text-3xl font-bold text-white mt-1 transition-all duration-300 group-hover:scale-110">
-                            {{ loading ? '—' : stat.value }}
-                        </p>
-                    </div>
-                    <div
-                        :class="[
-                            'p-3 rounded-xl backdrop-blur-sm transition-all duration-300 group-hover:scale-110 group-hover:rotate-6',
-                            stat.variant === 'success' && 'bg-emerald-500/20 shadow-lg shadow-emerald-500/20',
-                            stat.variant === 'error' && 'bg-red-500/20 shadow-lg shadow-red-500/20',
-                            stat.variant === 'info' && 'bg-blue-500/20 shadow-lg shadow-blue-500/20',
-                            stat.variant === 'default' && 'bg-violet-500/20 shadow-lg shadow-violet-500/20',
-                        ]"
-                    >
-                        <component
-                            :is="stat.icon"
-                            :size="28"
-                            :class="[
-                                'transition-colors duration-300',
-                                stat.variant === 'success' && 'text-emerald-400',
-                                stat.variant === 'error' && 'text-red-400',
-                                stat.variant === 'info' && 'text-blue-400',
-                                stat.variant === 'default' && 'text-violet-400',
-                            ]"
-                        />
-                    </div>
-                </div>
-            </div>
+        <div v-if="error" class="p-4 rounded-xl border border-red-500/30 bg-red-950/30 text-red-200">
+            {{ error }}
         </div>
 
-        <!-- Recent Tasks Card -->
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 shadow-xl backdrop-blur-sm">
-            <div class="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-transparent pointer-events-none"></div>
-            <div class="relative px-6 py-5 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                            <Activity :size="20" class="text-indigo-400" />
-                        </div>
-                        <h2 class="text-xl font-bold text-white">Recent Tasks</h2>
-                    </div>
-                    <button
-                        @click="navigateToTasks"
-                        class="px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 text-white text-sm font-medium transition-all duration-300 hover:scale-105 border border-slate-600/50 hover:border-slate-500/50"
-                    >
-                        View all
-                    </button>
-                </div>
-            </div>
-
-            <div class="px-6 py-6">
-                <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div v-for="i in 6" :key="i" class="h-32 bg-slate-800/50 rounded-xl animate-pulse border border-slate-700/50"></div>
-                </div>
-
-                <div v-else-if="recentTasks.length === 0" class="text-center py-16">
-                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-800/50 border border-slate-700/50 flex items-center justify-center">
-                        <Activity :size="32" class="text-gray-500" />
-                    </div>
-                    <p class="text-gray-400 text-lg mb-4">No tasks yet</p>
-                    <button
-                        @click="navigateToTasks"
-                        class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold transition-all duration-300 hover:scale-105 shadow-lg shadow-blue-600/30"
-                    >
-                        Create your first task
-                    </button>
-                </div>
-
-                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <TaskCard v-for="task in recentTasks" :key="task.meta?.id" :task="task" @view="handleViewTask" />
-                </div>
-            </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+                <template #header><div class="text-sm font-semibold text-slate-200">Pendentes</div></template>
+                <div class="text-3xl font-bold text-white">{{ loading ? '—' : pending }}</div>
+            </Card>
+            <Card>
+                <template #header><div class="text-sm font-semibold text-slate-200">Em execução</div></template>
+                <div class="text-3xl font-bold text-white">{{ loading ? '—' : running }}</div>
+            </Card>
+            <Card>
+                <template #header><div class="text-sm font-semibold text-slate-200">Bloqueadas</div></template>
+                <div class="text-3xl font-bold text-white">{{ loading ? '—' : blocked }}</div>
+            </Card>
+            <Card>
+                <template #header><div class="text-sm font-semibold text-slate-200">Falhas</div></template>
+                <div class="text-3xl font-bold text-white">{{ loading ? '—' : failed }}</div>
+            </Card>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- System Status Card -->
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 p-6 shadow-xl backdrop-blur-sm">
-                <div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-transparent pointer-events-none"></div>
-                <div class="relative">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                            <Activity :size="20" class="text-blue-400" />
-                        </div>
-                        <h2 class="text-xl font-bold text-white">System Status</h2>
+            <Card>
+                <template #header>
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-semibold text-slate-200">Tarefas recentes</div>
+                        <Button variant="ghost" size="sm" @click="router.push('/tasks')">Ver todas</Button>
                     </div>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-blue-500/30 transition-all duration-300">
-                            <span class="text-sm font-medium text-gray-300">Connection</span>
+                </template>
+                <div v-if="tasks.items.length === 0" class="text-sm text-slate-400">Sem tarefas.</div>
+                <div v-else class="space-y-2">
+                    <div
+                        v-for="t in tasks.items.slice(0, 8)"
+                        :key="t.id"
+                        class="px-3 py-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:bg-slate-900/40 cursor-pointer"
+                        @click="router.push(`/tasks/${t.id}`)"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="text-xs font-mono text-slate-200 truncate">{{ t.id }}</div>
+                                <div class="text-xs text-slate-400 truncate">{{ t.spec_user_message_preview }}</div>
+                            </div>
                             <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full" :class="isConnected ? 'bg-emerald-400 animate-pulse shadow-lg shadow-emerald-400/50' : 'bg-red-400'"></span>
-                                <span class="text-sm font-bold" :class="isConnected ? 'text-emerald-400' : 'text-red-400'">
-                                    {{ isConnected ? 'Connected' : 'Disconnected' }}
-                                </span>
+                                <Badge size="sm">{{ t.stage }}</Badge>
+                                <Badge size="sm" :variant="statusVariant(t.unified_status)">{{ t.unified_status }}</Badge>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-blue-500/30 transition-all duration-300">
-                            <span class="text-sm font-medium text-gray-300">Total Tasks</span>
-                            <span class="text-lg font-bold text-white">{{ metrics.totalTasks }}</span>
-                        </div>
-                        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-blue-500/30 transition-all duration-300">
-                            <span class="text-sm font-medium text-gray-300">Avg. Execution Time</span>
-                            <span class="text-lg font-bold text-white">
-                                {{
-                                    metrics.avgExecutionTime > 0
-                                        ? `${(metrics.avgExecutionTime / 1000).toFixed(1)}s`
-                                        : 'N/A'
-                                }}
-                            </span>
-                        </div>
                     </div>
                 </div>
-            </div>
+            </Card>
 
-            <!-- Quick Actions Card -->
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 p-6 shadow-xl backdrop-blur-sm">
-                <div class="absolute inset-0 bg-gradient-to-br from-violet-600/5 to-transparent pointer-events-none"></div>
-                <div class="relative">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
-                            <Activity :size="20" class="text-violet-400" />
-                        </div>
-                        <h2 class="text-xl font-bold text-white">Quick Actions</h2>
+            <Card>
+                <template #header>
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-semibold text-slate-200">Missões</div>
+                        <Button variant="ghost" size="sm" @click="router.push('/missions')">Ver todas</Button>
                     </div>
-                    <div class="space-y-3">
-                        <button
-                            @click="navigateToTasks"
-                            class="group w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gradient-to-r from-blue-600/20 to-blue-700/20 border border-blue-500/30 hover:from-blue-600/30 hover:to-blue-700/30 hover:border-blue-400/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20"
-                        >
-                            <ListTodo :size="18" class="text-blue-400 group-hover:scale-110 transition-transform duration-300" />
-                            <span class="text-sm font-semibold text-white">View all tasks</span>
-                        </button>
-                        <button
-                            @click="router.push('/metrics')"
-                            class="group w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600/20 to-emerald-700/20 border border-emerald-500/30 hover:from-emerald-600/30 hover:to-emerald-700/30 hover:border-emerald-400/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20"
-                        >
-                            <BarChart3 :size="18" class="text-emerald-400 group-hover:scale-110 transition-transform duration-300" />
-                            <span class="text-sm font-semibold text-white">View metrics</span>
-                        </button>
-                        <button
-                            @click="router.push('/health')"
-                            class="group w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gradient-to-r from-violet-600/20 to-violet-700/20 border border-violet-500/30 hover:from-violet-600/30 hover:to-violet-700/30 hover:border-violet-400/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/20"
-                        >
-                            <Activity :size="18" class="text-violet-400 group-hover:scale-110 transition-transform duration-300" />
-                            <span class="text-sm font-semibold text-white">System health</span>
-                        </button>
+                </template>
+                <div v-if="missions.items.length === 0" class="text-sm text-slate-400">Sem missões.</div>
+                <div v-else class="space-y-2">
+                    <div
+                        v-for="m in missions.items.slice(0, 8)"
+                        :key="m.id"
+                        class="px-3 py-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:bg-slate-900/40 cursor-pointer"
+                        @click="router.push(`/missions/${m.id}`)"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="text-sm font-semibold text-slate-200 truncate">{{ m.title }}</div>
+                                <div class="text-xs text-slate-400 truncate font-mono">{{ m.id }}</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <Badge size="sm" :variant="statusVariant(m.status)">{{ m.status }}</Badge>
+                                <Badge size="sm">prop: {{ m.counts?.proposed ?? 0 }}</Badge>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </Card>
         </div>
     </div>
 </template>
+

@@ -24,12 +24,15 @@ import { ref } from 'vue';
 import Footer from './Footer.vue';
 import Header from './Header.vue';
 import Sidebar from './Sidebar.vue';
+import { useSsotRealtime } from '@/composables/useSsotRealtime';
 
 const sidebarCollapsed = ref(false);
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value;
 };
+
+useSsotRealtime();
 </script>
 
 <style scoped>

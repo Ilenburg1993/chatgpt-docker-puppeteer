@@ -73,7 +73,7 @@ export default defineConfig({
                     'vue-vendor': ['vue', 'vue-router', 'pinia'],
                     'charts': ['chart.js'],
                     'ui': ['radix-vue', 'lucide-vue-next', 'class-variance-authority', 'clsx', 'tailwind-merge'],
-                    'vis': ['vis-timeline', 'vis-data'],
+                    'vis': ['vis-timeline', 'vis-data', 'vis-network'],
                     'utils': ['axios', 'lodash-es', 'date-fns', 'uuid'],
                 },
                 assetFileNames: (assetInfo) => {
