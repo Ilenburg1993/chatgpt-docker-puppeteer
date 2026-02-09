@@ -1,12 +1,18 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '#infra/fs/paths';
+import { ARTIFACTS_DIR, RESPONSE_DIR as LEGACY_RESPONSE_DIR } from '#infra/fs/paths';
 import * as logger from '#core/logger';
 import { atomicWrite } from '#infra/io';
 
-// Diretório de respostas
-const RESPONSE_DIR = path.join(ROOT, 'respostas');
+function _resolveArtifactsRoot() {
+    const fromEnv = process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || null;
+    return path.resolve(fromEnv || ARTIFACTS_DIR);
+}
+
+function _responseDir() {
+    return path.join(_resolveArtifactsRoot(), 'responses');
+}
 
 /**
  * Salva resposta em múltiplos formatos
@@ -17,14 +23,20 @@ const RESPONSE_DIR = path.join(ROOT, 'respostas');
  * @param {Object} responseData.generation - Generation metadata
  * @param {Object} responseData.validation - Validation (nullable)
  * @param {Object} responseData.preview - Preview estruturado
- * @returns {Promise<Object>} - { textFile, markdownFile, jsonFile, htmlFile }
+ * @param {{ attemptId?: string|null, writeLegacyLatest?: boolean }=} opts
+ * @returns {Promise<Object>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
  */
-async function saveResponseV2(taskId, responseData) {
+async function saveResponseV2(taskId, responseData, opts = {}) {
     try {
+        const RESPONSE_DIR = _responseDir();
         // Criar diretório se não existe
         await fs.mkdir(RESPONSE_DIR, { recursive: true });
 
-        const basePath = path.join(RESPONSE_DIR, taskId);
+        const attemptId = opts?.attemptId ? String(opts.attemptId) : null;
+        const basePath = attemptId
+            ? path.join(RESPONSE_DIR, taskId, attemptId)
+            : path.join(RESPONSE_DIR, taskId, 'latest');
+        await fs.mkdir(path.dirname(basePath), { recursive: true });
 
         // Salvar cada formato (atomic writes)
         await Promise.all([
@@ -48,12 +60,38 @@ async function saveResponseV2(taskId, responseData) {
             codeBlocks: responseData.content.json.codeBlocks?.length || 0,
         });
 
-        return {
+        const out = {
             textFile: `${basePath}.txt`,
             markdownFile: `${basePath}.md`,
             jsonFile: `${basePath}.json`,
             htmlFile: `${basePath}.html`,
         };
+
+        // Best-effort legacy mirror (task-scoped) for backwards compatibility.
+        const writeLegacyLatest = opts?.writeLegacyLatest !== false;
+        if (writeLegacyLatest) {
+            try {
+                await fs.mkdir(LEGACY_RESPONSE_DIR, { recursive: true });
+                const legacyBase = path.join(LEGACY_RESPONSE_DIR, taskId);
+                await Promise.all([
+                    atomicWrite(`${legacyBase}.txt`, responseData.content.text, 'utf-8'),
+                    atomicWrite(`${legacyBase}.md`, responseData.content.markdown, 'utf-8'),
+                    atomicWrite(`${legacyBase}.json`, JSON.stringify(responseData, null, 2), 'utf-8'),
+                    atomicWrite(`${legacyBase}.html`, wrapHTML(responseData.content.html, taskId), 'utf-8'),
+                ]);
+                // @ts-ignore
+                out.legacy = {
+                    textFile: `${legacyBase}.txt`,
+                    markdownFile: `${legacyBase}.md`,
+                    jsonFile: `${legacyBase}.json`,
+                    htmlFile: `${legacyBase}.html`,
+                };
+            } catch (_) {
+                /* ignore */
+            }
+        }
+
+        return out;
     } catch (error) {
         logger.error('[RESPONSE_STORE_V2] Erro ao salvar resposta', {
             taskId,
@@ -69,12 +107,17 @@ async function saveResponseV2(taskId, responseData) {
  *
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
+ * @param {{ attemptId?: string|null }=} opts
  * @returns {Promise<string|Object>} - Conteúdo da resposta
  */
-async function loadResponseV2(taskId, format) {
+async function loadResponseV2(taskId, format, opts = {}) {
     format = format || 'text';
 
-    const basePath = path.join(RESPONSE_DIR, taskId);
+    const RESPONSE_DIR = _responseDir();
+    const attemptId = opts?.attemptId ? String(opts.attemptId) : null;
+    const basePath = attemptId
+        ? path.join(RESPONSE_DIR, taskId, attemptId)
+        : path.join(RESPONSE_DIR, taskId, 'latest');
     const formatMap = {
         text: `${basePath}.txt`,
         markdown: `${basePath}.md`,
@@ -103,7 +146,7 @@ async function loadResponseV2(taskId, format) {
                 taskId,
                 requestedFormat: format,
             });
-            return await loadResponseV2(taskId, 'text');
+            return await loadResponseV2(taskId, 'text', opts);
         }
 
         // Arquivo não existe
@@ -123,7 +166,7 @@ async function loadResponseV2(taskId, format) {
  * @returns {Promise<Array<string>>} - Formatos disponíveis
  */
 async function listAvailableFormats(taskId) {
-    const basePath = path.join(RESPONSE_DIR, taskId);
+    const basePath = path.join(_responseDir(), taskId, 'latest');
     const formats = ['text', 'markdown', 'json', 'html'];
     const available = [];
 
@@ -147,7 +190,7 @@ async function listAvailableFormats(taskId) {
  * @returns {Promise<boolean>}
  */
 async function responseExists(taskId) {
-    const basePath = path.join(RESPONSE_DIR, taskId);
+    const basePath = path.join(_responseDir(), taskId, 'latest');
     const txtPath = `${basePath}.txt`;
 
     try {
@@ -165,7 +208,7 @@ async function responseExists(taskId) {
  * @returns {Promise<number>} - Número de arquivos deletados
  */
 async function deleteResponseV2(taskId) {
-    const basePath = path.join(RESPONSE_DIR, taskId);
+    const basePath = path.join(_responseDir(), taskId, 'latest');
     const extensions = ['txt', 'md', 'json', 'html'];
     let deletedCount = 0;
 

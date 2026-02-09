@@ -71,8 +71,17 @@ const STATUS_VALUES = {
     /** Task is paused (circuit breaker / manual pause) */
     PAUSED: 'PAUSED',
 
+    /** Task was cancelled by user/system */
+    CANCELLED: 'CANCELLED',
+
+    /** Task is blocked waiting for user action (login/page/etc) */
+    BLOCKED: 'BLOCKED',
+
     /** Driver/component is stalled (progress stopped but not failed) */
-    STALLED: 'STALLED'
+    STALLED: 'STALLED',
+
+    /** Component in degraded mode (health/infra) */
+    DEGRADED: 'DEGRADED',
 };
 
 /**

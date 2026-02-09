@@ -16,6 +16,29 @@ export const types = {
 };
 
 export const parseTask = raw => {
+    // V5-safe: never "heal" a declared V5 task back into V4.
+    if (raw?.meta?.version === '5.0') {
+        return TaskSchemaV5.parse(raw);
+    }
+
+    // Best-effort: if the structure looks like V5 but version is missing, try
+    // to validate as V5 before falling back to legacy healer+migrator.
+    const looksLikeV5 = Boolean(raw?.execution || raw?.mission || raw?.spec?.execution);
+    if (looksLikeV5 && raw && typeof raw === 'object') {
+        try {
+            const patched = {
+                ...raw,
+                meta: {
+                    ...(raw.meta || {}),
+                    version: '5.0',
+                },
+            };
+            return TaskSchemaV5.parse(patched);
+        } catch (_) {
+            // fallback below
+        }
+    }
+
     const healed = healTask(raw);
     // Auto-migração transparente V4 → V5
     return migrator.autoMigrateTask(healed);

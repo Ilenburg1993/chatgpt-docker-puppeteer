@@ -35,12 +35,16 @@ pids
 *.pid
 *.seed
 *.pid.lock
+data/
+*.sqlite
 
 # Task queue and results (sensitive data)
 fila/
 !fila/.gitkeep
 respostas/
 !respostas/.gitkeep
+artifacts/
+!artifacts/.gitkeep
 
 # Browser profiles (may contain sessions)
 profile/

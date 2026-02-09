@@ -10,7 +10,18 @@ async function atomicWrite(filepath, content) {
 
     try {
         // [FIX 1.2] Escrita assíncrona para não bloquear o Event Loop
-        await fs.writeFile(tmpPath, content, 'utf-8');
+        // Back-compat: callers sometimes pass a third argument (encoding) but older signature ignored it.
+        // We keep utf-8 for strings, and support binary (Buffer/Uint8Array) without forcing encoding.
+        const isBinary =
+            content &&
+            (Buffer.isBuffer(content) ||
+                ArrayBuffer.isView(content) ||
+                content instanceof ArrayBuffer);
+        if (isBinary) {
+            await fs.writeFile(tmpPath, content);
+        } else {
+            await fs.writeFile(tmpPath, content, 'utf-8');
+        }
 
         let attempts = 0;
         while (attempts < 10) {

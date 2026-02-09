@@ -8,6 +8,7 @@
   "exports": "./index.js",
   "imports": {
     "#main": "./src/main.js",
+    "#agent/*": "./src/agent/*.js",
     "#core/*": "./src/core/*.js",
     "#shared/*": "./src/shared/*.js",
     "#nerv/*": "./src/nerv/*.js",
@@ -18,6 +19,7 @@
     "#server/*": "./src/server/*.js",
     "#logic/*": "./src/logic/*.js",
     "#orchestrator/*": "./src/orchestrator/*.js",
+    "#orchestrator/*/*": "./src/orchestrator/*/*.js",
     "#missions/*": "./src/missions/*.js",
     "#validation/*": "./src/validation/*.js"
   },
@@ -46,7 +48,7 @@
   "scripts": {
     "start": "node index.js",
     "start:container": "NODE_ENV=development NODE_OPTIONS='--inspect=0.0.0.0:9229 --enable-source-maps --trace-warnings --trace-uncaught --unhandled-rejections=strict' node index.js",
-    "dev": "nodemon --exec \"node --inspect=0.0.0.0:9229\" index.js --ignore fila/ --ignore logs/ --ignore respostas/",
+    "dev": "nodemon --exec \"node --inspect=0.0.0.0:9229\" index.js --ignore fila/ --ignore logs/ --ignore respostas/ --ignore artifacts/",
     "dashboard:dev": "npm --workspace dashboard-ui run dev",
     "dashboard:build": "npm --workspace dashboard-ui run build",
     "dashboard:preview": "npm --workspace dashboard-ui run preview",
@@ -121,6 +123,7 @@
     "@lancedb/lancedb": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.4",
+    "better-sqlite3": "^11.10.0",
     "chalk": "^5.6.2",
     "compression": "^1.8.1",
     "dotenv": "^17.2.3",
@@ -146,7 +149,7 @@
     "tree-kill": "^1.2.2",
     "turndown": "^7.2.2",
     "user-agents": "^1.1.669",
-    "uuid": "^13.0.0",
+    "uuid": "^11.1.0",
     "ws": "^8.19.0",
     "xxhash-wasm": "^1.1.0",
     "zod": "^4.3.6"

@@ -13,16 +13,17 @@ const RESPONSE_DIR = path.join(ROOT, 'respostas');
  * @param {string} taskId - Task ID
  * @param {string|Object} response - Response V1 (string) ou V2 (object)
  * @param {Object} task - Task object (para preencher result)
+ * @param {string=} attemptId - attempt/correlation id (opcional)
  * @returns {Promise<Object>} - { storage, format }
  */
-async function saveResponse(taskId, response, task) {
+async function saveResponse(taskId, response, task, attemptId) {
     try {
         // Detectar formato
         const isV2 = isResponseV2(response);
 
         if (isV2) {
             // Response V2 (object completo)
-            return await saveResponseV2Format(taskId, response, task);
+            return await saveResponseV2Format(taskId, response, task, attemptId);
         } else {
             // Response V1 (string simples) - converter para V2
             logger.debug('[RESPONSE_ADAPTER] Response V1 detectada, convertendo para V2', {
@@ -31,7 +32,7 @@ async function saveResponse(taskId, response, task) {
             });
 
             const responseV2 = convertV1toV2(response, task);
-            return await saveResponseV2Format(taskId, responseV2, task);
+            return await saveResponseV2Format(taskId, responseV2, task, attemptId);
         }
     } catch (error) {
         logger.error('[RESPONSE_ADAPTER] Erro ao salvar response', {
@@ -49,12 +50,13 @@ async function saveResponse(taskId, response, task) {
  * @param {string} taskId - Task ID
  * @param {Object} responseV2 - Response V2 object
  * @param {Object} task - Task object
+ * @param {string=} attemptId - attempt/correlation id (opcional)
  * @returns {Promise<Object>} - { storage, format }
  * @private
  */
-async function saveResponseV2Format(taskId, responseV2, task) {
+async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
     // Salvar em 4 formatos
-    const storage = await saveResponseV2(taskId, responseV2);
+    const storage = await saveResponseV2(taskId, responseV2, { attemptId: attemptId || null, writeLegacyLatest: true });
 
     // Preencher task.result V5
     if (task && task.result) {

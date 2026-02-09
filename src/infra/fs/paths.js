@@ -11,6 +11,7 @@ const DIRS = {
     ROOT,
     QUEUE: path.join(ROOT, 'fila'),
     RESPONSE: path.join(ROOT, 'respostas'),
+    ARTIFACTS: path.join(ROOT, 'artifacts'),
     LOGS: path.join(ROOT, 'logs'),
     CORRUPT: path.join(ROOT, 'fila', 'corrupted'),
     REPORTS: path.join(ROOT, 'logs', 'crash_reports')
@@ -39,11 +40,12 @@ const LIMITS = {
 
 // Named exports (flattened from DIRS / FILES / LIMITS)
 export { ROOT };
-export const { QUEUE, RESPONSE, LOGS, CORRUPT, REPORTS } = DIRS;
+export const { QUEUE, RESPONSE, ARTIFACTS, LOGS, CORRUPT, REPORTS } = DIRS;
 export const { CONFIG, RULES, CONTROL, STATE, IDENTITY, VOCAB } = FILES;
 export const { MAX_JSON_SIZE, MAX_LOG_SIZE } = LIMITS;
 export const QUEUE_DIR = DIRS.QUEUE;
 export const RESPONSE_DIR = DIRS.RESPONSE;
+export const ARTIFACTS_DIR = DIRS.ARTIFACTS;
 export const LOG_DIR = DIRS.LOGS;
 
 export { DIRS, FILES, LIMITS };
