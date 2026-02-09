@@ -134,7 +134,7 @@
     "js-yaml": "^4.1.1",
     "node-html-parser": "^7.0.2",
     "openai": "^6.17.0",
-    "p-limit": "^7.0",
+    "p-limit": "^7.3",
     "pino": "^10.3.0",
     "pm2": "^6.0.14",
     "prom-client": "^15.1.3",
