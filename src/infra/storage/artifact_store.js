@@ -11,6 +11,16 @@ function _resolveArtifactsRoot() {
     return path.resolve(fromEnv || ARTIFACTS_DIR);
 }
 
+function _isUnderRoot(rootDir, filePath) {
+    try {
+        const root = path.resolve(rootDir);
+        const full = path.resolve(String(filePath || ''));
+        return full === root || full.startsWith(root + path.sep);
+    } catch (_) {
+        return false;
+    }
+}
+
 function _safeRel(rel) {
     const raw = String(rel || '').replace(/\\/g, '/').trim();
     if (!raw) throw new Error('artifact relPath required');
@@ -76,7 +86,11 @@ async function putJson({ kind, json, relPath, ext = 'json', mime = 'application/
 
 function resolveUri(artifactId) {
     const row = getArtifactById(artifactId);
-    return row?.storage_uri || null;
+    const uri = row?.storage_uri || null;
+    if (!uri) return null;
+    const root = _resolveArtifactsRoot();
+    if (!_isUnderRoot(root, uri)) return null;
+    return uri;
 }
 
 async function readText(artifactId) {
@@ -88,6 +102,10 @@ async function readText(artifactId) {
 async function stat(artifactId) {
     const row = getArtifactById(artifactId);
     if (!row) return null;
+    const root = _resolveArtifactsRoot();
+    if (!row.storage_uri || !_isUnderRoot(root, row.storage_uri)) {
+        return { ...row, fsStat: null, unavailable: true };
+    }
     let fsStat = null;
     try {
         fsStat = await fs.stat(row.storage_uri);

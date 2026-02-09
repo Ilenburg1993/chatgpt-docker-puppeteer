@@ -32,6 +32,28 @@ function _safeId(raw) {
     return String(raw || '').replace(/[^a-zA-Z0-9._-]/g, '');
 }
 
+function _getLockSnapshot(taskId) {
+    const db = getDb();
+    const row = db
+        .prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?')
+        .get(taskId);
+    if (!row) return null;
+    return {
+        locked_by: row.locked_by ? String(row.locked_by) : null,
+        lock_expires_at_ms: row.lock_expires_at_ms !== null && row.lock_expires_at_ms !== undefined ? Number(row.lock_expires_at_ms) : null,
+        status: row.status ? String(row.status) : null,
+        stage: row.stage ? String(row.stage) : null,
+    };
+}
+
+function _isTaskActivelyClaimed(lockSnapshot, nowMs = Date.now()) {
+    if (!lockSnapshot) return false;
+    if (!lockSnapshot.locked_by) return false;
+    const exp = Number(lockSnapshot.lock_expires_at_ms);
+    if (!Number.isFinite(exp)) return false;
+    return exp > nowMs;
+}
+
 function _uniqStrings(list) {
     const out = [];
     const seen = new Set();
@@ -216,6 +238,19 @@ async function handleTaskUpdate(req, res) {
         const existing = getTaskById(safeId);
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
+        }
+
+        const lockSnapshot = _getLockSnapshot(safeId);
+        const nowMs = Date.now();
+        const currentDbStatus = lockSnapshot?.status ? String(lockSnapshot.status).toUpperCase().trim() : null;
+        if (currentDbStatus === 'PENDING' && _isTaskActivelyClaimed(lockSnapshot, nowMs)) {
+            return res.status(409).json({
+                success: false,
+                error: 'Task em processamento (claim)',
+                message: 'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
+                details: { locked_by: lockSnapshot.locked_by, lock_expires_at_ms: lockSnapshot.lock_expires_at_ms },
+                request_id: req.id,
+            });
         }
 
         const currentStatus = String(existing.unified_status || existing.state?.status || '').toUpperCase().trim();
@@ -465,6 +500,19 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
         const status = String(existing.unified_status || existing.state?.status || '').toUpperCase().trim();
         if (status === 'RUNNING') {
             return res.status(409).json({ success: false, error: 'Task em execução: não é permitido editar dependências', request_id: req.id });
+        }
+
+        const lockSnapshot = _getLockSnapshot(taskId);
+        const nowMs = Date.now();
+        const currentDbStatus = lockSnapshot?.status ? String(lockSnapshot.status).toUpperCase().trim() : null;
+        if (currentDbStatus === 'PENDING' && _isTaskActivelyClaimed(lockSnapshot, nowMs)) {
+            return res.status(409).json({
+                success: false,
+                error: 'Task em processamento (claim)',
+                message: 'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
+                details: { locked_by: lockSnapshot.locked_by, lock_expires_at_ms: lockSnapshot.lock_expires_at_ms },
+                request_id: req.id,
+            });
         }
 
         const incoming = _uniqStrings(req.body.dependencies).map(_safeId).filter(Boolean);
