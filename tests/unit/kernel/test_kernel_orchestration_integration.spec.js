@@ -48,7 +48,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
 
     beforeEach(() => {
         nerv = new MockNERV();
-        kernel = createKernel({ nerv });
+        kernel = createKernel({ nerv, mode: 'legacy' });
     });
 
     afterEach(() => {
@@ -118,9 +118,9 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
         });
     });
 
-    describe('2b. Retry scheduling', () => {
-        it('should keep dispatch payload available until retry handler consumes it', async () => {
-            kernel.start();
+	    describe('2b. Retry scheduling', () => {
+	        it('should keep dispatch payload available until retry handler consumes it', async () => {
+	            kernel.start();
 
             const retryableTask = {
                 meta: {
@@ -148,27 +148,29 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
             assert.strictEqual(nerv.emittedCommands.length, 1, 'Primeiro dispatch enviado ao driver');
 
             // Simula falha retryable do driver
-            nerv.receive({
-                messageType: MessageType.EVENT,
-                actionCode: ActionCode.DRIVER_TASK_FAILED,
-                correlationId: 'corr-retry-001',
-                payload: {
-                    taskId: 'task-retry-payload',
-                    retryable: true,
-                    suggestedDelayMs: 0,
-                    reason: 'driver transient failure',
-                    error: 'transient'
-                }
-            });
+	            nerv.receive({
+	                messageType: MessageType.EVENT,
+	                actionCode: ActionCode.DRIVER_TASK_FAILED,
+	                correlationId: 'corr-retry-001',
+	                payload: {
+	                    taskId: 'task-retry-payload',
+	                    retryable: true,
+	                    suggestedDelayMs: 0,
+	                    reason: 'driver transient failure',
+	                    error: 'transient'
+	                }
+	            });
 
-            // Aguarda o setTimeout do retry (delayMs=0 ainda agenda em outro tick)
-            await new Promise(resolve => setTimeout(resolve, 25));
+	            // No novo modelo SSOT, o Kernel NÃO re-dispatcha retries.
+	            // Ele encerra/limpa runtime e deixa o worker/DB reagendar.
+	            await new Promise(resolve => setTimeout(resolve, 25));
 
-            assert.strictEqual(nerv.emittedCommands.length, 2, 'Kernel deve reenviar task no caminho de retry');
+	            assert.strictEqual(nerv.emittedCommands.length, 1, 'Kernel não deve reenviar task no caminho de retry');
+	            assert.strictEqual(kernel.getTask('task-retry-payload'), null, 'runtime deve ser esquecido após retry solicitado');
 
-            kernel.stop();
-        });
-    });
+	            kernel.stop();
+	        });
+	    });
 
     describe('3. Task execution flow (ITERATIVE strategy)', () => {
         it('should execute task V5 with ITERATIVE strategy and handle RETRY', async () => {

@@ -3,13 +3,17 @@ import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import { io as ioClient } from 'socket.io-client';
 import express from 'express';
-
-import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
-import { createEnvelope } from '#shared/nerv/envelope';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
 
 import * as socketHub from '#server/engine/socket';
-import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
 import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
+import * as ssotEventFeed from '#server/realtime/ssot_event_feed';
+import * as schemas from '#core/schemas';
+import { insertTask } from '#infra/db/task_repo';
+import { recordEvent } from '#infra/db/events_repo';
+import { closeDb } from '#infra/db/sqlite';
 
 function waitForEvent(socket, eventName, timeoutMs = 1500) {
     return new Promise((resolve, reject) => {
@@ -24,21 +28,6 @@ function waitForEvent(socket, eventName, timeoutMs = 1500) {
     });
 }
 
-function createMockNerv() {
-    /** @type {Set<Function>} */
-    const handlers = new Set();
-
-    return {
-        onReceive(handler) {
-            handlers.add(handler);
-            return () => handlers.delete(handler);
-        },
-        receive(envelope) {
-            handlers.forEach(h => h(envelope));
-        }
-    };
-}
-
 describe('Dashboard realtime contract (Socket.io)', () => {
     /** @type {import('http').Server|null} */
     let httpServer = null;
@@ -46,8 +35,16 @@ describe('Dashboard realtime contract (Socket.io)', () => {
     let port = null;
     /** @type {ReturnType<typeof ioClient>|null} */
     let client = null;
+    /** @type {string|null} */
+    let dbPath = null;
 
     before(async () => {
+        dbPath = path.join(os.tmpdir(), `maestro-test-dashboard-realtime-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+        process.env.MAESTRO_DB_PATH = dbPath;
+        try {
+            fs.rmSync(dbPath, { force: true });
+        } catch {}
+
         const app = express();
         httpServer = http.createServer(app);
 
@@ -67,25 +64,20 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         await waitForEvent(client, 'connect', 1500);
 
-        const nerv = createMockNerv();
+        ssotEventFeed.start({ socketHub, intervalMs: 50, batchLimit: 500 });
 
-        taskSyncBridge.initialize({
-            force: true,
-            socketHub,
-            nervClient: nerv
+        // Seed a first DB event so the feed+hub pipeline is exercised at least once.
+        const nowIso = new Date().toISOString();
+        const seedTask = schemas.core.TaskSchemaV5.parse({
+            meta: { id: 'task-seed', version: '5.0', created_at: nowIso, priority: 5, source: 'api', tags: [] },
+            spec: { target: 'chatgpt', payload: { system_message: '', user_message: 'seed' } },
+            policy: {},
+            state: { status: 'PENDING' },
+            result: {},
         });
+        insertTask(seedTask, { stage: 'READY', status: 'PENDING', actor: 'system', ifNotExists: true });
+        recordEvent({ entityType: 'task', entityId: 'task-seed', eventType: 'TASK_SEEDED', payload: { id: 'task-seed' } });
 
-        // Seed a first event so the bridge+hub pipeline is exercised at least once.
-        const envelope = createEnvelope({
-            actor: ActorRole.DRIVER,
-            target: null,
-            messageType: MessageType.EVENT,
-            actionCode: ActionCode.DRIVER_TASK_STARTED,
-            payload: { taskId: 'task-seed', target: 'chatgpt' },
-            correlationId: 'corr-seed'
-        });
-
-        nerv.receive(envelope);
         await waitForEvent(client, 'task:updates_batch', 2000);
     });
 
@@ -95,7 +87,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         } catch {}
 
         try {
-            taskSyncBridge.clearAll();
+            ssotEventFeed.stop();
         } catch {}
 
         try {
@@ -110,6 +102,16 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         } catch {}
 
         try {
+            closeDb();
+        } catch {}
+
+        try {
+            if (dbPath) {
+                fs.rmSync(dbPath, { force: true });
+            }
+        } catch {}
+
+        try {
             if (httpServer) {
                 await new Promise((resolve) => httpServer.close(() => resolve()));
                 httpServer = null;
@@ -117,25 +119,17 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         } catch {}
     });
 
-    it('emits task:updates_batch with {taskId,state} entries', async () => {
-        const nerv = createMockNerv();
-
-        taskSyncBridge.initialize({
-            force: true,
-            socketHub,
-            nervClient: nerv
+    it('emits task:updates_batch with {taskId,task} entries (SSOT feed)', async () => {
+        const nowIso = new Date().toISOString();
+        const task = schemas.core.TaskSchemaV5.parse({
+            meta: { id: 'task-1', version: '5.0', created_at: nowIso, priority: 5, source: 'api', tags: [] },
+            spec: { target: 'chatgpt', payload: { system_message: '', user_message: 'hello' } },
+            policy: {},
+            state: { status: 'PENDING' },
+            result: {},
         });
-
-        const envelope = createEnvelope({
-            actor: ActorRole.DRIVER,
-            target: null,
-            messageType: MessageType.EVENT,
-            actionCode: ActionCode.DRIVER_TASK_STARTED,
-            payload: { taskId: 'task-1', target: 'chatgpt' },
-            correlationId: 'corr-1'
-        });
-
-        nerv.receive(envelope);
+        insertTask(task, { stage: 'READY', status: 'PENDING', actor: 'system', ifNotExists: true });
+        recordEvent({ entityType: 'task', entityId: 'task-1', eventType: 'TASK_UPDATED', payload: { id: 'task-1' } });
 
         const batch = await waitForEvent(client, 'task:updates_batch', 2000);
 
@@ -145,8 +139,9 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         const first = batch.updates[0];
         assert.strictEqual(first.taskId, 'task-1');
-        assert.ok(first.state);
-        assert.strictEqual(first.state.status, 'RUNNING');
+        assert.ok(first.task);
+        assert.strictEqual(first.task.id, 'task-1');
+        assert.strictEqual(first.task.unified_status, 'PENDING');
     });
 
     it('emits telemetry:metrics after TelemetryAggregator.start()', async () => {

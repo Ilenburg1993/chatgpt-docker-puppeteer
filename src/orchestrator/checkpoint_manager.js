@@ -50,7 +50,8 @@ class CheckpointManager {
      */
     async saveCheckpoint(missionId, stepIndex, missionState, metadata = {}) {
         const timestamp = Date.now();
-        const checkpointId = `checkpoint-${timestamp}`;
+        // Ensure uniqueness even when multiple checkpoints are saved within the same millisecond.
+        const checkpointId = `checkpoint-${timestamp}-${Math.random().toString(16).slice(2, 8)}`;
 
         const checkpoint = {
             checkpoint_id: checkpointId,
