@@ -1,5 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
+import { resolveDbPath } from '#infra/db/sqlite';
+import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
+import fs from 'node:fs/promises';
 
 /**
  * GET /api/health - Health check geral do sistema
@@ -81,10 +84,29 @@ async function getPm2Health(req, res) {
  */
 async function getKernelHealth(req, res) {
     try {
-        // TODO: Implementar check real do Kernel
+        const kernel = req.app?.locals?.kernel || null;
+        const hasKernel = Boolean(kernel);
+
+        if (!hasKernel) {
+            return res.json({
+                status: 'not_applicable',
+                message: 'Kernel not injected in server process',
+                timestamp: Date.now(),
+            });
+        }
+
+        if (typeof kernel.getStatus === 'function') {
+            return res.json({
+                status: 'ok',
+                kernel: kernel.getStatus(),
+                timestamp: Date.now(),
+            });
+        }
+
         res.json({
-            status: 'unknown',
-            message: 'Kernel health check not implemented yet'
+            status: 'degraded',
+            message: 'Kernel injected but getStatus() is unavailable',
+            timestamp: Date.now(),
         });
     } catch (err) {
         log('ERROR', `[HEALTH] Erro no Kernel health check: ${err.message}`);
@@ -97,11 +119,50 @@ async function getKernelHealth(req, res) {
  */
 async function getDiskHealth(req, res) {
     try {
-        // TODO: Implementar check real do disco
-        res.json({
-            status: 'unknown',
-            message: 'Disk health check not implemented yet'
-        });
+        const dbPath = resolveDbPath();
+        const artifactsDir = _resolveArtifactsRoot();
+
+        const targets = [
+            { name: 'db', path: dbPath },
+            { name: 'artifacts', path: artifactsDir },
+        ];
+
+        /** @type {Record<string, any>} */
+        const out = {};
+        let okCount = 0;
+
+        for (const t of targets) {
+            const entry = { path: t.path, exists: false, statfs: null };
+            try {
+                await fs.stat(t.path);
+                entry.exists = true;
+            } catch (_) {
+                entry.exists = false;
+            }
+
+            // Best-effort statfs (Node 20+)
+            try {
+                if (typeof fs.statfs === 'function') {
+                    const s = await fs.statfs(t.path);
+                    entry.statfs = {
+                        bsize: s.bsize,
+                        blocks: s.blocks,
+                        bfree: s.bfree,
+                        bavail: s.bavail,
+                        free_bytes: Number(s.bsize) * Number(s.bavail),
+                        total_bytes: Number(s.bsize) * Number(s.blocks),
+                    };
+                }
+            } catch (_) {
+                entry.statfs = null;
+            }
+
+            out[t.name] = entry;
+            if (entry.exists) okCount += 1;
+        }
+
+        const status = okCount === targets.length ? 'ok' : 'degraded';
+        res.json({ status, targets: out, timestamp: Date.now() });
     } catch (err) {
         log('ERROR', `[HEALTH] Erro no Disk health check: ${err.message}`);
         res.status(500).json({ status: 'error', message: err.message });

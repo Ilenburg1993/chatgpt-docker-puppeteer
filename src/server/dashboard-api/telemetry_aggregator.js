@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import * as hardware from '#core/hardware';
+import { getDb } from '#infra/db/sqlite';
 
 /**
  * Ring Buffer para armazenamento eficiente de métricas históricas.
@@ -94,8 +95,7 @@ class TelemetryAggregator {
         // Referência ao Socket.io Hub
         this.socketHub = null;
 
-        // Referência ao Queue Cache (lazy loaded)
-        this._queueCache = null;
+        // DB SSOT (SQLite) — Queue metrics come from DB now
 
         // Interval de coleta
         this.collectionInterval = null;
@@ -159,21 +159,6 @@ class TelemetryAggregator {
     }
 
     /**
-     * Getter lazy para Queue Cache.
-     */
-    async getQueueCache() {
-        if (!this._queueCache) {
-            try {
-                this._queueCache = await import('#infra/queue/cache');
-            } catch (err) {
-                log('DEBUG', `[TelemetryAggregator] Queue cache não disponível`);
-                return null;
-            }
-        }
-        return this._queueCache;
-    }
-
-    /**
      * Coleta métricas e envia para dashboards.
      */
     async _collectAndBroadcast() {
@@ -204,20 +189,15 @@ class TelemetryAggregator {
         const hwMetrics = hardware.getAllMetrics();
 
         // Queue metrics
-        let queueMetrics = { size: 0, hitRate: 0 };
-        const _qc = await this.getQueueCache();
-        if (_qc) {
-            try {
-                const cacheMetrics = _qc.getCacheMetrics();
-                queueMetrics = {
-                    size: cacheMetrics.queueSize || 0,
-                    hitRate: cacheMetrics.hitRate || 0,
-                    hits: cacheMetrics.hits || 0,
-                    misses: cacheMetrics.misses || 0
-                };
-            } catch (err) {
-                // Ignora erros de queue
-            }
+        let queueMetrics = { size: 0, running: 0 };
+        try {
+            const db = getDb();
+            queueMetrics = {
+                size: db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE stage='READY' AND status='PENDING'").get()?.c || 0,
+                running: db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status='RUNNING'").get()?.c || 0,
+            };
+        } catch (_) {
+            // Best-effort: DB might not be available in some modes/tests
         }
 
         // Event loop lag

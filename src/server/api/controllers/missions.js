@@ -1,488 +1,1131 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import { log } from '#core/logger';
+import * as schemas from '#core/schemas';
+import { WorkflowGenerator } from '#missions/workflow_generator';
+import { getDb } from '#infra/db/sqlite';
+import { recordEvent } from '#infra/db/events_repo';
+import {
+    AUTONOMY_MODES,
+    MISSION_STATUS,
+    createMission,
+    deleteMission,
+    getMissionById,
+    listMissions,
+    updateMission,
+} from '#infra/db/mission_repo';
+import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
+import schemaGuard from '../../middleware/schema_guard.js';
+
 const router = express.Router();
 
-import { log } from '#core/logger';
+const workflowGenerator = new WorkflowGenerator();
 
-/**
- * IMPORTANTE: MissionManager será injetado via setter após boot
- * (evita circular dependency com Kernel/NERV)
- */
-let missionManager = null;
+const ALLOWED_TARGETS = new Set(['auto', 'chatgpt', 'gemini', 'claude', 'ollama']);
+const AUTONOMY_VALUES = Object.values(AUTONOMY_MODES);
+const AUTONOMY_SCHEMA = z.enum(/** @type {[string, ...string[]]} */ (AUTONOMY_VALUES));
 
-/**
- * Setter para injetar MissionManager após inicialização.
- * Chamado por src/main.js durante boot sequence.
- *
- * @param {Object} manager - Instância do MissionManager
- */
-function setMissionManager(manager) {
-    if (!manager) {
-        throw new Error('[MISSIONS_API] MissionManager inválido');
-    }
-    missionManager = manager;
-    log('INFO', '[MISSIONS_API] MissionManager injetado com sucesso');
+const createMissionSchema = z.object({
+    title: z.string().min(1).max(500),
+    description: z.string().max(5000).optional(),
+    templateId: z.string().min(1).max(200).optional().nullable(),
+    params: z.record(z.any()).optional(),
+    autonomy_mode: AUTONOMY_SCHEMA.optional(),
+    autonomyMode: AUTONOMY_SCHEMA.optional(),
+    policy: z.record(z.any()).optional(),
+});
+
+const patchMissionSchema = z
+    .object({
+        title: z.string().min(1).max(500).optional(),
+        description: z.string().max(5000).optional(),
+        autonomy_mode: AUTONOMY_SCHEMA.optional(),
+        autonomyMode: AUTONOMY_SCHEMA.optional(),
+    })
+    .refine(v => Object.keys(v).length > 0, { message: 'Body vazio' });
+
+const updatePolicySchema = z.object({
+    autonomy_mode: AUTONOMY_SCHEMA.optional(),
+    autonomyMode: AUTONOMY_SCHEMA.optional(),
+    policy: z.record(z.any()).optional(),
+});
+
+const feedbackSchema = z.object({
+    feedback: z.string().min(1).max(20000),
+});
+
+const suggestTasksSchema = z.object({
+    max_proposals: z.number().int().min(1).max(25).optional(),
+    target: z.string().optional(),
+});
+
+const proposalsAcceptSchema = z.object({
+    proposals: z
+        .array(
+            z.object({
+                title: z.string().optional(),
+                user_message: z.string().min(1),
+                system_message: z.string().optional().nullable(),
+                target: z.string().optional(),
+                priority: z.number().optional(),
+                depends_on: z.array(z.string()).optional(),
+                tags: z.array(z.string()).optional(),
+            })
+        )
+        .min(1)
+        .max(200),
+});
+
+const proposalsRejectSchema = z
+    .object({
+        all: z.boolean().optional(),
+        task_ids: z.array(z.string()).max(2000).optional(),
+    })
+    .refine(v => v.all === true || (Array.isArray(v.task_ids) && v.task_ids.length > 0), {
+        message: 'Body inválido: forneça {all:true} ou {task_ids:[...]}',
+    });
+
+function _asUpper(value) {
+    return value ? String(value).toUpperCase().trim() : null;
 }
 
-/**
- * Middleware para verificar se MissionManager está disponível.
- */
-function requireMissionManager(req, res, next) {
-    if (!missionManager) {
-        return res.status(503).json({
-            success: false,
-            error: 'MissionManager não inicializado',
-            message: 'Sistema ainda está inicializando ou MissionManager não foi configurado',
-            request_id: req.id
-        });
+function _asTrimmedString(value, fallback = '') {
+    if (value === null || value === undefined) return fallback;
+    return String(value).trim();
+}
+
+function _coerceAutonomyMode(raw) {
+    const value = _asUpper(raw);
+    if (!value) return AUTONOMY_MODES.USER_ONLY;
+    return AUTONOMY_MODES[value] ? value : AUTONOMY_MODES.USER_ONLY;
+}
+
+function _computeProgressView(mission) {
+    const workflow = mission?.context?.workflow || null;
+    const steps = Array.isArray(workflow?.steps) ? workflow.steps : [];
+
+    const progress = mission?.context?.progress || {};
+    const currentStepIndex = Number(progress.current_step_index || 0) || 0;
+
+    const totalSteps = steps.length;
+    const percent = totalSteps > 0 ? Math.max(0, Math.min(100, Math.round((currentStepIndex / totalSteps) * 100))) : 0;
+
+    return {
+        mission_id: mission.id,
+        status: mission.status,
+        autonomy_mode: mission.autonomy_mode,
+        progress: {
+            current_step_index: currentStepIndex,
+            total_steps: totalSteps,
+            percent,
+            current_task_id: progress.current_task_id || null,
+            created_count: progress.created_count || 0,
+            completed: Array.isArray(progress.completed) ? progress.completed : [],
+            failed: Array.isArray(progress.failed) ? progress.failed : [],
+        },
+        current_step: steps[currentStepIndex] || null,
+        workflow: workflow ? { id: workflow.id, template_id: workflow.template_id || null } : null,
+        is_active: mission.status === MISSION_STATUS.RUNNING,
+    };
+}
+
+function _pickAllowedTarget({ requested, allowedTargets = null } = {}) {
+    const requestedNormalized = requested ? String(requested).toLowerCase().trim() : null;
+    const allowed = Array.isArray(allowedTargets) ? allowedTargets.map(t => String(t).toLowerCase().trim()) : null;
+
+    if (requestedNormalized && allowed && allowed.includes(requestedNormalized)) {
+        return requestedNormalized;
     }
-    next();
+    if (requestedNormalized && !allowed) {
+        return requestedNormalized;
+    }
+
+    if (allowed && allowed.length > 0) {
+        return allowed[0];
+    }
+    return 'auto';
 }
 
 /* --------------------------------------------------------------------------
-   1. CREATE - Criar nova missão
+   0. TEMPLATES
 -------------------------------------------------------------------------- */
 
 /**
- * POST /api/missions
- * Cria uma nova missão a partir de um template.
- *
- * Body:
- *   {
- *     "title": "Escrever livro sobre Rust",
- *     "description": "Livro técnico de 300 páginas",
- *     "templateId": "book_writing",
- *     "params": {
- *       "topic": "Rust Programming",
- *       "num_chapters": 15,
- *       "target_pages": 300,
- *       "target_audience": "intermediate developers"
- *     }
- *   }
- *
- * Response:
- *   {
- *     "success": true,
- *     "mission": { id, title, status, workflow, ... },
- *     "request_id": "req-123"
- *   }
+ * GET /api/missions/templates/list
  */
-router.post('/', requireMissionManager, async (req, res) => {
+router.get('/templates/list', async (req, res) => {
     try {
-        const { title, description, templateId, params } = req.body;
-
-        // Validação básica
-        if (!title || !templateId) {
-            return res.status(400).json({
-                success: false,
-                error: 'Campos obrigatórios ausentes',
-                missing: !title ? 'title' : 'templateId',
-                request_id: req.id
-            });
-        }
-
-        log('INFO', `[MISSIONS_API] Criando missão: ${title} (template=${templateId})`, req.id);
-
-        // Cria missão via MissionManager
-        const mission = await missionManager.createMission({
-            title,
-            description: description || '',
-            templateId,
-            params: params || {}
-        });
-
-        log('INFO', `[MISSIONS_API] Missão criada: ${mission.id}`, req.id);
-
-        res.status(201).json({
+        const templates = await workflowGenerator.listTemplates();
+        res.json({
             success: true,
-            mission,
-            request_id: req.id
+            total: templates.length,
+            templates,
+            request_id: req.id,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao criar missão: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao listar templates: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
-            error: 'Erro ao criar missão',
-            details: err.message,
-            request_id: req.id
+            error: 'Erro ao listar templates',
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /* --------------------------------------------------------------------------
-   2. READ - Consultar missões
+   1. CREATE / READ
 -------------------------------------------------------------------------- */
 
 /**
- * GET /api/missions
- * Lista todas as missões com filtros opcionais.
- *
- * Query params:
- *   - status: PENDING|RUNNING|PAUSED|COMPLETED|FAILED
- *
- * Response:
- *   {
- *     "success": true,
- *     "total": 10,
- *     "missions": [...]
- *   }
+ * POST /api/missions
+ * Cria nova missão (SSOT SQLite). Se `templateId` for fornecido, gera workflow.
  */
-router.get('/', requireMissionManager, async (req, res) => {
+router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
     try {
-        const filters = {};
+        const title = _asTrimmedString(req.body?.title, '');
+        const description = _asTrimmedString(req.body?.description, '');
+        const templateId = req.body?.templateId ? String(req.body.templateId).trim() : null;
+        const params = req.body?.params && typeof req.body.params === 'object' ? req.body.params : {};
 
-        // Filtro por status
-        if (req.query.status) {
-            filters.status = req.query.status;
+        if (!title) {
+            return res.status(400).json({
+                success: false,
+                error: 'Campos obrigatórios ausentes',
+                missing: 'title',
+                request_id: req.id,
+            });
         }
 
-        const missions = await missionManager.listMissions(filters);
+        const autonomyMode = _coerceAutonomyMode(req.body?.autonomy_mode ?? req.body?.autonomyMode);
+        const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : {};
 
+        let workflow = null;
+        if (templateId) {
+            workflow = await workflowGenerator.generateWorkflow(templateId, params);
+        }
+
+        const mission = createMission({
+            title,
+            description,
+            autonomy_mode: autonomyMode,
+            policy,
+            context: {
+                workflow,
+                progress: {
+                    current_step_index: 0,
+                    current_task_id: null,
+                    created_count: 0,
+                    completed: [],
+                    failed: [],
+                },
+                feedback: [],
+                mission_context: {},
+            },
+        });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: mission.id,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_CREATED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${mission.id}:created`,
+        });
+
+        res.status(201).json({
+            success: true,
+            mission,
+            request_id: req.id,
+        });
+    } catch (err) {
+        log('ERROR', `[MISSIONS_API] Erro ao criar missão: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao criar missão',
+            details: err?.message || String(err),
+            request_id: req.id,
+        });
+    }
+});
+
+/**
+ * PATCH /api/missions/:id
+ * Atualiza campos básicos (título/descrição/autonomia) para uso no dashboard.
+ */
+router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
+    try {
+        const missionId = String(req.params.id);
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
+
+        const title = req.body?.title !== undefined ? _asTrimmedString(req.body.title, '') : undefined;
+        const description = req.body?.description !== undefined ? _asTrimmedString(req.body.description, '') : undefined;
+        const autonomyModeRaw = req.body?.autonomy_mode ?? req.body?.autonomyMode;
+        const autonomy_mode = autonomyModeRaw !== undefined ? _coerceAutonomyMode(autonomyModeRaw) : undefined;
+
+        const updated = updateMission(missionId, {
+            ...(title !== undefined ? { title } : {}),
+            ...(description !== undefined ? { description } : {}),
+            ...(autonomy_mode !== undefined ? { autonomy_mode } : {}),
+        });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_UPDATED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:updated`,
+        });
+
+        res.json({ success: true, mission: updated, request_id: req.id });
+    } catch (err) {
+        log('ERROR', `[MISSIONS_API] Erro ao atualizar missão: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({ success: false, error: 'Erro ao atualizar missão', details: err?.message || String(err), request_id: req.id });
+    }
+});
+
+/**
+ * GET /api/missions
+ */
+router.get('/', async (req, res) => {
+    try {
+        const status = req.query.status ? String(req.query.status).toUpperCase().trim() : null;
+        const missions = listMissions({ status, limit: 2000 });
         res.json({
             success: true,
             total: missions.length,
             missions,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao listar missões: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao listar missões: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao listar missões',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /**
  * GET /api/missions/:id
- * Retorna detalhes completos de uma missão.
- *
- * Response:
- *   {
- *     "success": true,
- *     "mission": { id, title, status, workflow, progress, ... }
- *   }
  */
-router.get('/:id', requireMissionManager, async (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const mission = await missionManager.getMission(missionId);
-
+        const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({
                 success: false,
                 error: 'Missão não encontrada',
                 mission_id: missionId,
-                request_id: req.id
+                request_id: req.id,
             });
         }
-
         res.json({
             success: true,
             mission,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao buscar missão: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao buscar missão: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao buscar missão',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /**
  * GET /api/missions/:id/progress
- * Retorna progresso detalhado de uma missão.
- *
- * Response:
- *   {
- *     "success": true,
- *     "progress": {
- *       "mission_id": "mission-123",
- *       "status": "RUNNING",
- *       "progress": { current_step: 5, total_steps: 17, percent: 29 },
- *       "current_step": { id: "step-2-chapter-3", ... },
- *       "is_active": true
- *     }
- *   }
  */
-router.get('/:id/progress', requireMissionManager, async (req, res) => {
+router.get('/:id/progress', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const progress = await missionManager.getMissionProgress(missionId);
-
-        if (!progress) {
+        const mission = getMissionById(missionId);
+        if (!mission) {
             return res.status(404).json({
                 success: false,
                 error: 'Missão não encontrada',
                 mission_id: missionId,
-                request_id: req.id
+                request_id: req.id,
             });
         }
 
         res.json({
             success: true,
-            progress,
-            request_id: req.id
+            progress: _computeProgressView(mission),
+            request_id: req.id,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao buscar progresso: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao buscar progresso: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao buscar progresso',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /* --------------------------------------------------------------------------
-   3. EXECUTE - Controle de execução
+   2. EXECUTION CONTROL
 -------------------------------------------------------------------------- */
 
 /**
  * POST /api/missions/:id/execute
- * Inicia execução de uma missão.
- *
- * Response:
- *   {
- *     "success": true,
- *     "message": "Missão iniciada",
- *     "mission_id": "mission-123"
- *   }
+ * Missão só entra em RUNNING via ação explícita do usuário.
  */
-router.post('/:id/execute', requireMissionManager, async (req, res) => {
+router.post('/:id/execute', async (req, res) => {
     try {
         const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
 
-        log('INFO', `[MISSIONS_API] Iniciando execução: ${missionId}`, req.id);
+        const now = Date.now();
+        const updated = updateMission(missionId, {
+            status: MISSION_STATUS.RUNNING,
+            started_at_ms: mission.started_at ? Date.parse(mission.started_at) : now,
+        });
 
-        await missionManager.executeMission(missionId);
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_EXECUTED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:execute`,
+        });
 
         res.json({
             success: true,
             message: 'Missão iniciada',
-            mission_id: missionId,
-            request_id: req.id
+            mission: updated,
+            request_id: req.id,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao executar missão: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao executar missão: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao executar missão',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /**
  * POST /api/missions/:id/pause
- * Pausa execução de uma missão.
- *
- * Response:
- *   {
- *     "success": true,
- *     "message": "Missão pausada",
- *     "mission_id": "mission-123"
- *   }
  */
-router.post('/:id/pause', requireMissionManager, async (req, res) => {
+router.post('/:id/pause', async (req, res) => {
     try {
         const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
 
-        log('INFO', `[MISSIONS_API] Pausando missão: ${missionId}`, req.id);
+        const now = Date.now();
 
-        await missionManager.pauseMission(missionId);
+        // Pausa missão (gating de elegibilidade no claimNextEligibleTask)
+        const updated = updateMission(missionId, { status: MISSION_STATUS.PAUSED });
+
+        // Pausa tasks já elegíveis/rodando (TaskControlWatcher emitirá abort para locked tasks)
+        try {
+            const db = getDb();
+            db.prepare(
+                `
+                UPDATE tasks
+                SET status = 'PAUSED',
+                    paused_at_ms = @now,
+                    updated_at_ms = @now
+                WHERE mission_id = @mission_id
+                  AND stage = 'READY'
+                  AND status IN ('PENDING', 'RUNNING')
+            `
+            ).run({ now, mission_id: missionId });
+        } catch (_) {
+            /* best-effort */
+        }
 
         res.json({
             success: true,
             message: 'Missão pausada',
-            mission_id: missionId,
-            request_id: req.id
+            mission: updated,
+            request_id: req.id,
+        });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_PAUSED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:pause`,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao pausar missão: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao pausar missão: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao pausar missão',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /**
  * POST /api/missions/:id/resume
- * Resume execução de uma missão pausada.
- *
- * Response:
- *   {
- *     "success": true,
- *     "message": "Missão resumida",
- *     "mission_id": "mission-123"
- *   }
  */
-router.post('/:id/resume', requireMissionManager, async (req, res) => {
+router.post('/:id/resume', async (req, res) => {
     try {
         const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
 
-        log('INFO', `[MISSIONS_API] Resumindo missão: ${missionId}`, req.id);
+        const now = Date.now();
 
-        await missionManager.resumeMission(missionId);
+        const updated = updateMission(missionId, { status: MISSION_STATUS.RUNNING, started_at_ms: mission.started_at ? Date.parse(mission.started_at) : now });
+
+        // Retoma tasks pausadas
+        try {
+            const db = getDb();
+            db.prepare(
+                `
+                UPDATE tasks
+                SET status = 'PENDING',
+                    paused_at_ms = NULL,
+                    updated_at_ms = @now
+                WHERE mission_id = @mission_id
+                  AND stage = 'READY'
+                  AND status = 'PAUSED'
+            `
+            ).run({ now, mission_id: missionId });
+        } catch (_) {
+            /* best-effort */
+        }
 
         res.json({
             success: true,
             message: 'Missão resumida',
-            mission_id: missionId,
-            request_id: req.id
+            mission: updated,
+            request_id: req.id,
+        });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_RESUMED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:resume`,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao resumir missão: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao resumir missão: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao resumir missão',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /* --------------------------------------------------------------------------
-   4. FEEDBACK - Injeção de feedback
+   3. POLICY / AUTONOMY
+-------------------------------------------------------------------------- */
+
+/**
+ * POST /api/missions/:id/policy
+ * Ajusta autonomia/budget em runtime.
+ */
+router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => {
+    try {
+        const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
+
+        const autonomy_mode = _coerceAutonomyMode(req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode);
+        const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : null;
+
+        const updated = updateMission(missionId, {
+            autonomy_mode,
+            ...(policy ? { policy } : {}),
+        });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_POLICY_UPDATED',
+            payload: { request_id: req.id, autonomy_mode, has_policy: Boolean(policy) },
+            dedupKey: `req:${req.id}:mission:${missionId}:policy`,
+        });
+
+        res.json({
+            success: true,
+            mission: updated,
+            request_id: req.id,
+        });
+    } catch (err) {
+        log('ERROR', `[MISSIONS_API] Erro ao atualizar policy: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao atualizar policy',
+            details: err?.message || String(err),
+            request_id: req.id,
+        });
+    }
+});
+
+/* --------------------------------------------------------------------------
+   4. FEEDBACK
 -------------------------------------------------------------------------- */
 
 /**
  * POST /api/missions/:id/feedback
- * Adiciona feedback a uma missão em execução.
- *
- * Body:
- *   {
- *     "feedback": "Adicione mais exemplos de código"
- *   }
- *
- * Response:
- *   {
- *     "success": true,
- *     "message": "Feedback adicionado",
- *     "mission_id": "mission-123"
- *   }
  */
-router.post('/:id/feedback', requireMissionManager, async (req, res) => {
+router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
     try {
         const missionId = req.params.id;
-        const { feedback } = req.body;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
 
-        if (!feedback || typeof feedback !== 'string') {
+        const feedback = _asTrimmedString(req.body?.feedback, '');
+        if (!feedback) {
             return res.status(400).json({
                 success: false,
                 error: 'Feedback inválido',
                 message: 'Campo "feedback" é obrigatório e deve ser string',
-                request_id: req.id
+                request_id: req.id,
             });
         }
 
-        log('INFO', `[MISSIONS_API] Adicionando feedback: ${missionId}`, req.id);
+        const current = mission.context || {};
+        const feedbackList = Array.isArray(current.feedback) ? current.feedback : [];
+        const updated = updateMission(missionId, {
+            context: {
+                ...current,
+                feedback: [...feedbackList, { ts_ms: Date.now(), text: feedback }],
+            },
+        });
 
-        await missionManager.addFeedback(missionId, feedback);
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_FEEDBACK_ADDED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:feedback`,
+        });
 
         res.json({
             success: true,
             message: 'Feedback adicionado',
-            mission_id: missionId,
-            request_id: req.id
+            mission: updated,
+            request_id: req.id,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao adicionar feedback',
-            details: err.message,
-            request_id: req.id
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
 /* --------------------------------------------------------------------------
-   5. DELETE - Deletar missão
+   5. DYNAMIC PLANNING (LLM → proposals)
+-------------------------------------------------------------------------- */
+
+/**
+ * POST /api/missions/:id/suggest-tasks
+ * Cria uma "planner task" que deve retornar JSON estrito de propostas.
+ *
+ * Body (opcional):
+ *  - max_proposals: number (default 5)
+ *  - target: auto|chatgpt|gemini|claude|ollama
+ */
+router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, res) => {
+    try {
+        const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
+
+        if (req.body?.target !== undefined && req.body?.target !== null && req.body?.target !== '') {
+            const t = String(req.body.target).toLowerCase().trim();
+            if (!ALLOWED_TARGETS.has(t)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Target inválido',
+                    details: { allowed: Array.from(ALLOWED_TARGETS), provided: t },
+                    request_id: req.id,
+                });
+            }
+        }
+
+        if (mission.status !== MISSION_STATUS.RUNNING) {
+            return res.status(409).json({
+                success: false,
+                error: 'Missão não está em execução',
+                message: 'Use POST /api/missions/:id/execute antes de sugerir tasks',
+                mission_id: missionId,
+                request_id: req.id,
+            });
+        }
+
+        if (mission.autonomy_mode === AUTONOMY_MODES.USER_ONLY) {
+            return res.status(409).json({
+                success: false,
+                error: 'Autonomia insuficiente',
+                message: 'Ajuste autonomy_mode para permitir sugestões da LLM (ex.: LLM_SUGGEST).',
+                mission_id: missionId,
+                request_id: req.id,
+            });
+        }
+
+        const maxProposals = Math.max(1, Math.min(Number(req.body?.max_proposals || 5) || 5, 25));
+        const target = _pickAllowedTarget({ requested: req.body?.target, allowedTargets: mission.policy?.allowed_targets });
+
+        const workflow = mission.context?.workflow || null;
+        const progress = mission.context?.progress || {};
+        const feedback = Array.isArray(mission.context?.feedback) ? mission.context.feedback : [];
+
+        const plannerContract = {
+            proposals: [
+                {
+                    title: 'string curta',
+                    user_message: 'prompt completo',
+                    system_message: 'opcional',
+                    target: 'auto|chatgpt|gemini|claude|ollama',
+                    priority: 0,
+                    depends_on: ['task-id-opcional'],
+                    tags: ['capitulo-1', 'revisao'],
+                },
+            ],
+            needs_user_input: false,
+            questions: [],
+            stop_reason: null,
+        };
+
+        const userMessage = [
+            'Você é um planner de tasks para uma mission.',
+            '',
+            'Retorne APENAS um JSON válido (sem Markdown, sem texto extra) seguindo exatamente este schema:',
+            JSON.stringify(plannerContract, null, 2),
+            '',
+            `Mission title: ${mission.title}`,
+            `Mission description: ${mission.description || ''}`,
+            '',
+            `Autonomy mode: ${mission.autonomy_mode}`,
+            `Max proposals: ${maxProposals}`,
+            '',
+            `Workflow template_id: ${workflow?.template_id || 'none'}`,
+            `Workflow steps: ${Array.isArray(workflow?.steps) ? workflow.steps.length : 0}`,
+            `Progress current_step_index: ${progress.current_step_index || 0}`,
+            '',
+            'Recent feedback (most recent last):',
+            JSON.stringify(feedback.slice(-10), null, 2),
+            '',
+            'Constraints:',
+            '- Use target inside allowed_targets when possible.',
+            '- Keep prompts self-contained and ready to run.',
+            '',
+            `Generate up to ${maxProposals} proposals.`,
+        ].join('\n');
+
+        const taskId = `task-${uuidv4()}`;
+        const nowIso = new Date().toISOString();
+
+        const taskV5 = schemas.core.TaskSchemaV5.parse({
+            meta: {
+                id: taskId,
+                version: '5.0',
+                created_at: nowIso,
+                priority: 10,
+                source: 'gui',
+                mission_id: missionId,
+                workflow_id: workflow?.id || undefined,
+                tags: ['mission_planner'],
+            },
+            spec: {
+                target,
+                payload: {
+                    system_message: 'Você DEVE retornar APENAS JSON válido. Não use Markdown nem texto fora do JSON.',
+                    user_message: userMessage,
+                },
+            },
+            policy: {
+                dependencies: [],
+                execute_after: null,
+            },
+            mission: {
+                mission_id: missionId,
+                step_id: 'planner',
+                step_index: 0,
+                step_dependencies: [],
+                mission_context: mission.context?.mission_context || {},
+                is_checkpoint: false,
+            },
+            state: { status: 'PENDING' },
+            result: {},
+        });
+
+        insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'user' });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_PLANNER_TASK_CREATED',
+            payload: { request_id: req.id, planner_task_id: taskId },
+            dedupKey: `req:${req.id}:mission:${missionId}:planner_task`,
+        });
+
+        res.json({
+            success: true,
+            mission_id: missionId,
+            task_id: taskId,
+            request_id: req.id,
+        });
+    } catch (err) {
+        log('ERROR', `[MISSIONS_API] Erro ao criar planner task: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao criar planner task',
+            details: err?.message || String(err),
+            request_id: req.id,
+        });
+    }
+});
+
+/**
+ * POST /api/missions/:id/proposals/accept
+ * Aplique propostas diretamente como tasks READY (execução automática).
+ *
+ * Body:
+ *   { proposals: [ ...plannerContract.proposals... ] }
+ */
+router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (req, res) => {
+    try {
+        const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
+
+        const proposals = Array.isArray(req.body?.proposals) ? req.body.proposals : null;
+        if (!proposals) {
+            return res.status(400).json({ success: false, error: 'Body inválido: "proposals" é obrigatório', request_id: req.id });
+        }
+
+        const workflow = mission.context?.workflow || null;
+        const nowIso = new Date().toISOString();
+
+        /** @type {string[]} */
+        const createdTaskIds = [];
+
+        for (const proposal of proposals.slice(0, 200)) {
+            const user_message = _asTrimmedString(proposal?.user_message, '');
+            if (!user_message) continue;
+
+            const taskId = `task-${uuidv4()}`;
+            const target = _pickAllowedTarget({ requested: proposal?.target, allowedTargets: mission.policy?.allowed_targets });
+
+            const taskV5 = schemas.core.TaskSchemaV5.parse({
+                meta: {
+                    id: taskId,
+                    version: '5.0',
+                    created_at: nowIso,
+                    priority: Number.isFinite(Number(proposal?.priority)) ? Number(proposal.priority) : 5,
+                    source: 'gui',
+                    mission_id: missionId,
+                    workflow_id: workflow?.id || undefined,
+                    tags: Array.isArray(proposal?.tags) ? proposal.tags.map(t => String(t)) : [],
+                },
+                spec: {
+                    target,
+                    payload: {
+                        system_message: _asTrimmedString(proposal?.system_message, ''),
+                        user_message,
+                    },
+                },
+                policy: {
+                    dependencies: Array.isArray(proposal?.depends_on) ? proposal.depends_on.map(d => String(d)) : [],
+                    execute_after: null,
+                },
+                mission: {
+                    mission_id: missionId,
+                    step_id: null,
+                    step_index: 0,
+                    step_dependencies: [],
+                    mission_context: mission.context?.mission_context || {},
+                    is_checkpoint: false,
+                },
+                state: { status: 'PENDING' },
+                result: {},
+            });
+
+            insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'user' });
+            createdTaskIds.push(taskId);
+        }
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_PROPOSALS_ACCEPTED',
+            payload: { request_id: req.id, created: createdTaskIds.length, task_ids: createdTaskIds },
+            dedupKey: `req:${req.id}:mission:${missionId}:proposals_accept`,
+        });
+
+        res.json({
+            success: true,
+            mission_id: missionId,
+            created: createdTaskIds.length,
+            task_ids: createdTaskIds,
+            request_id: req.id,
+        });
+    } catch (err) {
+        log('ERROR', `[MISSIONS_API] Erro ao aceitar proposals: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao aceitar proposals',
+            details: err?.message || String(err),
+            request_id: req.id,
+        });
+    }
+});
+
+/**
+ * POST /api/missions/:id/proposals/reject
+ * Rejeita proposals (tasks em stage=PROPOSED) de uma mission.
+ *
+ * Body:
+ *  - { all: true } ou { task_ids: string[] }
+ */
+router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (req, res) => {
+    try {
+        const missionId = String(req.params.id);
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
+
+        const now = Date.now();
+        const all = Boolean(req.body?.all);
+        const taskIdsRaw = Array.isArray(req.body?.task_ids) ? req.body.task_ids : null;
+        const taskIds = taskIdsRaw ? taskIdsRaw.map(t => String(t).replace(/[^a-zA-Z0-9._-]/g, '')).filter(Boolean) : [];
+
+        const db = getDb();
+        /** @type {string[]} */
+        let ids = [];
+        if (all) {
+            ids = db
+                .prepare(`SELECT id FROM tasks WHERE mission_id = @mission_id AND stage = 'PROPOSED' ORDER BY created_at_ms ASC LIMIT 2000`)
+                .all({ mission_id: missionId })
+                .map(r => String(r.id));
+        } else {
+            ids = taskIds.slice(0, 2000);
+        }
+
+        if (ids.length === 0) {
+            return res.json({ success: true, mission_id: missionId, rejected: 0, task_ids: [], request_id: req.id });
+        }
+
+        const placeholders = ids.map(() => '?').join(',');
+        const belongs = db
+            .prepare(`SELECT id FROM tasks WHERE id IN (${placeholders}) AND mission_id = ?`)
+            .all(...ids, missionId)
+            .map(r => String(r.id));
+
+        const belongsSet = new Set(belongs);
+        const rejectedIds = ids.filter(id => belongsSet.has(id));
+
+        if (rejectedIds.length === 0) {
+            return res.json({ success: true, mission_id: missionId, rejected: 0, task_ids: [], request_id: req.id });
+        }
+        // Update via stmt (clear and stable for better-sqlite3).
+        const tx2 = db.transaction(() => {
+            const stmt = db.prepare(
+                `
+                UPDATE tasks
+                SET stage = 'REJECTED',
+                    status = 'SKIPPED',
+                    updated_at_ms = @now,
+                    last_error = COALESCE(last_error, 'USER_REJECTED')
+                WHERE id = @id
+                  AND mission_id = @mission_id
+                  AND stage = 'PROPOSED'
+            `
+            );
+            for (const id of rejectedIds) {
+                stmt.run({ id, mission_id: missionId, now });
+            }
+        });
+        tx2();
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_PROPOSALS_REJECTED',
+            payload: { request_id: req.id, rejected: rejectedIds.length, task_ids: rejectedIds },
+            dedupKey: `req:${req.id}:mission:${missionId}:proposals_reject`,
+        });
+        for (const tid of rejectedIds.slice(0, 5000)) {
+            recordEvent({
+                entityType: 'task',
+                entityId: tid,
+                actorType: 'user',
+                actorId: req.ip || null,
+                eventType: 'TASK_PROPOSAL_REJECTED',
+                payload: { request_id: req.id, mission_id: missionId },
+                dedupKey: `req:${req.id}:task:${tid}:proposal_reject`,
+            });
+        }
+
+        res.json({ success: true, mission_id: missionId, rejected: rejectedIds.length, task_ids: rejectedIds, request_id: req.id });
+    } catch (err) {
+        log('ERROR', `[MISSIONS_API] Erro ao rejeitar proposals: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({ success: false, error: 'Erro ao rejeitar proposals', details: err?.message || String(err), request_id: req.id });
+    }
+});
+
+/* --------------------------------------------------------------------------
+   6. DELETE / CANCEL
 -------------------------------------------------------------------------- */
 
 /**
  * DELETE /api/missions/:id
- * Deleta uma missão completamente (filesystem).
- *
- * Response:
- *   {
- *     "success": true,
- *     "message": "Missão deletada",
- *     "mission_id": "mission-123"
- *   }
+ * Cancelamento lógico (preserva SSOT e evita tasks órfãs).
  */
-router.delete('/:id', requireMissionManager, async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const missionId = req.params.id;
+        const mission = getMissionById(missionId);
+        if (!mission) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
 
-        log('INFO', `[MISSIONS_API] Deletando missão: ${missionId}`, req.id);
+        const now = Date.now();
+        const updated = updateMission(missionId, {
+            status: MISSION_STATUS.CANCELLED,
+            completed_at_ms: now,
+        });
 
-        await missionManager.deleteMission(missionId);
+        // Cancel tasks that could still execute.
+        try {
+            const db = getDb();
+            db.prepare(
+                `
+                UPDATE tasks
+                SET status = 'CANCELLED',
+                    cancelled_at_ms = @now,
+                    updated_at_ms = @now,
+                    last_error = COALESCE(last_error, 'MISSION_CANCELLED')
+                WHERE mission_id = @mission_id
+                  AND status IN ('PENDING', 'RUNNING', 'PAUSED', 'FAILED')
+            `
+            ).run({ now, mission_id: missionId });
+        } catch (_) {
+            /* best-effort */
+        }
 
         res.json({
             success: true,
-            message: 'Missão deletada',
-            mission_id: missionId,
-            request_id: req.id
+            message: 'Missão cancelada',
+            mission: updated,
+            request_id: req.id,
+        });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_CANCELLED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:cancel`,
         });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao deletar missão: ${err.message}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao cancelar missão: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
-            error: 'Erro ao deletar missão',
-            details: err.message,
-            request_id: req.id
+            error: 'Erro ao cancelar missão',
+            details: err?.message || String(err),
+            request_id: req.id,
         });
     }
 });
 
-/* --------------------------------------------------------------------------
-   6. TEMPLATES - Listar templates disponíveis
--------------------------------------------------------------------------- */
-
 /**
- * GET /api/missions/templates/list
- * Lista todos os templates de missões disponíveis.
- *
- * Response:
- *   {
- *     "success": true,
- *     "templates": ["book_writing", "software_development", ...]
- *   }
+ * DELETE /api/missions/:id/purge
+ * Remoção física (uso administrativo).
  */
-router.get('/templates/list', requireMissionManager, async (req, res) => {
+router.delete('/:id/purge', async (req, res) => {
     try {
-        // Acessa WorkflowGenerator via MissionManager
-        const templates = await missionManager.workflowGenerator.listTemplates();
+        const missionId = req.params.id;
+        const removed = deleteMission(missionId);
+        if (!removed) {
+            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
 
-        res.json({
-            success: true,
-            total: templates.length,
-            templates,
-            request_id: req.id
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            eventType: 'MISSION_PURGED',
+            payload: { request_id: req.id },
+            dedupKey: `req:${req.id}:mission:${missionId}:purge`,
         });
+        res.json({ success: true, request_id: req.id });
     } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao listar templates: ${err.message}`, req.id);
-        res.status(500).json({
-            success: false,
-            error: 'Erro ao listar templates',
-            details: err.message,
-            request_id: req.id
-        });
+        log('ERROR', `[MISSIONS_API] Erro ao purgar missão: ${err?.message || String(err)}`, req.id);
+        res.status(500).json({ success: false, error: 'Erro ao purgar missão', request_id: req.id });
     }
 });
 
 export default router;
+
+/**
+ * @deprecated Legacy hook (filesystem MissionManager injection).
+ * Missions are now DB-driven (SQLite SSOT). Kept for backward compatibility.
+ */
+function setMissionManager(_) {
+    log('WARN', '[MISSIONS_API] setMissionManager() ignored (SSOT missions controller)');
+}
+
 export { setMissionManager };

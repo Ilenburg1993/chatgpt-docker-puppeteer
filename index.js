@@ -10,5 +10,5 @@
    - Legacy scripts
 ========================================================================== */
 
-import { main } from './src/main.js';
+import { main } from '#main';
 main();

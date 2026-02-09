@@ -4,6 +4,8 @@ import dashboardController from './controllers/dashboard.js';
 import missionsController from './controllers/missions.js';
 import systemController from './controllers/system.js';
 import dnaController from './controllers/dna.js';
+import artifactsController from './controllers/artifacts.js';
+import resultsController from './controllers/results.js';
 import { notFound, errorHandler } from '../middleware/error_handler.js';
 import denyIfDelegated from '../middleware/deny_if_delegated.js';
 import { log } from '#core/logger';
@@ -73,7 +75,8 @@ async function applyRoutes(app) {
      */
     app.use('/api/tasks', apiLimiter, tasksController);
     app.use('/api/queue', apiLimiter, tasksController); // Alias para operações bulk de fila
-    app.use('/api/results', apiLimiter, tasksController); // Alias para recuperação de respostas
+    app.use('/api/results', apiLimiter, resultsController); // Download/stream de resultados
+    app.use('/api/artifacts', apiLimiter, artifactsController);
 
     /**
      * DOMÍNIO DE SISTEMA E OBSERVABILIDADE (Agentes e Infraestrutura)

@@ -217,9 +217,8 @@ class TaskSyncBridge extends EventEmitter {
                 }
             };
 
-            // Prefer onEvent (quando disponível e correto); fallback para onReceive.
-            const canUseOnEvent = typeof nerv.onEvent === 'function' && nerv.onEvent.length >= 2;
-            if (canUseOnEvent) {
+            // Prefer onEvent; fallback para onReceive.
+            if (typeof nerv.onEvent === 'function') {
                 try {
                     const unsub = nerv.onEvent(actionCode, wrappedHandler);
                     if (typeof unsub === 'function') {

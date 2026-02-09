@@ -21,6 +21,7 @@ import * as logWatcher from './watchers/log_watcher.js';
 import reconciler from './supervisor/reconcilier.js';
 import ServerNERVAdapter from './nerv_adapter/server_nerv_adapter.js';
 import * as NERV from '#nerv/nerv';
+import * as ssotEventFeed from './realtime/ssot_event_feed.js';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -134,6 +135,15 @@ async function bootstrap(options = {}) {
         socketHub.init(httpServer);
         log('DEBUG', '[BOOT] Socket hub acoplado');
 
+        // Dashboard vNext: SSOT DB Event Feed (realtime via SQLite events table)
+        try {
+            const intervalMs = Number(process.env.SSOT_EVENT_FEED_INTERVAL_MS || 250) || 250;
+            const batchLimit = Number(process.env.SSOT_EVENT_FEED_BATCH_LIMIT || 500) || 500;
+            ssotEventFeed.start({ socketHub, intervalMs, batchLimit });
+        } catch (err) {
+            log('WARN', `[BOOT] Falha ao iniciar SSOTEventFeed: ${err.message}`);
+        }
+
         // Dashboard V2: TelemetryAggregator (realtime metrics)
         try {
             const intervalMs = Number(process.env.DASHBOARD_TELEMETRY_INTERVAL_MS || 1000) || 1000;
@@ -208,11 +218,15 @@ async function bootstrap(options = {}) {
         }
 
         // Dashboard V2: TaskSyncBridge (realtime task updates via NERV)
-        try {
-            taskSyncBridge.initialize({ socketHub, nervClient: nerv });
-            log('INFO', '[BOOT] TaskSyncBridge inicializado (NERV → Dashboard)');
-        } catch (err) {
-            log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
+        if (process.env.ENABLE_TASK_SYNC_BRIDGE === 'true') {
+            try {
+                taskSyncBridge.initialize({ socketHub, nervClient: nerv });
+                log('INFO', '[BOOT] TaskSyncBridge inicializado (NERV → Dashboard)');
+            } catch (err) {
+                log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
+            }
+        } else {
+            log('INFO', '[BOOT] TaskSyncBridge desativado (ENABLE_TASK_SYNC_BRIDGE!=true)');
         }
 
         // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)
