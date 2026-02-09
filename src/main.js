@@ -45,10 +45,20 @@ import CONFIG from './core/config.js';
 import identityManager from './core/identity_manager.js';
 import { createNERV } from './nerv/nerv.js';
 import { createKernel } from './kernel/kernel.js';
+import { getDb } from './infra/db/sqlite.js';
+import { importLegacyQueueFromDisk } from './infra/db/legacy_import.js';
+import { QueueWorker } from '#agent/queue_worker';
+import { TaskStateProjector } from '#agent/task_state_projector';
+import { TaskControlWatcher } from '#agent/task_control_watcher';
+import { MissionRunner } from '#agent/mission_runner';
+import { MissionPlannerProcessor } from '#agent/mission_planner_processor';
+import { AttemptWatchdog } from '#agent/attempt_watchdog';
+import { TaskOrchestrationWorker } from '#agent/task_orchestration_worker';
+import { AgentLoop } from '#agent/agent_loop';
 import { ConnectionOrchestrator } from './infra/ConnectionOrchestrator.js';
-import { MissionManager } from './missions/mission_manager.js';
 import * as forensics from './core/forensics.js';
-import * as DriverNERVAdapter from './driver/nerv_adapter/driver_nerv_adapter.js';
+import { saveResponse } from './infra/storage/response_adapter.js';
+import { DriverNERVAdapter } from './driver/nerv_adapter/driver_nerv_adapter.js';
 // ServerNERVAdapter is lazy-loaded when the server/socket hub is available
 
 // ============================================================================
@@ -443,12 +453,13 @@ async function boot() {
             maxTokens: process.env.CONTEXT_MAX_TOKENS || CONFIG.CONTEXT_MAX_TOKENS || 100000,
             summarizationPolicy: process.env.SUMMARIZATION_POLICY || CONFIG.SUMMARIZATION_POLICY || 'on_overflow'
         });
-        log('INFO', '[BOOT] ✅ ContextManager online (será compartilhado por Kernel e MissionManager)');
+        log('INFO', '[BOOT] ✅ ContextManager online (será compartilhado por Kernel e MissionRunner)');
 
-        // ===== FASE 4: KERNEL (DECISOR SOBERANO) =====
+        // ===== FASE 4: KERNEL (SSOT GATEWAY + NERV PUMP) =====
         log('INFO', '[BOOT] Fase 4/6: Inicializando KERNEL');
 
         const kernel = await createKernel({
+            mode: 'ssot_gateway',
             nerv, // Passa NERV diretamente
             contextManager, // V2.0: Injeta ContextManager compartilhado
             telemetry: {
@@ -466,7 +477,18 @@ async function boot() {
             process.exit(1);
         }
 
-        log('INFO', '[BOOT] ✅ KERNEL online (loop 20 Hz, com ContextManager compartilhado)');
+        // Start kernel lifecycle. We run the kernel pump in manual mode (AgentLoop).
+        try {
+            if (typeof kernel.start === 'function') {
+                kernel.start({ autoLoop: false });
+                log('INFO', '[BOOT] ✅ KERNEL started (SSOT gateway; pump manual via AgentLoop)');
+            }
+        } catch (err) {
+            log('FATAL', `[BOOT] kernel.start() falhou: ${err?.message || String(err)}`);
+            process.exit(1);
+        }
+
+        log('INFO', '[BOOT] ✅ KERNEL online (SSOT gateway)');
 
         // ======================================================================
         // ===== FASE 5: ADAPTERS (PONTES NERV) — SERVER MODE SEM IPC =========
@@ -477,13 +499,99 @@ async function boot() {
         // DRIVER ADAPTER (sempre local ao Maestro)
         // ----------------------------------------------------------------------
         // Em modo degradado (browserPool = null), DriverAdapter não executa tasks
-        const driverAdapter = new DriverNERVAdapter(nerv, browserPool, CONFIG);
+        const driverAdapter = new DriverNERVAdapter(nerv, browserPool, { saveResponse });
 
         if (systemMode === 'degraded') {
             log('WARN', '[BOOT] ⚠️ DriverAdapter em modo degradado (browserPool = null)');
             log('WARN', '[BOOT] Tasks dependentes de browser permanecem desativadas');
         } else {
             log('INFO', '[BOOT] ✅ DriverNERVAdapter online');
+        }
+
+        // ======================================================================
+        // ===== FASE 5.1: SSOT SQLITE + WORKERS (QueueWorker + Projector) =====
+        // ======================================================================
+
+        let queueWorker = null;
+        let taskProjector = null;
+        let taskControlWatcher = null;
+        let missionRunner = null;
+        let missionPlannerProcessor = null;
+        let attemptWatchdog = null;
+        let taskOrchestrationWorker = null;
+        let agentLoop = null;
+
+        try {
+            // Ensure DB is ready (migrations) and import legacy filesystem queue once (best-effort).
+            getDb();
+            try {
+                await importLegacyQueueFromDisk();
+            } catch (err) {
+                log('WARN', `[BOOT] Legacy queue import skipped/failed: ${err?.message || String(err)}`);
+            }
+
+            const identityNow = identityManager.getFullIdentity?.() || {};
+            const workerId = identityNow.robot_id || `worker-${process.pid}`;
+
+            taskProjector = new TaskStateProjector({ nerv, workerId });
+            taskProjector.start();
+
+            taskControlWatcher = new TaskControlWatcher({ nerv, intervalMs: Number(process.env.TASK_CONTROL_INTERVAL_MS || 500) || 500 });
+
+            queueWorker = new QueueWorker({
+                kernel,
+                workerId,
+                intervalMs: Number(process.env.QUEUE_WORKER_INTERVAL_MS || 250) || 250,
+                lockTtlMs: Number(process.env.QUEUE_WORKER_LOCK_TTL_MS || 60000) || 60000,
+                maxConcurrentTasks: Number(process.env.QUEUE_MAX_CONCURRENT_TASKS || 2) || 2,
+            });
+
+            missionRunner = new MissionRunner({
+                intervalMs: Number(process.env.MISSION_RUNNER_INTERVAL_MS || 1000) || 1000,
+            });
+
+            missionPlannerProcessor = new MissionPlannerProcessor({
+                intervalMs: Number(process.env.MISSION_PLANNER_INTERVAL_MS || 1500) || 1500,
+            });
+            attemptWatchdog = new AttemptWatchdog({
+                nerv,
+                intervalMs: Number(process.env.ATTEMPT_WATCHDOG_INTERVAL_MS || 1500) || 1500,
+                dispatchedStuckMs: Number(process.env.ATTEMPT_DISPATCHED_STUCK_MS || 30000) || 30000,
+                rescheduleDelayMs: Number(process.env.ATTEMPT_WATCHDOG_RESCHEDULE_DELAY_MS || 1000) || 1000,
+            });
+
+            taskOrchestrationWorker = new TaskOrchestrationWorker({
+                browserPool,
+                workerId,
+                intervalMs: Number(process.env.TASK_ORCHESTRATION_INTERVAL_MS || 1250) || 1250,
+                batchSize: Number(process.env.TASK_ORCHESTRATION_BATCH_SIZE || 50) || 50,
+            });
+
+            agentLoop = new AgentLoop({
+                kernel,
+                browserPool,
+                queueWorker,
+                taskControlWatcher,
+                missionRunner,
+                missionPlannerProcessor,
+                attemptWatchdog,
+                taskOrchestrationWorker,
+                intervals: {
+                    kernelMs: Number(process.env.KERNEL_CYCLE_INTERVAL || CONFIG.KERNEL_CYCLE_INTERVAL || 50) || 50,
+                    queueMs: Number(process.env.QUEUE_WORKER_INTERVAL_MS || 250) || 250,
+                    controlMs: Number(process.env.TASK_CONTROL_INTERVAL_MS || 500) || 500,
+                    missionMs: Number(process.env.MISSION_RUNNER_INTERVAL_MS || 1000) || 1000,
+                    plannerMs: Number(process.env.MISSION_PLANNER_INTERVAL_MS || 1500) || 1500,
+                    watchdogMs: Number(process.env.ATTEMPT_WATCHDOG_INTERVAL_MS || 1500) || 1500,
+                    orchestrationMs: Number(process.env.TASK_ORCHESTRATION_INTERVAL_MS || 1250) || 1250,
+                },
+            });
+            agentLoop.start();
+
+            log('INFO', '[BOOT] ✅ SSOT workers online (SQLite queue)');
+        } catch (err) {
+            log('FATAL', `[BOOT] SSOT workers init failed: ${err?.message || String(err)}`);
+            process.exit(1);
         }
 
         // ======================================================================
@@ -663,68 +771,12 @@ async function boot() {
         }
 
         // ======================================================================
-        // ===== FASE 5.5: MISSION ORCHESTRATION ===============================
+        // ===== FASE 5.5: MISSION ORCHESTRATION (SSOT) =========================
         // ======================================================================
-
-        log('INFO', '[BOOT] Fase 5.5/6: Inicializando Mission Orchestration Layer');
-
-        // ----------------------------------------------------------------------
-        // FeedbackProcessor — usa ContextManager compartilhado
-        // ----------------------------------------------------------------------
-        const { FeedbackProcessor } = await import('./missions/feedback_processor.js');
-
-        const feedbackProcessor = new FeedbackProcessor({
-            contextManager
-        });
-
-        log('DEBUG', '[BOOT] FeedbackProcessor criado');
-
-        // ----------------------------------------------------------------------
-        // CheckpointManager
-        // ----------------------------------------------------------------------
-        const { CheckpointManager } = await import('./orchestrator/checkpoint_manager.js');
-
-        const checkpointManager = new CheckpointManager({
-            baseDir: process.env.MISSIONS_DIR || CONFIG.MISSIONS_DIR || 'missions',
-            keepLast: process.env.CHECKPOINT_KEEP_LAST || CONFIG.CHECKPOINT_KEEP_LAST || 10,
-            autoCleanup: true
-        });
-
-        log('DEBUG', '[BOOT] CheckpointManager criado');
-
-        // ----------------------------------------------------------------------
-        // MissionManager
-        // ----------------------------------------------------------------------
-        const missionManager = new MissionManager({
-            kernel,
-            nerv,
-            contextManager,
-            feedbackProcessor,
-            checkpointManager
-        });
-
-        try {
-            await missionManager.initialize();
-        } catch (err) {
-            log('FATAL', `[BOOT] MissionManager.initialize falhou: ${err.message}`);
-            process.exit(1);
-        }
-
-        if (!missionManager || typeof missionManager.executeMission !== 'function') {
-            log('FATAL', '[BOOT] MissionManager inválido após inicialização');
-            process.exit(1);
-        }
-
-        log('INFO', '[BOOT] ✅ MissionManager online');
-
-        // ----------------------------------------------------------------------
-        // REST Controller injection — somente se server ativo
-        // ----------------------------------------------------------------------
-        if (serverAdapter) {
-            const missionsController = await import('./server/api/controllers/missions.js').then(m => m.default ?? m);
-            missionsController.setMissionManager(missionManager);
-            log('DEBUG', '[BOOT] MissionManager injetado no controller REST');
-        }
+        // Missions and tasks orchestration is DB-driven:
+        // - Dashboard/API writes to SQLite (SSOT)
+        // - MissionRunner creates tasks based on mission state/policy
+        // - QueueWorker executes eligible tasks automatically
 
         // ===== FASE 6: FINALIZAÇÃO =====
 
@@ -754,8 +806,7 @@ async function boot() {
                         nerv: Boolean(nerv),
                         kernel: Boolean(kernel),
                         browserPool: systemMode === 'degraded' ? false : Boolean(browserPool),
-                        serverAdapter: Boolean(serverAdapter),
-                        missionManager: Boolean(missionManager)
+                        serverAdapter: Boolean(serverAdapter)
                     };
                     // Campos minimamente exigidos para considerar o processo pronto
                     serverApp.locals.requiredReadiness = serverApp.locals.requiredReadiness || ['nerv', 'kernel'];
@@ -781,7 +832,7 @@ async function boot() {
          *   - serverMode é a topologia efetiva
          *   - shutdown NÃO deve redescobrir nada via filesystem
          */
-        return {
+	        return {
             // -------- CORE --------
             nerv,
             kernel,
@@ -795,8 +846,14 @@ async function boot() {
             driverAdapter: driverAdapter ?? null,
             serverAdapter: serverAdapter ?? null,
 
-            // -------- MISSION LAYER --------
-            missionManager: missionManager ?? null,
+	            // -------- SSOT WORKERS --------
+	            queueWorker: queueWorker ?? null,
+	            taskProjector: taskProjector ?? null,
+	            taskControlWatcher: taskControlWatcher ?? null,
+	            missionRunner: missionRunner ?? null,
+	            missionPlannerProcessor: missionPlannerProcessor ?? null,
+	            attemptWatchdog: attemptWatchdog ?? null,
+	            agentLoop: agentLoop ?? null,
 
             // -------- SERVER LAYER --------
             serverMode: SERVER_MODE,
@@ -828,15 +885,15 @@ async function boot() {
    GRACEFUL SHUTDOWN — CANONICAL (NERV-CENTRIC, NO IPC, TOPOLOGY-SAFE)
 ========================================================================== */
 
-async function shutdown(context) {
+	async function shutdown(context) {
     log('WARN', '[SHUTDOWN] Iniciando shutdown gracioso coordenado...');
 
     const shutdownStartTime = Date.now();
     const phases = [];
     let failedPhases = 0;
 
-    const { serverAdapter, driverAdapter, missionManager, kernel, browserPool, nerv, httpServer, httpAuthority } =
-        context || {};
+	    const { serverAdapter, driverAdapter, kernel, browserPool, nerv, httpServer, httpAuthority, queueWorker, taskProjector, taskControlWatcher, missionRunner, missionPlannerProcessor, attemptWatchdog, agentLoop } =
+	        context || {};
 
     const shutdownPhases = [
         /* -----------------------------------------------------------
@@ -942,22 +999,71 @@ async function shutdown(context) {
            DRIVER
         ----------------------------------------------------------- */
         {
-            name: 'DriverAdapter',
+            name: 'SSOTWorkers',
             fn: async () => {
-                if (driverAdapter && typeof driverAdapter.shutdown === 'function') {
-                    await driverAdapter.shutdown();
+                try {
+                    if (agentLoop && typeof agentLoop.stop === 'function') {
+                        agentLoop.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] agentLoop.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (queueWorker && typeof queueWorker.stop === 'function') {
+                        queueWorker.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] queueWorker.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (taskControlWatcher && typeof taskControlWatcher.stop === 'function') {
+                        taskControlWatcher.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] taskControlWatcher.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (taskProjector && typeof taskProjector.stop === 'function') {
+                        taskProjector.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] taskProjector.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (missionRunner && typeof missionRunner.stop === 'function') {
+                        missionRunner.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] missionRunner.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (missionPlannerProcessor && typeof missionPlannerProcessor.stop === 'function') {
+                        missionPlannerProcessor.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] missionPlannerProcessor.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (attemptWatchdog && typeof attemptWatchdog.stop === 'function') {
+                        attemptWatchdog.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] attemptWatchdog.stop falhou: ${err?.message || String(err)}`);
                 }
             }
         },
 
-        /* -----------------------------------------------------------
-           MISSION MANAGER
-        ----------------------------------------------------------- */
         {
-            name: 'MissionManager',
+            name: 'DriverAdapter',
             fn: async () => {
-                if (missionManager && typeof missionManager.cleanup === 'function') {
-                    missionManager.cleanup();
+                if (driverAdapter && typeof driverAdapter.shutdown === 'function') {
+                    await driverAdapter.shutdown();
                 }
             }
         },
