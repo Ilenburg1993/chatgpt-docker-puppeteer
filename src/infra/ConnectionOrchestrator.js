@@ -1,11 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import CONFIG from '#core/config';
+import { log } from '#core/logger';
+import os from 'node:os';
+import puppeteerCore from 'puppeteer-core';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import puppeteerCore from 'puppeteer-core';
-import os from 'node:os';
-import path from 'node:path';
-import { log } from '#core/logger';
-import CONFIG from '#core/config';
 import { createMockBrowser } from './mock_chrome.js';
 
 // Aplica stealth plugin para anti-detection
@@ -162,6 +161,21 @@ const PROXY_PORT = Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_P
    - All Chrome args must be set in START-CHROME-SIMPLE.bat, NOT here
 ======================================================================== */
 
+/**
+ * Orquestrador de conexões browser com suporte a múltiplos modos de conexão.
+ *
+ * Gerencia ciclo de vida completo: detecção de ambiente → conexão browser →
+ * seleção de página → validação. Suporta fallbacks automáticos entre modos
+ * (WebSocket endpoint, connect direto, auto-detecção).
+ *
+ * **Side-effects:** Inicia processos Chrome, gerencia conexões WebSocket.
+ * **Semântica:** Estados finitos bem definidos com transições controladas.
+ *
+ * @example
+ * const orchestrator = new ConnectionOrchestrator({ mode: 'auto' });
+ * await orchestrator.connect();
+ * const page = await orchestrator.getPage();
+ */
 class ConnectionOrchestrator {
     constructor(options = {}) {
         this.config = { ...DEFAULTS, ...options };
@@ -436,6 +450,9 @@ class ConnectionOrchestrator {
         const mode = this.config.mode;
         const autoFallback = this.config.autoFallback;
 
+        // FIXED (P0-2.3): Substituído recursão por loop iterativo
+        // Previne stack overflow em retry scenarios
+
         // =====================================================================
         // CHROME PROXY INTEGRATION - Estratégia Smart (Fast Path + Fallback)
         // =====================================================================
@@ -479,82 +496,88 @@ class ConnectionOrchestrator {
 
         let lastError = null;
 
-        for (const currentMode of modesToTry) {
-            // Evita tentar o mesmo modo múltiplas vezes
-            if (this.attemptedModes.includes(currentMode) && mode !== 'auto') {
-                continue;
+        // FIXED (P0-2.3): Loop iterativo ao invés de recursão
+        // Outer loop para retries (previne stack overflow)
+        while (this.retryCount < this.config.maxConnectionAttempts) {
+            // Inner loop para tentar diferentes modos
+            for (const currentMode of modesToTry) {
+                // Evita tentar o mesmo modo múltiplas vezes na mesma rodada
+                if (this.attemptedModes.includes(currentMode) && mode !== 'auto') {
+                    continue;
+                }
+
+                try {
+                    this.setState(STATES.CONNECTING_BROWSER, { mode: currentMode });
+                    log('INFO', `[ORCH] Tentando conexão em modo: ${currentMode}`);
+
+                    switch (currentMode) {
+                        case 'connect':
+                            this.browser = await this.tryConnectBrowserURL();
+                            break;
+
+                        case 'wsEndpoint':
+                            this.browser = await this.tryConnectWSEndpoint();
+                            break;
+
+                        default:
+                            throw new Error(`Modo desconhecido: ${currentMode} (suportados: wsEndpoint, connect)`);
+                    }
+
+                    if (this.browser) {
+                        // Registra listeners limpos
+                        this.browser.on('disconnected', this._onDisconnect);
+                        this.browser.on('targetdestroyed', this._onTargetDestroyed);
+
+                        this.retryCount = 0;
+                        this.attemptedModes = []; // Reseta tentativas após sucesso
+                        this.setState(STATES.BROWSER_READY);
+                        log('INFO', `[ORCH] Browser conectado com sucesso em modo: ${currentMode}`);
+                        return this.browser; // SUCCESS - sai imediatamente
+                    }
+                } catch (error) {
+                    lastError = error;
+                    this.attemptedModes.push(currentMode);
+                    log('WARN', `[ORCH] Falha em modo ${currentMode}: ${error.message}`);
+
+                    // Se não é auto e não tem fallback, rejeita imediatamente
+                    if (!autoFallback && mode !== 'auto') {
+                        throw error;
+                    }
+
+                    // Continua para próximo modo
+                    continue;
+                }
             }
 
-            try {
-                this.setState(STATES.CONNECTING_BROWSER, { mode: currentMode });
-                log('INFO', `[ORCH] Tentando conexão em modo: ${currentMode}`);
-
-                switch (currentMode) {
-                    case 'connect':
-                        this.browser = await this.tryConnectBrowserURL();
-                        break;
-
-                    case 'wsEndpoint':
-                        this.browser = await this.tryConnectWSEndpoint();
-                        break;
-
-                    default:
-                        throw new Error(`Modo desconhecido: ${currentMode} (suportados: wsEndpoint, connect)`);
-                }
-
-                if (this.browser) {
-                    // Registra listeners limpos
-                    this.browser.on('disconnected', this._onDisconnect);
-                    this.browser.on('targetdestroyed', this._onTargetDestroyed);
-
-                    this.retryCount = 0;
-                    this.attemptedModes = []; // Reseta tentativas após sucesso
-                    this.setState(STATES.BROWSER_READY);
-                    log('INFO', `[ORCH] Browser conectado com sucesso em modo: ${currentMode}`);
-                    return this.browser;
-                }
-            } catch (error) {
-                lastError = error;
-                this.attemptedModes.push(currentMode);
-                log('WARN', `[ORCH] Falha em modo ${currentMode}: ${error.message}`);
-
-                // Se não é auto e não tem fallback, rejeita imediatamente
-                if (!autoFallback && mode !== 'auto') {
-                    throw error;
-                }
-
-                // Continua para próximo modo
-                continue;
-            }
-        }
-
-        // Se chegou aqui, todos os modos falharam
-        this.retryCount++;
-        this.classifyIssue(
-            ISSUE_KIND.EVENT,
-            ISSUE_TYPES.BROWSER_NOT_STARTED,
-            lastError?.message || 'Todos os modos falharam'
-        );
-        this.setState(STATES.RETRY_BROWSER, { retry: this.retryCount, attemptedModes: this.attemptedModes });
-
-        // Retry com backoff exponencial
-        if (this.retryCount < this.config.maxConnectionAttempts) {
-            const delay = Math.min(
-                this.config.retryDelayMs * Math.pow(1.5, this.retryCount - 1),
-                this.config.maxRetryDelayMs
+            // Se chegou aqui, todos os modos falharam nesta rodada
+            this.retryCount++;
+            this.classifyIssue(
+                ISSUE_KIND.EVENT,
+                ISSUE_TYPES.BROWSER_NOT_STARTED,
+                lastError?.message || 'Todos os modos falharam'
             );
+            this.setState(STATES.RETRY_BROWSER, { retry: this.retryCount, attemptedModes: this.attemptedModes });
 
-            log('WARN', `[ORCH] Retry ${this.retryCount}/${this.config.maxConnectionAttempts} em ${delay}ms`);
-            await new Promise(r => {
-                setTimeout(r, delay);
-            });
+            // Se ainda há tentativas disponíveis, aguarda com backoff exponencial
+            if (this.retryCount < this.config.maxConnectionAttempts) {
+                const delay = Math.min(
+                    this.config.retryDelayMs * Math.pow(1.5, this.retryCount - 1),
+                    this.config.maxRetryDelayMs
+                );
 
-            // Reseta modos tentados para permitir nova rodada
-            this.attemptedModes = [];
-            return this.ensureBrowser(); // Recursão com retry
+                log('WARN', `[ORCH] Retry ${this.retryCount}/${this.config.maxConnectionAttempts} em ${delay}ms`);
+                await new Promise(r => setTimeout(r, delay));
+
+                // Reseta modos tentados para permitir nova rodada
+                this.attemptedModes = [];
+                // Continue outer while loop para tentar novamente
+            }
         }
 
-        throw new Error(`Falha ao conectar após ${this.retryCount} tentativas: ${lastError?.message}`);
+        // Esgotou todas as tentativas
+        throw new Error(
+            `Falha ao conectar após ${this.retryCount} tentativas: ${lastError?.message || 'Unknown error'}`
+        );
     }
 
     async scanForTargetPage() {

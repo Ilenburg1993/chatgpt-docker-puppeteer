@@ -322,9 +322,9 @@ class KernelNERVBridge {
      * Permite orchestrator preparar task (ITERATIVE, MULTI_STEP).
      *
      * @param {Object} task - Task V5
-     * @returns {Object} - Task modificada (se orquestrada)
+     * @returns {Promise<Object>} - Task modificada (se orquestrada)
      */
-    beforeTaskExecution(task) {
+    async beforeTaskExecution(task) {
         if (!this.orchestrator) {
             return task; // V1.x fallback: sem orchestrator
         }
@@ -346,7 +346,8 @@ class KernelNERVBridge {
         });
 
         // Prepara task (inicializa state de workflow/iteração)
-        const preparedTask = this.orchestrator.beforeExecution(task);
+        // ✅ P0-2.4: beforeExecution agora é async (workflow locking)
+        const preparedTask = await this.orchestrator.beforeExecution(task);
 
         // Cacheia task para afterExecution
         this.orchestrationCache.set(task.meta.id, {

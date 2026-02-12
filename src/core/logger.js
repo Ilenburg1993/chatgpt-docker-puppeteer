@@ -1,9 +1,14 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'node:fs';
 import path from 'node:path';
+import { initDirectory } from '#infra/async_init';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
+
+/**
+ * @typedef {'DEBUG'|'INFO'|'WARN'|'ERROR'|'FATAL'} LogLevel
+ */
 
 // --- DEFINIÇÃO DE ARQUIVOS ---
 const LOG_FILE = path.join(LOG_DIR, 'agente_current.log');
@@ -15,10 +20,9 @@ const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB para logs comuns
 const MAX_AUDIT_SIZE = 2 * 1024 * 1024; // 2MB para auditoria (conforme requisito server.js)
 const MAX_ARCHIVES = 5; // Mantém 5 arquivos de histórico por tipo
 
-// Garante a existência do diretório de logs
-if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-}
+// FIXED (P0-2.1): Usa async initialization para prevenir race condition
+// Garante thread-safe directory creation em ambientes multi-processo (PM2)
+const logDirReady = initDirectory(LOG_DIR, { recursive: true });
 
 /* ==========================================================================
    SISTEMA DE GESTÃO DE ARQUIVOS (ROTAÇÃO E LIMPEZA)
@@ -26,6 +30,8 @@ if (!fs.existsSync(LOG_DIR)) {
 
 /**
  * Apaga arquivos antigos para economizar espaço em disco.
+ * Side-effects: Remove arquivos do sistema de arquivos.
+ * @param {string} prefix - Prefixo dos arquivos a limpar.
  */
 function cleanOldFiles(prefix) {
     try {
@@ -51,6 +57,18 @@ function cleanOldFiles(prefix) {
 
 /**
  * Rotaciona um arquivo se ele exceder o limite definido.
+ * Side-effects: Renomeia arquivo e limpa arquivos antigos.
+ * @param {string} filePath - Caminho do arquivo a rotacionar.
+ * @param {string} prefix - Prefixo para o arquivo arquivado.
+ * @param {number} maxSize - Tamanho máximo em bytes.
+ */
+/**
+ * Rotaciona arquivo de log quando excede tamanho máximo.
+ * Side-effects: Renomeia arquivo atual para .bak e limpa arquivos antigos.
+ * @param {string} filePath - Caminho do arquivo a rotacionar.
+ * @param {string} prefix - Prefixo para arquivos de backup.
+ * @param {number} maxSize - Tamanho máximo em bytes.
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  */
 function rotateFile(filePath, prefix, maxSize) {
     try {
@@ -90,10 +108,18 @@ const configuredLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
 let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS.INFO;
 
 /**
- * Log Operacional: Registra eventos do fluxo de trabalho.
- * Agora com filtragem por nível baseada em LOG_LEVEL environment variable.
+ * Log Operacional: Registra eventos do fluxo de trabalho com filtragem por nível.
+ * FIXED (P0-2.1): Agora async para aguardar inicialização thread-safe do diretório.
+ * Side-effects: Escreve no console e arquivo de log, rotaciona arquivos se necessário.
+ * @param {LogLevel} level - Nível do log.
+ * @param {string|Error|Record<string, unknown>} msg - Mensagem ou objeto a logar.
+ * @param {string} [taskId='-'] - ID da tarefa associada.
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  */
-function log(level, msg, taskId = '-') {
+async function log(level, msg, taskId = '-') {
+    // Aguarda inicialização do diretório de logs (race-free)
+    await logDirReady;
+
     // Filter: Only log if level >= configured threshold
     const levelValue = LOG_LEVELS[level.toUpperCase()] ?? LOG_LEVELS.INFO;
     if (levelValue < minLevel) {
@@ -124,12 +150,16 @@ function log(level, msg, taskId = '-') {
 }
 
 /**
- * Get current configured log level.
+ * Retorna o nível de log configurado atualmente.
+ * @returns {string} Nível de log atual.
  */
 log.getLevel = () => configuredLevel;
 
 /**
- * Set log level dynamically at runtime.
+ * Define o nível de log dinamicamente em runtime.
+ * Side-effects: Altera o filtro de logs globalmente.
+ * @param {LogLevel} newLevel - Novo nível de log.
+ * @throws {Error} Nunca lança erro - valida entrada e loga avisos.
  */
 log.setLevel = (newLevel) => {
     const upperLevel = newLevel.toUpperCase();
@@ -143,7 +173,10 @@ log.setLevel = (newLevel) => {
 
 /**
  * Auditoria Governamental: Registra ações administrativas e mudanças de estado.
- * Absorvido do server.js para centralização de soberania.
+ * Side-effects: Escreve no arquivo de auditoria, rotaciona se necessário.
+ * @param {string} action - Ação auditada.
+ * @param {Record<string, unknown>} details - Detalhes da ação.
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe com fallback para console.
  */
 function audit(action, details) {
     rotateFile(AUDIT_FILE, 'audit_', MAX_AUDIT_SIZE);
@@ -161,6 +194,10 @@ function audit(action, details) {
 
 /**
  * Métricas de Performance: Registra dados para análise estatística futura.
+ * Side-effects: Escreve no arquivo de métricas, rotaciona se necessário.
+ * @param {string} name - Nome da métrica.
+ * @param {Record<string, unknown>} [payload] - Payload da métrica.
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  */
 function metric(name, payload) {
     rotateFile(METRICS_FILE, 'metrics_', MAX_LOG_SIZE);
@@ -205,9 +242,67 @@ cleanOldFiles('agente_');
 cleanOldFiles('metrics_');
 cleanOldFiles('audit_');
 
+/**
+ * Wrapper para log.debug.
+ * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ * @param {string} [taskId] - ID da tarefa.
+ */
 export const debug = log.debug;
+
+/**
+ * Wrapper para log.info.
+ * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ * @param {string} [taskId] - ID da tarefa.
+ */
 export const info = log.info;
+
+/**
+ * Wrapper para log.warn.
+ * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ * @param {string} [taskId] - ID da tarefa.
+ */
 export const warn = log.warn;
+
+/**
+ * Wrapper para log.error.
+ * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ * @param {string} [taskId] - ID da tarefa.
+ */
 export const error = log.error;
+
+/**
+ * Wrapper para log.fatal.
+ * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ * @param {string} [taskId] - ID da tarefa.
+ */
 export const fatal = log.fatal;
-export { log, audit, metric, metric as logMetric, LOG_DIR };
+
+/**
+ * Função principal de logging com métodos auxiliares.
+ * Side-effects: Escreve logs, rotaciona arquivos, filtra por nível.
+ * @type {((level: LogLevel, msg: string|Error|Record<string, unknown>, taskId?: string) => void) & {getLevel: () => string, setLevel: (newLevel: LogLevel) => void, debug: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, info: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, warn: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, error: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, fatal: (msg: string|Error|Record<string, unknown>, taskId?: string) => void}}
+ */
+export { log };
+
+/**
+ * Função de auditoria.
+ * Side-effects: Escreve auditoria em arquivo.
+ */
+    export { audit };
+
+/**
+ * Função de métricas.
+ * Side-effects: Escreve métricas em arquivo.
+ */
+    export { metric };
+
+/**
+ * Alias para metric.
+ * Side-effects: Escreve métricas em arquivo.
+ */
+    export { metric as logMetric };
+
+/**
+ * Diretório de logs.
+ */
+    export { LOG_DIR };

@@ -1,15 +1,42 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActorRole, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
+import { ExecutionEngine } from './execution_engine/execution_engine.js';
 import { KernelLoop } from './kernel_loop/kernel_loop.js';
-import { TaskRuntime, TaskState } from './task_runtime/task_runtime.js';
+import { KernelNERVBridge } from './nerv_bridge/kernel_nerv_bridge.js';
 import { ObservationStore } from './observation_store/observation_store.js';
 import { PolicyEngine } from './policy_engine/policy_engine.js';
-import { ExecutionEngine } from './execution_engine/execution_engine.js';
-import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
-import { KernelNERVBridge } from './nerv_bridge/kernel_nerv_bridge.js';
-import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
 import { TaskExecutionOrchestrator } from './task_execution_orchestrator.js';
+import { TaskRuntime, TaskState } from './task_runtime/task_runtime.js';
+import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
+
+/**
+ * Opções para createSsotGatewayKernel.
+ * @typedef {Object} SsotGatewayKernelOptions
+ * @property {Object} [nerv] - Instância do sistema NERV.
+ * @property {Object} [telemetry] - Opções de telemetria.
+ * @property {Object} [pump] - Opções do pump.
+ * @property {number} [pump.baseIntervalMs] - Intervalo base em ms.
+ * @property {Object} [browserPool] - Pool de browsers.
+ * @property {Object} [scheduler] - Scheduler de tarefas.
+ * @property {Function} [onActivateTask] - Callback para ativação de tarefa.
+ * @property {Function} [onTerminateTask] - Callback para terminação de tarefa.
+ * @property {Function} [onSuspendTask] - Callback para suspensão de tarefa.
+ * @property {Object} [loop] - Opções do loop.
+ * @property {string} [mode] - Modo do kernel.
+ */
+
+/**
+ * Opções para createKernel.
+ * @typedef {Object} KernelOptions
+ * @property {string} [mode='ssot_gateway'] - Modo do kernel.
+ * @property {Object} [nerv] - Instância do sistema NERV.
+ * @property {Object} [contextManager] - Gerenciador de contexto.
+ * @property {Object} [telemetry] - Opções de telemetria.
+ * @property {Object} [policy] - Políticas de execução.
+ * @property {Object} [loop] - Configuração do loop.
+ */
 
 /* ===========================
    Fábrica do Kernel
@@ -29,20 +56,20 @@ function _makeRetryableEmitError(err) {
     return error;
 }
 
-function createSsotGatewayKernel({
-    nerv,
-    telemetry: telemetryOptions = {},
-    pump: pumpOptions = {}
-} = {}) {
-    if (!nerv) {
-        throw new Error('Kernel requer instância do NERV configurada');
-    }
+/**
+ * Cria um kernel SSOT-first com gateway de execução e pump NERV.
+ * @param {SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
+ * @returns {Object} Instância do kernel com métodos start/stop/executeTask.
+ * @throws {Error} Se nerv não for fornecido.
+ */
+function createSsotGatewayKernel(config = {}) {
+    const { nerv, telemetry: telemetryOptions = {}, pump: pumpOptions = {} } = config;
 
     const telemetry = new KernelTelemetry({
         nerv,
         source: ActorRole.KERNEL.toLowerCase(),
         retention: 1000,
-        ...telemetryOptions
+        ...telemetryOptions,
     });
 
     const baseIntervalMs = Math.max(10, Number(pumpOptions.baseIntervalMs ?? 50) || 50);
@@ -52,6 +79,12 @@ function createSsotGatewayKernel({
     let tickCounter = 0;
     let lastTickAt = null;
 
+    /**
+     * Executa um passo do loop principal do kernel.
+     * Processa buffers de entrada e saída do NERV e atualiza contadores internos.
+     * Side-effects: Atualiza contadores de tick, processa envelopes do NERV.
+     * @returns {Promise<void>}
+     */
     async function step() {
         if (!running) return;
 
@@ -72,7 +105,7 @@ function createSsotGatewayKernel({
                 } catch (err) {
                     telemetry.warning('kernel_ssot_gateway_inbound_receive_failed', {
                         error: err?.message || String(err),
-                        at: Date.now()
+                        at: Date.now(),
                     });
                 }
                 drained += 1;
@@ -97,7 +130,7 @@ function createSsotGatewayKernel({
                         } catch (fallbackError) {
                             telemetry.critical('kernel_ssot_gateway_outbound_send_failed', {
                                 error: fallbackError?.message || err?.message || String(fallbackError || err),
-                                at: Date.now()
+                                at: Date.now(),
                             });
                         }
                     }
@@ -108,7 +141,7 @@ function createSsotGatewayKernel({
                     } catch (err) {
                         telemetry.warning('kernel_ssot_gateway_outbound_loopback_failed', {
                             error: err?.message || String(err),
-                            at: Date.now()
+                            at: Date.now(),
                         });
                     }
                 }
@@ -118,19 +151,61 @@ function createSsotGatewayKernel({
         }
     }
 
+    /**
+     * Inicia o kernel e seu loop automático se especificado.
+     * Side-effects: Define a variável running como verdadeira, inicia timer se autoLoop for verdadeiro.
+     * @param {Object} [options] - Opções de inicialização.
+     * @param {boolean} [options.autoLoop=true] - Se deve iniciar o loop automático.
+     */
     function start({ autoLoop = true } = {}) {
         telemetry.info('kernel_start_requested', { at: Date.now(), mode: 'ssot_gateway' });
         running = true;
 
         if (autoLoop) {
+            // FIXED (P0-2.2): Adiciona error handling para prevenir silent failures
+            // Circuit breaker para detectar falhas consecutivas do kernel pump
+            let consecutiveStepFailures = 0;
+            const MAX_CONSECUTIVE_FAILURES = 5;
+
             timer = setInterval(() => {
-                void step();
+                step().catch(err => {
+                    consecutiveStepFailures++;
+
+                    telemetry.critical('kernel_step_unhandled_error', {
+                        error: err?.message || String(err),
+                        stack: err?.stack,
+                        consecutiveFailures: consecutiveStepFailures,
+                        at: Date.now(),
+                    });
+
+                    // Log to stderr para captura imediata
+                    console.error('[KERNEL_STEP_FATAL]', err);
+
+                    // Circuit breaker: parar kernel se muitas falhas consecutivas
+                    if (consecutiveStepFailures >= MAX_CONSECUTIVE_FAILURES) {
+                        telemetry.critical('kernel_circuit_breaker_triggered', {
+                            failures: consecutiveStepFailures
+                        });
+                        console.error(`[KERNEL] Circuit breaker triggered after ${consecutiveStepFailures} consecutive failures`);
+                        stop(); // Parar kernel pump para evitar spam de erros
+                    }
+                }).then(() => {
+                    // Reset contador em caso de sucesso
+                    consecutiveStepFailures = 0;
+                });
             }, baseIntervalMs);
+
+            // Allow process to exit gracefully
+            timer.unref();
         }
 
         telemetry.info('kernel_started', { at: Date.now(), mode: 'ssot_gateway' });
     }
 
+    /**
+     * Para o kernel e seu loop automático.
+     * Side-effects: Define a variável running como falsa, limpa o timer se existir.
+     */
     function stop() {
         telemetry.info('kernel_stop_requested', { at: Date.now(), mode: 'ssot_gateway' });
         running = false;
@@ -141,6 +216,14 @@ function createSsotGatewayKernel({
         telemetry.info('kernel_stopped', { at: Date.now(), mode: 'ssot_gateway' });
     }
 
+    /**
+     * Executa uma tarefa através do driver.
+     * @param {Object} task - Tarefa a ser executada.
+     * @param {string} [correlationId] - ID de correlação para rastreamento.
+     * @returns {Promise<void>}
+     * @throws {Error} Se task.meta.id não for válido ou se ocorrer erro na emissão do comando.
+     * Side-effects: Envia comando para o driver via NERV.
+     */
     async function executeTask(task, correlationId) {
         if (!task?.meta?.id) {
             throw new Error('executeTask requer task.meta.id válido');
@@ -153,7 +236,7 @@ function createSsotGatewayKernel({
                 ActionCode.DRIVER_EXECUTE_TASK,
                 {
                     actionCode: ActionCode.DRIVER_EXECUTE_TASK,
-                    task
+                    task,
                 },
                 correlationId || null,
                 ActorRole.DRIVER
@@ -168,6 +251,10 @@ function createSsotGatewayKernel({
         stop,
         step,
         executeTask,
+        /**
+         * Obtém o status atual do kernel.
+         * @returns {Object} Status do kernel com informações sobre pump, nerv e telemetria.
+         */
         getStatus() {
             const status = {
                 mode: 'ssot_gateway',
@@ -175,13 +262,13 @@ function createSsotGatewayKernel({
                     running,
                     ticks: tickCounter,
                     lastTickAt,
-                    baseIntervalMs
+                    baseIntervalMs,
                 },
                 nerv: {
                     hasBuffers: Boolean(nerv?.buffers),
-                    hasTransport: Boolean(nerv?.transport)
+                    hasTransport: Boolean(nerv?.transport),
                 },
-                telemetry: telemetry.getStats()
+                telemetry: telemetry.getStats(),
             };
             return Object.freeze(status);
         },
@@ -189,7 +276,7 @@ function createSsotGatewayKernel({
         nerv,
         async shutdown() {
             stop();
-        }
+        },
     });
 
     telemetry.info('kernel_ready', { at: Date.now(), mode: 'ssot_gateway' });
@@ -220,7 +307,7 @@ function createLegacyKernel({
     contextManager = null,
     telemetry: telemetryOptions = {},
     policy: policyLimits = {},
-    loop: loopOptions = {}
+    loop: loopOptions = {},
 } = {}) {
     if (!nerv) {
         throw new Error('Kernel requer instância do NERV configurada');
@@ -234,7 +321,7 @@ function createLegacyKernel({
         nerv,
         source: ActorRole.KERNEL.toLowerCase(),
         retention: 1000,
-        ...telemetryOptions
+        ...telemetryOptions,
     });
 
     telemetry.info('kernel_initializing', { at: Date.now() });
@@ -261,8 +348,8 @@ function createLegacyKernel({
             maxObservationsPerTask: 1000,
             maxTaskAgeMs: 300000, // 5 minutos
             maxStalledCycles: 10,
-            ...policyLimits
-        }
+            ...policyLimits,
+        },
     });
 
     /* =========================================================
@@ -271,7 +358,7 @@ function createLegacyKernel({
 
     const orchestrator = new OrchestratorEngine({
         nerv,
-        contextManager
+        contextManager,
     });
 
     /* =========================================================
@@ -282,7 +369,7 @@ function createLegacyKernel({
         taskRuntime,
         observationStore,
         policyEngine,
-        telemetry
+        telemetry,
     });
 
     /* =========================================================
@@ -294,7 +381,7 @@ function createLegacyKernel({
         taskRuntime,
         observationStore,
         telemetry,
-        orchestrator
+        orchestrator,
     });
 
     /* =========================================================
@@ -307,10 +394,23 @@ function createLegacyKernel({
     /** @type {TaskExecutionOrchestrator|null} */
     let taskExecutor = null;
 
+    /**
+     * Limpa o estado de despacho pendente para uma tarefa específica.
+     * Side-effects: Remove a tarefa do mapa de despachos pendentes.
+     * @param {string} taskId - ID da tarefa a ser limpa.
+     */
     const cleanupTaskDispatchState = taskId => {
         pendingDispatch.delete(taskId);
     };
 
+    /**
+     * Termina uma tarefa em execução no runtime.
+     * Side-effects: Aplica transição de estado para TERMINATED, remove tarefa do runtime.
+     * @param {Object} params - Parâmetros da operação.
+     * @param {string} params.taskId - ID da tarefa a ser terminada.
+     * @param {string} [params.reason] - Razão para a terminação.
+     * @returns {Promise<void>}
+     */
     const terminateRuntimeTask = async ({ taskId, reason }) => {
         const runtime = taskRuntime.getTask(taskId);
 
@@ -327,7 +427,7 @@ function createLegacyKernel({
         taskRuntime.applyStateTransition({
             taskId,
             newState: TaskState.TERMINATED,
-            reason: reason || 'Task terminated by kernel decision'
+            reason: reason || 'Task terminated by kernel decision',
         });
 
         cleanupTaskDispatchState(taskId);
@@ -338,6 +438,14 @@ function createLegacyKernel({
         }
     };
 
+    /**
+     * Suspende uma tarefa em execução no runtime.
+     * Side-effects: Aplica transição de estado para SUSPENDED se aplicável.
+     * @param {Object} params - Parâmetros da operação.
+     * @param {string} params.taskId - ID da tarefa a ser suspensa.
+     * @param {string} [params.reason] - Razão para a suspensão.
+     * @returns {Promise<void>}
+     */
     const suspendRuntimeTask = async ({ taskId, reason }) => {
         const runtime = taskRuntime.getTask(taskId);
         if (!runtime || runtime.state === TaskState.TERMINATED || runtime.state === TaskState.SUSPENDED) {
@@ -347,10 +455,19 @@ function createLegacyKernel({
         taskRuntime.applyStateTransition({
             taskId,
             newState: TaskState.SUSPENDED,
-            reason: reason || 'Task suspended by kernel decision'
+            reason: reason || 'Task suspended by kernel decision',
         });
     };
 
+    /**
+     * Ativa uma tarefa no runtime do kernel.
+     * Side-effects: Aplica transição de estado para ACTIVE, despacha tarefa para executor.
+     * @param {Object} params - Parâmetros da operação.
+     * @param {string} params.taskId - ID da tarefa a ser ativada.
+     * @param {string} [params.reason] - Razão para a ativação.
+     * @returns {Promise<void>}
+     * @throws {Error} Se o despacho da tarefa falhar.
+     */
     const activateRuntimeTask = async ({ taskId, reason }) => {
         const runtime = taskRuntime.getTask(taskId);
         if (!runtime) {
@@ -365,7 +482,7 @@ function createLegacyKernel({
         taskRuntime.applyStateTransition({
             taskId,
             newState: TaskState.ACTIVE,
-            reason: reason || 'Task activated by kernel policy'
+            reason: reason || 'Task activated by kernel policy',
         });
 
         const queued = pendingDispatch.get(taskId);
@@ -387,14 +504,14 @@ function createLegacyKernel({
             telemetry.warning('kernel_activate_dispatch_failed', {
                 taskId,
                 error: error?.message || String(error),
-                at: Date.now()
+                at: Date.now(),
             });
 
             // SSOT (SQLite) é o único dono de retry/scheduling.
             // O Kernel encerra o runtime e deixa o worker decidir reschedule.
             await terminateRuntimeTask({
                 taskId,
-                reason: `Dispatch failed (SSOT will reschedule): ${error?.message || String(error)}`
+                reason: `Dispatch failed (SSOT will reschedule): ${error?.message || String(error)}`,
             });
             throw error;
         }
@@ -407,7 +524,7 @@ function createLegacyKernel({
             // SSOT handles retry scheduling (execute_after_ms). Kernel only terminates runtime.
             await terminateRuntimeTask({
                 taskId,
-                reason: `Retry requested (SSOT will reschedule, delayMs=${Number(delayMs) || 0}): ${reason || 'driver retry'}`
+                reason: `Retry requested (SSOT will reschedule, delayMs=${Number(delayMs) || 0}): ${reason || 'driver retry'}`,
             });
         },
         onTaskPermanentFailure: async ({ taskId, reason }) => {
@@ -415,7 +532,7 @@ function createLegacyKernel({
         },
         onTaskCompleted: async ({ taskId }) => {
             await terminateRuntimeTask({ taskId, reason: 'Task completed successfully' });
-        }
+        },
     });
 
     /* =========================================================
@@ -426,11 +543,12 @@ function createLegacyKernel({
         executionEngine,
         nervBridge,
         telemetry,
+        // @ts-ignore - KernelLoop constructor accepts additional callback properties
         onActivateTask: activateRuntimeTask,
         onTerminateTask: terminateRuntimeTask,
         onSuspendTask: suspendRuntimeTask,
         baseIntervalMs: 50,
-        ...loopOptions
+        ...loopOptions,
     });
 
     telemetry.info('kernel_composed', {
@@ -443,9 +561,9 @@ function createLegacyKernel({
             'ExecutionEngine',
             'KernelNERVBridge',
             'TaskExecutionOrchestrator',
-            'KernelLoop'
+            'KernelLoop',
         ],
-        at: Date.now()
+        at: Date.now(),
     });
 
     /* =========================================================
@@ -453,6 +571,12 @@ function createLegacyKernel({
   ========================================================= */
 
     const kernelInterface = Object.freeze({
+        /**
+         * Inicia o kernel e seus componentes.
+         * Side-effects: Inicia nervBridge e kernelLoop.
+         * @param {Object} [options] - Opções de inicialização.
+         * @param {boolean} [options.autoLoop=true] - Se deve iniciar o loop automático.
+         */
         start({ autoLoop = true } = {}) {
             telemetry.info('kernel_start_requested', { at: Date.now() });
 
@@ -462,6 +586,10 @@ function createLegacyKernel({
             telemetry.info('kernel_started', { at: Date.now() });
         },
 
+        /**
+         * Para o kernel e seus componentes.
+         * Side-effects: Para kernelLoop e nervBridge, limpa buffers de dispatch.
+         */
         stop() {
             telemetry.info('kernel_stop_requested', { at: Date.now() });
 
@@ -474,16 +602,24 @@ function createLegacyKernel({
             telemetry.info('kernel_stopped', { at: Date.now() });
         },
 
+        /**
+         * Obtém o status atual do kernel.
+         * @returns {Object} Status do kernel com informações sobre loop, tarefas, observações, nerv e telemetria.
+         */
         getStatus() {
             return Object.freeze({
                 loop: kernelLoop.getStatus(),
                 tasks: taskRuntime.getStats(),
                 observations: observationStore.getStats(),
                 nerv: nervBridge.getStatus(),
-                telemetry: telemetry.getStats()
+                telemetry: telemetry.getStats(),
             });
         },
 
+        /**
+         * Executa um passo do loop do kernel.
+         * @returns {Promise<void>}
+         */
         async step() {
             await kernelLoop.step();
         },
@@ -491,18 +627,42 @@ function createLegacyKernel({
         telemetry,
         nerv,
 
+        /**
+         * Cria uma nova tarefa no runtime.
+         * @param {Object} params - Parâmetros da tarefa.
+         * @param {string} params.taskId - ID da tarefa.
+         * @param {Object} [params.metadata={}] - Metadados adicionais.
+         * @returns {Object} Tarefa criada.
+         */
         createTask({ taskId, metadata = {} }) {
             return taskRuntime.createTask({ taskId, metadata });
         },
 
+        /**
+         * Obtém uma tarefa específica do runtime.
+         * @param {string} taskId - ID da tarefa.
+         * @returns {Object|null} Tarefa correspondente ou null se não encontrada.
+         */
         getTask(taskId) {
             return taskRuntime.getTask(taskId);
         },
 
+        /**
+         * Lista todas as tarefas no runtime.
+         * @returns {Array<Object>} Lista de tarefas.
+         */
         listTasks() {
             return taskRuntime.listTasks();
         },
 
+        /**
+         * Executa uma tarefa no kernel.
+         * Side-effects: Cria ou atualiza runtime da tarefa, adiciona à fila de despacho pendente.
+         * @param {Object} task - Tarefa a ser executada.
+         * @param {string} [correlationId] - ID de correlação para rastreamento.
+         * @returns {Promise<void>}
+         * @throws {Error} Se task.meta.id não for válido.
+         */
         async executeTask(task, correlationId) {
             if (!task?.meta?.id) {
                 throw new Error('executeTask requer task.meta.id válido');
@@ -526,8 +686,8 @@ function createLegacyKernel({
                     metadata: {
                         correlationId,
                         source: task.meta.source || 'kernel.executeTask',
-                        target: task.spec?.target || null
-                    }
+                        target: task.spec?.target || null,
+                    },
                 });
             }
 
@@ -535,10 +695,15 @@ function createLegacyKernel({
 
             await activateRuntimeTask({
                 taskId,
-                reason: 'Immediate activation on executeTask'
+                reason: 'Immediate activation on executeTask',
             });
         },
 
+        /**
+         * Desliga o kernel e libera recursos.
+         * Side-effects: Para kernelLoop, executa limpeza do taskExecutor, limpa buffers de dispatch.
+         * @returns {Promise<void>}
+         */
         async shutdown() {
             telemetry.info('kernel_shutting_down', { at: Date.now() });
 
@@ -553,7 +718,7 @@ function createLegacyKernel({
             pendingDispatch.clear();
 
             telemetry.info('kernel_shutdown_complete', { at: Date.now() });
-        }
+        },
     });
 
     telemetry.info('kernel_ready', { at: Date.now() });
@@ -562,9 +727,13 @@ function createLegacyKernel({
 }
 
 /**
- * createKernel (vNext)
- * - default: SSOT-first execution gateway + NERV pump
- * - optional: legacy "decisor soberano" kernel (mode='legacy')
+ * Cria uma instância do kernel com base na configuração fornecida.
+ * - Padrão: Gateway de execução SSOT-first + pump NERV
+ * - Opcional: Kernel legado "decisor soberano" (mode='legacy')
+ * 
+ * @param {KernelOptions|SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
+ * @returns {Object} Instância do kernel configurado.
+ * Side-effects: Cria e inicializa os componentes do kernel conforme a configuração.
  */
 function createKernel(config = {}) {
     const mode = config?.mode || 'ssot_gateway';

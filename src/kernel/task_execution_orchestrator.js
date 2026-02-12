@@ -101,7 +101,7 @@ class TaskExecutionOrchestrator {
         let preparedTask;
         try {
             // Hook: beforeExecution (orchestrator prepara task)
-            preparedTask = this.nervBridge.beforeTaskExecution(task);
+            preparedTask = await this.nervBridge.beforeTaskExecution(task);
         } catch (err) {
             const msg = err?.message || String(err);
             logger.log('ERROR', `[TaskExecutionOrchestrator] beforeTaskExecution falhou: ${taskId} - ${msg}`, correlationId);

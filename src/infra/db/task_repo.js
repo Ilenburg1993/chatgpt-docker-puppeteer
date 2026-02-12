@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { getDb } from './sqlite.js';
 import * as schemas from '#core/schemas';
+import { getDb } from './sqlite.js';
 
 const TASK_STAGES = Object.freeze({
     DRAFT: 'DRAFT',
@@ -88,7 +88,17 @@ function _normalizeTaskForDb(rawTask) {
  */
 function _rowToTask(row) {
     if (!row) return null;
-    const task = JSON.parse(row.task_json);
+
+    // ✅ P1-20: Protect JSON.parse() from corrupted task_json
+    let task;
+    try {
+        task = JSON.parse(row.task_json);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[task_repo] Invalid task_json for task ${row?.id}: ${msg}`);
+        // Return null for corrupted tasks - they'll be invisible until fixed
+        return null;
+    }
 
     // DB is SSOT for stage/status; mirror into task for UI/compat.
     task.stage = row.stage;
@@ -188,6 +198,16 @@ function getTaskDependencies(taskId) {
     return rows.map(r => _rowToTask(/** @type {TaskRow} */ (r)));
 }
 
+/**
+ * Inserts a task into the database.
+ * @param {any} rawTask - The raw task object
+ * @param {object} [options={}] - Options
+ * @param {string} [options.stage='READY'] - The task stage
+ * @param {string} [options.status='PENDING'] - The task status
+ * @param {string} [options.actor='system'] - The actor performing the action
+ * @param {boolean} [options.ifNotExists=false] - Whether to insert only if not exists
+ * @param {string|null} [options.promptTemplateArtifactId=null] - Prompt template artifact ID
+ */
 function insertTask(
     rawTask,
     { stage = TASK_STAGES.READY, status = 'PENDING', actor = 'system', ifNotExists = false, promptTemplateArtifactId = null } = {}
@@ -316,7 +336,26 @@ function insertTask(
     return getTaskById(id);
 }
 
-function updateTask(taskId, updates = {}) {
+/**
+ * Updates a task with optimistic locking (retries up to 3 times on version conflict).
+ * FIXED (P0-2.6): Agora throws em conflito permanente ao invés de retornar null
+ *
+ * @param {string} taskId
+ * @param {object} updates
+ * @param {number} [_retryCount=0] - Internal retry counter
+ * @returns {TaskRow} - Task atualizado (nunca null em conflito)
+ * @throws {Error} OptimisticLockError se max retries excedido
+ */
+function updateTask(taskId, updates = {}, _retryCount = 0) {
+    // Exponential backoff em retries (evita thundering herd)
+    if (_retryCount > 0) {
+        const backoffMs = Math.min(10 * Math.pow(2, _retryCount - 1), 100);
+        const start = Date.now();
+        while (Date.now() - start < backoffMs) {
+            // Busy wait - intencional para backoff curto
+        }
+    }
+
     const db = getDb();
     const now = _now();
 
@@ -327,6 +366,7 @@ function updateTask(taskId, updates = {}) {
 
     /** @type {TaskRow} */
     const row = /** @type {any} */ (existing);
+    const expectedVersion = row.updated_at_ms;
 
     const nextStage = updates.stage ?? row.stage;
     const nextStatus = updates.status ?? row.status;
@@ -472,7 +512,7 @@ function updateTask(taskId, updates = {}) {
             : row.latest_response_v2_json_artifact_id ?? null;
 
     const tx = db.transaction(() => {
-        db.prepare(
+        const result = db.prepare(
             `
             UPDATE tasks SET
                 mission_id = @mission_id,
@@ -504,10 +544,11 @@ function updateTask(taskId, updates = {}) {
                 blocked_reason = @blocked_reason,
                 blocked_at_ms = @blocked_at_ms,
                 blocked_details_json = @blocked_details_json
-            WHERE id = @id
+            WHERE id = @id AND updated_at_ms = @expected_version
         `
         ).run({
             id: taskId,
+            expected_version: expectedVersion,
             mission_id: nextMissionId,
             parent_id: nextParentId ? String(nextParentId) : null,
             workflow_id: nextWorkflowId ? String(nextWorkflowId) : null,
@@ -539,6 +580,12 @@ function updateTask(taskId, updates = {}) {
             blocked_details_json: blockedDetailsJson,
         });
 
+        // Optimistic locking: check if update actually happened
+        if (result.changes === 0) {
+            // Version conflict detected
+            return { conflict: true };
+        }
+
         if (nextDeps !== null) {
             db.prepare('DELETE FROM task_dependencies WHERE task_id = ?').run(taskId);
             if (nextDeps.length > 0) {
@@ -548,8 +595,28 @@ function updateTask(taskId, updates = {}) {
                 }
             }
         }
+
+        return { conflict: false };
     });
-    tx();
+
+    const txResult = tx();
+
+    // FIXED (P0-2.6): Throw em conflito permanente ao invés de retornar null
+    if (txResult.conflict) {
+        const MAX_RETRIES = 2; // 3 tentativas total (0, 1, 2)
+
+        if (_retryCount < MAX_RETRIES) {
+            return updateTask(taskId, updates, _retryCount + 1);
+        }
+
+        // Max retries exceeded - throw ao invés de retornar null
+        const error = new Error(
+            `Task ${taskId} update failed: version conflict after ${MAX_RETRIES + 1} attempts (OptimisticLockError)`
+        );
+        error.name = 'OptimisticLockError';
+
+        throw error;
+    }
 
     return getTaskById(taskId);
 }
@@ -564,10 +631,13 @@ function setTaskStatus(taskId, status, extra = {}) {
 
 /**
  * Atomically claims next eligible task (READY + PENDING).
- *
+ * @param {object} params - Parameters
+ * @param {string} params.workerId - The worker ID
+ * @param {number} [params.nowMs] - Current timestamp in ms
+ * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
  * @returns {object|null} { task, row } or null
  */
-function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 } = {}) {
+function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) {
     if (!workerId) {
         throw new Error('claimNextEligibleTask requer workerId');
     }
@@ -575,50 +645,49 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 } =
     const db = getDb();
 
     const tx = db.transaction(() => {
-        const candidate = db
-            .prepare(
-                `
-                SELECT t.*
-                FROM tasks t
-                LEFT JOIN missions m ON m.id = t.mission_id
-                WHERE t.stage = 'READY'
-                  AND t.status = 'PENDING'
-                  AND (t.execute_after_ms IS NULL OR t.execute_after_ms <= @now)
-                  AND (t.lock_expires_at_ms IS NULL OR t.lock_expires_at_ms <= @now)
-                  AND (t.mission_id IS NULL OR m.status = 'RUNNING')
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM task_dependencies d
-                    LEFT JOIN tasks parent ON parent.id = d.depends_on_task_id
-                    WHERE d.task_id = t.id
-                      AND (parent.id IS NULL OR parent.status != 'DONE')
-                  )
-                ORDER BY t.priority DESC, t.created_at_ms ASC
-                LIMIT 1
-            `
-            )
-            .get({ now: nowMs });
-
-        if (!candidate) {
-            return null;
-        }
-
+        // Atomic claim with re-validation of dependencies in UPDATE clause
         const updated = db
             .prepare(
                 `
+                WITH eligible AS (
+                    SELECT t.id
+                    FROM tasks t
+                    LEFT JOIN missions m ON m.id = t.mission_id
+                    WHERE t.stage = 'READY'
+                      AND t.status = 'PENDING'
+                      AND (t.execute_after_ms IS NULL OR t.execute_after_ms <= @now)
+                      AND (t.lock_expires_at_ms IS NULL OR t.lock_expires_at_ms <= @now)
+                      AND (t.mission_id IS NULL OR m.status = 'RUNNING')
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM task_dependencies d
+                        LEFT JOIN tasks parent ON parent.id = d.depends_on_task_id
+                        WHERE d.task_id = t.id
+                          AND (parent.id IS NULL OR parent.status != 'DONE')
+                      )
+                    ORDER BY t.priority DESC, t.created_at_ms ASC
+                    LIMIT 1
+                )
                 UPDATE tasks
                 SET locked_by = @workerId,
                     locked_at_ms = @now,
                     lock_expires_at_ms = @expires,
                     updated_at_ms = @now
-                WHERE id = @id
+                WHERE id IN (SELECT id FROM eligible)
                   AND stage = 'READY'
                   AND status = 'PENDING'
                   AND (lock_expires_at_ms IS NULL OR lock_expires_at_ms <= @now)
+                  -- Re-validate dependencies atomically within UPDATE
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM task_dependencies d
+                    LEFT JOIN tasks parent ON parent.id = d.depends_on_task_id
+                    WHERE d.task_id = tasks.id
+                      AND (parent.id IS NULL OR parent.status != 'DONE')
+                  )
             `
             )
             .run({
-                id: candidate.id,
                 workerId,
                 now: nowMs,
                 expires: nowMs + Math.max(1000, Number(lockTtlMs) || 60000),
@@ -628,7 +697,13 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 } =
             return null;
         }
 
-        return /** @type {TaskRow} */ (candidate);
+        // Retrieve the claimed task
+        const claimed = db.prepare('SELECT * FROM tasks WHERE locked_by = @workerId AND locked_at_ms = @now').get({
+            workerId,
+            now: nowMs,
+        });
+
+        return claimed ? /** @type {TaskRow} */ (claimed) : null;
     });
 
     const claimed = tx();
@@ -642,7 +717,13 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 } =
     };
 }
 
-function releaseTaskLock({ taskId, workerId } = {}) {
+/**
+ * Releases the lock on a task.
+ * @param {object} params - Parameters
+ * @param {string} params.taskId - The task ID
+ * @param {string} [params.workerId] - The worker ID (optional, for safety)
+ */
+function releaseTaskLock(/** @type {{ taskId: string, workerId?: string }} */ { taskId, workerId }) {
     const db = getDb();
     const now = _now();
     const res = db
@@ -661,7 +742,15 @@ function releaseTaskLock({ taskId, workerId } = {}) {
     return res.changes || 0;
 }
 
-function extendTaskLock({ taskId, workerId, nowMs = _now(), lockTtlMs = 60000 } = {}) {
+/**
+ * Extends the lock on a task.
+ * @param {object} params - Parameters
+ * @param {string} params.taskId - The task ID
+ * @param {string} params.workerId - The worker ID
+ * @param {number} [params.nowMs] - Current timestamp in ms
+ * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
+ */
+function extendTaskLock(/** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ { taskId, workerId, nowMs = _now(), lockTtlMs = 60000 }) {
     const db = getDb();
     const res = db
         .prepare(
@@ -732,19 +821,6 @@ function purgeTask(taskId) {
 }
 
 export {
-    TASK_STAGES,
-    getTaskById,
-    listTasks,
-    getTaskDependencies,
-    insertTask,
-    updateTask,
-    setTaskStage,
-    setTaskStatus,
-    claimNextEligibleTask,
-    releaseTaskLock,
-    extendTaskLock,
-    incrementTaskAttempts,
-    retryFailedTasks,
-    clearQueuePreserveRunning,
-    purgeTask,
+    claimNextEligibleTask, clearQueuePreserveRunning, extendTaskLock, getTaskById, getTaskDependencies, incrementTaskAttempts, insertTask, listTasks, purgeTask, releaseTaskLock, retryFailedTasks, setTaskStage,
+    setTaskStatus, TASK_STAGES, updateTask
 };
