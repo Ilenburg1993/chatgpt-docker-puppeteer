@@ -27,9 +27,38 @@ async function retryWithBackoff(fn, options = {}) {
     throw lastError;
 }
 
+/**
+ * Ollama Embeddings Provider (OpenAI-compatible API)
+ *
+ * IMPORTANT: Uses LOCAL Ollama endpoint only (http://host.docker.internal:11434).
+ * Embeddings are NOT available on Ollama Cloud.
+ *
+ * For text generation (coding/chat), use OllamaClient with:
+ * - qwen3-coder-next (cloud, coding agents)
+ * - qwen3-next (cloud, general chat)
+ *
+ * Architecture (v5.0):
+ * - Cloud (https://ollama.com): Generation models (qwen3-coder-next, qwen3-next)
+ * - Local (host.docker.internal:11434): Embeddings only (nomic-embed-text)
+ *
+ * @example
+ * const provider = new OllamaEmbeddingsProvider({
+ *   baseURL: 'http://host.docker.internal:11434/v1', // LOCAL only
+ *   model: 'nomic-embed-text:latest'
+ * });
+ */
 export class OllamaEmbeddingsProvider {
+    /**
+     * @param {Object} options - Configuration options
+     * @param {string} options.baseURL - LOCAL Ollama base URL (default: host.docker.internal:11434/v1)
+     * @param {string} options.model - Embedding model (default: nomic-embed-text:latest)
+     * @param {number} options.timeoutMs - Request timeout in ms (default: 30000)
+     */
     constructor(options = {}) {
-        this.baseURL = options.baseURL || DEFAULT_OLLAMA_BASE_URL;
+        // ALWAYS use local URL for embeddings (no cloud support)
+        this.baseURL = options.baseURL ||
+            process.env.OLLAMA_LOCAL_BASE_URL?.replace(/\/$/, '') + '/v1' ||
+            DEFAULT_OLLAMA_BASE_URL;
         this.model = options.model || DEFAULT_EMBEDDING_MODEL;
         this.timeoutMs = options.timeoutMs || 30_000;
     }

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Unified MCP Server for chatgpt-docker-puppeteer
+ * Unified MCP Server for chatgpt-docker-puppeteer (v5.0)
  *
- * Exposes multiple tools to Claude Desktop:
+ * Exposes multiple tools via Tool Registry to Claude Desktop:
  * - RAG search (local codebase)
- * - Future: GitHub integration, code graph, workspace context, etc.
+ * - Ollama Cloud generation (qwen3-coder-next, qwen3-next)
+ * - Ollama Local embeddings (nomic-embed-text)
+ * - GitHub integration (via upstream MCP - optional)
  *
  * Usage:
  * node tools/mcp/unified-server.mjs
@@ -19,8 +21,9 @@
  *       "command": "node",
  *       "args": ["/workspaces/chatgpt-docker-puppeteer/tools/mcp/unified-server.mjs"],
  *       "env": {
- *         "GITHUB_TOKEN": "ghp_...",
- *         "GITHUB_REPO": "owner/repo"
+ *         "OLLAMA_CLOUD_ENABLED": "true",
+ *         "OLLAMA_CLOUD_API_KEY": "your_key_here",
+ *         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
  *       }
  *     }
  *   }
@@ -30,13 +33,13 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-// Tool handlers
-import { ragTools, handleRagTool } from './tools/rag-tools.mjs';
+// Tool Registry (DRY Architecture)
+import { registry, initialize } from '../../src/integration/tool-registry.mjs';
 
 const server = new Server(
   {
     name: 'chatgpt-docker-puppeteer',
-    version: '3.0.0',
+    version: '5.0.0',
   },
   {
     capabilities: {
@@ -46,21 +49,17 @@ const server = new Server(
   }
 );
 
-// Combine all tools
-const ALL_TOOLS = [
-  ...ragTools,
-];
-
 /**
- * List all available tools
+ * List all available tools from Tool Registry
  */
 server.setRequestHandler('tools/list', async () => {
-  console.error('[MCP] Listing tools:', ALL_TOOLS.map(t => t.name).join(', '));
-  return { tools: ALL_TOOLS };
+  const tools = registry.getAllMetadata();
+  console.error('[MCP] Listing tools:', tools.map(t => t.name).join(', '));
+  return { tools };
 });
 
 /**
- * Execute tool by name
+ * Execute tool by name via Tool Registry
  */
 server.setRequestHandler('tools/call', async (request) => {
   const toolName = request.params.name;
@@ -69,9 +68,23 @@ server.setRequestHandler('tools/call', async (request) => {
   console.error(`[MCP] Calling tool: ${toolName} with args:`, JSON.stringify(args, null, 2));
 
   try {
-    // Route to appropriate handler
-    if (toolName.startsWith('rag_')) return await handleRagTool(toolName, args);
-    throw new Error(`Unknown tool: ${toolName}`);
+    const result = await registry.execute(toolName, args);
+
+    // MCP expects content array format
+    // If result is already in MCP format, return as-is
+    if (result && typeof result === 'object' && Array.isArray(result.content)) {
+      return result;
+    }
+
+    // Otherwise, wrap in MCP format
+    return {
+      content: [
+        {
+          type: 'text',
+          text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+        }
+      ]
+    };
   } catch (error) {
     console.error(`[MCP] Tool error:`, error);
     return {
@@ -128,9 +141,16 @@ server.setRequestHandler('resources/read', async (request) => {
 
 // Start server
 async function main() {
-  console.error('[MCP] Starting unified MCP server...');
+  console.error('[MCP] Starting unified MCP server (v5.0)...');
   console.error('[MCP] Server name: chatgpt-docker-puppeteer');
-  console.error('[MCP] Tools:', ALL_TOOLS.length);
+  console.error('[MCP] Initializing Tool Registry...');
+
+  // Initialize Tool Registry (RAG + Ollama Cloud/Local + Upstreams)
+  await initialize();
+
+  const stats = registry.getStats();
+  console.error(`[MCP] Tools registered: ${stats.totalTools}`);
+  console.error(`[MCP] Available tools: ${stats.tools.join(', ')}`);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
