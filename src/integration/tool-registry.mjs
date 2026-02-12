@@ -91,7 +91,7 @@ export class ToolRegistry {
     }
 
     /**
-     * Execute a tool by name
+     * Execute a tool by name (with optional retry, adaptive timeout, circuit breaker)
      *
      * @param {string} name - Tool name
      * @param {Object} params - Tool parameters (validated against inputSchema)
@@ -120,48 +120,175 @@ export class ToolRegistry {
             throw new Error(`Tool ${name} was cancelled before execution`);
         }
 
-        console.error(`[Tool Registry] Executing tool: ${name}`);
+        // Check if retry enabled (opt-in via env var, default: false)
+        const retryEnabled = process.env.MCP_TOOL_RETRY_ENABLED === 'true';
+        const maxRetries = Number(process.env.MCP_TOOL_MAX_RETRIES || 3);
 
-        // Layer 2 timeout: Tool execution wrapper (75s by default)
-        // This sits between MCP handler (90s) and Ollama client (60s)
-        const toolTimeout = Number(process.env.TOOL_EXECUTION_TIMEOUT || 75000);
-        const internalController = new AbortController();
-        const timeoutId = setTimeout(() => internalController.abort(), toolTimeout);
+        // Check if adaptive timeout enabled (opt-in via env var, default: false)
+        const adaptiveEnabled = process.env.MCP_TOOL_ADAPTIVE_TIMEOUT === 'true';
 
-        try {
-            // Combine external signal (if any) with internal timeout signal
-            const combinedSignal = options.signal
-                ? AbortSignal.any([options.signal, internalController.signal])
-                : internalController.signal;
-
-            // Pass combined signal to handler
-            const result = await tool.handler(params, {
-                ...options,
-                signal: combinedSignal
+        // Determine timeout strategy
+        let toolTimeout;
+        if (adaptiveEnabled) {
+            // Import adaptive module dynamically (only if enabled)
+            const { getToolTimeout } = await import('#logic/adaptive');
+            const adaptive = await getToolTimeout(name, {
+                contextSize: JSON.stringify(params).length,
             });
 
-            clearTimeout(timeoutId);
-            console.error(`[Tool Registry] Tool execution completed: ${name}`);
-            return result;
-
-        } catch (error) {
-            clearTimeout(timeoutId);
-
-            // Check if internal timeout fired (Layer 2)
-            if (internalController.signal.aborted && !options.signal?.aborted) {
-                console.error(`[Tool Registry] Tool '${name}' exceeded execution timeout (${toolTimeout}ms)`);
-                throw new Error(`Tool '${name}' exceeded execution timeout (${toolTimeout}ms)`);
+            if (adaptive.circuit_broken) {
+                throw new Error(
+                    `Tool ${name} circuit breaker active: ${adaptive.warning}`
+                );
             }
 
-            // Check if external signal aborted (from MCP handler or user)
-            if (error.name === 'AbortError' || options.signal?.aborted) {
-                console.error(`[Tool Registry] Tool execution cancelled: ${name}`);
-                throw new Error(`Tool ${name} was cancelled`);
-            }
-
-            console.error(`[Tool Registry] Tool execution failed: ${name}`, error);
-            throw new Error(`Tool ${name} execution failed: ${error.message}`);
+            toolTimeout = adaptive.timeout;
+            console.error(
+                `[Tool Registry] Using adaptive timeout for ${name}: ${toolTimeout}ms ` +
+                `(learned_avg=${adaptive.breakdown.learned_avg}ms, phase=${adaptive.phase})`
+            );
+        } else {
+            // Fallback to fixed timeout (backward compatible)
+            toolTimeout = Number(process.env.TOOL_EXECUTION_TIMEOUT || 75000);
         }
+
+        // Circuit breaker check (for Ollama tools only)
+        const isOllamaTool = name.startsWith('ollama_');
+        if (isOllamaTool && process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED !== 'false') {
+            // Import circuit breaker dynamically (only if needed)
+            const { getCircuitBreaker } = await import('./ollama-circuit-breaker.mjs');
+            const endpoint = process.env.OLLAMA_CLOUD_ENABLED === 'true' ? 'cloud' : 'local';
+            const breaker = getCircuitBreaker(endpoint);
+
+            if (!breaker.allowRequest()) {
+                const status = breaker.getStatus();
+                throw new Error(
+                    `Ollama ${endpoint} circuit breaker OPEN - service unavailable. ` +
+                    `Retry in ${Math.round(status.nextAttemptIn / 1000)}s`
+                );
+            }
+        }
+
+        // Retry loop (if enabled)
+        let attempt = 0;
+        let lastError = null;
+        const maxAttempts = retryEnabled ? maxRetries : 1;
+
+        while (attempt < maxAttempts) {
+            attempt++;
+            const startTime = Date.now();
+
+            console.error(
+                `[Tool Registry] Executing tool: ${name} ` +
+                `(attempt ${attempt}/${maxAttempts}${retryEnabled ? ', retry enabled' : ''})`
+            );
+
+            const internalController = new AbortController();
+            const timeoutId = setTimeout(() => internalController.abort(), toolTimeout);
+
+            try {
+                // Combine external signal (if any) with internal timeout signal
+                const combinedSignal = options.signal
+                    ? AbortSignal.any([options.signal, internalController.signal])
+                    : internalController.signal;
+
+                // Pass combined signal to handler
+                const result = await tool.handler(params, {
+                    ...options,
+                    signal: combinedSignal,
+                });
+
+                clearTimeout(timeoutId);
+                const duration = Date.now() - startTime;
+
+                // Success: record metrics for adaptive learning
+                if (adaptiveEnabled) {
+                    const { recordMetric } = await import('#logic/adaptive');
+                    await recordMetric('tool_execution', duration, `tool:${name}`);
+                }
+
+                // Success: record circuit breaker success
+                if (isOllamaTool && process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED !== 'false') {
+                    const { getCircuitBreaker } = await import('./ollama-circuit-breaker.mjs');
+                    const endpoint = process.env.OLLAMA_CLOUD_ENABLED === 'true' ? 'cloud' : 'local';
+                    const breaker = getCircuitBreaker(endpoint);
+                    breaker.recordSuccess();
+                }
+
+                if (attempt > 1) {
+                    console.error(
+                        `[Tool Registry] Tool ${name} succeeded on attempt ${attempt}/${maxAttempts} ` +
+                        `after ${duration}ms`
+                    );
+                }
+
+                console.error(`[Tool Registry] Tool execution completed: ${name} (${duration}ms)`);
+                return result;
+
+            } catch (error) {
+                clearTimeout(timeoutId);
+                lastError = error;
+
+                // Classify error for retry decision
+                const { classifyError, calculateBackoff } = await import('./error-classifier.mjs');
+                const classification = classifyError(error, {
+                    tool: name,
+                    model: params.model,
+                    attempt,
+                });
+
+                console.error(
+                    `[Tool Registry] Tool ${name} failed (attempt ${attempt}/${maxAttempts}): ` +
+                    `${classification.errorClass} - ${classification.reasonCode}`
+                );
+
+                // Record circuit breaker failure
+                if (isOllamaTool && process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED !== 'false') {
+                    const { getCircuitBreaker } = await import('./ollama-circuit-breaker.mjs');
+                    const endpoint = process.env.OLLAMA_CLOUD_ENABLED === 'true' ? 'cloud' : 'local';
+                    const breaker = getCircuitBreaker(endpoint);
+                    breaker.recordFailure();
+                }
+
+                // Check if retryable
+                if (!retryEnabled || !classification.retryable || attempt >= maxAttempts) {
+                    throw new Error(
+                        `Tool ${name} execution failed: ${error.message} ` +
+                        `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`
+                    );
+                }
+
+                // Model fallback for Ollama timeouts (if enabled)
+                if (
+                    classification.strategy === 'MODEL_FALLBACK' &&
+                    classification.modelFallback &&
+                    process.env.OLLAMA_MODEL_FALLBACK_ENABLED !== 'false'
+                ) {
+                    console.error(
+                        `[Tool Registry] Model fallback: ${params.model} → ${classification.modelFallback}`
+                    );
+                    params = { ...params, model: classification.modelFallback };
+                }
+
+                // Exponential backoff before retry
+                const maxBackoff = Number(process.env.MCP_TOOL_MAX_BACKOFF_MS || 30000);
+                const delayMs = calculateBackoff(
+                    attempt,
+                    classification.suggestedDelayMs,
+                    maxBackoff
+                );
+
+                console.error(
+                    `[Tool Registry] Retrying tool ${name} in ${delayMs}ms ` +
+                    `(strategy: ${classification.strategy}, ${classification.message})`
+                );
+
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+
+        // Max retries exceeded
+        throw lastError;
     }
 
     /**

@@ -1,13 +1,17 @@
 /**
- * Ollama Tools for Tool Registry
+ * Ollama Tools for Tool Registry (v5.0 - Dual-URL Architecture)
  *
- * Exposes Ollama server (host.docker.internal:11434) as first-class tools
+ * Exposes Ollama Cloud (generation) and Local (embeddings) as first-class tools
  * accessible by all LLMs and program logic.
  *
+ * Dual-URL Architecture:
+ * - Cloud (https://ollama.com): qwen3-coder-next, qwen3-next - requires API key
+ * - Local (host.docker.internal:11434): nomic-embed-text (embeddings only)
+ *
  * Tools:
- * - ollama_generate: Text generation using local models
- * - ollama_embed: Generate embeddings for arbitrary text
- * - ollama_models: List all available Ollama models
+ * - ollama_generate: Text generation using Ollama Cloud (or fallback to local)
+ * - ollama_embed: Generate embeddings using LOCAL Ollama only
+ * - ollama_models: List available models (cloud if enabled, local otherwise)
  */
 
 import { z } from 'zod';
@@ -22,6 +26,13 @@ const OllamaGenerateSchema = z.object({
         .max(10000, 'Prompt too long (max 10000 chars) - potential DoS attack'),
     model: z.string()
         .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .refine(val => {
+            // Cloud models (v5.0)
+            const cloudModels = ['qwen3-coder-next', 'qwen3-next', 'qwen3-next:80b-cloud'];
+            // Local models (v4.x backward compat)
+            const localModels = ['qwen2.5-coder:3b', 'qwen2.5:3b-instruct', 'qwen2.5-coder:7b'];
+            return cloudModels.includes(val) || localModels.includes(val);
+        }, 'Model must be qwen3-coder-next, qwen3-next:80b-cloud, or legacy local model')
         .optional(),
     temperature: z.number()
         .min(0, 'Temperature must be >= 0')
@@ -44,23 +55,32 @@ const OllamaEmbedSchema = z.object({
 });
 
 /**
- * ollama_generate tool: Text generation using local Ollama models
+ * ollama_generate tool: Text generation using Ollama Cloud (v5.0)
  *
- * Generate text using models like qwen2.5-coder:3b (CPU-optimized default).
+ * Generates text using powerful cloud GPUs (https://ollama.com).
+ * Models: qwen3-coder-next (coding agents) or qwen3-next (general chat).
+ *
+ * Requirements:
+ * - OLLAMA_CLOUD_ENABLED=true
+ * - OLLAMA_CLOUD_API_KEY set (get from https://ollama.com/settings/api-keys)
+ *
  * Useful for:
- * - Code generation and completion
+ * - Code generation and completion (qwen3-coder-next)
  * - Docstring/comment generation
  * - Code explanation
+ * - General chat and Q&A (qwen3-next)
  * - Intelligent decision-making in program logic
  *
- * CPU Optimization (v4.1):
- * - Default model: qwen2.5-coder:3b (2x faster than 7b on CPU)
- * - Max tokens: 1000 (reduced from 2000 for faster responses)
- * - Timeout: 60s (prevents long waits on CPU-only systems)
+ * Cloud Models (v5.0):
+ * - qwen3-coder-next: 80B MoE (3B active), 256k context, coding agents
+ * - qwen3-next: Hybrid attention, high-sparsity MoE, general chat
+ *
+ * Fallback:
+ * - If OLLAMA_CLOUD_ENABLED=false, uses local Ollama with legacy models
  *
  * @param {Object} params - Generation parameters
  * @param {string} params.prompt - The prompt to generate from
- * @param {string} params.model - Model name (default: qwen2.5-coder:3b from ENV)
+ * @param {string} params.model - Model name (default: qwen3-coder-next from ENV)
  * @param {number} params.temperature - Temperature 0-1 (default: 0.7)
  * @param {number} params.max_tokens - Max tokens to generate (default: 1000 from ENV)
  * @returns {Promise<string>} Generated text formatted as Markdown
@@ -84,8 +104,8 @@ async function ollamaGenerateHandler(params, options = {}) {
 
     const { prompt, model, temperature = 0.7, max_tokens } = validated;
 
-    // Use ENV defaults for CPU optimization
-    const selectedModel = model || process.env.OLLAMA_DEFAULT_MODEL || 'qwen2.5-coder:3b';
+    // Use ENV defaults (cloud models or local fallback)
+    const selectedModel = model || process.env.OLLAMA_DEFAULT_MODEL || 'qwen3-coder-next';
     const selectedMaxTokens = max_tokens || Number(process.env.OLLAMA_MAX_TOKENS || 1000);
     console.error(`[Ollama Tool] ollama_generate with model=${selectedModel}, max_tokens=${selectedMaxTokens}`);
 
@@ -117,13 +137,19 @@ async function ollamaGenerateHandler(params, options = {}) {
 }
 
 /**
- * ollama_embed tool: Generate embeddings for arbitrary text
+ * ollama_embed tool: Generate embeddings using LOCAL Ollama only
  *
- * Creates vector embeddings using nomic-embed-text (768D).
+ * Creates vector embeddings using nomic-embed-text (768D) on local Ollama.
+ * Embeddings are NOT available on Ollama Cloud - always uses local endpoint.
+ *
+ * Local Ollama: http://host.docker.internal:11434
+ * Requires: Local Ollama running (docker-compose up ollama OR ollama serve)
+ *
  * Useful for:
  * - Semantic similarity comparison
  * - Text clustering
  * - Vector search preparation
+ * - RAG system embeddings
  *
  * @param {Object} params - Embedding parameters
  * @param {string} params.text - Text to embed
@@ -239,15 +265,20 @@ async function ollamaModelsHandler() {
             formatted += `\n`;
         }
 
-        // Usage recommendations
+        // Usage recommendations (v5.0 - cloud + local)
         formatted += `## 💡 Usage Recommendations\n\n`;
-        formatted += `**For Code Generation (CPU-optimized):**\n`;
-        formatted += `- qwen2.5-coder:3b ✅ (default, 2x faster on CPU)\n`;
-        formatted += `- qwen2.5-coder:7b (best quality, but slow on CPU)\n\n`;
-        formatted += `**For General Chat:**\n`;
-        formatted += `- qwen2.5:3b-instruct\n\n`;
-        formatted += `**For Embeddings (RAG):**\n`;
-        formatted += `- nomic-embed-text ✅ (768D, used by RAG system)\n`;
+        formatted += `**For Code Generation & Agents (Cloud):**\n`;
+        formatted += `- qwen3-coder-next ✅ (80B MoE, 3B active, 256k context)\n\n`;
+        formatted += `**For General Chat (Cloud):**\n`;
+        formatted += `- qwen3-next ✅ (Hybrid attention, high-sparsity MoE)\n\n`;
+        formatted += `**For Embeddings (Local):**\n`;
+        formatted += `- nomic-embed-text ✅ (768D, used by RAG system)\n\n`;
+        formatted += `**Cloud Requirements:**\n`;
+        formatted += `- Set OLLAMA_CLOUD_ENABLED=true\n`;
+        formatted += `- Set OLLAMA_CLOUD_API_KEY (get from https://ollama.com/settings/api-keys)\n\n`;
+        formatted += `**Legacy Local Models (v4.x):**\n`;
+        formatted += `- qwen2.5-coder:3b (fallback if cloud disabled)\n`;
+        formatted += `- qwen2.5-coder:7b (fallback if cloud disabled)\n`;
 
         return formatted;
     } catch (error) {
@@ -277,24 +308,31 @@ export async function registerOllamaTools(registry) {
     registry.register(
         'ollama_generate',
         {
-            description: `Generate text using local Ollama models.
+            description: `Generate text using Ollama Cloud (https://ollama.com) with powerful GPUs.
 
-Available models (CPU-optimized):
-- qwen2.5-coder:3b ✅ (default, 3.1B params, 2x faster on CPU)
-- qwen2.5-coder:7b (best quality, 7.6B params, slower on CPU)
-- qwen2.5:3b-instruct (general chat)
+Available models (v5.0):
+- qwen3-coder-next ✅ (80B MoE, 3B active, 256k context, coding agents)
+- qwen3-next:80b-cloud ✅ (80B hybrid attention, high-sparsity MoE, general chat)
+
+Requirements:
+- OLLAMA_CLOUD_ENABLED=true
+- OLLAMA_CLOUD_API_KEY (generate at https://ollama.com/settings/api-keys)
 
 Use cases:
 - Generate code documentation/docstrings
 - Complete code snippets
 - Explain complex code
 - Generate test cases
+- General chat and Q&A
 - Intelligent decision-making in program logic
 
 Examples:
 - "Generate a docstring for this function: [code]"
 - "Complete this implementation: [partial code]"
-- "Explain what this code does: [code]"`,
+- "Explain what closures are in JavaScript"
+
+Fallback:
+- If cloud disabled, uses local Ollama with legacy models`,
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -304,9 +342,9 @@ Examples:
                     },
                     model: {
                         type: 'string',
-                        description: 'Model name (default: qwen2.5-coder:3b, CPU-optimized)',
-                        default: 'qwen2.5-coder:3b',
-                        enum: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b', 'qwen2.5:3b-instruct']
+                        description: 'Model name (default: qwen3-coder-next)',
+                        default: 'qwen3-coder-next',
+                        enum: ['qwen3-coder-next', 'qwen3-next:80b-cloud']
                     },
                     temperature: {
                         type: 'number',
@@ -317,7 +355,7 @@ Examples:
                     },
                     max_tokens: {
                         type: 'number',
-                        description: 'Maximum tokens to generate (default: 1000, CPU-optimized)',
+                        description: 'Maximum tokens to generate (default: 1000)',
                         default: 1000,
                         minimum: 1,
                         maximum: 4000
@@ -333,13 +371,19 @@ Examples:
     registry.register(
         'ollama_embed',
         {
-            description: `Generate embeddings for text using nomic-embed-text (768D).
+            description: `Generate embeddings using LOCAL Ollama only (http://host.docker.internal:11434).
+
+IMPORTANT: Embeddings are NOT available on Ollama Cloud.
+ALWAYS uses local endpoint with nomic-embed-text (768D).
+
+Requires: Local Ollama running (docker-compose up ollama OR ollama serve)
 
 Use cases:
 - Compare semantic similarity between texts
 - Prepare text for vector search
 - Cluster related content
 - Find semantic duplicates
+- RAG system embeddings
 
 The same embedding model used by the RAG system.`,
             inputSchema: {
