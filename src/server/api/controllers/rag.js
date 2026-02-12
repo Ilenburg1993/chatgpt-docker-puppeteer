@@ -1,10 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * RAG API Controller
- * 
+ *
  * Expõe o sistema RAG via REST API para acesso de LLMs externas
  * (OpenCode, Claude, Copilot, Codex, etc.)
- * 
+ *
  * Endpoints:
  * - POST /api/rag/ask - Busca semântica com formato Markdown
  * - POST /api/rag/query - Busca raw com resultados estruturados
@@ -12,21 +12,31 @@
  * - POST /api/rag/index - Trigger reindexação em background
  */
 
+import { log } from '#core/logger';
 import {
-    ragHealth,
-    ragQuery,
+    getRagCacheStats,
     ragAsk,
-    ragIndex,
+    ragHealth,
     ragHybridSearch,
-    getRagCacheStats
+    ragIndex,
+    ragQuery,
 } from '../../../../tools/rag/lib/facade.mjs';
 
 /**
- * POST /api/rag/ask
- * Busca semântica com output formatado em Markdown
- * 
- * Body: { query, topK?, pathPrefix?, ext?, tags? }
- * Response: { success, markdown, chunks, metadata }
+ * Handler para POST /api/rag/ask - Busca semântica com output em Markdown.
+ *
+ * **Side-effects:** Consulta cache RAG, pode executar busca vetorial.
+ * **Semântica:** Formata resultados como documento Markdown coeso para LLMs.
+ *
+ * @param {object} req - Request Express
+ * @param {object} req.body - Body com parâmetros de busca
+ * @param {string} req.body.query - Query de busca obrigatória
+ * @param {number} [req.body.topK=8] - Número máximo de chunks
+ * @param {string} [req.body.pathPrefix] - Filtro por prefixo de caminho
+ * @param {string|string[]} [req.body.ext] - Filtro por extensão de arquivo
+ * @param {string|string[]} [req.body.tags] - Filtro por tags
+ * @param {object} res - Response Express
+ * @returns {Promise<void>}
  */
 export async function handleRagAsk(req, res) {
   try {
@@ -59,7 +69,7 @@ export async function handleRagAsk(req, res) {
       }
     });
   } catch (error) {
-    console.error('[RAG API] handleRagAsk error:', error);
+    log.error('[RAG API] handleRagAsk error:', error);
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -69,11 +79,18 @@ export async function handleRagAsk(req, res) {
 }
 
 /**
- * POST /api/rag/query
- * Busca raw com resultados estruturados (sem formatação Markdown)
- * 
- * Body: { query, topK?, filters? }
- * Response: { success, results: [{ path, score, startLine, endLine, text, language, tags }] }
+ * Handler para POST /api/rag/query - Busca raw com resultados estruturados.
+ *
+ * **Side-effects:** Consulta cache RAG, pode executar busca vetorial.
+ * **Semântica:** Retorna chunks estruturados sem formatação Markdown.
+ *
+ * @param {object} req - Request Express
+ * @param {object} req.body - Body com parâmetros de busca
+ * @param {string} req.body.query - Query de busca obrigatória
+ * @param {number} [req.body.topK=8] - Número máximo de resultados
+ * @param {object} [req.body.filters] - Filtros adicionais de busca
+ * @param {object} res - Response Express
+ * @returns {Promise<void>}
  */
 export async function handleRagQuery(req, res) {
   try {
@@ -112,7 +129,7 @@ export async function handleRagQuery(req, res) {
       }
     });
   } catch (error) {
-    console.error('[RAG API] handleRagQuery error:', error);
+    log.error('[RAG API] handleRagQuery error:', error);
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -122,10 +139,14 @@ export async function handleRagQuery(req, res) {
 }
 
 /**
- * GET /api/rag/health
- * Health check do sistema RAG
- * 
- * Response: { ok, writable, manifest_ok, ollama: { ok, hasModel, models }, lancedb: { ok } }
+ * Handler para GET /api/rag/health - Health check do sistema RAG.
+ *
+ * **Side-effects:** Verifica conectividade com Ollama e LanceDB.
+ * **Semântica:** Status operacional completo do sistema RAG.
+ *
+ * @param {object} req - Request Express
+ * @param {object} res - Response Express
+ * @returns {Promise<void>}
  */
 export async function handleRagHealth(req, res) {
   try {
@@ -135,7 +156,7 @@ export async function handleRagHealth(req, res) {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[RAG API] handleRagHealth error:', error);
+    log.error('[RAG API] handleRagHealth error:', error);
     return res.status(500).json({
       success: false,
       ok: false,
@@ -146,13 +167,16 @@ export async function handleRagHealth(req, res) {
 }
 
 /**
- * POST /api/rag/index
- * Trigger reindexação do workspace em background
- * 
- * Body: { root? }
- * Response: { success, message }
- * 
- * IMPORTANTE: Indexação roda em background (não bloqueia response)
+ * Handler para POST /api/rag/index - Trigger reindexação em background.
+ *
+ * **Side-effects:** Inicia processo de indexação assíncrono (não bloqueante).
+ * **Semântica:** Reindexa workspace completo para atualizar cache RAG.
+ *
+ * @param {object} req - Request Express
+ * @param {object} [req.body] - Body opcional
+ * @param {string} [req.body.root] - Diretório raiz para indexação
+ * @param {object} res - Response Express
+ * @returns {Promise<void>}
  */
 export async function handleRagIndex(req, res) {
   try {
@@ -161,10 +185,10 @@ export async function handleRagIndex(req, res) {
     // Inicia indexação em background (não aguarda conclusão)
     ragIndex({ root })
       .then(() => {
-        console.log('[RAG API] Background indexing completed successfully');
+        log.info('[RAG API] Background indexing completed successfully');
       })
       .catch(err => {
-        console.error('[RAG API] Background indexing failed:', err);
+        log.error('[RAG API] Background indexing failed:', err);
       });
 
     return res.json({
@@ -173,7 +197,7 @@ export async function handleRagIndex(req, res) {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[RAG API] handleRagIndex error:', error);
+    log.error('[RAG API] handleRagIndex error:', error);
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -183,29 +207,24 @@ export async function handleRagIndex(req, res) {
 }
 
 /**
- * POST /api/rag/hybrid
- * Hybrid search (Vector + FTS + Reranking + MMR)
+ * Handler para POST /api/rag/hybrid - Busca híbrida (Vetor + FTS + Reranking + MMR).
  *
- * Body: {
- *   query: string,
- *   topK?: number,
- *   pathPrefix?: string,
- *   ext?: string,
- *   tags?: string[],
- *   rerank?: boolean,
- *   rerankWeights?: object,
- *   mmr?: boolean,
- *   mmrLambda?: number
- * }
+ * **Side-effects:** Executa busca vetorial, full-text search e reranking.
+ * **Semântica:** Combina múltiplas estratégias de busca para máxima relevância.
  *
- * Response: {
- *   success: boolean,
- *   results: Array<{
- *     path, score, distance, rerank_score?, rerank_signals?,
- *     start_line, end_line, text, language, tags
- *   }>,
- *   metadata: { topK, dim, model, query, hybridMode, rerank, mmr, mmrLambda }
- * }
+ * @param {object} req - Request Express
+ * @param {object} req.body - Body com parâmetros de busca híbrida
+ * @param {string} req.body.query - Query de busca obrigatória
+ * @param {number} [req.body.topK] - Número máximo de resultados
+ * @param {string} [req.body.pathPrefix] - Filtro por prefixo de caminho
+ * @param {string} [req.body.ext] - Filtro por extensão
+ * @param {string[]} [req.body.tags] - Filtro por tags
+ * @param {boolean} [req.body.rerank] - Habilitar reranking
+ * @param {object} [req.body.rerankWeights] - Pesos para reranking
+ * @param {boolean} [req.body.mmr] - Habilitar MMR (Maximal Marginal Relevance)
+ * @param {number} [req.body.mmrLambda] - Lambda para MMR
+ * @param {object} res - Response Express
+ * @returns {Promise<void>}
  */
 export async function handleRagHybridSearch(req, res) {
   try {
@@ -268,7 +287,7 @@ export async function handleRagHybridSearch(req, res) {
       }
     });
   } catch (error) {
-    console.error('[RAG API] handleRagHybridSearch error:', error);
+    log.error('[RAG API] handleRagHybridSearch error:', error);
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -278,14 +297,14 @@ export async function handleRagHybridSearch(req, res) {
 }
 
 /**
- * GET /api/rag/stats
- * Estatísticas do cache de embeddings
+ * Handler para GET /api/rag/stats - Estatísticas do cache de embeddings.
  *
- * Response: {
- *   success: boolean,
- *   stats: { size, maxSize, hits, misses, hitRate },
- *   timestamp: number
- * }
+ * **Side-effects:** Lê estatísticas do cache RAG.
+ * **Semântica:** Métricas de performance e eficiência do sistema de cache.
+ *
+ * @param {object} req - Request Express
+ * @param {object} res - Response Express
+ * @returns {Promise<void>}
  */
 export async function handleRagStats(req, res) {
   try {
@@ -303,7 +322,7 @@ export async function handleRagStats(req, res) {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[RAG API] handleRagStats error:', error);
+    log.error('[RAG API] handleRagStats error:', error);
     return res.status(500).json({
       success: false,
       error: error.message,

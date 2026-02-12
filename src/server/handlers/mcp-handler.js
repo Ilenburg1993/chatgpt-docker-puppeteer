@@ -63,6 +63,15 @@ const handlers = {
     },
 
     /**
+     * notifications/cancelled: client notifies that a request was cancelled
+     * Notification (no response expected).
+     */
+    'notifications/cancelled': async (params) => {
+        console.error('[MCP Handler] notifications/cancelled:', params);
+        return {};
+    },
+
+    /**
      * ping: liveness check
      */
     'ping': async () => {
@@ -199,15 +208,14 @@ const handlers = {
 };
 
 /**
- * Setup MCP handler on Express app
+ * Configura endpoint MCP (Model Context Protocol) no servidor Express.
  *
- * Registers POST/GET /api/mcp endpoint that:
- * 1. Lists all tools from Tool Registry (tools/list)
- * 2. Executes tools by name (tools/call)
- * 3. Provides resources (optional: cache stats)
+ * **Side-effects:** Registra rotas POST/GET /api/mcp no app Express.
+ * **Semântica:** Suporte completo a JSON-RPC 2.0 com batch requests, notifications e SSE discovery.
  *
- * @param {Express.Application} app - Express app instance
- * @param {ToolRegistry} registry - Tool registry instance
+ * @param {Express.Application} app - Instância do Express app
+ * @param {ToolRegistry} registry - Registry de ferramentas MCP
+ * @returns {void}
  */
 export function setupMCPHandler(app, registry) {
     console.error('[MCP Handler] Setting up MCP endpoint...');
