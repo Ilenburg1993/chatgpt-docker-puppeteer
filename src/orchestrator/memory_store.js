@@ -12,6 +12,15 @@ const PATTERN_TYPE = {
     CUSTOM: 'custom' // Pattern customizado
 };
 
+/**
+ * MemoryStore - Armazenamento de padrões aprendidos para orquestração adaptativa.
+ *
+ * **Side-effects:** Mantém estado em memória, opcionalmente persiste em disco.
+ * **Semântica:** Indexa padrões por tipo para busca rápida e aprendizado contínuo.
+ * **Unidades:** maxSize limita número de padrões armazenados.
+ *
+ * @class
+ */
 class MemoryStore {
     constructor(options = {}) {
         this.config = {
@@ -251,4 +260,12 @@ class MemoryStore {
 }
 
 export default MemoryStore;
+
+/**
+ * Constantes de tipos de patterns suportados.
+ *
+ * **Side-effects:** Nenhum (constante imutável).
+ * **Semântica:** Define tipos padrão para categorização de patterns.
+ * **Unidades:** Strings que representam categorias de patterns.
+ */
 export { PATTERN_TYPE };

@@ -1,17 +1,41 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
-import { sendCommand } from '#nerv/adapters/high_level_adapter';
-import { getDb } from '#infra/db/sqlite';
 import { recordEvent } from '#infra/db/events_repo';
-import { releaseTaskLock, updateTask, TASK_STAGES } from '#infra/db/task_repo';
+import { getDb } from '#infra/db/sqlite';
 import { updateAttempt } from '#infra/db/task_attempt_repo';
+import { releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import { sendCommand } from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Opções do construtor do AttemptWatchdog.
+ * @typedef {Object} AttemptWatchdogOptions
+ * @property {Object|null} [nerv] - Instância do sistema nerv para comunicação.
+ * @property {number} [intervalMs=1500] - Intervalo entre ticks em ms.
+ * @property {number} [dispatchedStuckMs=30000] - Timeout para estado DISPATCHED em ms.
+ * @property {number} [acceptedStuckMs=120000] - Timeout para estado ACCEPTED em ms.
+ * @property {number} [runningHeartbeatStuckMs=30000] - Timeout para heartbeats em RUNNING em ms.
+ * @property {number} [rescheduleDelayMs=1000] - Delay para reagendamento em ms.
+ * @property {number} [envEscalationWindowMs=900000] - Janela para escalação de ambiente em ms.
+ * @property {number} [envEscalationThreshold=10] - Threshold para escalação de ambiente.
+ * @property {number} [llmTimeoutEscalationWindowMs=1800000] - Janela para escalação de timeout LLM em ms.
+ * @property {number} [llmTimeoutEscalationThreshold=10] - Threshold para escalação de timeout LLM.
+ * @property {number} [maxBatch=25] - Máximo de tarefas por lote.
+ */
+
+/**
+ * Watchdog que monitora tentativas de tarefas e detecta timeouts ou falhas.
+ * Responsável por escalar tarefas stuck e manter saúde do sistema.
+ */
 class AttemptWatchdog {
+    /**
+     * Cria um watchdog para monitorar tentativas de tarefas.
+     * @param {AttemptWatchdogOptions} [options={}] - Opções de configuração.
+     */
     constructor({
         nerv = null,
         intervalMs = 1500,
@@ -42,6 +66,11 @@ class AttemptWatchdog {
         this._timer = null;
     }
 
+    /**
+     * Inicia o watchdog, começando a monitorar tentativas de tarefas.
+     * @returns {void}
+     * @sideEffects Inicia timer interno e executa tick imediatamente.
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -50,6 +79,11 @@ class AttemptWatchdog {
         log('INFO', `[AttemptWatchdog] started (interval=${this.intervalMs}ms)`);
     }
 
+    /**
+     * Para o watchdog, cancelando o timer de monitoramento.
+     * @returns {void}
+     * @sideEffects Cancela timer interno.
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -59,6 +93,13 @@ class AttemptWatchdog {
         log('INFO', '[AttemptWatchdog] stopped');
     }
 
+    /**
+     * Executa um ciclo de monitoramento: detecta tentativas stuck e as escalona.
+     * Verifica timeouts para estados DISPATCHED, ACCEPTED e heartbeats em RUNNING.
+     * @returns {Promise<void>}
+     * @throws {Error} Erros são logados mas não relançados.
+     * @sideEffects Modifica estado do banco (status, locks) e envia comandos via nerv.
+     */
     async tick() {
         if (this._stopped) return;
         if (this._running) return;

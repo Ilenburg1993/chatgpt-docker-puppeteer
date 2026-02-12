@@ -3,6 +3,14 @@
 import * as driverFactory from './factory.js';
 
 /**
+ * Opções do construtor do DriverLifecycleManager.
+ * @typedef {Object} DriverLifecycleOptions
+ * @property {string|null} [taskId] - ID da tarefa associada.
+ * @property {string|null} [target] - Nome do target do driver.
+ * @property {Object} [driverConfig] - Configuração adicional do driver.
+ */
+
+/**
  * DriverLifecycleManager
  *
  * Responsabilidade: coordenar o ciclo de vida de um driver por task, com soberania
@@ -12,10 +20,8 @@ import * as driverFactory from './factory.js';
  */
 export class DriverLifecycleManager {
     /**
-     * @param {object} opts
-     * @param {string} [opts.taskId]
-     * @param {string} [opts.target]
-     * @param {object} [opts.driverConfig]
+     * Cria um gerenciador de ciclo de vida para drivers.
+     * @param {DriverLifecycleOptions} [options={}] - Opções de configuração.
      */
     constructor({ taskId = null, target = null, driverConfig = {} } = {}) {
         this.taskId = taskId;
@@ -30,14 +36,17 @@ export class DriverLifecycleManager {
         this._released = false;
     }
 
-    /** @returns {AbortSignal} */
+    /**
+     * @returns {AbortSignal} Sinal de abort para controle de interrupção.
+     */
     get signal() {
         return this.abortController.signal;
     }
 
     /**
-     * Cria/adquire um driver. Nao faz attach a pagina por conta propria.
-     * @returns {Promise<any>}
+     * Cria/adquire um driver. Não faz attach a página por conta própria.
+     * @returns {Promise<any>} Instância do driver adquirido.
+     * @throws {Error} Se falhar ao adquirir driver do pool ou criar novo.
      */
     async acquire() {
         if (this.driver) return this.driver;
@@ -60,8 +69,10 @@ export class DriverLifecycleManager {
     }
 
     /**
-     * Interrompe a execucao associada.
-     * @param {string} [reason]
+     * Interrompe a execução associada.
+     * @param {string} [reason='aborted'] - Motivo da interrupção.
+     * @returns {void}
+     * @sideEffects Aborta o AbortController associado.
      */
     abort(reason = 'aborted') {
         try {
@@ -73,8 +84,9 @@ export class DriverLifecycleManager {
     }
 
     /**
-     * Libera o driver de volta ao pool quando aplicavel.
+     * Libera o driver de volta ao pool quando aplicável.
      * @returns {Promise<void>}
+     * @sideEffects Retorna driver ao pool e limpa referência local.
      */
     async release() {
         if (this._released) return;

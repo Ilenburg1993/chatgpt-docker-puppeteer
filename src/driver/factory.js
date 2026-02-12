@@ -1,10 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
 import EventEmitter from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import TargetDriver from './core/TargetDriver.js';
-import { log } from '#core/logger';
 
 /* ==========================================================================
    FACTORY_CONFIG v3.0 - Pool Management
@@ -1110,20 +1110,112 @@ class DriverFactory extends EventEmitter {
  */
 const factory = new DriverFactory();
 
+/**
+ * Cria novo driver para target.
+ * @type {function(string, object): Promise<object>}
+ */
 export const createDriver = factory.createDriver.bind(factory);
+
+/**
+ * Adquire driver do pool.
+ * @type {function(string): Promise<object>}
+ */
 export const acquireFromPool = factory.acquireFromPool.bind(factory);
+
+/**
+ * Libera driver para o pool.
+ * @type {function(object): void}
+ */
 export const releaseToPool = factory.releaseToPool.bind(factory);
+
+/**
+ * Inicializa pool de drivers.
+ * @type {function(): Promise<void>}
+ */
 export const initializePool = factory.initializePool.bind(factory);
+
+/**
+ * Desliga factory e pool.
+ * @type {function(): Promise<void>}
+ */
 export const shutdown = factory.shutdown.bind(factory);
+
+/**
+ * Adiciona listener de evento.
+ * @type {function(string, function): void}
+ */
 export const on = factory.on.bind(factory);
+
+/**
+ * Adiciona listener único de evento.
+ * @type {function(string, function): void}
+ */
 export const once = factory.once.bind(factory);
+
+/**
+ * Remove listener de evento.
+ * @type {function(string, function): void}
+ */
 export const off = factory.off.bind(factory);
+
+/**
+ * Emite evento.
+ * @type {function(string, ...*): void}
+ */
 export const emit = factory.emit.bind(factory);
+
+/**
+ * Obtém metadados de driver específico.
+ * @type {function(string): object}
+ */
 export const getDriverMetadata = factory.getDriverMetadata.bind(factory);
+
+/**
+ * Obtém metadados de todos os drivers.
+ * @type {function(): object}
+ */
 export const getAllDriversMetadata = factory.getAllDriversMetadata.bind(factory);
+
+/**
+ * Verifica se target está disponível.
+ * @type {function(string): boolean}
+ */
 export const hasTarget = factory.hasTarget.bind(factory);
+
+/**
+ * Obtém target padrão.
+ * @type {function(): string}
+ */
 export const getDefaultTarget = factory.getDefaultTarget.bind(factory);
+
+/**
+ * Obtém status de saúde da factory.
+ * @type {function(): object}
+ */
 export const getHealth = factory.getHealth.bind(factory);
+
+/**
+ * Obtém métricas da factory.
+ * @type {function(): object}
+ */
 export const getMetrics = factory.getMetrics.bind(factory);
+
+/**
+ * Lista de targets disponíveis.
+ * @type {string[]}
+ */
 export const availableTargets = Object.keys(factory.getAllDriversMetadata());
-export { FACTORY_CONFIG, FACTORY_EVENTS, factory };
+
+/**
+ * Configuração da factory.
+ * @type {object}
+ */
+/**
+ * Eventos da factory.
+ * @type {object}
+ */
+/**
+ * Instância da factory.
+ * @type {object}
+ */
+export { factory, FACTORY_CONFIG, FACTORY_EVENTS };

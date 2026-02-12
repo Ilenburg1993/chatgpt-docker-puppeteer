@@ -91,6 +91,9 @@ const ActionCode = Object.freeze({
     CACHE_CLEAR: 'CACHE_CLEAR',
     STALL_DETECTED: 'STALL_DETECTED',
     INFRA_EMERGENCY: 'INFRA_EMERGENCY', // ONDA 2: Infrastructure emergency escalation
+    INFRA_READY: 'INFRA_READY', // Infrastructure component ready
+    INFRA_SHUTDOWN: 'INFRA_SHUTDOWN', // Infrastructure component shutdown
+    ARTIFACT_REGISTRATION_FAILED: 'ARTIFACT_REGISTRATION_FAILED', // Artifact registration/linking failure
 
     // ---- FORENSICS ----
     FORENSICS_DUMP_CREATED: 'FORENSICS_DUMP_CREATED', // ONDA 2: Crash dump evidence ready
@@ -211,4 +214,4 @@ const TechnicalCode = Object.freeze({
     HANDSHAKE_FAILED: 'HANDSHAKE_FAILED'
 });
 
-export { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole, ChannelState, TechnicalCode };
+export { ActionCode, ActorRole, ChannelState, MessageType, PROTOCOL_VERSION, TechnicalCode };

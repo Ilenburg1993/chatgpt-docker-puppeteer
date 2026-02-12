@@ -2,10 +2,11 @@
 import * as logger from '#core/logger';
 
 /**
- * LLMJudge - Valida qualidade de resposta usando LLM como juiz
+ * LLMJudge - Valida qualidade de resposta usando LLM como juiz.
  *
- * ATENÇÃO: Este módulo é OPCIONAL e pode ser desabilitado via config.
- * Requer chamada extra ao LLM, aumentando custo e latência.
+ * **Side-effects:** Executa chamada adicional ao LLM para avaliação.
+ * **Semântica:** Usa modelo de linguagem para avaliar resposta em completude, relevância e qualidade.
+ * **Unidades:** Scores de 0-100, thresholds configuráveis para decisão automática.
  *
  * @class
  */

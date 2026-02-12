@@ -1,5 +1,5 @@
-import { createCursor } from 'ghost-cursor';
 import { log as _log } from '#core/logger';
+import { createCursor } from 'ghost-cursor';
 
 // ============================================
 // CONFIGURATION (Externalized from v2.0)
@@ -48,7 +48,7 @@ const BIOMECHANICS_CONFIG = {
     CURSOR_CACHE_MAX_SIZE: 10,
 
     // Gaussian clamping (v2.0)
-    GAUSSIAN_CLAMP_SIGMA: 3 // Clamp gaussian to ±3σ
+    GAUSSIAN_CLAMP_SIGMA: 3, // Clamp gaussian to ±3σ
 };
 
 // ============================================
@@ -60,7 +60,7 @@ const TYPING_PROFILES = {
     slow: { min: 80, max: 150, wpm: 25 },
     average: { min: 45, max: 85, wpm: 45 },
     fast: { min: 20, max: 50, wpm: 70 },
-    expert: { min: 10, max: 30, wpm: 90 }
+    expert: { min: 10, max: 30, wpm: 90 },
 };
 
 // ============================================
@@ -99,8 +99,8 @@ const LAYOUTS = {
         w: 'qase',
         x: 'zsdc',
         y: 'tghu',
-        z: 'asx'
-    }
+        z: 'asx',
+    },
 };
 
 // ============================================
@@ -224,6 +224,13 @@ async function getElementRect(
 // ============================================
 // WAKE UP MOVE (v2.0 - Viewport validation)
 // ============================================
+
+/**
+ * Executa movimento de "acordar" o mouse para posição aleatória na viewport
+ * @param {object} page - Instância da página Puppeteer
+ * @returns {Promise<void>} Completa quando movimento terminar ou falhar silenciosamente
+ * @sideEffects Move mouse para posição aleatória - operação I/O
+ */
 async function wakeUpMove(page) {
     try {
         if (!page || page.isClosed()) {
@@ -583,8 +590,6 @@ async function humanTypeCore(
     }
 }
 
-
-
 // ============================================
 // PUBLIC CONFIG (v2.0 - Test/Consumer Contract)
 // ============================================
@@ -617,7 +622,7 @@ const HUMAN_CONFIG = Object.freeze({
     FOCUS_MAX_RETRIES: BIOMECHANICS_CONFIG.FOCUS_MAX_RETRIES,
     FOCUS_RESTORE_DELAY: BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY,
     CURSOR_CACHE_MAX_SIZE: BIOMECHANICS_CONFIG.CURSOR_CACHE_MAX_SIZE,
-    GAUSSIAN_CLAMP_SIGMA: BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA
+    GAUSSIAN_CLAMP_SIGMA: BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA,
 });
 
 // ============================================
@@ -625,6 +630,14 @@ const HUMAN_CONFIG = Object.freeze({
 // ============================================
 const _gaussianParamCache = new Map();
 
+/**
+ * Gera número aleatório com distribuição gaussiana (normal) usando cache de parâmetros
+ * @param {number} mean - Média da distribuição
+ * @param {number} sigma - Desvio padrão da distribuição
+ * @returns {number} Valor aleatório gaussiano
+ * @throws {TypeError} Se parâmetros não forem números válidos
+ * @sideEffects Modifica cache interno - operação com estado
+ */
 function gaussian(mean, sigma) {
     if (typeof mean !== 'number' || Number.isNaN(mean)) {
         throw new TypeError('mean must be a number');
@@ -692,6 +705,19 @@ function _sleep(ms) {
 // PUBLIC API (Driver-first) + Legacy Compatibility
 // ============================================
 
+/**
+ * Executa clique humano realista em elemento usando biometria comportamental
+ * @param {object} driver - Instância do driver com page e métodos _emitVital
+ * @param {string} selector - Seletor CSS do elemento alvo
+ * @param {object} [options={}] - Opções de configuração
+ * @param {AbortSignal} [options.signal] - Sinal para cancelar operação
+ * @param {Function} [options.onPulse] - Callback para progresso (pulsos)
+ * @param {number} [options.offsetX=0] - Offset X relativo ao centro do elemento
+ * @param {number} [options.offsetY=0] - Offset Y relativo ao centro do elemento
+ * @returns {Promise<boolean>} true se clique foi executado com sucesso
+ * @throws {TypeError} Se parâmetros obrigatórios estiverem ausentes ou inválidos
+ * @sideEffects Move mouse, executa clique, emite eventos vitais - operação I/O
+ */
 async function humanClick(...args) {
     if (_isLegacyHumanClickArgs(args)) {
         // Legacy API used by biomechanics_engine.
@@ -719,7 +745,6 @@ async function humanClick(...args) {
         driver._emitVital('CLICK_ABORTED', { selector, reason: 'signal_aborted_at_start' });
         return false;
     }
-
 
     driver._emitVital('CLICK_START', { selector });
 
@@ -810,66 +835,98 @@ async function humanType(...args) {
 
     const page = driver.page;
     const signal = options.signal || null;
+    const profile = options.profile || 'balanced';
 
     if (signal?.aborted) {
         driver._emitVital('TYPE_ABORTED', { selector, reason: 'signal_aborted_at_start' });
         return false;
     }
 
-    if (typeof page.isClosed === 'function' && page.isClosed()) {
-        const err = new Error('page is closed');
-        driver._emitVital('TYPE_ERROR', { selector, error: err.message, critical: true });
-        throw err;
-    }
-
     driver._emitVital('TYPE_START', { selector, chars: text.length });
 
-    // Focus lock prevention: if activeElement seems stuck, blur it.
-    for (let i = 0; i < HUMAN_CONFIG.FOCUS_MAX_RETRIES; i++) {
-        try {
-            const locked = await page.evaluate(() => {
-                return !!document.activeElement;
-            });
-            if (!locked) break;
-            await page.evaluate(() => {
-                try {
-                    document.activeElement && document.activeElement.blur && document.activeElement.blur();
-                } catch (_err) {
-                    // ignore
-                }
-                return true;
-            });
-            await _sleep(HUMAN_CONFIG.FOCUS_RESTORE_DELAY);
-        } catch (_err) {
-            break;
-        }
-    }
-
-    // Ensure element exists
-    try {
-        await page.waitForSelector(selector);
-    } catch (_err) {
-        // ignore; typing will still call keyboard.type in tests
-    }
-
     let typed = 0;
-    for (let i = 0; i < text.length; i++) {
+    let fatigueCount = 0;
+
+    for (const char of text) {
         if (signal?.aborted) {
-            driver._emitVital('TYPE_ABORTED', { selector, typed, total: text.length });
+            driver._emitVital('TYPE_ABORTED', { selector, reason: 'signal_aborted', typed, total: text.length });
             return false;
         }
 
-        // Yield periodically when abort is in play so timers can fire deterministically in tests.
-        if (signal && i % HUMAN_CONFIG.ABORT_YIELD_EVERY_CHARS === 0) {
-            await _sleep(0);
+        // Focus check every N characters
+        if (typed % HUMAN_CONFIG.TYPE_FOCUS_CHECK_EVERY === 0) {
+            const focused = await page.evaluate(
+                () => document.activeElement === document.querySelector(arguments[0]),
+                selector
+            );
+            if (!focused) {
+                driver._emitVital('TYPE_FOCUS_LOST', { selector, attempt: typed });
+                // Try to restore focus
+                try {
+                    await page.focus(selector);
+                    await _sleep(HUMAN_CONFIG.TYPE_FOCUS_RESTORE_DELAY);
+                } catch (_e) {
+                    driver._emitVital('TYPE_ABORTED', {
+                        selector,
+                        reason: 'focus_restore_failed',
+                        typed,
+                        total: text.length,
+                    });
+                    return false;
+                }
+            }
         }
 
-        const ch = text[i];
-        await page.keyboard.type(ch);
-        typed++;
+        // Fatigue simulation
+        if (fatigueCount > HUMAN_CONFIG.TYPE_FATIGUE_THRESHOLD) {
+            const fatigueProb = fatigueCount / HUMAN_CONFIG.TYPE_FATIGUE_PROBABILITY_DIVISOR;
+            if (Math.random() < fatigueProb) {
+                const pauseMs = gaussian(HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MIN, HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MAX);
+                await _sleep(pauseMs);
+                fatigueCount = 0; // Reset after pause
 
-        if (typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS === 0) {
-            driver._emitVital('TYPE_PROGRESS', { selector, typed, total: text.length });
+                if (
+                    pauseMs > HUMAN_CONFIG.TYPE_FATIGUE_MOVE_THRESHOLD &&
+                    Math.random() < HUMAN_CONFIG.TYPE_FATIGUE_MOVE_CHANCE
+                ) {
+                    // Move mouse to random position to simulate "rest"
+                    const viewport = await page.viewport();
+                    const x = Math.random() * viewport.width;
+                    const y = Math.random() * viewport.height;
+                    await page.mouse.move(x, y, { steps: 10 });
+                }
+            }
+        }
+
+        // Typing rhythm with typos
+        const flightTime = TYPING_PROFILES[profile].getFlightTime(char);
+        await _sleep(flightTime);
+
+        // Typo simulation
+        if (Math.random() < HUMAN_CONFIG.TYPE_TYPO_RATE) {
+            // Generate typo
+            const typoChar = _generateTypo(char);
+            await page.keyboard.type(typoChar);
+
+            // Brief pause before correction
+            await _sleep(HUMAN_CONFIG.TYPE_TYPO_BACKSPACE_DELAY);
+
+            // Correct by backspacing and retyping
+            await page.keyboard.press('Backspace');
+            await _sleep(flightTime * 0.5); // Brief pause
+            await page.keyboard.type(char);
+        } else {
+            await page.keyboard.type(char);
+        }
+
+        typed++;
+        fatigueCount++;
+
+        // Progress reporting
+        if (text.length > HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS) {
+            if (typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS === 0) {
+                driver._emitVital('TYPE_PROGRESS', { selector, typed, total: text.length });
+            }
         }
     }
 
@@ -881,4 +938,4 @@ async function humanType(...args) {
     return true;
 }
 
-export { humanClick, humanType, wakeUpMove, gaussian, HUMAN_CONFIG };
+export { gaussian, HUMAN_CONFIG, humanClick, humanType, wakeUpMove };

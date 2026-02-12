@@ -1,17 +1,76 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs/promises';
-import { v4 as uuidv4 } from 'uuid';
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { getDb } from '#infra/db/sqlite';
 import { recordEvent } from '#infra/db/events_repo';
 import { AUTONOMY_MODES, getMissionById } from '#infra/db/mission_repo';
+import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
+import fs from 'node:fs/promises';
+import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * @typedef {object} MissionPlannerProcessorOptions
+ * @property {number} [intervalMs=1500] - Intervalo em ms entre ticks do processador.
+ */
+
+/**
+ * @typedef {object} PickTargetOptions
+ * @property {string} [requested] - Target solicitado.
+ * @property {string[]} [allowedTargets] - Targets permitidos.
+ */
+
+/**
+ * @typedef {object} Mission
+ * @property {string} id - ID da missão.
+ * @property {string} title - Título da missão.
+ * @property {string} description - Descrição da missão.
+ * @property {string} status - Status da missão.
+ * @property {string} autonomy_mode - Modo de autonomia.
+ * @property {Record<string, unknown>} policy - Política da missão.
+ * @property {Record<string, unknown>} context - Contexto da missão.
+ * @property {string} created_at - Data de criação.
+ * @property {string} updated_at - Data de atualização.
+ * @property {string|null} started_at - Data de início.
+ * @property {string|null} completed_at - Data de conclusão.
+ */
+
+/**
+ * @typedef {object} ShouldAutoApproveOptions
+ * @property {Mission} [mission] - Missão associada.
+ * @property {string[]} [proposalTags=[]] - Tags da proposta.
+ */
+
+/**
+ * @typedef {object} ProcessPlannerResultOptions
+ * @property {string} missionId - ID da missão.
+ * @property {string} taskId - ID da tarefa.
+ */
+
+/**
+ * @typedef {object} Proposal
+ * @property {string} user_message - Mensagem do usuário.
+ * @property {string[]} [tags] - Tags da proposta.
+ * @property {string} [target] - Target solicitado.
+ * @property {number} [priority] - Prioridade da tarefa.
+ * @property {string} [system_message] - Mensagem do sistema.
+ * @property {string} [title] - Título da proposta.
+ * @property {string[]} [depends_on] - Dependências.
+ */
+
+/**
+ * Função utilitária para pausar execução por ms milissegundos.
+ * @param {number} ms - Milissegundos para aguardar.
+ * @returns {Promise<void>}
+ */
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Extrai JSON de uma string de texto, tentando múltiplas estratégias.
+ * @param {string} text - Texto contendo JSON.
+ * @returns {Record<string, unknown> | null} - Objeto JSON extraído ou null se falhar.
+ */
 function _extractJson(text) {
     const raw = typeof text === 'string' ? text.trim() : '';
     if (!raw) return null;
@@ -48,6 +107,11 @@ function _extractJson(text) {
     return null;
 }
 
+/**
+ * Seleciona o target apropriado baseado na solicitação e targets permitidos.
+ * @param {PickTargetOptions} [options={}] - Opções para seleção de target.
+ * @returns {string} - Target selecionado.
+ */
 function _pickTarget({ requested, allowedTargets } = {}) {
     const req = requested ? String(requested).toLowerCase().trim() : null;
     const allowed = Array.isArray(allowedTargets) ? allowedTargets.map(t => String(t).toLowerCase().trim()) : null;
@@ -58,6 +122,11 @@ function _pickTarget({ requested, allowedTargets } = {}) {
     return 'auto';
 }
 
+/**
+ * Verifica se uma proposta deve ser auto-aprovada baseado na missão e tags.
+ * @param {ShouldAutoApproveOptions} options - Opções para verificação.
+ * @returns {boolean} - True se deve auto-aprovar.
+ */
 function _shouldAutoApprove({ mission, proposalTags = [] } = {}) {
     if (!mission || mission.autonomy_mode !== AUTONOMY_MODES.LLM_AUTO_APPROVE_WITH_BUDGET) {
         return false;
@@ -78,7 +147,15 @@ function _shouldAutoApprove({ mission, proposalTags = [] } = {}) {
     return true;
 }
 
+/**
+ * Processador de missões que monitora tarefas do mission planner e gera novas tarefas baseadas em propostas.
+ * Side-effects: Lê do banco de dados, registra eventos, insere novas tarefas.
+ */
 class MissionPlannerProcessor {
+    /**
+     * Cria uma instância do MissionPlannerProcessor.
+     * @param {MissionPlannerProcessorOptions} [options={}] - Opções de configuração.
+     */
     constructor({ intervalMs = 1500 } = {}) {
         this.intervalMs = Math.max(250, Number(intervalMs) || 1500);
         this._timer = null;
@@ -86,6 +163,10 @@ class MissionPlannerProcessor {
         this._stopped = false;
     }
 
+    /**
+     * Inicia o processador, configurando um timer para executar ticks periodicamente.
+     * Side-effects: Inicia timer, registra log.
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -94,6 +175,10 @@ class MissionPlannerProcessor {
         log('INFO', `[MissionPlannerProcessor] started (interval=${this.intervalMs}ms)`);
     }
 
+    /**
+     * Para o processador, limpando o timer.
+     * Side-effects: Para timer, registra log.
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -103,6 +188,11 @@ class MissionPlannerProcessor {
         log('INFO', '[MissionPlannerProcessor] stopped');
     }
 
+    /**
+     * Executa um tick do processador, processando tarefas do mission planner.
+     * Side-effects: Lê do banco, registra eventos, processa resultados.
+     * @returns {Promise<void>}
+     */
     async tick() {
         if (this._stopped) return;
         if (this._running) return;
@@ -164,6 +254,12 @@ class MissionPlannerProcessor {
         }
     }
 
+    /**
+     * Processa o resultado de uma tarefa do mission planner, extraindo propostas e criando novas tarefas.
+     * Side-effects: Lê arquivos, registra eventos, insere tarefas no banco.
+     * @param {ProcessPlannerResultOptions} options - Opções com IDs da missão e tarefa.
+     * @returns {Promise<void>}
+     */
     async _processPlannerResult({ missionId, taskId }) {
         const mission = getMissionById(missionId);
         if (!mission) {
@@ -234,7 +330,10 @@ class MissionPlannerProcessor {
             const stage = autoApprove ? TASK_STAGES.READY : TASK_STAGES.PROPOSED;
 
             const taskIdNew = `task-${uuidv4()}`;
-            const target = _pickTarget({ requested: proposal?.target, allowedTargets: mission.policy?.allowed_targets });
+            const target = _pickTarget({
+                requested: proposal?.target,
+                allowedTargets: mission.policy?.allowed_targets,
+            });
             const priority = Number.isFinite(Number(proposal?.priority)) ? Number(proposal.priority) : 5;
 
             const taskV5 = schemas.core.TaskSchemaV5.parse({

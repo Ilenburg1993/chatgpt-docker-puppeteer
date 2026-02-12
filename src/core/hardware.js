@@ -1,12 +1,29 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import v8 from 'node:v8';
 import os from 'node:os';
+import v8 from 'node:v8';
+
+/**
+ * Estatísticas detalhadas de heap memory do V8.
+ * @typedef {Object} HeapStats
+ * @property {number} heap_used_mb - Memória heap usada em MB.
+ * @property {number} heap_total_mb - Memória heap total em MB.
+ * @property {number} heap_limit_mb - Limite de heap em MB.
+ * @property {number} heap_usage_percent - Percentual de uso do heap.
+ * @property {number} total_heap_size_executable_mb - Tamanho executável do heap em MB.
+ * @property {number} total_physical_size_mb - Tamanho físico total em MB.
+ * @property {number} total_available_size_mb - Tamanho disponível em MB.
+ * @property {number} used_heap_size_mb - Alias para heap_used_mb.
+ * @property {number} malloced_memory_mb - Memória alocada em MB.
+ * @property {number} peak_malloced_memory_mb - Pico de memória alocada em MB.
+ * @property {boolean} does_zap_garbage - Se o garbage collector zera memória liberada.
+ * @property {number} number_of_native_contexts - Número de contextos nativos.
+ * @property {number} number_of_detached_contexts - Número de contextos destacados.
+ */
 
 /**
  * Retorna estatísticas detalhadas de heap memory.
  * P9.1: Adiciona visibilidade para prevenir OOM.
- *
- * @returns {Object} Heap statistics
+ * @returns {HeapStats} Estatísticas do heap V8.
  */
 function getHeapStats() {
     const heapStats = v8.getHeapStatistics();
@@ -35,9 +52,18 @@ function getHeapStats() {
 }
 
 /**
+ * Estatísticas de CPU do sistema.
+ * @typedef {Object} CPUStats
+ * @property {string} model - Modelo do processador.
+ * @property {number} cores - Número de núcleos.
+ * @property {string} load_1min - Carga média de 1 minuto.
+ * @property {string} load_5min - Carga média de 5 minutos.
+ * @property {string} load_15min - Carga média de 15 minutos.
+ */
+
+/**
  * Retorna estatísticas de CPU.
- *
- * @returns {Object} CPU statistics
+ * @returns {CPUStats} Estatísticas de CPU do sistema.
  */
 function getCPUStats() {
     const cpus = os.cpus();
@@ -53,9 +79,17 @@ function getCPUStats() {
 }
 
 /**
+ * Estatísticas de memória do sistema.
+ * @typedef {Object} MemoryStats
+ * @property {number} total_mb - Memória total em MB.
+ * @property {number} free_mb - Memória livre em MB.
+ * @property {number} used_mb - Memória usada em MB.
+ * @property {number} usage_percent - Percentual de uso da memória.
+ */
+
+/**
  * Retorna estatísticas de memória do sistema.
- *
- * @returns {Object} Memory statistics
+ * @returns {MemoryStats} Estatísticas de memória do sistema.
  */
 function getMemoryStats() {
     const totalMem = os.totalmem();
@@ -71,9 +105,19 @@ function getMemoryStats() {
 }
 
 /**
+ * Informações gerais do sistema.
+ * @typedef {Object} SystemInfo
+ * @property {string} platform - Plataforma do sistema operacional.
+ * @property {string} arch - Arquitetura do processador.
+ * @property {string} hostname - Nome do host.
+ * @property {number} uptime_seconds - Tempo de atividade em segundos.
+ * @property {string} node_version - Versão do Node.js.
+ * @property {number} pid - ID do processo.
+ */
+
+/**
  * Retorna informações gerais do sistema.
- *
- * @returns {Object} System info
+ * @returns {SystemInfo} Informações do sistema e processo.
  */
 function getSystemInfo() {
     return {
@@ -87,10 +131,19 @@ function getSystemInfo() {
 }
 
 /**
+ * Todas as métricas de hardware consolidadas.
+ * @typedef {Object} HardwareMetrics
+ * @property {number} timestamp - Timestamp da coleta em ms.
+ * @property {HeapStats} heap - Estatísticas do heap V8.
+ * @property {MemoryStats} memory - Estatísticas de memória do sistema.
+ * @property {CPUStats} cpu - Estatísticas de CPU.
+ * @property {SystemInfo} system - Informações do sistema.
+ */
+
+/**
  * Retorna todas as métricas de hardware em um único objeto.
  * Útil para dashboards e health checks.
- *
- * @returns {Object} All hardware metrics
+ * @returns {HardwareMetrics} Todas as métricas de hardware consolidadas.
  */
 function getAllMetrics() {
     return {
@@ -102,4 +155,4 @@ function getAllMetrics() {
     };
 }
 
-export { getHeapStats, getCPUStats, getMemoryStats, getSystemInfo, getAllMetrics };
+export { getAllMetrics, getCPUStats, getHeapStats, getMemoryStats, getSystemInfo };

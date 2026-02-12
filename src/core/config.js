@@ -1,13 +1,33 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import 'dotenv/config';
-import { z } from 'zod';
-import EventEmitter from 'node:events';
-import { log } from './logger.js';
 import * as PATHS from '#infra/fs/paths';
 import { safeReadJSON } from '#infra/fs/safe_read';
+import 'dotenv/config';
+import EventEmitter from 'node:events';
+import { z } from 'zod';
+import { log } from './logger.js';
+
+/**
+ * @typedef {Object} BrowserEndpoint
+ * @property {string} url - URL do endpoint do browser.
+ * @property {string} [wsEndpoint] - Endpoint WebSocket opcional.
+ */
+
+/**
+ * @typedef {Object} ConfigUpdateEvent
+ * @property {Record<string, unknown>} new - Nova configuração.
+ * @property {Record<string, unknown>} old - Configuração anterior.
+ * @property {number} ts - Timestamp da atualização.
+ * @property {string} correlationId - ID de correlação para rastreamento.
+ */
+
 /* --------------------------------------------------------------------------
    ENV VALIDATION (P8.5)
 -------------------------------------------------------------------------- */
+
+/**
+ * Valida variáveis de ambiente obrigatórias e recomendadas no carregamento do módulo.
+ * Side-effects: Registra logs de erro/aviso se faltarem variáveis.
+ */
 function validateEnvFile() {
     const requiredEnvVars = ['NODE_ENV'];
 
@@ -130,6 +150,11 @@ const ConfigSchema = z
  * 2. GESTOR REATIVO DE CONFIGURAÇÃO
  * Implementa o padrão Singleton com capacidades de emissão de eventos.
  */
+/**
+ * Gerenciador reativo de configuração com cache em RAM e hot-reload.
+ * Extends EventEmitter para notificar mudanças de configuração.
+ * Side-effects: Emite evento 'updated' quando configuração muda.
+ */
 class ConfigurationManager extends EventEmitter {
     constructor() {
         super();
@@ -140,8 +165,10 @@ class ConfigurationManager extends EventEmitter {
 
     /**
      * Realiza a carga ou recarga (Hot-Reload) das configurações mestras.
-     * @param {string} correlationId - Rastro de causalidade para rastreio no log.
-     * @returns {Promise<object>} A configuração consolidada e validada.
+     * Side-effects: Lê arquivo config.json, valida, atualiza cache, emite evento 'updated'.
+     * @param {string} [correlationId='sys-boot'] - Rastro de causalidade para rastreio no log.
+     * @returns {Promise<Record<string, unknown>>} A configuração consolidada e validada.
+     * @throws {Error} Nunca lança erro - opera em modo fail-safe.
      */
     async reload(correlationId = 'sys-boot') {
         try {
@@ -167,7 +194,7 @@ class ConfigurationManager extends EventEmitter {
                     new: this.currentConfig,
                     old: oldConfig,
                     ts: Date.now(),
-                    correlationId
+                    correlationId,
                 });
             } else {
                 log('ERROR', `[CONFIG] Falha na validação do config.json: ${result.error.message}`, correlationId);
@@ -259,7 +286,7 @@ class ConfigurationManager extends EventEmitter {
 
         return {
             url,
-            ...(wsEndpoint && { wsEndpoint })
+            ...(wsEndpoint && { wsEndpoint }),
         };
     }
 
@@ -342,10 +369,10 @@ class ConfigurationManager extends EventEmitter {
     }
 
     /**
-     * Generic getter method for accessing config values with default fallback
-     * @param {string} key - Configuration key
-     * @param {*} defaultValue - Default value if key not found
-     * @returns {*} Configuration value or default
+     * Getter genérico para acessar valores de configuração com fallback padrão.
+     * @param {string} key - Chave da configuração.
+     * @param {*} defaultValue - Valor padrão se chave não encontrada.
+     * @returns {*} Valor da configuração ou padrão.
      */
     get(key, defaultValue) {
         return this.currentConfig[key] !== undefined ? this.currentConfig[key] : defaultValue;
@@ -354,4 +381,10 @@ class ConfigurationManager extends EventEmitter {
 
 // Exporta como Singleton Soberano
 const manager = new ConfigurationManager();
+
+/**
+ * Instância singleton do gerenciador de configuração.
+ * Side-effects: Emite eventos 'updated' quando config muda.
+ * @type {ConfigurationManager}
+ */
 export default manager;

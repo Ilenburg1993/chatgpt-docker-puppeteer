@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from './constants.js';
 import { v4 as uuidv4 } from 'uuid';
+import { ActionCode, ActorRole, MessageType, PROTOCOL_VERSION } from './constants.js';
 
 /**
  * --------------------------------------------------------------------------
@@ -23,11 +23,18 @@ function assertUUID(value, field) {
 }
 
 /**
- * --------------------------------------------------------------------------
- * ENVELOPE FACTORY (CANONICAL)
- * --------------------------------------------------------------------------
- * Creates an immutable IPC envelope.
- * No defaults hide intent. No field is inferred.
+ * Cria envelope IPC imutável seguindo protocolo NERV.
+ * Sem defaults que ocultem intenção. Nenhum campo é inferido.
+ *
+ * @param {object} params - Parâmetros para criação do envelope
+ * @param {import('./constants.js').ActorRole} params.actor - Papel do ator emissor
+ * @param {import('./constants.js').MessageType} params.messageType - Tipo ontológico da mensagem
+ * @param {import('./constants.js').ActionCode} params.actionCode - Código semântico da ação
+ * @param {object} [params.payload={}] - Payload semântico da mensagem
+ * @param {string|null} [params.correlationId=null] - ID de correlação (opcional)
+ * @param {import('./constants.js').ActorRole|null} [params.target=null] - Papel do ator alvo (opcional)
+ * @returns {object} Envelope NERV válido e imutável
+ * @throws {Error} Se parâmetros violarem invariantes do protocolo
  */
 function createEnvelope({ actor, messageType, actionCode, payload = {}, correlationId = null, target = null }) {
     /* ------------------------------------------------------------------------
@@ -83,25 +90,25 @@ function createEnvelope({ actor, messageType, actionCode, payload = {}, correlat
     const envelope = {
         protocol: {
             version: PROTOCOL_VERSION,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         },
 
         identity: {
             actor,
-            target
+            target,
         },
 
         causality: {
             msg_id: msgId,
-            correlation_id: effectiveCorrelationId
+            correlation_id: effectiveCorrelationId,
         },
 
         type: {
             message_type: messageType,
-            action_code: actionCode
+            action_code: actionCode,
         },
 
-        payload
+        payload,
     };
 
     /* ------------------------------------------------------------------------
@@ -126,10 +133,16 @@ function deepFreeze(obj) {
     return obj;
 }
 
-
 // Normalization helper: accepts either a canonical envelope or a flattened
 // envelope ({ actor, messageType, actionCode, payload, correlationId, target })
 // and returns a canonical, validated envelope.
+/**
+ * Normaliza envelopes NERV de diferentes formatos para o formato canônico
+ * @param {*} envelope - Envelope a ser normalizado (canônico ou legado)
+ * @returns {object} Envelope NERV canônico e validado
+ * @throws {Error} Se o envelope não puder ser normalizado
+ * @sideEffects Nenhum - função pura
+ */
 function normalize(envelope) {
     if (!envelope || typeof envelope !== 'object') {
         throw new Error('Envelope must be an object');
@@ -151,9 +164,16 @@ function normalize(envelope) {
         const target = targetKey && ActorRole[targetKey] ? ActorRole[targetKey] : null;
 
         const messageType = envelope.kind || (envelope.type && envelope.type.message_type);
-        const actionCode = (envelope.payload && envelope.payload.actionCode) || envelope.actionCode || (envelope.type && envelope.type.action_code) || null;
+        const actionCode =
+            (envelope.payload && envelope.payload.actionCode) ||
+            envelope.actionCode ||
+            (envelope.type && envelope.type.action_code) ||
+            null;
         const payload = envelope.payload || envelope.data || {};
-        const correlationId = envelope.ids && (envelope.ids.correlation_id || envelope.ids.correlationId) ? (envelope.ids.correlation_id || envelope.ids.correlationId) : null;
+        const correlationId =
+            envelope.ids && (envelope.ids.correlation_id || envelope.ids.correlationId)
+                ? envelope.ids.correlation_id || envelope.ids.correlationId
+                : null;
 
         return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });
     }
@@ -169,6 +189,13 @@ function normalize(envelope) {
     return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });
 }
 
+/**
+ * Valida envelope NERV (canônico ou achatado) lançando erro se inválido
+ * @param {*} envelope - Envelope a ser validado
+ * @returns {boolean} true se válido
+ * @throws {Error} Se o envelope for inválido
+ * @sideEffects Pode lançar erro - função de validação
+ */
 function assertValid(envelope) {
     if (!envelope || typeof envelope !== 'object') {
         throw new Error('Envelope must be an object');
@@ -189,10 +216,10 @@ function assertValid(envelope) {
         actionCode: envelope.actionCode,
         payload: envelope.payload || envelope.data || {},
         correlationId: envelope.correlationId || null,
-        target: envelope.target || null
+        target: envelope.target || null,
     });
 
     return true;
 }
 
-export { createEnvelope, normalize, assertValid };
+export { assertValid, createEnvelope, normalize };

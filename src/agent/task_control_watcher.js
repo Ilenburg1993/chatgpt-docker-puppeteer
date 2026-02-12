@@ -1,13 +1,29 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
-import { sendCommand } from '#nerv/adapters/high_level_adapter';
-import { getDb } from '#infra/db/sqlite';
 import { recordEvent } from '#infra/db/events_repo';
+import { getDb } from '#infra/db/sqlite';
 import { releaseTaskLock } from '#infra/db/task_repo';
+import { sendCommand } from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
+/**
+ * Opções do construtor do TaskControlWatcher.
+ * @typedef {Object} TaskControlWatcherOptions
+ * @property {Object} nerv - Instância do sistema nerv para comunicação.
+ * @property {number} [intervalMs=500] - Intervalo entre ticks em ms.
+ */
+
+/**
+ * Watcher que monitora tarefas em estados de controle (PAUSED/CANCELLED) e emite comandos de abort.
+ * Responsável por notificar drivers quando tarefas são canceladas ou pausadas pelo usuário.
+ */
 class TaskControlWatcher {
-    constructor({ nerv, intervalMs = 500 } = {}) {
+    /**
+     * Cria um watcher para monitorar controles de tarefas.
+     * @param {TaskControlWatcherOptions} options - Opções de configuração.
+     */
+    constructor(options) {
+        const { nerv, intervalMs = 500 } = options;
         if (!nerv) {
             throw new Error('[TaskControlWatcher] nerv required');
         }
@@ -18,6 +34,16 @@ class TaskControlWatcher {
         this._stopped = false;
     }
 
+    /**
+     * Inicia o watcher, começando a monitorar tarefas em estados de controle.
+     * @returns {void}
+     * @sideEffects Inicia timer interno e executa tick imediatamente.
+     */
+    /**
+     * Inicia o watcher, começando a monitorar tarefas em estados de controle.
+     * @returns {void}
+     * @sideEffects Inicia timer interno e executa tick imediatamente.
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -28,6 +54,11 @@ class TaskControlWatcher {
         log('INFO', `[TaskControlWatcher] started (interval=${this.intervalMs}ms)`);
     }
 
+    /**
+     * Para o watcher, cancelando o timer de monitoramento.
+     * @returns {void}
+     * @sideEffects Cancela timer interno.
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -37,6 +68,13 @@ class TaskControlWatcher {
         log('INFO', '[TaskControlWatcher] stopped');
     }
 
+    /**
+     * Executa um ciclo de monitoramento: busca tarefas PAUSED/CANCELLED com locks ativos
+     * e emite comandos DRIVER_ABORT via nerv, liberando locks após.
+     * @returns {Promise<void>}
+     * @throws {Error} Erros são logados mas não relançados.
+     * @sideEffects Modifica estado do banco (events, locks) e envia comandos via nerv.
+     */
     async tick() {
         if (this._stopped) return;
         if (this._running) return;
@@ -99,7 +137,11 @@ class TaskControlWatcher {
                         ActorRole.DRIVER
                     );
                 } catch (err) {
-                    log('WARN', `[TaskControlWatcher] Failed to emit DRIVER_ABORT for ${taskId}: ${err?.message || String(err)}`, correlationId);
+                    log(
+                        'WARN',
+                        `[TaskControlWatcher] Failed to emit DRIVER_ABORT for ${taskId}: ${err?.message || String(err)}`,
+                        correlationId
+                    );
                 }
 
                 // Hygiene: clear lock so the queue doesn't consider this task in-flight forever.

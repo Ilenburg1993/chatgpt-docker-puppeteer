@@ -1,15 +1,25 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import * as envelopesModule from '#shared/nerv/envelope';
 import { CONNECTION_MODES } from '#core/constants/browser';
-import createCorrelation from './correlation/correlation_store.js';
-import createTelemetry from './telemetry/ipc_telemetry.js';
-import createBuffers from './buffers/buffers.js';
-import createTransport from './transport/transport.js';
-import createHybridTransport from './transport/hybrid_transport.js';
-import createEmission from './emission/emission.js';
-import createReception from './reception/reception.js';
-import createHealth from './health/health.js';
+import { log } from '#core/logger';
+import * as envelopesModule from '#shared/nerv/envelope';
 import { getActionCode, getMessageType } from '#shared/nerv/envelope_reader';
+import createBuffers from './buffers/buffers.js';
+import createCorrelation from './correlation/correlation_store.js';
+import createEmission from './emission/emission.js';
+import createHealth from './health/health.js';
+import createReception from './reception/reception.js';
+import createTelemetry from './telemetry/ipc_telemetry.js';
+import createHybridTransport from './transport/hybrid_transport.js';
+import createTransport from './transport/transport.js';
+
+/**
+ * @typedef {object} NERVConfig
+ * @property {'LOCAL'|'HYBRID'} [mode='LOCAL'] - Modo de conexão NERV
+ * @property {string} [socketUrl] - URL para Socket.io (modo HYBRID)
+ * @property {object} [socketOptions] - Opções para Socket.io
+ * @property {object} [buffers] - Configurações de buffers inbound/outbound
+ * @property {object} [health] - Configurações de health monitoring
+ */
 
 /* ===========================
    Funções auxiliares de bootstrap
@@ -23,12 +33,12 @@ async function bootstrapSocketAdapter(config) {
 
     const socketAdapter = createSocketAdapter({
         url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3008',
-        options: config.socketOptions || {}
+        options: config.socketOptions || {},
     });
 
     // Log de eventos de conexão (antes de criar telemetria)
     socketAdapter.events.on('log', ({ level, msg }) => {
-        console.log(`[NERV/${level}] ${msg}`);
+        log.info(`[NERV/${level}] ${msg}`);
     });
 
     return socketAdapter;
@@ -42,7 +52,7 @@ function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
         const hybridTransport = createHybridTransport({
             mode,
             socketAdapter,
-            telemetry
+            telemetry,
         });
 
         hybridTransport.start();
@@ -62,7 +72,7 @@ function bootstrapTransport({ hybridTransport, config, telemetry }) {
             ? createTransport({
                   telemetry,
                   adapter: config.transport.adapter,
-                  reconnect: config.transport?.reconnect
+                  reconnect: config.transport?.reconnect,
               })
             : null)
     );
@@ -79,7 +89,7 @@ function buildPublicAPI({
     transport,
     health,
     telemetry,
-    socketAdapter
+    socketAdapter,
 }) {
     const baseOnReceive = hybridTransport ? hybridTransport.onReceive : reception.onReceive;
 
@@ -174,7 +184,7 @@ function buildPublicAPI({
             if (socketAdapter && socketAdapter.stop) {
                 socketAdapter.stop();
             }
-        }
+        },
     };
 }
 
@@ -183,17 +193,15 @@ function buildPublicAPI({
 =========================== */
 
 /**
- * Cria o subsistema NERV.
+ * Cria o subsistema NERV (Neural Event Relay Virtual).
  *
- * @param {Object} config
- * Configurações estruturais:
- * - mode: 'local' | 'hybrid' (default: 'local')
- *   * local: EventEmitter puro (in-process)
- *   * hybrid: EventEmitter + Socket.io adapter (local + remoto)
- * - transport: { adapter, reconnect? } (se mode='remote' ou adapter customizado)
- * - buffers: { inbound?, outbound? }
- * - health: { thresholds? }
- * - socketUrl: URL do servidor Socket.io (se mode='hybrid')
+ * **Side-effects:** Inicializa transportes, telemetria, correlação, buffers, health monitoring.
+ * **Semântica:** Bootstrap completo do sistema de comunicação neural com todos os componentes.
+ * **Unidades:** Configurações seguem typedef NERVConfig.
+ *
+ * @param {NERVConfig} [config={}] - Configurações estruturais do NERV
+ * @returns {Promise<object>} Instância NERV com API pública completa (congelada)
+ * @throws {Error} Se bootstrap de algum componente falhar
  */
 async function createNERV(config = {}) {
     /* 0. Modo de operação */
@@ -210,7 +218,7 @@ async function createNERV(config = {}) {
     const envelopes = {
         createEnvelope: envelopesModule.createEnvelope,
         normalize: envelopesModule.normalize,
-        assertValid: envelopesModule.assertValid
+        assertValid: envelopesModule.assertValid,
     };
 
     /* 4. Correlação */
@@ -219,7 +227,7 @@ async function createNERV(config = {}) {
     /* 5. Buffers */
     const buffers = createBuffers({
         telemetry,
-        limits: config.buffers || {}
+        limits: config.buffers || {},
     });
 
     /* 6. Transporte físico */
@@ -230,20 +238,20 @@ async function createNERV(config = {}) {
         envelopes,
         buffers,
         correlation,
-        telemetry
+        telemetry,
     });
 
     /* 8. Recepção */
     const reception = createReception({
         envelopes,
         correlation,
-        telemetry
+        telemetry,
     });
 
     /* 9. Health */
     const health = createHealth({
         telemetry,
-        thresholds: config.health?.thresholds || {}
+        thresholds: config.health?.thresholds || {},
     });
 
     /* 10. Interface pública */
@@ -255,7 +263,7 @@ async function createNERV(config = {}) {
         transport,
         health,
         telemetry,
-        socketAdapter
+        socketAdapter,
     });
 
     return Object.freeze(publicAPI);

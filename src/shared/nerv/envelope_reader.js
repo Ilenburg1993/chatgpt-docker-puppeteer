@@ -1,5 +1,11 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
+/**
+ * Extrai o tipo de mensagem de envelope NERV (suporta formatos canônico e legado)
+ * @param {*} envelope - Envelope NERV a ser analisado
+ * @returns {import('./constants.js').MessageType|null} Tipo da mensagem ou null se não encontrado
+ * @sideEffects Nenhum - função pura
+ */
 function getMessageType(envelope) {
     return (
         envelope?.kind ||
@@ -10,6 +16,12 @@ function getMessageType(envelope) {
     );
 }
 
+/**
+ * Extrai o código de ação de envelope NERV (suporta formatos canônico e legado)
+ * @param {*} envelope - Envelope NERV a ser analisado
+ * @returns {string|null} Código da ação ou null se não encontrado
+ * @sideEffects Nenhum - função pura
+ */
 function getActionCode(envelope) {
     return (
         envelope?.actionCode ||
@@ -20,6 +32,12 @@ function getActionCode(envelope) {
     );
 }
 
+/**
+ * Extrai o ID de correlação de envelope NERV (suporta formatos canônico e legado)
+ * @param {*} envelope - Envelope NERV a ser analisado
+ * @returns {string|null} ID de correlação ou null se não encontrado
+ * @sideEffects Nenhum - função pura
+ */
 function getCorrelationId(envelope) {
     return (
         envelope?.correlationId ||
@@ -30,6 +48,12 @@ function getCorrelationId(envelope) {
     );
 }
 
+/**
+ * Extrai o ID da mensagem de envelope NERV (suporta formatos canônico e legado)
+ * @param {*} envelope - Envelope NERV a ser analisado
+ * @returns {string|null} ID da mensagem ou null se não encontrado
+ * @sideEffects Nenhum - função pura
+ */
 function getMsgId(envelope) {
     return (
         envelope?.msgId ||
@@ -40,12 +64,24 @@ function getMsgId(envelope) {
     );
 }
 
+/**
+ * Extrai o payload de envelope NERV
+ * @param {*} envelope - Envelope NERV a ser analisado
+ * @returns {object} Payload da mensagem (objeto vazio se não encontrado)
+ * @sideEffects Nenhum - função pura
+ */
 function getPayload(envelope) {
     return envelope?.payload || {};
 }
 
+/**
+ * Extrai o ID da tarefa do payload de envelope NERV
+ * @param {object} payload - Payload da mensagem a ser analisado
+ * @returns {string|null} ID da tarefa ou null se não encontrado
+ * @sideEffects Nenhum - função pura
+ */
 function getTaskIdFromPayload(payload) {
     return payload?.taskId || payload?.task_id || payload?.task?.meta?.id || payload?.task?.id || null;
 }
 
-export { getMessageType, getActionCode, getCorrelationId, getMsgId, getPayload, getTaskIdFromPayload };
+export { getActionCode, getCorrelationId, getMessageType, getMsgId, getPayload, getTaskIdFromPayload };

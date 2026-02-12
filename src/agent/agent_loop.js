@@ -1,7 +1,55 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
+/**
+ * Opções de configuração para intervalos do AgentLoop.
+ * @typedef {Object} AgentLoopIntervals
+ * @property {number} [kernelMs=50] - Intervalo para kernel.step() em ms.
+ * @property {number} [queueMs=250] - Intervalo para queueWorker.tick() em ms.
+ * @property {number} [controlMs=500] - Intervalo para taskControlWatcher.tick() em ms.
+ * @property {number} [missionMs=1000] - Intervalo para missionRunner.tick() em ms.
+ * @property {number} [plannerMs=1500] - Intervalo para missionPlannerProcessor.tick() em ms.
+ * @property {number} [watchdogMs=1500] - Intervalo para attemptWatchdog.tick() em ms.
+ * @property {number} [orchestrationMs=1250] - Intervalo para taskOrchestrationWorker.tick() em ms.
+ */
+
+/**
+ * Opções do construtor do AgentLoop.
+ * @typedef {Object} AgentLoopOptions
+ * @property {Object} kernel - Instância do kernel com método step() (obrigatório).
+ * @property {Object} [browserPool=null] - Pool de browsers com circuit breaker.
+ * @property {Object} [queueWorker=null] - Worker da fila com método tick().
+ * @property {Object} [taskControlWatcher=null] - Watcher de controle de tarefas.
+ * @property {Object} [missionRunner=null] - Runner de missões.
+ * @property {Object} [missionPlannerProcessor=null] - Processador de planejamento.
+ * @property {Object} [attemptWatchdog=null] - Watchdog de tentativas.
+ * @property {Object} [taskOrchestrationWorker=null] - Worker de orquestração.
+ * @property {AgentLoopIntervals} [intervals={}] - Configuração de intervalos.
+ * @property {number} [baseTickMs=25] - Intervalo base do loop principal em ms.
+ */
+
+/**
+ * Estado interno dos próximos ticks do AgentLoop.
+ * @typedef {Object} AgentLoopNextTicks
+ * @property {number} kernelAt - Timestamp do próximo tick do kernel.
+ * @property {number} queueAt - Timestamp do próximo tick da fila.
+ * @property {number} controlAt - Timestamp do próximo tick do controle.
+ * @property {number} missionAt - Timestamp do próximo tick das missões.
+ * @property {number} plannerAt - Timestamp do próximo tick do planner.
+ * @property {number} watchdogAt - Timestamp do próximo tick do watchdog.
+ * @property {number} orchestrationAt - Timestamp do próximo tick da orquestração.
+ */
+
+/**
+ * Loop principal de execução do agente, coordenando múltiplos workers e watchers.
+ * Implementa um sistema de ticks assíncronos com intervalos configuráveis.
+ */
 class AgentLoop {
+    /**
+     * Cria uma nova instância do AgentLoop.
+     * @param {AgentLoopOptions} options - Opções de configuração.
+     * @throws {Error} Se kernel.step() não estiver disponível.
+     */
     constructor({
         kernel,
         browserPool = null,
@@ -55,6 +103,10 @@ class AgentLoop {
         };
     }
 
+    /**
+     * Inicia o loop de execução do agente.
+     * Side-effects: Inicia timer global, chama step() imediatamente e periodicamente.
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -67,6 +119,10 @@ class AgentLoop {
         log('INFO', `[AgentLoop] started (tick=${this.baseTickMs}ms)`);
     }
 
+    /**
+     * Para o loop de execução do agente.
+     * Side-effects: Limpa timer global, marca como parado.
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -76,6 +132,11 @@ class AgentLoop {
         log('INFO', '[AgentLoop] stopped');
     }
 
+    /**
+     * Executa um passo do loop, verificando e executando workers conforme intervalos.
+     * Side-effects: Executa múltiplos workers assincronamente, logs erros.
+     * @returns {Promise<void>}
+     */
     async step() {
         if (this._stopped) return;
         if (this._running) return;

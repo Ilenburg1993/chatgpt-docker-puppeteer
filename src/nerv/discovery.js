@@ -4,9 +4,15 @@ import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
- * Publica SERVER_READY.
- * - Tenta usar NERV quando `nerv` é passado.
- * - Caso contrário, se `ENABLE_STATE_FILE=true`, grava arquivo de estado legado (compat).
+ * Publica evento SERVER_READY para descoberta de serviço.
+ *
+ * **Side-effects:** Envia evento via NERV ou registra estado (modo legado).
+ * **Semântica:** Sinaliza que servidor está pronto para aceitar conexões.
+ * **Unidades:** Timeout em milissegundos.
+ *
+ * @param {object} [nerv] - Instância NERV para publicação (opcional)
+ * @param {object} [payload={}] - Payload adicional do evento
+ * @returns {object|null} Envelope enviado ou null se falhar
  */
 function publishServerReady(nerv, payload = {}) {
     // Prefer NERV when available
@@ -24,7 +30,13 @@ function publishServerReady(nerv, payload = {}) {
 }
 
 /**
- * Remove publicação legacy (apenas limpa arquivo se ENABLE_STATE_FILE=true).
+ * Remove publicação de SERVER_READY (modo legado).
+ *
+ * **Side-effects:** Remove arquivo de estado legado se existir.
+ * **Semântica:** Limpa sinal de prontidão do servidor.
+ * **Unidades:** N/A
+ *
+ * @returns {boolean} True se arquivo foi removido, false caso contrário
  */
 function unpublishServerReady() {
     log('DEBUG', '[DISCOVERY] unpublishServerReady no-op (file fallback REMOVED)');
@@ -33,7 +45,16 @@ function unpublishServerReady() {
 
 /**
  * Aguarda o primeiro evento SERVER_READY via NERV.
- * Retorna uma Promise que resolve com o payload do envelope.
+ *
+ * **Side-effects:** Registra listener temporário no NERV, configura timeout.
+ * **Semântica:** Promise que resolve quando servidor sinaliza prontidão.
+ * **Unidades:** timeoutMs em milissegundos (padrão 10000).
+ *
+ * @param {object} nerv - Instância NERV com método onEvent
+ * @param {object} [options={}] - Opções de configuração
+ * @param {number} [options.timeoutMs=10000] - Timeout em milissegundos
+ * @returns {Promise<object>} Payload do envelope SERVER_READY
+ * @throws {Error} Se NERV não tem onEvent ou timeout expirar
  */
 function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
     return new Promise((resolve, reject) => {
@@ -68,8 +89,16 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
 }
 
 /**
- * Escuta continuamente eventos SERVER_READY e chama handler(envelope.payload).
- * Retorna uma função de unsubscribe.
+ * Escuta continuamente eventos SERVER_READY e chama handler.
+ *
+ * **Side-effects:** Registra listener permanente no NERV.
+ * **Semântica:** Observador contínuo de eventos de prontidão do servidor.
+ * **Unidades:** N/A
+ *
+ * @param {object} nerv - Instância NERV com método onEvent
+ * @param {function(object): void} handler - Callback invocado para cada SERVER_READY
+ * @returns {function(): void} Função de unsubscribe para remover listener
+ * @throws {Error} Se NERV não tem onEvent ou handler não é função
  */
 function listenForServerReady(nerv, handler) {
     if (!nerv || typeof nerv.onEvent !== 'function') {
@@ -91,4 +120,4 @@ function listenForServerReady(nerv, handler) {
     return unsub;
 }
 
-export { publishServerReady, unpublishServerReady, waitForServerReady, listenForServerReady };
+export { listenForServerReady, publishServerReady, unpublishServerReady, waitForServerReady };

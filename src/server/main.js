@@ -1,29 +1,40 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import 'dotenv/config';
-import { log } from '#core/logger';
-import { PROTOCOL_VERSION, MessageType, ActionCode, ActorRole } from '#shared/nerv/constants';
-import { CONNECTION_MODES } from '#core/constants/browser';
-import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import * as Authority from '#core/authority';
-import * as Discovery from '#nerv/discovery';
-import * as serverEngine from './engine/server.js';
-import * as socketHub from './engine/socket.js';
-import * as lifecycle from './engine/lifecycle.js';
-import app from './engine/app.js';
-import * as router from './api/router.js';
-import * as pm2Bridge from './realtime/bus/pm2_bridge.js';
-import * as logTail from './realtime/streams/log_tail.js';
-import * as hardwareTelemetry from './realtime/telemetry/hardware.js';
-import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
-import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
-import * as fsWatcher from './watchers/fs_watcher.js';
-import * as logWatcher from './watchers/log_watcher.js';
-import reconciler from './supervisor/reconcilier.js';
-import ServerNERVAdapter from './nerv_adapter/server_nerv_adapter.js';
-import * as NERV from '#nerv/nerv';
-import * as ssotEventFeed from './realtime/ssot_event_feed.js';
+
+// Load environment variables: .env.local (sensitive) overrides .env (defaults)
+// Order matters: .env.local must be loaded first to take precedence
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+// Load .env.local if exists (Ollama Cloud API keys, etc.)
+if (fs.existsSync('.env.local')) {
+    dotenv.config({ path: '.env.local' });
+}
+// Load .env (defaults, always exists)
+dotenv.config();
+
+import * as Authority from '#core/authority';
+import { CONNECTION_MODES } from '#core/constants/browser';
+import { log } from '#core/logger';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import * as Discovery from '#nerv/discovery';
+import * as NERV from '#nerv/nerv';
+import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
+import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
+import { ActionCode, ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
+import * as router from './api/router.js';
+import app from './engine/app.js';
+import * as lifecycle from './engine/lifecycle.js';
+import * as serverEngine from './engine/server.js';
+import * as socketHub from './engine/socket.js';
+import ServerNERVAdapter from './nerv_adapter/server_nerv_adapter.js';
+import * as pm2Bridge from './realtime/bus/pm2_bridge.js';
+import * as ssotEventFeed from './realtime/ssot_event_feed.js';
+import * as logTail from './realtime/streams/log_tail.js';
+import * as hardwareTelemetry from './realtime/telemetry/hardware.js';
+import reconciler from './supervisor/reconcilier.js';
+import * as fsWatcher from './watchers/fs_watcher.js';
+import * as logWatcher from './watchers/log_watcher.js';
 
 
 /* ==========================================================================
@@ -39,8 +50,9 @@ import { fileURLToPath } from 'node:url';
  *   ✔ Commit atômico via arquivo temporário
  *   ✔ Nunca retorna estado parcialmente gravado
  *
- * @param {number} port Porta efetivamente bound pelo HTTP engine
- * @param {'standalone'|'delegated'} [authority]
+ * @param {number} port - Porta efetivamente bound pelo HTTP engine
+ * @param {'standalone'|'delegated'} [authority='standalone'] - Modo de autoridade do servidor
+ * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)
  */
 function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
     // Legacy compatibility hook: discovery is now canonical via NERV (SERVER_READY).
@@ -71,6 +83,13 @@ function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STAND
 ========================================================================== */
 
 /**
+ * @typedef {object} BootstrapOptions
+ * @property {'standalone'|'delegated'} [authority] - Modo de autoridade do servidor
+ * @property {object} [nerv] - Instância NERV para injeção
+ * @property {object} [missionManager] - MissionManager para injeção
+ */
+
+/**
  * Executa boot completo do processo SERVER.
  *
  * Ordem é contratual e não deve ser alterada sem auditoria:
@@ -86,7 +105,10 @@ function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STAND
  *   9. ServerNERVAdapter
  *  10. reconciler
  *
+ * @param {BootstrapOptions} [options={}] - Opções de configuração do bootstrap
  * @returns {Promise<object>} Contexto operacional mínimo do server
+ * @throws {Error} - Se alguma fase do bootstrap falhar
+ * @sideEffects - Inicializa servidor HTTP, conecta NERV, registra watchers
  */
 async function bootstrap(options = {}) {
     const authority = Authority.resolveAuthority(options.authority);

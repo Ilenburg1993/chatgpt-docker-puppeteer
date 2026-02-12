@@ -1,22 +1,107 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs';
-import { STATUS_VALUES } from './constants/tasks.js';
-import { promises as fsp } from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
-import https from 'node:https';
-import http from 'node:http';
-import { exec } from 'node:child_process';
-import CONFIG from './config.js';
 import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
+import { exec } from 'node:child_process';
+import fs, { promises as fsp } from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
+import os from 'node:os';
+import path from 'node:path';
+import CONFIG from './config.js';
+import { STATUS_VALUES } from './constants/tasks.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
 const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 
 /**
+ * @typedef {Object} ChromeConnectionStatus
+ * @property {boolean} connected - Se a conexão com Chrome foi estabelecida.
+ * @property {string} [endpoint] - Endpoint HTTP usado para conexão.
+ * @property {string} [error] - Mensagem de erro se não conectado.
+ * @property {number} [latency_ms] - Latência da conexão em ms.
+ * @property {string} [version] - Versão do Chrome detectada.
+ * @property {string} [protocol] - Versão do protocolo.
+ * @property {string} [user_agent] - User agent do Chrome.
+ * @property {string} [ws_endpoint] - Endpoint WebSocket para debugging.
+ */
+
+/**
+ * @typedef {Object} HardwareMetrics
+ * @property {string} cpu_load - Carga de CPU em porcentagem.
+ * @property {string} ram_usage_pct - Uso de RAM em porcentagem.
+ * @property {string} ram_free_gb - RAM livre em GB (formato string com 'GB').
+ * @property {number} ts - Timestamp da coleta em ms.
+ */
+
+/**
+ * @typedef {Object} Trends
+ * @property {number[]} ram - Histórico de uso de RAM.
+ * @property {number[]} cpu - Histórico de carga de CPU.
+ * @property {number[]} io - Histórico de latência de I/O.
+ */
+
+/**
+ * @typedef {Object} StorageSLA
+ * @property {number} latency_ms - Latência de I/O em ms.
+ * @property {boolean} write_ok - Se a escrita foi bem-sucedida.
+ * @property {string} disk_info_raw - Informações brutas do disco.
+ */
+
+/**
+ * @typedef {Object} DNASanity
+ * @property {boolean} ok - Se o DNA está íntegro.
+ * @property {string} [msg] - Mensagem de erro se não íntegro.
+ * @property {number} [version] - Versão do DNA.
+ */
+
+/**
+ * @typedef {Object} NetworkProbe
+ * @property {boolean} ok - Se a conexão foi bem-sucedida.
+ * @property {string|number} status - Status da resposta ou 'OFFLINE'/'TIMEOUT'.
+ * @property {number} ms - Tempo de resposta em ms.
+ */
+
+/**
+ * @typedef {Object} QueueStats
+ * @property {number} pending - Número de tarefas pendentes.
+ * @property {number} running - Número de tarefas em execução.
+ * @property {number} total - Total de tarefas.
+ */
+
+/**
+ * @typedef {Object} RecoveryStep
+ * @property {string} op - Operação sugerida.
+ * @property {string} target - Alvo da operação.
+ * @property {string} impact - Impacto ('low'|'medium'|'high'|'critical').
+ */
+
+/**
+ * @typedef {Object} FullCheckResult
+ * @property {Object} meta - Metadados do diagnóstico.
+ * @property {string} meta.version - Versão do engine.
+ * @property {string} meta.engine - Nome do engine.
+ * @property {string} meta.timestamp - Timestamp ISO.
+ * @property {number} meta.duration_ms - Duração em ms.
+ * @property {Object} health - Status de saúde.
+ * @property {number} health.score - Pontuação de saúde (0-100).
+ * @property {string} health.status - Status ('HEALTHY'|'DEGRADED'|'CRITICAL').
+ * @property {Object} telemetry - Dados de telemetria.
+ * @property {NetworkProbe[]} telemetry.network - Resultados de rede.
+ * @property {StorageSLA} telemetry.storage - Dados de armazenamento.
+ * @property {DNASanity} telemetry.dna - Status do DNA.
+ * @property {ChromeConnectionStatus & {proxyReport: any}} telemetry.chrome - Status do Chrome + relatório proxy.
+ * @property {QueueStats} telemetry.queue - Estatísticas da fila.
+ * @property {HardwareMetrics & {event_loop_lag_ms: number, uptime_seconds: number}} telemetry.system - Métricas do sistema.
+ * @property {Object} recovery_manifest - Manifesto de recuperação.
+ * @property {string[]} recovery_manifest.detected_issues - Problemas detectados.
+ * @property {RecoveryStep[]} recovery_manifest.suggested_steps - Passos sugeridos.
+ * @property {boolean} recovery_manifest.can_auto_fix - Se pode corrigir automaticamente.
+ */
+
+/**
  * Verifica conectividade com Chrome Remote Debugging.
- * @returns {Promise<object>} Status da conexão com Chrome.
+ * @returns {Promise<ChromeConnectionStatus>} Status da conexão com Chrome, incluindo versão e latência se conectado.
+ * @throws {Error} Nunca lança erro - sempre retorna objeto de status.
  */
 async function probeChromeConnection() {
     const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
@@ -94,6 +179,11 @@ async function probeChromeConnection() {
 }
 
 // --- GESTÃO DE TENDÊNCIAS (PERSISTÊNCIA DE BASELINE) ---
+/**
+ * Carrega tendências de métricas de saúde do arquivo de persistência.
+ * @returns {Promise<Trends>} Objeto com arrays de tendências para RAM, CPU e I/O. Retorna arrays vazios se arquivo não existir ou houver erro.
+ * @throws {Error} Nunca lança erro - sempre retorna objeto com arrays vazios em caso de falha.
+ */
 async function getTrends() {
     try {
         if (!fs.existsSync(TREND_FILE)) {
@@ -128,7 +218,7 @@ async function saveTrends(trends) {
 /**
  * Coleta métricas instantâneas de Hardware.
  * Absorvido do server.js para centralização de soberania de dados.
- * @returns {object} Métricas padronizadas para o Dashboard/Telemetria.
+ * @returns {HardwareMetrics} Métricas padronizadas para o Dashboard/Telemetria.
  */
 function getHardwareMetrics() {
     const freeMem = os.freemem();
@@ -143,6 +233,9 @@ function getHardwareMetrics() {
 
 /**
  * Triangulação de Rede via Handshake HTTP.
+ * @param {string} url - URL a ser testada para conectividade.
+ * @returns {Promise<NetworkProbe>} Resultado do teste de conectividade com status, latência e sucesso.
+ * @throws {Error} Nunca lança erro - sempre resolve a Promise.
  */
 async function probeConnectivity(url) {
     return new Promise(resolve => {
@@ -162,6 +255,8 @@ async function probeConnectivity(url) {
 
 /**
  * Auditoria de I/O e Espaço em Disco (SLA de Hardware).
+ * @returns {Promise<StorageSLA>} Métricas de armazenamento incluindo latência de I/O, sucesso de escrita e informações do disco.
+ * @throws {Error} Nunca lança erro - sempre resolve a Promise.
  */
 async function checkStorageSLA() {
     const t0 = Date.now();
@@ -193,6 +288,8 @@ async function checkStorageSLA() {
 
 /**
  * Validação de Integridade do DNA.
+ * @returns {Promise<DNASanity>} Status da validação do arquivo dynamic_rules.json.
+ * @throws {Error} Nunca lança erro - sempre retorna objeto de status.
  */
 async function validateDNASanity() {
     const rulesPath = path.join(ROOT, 'dynamic_rules.json');
@@ -212,6 +309,12 @@ async function validateDNASanity() {
    MOTOR DE DIAGNÓSTICO E MANIFESTO DE RECUPERAÇÃO
 ========================================================================== */
 
+/**
+ * Executa verificação completa de saúde do sistema.
+ * Coleta métricas de rede, armazenamento, DNA, Chrome e sistema, gera relatório de saúde e manifesto de recuperação.
+ * @returns {Promise<FullCheckResult>} Relatório completo de diagnóstico com telemetria, saúde e sugestões de recuperação.
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe e sempre retorna resultado.
+ */
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
@@ -314,4 +417,4 @@ async function runFullCheck() {
     };
 }
 
-export { runFullCheck, getHardwareMetrics, probeChromeConnection };
+export { getHardwareMetrics, probeChromeConnection, runFullCheck };

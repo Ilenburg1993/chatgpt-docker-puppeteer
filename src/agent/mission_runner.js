@@ -1,10 +1,40 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { v4 as uuidv4 } from 'uuid';
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
+import { getMissionById, listMissions, MISSION_STATUS, updateMission } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
-import { getMissionById, listMissions, MISSION_STATUS, updateMission } from '#infra/db/mission_repo';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * @typedef {Object} MissionRunnerOptions
+ * @property {number} [intervalMs=1000] - Intervalo entre ticks em ms.
+ */
+
+/**
+ * @typedef {Object} MissionProgress
+ * @property {number} current_step_index - Índice do passo atual.
+ * @property {string|null} current_task_id - ID da tarefa atual.
+ * @property {string[]} completed - IDs de tarefas completadas.
+ * @property {string[]} failed - IDs de tarefas falhadas.
+ * @property {number} [created_count] - Contador de tarefas criadas.
+ * @property {string} [last_step_id] - ID do último passo executado.
+ * @property {number} [last_step_index] - Índice do último passo executado.
+ */
+
+/**
+ * @typedef {Object} MissionContext
+ * @property {Object} [workflow] - Workflow da missão.
+ * @property {Object[]} [workflow.steps] - Passos do workflow.
+ * @property {MissionProgress} [progress] - Progresso da missão.
+ * @property {Object} [mission_context] - Contexto da missão.
+ * @property {string} [target] - Target padrão.
+ */
+
+/**
+ * @typedef {Object} MissionPolicy
+ * @property {number} [max_tasks_total] - Máximo de tarefas totais.
+ */
 
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -18,7 +48,16 @@ function _safeJson(obj, fallback) {
     }
 }
 
+/**
+ * Executor de missões com workflow automatizado.
+ * Processa missões em execução, cria tarefas para cada passo do workflow.
+ * Side-effects: Atualiza status de missões, cria tarefas no banco, loga progresso.
+ */
 class MissionRunner {
+    /**
+     * Cria uma nova instância do executor de missões.
+     * @param {MissionRunnerOptions} [options] - Opções de configuração.
+     */
     constructor({ intervalMs = 1000 } = {}) {
         this.intervalMs = Math.max(200, Number(intervalMs) || 1000);
         this._timer = null;
@@ -26,6 +65,11 @@ class MissionRunner {
         this._stopped = false;
     }
 
+    /**
+     * Inicia o processamento contínuo de missões.
+     * Side-effects: Inicia timer, loga início.
+     * @returns {void}
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -34,6 +78,11 @@ class MissionRunner {
         log('INFO', `[MissionRunner] started (interval=${this.intervalMs}ms)`);
     }
 
+    /**
+     * Para o processamento de missões.
+     * Side-effects: Para timer, loga parada.
+     * @returns {void}
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -43,6 +92,13 @@ class MissionRunner {
         log('INFO', '[MissionRunner] stopped');
     }
 
+    /**
+     * Executa um ciclo de processamento de missões.
+     * Processa todas as missões em execução, evitando concorrência.
+     * Side-effects: Processa missões, cria tarefas, atualiza status.
+     * @returns {Promise<void>} Não retorna valor.
+     * @throws {Error} Nunca lança erro - opera em modo fail-safe.
+     */
     async tick() {
         if (this._stopped) return;
         if (this._running) return;
@@ -54,7 +110,10 @@ class MissionRunner {
                 try {
                     await this._processMission(mission.id);
                 } catch (err) {
-                    log('WARN', `[MissionRunner] mission ${mission.id} processing failed: ${err?.message || String(err)}`);
+                    log(
+                        'WARN',
+                        `[MissionRunner] mission ${mission.id} processing failed: ${err?.message || String(err)}`
+                    );
                 }
                 await _sleep(0);
             }
@@ -63,6 +122,13 @@ class MissionRunner {
         }
     }
 
+    /**
+     * Processa uma missão específica.
+     * Avança workflow, cria tarefas, atualiza progresso.
+     * @param {string} missionId - ID da missão a processar.
+     * @returns {Promise<void>} Não retorna valor.
+     * @throws {Error} Nunca lança erro - opera em modo fail-safe.
+     */
     async _processMission(missionId) {
         const mission = getMissionById(missionId);
         if (!mission) return;
@@ -79,7 +145,12 @@ class MissionRunner {
             return;
         }
 
-        const progress = context.progress || { current_step_index: 0, current_task_id: null, completed: [], failed: [] };
+        const progress = context.progress || {
+            current_step_index: 0,
+            current_task_id: null,
+            completed: [],
+            failed: [],
+        };
         const policy = mission.policy || {};
 
         const maxTasks = Number(policy.max_tasks_total || 200) || 200;
@@ -107,7 +178,9 @@ class MissionRunner {
             if (status === 'DONE') {
                 const nextProgress = {
                     ...progress,
-                    completed: Array.isArray(progress.completed) ? [...progress.completed, progress.current_task_id] : [progress.current_task_id],
+                    completed: Array.isArray(progress.completed)
+                        ? [...progress.completed, progress.current_task_id]
+                        : [progress.current_task_id],
                     current_task_id: null,
                     current_step_index: Number(progress.current_step_index || 0) + 1,
                 };
@@ -121,14 +194,20 @@ class MissionRunner {
             // Terminal but not DONE
             const nextProgress = {
                 ...progress,
-                failed: Array.isArray(progress.failed) ? [...progress.failed, progress.current_task_id] : [progress.current_task_id],
+                failed: Array.isArray(progress.failed)
+                    ? [...progress.failed, progress.current_task_id]
+                    : [progress.current_task_id],
                 current_task_id: null,
             };
 
             updateMission(missionId, {
                 status: MISSION_STATUS.FAILED,
                 completed_at_ms: Date.now(),
-                context: { ...context, progress: nextProgress, failure_reason: `Task ${progress.current_task_id} ended with ${status}` },
+                context: {
+                    ...context,
+                    progress: nextProgress,
+                    failure_reason: `Task ${progress.current_task_id} ended with ${status}`,
+                },
             });
             return;
         }
@@ -150,10 +229,7 @@ class MissionRunner {
         const nowIso = new Date().toISOString();
 
         const userMessage =
-            step?.prompt_template ||
-            step?.description ||
-            step?.name ||
-            `Execute mission step ${currentStepIndex + 1}`;
+            step?.prompt_template || step?.description || step?.name || `Execute mission step ${currentStepIndex + 1}`;
 
         const target = step?.target || context?.target || 'chatgpt';
 
@@ -210,4 +286,8 @@ class MissionRunner {
     }
 }
 
+/**
+ * Classe executora de missões com workflow automatizado.
+ * @type {typeof MissionRunner}
+ */
 export { MissionRunner };

@@ -1,4 +1,5 @@
 import * as i18n from '#core/i18n';
+import { log } from '#core/logger';
 import * as io from '#infra/io';
 
 /* ==========================================================================
@@ -21,7 +22,7 @@ const SADI_CONFIG = {
  */
 const DEBUG = process.env.SADI_DEBUG === 'true';
 function debug(msg, ...args) {
-    if (DEBUG) console.log(`[SADI:DEBUG] ${msg}`, ...args);
+    if (DEBUG) log.debug(`[SADI:DEBUG] ${msg}`, ...args);
 }
 
 /**
@@ -494,14 +495,14 @@ async function findChatInputSelector(page, langCode = 'en') {
                     }
                 } catch (evolutionError) {
                     // Graceful degradation - don't fail if evolution fails
-                    console.warn('[SADI] DNA evolution failed:', evolutionError.message);
+                    log.warn('[SADI] DNA evolution failed:', evolutionError.message);
                 }
             }
         }
 
         return result;
     } catch (error) {
-        console.error('[SADI] findChatInputSelector error:', error.message);
+        log.error('[SADI] findChatInputSelector error:', error.message);
         return null; // Graceful fallback
     }
 }
@@ -612,7 +613,7 @@ async function findSendButtonSelector(page, inputProtocol) {
 
         return result;
     } catch (error) {
-        console.error('[SADI] findSendButtonSelector error:', error.message);
+        log.error('[SADI] findSendButtonSelector error:', error.message);
         return null; // Graceful fallback
     }
 }
@@ -687,7 +688,7 @@ async function findResponseArea(page) {
 
         return result;
     } catch (error) {
-        console.error('[SADI] findResponseArea error:', error.message);
+        log.error('[SADI] findResponseArea error:', error.message);
         return null; // Graceful fallback
     }
 }
@@ -702,11 +703,11 @@ async function findResponseArea(page) {
 async function validateCandidateInteractivity(page, protocol) {
     // v4.0: Validação de parâmetros
     if (!page || typeof page.evaluate !== 'function') {
-        console.error('[SADI] validateCandidateInteractivity: invalid page object');
+        log.error('[SADI] validateCandidateInteractivity: invalid page object');
         return false;
     }
     if (!protocol || !protocol.selector) {
-        console.error('[SADI] validateCandidateInteractivity: invalid protocol');
+        log.error('[SADI] validateCandidateInteractivity: invalid protocol');
         return false;
     }
 
@@ -742,9 +743,9 @@ async function validateCandidateInteractivity(page, protocol) {
         debug('validateCandidateInteractivity: result=%s', isInteractive);
         return isInteractive;
     } catch (e) {
-        console.error('[SADI] validateCandidateInteractivity error:', e.message);
+        log.error('[SADI] validateCandidateInteractivity error:', e.message);
         return false;
     }
 }
 
-export { findChatInputSelector, findSendButtonSelector, findResponseArea, validateCandidateInteractivity, findFrameByPath };
+export { findChatInputSelector, findFrameByPath, findResponseArea, findSendButtonSelector, validateCandidateInteractivity };

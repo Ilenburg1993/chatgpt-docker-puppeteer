@@ -1,4 +1,31 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
+
+/**
+ * Esquema de validação para variável de ambiente.
+ * @typedef {Object} EnvVariableSpec
+ * @property {'FATAL'|'ERROR'|'WARN'} level - Nível de criticidade da variável.
+ * @property {(val: string) => boolean} validator - Função validadora para o valor.
+ * @property {string} default - Valor padrão se não definido.
+ * @property {string} message - Mensagem de erro para validação falhada.
+ */
+
+/**
+ * Resultado da validação de ambiente.
+ * @typedef {Object} ValidationResult
+ * @property {boolean} valid - Se todas as validações passaram.
+ * @property {Array<{key: string, level: string, message: string}>} errors - Lista de erros de validação.
+ * @property {Array<{key: string, level: string, message: string}>} warnings - Lista de avisos de validação.
+ * @property {Record<string, string>} env - Valores ENV resolvidos (com defaults aplicados).
+ */
+
+/**
+ * Opções para validação de ambiente.
+ * @typedef {Object} ValidationOptions
+ * @property {boolean} [throwOnError=true] - Lançar erro se validação FATAL/ERROR falhar.
+ * @property {boolean} [applyDefaults=true] - Aplicar valores padrão para variáveis faltantes.
+ * @property {boolean} [verbose=false] - Logar todos os resultados de validação.
+ */
 
 /**
  * Environment Variable Validator
@@ -233,21 +260,9 @@ const ENV_SCHEMA = {
 };
 
 /**
- * Validation result
- * @typedef {Object} ValidationResult
- * @property {boolean} valid - Whether all validations passed
- * @property {Array<{key: string, level: string, message: string}>} errors - List of validation errors
- * @property {Array<{key: string, level: string, message: string}>} warnings - List of validation warnings
- * @property {Object} env - Resolved ENV values (with defaults applied)
- */
-
-/**
  * Validate environment variables against schema
  *
- * @param {Object} options - Validation options
- * @param {boolean} options.throwOnError - Throw error if FATAL or ERROR level validation fails (default: true)
- * @param {boolean} options.applyDefaults - Apply default values for missing vars (default: true)
- * @param {boolean} options.verbose - Log all validation results (default: false)
+ * @param {ValidationOptions} options - Validation options
  * @returns {ValidationResult}
  *
  * @example
@@ -259,14 +274,11 @@ const ENV_SCHEMA = {
  * console.log(result.errors);
  */
 export function validateEnv(options = {}) {
-    const {
-        throwOnError = true,
-        applyDefaults = true,
-        verbose = false
-    } = options;
+    const { throwOnError = true, applyDefaults = true, verbose = false } = options;
 
     const errors = [];
     const warnings = [];
+    /** @type {Record<string, string>} */
     const resolvedEnv = {};
 
     // Validate each ENV variable
@@ -280,13 +292,13 @@ export function validateEnv(options = {}) {
                 process.env[key] = value;
 
                 if (verbose) {
-                    console.log(`[ENV Validator] Applied default for ${key}: ${value}`);
+                    log.info(`[ENV Validator] Applied default for ${key}: ${value}`);
                 }
             } else {
                 const error = {
                     key,
                     level: spec.level,
-                    message: `Missing required ENV variable: ${key}`
+                    message: `Missing required ENV variable: ${key}`,
                 };
 
                 if (spec.level === 'WARN') {
@@ -304,7 +316,7 @@ export function validateEnv(options = {}) {
             const error = {
                 key,
                 level: spec.level,
-                message: `Invalid value for ${key}: "${value}". ${spec.message}`
+                message: `Invalid value for ${key}: "${value}". ${spec.message}`,
             };
 
             if (spec.level === 'WARN') {
@@ -319,7 +331,7 @@ export function validateEnv(options = {}) {
                 process.env[key] = value;
 
                 if (verbose) {
-                    console.log(`[ENV Validator] Applied default after validation failure for ${key}: ${value}`);
+                    log.info(`[ENV Validator] Applied default after validation failure for ${key}: ${value}`);
                 }
             }
         }
@@ -337,7 +349,7 @@ export function validateEnv(options = {}) {
         warnings.push({
             key: 'TOOL_EXECUTION_TIMEOUT',
             level: 'WARN',
-            message: `TOOL_EXECUTION_TIMEOUT (${toolTimeout}ms) should be > OLLAMA_GENERATE_TIMEOUT (${ollamaTimeout}ms) for proper timeout cascade`
+            message: `TOOL_EXECUTION_TIMEOUT (${toolTimeout}ms) should be > OLLAMA_GENERATE_TIMEOUT (${ollamaTimeout}ms) for proper timeout cascade`,
         });
     }
 
@@ -345,7 +357,7 @@ export function validateEnv(options = {}) {
         warnings.push({
             key: 'MCP_TOOL_TIMEOUT',
             level: 'WARN',
-            message: `MCP_TOOL_TIMEOUT (${mcpTimeout}ms) should be > TOOL_EXECUTION_TIMEOUT (${toolTimeout}ms) for proper timeout cascade`
+            message: `MCP_TOOL_TIMEOUT (${mcpTimeout}ms) should be > TOOL_EXECUTION_TIMEOUT (${toolTimeout}ms) for proper timeout cascade`,
         });
     }
 
@@ -353,7 +365,7 @@ export function validateEnv(options = {}) {
         warnings.push({
             key: 'SERVER_REQUEST_TIMEOUT',
             level: 'WARN',
-            message: `SERVER_REQUEST_TIMEOUT (${serverTimeout}ms) should be > MCP_TOOL_TIMEOUT (${mcpTimeout}ms) for proper timeout cascade`
+            message: `SERVER_REQUEST_TIMEOUT (${serverTimeout}ms) should be > MCP_TOOL_TIMEOUT (${mcpTimeout}ms) for proper timeout cascade`,
         });
     }
 
@@ -366,7 +378,7 @@ export function validateEnv(options = {}) {
             errors.push({
                 key: 'MCP_UPSTREAM_URL',
                 level: 'ERROR',
-                message: 'MCP_UPSTREAM_ENABLED=true but MCP_UPSTREAM_URL is missing'
+                message: 'MCP_UPSTREAM_ENABLED=true but MCP_UPSTREAM_URL is missing',
             });
         }
     }
@@ -378,7 +390,8 @@ export function validateEnv(options = {}) {
             warnings.push({
                 key: 'GITHUB_PERSONAL_ACCESS_TOKEN',
                 level: 'WARN',
-                message: 'MCP_GITHUB_PROXY_ENABLED=true but GITHUB_PERSONAL_ACCESS_TOKEN is missing (GitHub upstream will be not-ready)'
+                message:
+                    'MCP_GITHUB_PROXY_ENABLED=true but GITHUB_PERSONAL_ACCESS_TOKEN is missing (GitHub upstream will be not-ready)',
             });
         }
     }
@@ -388,24 +401,24 @@ export function validateEnv(options = {}) {
     const hasWarnings = warnings.length > 0;
 
     if (hasErrors) {
-        console.error('\n❌ ENV Validation FAILED:\n');
+        log.error('\n❌ ENV Validation FAILED:\n');
         for (const error of errors) {
-            console.error(`  [${error.level}] ${error.message}`);
+            log.error(`  [${error.level}] ${error.message}`);
         }
-        console.error('');
+        log.error('');
     }
 
     if (hasWarnings) {
-        console.warn('\n⚠️  ENV Validation WARNINGS:\n');
+        log.warn('\n⚠️  ENV Validation WARNINGS:\n');
         for (const warning of warnings) {
-            console.warn(`  [${warning.level}] ${warning.message}`);
+            log.warn(`  [${warning.level}] ${warning.message}`);
         }
-        console.warn('');
+        log.warn('');
     }
 
     if (!hasErrors && !hasWarnings) {
         if (verbose) {
-            console.log('✅ ENV Validation PASSED (all variables valid)\n');
+            log.info('✅ ENV Validation PASSED (all variables valid)\n');
         }
     }
 
@@ -415,7 +428,7 @@ export function validateEnv(options = {}) {
         if (fatalErrors.length > 0) {
             throw new Error(
                 `ENV validation failed with ${fatalErrors.length} critical error(s). ` +
-                `Fix the issues above and restart the process.`
+                    `Fix the issues above and restart the process.`
             );
         }
     }
@@ -424,7 +437,7 @@ export function validateEnv(options = {}) {
         valid: !hasErrors,
         errors,
         warnings,
-        env: resolvedEnv
+        env: resolvedEnv,
     };
 }
 
