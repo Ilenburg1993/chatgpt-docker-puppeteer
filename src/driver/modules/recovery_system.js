@@ -1,6 +1,7 @@
 import EventEmitter from 'node:events';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { log } from '#core/logger';
+import { createSharedTimeout } from '#infra/abort_controller_utils';
 
 /* ==========================================================================
    RECOVERY_CONFIG v2.0 - Zero Magic Numbers
@@ -277,24 +278,30 @@ class RecoverySystem extends EventEmitter {
                     return;
                 }
 
-                // ✅ BUG #7 FIX: Timeout protection em focus operations
+                // FIXED (P0-1.5): Usa createSharedTimeout para garantir cleanup do AbortController
+                // Previne operações órfãs de foco quando timeout vence
                 const focusTimeout = RECOVERY_CONFIG.FOCUS_TIMEOUT_MS;
+                const { promise: timeoutPromise, cleanup } = createSharedTimeout(focusTimeout, 'FOCUS_TIMEOUT');
 
-                // Mouse click at (1,1)
-                await Promise.race([this.driver.page.mouse.click(1, 1), this._timeout(focusTimeout, 'mouse_click')]);
+                try {
+                    // Mouse click at (1,1)
+                    await Promise.race([this.driver.page.mouse.click(1, 1), timeoutPromise]);
 
-                // Window focus
-                await Promise.race([
-                    this.driver.page.evaluate(() => window.focus()),
-                    this._timeout(focusTimeout, 'window_focus'),
-                ]);
+                    // Window focus
+                    await Promise.race([
+                        this.driver.page.evaluate(() => window.focus()),
+                        timeoutPromise
+                    ]);
 
-                log('DEBUG', '[RECOVERY] Tier 1: Focus restored successfully', correlationId);
+                    log('DEBUG', '[RECOVERY] Tier 1: Focus restored successfully', correlationId);
 
-                // ✅ EventEmitter telemetry
-                this.emit(RECOVERY_EVENTS.FOCUS_RESTORED, {
-                    timestamp: Date.now(),
-                });
+                    // ✅ EventEmitter telemetry
+                    this.emit(RECOVERY_EVENTS.FOCUS_RESTORED, {
+                        timestamp: Date.now(),
+                    });
+                } finally {
+                    cleanup(); // Garantir cleanup do timeout
+                }
             } else {
                 log('WARN', `[RECOVERY] Página não disponível - pulando recovery de foco`, correlationId);
             }
@@ -549,5 +556,47 @@ class RecoverySystem extends EventEmitter {
     }
 }
 
+ /**
+ * Factory function para criar instância do RecoverySystem
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Cria nova instância do RecoverySystem associada ao driver fornecido.
+ * **Unidades:** N/A
+ *
+ * @param {object} driver - Instância do driver para sistema de recuperação
+ * @returns {RecoverySystem} Nova instância do RecoverySystem
+ */
 export const create = driver => new RecoverySystem(driver);
-export { RecoverySystem, RECOVERY_CONFIG, RECOVERY_EVENTS };
+
+/**
+ * Classe do sistema de recuperação escalonada
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Classe principal para implementação de sistema de recuperação de falhas.
+ * **Unidades:** N/A
+ *
+ * @type {Function}
+ */
+export { RecoverySystem };
+
+/**
+ * Configurações do sistema de recuperação
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de timeouts e limites para recuperação de falhas.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, number>}
+ */
+export { RECOVERY_CONFIG };
+
+/**
+ * Eventos emitidos pelo sistema de recuperação
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
+export { RECOVERY_EVENTS };

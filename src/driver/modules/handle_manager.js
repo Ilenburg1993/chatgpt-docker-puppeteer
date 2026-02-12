@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
+import { withTimeout } from '#infra/abort_controller_utils';
 
 /* ==========================================================================
    HANDLE_CONFIG - Configurações centralizadas (zero magic numbers)
@@ -285,8 +286,12 @@ class HandleManager extends EventEmitter {
                 const h = this.activeHandles.pop();
 
                 try {
-                    // ✅ v2.0: Timeout individual em dispose (1s)
-                    await Promise.race([h.dispose(), this._timeout(HANDLE_CONFIG.DISPOSE_TIMEOUT_MS, 'dispose')]);
+                    // FIXED (P0-1.3): Usa withTimeout para garantir cleanup
+                    await withTimeout(
+                        () => h.dispose(),
+                        HANDLE_CONFIG.DISPOSE_TIMEOUT_MS,
+                        'HANDLE_DISPOSE_TIMEOUT'
+                    );
 
                     cleanedCount++;
                     this.stats.handlesCleared++;
@@ -405,8 +410,13 @@ class HandleManager extends EventEmitter {
         this.activeHandles.splice(index, 1);
 
         try {
-            // ✅ Timeout individual
-            await Promise.race([handle.dispose(), this._timeout(HANDLE_CONFIG.DISPOSE_TIMEOUT_MS, 'dispose')]);
+            // FIXED (P0-1.3): Usa withTimeout para garantir cleanup do AbortController
+            // Previne timeout leaks quando dispose() trava
+            await withTimeout(
+                () => handle.dispose(),
+                HANDLE_CONFIG.DISPOSE_TIMEOUT_MS,
+                'HANDLE_DISPOSE_TIMEOUT'
+            );
 
             this.stats.handlesCleared++;
 
@@ -428,9 +438,16 @@ class HandleManager extends EventEmitter {
             // ✅ Emit erro
             this.emit(HANDLE_EVENTS.CLEANUP_ERROR, {
                 error: err.message,
-                isTimeout: err.name === 'TimeoutError',
+                isTimeout: err.code === 'TIMEOUT' || err.name === 'TimeoutError',
                 remaining: this.activeHandles.length
             });
+
+            // FIXED: Forçar dispose mesmo em timeout (best effort)
+            try {
+                await handle.dispose().catch(() => {});
+            } catch (_) {
+                // Ignore - já logamos o erro principal acima
+            }
 
             return false;
         }
@@ -517,8 +534,49 @@ class HandleManager extends EventEmitter {
     }
 }
 
+ /**
+ * Factory function para criar instância do HandleManager
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Cria nova instância do HandleManager associada ao driver fornecido.
+ * **Unidades:** N/A
+ *
+ * @param {object} driver - Instância do driver para gerenciar handles
+ * @returns {HandleManager} Nova instância do HandleManager
+ */
 export const create = (driver) => {
     return new HandleManager(driver);
 };
 
-export { HandleManager, HANDLE_CONFIG, HANDLE_EVENTS };
+/**
+ * Constantes de configuração do HandleManager
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de timeouts e limites para gerenciamento de handles.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, number>}
+ */
+export { HandleManager };
+
+/**
+ * Eventos emitidos pelo HandleManager
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
+export { HANDLE_CONFIG };
+
+/**
+ * Configurações do HandleManager
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de timeouts e limites para gerenciamento de handles.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, number>}
+ */
+export { HANDLE_EVENTS };

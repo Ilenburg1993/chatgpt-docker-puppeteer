@@ -203,6 +203,9 @@ class TargetDriver extends EventEmitter {
 
         // ✅ v3.0: AbortSignal listener será configurado em attachContext()
         this._abortHandler = null;
+
+        // ✅ P0-8: Page lifecycle event listeners (configurados em attachContext)
+        this._pageEventListeners = [];
     }
 
     /* ==========================================================================
@@ -234,6 +237,116 @@ class TargetDriver extends EventEmitter {
         if (this.signal && this._abortHandler) {
             this.signal.removeEventListener('abort', this._abortHandler);
             this._abortHandler = null;
+        }
+    }
+
+    /**
+     * Configura listeners para page lifecycle events.
+     * ✅ P0-8: Previne resource leaks e adiciona telemetria para page crashes.
+     * Segue padrão de PageLifecycleMonitor.js.
+     *
+     * @private
+     */
+    _setupPageLifecycleHandlers() {
+        if (!this.page || this._pageEventListeners.length > 0) {
+            return;
+        }
+
+        try {
+            // 1. Page close event
+            const closeHandler = () => {
+                log('WARN', `[${this.name}] Page closed unexpectedly`, this.correlationId);
+                this.emit(EVENTS.WARNING, {
+                    type: 'PAGE_CLOSED',
+                    correlationId: this.correlationId,
+                    state: this._state,
+                    ts: Date.now()
+                });
+
+                // Reset to IDLE if not already UNATTACHED
+                if (this._state !== STATES.UNATTACHED) {
+                    try {
+                        this.setState(STATES.IDLE);
+                    } catch (_) {
+                        // If setState fails, force update
+                        this._state = STATES.IDLE;
+                        this.stateUpdated = Date.now();
+                    }
+                }
+            };
+            this.page.on('close', closeHandler);
+            this._pageEventListeners.push({ event: 'close', handler: closeHandler });
+
+            // 2. Page error event
+            const errorHandler = (err) => {
+                log('ERROR', `[${this.name}] Page error: ${err.message}`, this.correlationId);
+                this.emit(EVENTS.WARNING, {
+                    type: 'PAGE_ERROR',
+                    error: err.message,
+                    correlationId: this.correlationId,
+                    ts: Date.now()
+                });
+
+                this._errorCount++;
+                this._lastError = {
+                    type: 'PAGE_ERROR',
+                    message: err.message,
+                    ts: Date.now()
+                };
+            };
+            this.page.on('error', errorHandler);
+            this._pageEventListeners.push({ event: 'error', handler: errorHandler });
+
+            // 3. Page disconnected event
+            const disconnectHandler = () => {
+                log('ERROR', `[${this.name}] Page disconnected`, this.correlationId);
+                this.emit(EVENTS.WARNING, {
+                    type: 'PAGE_DISCONNECTED',
+                    correlationId: this.correlationId,
+                    state: this._state,
+                    ts: Date.now()
+                });
+
+                // Reset to IDLE if not already UNATTACHED
+                if (this._state !== STATES.UNATTACHED) {
+                    try {
+                        this.setState(STATES.IDLE);
+                    } catch (_) {
+                        // If setState fails, force update
+                        this._state = STATES.IDLE;
+                        this.stateUpdated = Date.now();
+                    }
+                }
+            };
+            this.page.on('disconnected', disconnectHandler);
+            this._pageEventListeners.push({ event: 'disconnected', handler: disconnectHandler });
+
+            log('DEBUG', `[${this.name}] Page lifecycle handlers attached (${this._pageEventListeners.length})`, this.correlationId);
+
+        } catch (err) {
+            log('ERROR', `[${this.name}] Failed to attach page handlers: ${err.message}`, this.correlationId);
+        }
+    }
+
+    /**
+     * Remove listeners de page lifecycle events.
+     * ✅ P0-8: Previne memory leaks.
+     *
+     * @private
+     */
+    _teardownPageLifecycleHandlers() {
+        if (!this.page || this._pageEventListeners.length === 0) {
+            return;
+        }
+
+        try {
+            this._pageEventListeners.forEach(({ event, handler }) => {
+                this.page.off(event, handler);
+            });
+            this._pageEventListeners = [];
+            log('DEBUG', `[${this.name}] Page lifecycle handlers removed`, this.correlationId);
+        } catch (err) {
+            log('WARN', `[${this.name}] Error removing page handlers: ${err.message}`, this.correlationId);
         }
     }
 
@@ -386,6 +499,9 @@ class TargetDriver extends EventEmitter {
         // Setup AbortSignal listener
         this._setupAbortListener();
 
+        // ✅ P0-8: Setup page lifecycle event listeners
+        this._setupPageLifecycleHandlers();
+
         // Transição: UNATTACHED → IDLE
         this.setState(STATES.IDLE);
 
@@ -469,6 +585,9 @@ class TargetDriver extends EventEmitter {
 
         // Teardown AbortSignal listener
         this._teardownAbortListener();
+
+        // ✅ P0-8: Teardown page lifecycle event listeners
+        this._teardownPageLifecycleHandlers();
 
         // Detach page + signal
         this.page = null;
@@ -912,6 +1031,13 @@ class TargetDriver extends EventEmitter {
             return;
         }
 
+        // FIXED (P0-1.4): Remove abort listener ANTES de detach para garantir cleanup
+        // Previne leak se detachContext() lançar exceção
+        this._teardownAbortListener();
+
+        // ✅ P0-8: Teardown page lifecycle handlers ANTES de detach
+        this._teardownPageLifecycleHandlers();
+
         // ✅ v3.0: Detach context se ainda attached
         if (this.isContextAttached()) {
             try {
@@ -954,6 +1080,35 @@ TargetDriver.STATES = STATES;
 
 export default TargetDriver;
 
+/**
+ * Configuração padrão do TargetDriver
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de timeouts, capacidades padrão e limites para operação do driver.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, any>}
+ */
 export { TARGETDRIVER_CONFIG };
+
+/**
+ * Matriz de transições de estado válidas
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Define transições permitidas entre estados da máquina de estados do driver.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string[]>}
+ */
 export { STATE_TRANSITIONS };
+
+/**
+ * Esquema de validação de capacidades do driver
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Lista de capacidades suportadas pelos drivers de LLM.
+ * **Unidades:** N/A
+ *
+ * @type {string[]}
+ */
 export { CAPABILITIES_SCHEMA };

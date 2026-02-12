@@ -1,8 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log } from './logger.js';
 import { execSync } from 'node:child_process';
-import http from 'node:http';
 import CONFIG from './config.js';
+import { log } from './logger.js';
+import { checkUrlHealth } from '#infra/http_client_utils';
 
 /**
  * Resultado canônico de decisões de boot relacionadas ao Browser Pool.
@@ -46,10 +46,13 @@ function getBrowserEndpoint() {
     return CONFIG.BROWSER_ENDPOINT;
 }
 
-/** * Health check para Chrome remote debugging.
- * “Verifica se Chrome está acessível no endpoint de Remote Debugging configurado.”
+/**
+ * Verifica se Chrome está acessível no endpoint de Remote Debugging configurado.
  *
- * @param {string|null} [endpoint] - ##
+ * FIXED (P0-1.1): Agora usa http_client_utils para garantir cleanup de requests.
+ * Previne vazamento de file descriptors em health checks repetidos.
+ *
+ * @param {string|null} [endpoint] - Endpoint customizado (opcional)
  * @param {number} [timeout=2000] - Timeout em ms
  * @returns {Promise<boolean>} - true se Chrome está acessível
  */
@@ -57,21 +60,15 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
     const chromeEndpoint = endpoint || resolveChromeEndpoint();
     const url = `${chromeEndpoint.replace(/\/$/, '')}/json/version`;
 
-    return new Promise(resolve => {
-        const timeoutId = setTimeout(() => {
-            resolve(false);
-        }, timeout);
-
-        http.get(url, res => {
-            clearTimeout(timeoutId);
-            resolve(res.statusCode === 200);
-        }).on('error', () => {
-            clearTimeout(timeoutId);
-            resolve(false);
-        });
-    });
+    try {
+        const { ok } = await checkUrlHealth(url, timeout);
+        return ok;
+    } catch (_err) {
+        // checkUrlHealth já trata erros internamente e retorna ok:false
+        // Este catch é para casos extremos
+        return false;
+    }
 }
-
 /**
  * Cria e inicializa um BrowserPoolManager de forma canônica.
  * Centraliza a lógica de construção para evitar divergência
@@ -125,7 +122,7 @@ async function tryStartChrome() {
         // Executa script (timeout 15s)
         execSync('bash scripts/start-chrome.sh', {
             timeout: 15000,
-            stdio: 'inherit' // Mostra output do script no console
+            stdio: 'inherit', // Mostra output do script no console
         });
 
         // Valida que Chrome iniciou
@@ -169,7 +166,7 @@ function getChromeInstructions(errorMessage) {
         'O sistema necessita do Chrome com remote debugging ativo.',
         '',
         `Erro detectado: ${errorMessage}`,
-        ''
+        '',
     ];
 
     if (proxyEnabled) {
@@ -265,7 +262,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                                 process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
                             healthCheckInterval:
                                 process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
-                            browserEndpoint: getBrowserEndpoint()
+                            browserEndpoint: getBrowserEndpoint(),
                         });
 
                         log('INFO', '[RESILIENCE] ✅ Browser Pool reconectado com sucesso após iniciar Chrome!');
@@ -273,7 +270,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                         return {
                             success: true,
                             mode: 'full',
-                            browserPool
+                            browserPool,
                         };
                     } catch (retryError) {
                         log('WARN', `[RESILIENCE] Falha ao reconectar após iniciar Chrome: ${retryError.message}`);
@@ -288,16 +285,16 @@ async function handleBrowserPoolFailure(error, options = {}) {
         }
 
         // 3. Auto-retry falhou, mostra instruções ao usuário
-        getChromeInstructions(error.message).forEach(line => console.log(line));
+        getChromeInstructions(error.message).forEach(line => log.info(line));
     }
 
     // 4. Modo degradado (se permitido)
     if (allowDegradedMode) {
-        console.log('OPÇÕES:');
-        console.log('  1) Aguardar - Corrija o problema e pressione ENTER para retry');
-        console.log('  2) Modo Degradado - Iniciar sistema sem Browser Pool (limitado)');
-        console.log('  3) Abortar - Sair do sistema');
-        console.log('');
+        log.info('OPÇÕES:');
+        log.info('  1) Aguardar - Corrija o problema e pressione ENTER para retry');
+        log.info('  2) Modo Degradado - Iniciar sistema sem Browser Pool (limitado)');
+        log.info('  3) Abortar - Sair do sistema');
+        log.info('');
 
         // Em ambiente não-interativo (PM2, Docker), aplica comportamento seguro por padrão:
         // - Se allowDegradedMode=true, inicia em modo degradado automaticamente (sem prompt)
@@ -308,7 +305,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                 return {
                     success: true,
                     mode: 'degraded',
-                    browserPool: null
+                    browserPool: null,
                 };
             }
 
@@ -320,7 +317,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
         const readline = await import('node:readline').then(m => m.default ?? m);
         const rl = readline.createInterface({
             input: process.stdin,
-            output: process.stdout
+            output: process.stdout,
         });
 
         const choice = await new Promise(resolve => {
@@ -348,10 +345,9 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                     const browserPool = await createBrowserPool({
                         poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
-                        allocationStrategy:
-                            process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
+                        allocationStrategy: process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
                         healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
-                        browserEndpoint: getBrowserEndpoint()
+                        browserEndpoint: getBrowserEndpoint(),
                     });
 
                     log('INFO', '[RESILIENCE] ✅ Browser Pool conectado com sucesso após correção manual!');
@@ -359,7 +355,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                     return {
                         success: true,
                         mode: 'full',
-                        browserPool
+                        browserPool,
                     };
                 } catch (retryError) {
                     log('ERROR', `[RESILIENCE] Retry falhou: ${retryError.message}`);
@@ -376,7 +372,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                 return {
                     success: true,
                     mode: 'degraded',
-                    browserPool: null // Indica modo degradado
+                    browserPool: null, // Indica modo degradado
                 };
 
             case '3':
@@ -425,7 +421,7 @@ async function initializeBrowserPoolResilient(config, options = {}) {
         return {
             success: true,
             mode: 'full',
-            browserPool
+            browserPool,
         };
     } catch (error) {
         log('WARN', `[RESILIENCE] Browser Pool falhou na inicialização: ${error.message}`);
@@ -435,4 +431,12 @@ async function initializeBrowserPoolResilient(config, options = {}) {
     }
 }
 
-export { checkChromeHealth, tryStartChrome, getChromeInstructions, handleBrowserPoolFailure, initializeBrowserPoolResilient, resolveChromeEndpoint, getBrowserEndpoint };
+export {
+    checkChromeHealth,
+    getBrowserEndpoint,
+    getChromeInstructions,
+    handleBrowserPoolFailure,
+    initializeBrowserPoolResilient,
+    resolveChromeEndpoint,
+    tryStartChrome,
+};
