@@ -4,13 +4,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 const router = express.Router();
 
+import { audit, log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { putJson, readText as readArtifactText } from '#infra/storage/artifact_store';
 import { insertArtifact } from '#infra/db/artifact_repo';
-import { getAttemptById, listAttemptsByTask } from '#infra/db/task_attempt_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
-import { ok, fail } from '../utils/api_envelope.js';
+import { getAttemptById, listAttemptsByTask } from '#infra/db/task_attempt_repo';
 import {
     clearQueuePreserveRunning,
     getTaskById,
@@ -21,8 +20,9 @@ import {
     retryFailedTasks,
     updateTask,
 } from '#infra/db/task_repo';
-import { audit, log } from '#core/logger';
+import { putJson, readText as readArtifactText } from '#infra/storage/artifact_store';
 import schemaGuard from '../../middleware/schema_guard.js';
+import { fail, ok } from '../utils/api_envelope.js';
 
 const ALLOWED_TASK_STAGES = new Set(['DRAFT', 'PROPOSED', 'READY', 'REJECTED', 'ARCHIVED']);
 const ALLOWED_TASK_STATUSES = new Set(['PENDING', 'RUNNING', 'DONE', 'FAILED', 'PAUSED', 'SKIPPED', 'CANCELLED', 'BLOCKED']);
@@ -30,6 +30,70 @@ const ALLOWED_TARGETS = new Set(['auto', 'chatgpt', 'gemini', 'claude', 'ollama'
 
 function _safeId(raw) {
     return String(raw || '').replace(/[^a-zA-Z0-9._-]/g, '');
+}
+
+/**
+ * ✅ P1-17: Safe wrapper for _safeUpdateTask() that catches OptimisticLockError.
+ * Returns null on conflict, allowing API to return 409 Conflict.
+ * @param {string} taskId - Task ID
+ * @param {object} updates - Updates
+ * @param {object} [options] - Options
+ * @param {boolean} [options.throwOnConflict=false] - If true, re-throws
+ * @returns {object|null} Updated task or null on conflict
+ */
+function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {
+    try {
+        return updateTask(taskId, updates);
+    } catch (err) {
+        if (err && err.name === 'OptimisticLockError') {
+            log('WARN', `[TasksAPI] Task ${taskId} update conflict after retries`);
+            if (throwOnConflict) throw err;
+            return null;
+        }
+        throw err;
+    }
+}
+
+/**
+ * Detects cycles in task dependency graph using DFS.
+ * @param {string} taskId - Starting task ID
+ * @param {string[]} newDeps - New dependencies being added
+ * @param {Set<string>} [visited] - Already visited in current path
+ * @returns {{ hasCycle: boolean, path?: string[] }}
+ */
+function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
+    if (visited.has(taskId)) {
+        return { hasCycle: true, path: [...visited, taskId] };
+    }
+
+    visited.add(taskId);
+    const db = getDb();
+
+    // For the starting task, use the NEW dependencies we're about to set
+    const depsToCheck = visited.size === 1 ? newDeps : null;
+
+    if (!depsToCheck) {
+        // For non-starting tasks, read existing dependencies from DB
+        const rows = db.prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?').all(taskId);
+        const existingDeps = rows.map(r => String(r.depends_on_task_id));
+
+        for (const depId of existingDeps) {
+            const result = _detectDependencyCycle(depId, newDeps, new Set(visited));
+            if (result.hasCycle) {
+                return result;
+            }
+        }
+    } else {
+        // Check new dependencies
+        for (const depId of depsToCheck) {
+            const result = _detectDependencyCycle(depId, newDeps, new Set(visited));
+            if (result.hasCycle) {
+                return result;
+            }
+        }
+    }
+
+    return { hasCycle: false };
 }
 
 function _getLockSnapshot(taskId) {
@@ -196,26 +260,44 @@ router.post('/', async (req, res) => {
             promptTemplateArtifactId = null;
         }
 
-        insertTask(taskV5, { stage: desiredStage, status: 'PENDING', actor: 'gui', promptTemplateArtifactId });
+        // Idempotency: check if task already exists before insert
+        const existing = getTaskById(safeId);
+        let created = false;
 
-        await audit('CREATE_TASK', {
-            id: safeId,
-            source: 'GUI',
-            request_id: req.id,
-        });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_CREATED_BY_USER',
-            payload: { request_id: req.id, stage: desiredStage, status: 'PENDING' },
-            dedupKey: `req:${req.id}:task:${safeId}:created`,
-        });
+        if (existing) {
+            // Task already exists - check if this is a duplicate request
+            const clientRequestId = req.body?.client_request_id ? String(req.body.client_request_id) : null;
+            if (clientRequestId) {
+                // If client provided a request ID, treat as idempotent retry
+                log('INFO', `[API_TASKS] Idempotent retry detected for task ${safeId} with client_request_id ${clientRequestId}`, req.id);
+            }
+            // Return existing task
+        } else {
+            // Create new task
+            insertTask(taskV5, { stage: desiredStage, status: 'PENDING', actor: 'gui', promptTemplateArtifactId });
+            created = true;
+
+            await audit('CREATE_TASK', {
+                id: safeId,
+                source: 'GUI',
+                request_id: req.id,
+            });
+            recordEvent({
+                entityType: 'task',
+                entityId: safeId,
+                actorType: 'user',
+                actorId: req.ip || null,
+                eventType: 'TASK_CREATED_BY_USER',
+                payload: { request_id: req.id, stage: desiredStage, status: 'PENDING' },
+                dedupKey: `req:${req.id}:task:${safeId}:created`,
+            });
+        }
 
         res.json({
             success: true,
+            created,
             id: safeId,
+            task: created ? getTaskById(safeId) : existing,
             request_id: req.id,
         });
     } catch (e) {
@@ -364,13 +446,24 @@ async function handleTaskUpdate(req, res) {
             extra.paused_at_ms = null;
         }
 
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             task: validated,
             ...(desiredStatus ? { status: desiredStatus } : {}),
             ...(desiredStage ? { stage: desiredStage } : {}),
             ...(promptTemplateArtifactId ? { prompt_template_artifact_id: promptTemplateArtifactId } : {}),
             ...extra,
         });
+
+        // Optimistic locking: updateTask returns null if concurrent modification detected
+        if (!updated) {
+            return res.status(409).json({
+                success: false,
+                error: 'Concurrent modification detected',
+                message: 'A task foi modificada por outro processo durante esta operação. Recarregue e tente novamente.',
+                request_id: req.id,
+            });
+        }
+
         if (desiredStatus || desiredStage) {
             try {
                 releaseTaskLock({ taskId: safeId });
@@ -548,8 +641,17 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
             },
         };
 
+        // ✅ P1-7: Move cycle check INSIDE transaction to prevent race condition
         const tx = db.transaction(() => {
-            updateTask(taskId, { task: nextTask, dependencies: deps });
+            // Re-check for circular dependencies with exclusive lock held
+            if (deps.length > 0) {
+                const cycleCheck = _detectDependencyCycle(taskId, deps);
+                if (cycleCheck.hasCycle) {
+                    throw new Error('CIRCULAR_DEPENDENCY_DETECTED');
+                }
+            }
+
+            _safeUpdateTask(taskId, { task: nextTask, dependencies: deps });
 
             recordEvent({
                 entityType: 'task',
@@ -561,7 +663,20 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
                 dedupKey: `req:${req.id}:task:${taskId}:deps_replace`,
             });
         });
-        tx();
+
+        try {
+            tx();
+        } catch (txErr) {
+            if (txErr && txErr.message === 'CIRCULAR_DEPENDENCY_DETECTED') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Dependência circular detectada',
+                    message: 'As dependências fornecidas criariam um ciclo no grafo de dependências, o que causaria deadlock.',
+                    request_id: req.id,
+                });
+            }
+            throw txErr;  // Re-throw unexpected errors
+        }
 
         res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
     } catch (err) {
@@ -585,7 +700,7 @@ router.post('/:id/approve', async (req, res) => {
             return res.status(409).json({ success: false, error: 'Ação inválida: task não está em PROPOSED', request_id: req.id });
         }
 
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             stage: 'READY',
             status: 'PENDING',
             paused_at_ms: null,
@@ -627,7 +742,7 @@ router.post('/:id/reject', async (req, res) => {
             return res.status(409).json({ success: false, error: 'Ação inválida: task não está em PROPOSED', request_id: req.id });
         }
 
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             stage: 'REJECTED',
             status: 'SKIPPED',
             last_error: 'USER_REJECTED',
@@ -660,7 +775,7 @@ router.post('/:id/pause', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
         const now = Date.now();
-        const updated = updateTask(safeId, { status: 'PAUSED', paused_at_ms: now });
+        const updated = _safeUpdateTask(safeId, { status: 'PAUSED', paused_at_ms: now });
         if (!updated) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
@@ -690,7 +805,7 @@ router.post('/:id/pause', async (req, res) => {
 router.post('/:id/resume', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             status: 'PENDING',
             paused_at_ms: null,
             blocked_reason: null,
@@ -727,7 +842,7 @@ router.post('/:id/resume', async (req, res) => {
 router.post('/:id/unblock', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             status: 'PENDING',
             paused_at_ms: null,
             blocked_reason: null,
@@ -774,7 +889,7 @@ router.post('/:id/retry', async (req, res) => {
         if (!ALLOWED_TASK_STATUSES.has(currentStatus)) {
             return res.status(409).json({ success: false, error: 'Status atual inválido para retry', request_id: req.id });
         }
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             stage: 'READY',
             status: 'PENDING',
             attempts: 0,
@@ -853,7 +968,7 @@ router.delete('/:id', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
         const now = Date.now();
-        const updated = updateTask(safeId, {
+        const updated = _safeUpdateTask(safeId, {
             status: 'CANCELLED',
             cancelled_at_ms: now,
             last_error: 'USER_CANCELLED',
@@ -953,6 +1068,9 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
         const updated = [];
         const failed = [];
 
+        // Prepare all updates first (validate), then apply atomically
+        const batch = [];
+
         for (const id of ids) {
             try {
                 const existing = getTaskById(id);
@@ -963,6 +1081,8 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
 
                 const status = String(existing.unified_status || existing.state?.status || '').toUpperCase();
                 const isRunning = status === 'RUNNING';
+
+                const now = Date.now();
 
                 if (isRunning && ['set_stage', 'set_target', 'set_priority', 'set_execute_after', 'approve', 'reject', 'retry', 'resume', 'unblock'].includes(action)) {
                     failed.push({ id, error: 'Task RUNNING: ação não permitida' });
@@ -984,27 +1104,24 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                     continue;
                 }
 
-                let next = null;
-                const now = Date.now();
+                // Build update payload based on action
+                let updatePayload = null;
+                let shouldReleaseLock = false;
 
                 if (action === 'pause') {
-                    next = updateTask(id, { status: 'PAUSED', paused_at_ms: now });
+                    updatePayload = { status: 'PAUSED', paused_at_ms: now };
                 } else if (action === 'resume' || action === 'unblock') {
-                    next = updateTask(id, {
+                    updatePayload = {
                         status: 'PENDING',
                         paused_at_ms: null,
                         blocked_reason: null,
                         blocked_at_ms: null,
                         blocked_details_json: null,
                         execute_after_ms: null,
-                    });
-                    try {
-                        releaseTaskLock({ taskId: id });
-                    } catch (_) {
-                        /* ignore */
-                    }
+                    };
+                    shouldReleaseLock = true;
                 } else if (action === 'retry') {
-                    next = updateTask(id, {
+                    updatePayload = {
                         stage: 'READY',
                         status: 'PENDING',
                         attempts: 0,
@@ -1017,45 +1134,29 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                         paused_at_ms: null,
                         execute_after_ms: null,
                         last_error: null,
-                    });
-                    try {
-                        releaseTaskLock({ taskId: id });
-                    } catch (_) {
-                        /* ignore */
-                    }
+                    };
+                    shouldReleaseLock = true;
                 } else if (action === 'cancel') {
-                    next = updateTask(id, { status: 'CANCELLED', cancelled_at_ms: now, last_error: 'USER_CANCELLED' });
-                    try {
-                        releaseTaskLock({ taskId: id });
-                    } catch (_) {
-                        /* ignore */
-                    }
+                    updatePayload = { status: 'CANCELLED', cancelled_at_ms: now, last_error: 'USER_CANCELLED' };
+                    shouldReleaseLock = true;
                 } else if (action === 'approve') {
-                    next = updateTask(id, { stage: 'READY', status: 'PENDING', paused_at_ms: null, cancelled_at_ms: null, failed_at_ms: null });
-                    try {
-                        releaseTaskLock({ taskId: id });
-                    } catch (_) {
-                        /* ignore */
-                    }
+                    updatePayload = { stage: 'READY', status: 'PENDING', paused_at_ms: null, cancelled_at_ms: null, failed_at_ms: null };
+                    shouldReleaseLock = true;
                 } else if (action === 'reject') {
-                    next = updateTask(id, { stage: 'REJECTED', status: 'SKIPPED', last_error: 'USER_REJECTED' });
-                    try {
-                        releaseTaskLock({ taskId: id });
-                    } catch (_) {
-                        /* ignore */
-                    }
+                    updatePayload = { stage: 'REJECTED', status: 'SKIPPED', last_error: 'USER_REJECTED' };
+                    shouldReleaseLock = true;
                 } else if (action === 'set_stage') {
-                    next = updateTask(id, { stage: stageParam });
+                    updatePayload = { stage: stageParam };
                 } else if (action === 'set_target') {
                     const task = existing;
                     task.spec = task.spec || {};
                     task.spec.target = targetParam;
-                    next = updateTask(id, { task });
+                    updatePayload = { task };
                 } else if (action === 'set_priority') {
                     const task = existing;
                     task.meta = task.meta || {};
                     task.meta.priority = Math.trunc(priorityParam);
-                    next = updateTask(id, { task });
+                    updatePayload = { task };
                 } else if (action === 'set_execute_after') {
                     const task = existing;
                     task.policy = task.policy || {};
@@ -1072,34 +1173,66 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                     }
 
                     task.policy.execute_after = ms ? new Date(ms).toISOString() : null;
-                    next = updateTask(id, { task, execute_after_ms: ms });
-                    if (ms === null) {
+                    updatePayload = { task, execute_after_ms: ms };
+                    shouldReleaseLock = ms === null;
+                }
+
+                if (!updatePayload) {
+                    failed.push({ id, error: 'Ação não reconhecida' });
+                    continue;
+                }
+
+                // Add to batch for atomic execution
+                batch.push({ id, updatePayload, shouldReleaseLock });
+            } catch (err) {
+                failed.push({ id: ids[ids.indexOf(id)] || 'unknown', error: err?.message || String(err) });
+            }
+        }
+
+        // Apply all updates atomically in a transaction
+        if (batch.length > 0) {
+            const db = getDb();
+            const tx = db.transaction(() => {
+                for (const { id, updatePayload } of batch) {
+                    const result = _safeUpdateTask(id, updatePayload);
+                    if (!result) {
+                        // Optimistic locking conflict or task disappeared
+                        throw new Error(`Task ${id}: concurrent modification or not found`);
+                    }
+                    updated.push({ id, task: result });
+                }
+            });
+
+            try {
+                tx();
+
+                // Release locks and record events outside transaction
+                for (const { id, shouldReleaseLock } of batch) {
+                    if (shouldReleaseLock) {
                         try {
                             releaseTaskLock({ taskId: id });
                         } catch (_) {
                             /* ignore */
                         }
                     }
+
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: id,
+                        actorType: 'user',
+                        actorId: req.ip || null,
+                        eventType: `TASK_BULK_${action.toUpperCase()}`,
+                        payload: { request_id: req.id, params },
+                        dedupKey: `req:${req.id}:task:${id}:bulk:${action}`,
+                    });
                 }
-
-                if (!next) {
-                    failed.push({ id, error: 'Falha ao atualizar task' });
-                    continue;
+            } catch (txErr) {
+                // Transaction failed - all updates rolled back
+                for (const { id } of batch) {
+                    failed.push({ id, error: txErr?.message || 'Transaction failed' });
                 }
-
-                recordEvent({
-                    entityType: 'task',
-                    entityId: id,
-                    actorType: 'user',
-                    actorId: req.ip || null,
-                    eventType: `TASK_BULK_${action.toUpperCase()}`,
-                    payload: { request_id: req.id, params },
-                    dedupKey: `req:${req.id}:task:${id}:bulk:${action}`,
-                });
-
-                updated.push({ id, task: next });
-            } catch (err) {
-                failed.push({ id, error: err?.message || String(err) });
+                // Clear any partial success
+                updated.length = 0;
             }
         }
 

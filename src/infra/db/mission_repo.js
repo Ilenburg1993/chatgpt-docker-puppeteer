@@ -100,8 +100,29 @@ function getMissionById(missionId) {
 }
 
 function _rowToMission(row) {
-    const policy = row.policy_json ? JSON.parse(row.policy_json) : {};
-    const context = row.context_json ? JSON.parse(row.context_json) : {};
+    // ✅ P1-20: Protect JSON.parse() from corrupted policy_json
+    let policy = {};
+    if (row.policy_json) {
+        try {
+            policy = JSON.parse(row.policy_json);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[mission_repo] Invalid policy_json for mission ${row?.id}: ${msg}`);
+            policy = {};  // Fallback to empty object
+        }
+    }
+
+    // ✅ P1-20: Protect JSON.parse() from corrupted context_json
+    let context = {};
+    if (row.context_json) {
+        try {
+            context = JSON.parse(row.context_json);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[mission_repo] Invalid context_json for mission ${row?.id}: ${msg}`);
+            context = {};  // Fallback to empty object
+        }
+    }
 
     return {
         id: row.id,
