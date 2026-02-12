@@ -13,6 +13,7 @@ import { AdaptiveThrottler } from './adaptive_throttler.mjs';
 import { openDb, ensureTable, deleteByPath, addChunks, search, hybridSearch } from './storage/lancedb.mjs';
 import { formatMarkdownResults } from './format.mjs';
 import { normalizeQuery } from './text/query_normalizer.mjs';
+import { withTimeout } from '../../../src/infra/abort_controller_utils.js';
 
 // Singleton query embedding cache
 const queryEmbedCache = new EmbeddingCache(100);
@@ -46,68 +47,82 @@ async function retryWithBackoff(fn, options = {}) {
     throw lastError;
 }
 
+/**
+ * ✅ P1-1: Wrapped with timeout (30s) to prevent hanging on slow operations
+ */
 export async function ragHealth(options = {}) {
-    const paths = getRagPaths(options.paths);
-    await ensureDirs(paths);
+    return await withTimeout(
+        async () => {
+            const paths = getRagPaths(options.paths);
+            await ensureDirs(paths);
 
-    const writable = await canWrite(paths.indexDir) && await canWrite(paths.dbDir);
-    const manifest = await loadManifest(paths).catch(err => ({ error: String(err?.message || err) }));
+            const writable = await canWrite(paths.indexDir) && await canWrite(paths.dbDir);
+            const manifest = await loadManifest(paths).catch(err => ({ error: String(err?.message || err) }));
 
-    const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
-        baseURL: options.ollamaBaseUrl,
-        model: options.model
-    });
-    const embHealth = await embeddings.health().catch(err => ({ ok: false, error: String(err?.message || err) }));
+            const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
+                baseURL: options.ollamaBaseUrl,
+                model: options.model
+            });
+            const embHealth = await embeddings.health().catch(err => ({ ok: false, error: String(err?.message || err) }));
 
-    const db = await openDb(paths.dbDir).catch(err => ({ error: String(err?.message || err) }));
-    let tableNames = null;
-    if (!('error' in db)) {
-        tableNames = await db.tableNames().catch(() => null);
-        try {
-            await db.close();
-        } catch (_) {
-            // ignore
-        }
-    }
+            const db = await openDb(paths.dbDir).catch(err => ({ error: String(err?.message || err) }));
+            let tableNames = null;
+            if (!('error' in db)) {
+                tableNames = await db.tableNames().catch(() => null);
+                try {
+                    await db.close();
+                } catch (_) {
+                    // ignore
+                }
+            }
 
-    const ok =
-        writable &&
-        !(manifest && manifest.error) &&
-        embHealth.ok &&
-        embHealth.hasModel &&
-        !('error' in db);
+            const ok =
+                writable &&
+                !(manifest && manifest.error) &&
+                embHealth.ok &&
+                embHealth.hasModel &&
+                !('error' in db);
 
-    return {
-        ok,
-        paths,
-        writable,
-        manifest_ok: !(manifest && manifest.error),
-        manifest,
-        ollama: embHealth,
-        lancedb: { ok: !('error' in db), tableNames }
-    };
+            return {
+                ok,
+                paths,
+                writable,
+                manifest_ok: !(manifest && manifest.error),
+                manifest,
+                ollama: embHealth,
+                lancedb: { ok: !('error' in db), tableNames }
+            };
+        },
+        30000,
+        'RAG_HEALTH_TIMEOUT'
+    );
 }
 
+/**
+ * ✅ P1-1: Wrapped with timeout (30 minutes) to prevent infinite indexing
+ */
 export async function ragIndex(options = {}) {
-    const root = options.root ? path.resolve(options.root) : await findProjectRoot(process.cwd());
-    const paths = getRagPaths(options.paths);
-    await ensureDirs(paths);
+    return await withTimeout(
+        async () => {
+            const root = options.root ? path.resolve(options.root) : await findProjectRoot(process.cwd());
+            const paths = getRagPaths(options.paths);
+            await ensureDirs(paths);
 
-    const lock = await acquireIndexLock(paths);
-    if (!lock.acquired) {
-        const lockInfo = lock.existingLock || {};
-        const err = new Error(
-            `RAG_INDEX_LOCKED: Another indexing process is running.\n` +
-            `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
-            `If no indexing is running, the lock may be stale.\n` +
-            `It will auto-clear after 6 hours, or you can manually remove:\n` +
-            `  rm /home/node/.local/share/rag-index/index.lock\n`
-        );
-        err.details = lock;
-        throw err;
-    }
+            const lock = await acquireIndexLock(paths);
+            if (!lock.acquired) {
+                const lockInfo = lock.existingLock || {};
+                const err = new Error(
+                    `RAG_INDEX_LOCKED: Another indexing process is running.\n` +
+                    `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
+                    `If no indexing is running, the lock may be stale.\n` +
+                    `It will auto-clear after 6 hours, or you can manually remove:\n` +
+                    `  rm /home/node/.local/share/rag-index/index.lock\n`
+                );
+                err.details = lock;
+                throw err;
+            }
 
-    try {
+            try {
         let manifest = await loadManifest(paths);
         if (!manifest) {
             manifest = createEmptyManifest();
@@ -309,84 +324,100 @@ export async function ragIndex(options = {}) {
             // ignore
         }
 
-        return report;
-    } finally {
-        await releaseIndexLock(paths);
-    }
+                return report;
+            } finally {
+                await releaseIndexLock(paths);
+            }
+        },
+        1800000, // 30 minutes
+        'RAG_INDEX_TIMEOUT'
+    );
 }
 
+/**
+ * ✅ P1-1: Wrapped with timeout (60s) to prevent hanging on slow queries
+ */
 export async function ragQuery(options = {}) {
-    const paths = getRagPaths(options.paths);
-    await ensureDirs(paths);
-    const manifest = (await loadManifest(paths)) || createEmptyManifest();
-    const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
-        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
-        model: options.model || manifest.embedding.model
-    });
+    return await withTimeout(
+        async () => {
+            const paths = getRagPaths(options.paths);
+            await ensureDirs(paths);
+            const manifest = (await loadManifest(paths)) || createEmptyManifest();
+            const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
+                baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+                model: options.model || manifest.embedding.model
+            });
 
-    // Normalize query for better cache hits (same query variations → same cache key)
-    const normalizedQuery = normalizeQuery(options.query);
+            // Normalize query for better cache hits (same query variations → same cache key)
+            const normalizedQuery = normalizeQuery(options.query);
 
-    // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
-    let vector;
-    if (!options.embeddingsProvider) {
-        vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
-        if (vector) {
-            console.log('[RAG] Query embedding: cache hit');
-        }
-    }
-
-    if (!vector) {
-        if (!options.embeddingsProvider) {
-            console.log('[RAG] Query embedding: cache miss, generating...');
-        }
-        // Use original query for embedding (not normalized, to preserve semantic nuances)
-        vector = await embeddings.embed(options.query);
-        if (!options.embeddingsProvider) {
-            // But store with normalized key for better cache reuse
-            queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
-        }
-    }
-
-    if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
-        throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
-    }
-
-    const db = await openDb(paths.dbDir);
-    let dbClosed = false;
-
-    try {
-        const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-
-        const results = await search(table, vector, {
-            topK: options.topK ?? 8,
-            filters: options.filters || {}
-        });
-
-        return {
-            query: options.query,
-            embedding_model: embeddings.model,
-            topK: options.topK ?? 8,
-            filters: options.filters || {},
-            results
-        };
-    } finally {
-        // Always close database connection, even on error (prevents resource leak)
-        if (!dbClosed) {
-            try {
-                await db.close();
-                dbClosed = true;
-            } catch (_) {
-                // ignore close errors
+            // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
+            let vector;
+            if (!options.embeddingsProvider) {
+                vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
+                if (vector) {
+                    console.log('[RAG] Query embedding: cache hit');
+                }
             }
-        }
-    }
+
+            if (!vector) {
+                if (!options.embeddingsProvider) {
+                    console.log('[RAG] Query embedding: cache miss, generating...');
+                }
+                // Use original query for embedding (not normalized, to preserve semantic nuances)
+                vector = await embeddings.embed(options.query);
+                if (!options.embeddingsProvider) {
+                    // But store with normalized key for better cache reuse
+                    queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
+                }
+            }
+
+            if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
+                throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+            }
+
+            const db = await openDb(paths.dbDir);
+            let dbClosed = false;
+
+            try {
+                const table = await ensureTable(db, manifest.embedding.dim || vector.length);
+
+                const results = await search(table, vector, {
+                    topK: options.topK ?? 8,
+                    filters: options.filters || {}
+                });
+
+                return {
+                    query: options.query,
+                    embedding_model: embeddings.model,
+                    topK: options.topK ?? 8,
+                    filters: options.filters || {},
+                    results
+                };
+            } finally {
+                // Always close database connection, even on error (prevents resource leak)
+                if (!dbClosed) {
+                    try {
+                        await db.close();
+                        dbClosed = true;
+                    } catch (_) {
+                        // ignore close errors
+                    }
+                }
+            }
+        },
+        60000, // 60 seconds
+        'RAG_QUERY_TIMEOUT'
+    );
 }
 
 /**
  * Hybrid search (vector + FTS + reranking + MMR) with formatted output
  * Combines semantic vector search with lexical full-text search,
  * multi-signal reranking, and MMR diversity algorithm
+ *
+ * ✅ P1-1: Wrapped with timeout (90s) to prevent hanging on slow hybrid searches
+ *
  * @param {object} options - Search options
  * @param {string} options.query - Query text
  * @param {number} [options.topK] - Number of results (default: 8)
@@ -401,96 +432,102 @@ export async function ragQuery(options = {}) {
  * @returns {Promise<object>} - Search results + metadata
  */
 export async function ragHybridSearch(options = {}) {
-    const paths = getRagPaths(options.paths);
-    await ensureDirs(paths);
-    const manifest = (await loadManifest(paths)) || createEmptyManifest();
+    return await withTimeout(
+        async () => {
+            const paths = getRagPaths(options.paths);
+            await ensureDirs(paths);
+            const manifest = (await loadManifest(paths)) || createEmptyManifest();
 
-    const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
-        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
-        model: options.model || manifest.embedding.model
-    });
+            const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
+                baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+                model: options.model || manifest.embedding.model
+            });
 
-    const {
-        query,
-        topK = 8,
-        pathPrefix,
-        ext,
-        tags,
-        distanceRange,
-        rerank = true,         // Enable reranking by default
-        rerankWeights,         // Custom weights (optional)
-        mmr = true,            // Enable MMR by default
-        mmrLambda = 0.7        // MMR lambda (0.7 = 70% relevance, 30% diversity)
-    } = options;
+            const {
+                query,
+                topK = 8,
+                pathPrefix,
+                ext,
+                tags,
+                distanceRange,
+                rerank = true,         // Enable reranking by default
+                rerankWeights,         // Custom weights (optional)
+                mmr = true,            // Enable MMR by default
+                mmrLambda = 0.7        // MMR lambda (0.7 = 70% relevance, 30% diversity)
+            } = options;
 
-    // Normalize query for better cache hits (same query variations → same cache key)
-    const normalizedQuery = normalizeQuery(query);
+            // Normalize query for better cache hits (same query variations → same cache key)
+            const normalizedQuery = normalizeQuery(query);
 
-    // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
-    let vector;
-    if (!options.embeddingsProvider) {
-        vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
-        if (vector) {
-            console.log('[RAG] Query embedding: cache hit ✅');
-        }
-    }
-
-    if (!vector) {
-        if (!options.embeddingsProvider) {
-            console.log('[RAG] Query embedding: cache miss, generating...');
-        }
-        // Use original query for embedding (not normalized, to preserve semantic nuances)
-        vector = await embeddings.embed(query);
-        if (!options.embeddingsProvider) {
-            // But store with normalized key for better cache reuse
-            queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
-        }
-    }
-
-    if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
-        throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
-    }
-
-    const db = await openDb(paths.dbDir);
-    let dbClosed = false;
-
-    try {
-        const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-
-        console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
-
-        const results = await hybridSearch(table, vector, query, {
-            topK,
-            filters: { pathPrefix, ext, tags },
-            distanceRange,
-            rerank,
-            rerankWeights,
-            mmr,
-            mmrLambda
-        });
-
-        return {
-            results,
-            topK,
-            dim: manifest.embedding.dim,
-            model: manifest.embedding.model || embeddings.model,
-            query,
-            hybridMode: true,
-            rerank,
-            mmr,
-            mmrLambda
-        };
-    } finally {
-        // Always close database connection, even on error (prevents resource leak)
-        if (!dbClosed) {
-            try {
-                await db.close();
-                dbClosed = true;
-            } catch (_) {
-                // ignore close errors
+            // Try cache first (only for real queries, skip if embeddingsProvider injected = test)
+            let vector;
+            if (!options.embeddingsProvider) {
+                vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
+                if (vector) {
+                    console.log('[RAG] Query embedding: cache hit ✅');
+                }
             }
-        }
-    }
+
+            if (!vector) {
+                if (!options.embeddingsProvider) {
+                    console.log('[RAG] Query embedding: cache miss, generating...');
+                }
+                // Use original query for embedding (not normalized, to preserve semantic nuances)
+                vector = await embeddings.embed(query);
+                if (!options.embeddingsProvider) {
+                    // But store with normalized key for better cache reuse
+                    queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
+                }
+            }
+
+            if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
+                throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+            }
+
+            const db = await openDb(paths.dbDir);
+            let dbClosed = false;
+
+            try {
+                const table = await ensureTable(db, manifest.embedding.dim || vector.length);
+
+                console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
+
+                const results = await hybridSearch(table, vector, query, {
+                    topK,
+                    filters: { pathPrefix, ext, tags },
+                    distanceRange,
+                    rerank,
+                    rerankWeights,
+                    mmr,
+                    mmrLambda
+                });
+
+                return {
+                    results,
+                    topK,
+                    dim: manifest.embedding.dim,
+                    model: manifest.embedding.model || embeddings.model,
+                    query,
+                    hybridMode: true,
+                    rerank,
+                    mmr,
+                    mmrLambda
+                };
+            } finally {
+                // Always close database connection, even on error (prevents resource leak)
+                if (!dbClosed) {
+                    try {
+                        await db.close();
+                        dbClosed = true;
+                    } catch (_) {
+                        // ignore close errors
+                    }
+                }
+            }
+        },
+        90000, // 90 seconds (hybrid search is more expensive)
+        'RAG_HYBRID_SEARCH_TIMEOUT'
+    );
 }
 
 export async function ragAsk(options = {}) {
