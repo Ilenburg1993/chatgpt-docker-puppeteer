@@ -1,15 +1,112 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import crypto from 'node:crypto';
 import { log } from '#core/logger';
-import { getDb } from '#infra/db/sqlite';
-import { recordEvent } from '#infra/db/events_repo';
-import { getAttemptById } from '#infra/db/task_attempt_repo';
 import { insertArtifact } from '#infra/db/artifact_repo';
-import { insertTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
-import { readText, putText } from '#infra/storage/artifact_store';
+import { recordEvent } from '#infra/db/events_repo';
+import { getDb } from '#infra/db/sqlite';
+import { getAttemptById } from '#infra/db/task_attempt_repo';
+import { extendTaskLock, insertTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import { resilientLock } from '#infra/locks/resilient_lock';
+import { putText, readText } from '#infra/storage/artifact_store';
 import { ValidationService } from '#orchestrator/validation/validation_service';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 
+/**
+ * @file Task orchestration worker
+ * @description Orchestrates post-run task processing for ITERATIVE and MULTI_STEP strategies.
+ * Claims DB locks, records events, persists feedback artifacts and creates child tasks when needed.
+ * @module src/agent/task_orchestration_worker.js
+ */
+
+/**
+ * Options for `TaskOrchestrationWorker` constructor.
+ * @typedef {Object} WorkerOptions
+ * @property {any} [browserPool] - Browser pool instance used for circuit-breaker checks.
+ * @property {string} [workerId] - Optional worker identifier.
+ * @property {number} [intervalMs] - Tick interval in milliseconds.
+ * @property {number} [batchSize] - Maximum number of tasks to fetch per tick.
+ * @property {number} [pausedRescheduleDelayMs] - Delay applied when dispatch is paused.
+ * @property {OutputMissingEscalation} [outputMissingEscalation] - Escalation policy for missing attempt outputs.
+ */
+
+/**
+ * @typedef {Object} OutputMissingEscalation
+ * @property {number} windowMs - Time window in milliseconds to count missing-output events.
+ * @property {number} threshold - Number of occurrences in window before blocking the task.
+ */
+
+/**
+ * Row returned by the worker's DB query in `tick()`.
+ * @typedef {Object} TaskRow
+ * @property {any} id
+ * @property {any} mission_id
+ * @property {string|null} task_json
+ * @property {string|null} result_json
+ * @property {any} latest_attempt_id
+ * @property {number} updated_at_ms
+ */
+
+/**
+ * Minimal in-memory Task shape (parsed from task_json). Fields are optional and dynamic.
+ * @typedef {Object} Task
+ * @property {Object<string, any>} [spec]
+ * @property {Object<string, any>} [meta]
+ * @property {Object<string, any>} [state]
+ * @property {Object<string, any>} [policy]
+ * @property {Object<string, any>} [mission]
+ */
+
+/**
+ * Partial Attempt record shape.
+ * @typedef {Object} Attempt
+ * @property {any} id
+ * @property {any} response_v2_json_artifact_id
+ * @property {any} response_text_artifact_id
+ */
+
+/**
+ * Result returned by ValidationService.validate().
+ * @typedef {Object} ValidationResult
+ * @property {boolean} passed
+ * @property {number} overall_score
+ * @property {Array<string|Object>} issues
+ */
+
+/**
+ * Workflow orchestration state stored inside `task.state.workflow_state`.
+ * @typedef {Object} WorkflowState
+ * @property {number} current_step_index
+ * @property {string[]} completed_steps
+ * @property {string[]} failed_steps
+ * @property {Object<string, any>} accumulated_context
+ */
+
+/**
+ * Return shape from `putText()` used to create artifacts.
+ * @typedef {Object} PutTextResult
+ * @property {string} mime
+ * @property {number} sizeBytes
+ * @property {string} sha256
+ * @property {string} storageUri
+ */
+
+/**
+ * Shape of event records passed to `recordEvent()`.
+ * @typedef {Object} EventRecord
+ * @property {string} entityType
+ * @property {string|number} entityId
+ * @property {number} tsMs
+ * @property {string} actorType
+ * @property {string} eventType
+ * @property {Object<string, any>} payload
+ * @property {string} dedupKey
+ */
+
+/**
+ * Minimal DB interface expected from `getDb()` (better-sqlite3-like).
+ * @typedef {Object} DBInterface
+ * @property {function(string): {get: function(...any): any, all: function(...any): any[], run: function(...any): {changes?: number}}} prepare
+ */
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -43,58 +140,87 @@ function _hashId(input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
-async function _readAttemptOutputText({ taskId, attemptId, resultJson } = {}) {
+/**
+ * Read the most relevant textual output for an attempt.
+ * ✅ P0-14: Retry logic para lidar com race entre putText() e read.
+ * Sources checked: response_v2_json artifact, response_text artifact, legacy result_json storage file.
+ * @private
+ * @param {{taskId?: string|number, attemptId?: string|number, resultJson?: string|Object, maxRetries?: number, retryDelayMs?: number}} [opts]
+ * @returns {Promise<string>} Returns empty string when no output is available.
+ */
+async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetries = 3, retryDelayMs = 50 } = {}) {
     if (!taskId || !attemptId) return '';
 
-    const attempt = getAttemptById(attemptId);
+    // ✅ P0-14: Retry loop para lidar com artifact ainda sendo escrito
+    for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
+        const attempt = getAttemptById(attemptId);
 
-    // 1) response_v2_json artifact
-    const v2Id = attempt?.response_v2_json_artifact_id || null;
-    if (v2Id) {
-        try {
-            const raw = await readText(v2Id);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                const text =
-                    parsed?.content?.text ||
-                    parsed?.output ||
-                    parsed?.result?.output ||
-                    parsed?.result?.raw_output_preview ||
-                    '';
-                if (typeof text === 'string' && text.trim()) {
-                    return text;
+        // 1) response_v2_json artifact
+        const v2Id = attempt?.response_v2_json_artifact_id || null;
+        if (v2Id) {
+            try {
+                const raw = await readText(v2Id);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    const text =
+                        parsed?.content?.text ||
+                        parsed?.output ||
+                        parsed?.result?.output ||
+                        parsed?.result?.raw_output_preview ||
+                        '';
+                    if (typeof text === 'string' && text.trim()) {
+                        if (retryCount > 0) {
+                            log('DEBUG', `[_readAttemptOutputText] Found output after ${retryCount} retries`, String(taskId));
+                        }
+                        return text;
+                    }
                 }
+            } catch (_) {
+                /* ignore */
             }
-        } catch (_) {
-            /* ignore */
         }
-    }
 
-    // 2) response_text artifact
-    const textId = attempt?.response_text_artifact_id || null;
-    if (textId) {
-        try {
-            const raw = await readText(textId);
-            if (typeof raw === 'string' && raw.trim()) return raw;
-        } catch (_) {
-            /* ignore */
+        // 2) response_text artifact
+        const textId = attempt?.response_text_artifact_id || null;
+        if (textId) {
+            try {
+                const raw = await readText(textId);
+                if (typeof raw === 'string' && raw.trim()) {
+                    if (retryCount > 0) {
+                        log('DEBUG', `[_readAttemptOutputText] Found output after ${retryCount} retries`, String(taskId));
+                    }
+                    return raw;
+                }
+            } catch (_) {
+                /* ignore */
+            }
         }
-    }
 
-    // 3) Legacy fallback: tasks.result_json.storage.text_file
-    let parsed = null;
-    try {
-        parsed = resultJson ? JSON.parse(String(resultJson)) : null;
-    } catch (_) {
-        parsed = null;
-    }
-    const p = parsed?.storage?.text_file || parsed?.storage?.textFile || null;
-    if (p) {
+        // 3) Legacy fallback: tasks.result_json.storage.text_file
+        let parsed = null;
         try {
-            const raw = await fs.readFile(String(p), 'utf8');
-            if (typeof raw === 'string' && raw.trim()) return raw;
+            parsed = resultJson ? JSON.parse(String(resultJson)) : null;
         } catch (_) {
-            /* ignore */
+            // Parse failed, keep null
+        }
+        const p = parsed?.storage?.text_file || parsed?.storage?.textFile || null;
+        if (p) {
+            try {
+                const raw = await fs.readFile(String(p), 'utf8');
+                if (typeof raw === 'string' && raw.trim()) {
+                    if (retryCount > 0) {
+                        log('DEBUG', `[_readAttemptOutputText] Found output after ${retryCount} retries`, String(taskId));
+                    }
+                    return raw;
+                }
+            } catch (_) {
+                /* ignore */
+            }
+        }
+
+        // ✅ P0-14: Se não encontrou e ainda tem retries, aguardar antes de tentar novamente
+        if (retryCount < maxRetries - 1) {
+            await _sleep(retryDelayMs);
         }
     }
 
@@ -105,6 +231,12 @@ function _ensureArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
+/**
+ * Add or replace an input object into an inputs array by matching `type` or `label`.
+ * @private
+ * @param {{inputs?: Array<Object>, next?: Object}} [opts]
+ * @returns {Array<Object>}
+ */
 function _setOrReplaceInput({ inputs, next } = {}) {
     const list = _ensureArray(inputs).filter(Boolean);
     if (!next || typeof next !== 'object') return list;
@@ -137,11 +269,31 @@ function _workflowStateFromTask(task) {
         current_step_index: Number(ws.current_step_index || 0) || 0,
         completed_steps: _ensureArray(ws.completed_steps).map(String),
         failed_steps: _ensureArray(ws.failed_steps).map(String),
-        accumulated_context: ws.accumulated_context && typeof ws.accumulated_context === 'object' ? ws.accumulated_context : {},
+        accumulated_context:
+            ws.accumulated_context && typeof ws.accumulated_context === 'object' ? ws.accumulated_context : {},
     };
 }
 
+/**
+ * TaskOrchestrationWorker
+ *
+ * Scans the database for finished tasks with orchestration strategies and
+ * applies orchestration logic (ITERATIVE or MULTI_STEP). This worker claims
+ * task locks, records events, persists feedback artifacts and creates child
+ * tasks when required.
+ *
+ * Side effects: updates `tasks` rows, records events via `recordEvent()`,
+ * writes artifact storage via `putText()` and `insertArtifact()`, and creates
+ * child tasks via `insertTask()`.
+ *
+ * @class
+ * @param {WorkerOptions} [options] - Configuration options for the worker.
+ */
 class TaskOrchestrationWorker {
+    /**
+     * Create a new TaskOrchestrationWorker.
+     * @param {WorkerOptions} [options]
+     */
     constructor({
         browserPool = null,
         workerId = null,
@@ -162,9 +314,15 @@ class TaskOrchestrationWorker {
         this._stopped = false;
 
         // Deterministic validation (no NERV side effects).
+        // ✅ P0-2.5: Lock management delegado ao ResilientLockManager (sem tracking manual)
         this.validationService = new ValidationService({ nerv: null });
     }
 
+    /**
+     * Start the worker main loop. Non-blocking.
+     * @public
+     * @returns {void}
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -173,6 +331,12 @@ class TaskOrchestrationWorker {
         log('INFO', `[TaskOrchestrationWorker] started (interval=${this.intervalMs}ms, batch=${this.batchSize})`);
     }
 
+    /**
+     * Stop the worker.
+     * ✅ P0-2.5: Lock cleanup automático via ResilientLockManager (sem manual cleanup).
+     * @public
+     * @returns {void}
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -182,40 +346,112 @@ class TaskOrchestrationWorker {
         log('INFO', '[TaskOrchestrationWorker] stopped');
     }
 
+    /**
+     * Verifica se o dispatch deve ser pausado baseado no circuit breaker do browser pool.
+     * @private
+     * @returns {boolean} True se o sistema deve pausar dispatch.
+     */
     _shouldPauseDispatch() {
         return Boolean(this.browserPool?.circuitBreaker?.shouldPauseSystem?.());
     }
 
+    /**
+     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
+     * Prevents worker crashes when concurrent updates cause optimistic lock conflicts.
+     *
+     * @private
+     * @param {string} taskId - Task ID to update
+     * @param {object} updates - Update payload
+     * @param {object} [options] - Options
+     * @param {boolean} [options.critical=false] - If true, re-throws OptimisticLockError (caller MUST handle)
+     * @param {string} [options.context=''] - Context string for logging
+     * @returns {boolean} True if update succeeded, false if conflict occurred (non-critical only)
+     * @throws {Error} Re-throws OptimisticLockError if options.critical=true
+     */
+    _safeUpdateTask(taskId, updates, { critical = false, context = '' } = {}) {
+        try {
+            updateTask(taskId, updates);
+            return true;
+        } catch (err) {
+            if (err && err.name === 'OptimisticLockError') {
+                const msg = context
+                    ? `[TaskOrchestrationWorker] ${context}: Task ${taskId} update conflict after retries`
+                    : `[TaskOrchestrationWorker] Task ${taskId} update conflict after retries`;
+
+                log('WARN', msg, String(taskId));
+
+                if (critical) {
+                    throw err; // Re-throw for critical operations
+                }
+
+                return false; // Non-critical: log and continue
+            }
+
+            // Re-throw all other errors (unexpected)
+            throw err;
+        }
+    }
+
+    /**
+     * Check events table to see whether orchestration was already applied for a given task+attempt.
+     * @private
+     * @param {{taskId?: any, attemptId?: any}} [opts]
+     * @returns {boolean}
+     */
     _hasAppliedOrchestration({ taskId, attemptId } = {}) {
         const db = getDb();
         const dedupKey = `task:${taskId}:orchestrated:${attemptId}`;
-        return Boolean(
-            db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey)?.ok
+        return Boolean(db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey)?.ok);
+    }
+
+    /**
+     * Try to claim orchestration lock on a task row using ResilientLockManager.
+     * ✅ P0-2.5: Usa ResilientLockManager para garantir cleanup automático em crash.
+     * @private
+     * @param {{taskId?: any, nowMs?: number, lockTtlMs?: number}} [opts]
+     * @returns {Promise<boolean>} True when lock was acquired.
+     */
+    async _claimOrchestrationLock({ taskId, nowMs, lockTtlMs = 300000 } = {}) {
+        const db = getDb();
+        const now = Number(nowMs) || _now();
+        const expires = now + Math.max(5000, Number(lockTtlMs) || 300000);
+
+        return await resilientLock.acquire(
+            `task:orch:${taskId}`,
+            async () => {
+                // Acquire: Update DB lock
+                const res = db
+                    .prepare(
+                        `
+                        UPDATE tasks
+                        SET locked_by = @workerId,
+                            locked_at_ms = @now,
+                            lock_expires_at_ms = @expires,
+                            updated_at_ms = @now
+                        WHERE id = @id
+                          AND (locked_by IS NULL OR lock_expires_at_ms IS NULL OR lock_expires_at_ms <= @now)
+                    `
+                    )
+                    .run({ id: taskId, workerId: this.workerId, now, expires });
+
+                return Boolean(res.changes);
+            },
+            async () => {
+                // Release: Clear DB lock
+                releaseTaskLock({ taskId, workerId: this.workerId });
+            },
+            { taskId, workerId: this.workerId, acquiredAt: now }
         );
     }
 
-    _claimOrchestrationLock({ taskId, nowMs, lockTtlMs = 120000 } = {}) {
-        const db = getDb();
-        const now = Number(nowMs) || _now();
-        const expires = now + Math.max(5000, Number(lockTtlMs) || 120000);
-
-        const res = db
-            .prepare(
-                `
-                UPDATE tasks
-                SET locked_by = @workerId,
-                    locked_at_ms = @now,
-                    lock_expires_at_ms = @expires,
-                    updated_at_ms = @now
-                WHERE id = @id
-                  AND (locked_by IS NULL OR lock_expires_at_ms IS NULL OR lock_expires_at_ms <= @now)
-            `
-            )
-            .run({ id: taskId, workerId: this.workerId, now, expires });
-
-        return Boolean(res.changes);
-    }
-
+    /**
+     * Processa um lote de tarefas concluídas que requerem orquestração pós-execução.
+     * Busca tarefas ARCHIVED/DONE com estratégias ITERATIVE ou MULTI_STEP, reivindica locks
+     * e aplica lógica de orquestração (feedback, child tasks, etc.).
+     * @returns {Promise<void>}
+     * @throws {Error} Erros são logados mas não relançados para não interromper o loop.
+     * @sideEffects Modifica estado do banco de dados, cria artifacts, child tasks e eventos.
+     */
     async tick() {
         if (this._stopped) return;
         if (this._running) return;
@@ -252,25 +488,43 @@ class TaskOrchestrationWorker {
                 }
 
                 const now = _now();
-                if (!this._claimOrchestrationLock({ taskId, nowMs: now })) {
+                // ✅ P0-2.5: Usa ResilientLockManager (await porque é async agora)
+                const lockAcquired = await this._claimOrchestrationLock({ taskId, nowMs: now });
+                if (!lockAcquired) {
                     continue;
                 }
 
                 try {
-                    const result = await this._processTaskRow(row);
-                    if (result?.finalized) {
-                        recordEvent({
-                            entityType: 'task',
-                            entityId: taskId,
-                            tsMs: _now(),
-                            actorType: 'system',
-                            eventType: 'TASK_ORCHESTRATION_APPLIED',
-                            payload: { taskId, attemptId },
-                            dedupKey: `task:${taskId}:orchestrated:${attemptId}`,
+                    // ✅ P0-2.5: Setup lock extension usando ResilientLock.extend()
+                    const ORCHESTRATION_LOCK_TTL_MS = 300000; // 5 minutes
+                    const lockExtensionInterval = setInterval(async () => {
+                        await resilientLock.extend(`task:orch:${taskId}`, () => {
+                            extendTaskLock({ taskId, workerId: this.workerId, lockTtlMs: ORCHESTRATION_LOCK_TTL_MS });
+                            return true;
                         });
+                    }, 30000); // Extend every 30s
+
+                    try {
+                        const result = await this._processTaskRow(row);
+                        if (result?.finalized) {
+                            recordEvent({
+                                entityType: 'task',
+                                entityId: taskId,
+                                tsMs: _now(),
+                                actorType: 'system',
+                                eventType: 'TASK_ORCHESTRATION_APPLIED',
+                                payload: { taskId, attemptId },
+                                dedupKey: `task:${taskId}:orchestrated:${attemptId}`,
+                            });
+                        }
+                    } finally {
+                        clearInterval(lockExtensionInterval);
                     }
                 } catch (err) {
-                    log('WARN', `[TaskOrchestrationWorker] task ${taskId} orchestration failed: ${err?.message || String(err)}`);
+                    log(
+                        'WARN',
+                        `[TaskOrchestrationWorker] task ${taskId} orchestration failed: ${err?.message || String(err)}`
+                    );
                     recordEvent({
                         entityType: 'task',
                         entityId: taskId,
@@ -281,7 +535,8 @@ class TaskOrchestrationWorker {
                         dedupKey: `task:${taskId}:orchestration_error:${attemptId}`,
                     });
                 } finally {
-                    releaseTaskLock({ taskId, workerId: this.workerId });
+                    // ✅ P0-2.5: Release via ResilientLockManager (cleanup automático)
+                    await resilientLock.release(`task:orch:${taskId}`);
                 }
 
                 await _sleep(0);
@@ -299,19 +554,20 @@ class TaskOrchestrationWorker {
         try {
             task = row.task_json ? JSON.parse(String(row.task_json)) : null;
         } catch (_) {
-            task = null;
+            // Parse failed, keep null
         }
         if (!task || typeof task !== 'object') return { finalized: true };
 
         const strategy = task?.spec?.execution?.strategy || null;
         if (strategy !== 'ITERATIVE' && strategy !== 'MULTI_STEP') {
             // Safety: block unknown strategy.
-            updateTask(taskId, {
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(taskId, {
                 status: 'BLOCKED',
                 blocked_reason: 'ORCH_STRATEGY_UNKNOWN',
                 blocked_at_ms: _now(),
                 blocked_details_json: _safeJsonString({ attemptId, strategy }),
-            });
+            }, { context: 'Block unknown strategy' });
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -344,6 +600,12 @@ class TaskOrchestrationWorker {
         return { finalized: true };
     }
 
+    /**
+     * Handle missing output for an attempt. If threshold exceeded inside window, blocks the task.
+     * @private
+     * @param {{taskId?: any, attemptId?: any}} [opts]
+     * @returns {Promise<boolean>} True if task was blocked due to missing output.
+     */
     async _handleMissingOutput({ taskId, attemptId } = {}) {
         const db = getDb();
         const now = _now();
@@ -361,9 +623,10 @@ class TaskOrchestrationWorker {
         const windowMs = Math.max(60000, Number(this.outputMissingEscalation?.windowMs || 600000) || 600000);
         const threshold = Math.max(1, Number(this.outputMissingEscalation?.threshold || 3) || 3);
 
-        const recent = db
-            .prepare(
-                `
+        const recent =
+            db
+                .prepare(
+                    `
                 SELECT COUNT(1) AS c
                 FROM events
                 WHERE entity_type = 'task'
@@ -371,20 +634,21 @@ class TaskOrchestrationWorker {
                   AND event_type = 'TASK_ORCHESTRATION_OUTPUT_MISSING'
                   AND ts_ms >= ?
             `
-            )
-            .get(taskId, now - windowMs)?.c || 0;
+                )
+                .get(taskId, now - windowMs)?.c || 0;
 
         if (Number(recent || 0) < threshold) {
             // First occurrences: keep it as-is; next tick may succeed once artifacts are persisted.
             return false;
         }
 
-        updateTask(taskId, {
+        // ✅ P1-17: Safe update with OptimisticLockError handling
+        this._safeUpdateTask(taskId, {
             status: 'BLOCKED',
             blocked_reason: 'ORCH_OUTPUT_MISSING',
             blocked_at_ms: now,
             blocked_details_json: _safeJsonString({ attemptId, recent, windowMs }),
-        });
+        }, { context: 'Block output missing' });
 
         recordEvent({
             entityType: 'task',
@@ -399,18 +663,28 @@ class TaskOrchestrationWorker {
         return true;
     }
 
+    /**
+     * Handle ITERATIVE orchestration: validate output, persist iteration_state, schedule retry or block.
+     * @private
+     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
+     * @returns {Promise<void>}
+     */
     async _handleIterative({ taskId, attemptId, task, outputText } = {}) {
         const now = _now();
         const cfg = task?.spec?.execution?.iterative_config || {};
         const maxIterations = Math.max(1, Number(cfg?.max_iterations ?? 3) || 3);
 
         const existingState = task.state && typeof task.state === 'object' ? task.state : {};
-        const iter = existingState.iteration_state && typeof existingState.iteration_state === 'object' ? existingState.iteration_state : {};
+        const iter =
+            existingState.iteration_state && typeof existingState.iteration_state === 'object'
+                ? existingState.iteration_state
+                : {};
         const currentIteration = Math.max(0, Number(iter.current_iteration || 0) || 0);
         const nextIteration = currentIteration + 1;
 
         const validators = _ensureArray(task?.spec?.validation?.validators);
-        const criteriaRaw = cfg?.validation_criteria || task?.spec?.execution?.iterative_config?.validation_criteria || {};
+        const criteriaRaw =
+            cfg?.validation_criteria || task?.spec?.execution?.iterative_config?.validation_criteria || {};
         const criteria = criteriaRaw && typeof criteriaRaw === 'object' ? criteriaRaw : {};
 
         const validationResult = await this.validationService.validate(String(outputText), {
@@ -442,7 +716,8 @@ class TaskOrchestrationWorker {
         };
 
         // Always persist state updates (even when no retry is needed).
-        updateTask(taskId, { task });
+        // ✅ P1-17: Safe update with OptimisticLockError handling
+        this._safeUpdateTask(taskId, { task }, { context: 'Persist quality metrics' });
 
         if (validationResult.passed) {
             recordEvent({
@@ -466,7 +741,8 @@ class TaskOrchestrationWorker {
                 outputPreview: _truncate(outputText, 2000),
             });
 
-            updateTask(taskId, {
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(taskId, {
                 status: 'BLOCKED',
                 blocked_reason: 'VALIDATION_MANUAL_REVIEW',
                 blocked_at_ms: now,
@@ -477,7 +753,7 @@ class TaskOrchestrationWorker {
                     issues: _ensureArray(validationResult.issues).slice(0, 50),
                     feedback_artifact_id: feedbackArtifactId,
                 }),
-            });
+            }, { context: 'Block for manual review' });
 
             recordEvent({
                 entityType: 'task',
@@ -487,6 +763,34 @@ class TaskOrchestrationWorker {
                 eventType: 'TASK_BLOCKED_BY_VALIDATION',
                 payload: { attemptId, iteration: nextIteration, feedback_artifact_id: feedbackArtifactId },
                 dedupKey: `task:${taskId}:blocked_by_validation:${attemptId}`,
+            });
+            return;
+        }
+
+        // P2-11: Fail-fast for hopeless validation scores.
+        // If score is extremely low, further iterations are unlikely to succeed.
+        const MIN_SCORE_THRESHOLD = 0.3;
+        if (validationResult.overall_score < MIN_SCORE_THRESHOLD && nextIteration > 1) {
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(taskId, {
+                status: 'FAILED',
+                stage: TASK_STAGES.ARCHIVED,
+                failed_at_ms: now,
+                last_error: `VALIDATION_HOPELESS: score ${validationResult.overall_score.toFixed(2)} < ${MIN_SCORE_THRESHOLD} after ${nextIteration} iterations`,
+            }, { context: 'Mark as failed (hopeless)' });
+            recordEvent({
+                entityType: 'task',
+                entityId: taskId,
+                tsMs: now,
+                actorType: 'system',
+                eventType: 'TASK_ORCHESTRATION_HOPELESS',
+                payload: {
+                    attemptId,
+                    iteration: nextIteration,
+                    overall_score: validationResult.overall_score,
+                    threshold: MIN_SCORE_THRESHOLD,
+                },
+                dedupKey: `task:${taskId}:orch_hopeless:${attemptId}`,
             });
             return;
         }
@@ -514,7 +818,8 @@ class TaskOrchestrationWorker {
         // Add/replace orchestration_feedback input for the next run.
         task.spec = task.spec || {};
         task.spec.payload = task.spec.payload || {};
-        task.spec.payload.context = task.spec.payload.context && typeof task.spec.payload.context === 'object' ? task.spec.payload.context : {};
+        task.spec.payload.context =
+            task.spec.payload.context && typeof task.spec.payload.context === 'object' ? task.spec.payload.context : {};
 
         const prevInputs = _ensureArray(task.spec.payload.context.inputs);
         task.spec.payload.context.inputs = _setOrReplaceInput({
@@ -531,12 +836,17 @@ class TaskOrchestrationWorker {
         const executeAfterMs = now + delayMs;
 
         // Rearm the SAME taskId for SSOT dispatch (new attempt will be created).
-        updateTask(taskId, {
+        // ✅ P1-17: Safe update with OptimisticLockError handling (CRITICAL operation)
+        this._safeUpdateTask(taskId, {
             task,
             stage: TASK_STAGES.READY,
             status: 'PENDING',
             execute_after_ms: executeAfterMs,
-            last_error: `ORCHESTRATION_RETRY_SCHEDULED(iter=${nextIteration}, score=${Number(validationResult.overall_score || 0).toFixed(1)})`.slice(0, 2000),
+            last_error:
+                `ORCHESTRATION_RETRY_SCHEDULED(iter=${nextIteration}, score=${Number(validationResult.overall_score || 0).toFixed(1)})`.slice(
+                    0,
+                    2000
+                ),
             started_at_ms: null,
             completed_at_ms: null,
             failed_at_ms: null,
@@ -550,7 +860,10 @@ class TaskOrchestrationWorker {
             latest_rendered_prompt_artifact_id: null,
             latest_response_v2_json_artifact_id: null,
             result_json: null,
-        });
+        }, { critical: true, context: 'Rearm task for retry' }); // CRITICAL: must succeed for retry
+
+        // ✅ P0-14: Small delay para garantir artifact flush completo antes de próxima leitura
+        await _sleep(100);
 
         recordEvent({
             entityType: 'task',
@@ -568,6 +881,12 @@ class TaskOrchestrationWorker {
         });
     }
 
+    /**
+     * Persist a human-readable feedback artifact and register it in the artifacts repo.
+     * @private
+     * @param {{taskId?: any, attemptId?: any, validationResult?: any, outputPreview?: any}} [opts]
+     * @returns {Promise<any>} Artifact id returned by insertArtifact().
+     */
     async _persistFeedbackArtifact({ taskId, attemptId, validationResult, outputPreview } = {}) {
         const now = _now();
         const issues = _ensureArray(validationResult?.issues).slice(0, 50);
@@ -610,17 +929,24 @@ class TaskOrchestrationWorker {
         return artId;
     }
 
+    /**
+     * Handle MULTI_STEP orchestration: update workflow_state, persist completed step and create child task for next step.
+     * @private
+     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
+     * @returns {Promise<void>}
+     */
     async _handleMultiStep({ taskId, attemptId, task, outputText } = {}) {
         const now = _now();
         const wf = task?.spec?.execution?.workflow_config || null;
         const steps = _ensureArray(wf?.steps);
         if (!steps.length) {
-            updateTask(taskId, {
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(taskId, {
                 status: 'BLOCKED',
                 blocked_reason: 'WORKFLOW_CONFIG_MISSING',
                 blocked_at_ms: now,
                 blocked_details_json: _safeJsonString({ attemptId }),
-            });
+            }, { context: 'Block workflow config missing' });
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -641,12 +967,13 @@ class TaskOrchestrationWorker {
         // Only execute_prompt is supported for now.
         const action = currentStep?.action ? String(currentStep.action) : 'execute_prompt';
         if (action !== 'execute_prompt') {
-            updateTask(taskId, {
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(taskId, {
                 status: 'BLOCKED',
                 blocked_reason: 'WORKFLOW_ACTION_UNSUPPORTED',
                 blocked_at_ms: now,
                 blocked_details_json: _safeJsonString({ attemptId, step_id: currentStepId, action }),
-            });
+            }, { context: 'Block workflow action unsupported' });
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -661,7 +988,8 @@ class TaskOrchestrationWorker {
 
         // Accumulate context as refs (no blobs).
         const attempt = getAttemptById(attemptId);
-        const acc = state.accumulated_context && typeof state.accumulated_context === 'object' ? state.accumulated_context : {};
+        const acc =
+            state.accumulated_context && typeof state.accumulated_context === 'object' ? state.accumulated_context : {};
         acc[currentStepId] = {
             step_id: currentStepId,
             task_id: taskId,
@@ -683,7 +1011,8 @@ class TaskOrchestrationWorker {
         };
 
         // Persist state on the completed task (audit-friendly).
-        updateTask(taskId, { task });
+        // ✅ P1-17: Safe update with OptimisticLockError handling
+        this._safeUpdateTask(taskId, { task }, { context: 'Persist workflow state' });
 
         if (nextIndex >= steps.length) {
             recordEvent({
@@ -692,7 +1021,11 @@ class TaskOrchestrationWorker {
                 tsMs: now,
                 actorType: 'system',
                 eventType: 'TASK_ORCHESTRATION_WORKFLOW_DONE',
-                payload: { attemptId, workflow_id: task?.meta?.workflow_id || task?.meta?.id, total_steps: steps.length },
+                payload: {
+                    attemptId,
+                    workflow_id: task?.meta?.workflow_id || task?.meta?.id,
+                    total_steps: steps.length,
+                },
                 dedupKey: `task:${taskId}:workflow_done:${attemptId}`,
             });
             return;
@@ -702,12 +1035,13 @@ class TaskOrchestrationWorker {
         const nextStepId = nextStep?.id ? String(nextStep.id) : `step-${nextIndex}`;
         const nextAction = nextStep?.action ? String(nextStep.action) : 'execute_prompt';
         if (nextAction !== 'execute_prompt') {
-            updateTask(taskId, {
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(taskId, {
                 status: 'BLOCKED',
                 blocked_reason: 'WORKFLOW_ACTION_UNSUPPORTED',
                 blocked_at_ms: now,
                 blocked_details_json: _safeJsonString({ attemptId, step_id: nextStepId, action: nextAction }),
-            });
+            }, { context: 'Block next step action unsupported' });
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -759,7 +1093,9 @@ class TaskOrchestrationWorker {
                     system_message: sys,
                     user_message: String(prompt),
                     context: {
-                        ...(task?.spec?.payload?.context && typeof task.spec.payload.context === 'object' ? task.spec.payload.context : {}),
+                        ...(task?.spec?.payload?.context && typeof task.spec.payload.context === 'object'
+                            ? task.spec.payload.context
+                            : {}),
                         inputs,
                         workflow_step_id: nextStepId,
                         workflow_step_index: nextIndex,
