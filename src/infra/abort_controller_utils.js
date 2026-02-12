@@ -1,0 +1,306 @@
+/**
+ * @fileoverview Utility functions for managing AbortController with Promise operations.
+ * Provides safe patterns for timeout handling and resource cleanup.
+ *
+ * Created to address P0 bugs in forensics.js, handle_manager.js, and recovery_system.js
+ * where Promise.race() operations lacked proper cleanup mechanisms.
+ *
+ * @module infra/abort_controller_utils
+ */
+
+/**
+ * Executes an operation with a timeout using Promise.race and AbortController.
+ * Guarantees proper cleanup of timers and signals abort on completion or error.
+ *
+ * @param {Function} operation - Function that returns a Promise
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout
+ * @returns {Promise<*>} Result of the operation
+ * @throws {Error} If timeout occurs or operation fails
+ *
+ * @example
+ * const result = await withTimeout(
+ *   () => page.screenshot({ path: 'screenshot.png' }),
+ *   5000,
+ *   'SCREENSHOT_TIMEOUT'
+ * );
+ */
+export async function withTimeout(operation, timeoutMs, timeoutMessage = 'Operation timed out') {
+    const controller = new AbortController();
+    let timeoutId = null;
+
+    try {
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                controller.abort(timeoutMessage);
+                const error = new Error(timeoutMessage);
+                error.code = 'TIMEOUT';
+                error.timeoutMs = timeoutMs;
+                reject(error);
+            }, timeoutMs);
+        });
+
+        const result = await Promise.race([operation(), timeoutPromise]);
+
+        // Clear timeout on success
+        clearTimeout(timeoutId);
+
+        return result;
+    } catch (err) {
+        // Ensure timeout is cleared even on error
+        clearTimeout(timeoutId);
+        controller.abort('operation_failed');
+        throw err;
+    } finally {
+        // Final cleanup - abort any pending operations
+        controller.abort('cleanup');
+    }
+}
+
+/**
+ * Executes an operation that accepts an AbortSignal with automatic timeout.
+ * The operation receives the signal and should respect it for cancellation.
+ *
+ * @param {Function} operation - Function that accepts AbortSignal and returns Promise
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @param {string} [timeoutMessage='Operation aborted'] - Error message for timeout
+ * @returns {Promise<*>} Result of the operation
+ * @throws {Error} If timeout occurs or operation fails
+ *
+ * @example
+ * const result = await withAbort(
+ *   async (signal) => {
+ *     const response = await fetch(url, { signal });
+ *     return response.json();
+ *   },
+ *   10000,
+ *   'FETCH_TIMEOUT'
+ * );
+ */
+export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operation aborted') {
+    const controller = new AbortController();
+    let timeoutId = null;
+
+    try {
+        timeoutId = setTimeout(() => {
+            controller.abort(timeoutMessage);
+        }, timeoutMs);
+
+        const result = await operation(controller.signal);
+
+        // Clear timeout on success
+        clearTimeout(timeoutId);
+
+        return result;
+    } catch (err) {
+        // Ensure timeout is cleared even on error
+        clearTimeout(timeoutId);
+        controller.abort('operation_failed');
+        throw err;
+    } finally {
+        // Final cleanup
+        controller.abort('cleanup');
+    }
+}
+
+/**
+ * Creates a shared timeout promise that can be reused in multiple Promise.race() calls.
+ * Useful when you need the same timeout for multiple sequential operations.
+ * Returns both the timeout promise and a cleanup function.
+ *
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout
+ * @returns {{promise: Promise<never>, controller: AbortController, cleanup: Function}}
+ *
+ * @example
+ * const { promise: timeoutPromise, cleanup } = createSharedTimeout(5000, 'FOCUS_TIMEOUT');
+ * try {
+ *   await Promise.race([page.mouse.click(1, 1), timeoutPromise]);
+ *   await Promise.race([page.evaluate(() => window.focus()), timeoutPromise]);
+ * } finally {
+ *   cleanup();
+ * }
+ */
+export function createSharedTimeout(timeoutMs, timeoutMessage = 'Operation timed out') {
+    const controller = new AbortController();
+    let timeoutId = null;
+    let promiseResolved = false;
+
+    const promise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            promiseResolved = true;
+            controller.abort(timeoutMessage);
+            const error = new Error(timeoutMessage);
+            error.code = 'TIMEOUT';
+            error.timeoutMs = timeoutMs;
+            reject(error);
+        }, timeoutMs);
+    });
+
+    const cleanup = () => {
+        if (timeoutId !== null && !promiseResolved) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        controller.abort('cleanup');
+    };
+
+    return { promise, controller, cleanup };
+}
+
+/**
+ * Wraps multiple operations in a single timeout context.
+ * If any operation exceeds the total timeout, all are aborted.
+ *
+ * @param {Array<Function>} operations - Array of functions returning Promises
+ * @param {number} timeoutMs - Total timeout for all operations
+ * @param {string} [timeoutMessage='Operations timed out'] - Error message
+ * @returns {Promise<Array>} Array of results from all operations
+ * @throws {Error} If timeout occurs or any operation fails
+ *
+ * @example
+ * const [clickResult, focusResult] = await withSharedTimeout(
+ *   [
+ *     () => page.mouse.click(1, 1),
+ *     () => page.evaluate(() => window.focus())
+ *   ],
+ *   5000,
+ *   'FOCUS_RECOVERY_TIMEOUT'
+ * );
+ */
+export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 'Operations timed out') {
+    const { promise: timeoutPromise, cleanup } = createSharedTimeout(timeoutMs, timeoutMessage);
+    const results = [];
+
+    try {
+        for (const operation of operations) {
+            const result = await Promise.race([operation(), timeoutPromise]);
+            results.push(result);
+        }
+        return results;
+    } finally {
+        cleanup();
+    }
+}
+
+/**
+ * Executes an operation with retries and timeout per attempt.
+ * Each retry gets a fresh timeout, and exponential backoff is applied.
+ *
+ * @param {Function} operation - Function that returns a Promise
+ * @param {Object} options - Configuration options
+ * @param {number} options.maxRetries - Maximum number of retry attempts (default: 3)
+ * @param {number} options.timeoutMs - Timeout per attempt in milliseconds (default: 5000)
+ * @param {number} options.backoffMs - Base backoff delay in milliseconds (default: 100)
+ * @param {Function} [options.shouldRetry] - Function to determine if error is retryable (default: all errors retry)
+ * @returns {Promise<*>} Result of the operation
+ * @throws {Error} If all retries fail
+ *
+ * @example
+ * const result = await withRetry(
+ *   () => fetch(url).then(r => r.json()),
+ *   {
+ *     maxRetries: 3,
+ *     timeoutMs: 5000,
+ *     backoffMs: 100,
+ *     shouldRetry: (err) => err.code !== 'AUTH_ERROR'
+ *   }
+ * );
+ */
+export async function withRetry(operation, options = {}) {
+    const {
+        maxRetries = 3,
+        timeoutMs = 5000,
+        backoffMs = 100,
+        shouldRetry = () => true
+    } = options;
+
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await withTimeout(operation, timeoutMs, `RETRY_ATTEMPT_${attempt}_TIMEOUT`);
+        } catch (err) {
+            lastError = err;
+
+            // Don't retry if we've exhausted attempts or error is not retryable
+            if (attempt >= maxRetries || !shouldRetry(err)) {
+                break;
+            }
+
+            // Exponential backoff
+            const delay = Math.min(backoffMs * Math.pow(2, attempt), 5000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+
+    // All retries failed
+    const error = new Error(`Operation failed after ${maxRetries + 1} attempts`);
+    error.code = 'MAX_RETRIES_EXCEEDED';
+    error.lastError = lastError;
+    error.attempts = maxRetries + 1;
+    throw error;
+}
+
+/**
+ * Utility to check if an error is an abort error.
+ * Useful for handling AbortController cancellations.
+ *
+ * @param {Error} error - The error to check
+ * @returns {boolean} True if error is from abort
+ *
+ * @example
+ * try {
+ *   await withTimeout(operation, 5000);
+ * } catch (err) {
+ *   if (isAbortError(err)) {
+ *     console.log('Operation was aborted/timed out');
+ *   }
+ * }
+ */
+export function isAbortError(error) {
+    return error && (
+        error.name === 'AbortError' ||
+        error.code === 'ABORT_ERR' ||
+        error.code === 'TIMEOUT' ||
+        (error.message && error.message.includes('abort'))
+    );
+}
+
+/**
+ * Creates a cancellable operation that can be manually aborted.
+ * Returns the operation promise and a cancel function.
+ *
+ * @param {Function} operation - Function that accepts AbortSignal and returns Promise
+ * @returns {{promise: Promise<*>, cancel: Function}}
+ *
+ * @example
+ * const { promise, cancel } = createCancellable(async (signal) => {
+ *   const response = await fetch(url, { signal });
+ *   return response.json();
+ * });
+ *
+ * // Later, if needed:
+ * cancel('User cancelled');
+ *
+ * try {
+ *   const result = await promise;
+ * } catch (err) {
+ *   if (isAbortError(err)) {
+ *     console.log('Operation was cancelled');
+ *   }
+ * }
+ */
+export function createCancellable(operation) {
+    const controller = new AbortController();
+
+    const promise = operation(controller.signal).finally(() => {
+        controller.abort('cleanup');
+    });
+
+    const cancel = (reason = 'Cancelled') => {
+        controller.abort(reason);
+    };
+
+    return { promise, cancel };
+}
