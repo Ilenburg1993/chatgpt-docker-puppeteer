@@ -314,7 +314,7 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
 
         // Mock simplificado do nervBridge
         nervBridge = {
-            beforeTaskExecution: task => task,
+            beforeTaskExecution: async task => task,
             afterTaskExecution: async (task, result) => ({ action: 'DONE', task, feedback: null }),
             processOrchestrationDecision: async (decision, correlationId) => {},
             emitCommand: params => nerv.emitCommand(params),

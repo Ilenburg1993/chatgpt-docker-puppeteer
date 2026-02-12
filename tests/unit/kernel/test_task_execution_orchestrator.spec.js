@@ -32,7 +32,7 @@ describe('TaskExecutionOrchestrator', () => {
         nerv = new MockNERV();
 
         nervBridge = {
-            beforeTaskExecution: task => task,
+            beforeTaskExecution: async task => task,
             emitCommandCalls: [],
             emitEventCalls: [],
             decisions: 0,
