@@ -30,7 +30,8 @@
         // === OPTIONAL (Visual & Utilities) ===
         "PKief.material-icon-theme",
         "streetsidesoftware.code-spell-checker",
-        "oderwat.indent-rainbow" // Cores arco-íris por nível de indentação (funcionalidade única)
+        "oderwat.indent-rainbow",
+        "ms-vscode-remote.vscode-remote-extensionpack" // Cores arco-íris por nível de indentação (funcionalidade única)
     ],
     "unwantedRecommendations": [
         // Language servers não relevantes para Node.js project

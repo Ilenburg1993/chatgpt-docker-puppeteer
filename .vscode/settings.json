@@ -1,22 +1,45 @@
 {
-  // ============================================================
-  // 0. IDENTIDADE GLOBAL E TOOLCHAIN BASE
-  // ============================================================
+  // ============================================================================
+  // VS CODE WORKSPACE SETTINGS — Documento reorganizado e documentado
+  // ----------------------------------------------------------------------------
+  // Objetivo: reordenar e agrupar as MESMAS configurações, sem alterar valores.
+  // Observação: este arquivo está em JSONC (permite comentários e trailing commas).
+  // ============================================================================
+
+  // ============================================================================
+  // 0) IDENTIDADE / TOOLCHAIN BASE
+  // ----------------------------------------------------------------------------
+  // - Força o VS Code a usar um TypeScript SDK específico (normalmente o do projeto).
+  // - Evita divergência entre TS global e TS local (versão/patch-level).
+  // ============================================================================
   "typescript.tsdk": "node_modules/typescript/lib",
-  // ============================================================
-  // 1. SEGURANÇA, ESTADO E INTEGRIDADE
-  // ============================================================
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // ============================================================================
+  // 1) SEGURANÇA, ESTADO E INTEGRIDADE (FILES / RESTORE)
+  // ----------------------------------------------------------------------------
+  // - Recuperação de estado, undo stack e comportamento de auto-save/refactor.
+  // ============================================================================
   "files.hotExit": "onExitAndWindowClose",
   "files.restoreUndoStack": true,
   "files.refactoring.autoSave": true,
+
+  // ============================================================================
+  // 2) REMOTE / SSH (CONEXÃO E LOG)
+  // ----------------------------------------------------------------------------
+  // - Ajustes do Remote SSH: forwarding, servidor local e verbosidade de logs.
+  // ============================================================================
   "remote.SSH.enableAgentForwarding": true,
   "remote.SSH.useLocalServer": true,
   "remote.SSH.loglevel": "info",
-  // ============================================================
-  // 2. DEV CONTAINERS / REMOTE
-  // ============================================================
+
+  // ============================================================================
+  // 3) DEV CONTAINERS / REMOTE (PORTS / GPU / EXTENSIONS)
+  // ----------------------------------------------------------------------------
+  // - Comportamento padrão em Dev Containers e port forwarding remoto.
+  // ============================================================================
   "dev.containers.defaultExtensions": [],
-  "dev.containers.executeInWSL": false,
+  "dev.containers.executeInWSL": true,
   "dev.containers.gpuAvailability": "none",
   "remote.autoForwardPorts": false,
   "remote.restoreForwardedPorts": false,
@@ -26,116 +49,137 @@
       "onAutoForward": "ignore"
     }
   },
-  // ============================================================
-  // 3. EDITOR — FUNDAMENTOS E UX CENTRAL
-  // ============================================================
+
+  // ============================================================================
+  // 4) EDITOR — FUNDAMENTOS / UX CENTRAL
+  // ----------------------------------------------------------------------------
+  // - Formatação, indentação, quebra de linha, renderização e ergonomia.
+  // ============================================================================
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "modificationsIfAvailable",
   "editor.formatOnPaste": true,
   "editor.formatOnType": false,
   "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
+
   "editor.tabSize": 4,
   "editor.insertSpaces": true,
   "editor.detectIndentation": true,
+
   "editor.wordWrap": "on",
   "editor.wordWrapColumn": 120,
   "editor.wrappingIndent": "indent",
-  "editor.rulers": [
-    100,
-    120
-  ],
+  "editor.rulers": [100, 120],
+
   "editor.cursorBlinking": "smooth",
   "editor.cursorSmoothCaretAnimation": "on",
   "editor.smoothScrolling": true,
   "editor.mouseWheelZoom": true,
   "editor.fontLigatures": true,
+
   "editor.renderWhitespace": "boundary",
   "editor.renderControlCharacters": true,
   "editor.renderLineHighlight": "all",
   "editor.matchBrackets": "always",
+
   "editor.bracketPairColorization.enabled": true,
   "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
   "editor.guides.bracketPairs": "active",
   "editor.guides.indentation": true,
   "editor.guides.highlightActiveIndentation": true,
+
   "editor.largeFileOptimizations": true,
-  // ============================================================
-  // 4. EDITOR — NAVEGAÇÃO, FOLDING, OUTLINE
-  // ============================================================
+
+  // ============================================================================
+  // 5) EDITOR — NAVEGAÇÃO / FOLDING / OUTLINE / BREADCRUMBS
+  // ----------------------------------------------------------------------------
+  // - Controles de dobramento, comportamento de navegação, breadcrumbs e outline.
+  // ============================================================================
   "editor.folding": true,
   "editor.foldingStrategy": "auto",
   "editor.foldingHighlight": true,
   "editor.showFoldingControls": "always",
   "editor.foldingMaximumRegions": 5000,
+
   "editor.gotoLocation.multipleDefinitions": "goto",
   "editor.gotoLocation.multipleReferences": "goto",
+
   "editor.selectionHighlight": false,
   "editor.occurrencesHighlight": "off",
   "editor.showUnused": false,
   "editor.showDeprecated": false,
+
   "breadcrumbs.enabled": false,
   "breadcrumbs.filePath": "on",
   "breadcrumbs.symbolPath": "on",
+
   "outline.showFiles": true,
   "outline.showModules": false,
   "outline.showFunctions": true,
   "outline.showVariables": false,
-  // ============================================================
-  // 5. EDITOR — MINIMAP, STICKY SCROLL, SEMANTIC
-  // ============================================================
-  "editor.minimap.enabled": false,
+
+  // ============================================================================
+  // 6) EDITOR — MINIMAP / STICKY SCROLL / SEMANTIC
+  // ----------------------------------------------------------------------------
+  // - Visualização de minimapa, sticky scroll e semantic token behavior.
+  // ============================================================================
+  "editor.minimap.enabled": true,
   "editor.minimap.maxColumn": 120,
   "editor.minimap.renderCharacters": false,
   "editor.minimap.showSlider": "always",
+
   "editor.stickyScroll.enabled": false,
   "editor.stickyScroll.maxLineCount": 5,
   "editor.stickyScroll.defaultModel": "outlineModel",
+
   "editor.linkedEditing": true,
   "editor.semanticHighlighting.enabled": "configuredByTheme",
   "editor.semanticTokenColorCustomizations": {
     "enabled": true
   },
-  // ============================================================
-  // 6. SUGGESTIONS, INLINE, INTELLISENSE
-  // ============================================================
+
+  // ============================================================================
+  // 7) EDITOR — SUGGESTIONS / INLINE / INTELLISENSE
+  // ----------------------------------------------------------------------------
+  // - Comportamento do suggest widget e sugestões inline (inclui conflito/convivência).
+  // ============================================================================
   "editor.inlineSuggest.enabled": true,
   "editor.inlineSuggest.suppressSuggestions": true,
+
   "editor.quickSuggestions": {
-    "other": "on",
+    "other": "off",
     "comments": "off",
     "strings": "off"
   },
   "editor.quickSuggestionsDelay": 50,
+
   "editor.suggestSelection": "first",
   "editor.acceptSuggestionOnEnter": "off",
   "editor.acceptSuggestionOnCommitCharacter": true,
-  "editor.suggest.preview": false,
-  "editor.suggest.showInlineDetails": false,
+
+  "editor.suggest.preview": true,
+  "editor.suggest.showInlineDetails": true,
   "editor.suggest.showSnippets": true,
-  "editor.snippetSuggestions": "top",
+  "editor.snippetSuggestions": "bottom",
+
   "editor.suggest.localityBonus": true,
   "editor.suggest.shareSuggestSelections": true,
   "editor.suggest.selectionMode": "always",
   "editor.suggest.filterGraceful": true,
   "editor.suggest.matchOnWordStartOnly": false,
   "editor.suggest.showStatusBar": true,
+
   "editor.tabCompletion": "on",
   "editor.wordBasedSuggestions": "offWithInlineSuggestions",
   "editor.wordBasedSuggestionsMode": "currentDocument",
-  // ============================================================
-  // 7. LINGUAGENS — JAVASCRIPT / TYPESCRIPT / JSON
-  // (LIMPO: duplicações removidas + contradições eliminadas)
-  // ============================================================
 
-  // ============================================================
-  // 7.1 JAVASCRIPT — Validação / Formatação
-  // ============================================================
+  // ============================================================================
+  // 8) LINGUAGENS — JAVASCRIPT (VALIDAÇÃO / SUGGEST / IMPORTS / PREFS / INLAY)
+  // ----------------------------------------------------------------------------
+  // - Configuração de IntelliSense e preferências do JS (inclui ESM import endings).
+  // ============================================================================
   "javascript.validate.enable": true,
   "javascript.format.enable": false,
 
-  // ============================================================
-  // 7.2 JAVASCRIPT — Sugestões / IntelliSense
-  // ============================================================
   "javascript.suggest.enabled": true,
   "javascript.suggest.autoImports": true,
   "javascript.suggest.completeFunctionCalls": true,
@@ -143,34 +187,24 @@
   "javascript.suggest.names": true,
   "javascript.suggest.paths": true,
 
-  // ============================================================
-  // 7.3 JAVASCRIPT — Imports / Movimentação de Arquivos
-  // ============================================================
   "javascript.updateImportsOnFileMove.enabled": "always",
 
-  // ============================================================
-  // 7.4 JAVASCRIPT — Preferências de Estilo / Imports (ESM)
-  // ============================================================
   "javascript.preferences.quoteStyle": "single",
   "javascript.preferences.importModuleSpecifier": "relative",
   "javascript.preferences.importModuleSpecifierEnding": "js",
 
-  // ============================================================
-  // 7.5 JAVASCRIPT — Inlay Hints
-  // ============================================================
   "javascript.inlayHints.parameterNames.enabled": "literals",
   "javascript.inlayHints.functionLikeReturnTypes.enabled": false,
   "javascript.inlayHints.variableTypes.enabled": false,
 
-  // ============================================================
-  // 7.6 TYPESCRIPT — Validação / Aquisição Automática
-  // ============================================================
+  // ============================================================================
+  // 9) LINGUAGENS — TYPESCRIPT (VALIDAÇÃO / ATA / TSSERVER / PREFS / INLAY)
+  // ----------------------------------------------------------------------------
+  // - Configura TS validate, aquisição automática de tipos (ATA), watchers e diagnósticos.
+  // ============================================================================
   "typescript.validate.enable": true,
-  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.disableAutomaticTypeAcquisition": false,
 
-  // ============================================================
-  // 7.7 TYPESCRIPT — TS Server (Performance / Watchers)
-  // ============================================================
   "typescript.tsserver.maxTsServerMemory": 4096,
   "typescript.tsserver.useSeparateSyntaxServer": true,
   "typescript.tsserver.watchOptions": {
@@ -179,173 +213,151 @@
     "fallbackPolling": "dynamicPriorityPolling"
   },
 
-  // ============================================================
-  // 7.8 TYPESCRIPT — TS Server (Experimental)
-  // ============================================================
-  // enableProjectDiagnostics: Analisa TODO o projeto (não só arquivos abertos)
-  // ✅ HABILITADO: Agora que dashboard-ui e node_modules estão excluídos,
-  //    deve mostrar apenas erros reais sem ruído.
-  // ⚠️  Se VSCode ficar lento ou mostrar muitos erros, mude para false.
+  // Experimental: diagnósticos do projeto inteiro + watcher do VS Code
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
   "typescript.tsserver.experimental.useVsCodeWatcher": true,
 
-  // ============================================================
-  // 7.9 TYPESCRIPT — Preferências de Imports / ESM
-  // ============================================================
   "typescript.preferences.importModuleSpecifier": "relative",
   "typescript.preferences.importModuleSpecifierEnding": "js",
   "typescript.updateImportsOnFileMove.enabled": "always",
 
-  // ============================================================
-  // 7.10 TYPESCRIPT — Diagnósticos / Estilo
-  // ============================================================
   "typescript.reportStyleChecksAsWarnings": false,
 
-  // ============================================================
-  // 7.11 TYPESCRIPT — Inlay Hints
-  // ============================================================
   "typescript.inlayHints.parameterNames.enabled": "literals",
   "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
   "typescript.inlayHints.variableTypes.enabled": false,
 
-  // ============================================================
-  // 7.12 JS/TS — Implicit Project Config (quando não há jsconfig/tsconfig)
-  // ============================================================
+  // ============================================================================
+  // 10) JS/TS — IMPLICIT PROJECT CONFIG (SEM TSCONFIG/JSCONFIG)
+  // ----------------------------------------------------------------------------
+  // - Define comportamento do projeto implícito (checkJs e módulo NodeNext).
+  // ============================================================================
   "js/ts.implicitProjectConfig.checkJs": true,
   "js/ts.implicitProjectConfig.module": "NodeNext",
 
-  // ============================================================
-// 7.13 JSON — Formatação / Validação / Schemas
-// ============================================================
-"json.format.enable": true,
-"json.validate.enable": true,
+  // ============================================================================
+  // 11) JSON — FORMATAÇÃO / VALIDAÇÃO / SUGGEST / SCHEMAS / PERFORMANCE
+  // ----------------------------------------------------------------------------
+  // - Ativa JSON language service, schema downloads e mapeamentos de schemas.
+  // ============================================================================
+  "json.format.enable": true,
+  "json.validate.enable": true,
+  "json.suggest.enable": true,
+  "json.schemaDownload.enable": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["package.json"],
+      "url": "https://json.schemastore.org/package"
+    },
+    {
+      "fileMatch": ["tsconfig.json", "tsconfig.*.json"],
+      "url": "https://json.schemastore.org/tsconfig"
+    },
+    {
+      "fileMatch": ["jsconfig.json"],
+      "url": "https://json.schemastore.org/jsconfig"
+    },
+    {
+      "fileMatch": [".eslintrc", ".eslintrc.json"],
+      "url": "https://json.schemastore.org/eslintrc"
+    },
+    {
+      "fileMatch": [".prettierrc", ".prettierrc.json"],
+      "url": "https://json.schemastore.org/prettierrc"
+    },
 
-// Autocomplete inteligente
-"json.suggest.enable": true,
+    {
+      "fileMatch": [".vscode/settings.json"],
+      "url": "https://json.schemastore.org/vscode-settings"
+    },
+    {
+      "fileMatch": [".vscode/extensions.json"],
+      "url": "https://json.schemastore.org/vscode-extensions"
+    },
+    {
+      "fileMatch": [".vscode/launch.json"],
+      "url": "https://json.schemastore.org/launch"
+    },
+    {
+      "fileMatch": [".vscode/tasks.json"],
+      "url": "https://json.schemastore.org/tasks"
+    },
+    {
+      "fileMatch": [".devcontainer/devcontainer.json"],
+      "url": "https://json.schemastore.org/devcontainer"
+    },
 
-// Schemas
-"json.schemaDownload.enable": true,
-"json.schemas": [
-  // Node / TypeScript / JS tooling
-  {
-    "fileMatch": ["package.json"],
-    "url": "https://json.schemastore.org/package"
-  },
-  {
-    "fileMatch": ["tsconfig.json", "tsconfig.*.json"],
-    "url": "https://json.schemastore.org/tsconfig"
-  },
-  {
-    "fileMatch": ["jsconfig.json"],
-    "url": "https://json.schemastore.org/jsconfig"
-  },
-  {
-    "fileMatch": [".eslintrc", ".eslintrc.json"],
-    "url": "https://json.schemastore.org/eslintrc"
-  },
-  {
-    "fileMatch": [".prettierrc", ".prettierrc.json"],
-    "url": "https://json.schemastore.org/prettierrc"
-  },
+    {
+      "fileMatch": ["docker-compose.json", "docker-compose.*.json"],
+      "url": "https://json.schemastore.org/docker-compose"
+    },
 
-  // VS Code / DevContainer
-  {
-    "fileMatch": [".vscode/settings.json"],
-    "url": "https://json.schemastore.org/vscode-settings"
-  },
-  {
-    "fileMatch": [".vscode/extensions.json"],
-    "url": "https://json.schemastore.org/vscode-extensions"
-  },
-  {
-    "fileMatch": [".vscode/launch.json"],
-    "url": "https://json.schemastore.org/launch"
-  },
-  {
-    "fileMatch": [".vscode/tasks.json"],
-    "url": "https://json.schemastore.org/tasks"
-  },
-  {
-    "fileMatch": [".devcontainer/devcontainer.json"],
-    "url": "https://json.schemastore.org/devcontainer"
-  },
+    {
+      "fileMatch": [".github/dependabot.yml"],
+      "url": "https://json.schemastore.org/dependabot-2.0"
+    },
 
-  // Docker (somente se você realmente usar docker-compose.json)
-  {
-    "fileMatch": ["docker-compose.json", "docker-compose.*.json"],
-    "url": "https://json.schemastore.org/docker-compose"
+    {
+      "fileMatch": ["nodemon.json"],
+      "url": "https://json.schemastore.org/nodemon"
+    },
+    {
+      "fileMatch": ["lerna.json"],
+      "url": "https://json.schemastore.org/lerna"
+    },
+    {
+      "fileMatch": ["turbo.json"],
+      "url": "https://json.schemastore.org/turbo"
+    },
+    {
+      "fileMatch": ["biome.json", "biome.jsonc"],
+      "url": "https://json.schemastore.org/biome"
+    }
+  ],
+  "json.maxItemsComputed": 10000,
+  "json.trace.server": "messages",
+
+  // ============================================================================
+  // 12) CODELENS (GLOBAL) + TS/JS CODELENS HEAVY FEATURES
+  // ----------------------------------------------------------------------------
+  // - Mantém CodeLens ativo, mas desliga lenses “pesados” (refs/impl) de TS/JS.
+  // - Mantém GitLens CodeLens.
+  // ============================================================================
+  "editor.codeLens": true,
+  "javascript.referencesCodeLens.enabled": true,
+  "typescript.referencesCodeLens.enabled": true,
+  "typescript.implementationsCodeLens.enabled": true,
+  "gitlens.codeLens.enabled": true,
+
+  // ============================================================================
+  // 13) TYPESCRIPT — LOGGING / TRACING (DEBUG)
+  // ----------------------------------------------------------------------------
+  // - Mantém tracing e log do tsserver desativados (impacto de performance).
+  // ============================================================================
+  "typescript.tsserver.enableTracing": false,
+  "typescript.tsserver.log": "off",
+
+  // ============================================================================
+  // 14) FORMATTERS POR LINGUAGEM (SCOPED SETTINGS)
+  // ----------------------------------------------------------------------------
+  // - Overrides por linguagem para formatador e/ou CodeLens.
+  // ============================================================================
+  "[javascript]": {
+    "editor.codeLens": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-
-  // GitHub
-  {
-    "fileMatch": [".github/dependabot.yml"],
-    "url": "https://json.schemastore.org/dependabot-2.0"
+  "[javascriptreact]": {
+    "editor.codeLens": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-
-  // Common configs
-  {
-    "fileMatch": ["nodemon.json"],
-    "url": "https://json.schemastore.org/nodemon"
+  "[typescript]": {
+    "editor.codeLens": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  {
-    "fileMatch": ["lerna.json"],
-    "url": "https://json.schemastore.org/lerna"
+  "[typescriptreact]": {
+    "editor.codeLens": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  {
-    "fileMatch": ["turbo.json"],
-    "url": "https://json.schemastore.org/turbo"
-  },
-  {
-    "fileMatch": ["biome.json", "biome.jsonc"],
-    "url": "https://json.schemastore.org/biome"
-  }
-],
-
-// Performance / Debug
-"json.maxItemsComputed": 10000,
-"json.trace.server": "off",
-
-
-	  // ============================================================
-	  // 7.14 EDITOR — CodeLens (global)
-	  // ============================================================
-	  // Performance: mantenha CodeLens desligado globalmente e habilite
-	  // apenas nas linguagens onde você realmente usa (JS/TS + Copilot).
-	  "editor.codeLens": true,
-
-	  // Desliga CodeLens "pesados" do TS/JS (referências/implementações).
-	  // Mantém o Copilot CodeLens (ex.: "Generate tests") quando CodeLens estiver ligado no arquivo.
-	  "javascript.referencesCodeLens.enabled": false,
-	  "typescript.referencesCodeLens.enabled": false,
-	  "typescript.implementationsCodeLens.enabled": false,
-	  "gitlens.codeLens.enabled": true,
-
-  // ============================================================
-	  // 7.15 TYPESCRIPT — Logging / Tracing (Debug)
-	  // ============================================================
-	  // 🔍 MODO DEBUG (desligado por padrão): tracing/log verboso degrada performance (inclui CodeLens/IntelliSense)
-	  "typescript.tsserver.enableTracing": false,
-	  "typescript.tsserver.log": "off",
-
-  // ============================================================
-  // 8. FORMATTERS POR LINGUAGEM
-  // ============================================================
-	  "[javascript]": {
-	    "editor.codeLens": true,
-	    "editor.defaultFormatter": "esbenp.prettier-vscode"
-	  },
-	  "[javascriptreact]": {
-	    "editor.codeLens": true,
-	    "editor.defaultFormatter": "esbenp.prettier-vscode"
-	  },
-	  "[typescript]": {
-	    "editor.codeLens": true,
-	    "editor.defaultFormatter": "esbenp.prettier-vscode"
-	  },
-	  "[typescriptreact]": {
-	    "editor.codeLens": true,
-	    "editor.defaultFormatter": "esbenp.prettier-vscode"
-	  },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
   },
@@ -355,17 +367,15 @@
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-containers"
   },
-  // ============================================================
-  // 9. ESLINT / LINTING
-  // ============================================================
+
+  // ============================================================================
+  // 15) ESLINT / LINTING
+  // ----------------------------------------------------------------------------
+  // - ESLint habilitado, valida linguagens específicas, roda onType, e configura output.
+  // ============================================================================
   "eslint.enable": true,
-  "eslint.validate": [
-    "javascript",
-    "javascriptreact",
-    "typescript",
-    "typescriptreact"
-  ],
-  "eslint.run": "onSave",
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "eslint.run": "onType",
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
   "eslint.alwaysShowStatus": false,
@@ -394,9 +404,12 @@
       "severity": "off"
     }
   ],
-  // ============================================================
-  // 10. TERMINAL INTEGRADO
-  // ============================================================
+
+  // ============================================================================
+  // 16) TERMINAL INTEGRADO
+  // ----------------------------------------------------------------------------
+  // - Perfis, UI/UX do terminal, integração do shell e comportamento de sessão.
+  // ============================================================================
   "terminal.integrated.defaultProfile.linux": "bash",
   "terminal.integrated.fontFamily": "monospace",
   "terminal.integrated.fontSize": 13,
@@ -416,9 +429,12 @@
   "terminal.integrated.tabs.hideCondition": "never",
   "terminal.integrated.confirmOnExit": "hasChildProcesses",
   "terminal.integrated.confirmOnKill": "editor",
-  // ============================================================
-  // 11. GIT / SCM / DIFF
-  // ============================================================
+
+  // ============================================================================
+  // 17) GIT / SCM / DIFF
+  // ----------------------------------------------------------------------------
+  // - Operações Git, visão do SCM e configurações do diff editor.
+  // ============================================================================
   "git.enableSmartCommit": true,
   "git.ignoreLimitWarning": true,
   "git.autofetch": false,
@@ -431,14 +447,13 @@
   "git.mergeEditor": true,
   "git.openRepositoryInParentFolders": "always",
   "git.timeline.showUncommitted": true,
-  "git.branchProtection": [
-    "main",
-    "master"
-  ],
+  "git.branchProtection": ["main", "master"],
+
   "scm.defaultViewMode": "tree",
   "scm.diffDecorations": "all",
   "scm.diffDecorationsGutterWidth": 3,
   "scm.alwaysShowProviders": true,
+
   "diffEditor.renderSideBySide": true,
   "diffEditor.renderMarginRevertIcon": true,
   "diffEditor.diffAlgorithm": "advanced",
@@ -446,9 +461,12 @@
   "diffEditor.maxComputationTime": 5000,
   "diffEditor.renderIndicators": true,
   "diffEditor.ignoreTrimWhitespace": true,
-  // ============================================================
-  // 12. PROBLEMS / DEBUG / TASKS / TESTING
-  // ============================================================
+
+  // ============================================================================
+  // 18) PROBLEMS / DEBUG / TASKS / TESTING
+  // ----------------------------------------------------------------------------
+  // - Painel Problems, debug UX, runner de testes e tarefas.
+  // ============================================================================
   "problems.autoReveal": true,
   "problems.decorations.enabled": true,
   "problems.showCurrentInStatus": true,
@@ -460,45 +478,57 @@
   "problems.tabSize": 10,
   "problems.multiline.enabled": true,
   "problems.multiline.indentSize": 4,
+
   "debug.inlineValues": "on",
   "debug.focusEditorOnBreak": true,
   "debug.showBreakpointsInOverviewRuler": true,
   "debug.showInlineBreakpointCandidates": true,
   "debug.toolBarLocation": "docked",
+
   "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
   "testing.automaticallyOpenTestResults": "neverOpen",
   "testing.openTesting": "neverOpen",
   "testing.saveBeforeTest": true,
   "testing.followRunningTest": true,
   "testing.alwaysRevealTestOnStateChange": false,
+
   "task.autoDetect": "on",
   "task.problemMatchers.neverPrompt": false,
   "task.slowProviderWarning": true,
   "task.quickOpen.detail": true,
   "task.quickOpen.skip": false,
-  // ============================================================
-  // 13. SEARCH / FILESYSTEM / EXPLORER
-  // ============================================================
+
+  // ============================================================================
+  // 19) SEARCH / FILESYSTEM / EXPLORER (IO & SEARCH UX)
+  // ----------------------------------------------------------------------------
+  // - Final de arquivo, encoding, trimming, autosave, search UX e conflitos.
+  // ============================================================================
   "files.eol": "\n",
   "files.encoding": "utf8",
   "files.trimTrailingWhitespace": true,
   "files.trimFinalNewlines": true,
   "files.insertFinalNewline": true,
+
   "files.autoSave": "onFocusChange",
   "files.autoSaveDelay": 1000,
+
   "files.associations": { /* intact */},
   "files.watcherExclude": { /* intact */},
   "search.exclude": { /* intact */},
+
   "search.smartCase": true,
   "search.searchOnType": true,
   "search.searchOnTypeDebouncePeriod": 300,
   "search.globalFindClipboard": true,
+
   "files.simpleDialog.enable": true,
   "files.saveConflictResolution": "overwriteFileOnDisk",
 
-  // ============================================================
-  // 14. IA / COPILOT / MCP
-  // ============================================================
+  // ============================================================================
+  // 20) IA / COPILOT / MCP (CORE)
+  // ----------------------------------------------------------------------------
+  // - Liga Copilot por linguagem, ativa sugestões inline e configura chat/MCP.
+  // ============================================================================
   "github.copilot.enable": {
     "*": true,
     "javascript": true,
@@ -506,22 +536,74 @@
     "markdown": true,
     "plaintext": false
   },
+
+  "workbench.startupEditor": "agentSessionsWelcomePage",
+  "chat.viewSessions.enabled": true,
+  "chat.agentsControl.enabled": true,
+  "chat.agentsControl.clickBehavior": "cycle",
+  "chat.unifiedAgentsBar.enabled": true,
+  "chat.agent.enabled": true,
+  "chat.mcp.access": true,
+  "chat.mcp.discovery.enabled": {
+    "claude-desktop": true,
+    "windsurf": true,
+    "cursor-global": true,
+    "cursor-workspace": true
+  },
+  "chat.tools.global.autoApprove": true,
+  "chat.agent.thinking.collapsedTools": "always",
+  "chat.agent.thinkingStyle": "fixedScrolling",
+  "github.copilot.chat.agent.thinkingTool": true,
+  "github.copilot.chat.summarizeAgentConversationHistory.enabled": true,
+  "github.copilot.chat.newWorkspaceCreation.enabled": true,
+
+  "chat.math.enabled": true,
+
+  // Trigger characters para suggest widget do editor (mantém como no arquivo original)
+  "editor.suggestOnTriggerCharacters": true,
+  "inlineChat.defaultModel": "copilot/grok-code-fast-1",
+
+
+
+  "inlineChat.renderMode": "hover",
+  "editor.inlineSuggest.syntaxHighlightingEnabled": true,
+  "inlineChat.affordance": "true",
+  "inlineChat.lineEmptyHint": "Digite uma mensagem para iniciar o chat...",
+  "inlineChat.lineNaturalLanguageHint": "Digite uma mensagem em linguagem natural...",
+
+  "github.copilot.chat.reviewSelection.enabled": true,
+  "github.copilot.chat.reviewSelection.instructions": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat.",
+  "github.copilot.chat.reviewSelection.instructions.pt-br": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat.",
+
   "github.copilot.inlineSuggest.enable": true,
   "github.copilot.editor.enableAutoCompletions": true,
   "github.copilot.nextEditSuggestions.enabled": true,
+
   "github.copilot.chat.localeOverride": "pt-br",
   "github.copilot.chat.welcomeMessage": "once",
   "github.copilot.advanced": { /* intact */},
+
   "chat.mcp.serverSampling": {
     "chatgpt-docker-puppeteer/.vscode/mcp.json: chatgpt-docker-puppeteer": {
       "allowedModels": [
-        "copilot/gpt-5-mini",
         "copilot/auto",
-        "copilot/claude-sonnet-4.5"
+        "copilot/claude-sonnet-4.5",
+        "copilot/gpt-5-mini",
+        "copilot/gpt-5.2-codex",
+        "copilot/grok-code-fast-1",
+        "copilot/oswe-vscode-prime",
+        "customoai/Qwen 3 Coder (Ollama Cloud)/qwen3-coder-next"
       ]
     }
   },
-  "claudeCodeChat.permissions.yoloMode": false,
+
+  "claudeCodeChat.permissions.yoloMode": true,
+
+  // ============================================================================
+  // 21) LANGUAGE OVERRIDES — MARKDOWN / CSS / VUE / POWERSHELL
+  // ----------------------------------------------------------------------------
+  // - Overrides por linguagem aplicados no workspace.
+  // ============================================================================
   "[markdown]": {
     "editor.defaultFormatter": "yzhang.markdown-all-in-one",
     "editor.wordWrap": "on",
@@ -531,111 +613,186 @@
       "comments": "off",
       "strings": "off"
     },
-    "editor.wordBasedSuggestions": "off",
-    "editor.suggest.preview": false,
-    "editor.suggest.showInlineDetails": false
+    "editor.wordBasedSuggestions": "true",
+    "editor.suggest.preview": true,
+    "editor.suggest.showInlineDetails": true
   },
-  // ============================================================
-  // 15. WORKBENCH / WINDOW / TELEMETRIA
-  // ============================================================
-"workbench.colorTheme": "GitHub Dark Default",
-  "workbench.iconTheme": "material-icon-theme",
-  "workbench.startupEditor": "none",
+  "[css]": {
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+  },
+  "[vue]": {
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+  },
+  "[powershell]": {
+    "files.encoding": "utf8bom"
+  },
+
+  // ============================================================================
+  // 22) WORKBENCH / WINDOW / UI / TELEMETRIA
+  // ----------------------------------------------------------------------------
+  // - Temas, comportamento da janela, tabs, limites e telemetria.
+  // ============================================================================
+  "workbench.colorTheme": "GitHub Dark Default",
+  "workbench.iconTheme": "vs-seti",
+
+
   "workbench.editor.enablePreview": false,
   "workbench.editor.closeEmptyGroups": true,
   "workbench.editor.highlightModifiedTabs": true,
   "workbench.editor.limit.enabled": true,
   "workbench.editor.limit.value": 15,
   "workbench.editor.limit.perEditorGroup": true,
+
   "window.restoreWindows": "none",
   "window.newWindowDimensions": "default",
   "window.titleBarStyle": "custom",
   "window.openFoldersInNewWindow": "off",
   "window.openFilesInNewWindow": "off",
+
   "telemetry.telemetryLevel": "off",
   "redhat.telemetry.enabled": false,
-"cSpell.language": "en,pt-BR",
-"inlineChat.notebookAgent": false,
-"inlineChat.enableV2": true,
-"chat.mcp.gallery.enabled": true,
-"chat.edits2.enabled": true,
-"chat.editing.autoAcceptDelay": 3,
-"chat.customAgentInSubagent.enabled": true,
-"chat.checkpoints.showFileChanges": true,
-"chat.agent.maxRequests": 250,
-"[powershell]": {
-  "files.encoding": "utf8bom"
-},
-"chat.renderRelatedFiles": true,
-"chat.useAgentSkills": true,
-"chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
-"chat.tools.terminal.autoReplyToPrompts": true,
-"github.copilot.chat.anthropic.thinking.budgetTokens": 32000,
-"github.copilot.chat.anthropic.tools.websearch.enabled": true,
-"github.copilot.chat.codesearch.enabled": true,
-"github.copilot.chat.customAgents.showOrganizationAndEnterpriseAgents": true,
-"github.copilot.chat.githubMcpServer.enabled": true,
-"github.copilot.chat.generateTests.codeLens": true,
-"github.copilot.chat.languageContext.fix.typescript.enabled": true,
-"github.copilot.chat.languageContext.inline.typescript.enabled": true,
-"github.copilot.chat.languageContext.typescript.enabled": true,
-"github.copilot.chat.languageContext.typescript.includeDocumentation": true,
-"github.copilot.chat.newWorkspace.useContext7": true,
-"github.copilot.chat.responsesApiReasoningEffort": "high",
-"github.copilot.chat.tools.memory.enabled": true,
-"github.copilot.chat.virtualTools.threshold": 128,
-"github.copilot.selectedCompletionModel": "Gpt-5 mini",
-"githubIssues.assignWhenWorking": true,
-"[css]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
-},
-"[vue]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
-},
-"claudeCode.allowDangerouslySkipPermissions": true,
-"workbench.editor.alwaysShowEditorActions": true,
-"workbench.editor.closeOnFileDelete": true,
-"workbench.editor.enablePreviewFromCodeNavigation": false,
-"workbench.editor.enablePreviewFromQuickOpen": false,
-"chat.agentSessionProjection.enabled": true,
-"chat.editMode.hidden": false,
-"chat.editing.explainChanges.enabled": true,
-"chat.editor.wordWrap": "on",
-"chat.experimental.useSkillAdherencePrompt": true,
-"chat.includeReferencedInstructions": true,
-"chat.mcp.assisted.nuget.enabled": true,
-"chat.tips.enabled": true,
-"chat.tools.terminal.sandbox.enabled": false,
-"terminal.integrated.shellIntegration.environmentReporting": true,
-"terminal.integrated.env.linux": {
-  "CODEX_HOME": "${workspaceFolder}/.codex"
-},
-"windowsaistudio.enableRemoteFine-tuningAndInference": true,
-"editor.autoIndentOnPaste": true,
-"editor.occurrencesHighlightDelay": 100,
-"workbench.externalBrowser": "chrome",
-"windowsaistudio.openAIInferencePort": 11434,
-"cSpell.enabled": false,
-"github.copilot.chat.agent.autoFix": true,
-"github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
-"github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
-"github.copilot.chat.copilotMemory.enabled": true,
-"github.copilot.chat.advanced.workspace.codeSearchExternalIngest.enabled": true,
-"terminal.integrated.enableKittyKeyboardProtocol": true,
-"chat.tools.terminal.enableAutoApprove": true,
-"github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
-"github.copilot.chat.switchAgent.enabled": true,
-"claude-code.autosave": true,
-"claude-code.useTerminal": true,
-"claude-code.selectedModel": "sonnet",
-"claude-code.autoCloseDiffTabs": true,
-"github.copilot.chat.claudeAgent.enabled": true,
-"github.copilot.chat.anthropic.toolSearchTool.enabled": true,
-"remote.SSH.defaultForwardedPorts": [
 
-],
-"github.copilot.chat.anthropic.contextEditing.enabled": true,
-"python.analysis.aiHoverSummaries": true,
-"chatgpt.runCodexInWindowsSubsystemForLinux": true,
+  // ============================================================================
+  // 23) CHAT / INLINE CHAT / AGENT / UX EXPERIMENTS
+  // ----------------------------------------------------------------------------
+  // - Ajustes diversos relacionados ao chat/agent, flags experimentais e UX.
+  // ============================================================================
+  "cSpell.language": "en,pt-BR",
+  "inlineChat.notebookAgent": false,
+  "inlineChat.enableV2": true,
 
+  "chat.mcp.gallery.enabled": true,
+  "chat.edits2.enabled": true,
+  "chat.editing.autoAcceptDelay": 3,
+  "chat.customAgentInSubagent.enabled": true,
+  "chat.checkpoints.showFileChanges": true,
+  "chat.agent.maxRequests": 250,
+  "chat.renderRelatedFiles": true,
+  "chat.useAgentSkills": true,
+  "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+  "chat.tools.terminal.autoReplyToPrompts": true,
+  "chat.agentSessionProjection.enabled": true,
+  "chat.editMode.hidden": false,
+  "chat.editing.explainChanges.enabled": true,
+  "chat.editor.wordWrap": "on",
+  "chat.experimental.useSkillAdherencePrompt": true,
+  "chat.includeReferencedInstructions": true,
+  "chat.mcp.assisted.nuget.enabled": true,
+  "chat.tips.enabled": true,
+  "chat.tools.terminal.sandbox.enabled": false,
+  "chat.tools.terminal.enableAutoApprove": true,
+  "chat.tools.terminal.blockDetectedFileWrites": "never",
+
+  // ============================================================================
+  // 24) TERMINAL — INTEGRAÇÕES / ENV / REPORTING
+  // ----------------------------------------------------------------------------
+  // - Shell integration reporting e env vars específicas do workspace.
+  // ============================================================================
+  "terminal.integrated.shellIntegration.environmentReporting": true,
+  "terminal.integrated.env.linux": {
+    "CODEX_HOME": "${workspaceFolder}/.codex"
+  },
+  "terminal.integrated.enableKittyKeyboardProtocol": true,
+
+  // ============================================================================
+  // 25) COPILOT CHAT — MODELOS / CONTEXTO / FERRAMENTAS / LIMITES
+  // ----------------------------------------------------------------------------
+  // - Bloco grande de tuning de modelos, contexto TS, websearch, memory e afins.
+  // ============================================================================
+  "github.copilot.chat.anthropic.thinking.budgetTokens": 32000,
+  "github.copilot.chat.anthropic.tools.websearch.enabled": true,
+  "github.copilot.chat.codesearch.enabled": true,
+  "github.copilot.chat.customAgents.showOrganizationAndEnterpriseAgents": true,
+  "github.copilot.chat.githubMcpServer.enabled": true,
+  "github.copilot.chat.generateTests.codeLens": true,
+
+  "github.copilot.chat.languageContext.fix.typescript.enabled": true,
+  "github.copilot.chat.languageContext.inline.typescript.enabled": true,
+  "github.copilot.chat.languageContext.typescript.enabled": true,
+  "github.copilot.chat.languageContext.typescript.includeDocumentation": true,
+  "github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
+
+  "github.copilot.chat.newWorkspace.useContext7": true,
+  "github.copilot.chat.responsesApiReasoningEffort": "high",
+  "github.copilot.chat.tools.memory.enabled": true,
+  "github.copilot.chat.virtualTools.threshold": 128,
+  "github.copilot.chat.switchAgent.enabled": true,
+
+  "github.copilot.selectedCompletionModel": "Gpt-5 mini",
+  "githubIssues.assignWhenWorking": true,
+
+  // Claude / Anthropic agent toggles (extensões e integrações)
+  "github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
+  "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
+  "github.copilot.chat.claudeAgent.enabled": true,
+  "github.copilot.chat.anthropic.toolSearchTool.enabled": true,
+  "github.copilot.chat.anthropic.contextEditing.enabled": true,
+  "github.copilot.chat.copilotMemory.enabled": true,
+  "github.copilot.chat.agent.autoFix": true,
+  "github.copilot.chat.advanced.workspace.codeSearchExternalIngest.enabled": true,
+
+  // ============================================================================
+  // 26) EXTENSÕES / OUTROS — CLAUDE CODE / PYTHON / CHATGPT / MAKEFILE
+  // ----------------------------------------------------------------------------
+  // - Flags e opções de extensões adicionais presentes no arquivo original.
+  // ============================================================================
+  "claudeCode.allowDangerouslySkipPermissions": true,
+  "claude-code.autosave": true,
+  "claude-code.useTerminal": true,
+  "claude-code.selectedModel": "sonnet",
+  "claude-code.autoCloseDiffTabs": true,
+
+  "python.analysis.aiHoverSummaries": true,
+  "chatgpt.runCodexInWindowsSubsystemForLinux": true,
+  "makefile.configureOnOpen": false,
+
+  // ============================================================================
+  // 27) WORKBENCH — AÇÕES / FECHAMENTO / PREVIEW (ADICIONAIS)
+  // ----------------------------------------------------------------------------
+  // - Ajustes adicionais do workbench editor.
+  // ============================================================================
+  "workbench.editor.alwaysShowEditorActions": true,
+  "workbench.editor.closeOnFileDelete": true,
+  "workbench.editor.enablePreviewFromCodeNavigation": false,
+  "workbench.editor.enablePreviewFromQuickOpen": false,
+
+  // ============================================================================
+  // 28) OUTROS — INDENTAÇÃO / OCCURRENCES / BROWSER
+  // ----------------------------------------------------------------------------
+  // - Ajustes diversos do editor/workbench.
+  // ============================================================================
+  "editor.autoIndentOnPaste": true,
+  "editor.occurrencesHighlightDelay": 100,
+  "workbench.externalBrowser": "chrome",
+
+  // ============================================================================
+  // 29) WINDOWS AI STUDIO (AI TOOLKIT) — REMOTE INFERENCE / PORT
+  // ----------------------------------------------------------------------------
+  // - Flags e arrays (vazios) para providers/endpoints externos.
+  // ============================================================================
+  "windowsaistudio.enableRemoteFine-tuningAndInference": true,
+  "windowsaistudio.openAIInferencePort": 11434,
+  "windowsaistudio.externalOpenAIProviders": [],
+  "windowsaistudio.remoteInfereneEndpoints": [],
+
+  // ============================================================================
+  // 30) REMOTE / SSH — FORWARDED PORTS DEFAULT (LISTA)
+  // ----------------------------------------------------------------------------
+  // - Mantém lista vazia, conforme arquivo original.
+  // ============================================================================
+  "remote.SSH.defaultForwardedPorts": [],
+
+  // ============================================================================
+  // 31) COPILOT — BYOK / OLLAMA ENDPOINT
+  // ----------------------------------------------------------------------------
+  // - Endpoint do Ollama acessível (ex.: dentro de container) via host.docker.internal.
+  // ============================================================================
+  "github.copilot.chat.byok.ollamaEndpoint": "http://host.docker.internal:11434/",
+
+  // ============================================================================
+  // 32) SPELLING (CSPELL)
+  // ----------------------------------------------------------------------------
+  // - Desliga o cSpell no workspace.
+  // ============================================================================
+  "cSpell.enabled": false
 }

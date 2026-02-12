@@ -1,14 +1,19 @@
 #!/usr/bin/env node
-/* ==========================================================================
-   index.js
-   Entry Point Proxy - Delegates to src/main.js
-
-   This file exists for compatibility with:
-   - package.json "main" field
-   - Docker CMD
-   - PM2 ecosystem.config.cjs
-   - Legacy scripts
-========================================================================== */
+/**
+ * @file index.js
+ * @description Entry Point Proxy - Delega para src/main.js
+ *
+ * Este arquivo existe para compatibilidade com:
+ * - Campo "main" do package.json
+ * - Docker CMD
+ * - PM2 ecosystem.config.cjs
+ * - Scripts legados
+ */
 
 import { main } from '#main';
+
+/**
+ * Função principal que inicia a aplicação.
+ * Side-effects: Inicia o loop principal da aplicação.
+ */
 main();

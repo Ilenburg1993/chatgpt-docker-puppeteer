@@ -149,6 +149,10 @@ module.exports = {
             log_rotate_interval: '1d',    // Rotacionar diariamente
             log_rotate_max: 7,            // Manter últimos 7 dias
 
+            // Load .env.local for sensitive configs (Ollama Cloud API keys, etc.)
+            // Order: .env.local overrides .env (dotenv loaded in main.js)
+            env_file: './.env.local',
+
             // Ambiente
             env: {
                 PORT: 3008,
@@ -156,7 +160,12 @@ module.exports = {
                 DAEMON_MODE: 'true',
                 SERVER_AUTHORITY: 'standalone', // PM2 SOBERANO: Processo autônomo
                 ENABLE_STATE_FILE: 'false',     // Usa NERV SERVER_READY (não estado.json)
-                MCP_ENABLED: 'true'             // Habilita MCP handler (v4.1)
+                MCP_ENABLED: 'true',            // Habilita MCP handler (v4.1)
+
+                // Adaptive timeout defaults (can be overridden in .env.local)
+                MCP_TOOL_ADAPTIVE_TIMEOUT: 'true',   // Enable adaptive timeout (P99.9999)
+                MCP_TOOL_RETRY_ENABLED: 'true',      // Enable retry with exponential backoff
+                OLLAMA_CIRCUIT_BREAKER_ENABLED: 'true' // Circuit breaker protection
             },
 
             env_production: {
@@ -165,7 +174,10 @@ module.exports = {
                 DAEMON_MODE: 'true',
                 SERVER_AUTHORITY: 'standalone',
                 ENABLE_STATE_FILE: 'false',
-                MCP_ENABLED: 'true'
+                MCP_ENABLED: 'true',
+                MCP_TOOL_ADAPTIVE_TIMEOUT: 'true',
+                MCP_TOOL_RETRY_ENABLED: 'true',
+                OLLAMA_CIRCUIT_BREAKER_ENABLED: 'true'
             }
         },
 
