@@ -1,30 +1,35 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs';
-import path from 'node:path';
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
-import { ActionCode, MessageType } from '#shared/nerv/constants';
-import { getActionCode, getCorrelationId, getMessageType, getMsgId, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
-import * as PATHS from '#infra/fs/paths';
-import { recordEvent } from '#infra/db/events_repo';
-import { extendTaskLock, incrementTaskAttempts, releaseTaskLock, updateTask, TASK_STAGES } from '#infra/db/task_repo';
-import { getDb } from '#infra/db/sqlite';
 import { insertArtifact } from '#infra/db/artifact_repo';
+import { recordEvent } from '#infra/db/events_repo';
+import { getDb } from '#infra/db/sqlite';
 import { updateAttempt, upsertAttempt } from '#infra/db/task_attempt_repo';
+import { extendTaskLock, incrementTaskAttempts, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import * as PATHS from '#infra/fs/paths';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
+import {
+    getActionCode,
+    getCorrelationId,
+    getMessageType,
+    getMsgId,
+    getPayload,
+    getTaskIdFromPayload,
+} from '#shared/nerv/envelope_reader';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function _safeDelayMs(payload) {
     const raw =
-        payload?.suggestedDelayMs ??
-        payload?.retryDelayMs ??
-        payload?.retry_delay_ms ??
-        payload?.delayMs ??
-        null;
+        payload?.suggestedDelayMs ?? payload?.retryDelayMs ?? payload?.retry_delay_ms ?? payload?.delayMs ?? null;
     const n = Number(raw);
     return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 function _storagePointers(taskId) {
-    const artifactsRoot = path.resolve(process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || PATHS.ARTIFACTS);
+    const artifactsRoot = path.resolve(
+        process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || PATHS.ARTIFACTS
+    );
     const basePath = path.join(artifactsRoot, 'responses', taskId, 'latest');
     return {
         text_file: `${basePath}.txt`,
@@ -159,8 +164,24 @@ function _getCurrentAttemptIdForTask(taskId) {
     }
 }
 
+/**
+ * Opções do construtor do TaskStateProjector.
+ * @typedef {Object} TaskStateProjectorOptions
+ * @property {Object} nerv - Instância do sistema nerv com método onReceive.
+ * @property {string|null} [workerId] - ID opcional do worker.
+ */
+
+/**
+ * Projetor que escuta mensagens NERV e projeta estado de tarefas no SQLite.
+ * Responsável por manter consistência entre mensagens do sistema e estado persistido.
+ */
 class TaskStateProjector {
-    constructor({ nerv, workerId = null } = {}) {
+    /**
+     * Cria um projetor de estado de tarefas.
+     * @param {TaskStateProjectorOptions} options - Opções de configuração.
+     */
+    constructor(options) {
+        const { nerv, workerId = null } = options;
         if (!nerv || typeof nerv.onReceive !== 'function') {
             throw new Error('[TaskStateProjector] nerv.onReceive required');
         }
@@ -173,6 +194,45 @@ class TaskStateProjector {
         this.admissionLockTtlMs = Math.max(60000, Number(CONFIG?.all?.TASK_ADMISSION_LOCK_TTL_MS || 300000) || 300000);
     }
 
+    /**
+     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
+     * Prevents projector crashes when concurrent updates cause optimistic lock conflicts.
+     *
+     * @private
+     * @param {string} taskId - Task ID to update
+     * @param {Record<string, any>} updates - Update payload (status, stage, timestamps, etc.)
+     * @param {{ critical?: boolean, context?: string }} [options] - Options
+     * @returns {boolean} True if update succeeded, false if conflict occurred (non-critical only)
+     * @throws {Error} Re-throws OptimisticLockError if options.critical=true
+     */
+    _safeUpdateTask(taskId, updates, { critical = false, context = '' } = {}) {
+        try {
+            updateTask(taskId, updates);
+            return true;
+        } catch (err) {
+            if (err && err.name === 'OptimisticLockError') {
+                const msg = context
+                    ? `[TaskStateProjector] ${context}: Task ${taskId} update conflict after retries`
+                    : `[TaskStateProjector] Task ${taskId} update conflict after retries`;
+
+                log('WARN', msg, String(taskId));
+
+                if (critical) {
+                    throw err;
+                }
+
+                return false;
+            }
+
+            throw err;
+        }
+    }
+
+    /**
+     * Inicia o projetor, registrando handler para mensagens NERV.
+     * @returns {void}
+     * @sideEffects Registra listener no nerv e inicia projeção de estado.
+     */
     start() {
         if (this._unsub) return;
         const maybeUnsub = this.nerv.onReceive(envelope => {
@@ -186,6 +246,11 @@ class TaskStateProjector {
         log('INFO', '[TaskStateProjector] started (NERV → SQLite)');
     }
 
+    /**
+     * Para o projetor, removendo handler de mensagens NERV.
+     * @returns {void}
+     * @sideEffects Remove listener do nerv.
+     */
     stop() {
         if (this._unsub) {
             try {
@@ -198,6 +263,13 @@ class TaskStateProjector {
         log('INFO', '[TaskStateProjector] stopped');
     }
 
+    /**
+     * Processa um envelope NERV, projetando estado de tarefa no SQLite se for evento suportado.
+     * @private
+     * @param {Object} envelope - Envelope NERV contendo mensagem.
+     * @returns {void}
+     * @sideEffects Modifica estado do banco de dados baseado no evento.
+     */
     _handleEnvelope(envelope) {
         if (getMessageType(envelope) !== MessageType.EVENT) {
             return;
@@ -232,6 +304,10 @@ class TaskStateProjector {
         const attemptId = correlationId || null;
         const msgId = getMsgId(envelope) || null;
         const now = Date.now();
+
+        // P0-5 FIX: Stale attempt check now relies on optimistic locking in updateTask
+        // instead of separate DB read. updateTask() will return null if concurrent modification
+        // detected (including attempt ID changes), preventing stale event application.
         const currentAttemptId = attemptId ? _getCurrentAttemptIdForTask(taskId) : null;
         const isStaleAttempt = Boolean(attemptId && currentAttemptId && attemptId !== currentAttemptId);
 
@@ -252,7 +328,8 @@ class TaskStateProjector {
         }
 
         if (actionCode === ActionCode.DRIVER_TASK_ACCEPTED || actionCode === ActionCode.DRIVER_TASK_HEARTBEAT) {
-            const lockTtlMs = actionCode === ActionCode.DRIVER_TASK_ACCEPTED ? this.admissionLockTtlMs : this.runningLockTtlMs;
+            const lockTtlMs =
+                actionCode === ActionCode.DRIVER_TASK_ACCEPTED ? this.admissionLockTtlMs : this.runningLockTtlMs;
 
             try {
                 if (attemptId) {
@@ -285,7 +362,7 @@ class TaskStateProjector {
             });
 
             // Keep correlation linkage fresh (helps control/abort routing).
-            updateTask(taskId, {
+            this._safeUpdateTask(taskId, {
                 last_correlation_id: correlationId,
                 latest_attempt_id: attemptId,
             });
@@ -296,7 +373,11 @@ class TaskStateProjector {
             // Attempt transitions to RUNNING at DRIVER_TASK_STARTED.
             try {
                 if (attemptId) {
-                    const updated = updateAttempt(attemptId, { status: 'RUNNING', started_at_ms: now, last_heartbeat_at_ms: now });
+                    const updated = updateAttempt(attemptId, {
+                        status: 'RUNNING',
+                        started_at_ms: now,
+                        last_heartbeat_at_ms: now,
+                    });
                     if (!updated) {
                         upsertAttempt({
                             id: attemptId,
@@ -326,7 +407,7 @@ class TaskStateProjector {
                 lockTtlMs: this.runningLockTtlMs,
             });
 
-            updateTask(taskId, {
+            this._safeUpdateTask(taskId, {
                 status: 'RUNNING',
                 started_at_ms: now,
                 last_correlation_id: correlationId,
@@ -348,7 +429,7 @@ class TaskStateProjector {
             const delayMs = _safeDelayMs(payload) ?? 500;
             const executeAfterMs = now + Math.max(250, delayMs);
 
-            updateTask(taskId, {
+            this._safeUpdateTask(taskId, {
                 status: 'PENDING',
                 stage: TASK_STAGES.READY,
                 last_correlation_id: correlationId,
@@ -384,8 +465,30 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_) {
-                /* ignore */
+            } catch (err) {
+                log(
+                    'ERROR',
+                    `[PROJECTOR] Failed to register attempt for DRIVER_TASK_FAILED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                );
+                // Emit NERV event for visibility
+                try {
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: now,
+                        actorType: 'system',
+                        eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                        payload: {
+                            phase: 'attempt_registration',
+                            action_code: actionCode,
+                            attempt_id: attemptId,
+                            error: err?.message || String(err),
+                        },
+                        dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:${now}`,
+                    });
+                } catch (_) {
+                    /* NERV emit is best-effort */
+                }
             }
 
             releaseTaskLock({ taskId });
@@ -395,7 +498,8 @@ class TaskStateProjector {
         if (actionCode === ActionCode.DRIVER_TASK_COMPLETED) {
             const result = payload?.result;
             const text = typeof result === 'string' ? result : JSON.stringify(result ?? null);
-            const storage = payload?.storage && typeof payload.storage === 'object' ? payload.storage : _storagePointers(taskId);
+            const storage =
+                payload?.storage && typeof payload.storage === 'object' ? payload.storage : _storagePointers(taskId);
 
             const artifactIds = _registerResponseArtifacts({ storage, actor: 'system' });
 
@@ -426,15 +530,38 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_) {
-                /* ignore */
+            } catch (err) {
+                log(
+                    'ERROR',
+                    `[PROJECTOR] CRITICAL: Failed to link artifacts for completed task (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                );
+                // Emit NERV event for visibility - this is critical as task may complete without artifacts
+                try {
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: now,
+                        actorType: 'system',
+                        eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                        payload: {
+                            phase: 'artifact_linking',
+                            action_code: actionCode,
+                            attempt_id: attemptId,
+                            artifact_ids: artifactIds,
+                            error: err?.message || String(err),
+                        },
+                        dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:${now}`,
+                    });
+                } catch (_) {
+                    /* NERV emit is best-effort */
+                }
             }
 
             if (isStaleAttempt) {
                 return;
             }
 
-            updateTask(taskId, {
+            this._safeUpdateTask(taskId, {
                 stage: TASK_STAGES.ARCHIVED,
                 status: 'DONE',
                 completed_at_ms: now,
@@ -495,15 +622,36 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_) {
-                /* ignore */
+            } catch (err) {
+                log(
+                    'ERROR',
+                    `[PROJECTOR] Failed to register attempt for DRIVER_TASK_ABORTED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                );
+                try {
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: now,
+                        actorType: 'system',
+                        eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                        payload: {
+                            phase: 'attempt_registration',
+                            action_code: actionCode,
+                            attempt_id: attemptId,
+                            error: err?.message || String(err),
+                        },
+                        dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:${now}`,
+                    });
+                } catch (_) {
+                    /* NERV emit is best-effort */
+                }
             }
 
             if (isStaleAttempt) {
                 return;
             }
 
-            updateTask(taskId, {
+            this._safeUpdateTask(taskId, {
                 status: nextStatus,
                 ...(nextStatus === 'PAUSED' ? { paused_at_ms: now } : { cancelled_at_ms: now }),
                 last_error: payload?.reason ? String(payload.reason) : 'USER_ABORT',
@@ -547,8 +695,30 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log(
+                        'ERROR',
+                        `[PROJECTOR] Failed to register attempt for duplicate dispatch (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    );
+                    try {
+                        recordEvent({
+                            entityType: 'task',
+                            entityId: taskId,
+                            tsMs: now,
+                            actorType: 'system',
+                            eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                            payload: {
+                                phase: 'attempt_registration',
+                                action_code: actionCode,
+                                attempt_id: attemptId,
+                                context: 'duplicate_dispatch',
+                                error: err?.message || String(err),
+                            },
+                            dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:dup:${now}`,
+                        });
+                    } catch (_) {
+                        /* NERV emit is best-effort */
+                    }
                 }
                 return;
             }
@@ -556,16 +726,14 @@ class TaskStateProjector {
             if (isStaleAttempt) {
                 try {
                     if (attemptId) {
-                        const reasonCode =
-                            payload?.reason_code ||
-                            payload?.reasonCode ||
-                            payload?.reason ||
-                            null;
+                        const reasonCode = payload?.reason_code || payload?.reasonCode || payload?.reason || null;
                         const causeLayer = payload?.cause_layer || payload?.causeLayer || null;
-                        const diagStorage = payload?.details?.diagnostic_storage || payload?.details?.diagnosticStorage || null;
+                        const diagStorage =
+                            payload?.details?.diagnostic_storage || payload?.details?.diagnosticStorage || null;
                         const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
                         const diagJson = JSON.stringify(diagIds);
-                        const summary = payload?.details?.diagnosis_summary || payload?.details?.diagnosisSummary || null;
+                        const summary =
+                            payload?.details?.diagnosis_summary || payload?.details?.diagnosisSummary || null;
                         const summaryJson = summary ? JSON.stringify(summary).slice(0, 10000) : null;
 
                         updateAttempt(attemptId, {
@@ -580,8 +748,30 @@ class TaskStateProjector {
                             diagnosis_json: summaryJson,
                         });
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log(
+                        'ERROR',
+                        `[PROJECTOR] Failed to register diagnostic artifacts for stale attempt (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    );
+                    try {
+                        recordEvent({
+                            entityType: 'task',
+                            entityId: taskId,
+                            tsMs: now,
+                            actorType: 'system',
+                            eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                            payload: {
+                                phase: 'diagnostic_artifacts',
+                                action_code: actionCode,
+                                attempt_id: attemptId,
+                                context: 'stale_attempt',
+                                error: err?.message || String(err),
+                            },
+                            dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:stale:${now}`,
+                        });
+                    } catch (_) {
+                        /* NERV emit is best-effort */
+                    }
                 }
                 return;
             }
@@ -590,7 +780,14 @@ class TaskStateProjector {
             const nextAction = payload?.next_action || payload?.nextAction || null;
             const delayMs = _safeDelayMs(payload);
             const reasonClass = payload?.reason_class || payload?.reasonClass || null;
-            const countAttempt = Boolean(payload?.count_attempt ?? payload?.countAttempt ?? false);
+
+            // Policy: TASK_ERROR always counts attempts regardless of payload.
+            // Transient/operational failures should use ENV_UNAVAILABLE instead.
+            let countAttempt = Boolean(payload?.count_attempt ?? payload?.countAttempt ?? false);
+            if (reasonClass === 'TASK_ERROR') {
+                countAttempt = true;
+            }
+
             const reasonCode = payload?.reason_code || payload?.reasonCode || payload?.reason || null;
             const causeLayer = payload?.cause_layer || payload?.causeLayer || null;
 
@@ -605,7 +802,7 @@ class TaskStateProjector {
 
             // USER_ACTION_REQUIRED → BLOCKED
             if (nextAction === 'BLOCK' || reasonClass === 'USER_ACTION_REQUIRED') {
-                updateTask(taskId, {
+                this._safeUpdateTask(taskId, {
                     status: 'BLOCKED',
                     stage: TASK_STAGES.READY,
                     blocked_reason: String(payload?.reason || 'USER_ACTION_REQUIRED').slice(0, 200),
@@ -649,8 +846,30 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log(
+                        'ERROR',
+                        `[PROJECTOR] Failed to register diagnostic artifacts for USER_ACTION_REQUIRED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    );
+                    try {
+                        recordEvent({
+                            entityType: 'task',
+                            entityId: taskId,
+                            tsMs: now,
+                            actorType: 'system',
+                            eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                            payload: {
+                                phase: 'diagnostic_artifacts',
+                                action_code: actionCode,
+                                attempt_id: attemptId,
+                                context: 'user_action_required',
+                                error: err?.message || String(err),
+                            },
+                            dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:block:${now}`,
+                        });
+                    } catch (_) {
+                        /* NERV emit is best-effort */
+                    }
                 }
 
                 releaseTaskLock({ taskId });
@@ -661,7 +880,7 @@ class TaskStateProjector {
             if (reasonClass === 'ENV_UNAVAILABLE') {
                 const executeAfterMs = now + Math.max(250, delayMs ?? 2000);
 
-                updateTask(taskId, {
+                this._safeUpdateTask(taskId, {
                     status: 'PENDING',
                     stage: TASK_STAGES.READY,
                     last_error: errText.slice(0, 2000),
@@ -705,15 +924,38 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log(
+                        'ERROR',
+                        `[PROJECTOR] Failed to register diagnostic artifacts for ENV_UNAVAILABLE (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    );
+                    try {
+                        recordEvent({
+                            entityType: 'task',
+                            entityId: taskId,
+                            tsMs: now,
+                            actorType: 'system',
+                            eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                            payload: {
+                                phase: 'diagnostic_artifacts',
+                                action_code: actionCode,
+                                attempt_id: attemptId,
+                                context: 'env_unavailable',
+                                error: err?.message || String(err),
+                            },
+                            dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:env:${now}`,
+                        });
+                    } catch (_) {
+                        /* NERV emit is best-effort */
+                    }
                 }
 
                 releaseTaskLock({ taskId });
                 return;
             }
 
-            // TASK_ERROR → retry with max_attempts gate; consume attempts only when count_attempt=true.
+            // TASK_ERROR → retry with max_attempts gate.
+            // Policy: TASK_ERROR always consumes attempts (count_attempt is forced to true above).
             if (reasonClass === 'TASK_ERROR') {
                 let maxAttempts = 3;
                 let currentAttempts = 0;
@@ -769,11 +1011,34 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log(
+                        'ERROR',
+                        `[PROJECTOR] Failed to register diagnostic artifacts for TASK_ERROR (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    );
+                    try {
+                        recordEvent({
+                            entityType: 'task',
+                            entityId: taskId,
+                            tsMs: now,
+                            actorType: 'system',
+                            eventType: ActionCode.ARTIFACT_REGISTRATION_FAILED,
+                            payload: {
+                                phase: 'diagnostic_artifacts',
+                                action_code: actionCode,
+                                attempt_id: attemptId,
+                                context: 'task_error',
+                                error: err?.message || String(err),
+                            },
+                            dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:terr:${now}`,
+                        });
+                    } catch (_) {
+                        /* NERV emit is best-effort */
+                    }
                 }
 
-                // Operational failures (count_attempt=false) should use a longer backoff.
+                // Unreachable for TASK_ERROR (count_attempt is forced to true).
+                // This branch is defensive for future reason_class values.
                 if (!countAttempt) {
                     const base = 30000;
                     const max = 120000;
@@ -781,7 +1046,7 @@ class TaskStateProjector {
                     const computed = Math.min(max, base + Math.floor(Math.random() * 5000));
                     const executeAfterMs = now + Math.max(base, delayMs ?? computed) + jitter;
 
-                    updateTask(taskId, {
+                    this._safeUpdateTask(taskId, {
                         status: 'PENDING',
                         stage: TASK_STAGES.READY,
                         last_error: errText.slice(0, 2000),
@@ -797,7 +1062,7 @@ class TaskStateProjector {
                 }
 
                 if (nextAttempts >= maxAttempts) {
-                    updateTask(taskId, {
+                    this._safeUpdateTask(taskId, {
                         status: 'FAILED',
                         stage: TASK_STAGES.ARCHIVED,
                         failed_at_ms: now,
@@ -819,7 +1084,7 @@ class TaskStateProjector {
                 const jitter = Math.floor(Math.random() * 250);
                 const executeAfterMs = now + Math.max(250, delayMs ?? computed) + jitter;
 
-                updateTask(taskId, {
+                this._safeUpdateTask(taskId, {
                     status: 'PENDING',
                     stage: TASK_STAGES.READY,
                     last_error: errText.slice(0, 2000),
@@ -837,7 +1102,7 @@ class TaskStateProjector {
             if (retryable && (nextAction === 'RETRY_LATER' || delayMs !== null)) {
                 const executeAfterMs = now + Math.max(250, delayMs ?? 1000);
 
-                updateTask(taskId, {
+                this._safeUpdateTask(taskId, {
                     status: 'PENDING',
                     stage: TASK_STAGES.READY,
                     last_error: errText.slice(0, 2000),
@@ -889,7 +1154,7 @@ class TaskStateProjector {
                 return;
             }
 
-            updateTask(taskId, {
+            this._safeUpdateTask(taskId, {
                 status: 'FAILED',
                 failed_at_ms: now,
                 last_error: errText.slice(0, 2000),
@@ -898,9 +1163,26 @@ class TaskStateProjector {
             });
 
             try {
-                    if (attemptId) {
-                        const updated = updateAttempt(attemptId, {
+                if (attemptId) {
+                    const updated = updateAttempt(attemptId, {
+                        status: 'FAILED',
+                        ended_at_ms: now,
+                        error: errText.slice(0, 2000),
+                        reason_class: reasonClass ? String(reasonClass) : null,
+                        count_attempt: countAttempt ? 1 : 0,
+                        reason_code: reasonCode ? String(reasonCode) : null,
+                        cause_layer: causeLayer ? String(causeLayer) : null,
+                        diagnostic_artifacts_json: diagJson,
+                        diagnosis_json: summaryJson,
+                    });
+                    if (!updated) {
+                        upsertAttempt({
+                            id: attemptId,
+                            task_id: taskId,
+                            mission_id: _getMissionIdForTask(taskId),
                             status: 'FAILED',
+                            worker_id: null,
+                            created_at_ms: now,
                             ended_at_ms: now,
                             error: errText.slice(0, 2000),
                             reason_class: reasonClass ? String(reasonClass) : null,
@@ -910,28 +1192,11 @@ class TaskStateProjector {
                             diagnostic_artifacts_json: diagJson,
                             diagnosis_json: summaryJson,
                         });
-                        if (!updated) {
-                            upsertAttempt({
-                                id: attemptId,
-                                task_id: taskId,
-                                mission_id: _getMissionIdForTask(taskId),
-                                status: 'FAILED',
-                                worker_id: null,
-                                created_at_ms: now,
-                                ended_at_ms: now,
-                                error: errText.slice(0, 2000),
-                                reason_class: reasonClass ? String(reasonClass) : null,
-                                count_attempt: countAttempt ? 1 : 0,
-                                reason_code: reasonCode ? String(reasonCode) : null,
-                                cause_layer: causeLayer ? String(causeLayer) : null,
-                                diagnostic_artifacts_json: diagJson,
-                                diagnosis_json: summaryJson,
-                            });
-                        }
                     }
-                } catch (_) {
-                    /* ignore */
                 }
+            } catch (_) {
+                /* ignore */
+            }
             releaseTaskLock({ taskId });
         }
     }

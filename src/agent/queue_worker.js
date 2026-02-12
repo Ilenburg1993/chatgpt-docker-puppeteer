@@ -1,12 +1,29 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
-import { promises as fs } from 'node:fs';
-import { getDb } from '#infra/db/sqlite';
-import { claimNextEligibleTask, releaseTaskLock, updateTask, TASK_STAGES } from '#infra/db/task_repo';
-import { recordEvent } from '#infra/db/events_repo';
 import { insertArtifact } from '#infra/db/artifact_repo';
-import { upsertAttempt, updateAttempt } from '#infra/db/task_attempt_repo';
+import { recordEvent } from '#infra/db/events_repo';
+import { getDb } from '#infra/db/sqlite';
+import { updateAttempt, upsertAttempt } from '#infra/db/task_attempt_repo';
+import { claimNextEligibleTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { putJson, putText, readText } from '#infra/storage/artifact_store';
+import { promises as fs } from 'node:fs';
+
+/**
+ * Opções do construtor do QueueWorker.
+ * @typedef {Object} QueueWorkerOptions
+ * @property {Object} kernel - Instância do kernel com método executeTask() (obrigatório).
+ * @property {string} workerId - ID único do worker (obrigatório).
+ * @property {number} [intervalMs=250] - Intervalo entre ticks em ms.
+ * @property {number} [lockTtlMs=60000] - TTL do lock em ms.
+ * @property {number} [maxConcurrentTasks=2] - Máximo de tarefas concorrentes.
+ */
+
+/**
+ * Parâmetros para composição de prompt do driver.
+ * @typedef {Object} DriverPromptParams
+ * @property {string} [systemMessage] - Mensagem do sistema.
+ * @property {string} [userMessage] - Mensagem do usuário.
+ */
 
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -25,7 +42,13 @@ function _truncate(text, maxLen) {
     return s.length > n ? s.slice(0, n) : s;
 }
 
-function _composeDriverPrompt({ systemMessage, userMessage } = {}) {
+/**
+ * Compõe um prompt para o driver baseado em mensagens do sistema e usuário.
+ * @param {DriverPromptParams} [params={}] - Parâmetros do prompt.
+ * @returns {string} Prompt composto ou string vazia se não houver mensagem do usuário.
+ */
+function _composeDriverPrompt(params = {}) {
+    const { systemMessage, userMessage } = params;
     const sys = typeof systemMessage === 'string' ? systemMessage.trim() : '';
     const usr = typeof userMessage === 'string' ? userMessage.trim() : '';
     if (!usr) return '';
@@ -51,7 +74,7 @@ async function _readTextFromTaskLatestResult(taskId) {
     }
 }
 
-async function _resolveContextInputs(inputs = []) {
+async function _resolveContextInputs(inputs = [], currentTaskId = null) {
     if (!Array.isArray(inputs) || inputs.length === 0) return '';
 
     const MAX_PER_INPUT_CHARS = Math.max(1000, Number(process.env.QUEUE_INPUT_MAX_CHARS || 50000) || 50000);
@@ -64,6 +87,15 @@ async function _resolveContextInputs(inputs = []) {
         if (type === 'task_result') {
             const srcTaskId = input?.task_id ? String(input.task_id) : null;
             if (!srcTaskId) continue;
+
+            // Cycle detection: skip self-references to prevent reading from incomplete/stale results.
+            if (currentTaskId && srcTaskId === currentTaskId) {
+                log(
+                    'WARN',
+                    `[QUEUE] Skipping self-referencing context input (task_id=${srcTaskId}) in task ${currentTaskId}`
+                );
+                continue;
+            }
 
             const attempt = input?.attempt ? String(input.attempt) : 'latest';
             const format = input?.format ? String(input.format) : 'text';
@@ -124,13 +156,12 @@ async function _resolveContextInputs(inputs = []) {
 }
 
 class QueueWorker {
-    constructor({
-        kernel,
-        workerId,
-        intervalMs = 250,
-        lockTtlMs = 60000,
-        maxConcurrentTasks = 2,
-    } = {}) {
+    /**
+     * Cria um worker da fila para reivindicar e executar tarefas.
+     * @param {QueueWorkerOptions} options - Opções de configuração do worker.
+     */
+    constructor(options) {
+        const { kernel, workerId, intervalMs = 250, lockTtlMs = 60000, maxConcurrentTasks = 2 } = options;
         if (!kernel || typeof kernel.executeTask !== 'function') {
             throw new Error('[QueueWorker] kernel.executeTask required');
         }
@@ -149,6 +180,29 @@ class QueueWorker {
         this._stopped = false;
     }
 
+    /**
+     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
+     * @private
+     */
+    _safeUpdateTask(taskId, updates, { critical = false, context = '' } = {}) {
+        try {
+            updateTask(taskId, updates);
+            return true;
+        } catch (err) {
+            if (err && err.name === 'OptimisticLockError') {
+                log('WARN', `[QueueWorker] ${context || 'Update'}: Task ${taskId} conflict`, String(taskId));
+                if (critical) throw err;
+                return false;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Inicia o worker, começando a reivindicar e executar tarefas periodicamente.
+     * @returns {void}
+     * @sideEffects Inicia timer interno e executa tick imediatamente.
+     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -163,6 +217,11 @@ class QueueWorker {
         log('INFO', `[QueueWorker] started (interval=${this.intervalMs}ms, maxConcurrent=${this.maxConcurrentTasks})`);
     }
 
+    /**
+     * Para o worker, cancelando o timer e impedindo novas execuções.
+     * @returns {void}
+     * @sideEffects Cancela timer interno e marca worker como parado.
+     */
     stop() {
         this._stopped = true;
         if (this._timer) {
@@ -172,6 +231,12 @@ class QueueWorker {
         log('INFO', '[QueueWorker] stopped');
     }
 
+    /**
+     * Executa um ciclo do worker: reivindica tarefas elegíveis e as executa.
+     * @returns {Promise<void>}
+     * @throws {Error} Se houver erro na execução de tarefa (logado, não relançado).
+     * @sideEffects Modifica estado do banco de dados, executa tarefas via kernel.
+     */
     async tick() {
         if (this._stopped) return;
         if (this._running) return;
@@ -181,9 +246,10 @@ class QueueWorker {
             const db = getDb();
             const now = Date.now();
 
-            const inflight = db
-                .prepare(
-                    `
+            const inflight =
+                db
+                    .prepare(
+                        `
                     SELECT COUNT(1) AS c
                     FROM tasks
                     WHERE locked_by = @workerId
@@ -192,8 +258,8 @@ class QueueWorker {
                       AND stage = @stage
                       AND status IN ('PENDING', 'RUNNING')
                 `
-                )
-                .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY })?.c || 0;
+                    )
+                    .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY })?.c || 0;
 
             const availableSlots = Math.max(0, this.maxConcurrentTasks - Number(inflight || 0));
             if (availableSlots <= 0) {
@@ -220,7 +286,7 @@ class QueueWorker {
                 // Final guard: do not dispatch tasks without user_message.
                 const userMessage = task?.spec?.payload?.user_message;
                 if (!userMessage || typeof userMessage !== 'string' || !userMessage.trim()) {
-                    updateTask(taskId, {
+                    this._safeUpdateTask(taskId, {
                         status: 'FAILED',
                         stage: TASK_STAGES.ARCHIVED,
                         last_error: 'TASK_INVALID: spec.payload.user_message missing',
@@ -234,7 +300,7 @@ class QueueWorker {
                 const maxAttempts = Math.max(1, Number(task?.policy?.max_attempts ?? 3) || 3);
                 const currentAttempts = Number(claimed?.row?.attempts ?? 0) || 0;
                 if (currentAttempts >= maxAttempts) {
-                    updateTask(taskId, {
+                    this._safeUpdateTask(taskId, {
                         status: 'FAILED',
                         stage: TASK_STAGES.ARCHIVED,
                         last_error: `MAX_ATTEMPTS_REACHED(${currentAttempts}/${maxAttempts})`,
@@ -257,7 +323,7 @@ class QueueWorker {
 
                 // Persist correlation id for debuggability / abort routing.
                 // Also set latest_attempt_id early so projectors/watchdogs can treat stale events correctly.
-                updateTask(taskId, { last_correlation_id: correlationId, latest_attempt_id: correlationId });
+                this._safeUpdateTask(taskId, { last_correlation_id: correlationId, latest_attempt_id: correlationId });
 
                 // Create attempt record (attempt == correlationId).
                 const missionId = task?.meta?.mission_id || task?.mission?.mission_id || null;
@@ -286,8 +352,14 @@ class QueueWorker {
                 try {
                     if (!task?.prompt_template_artifact_id) {
                         const tpl = {
-                            system_message: typeof task?.spec?.payload?.system_message === 'string' ? task.spec.payload.system_message : '',
-                            user_message: typeof task?.spec?.payload?.user_message === 'string' ? task.spec.payload.user_message : '',
+                            system_message:
+                                typeof task?.spec?.payload?.system_message === 'string'
+                                    ? task.spec.payload.system_message
+                                    : '',
+                            user_message:
+                                typeof task?.spec?.payload?.user_message === 'string'
+                                    ? task.spec.payload.user_message
+                                    : '',
                         };
                         const stored = await putJson({
                             kind: 'prompt_template',
@@ -304,16 +376,18 @@ class QueueWorker {
                             created_by: 'system',
                             created_at_ms: Date.now(),
                         });
-                        updateTask(taskId, { prompt_template_artifact_id: artId });
+                        this._safeUpdateTask(taskId, { prompt_template_artifact_id: artId });
                     }
                 } catch (_) {
                     /* ignore */
                 }
 
                 // Render prompt for this attempt (supports optional context.inputs).
-                const systemMessage = typeof task?.spec?.payload?.system_message === 'string' ? task.spec.payload.system_message : '';
-                const baseUserMessage = typeof task?.spec?.payload?.user_message === 'string' ? task.spec.payload.user_message : '';
-                const inputsAppend = await _resolveContextInputs(task?.spec?.payload?.context?.inputs);
+                const systemMessage =
+                    typeof task?.spec?.payload?.system_message === 'string' ? task.spec.payload.system_message : '';
+                const baseUserMessage =
+                    typeof task?.spec?.payload?.user_message === 'string' ? task.spec.payload.user_message : '';
+                const inputsAppend = await _resolveContextInputs(task?.spec?.payload?.context?.inputs, taskId);
                 const renderedUserMessage = `${baseUserMessage}${inputsAppend}`;
                 const driverPrompt = _composeDriverPrompt({ systemMessage, userMessage: renderedUserMessage });
 
@@ -337,7 +411,7 @@ class QueueWorker {
                         created_at_ms: Date.now(),
                     });
                     updateAttempt(correlationId, { rendered_prompt_artifact_id: renderedPromptArtifactId });
-                    updateTask(taskId, {
+                    this._safeUpdateTask(taskId, {
                         latest_attempt_id: correlationId,
                         latest_rendered_prompt_artifact_id: renderedPromptArtifactId,
                     });
@@ -363,7 +437,11 @@ class QueueWorker {
 
                     // Attempt ended before driver start.
                     try {
-                        updateAttempt(correlationId, { status: retryable ? 'FAILED' : 'FAILED', ended_at_ms: Date.now(), error: msg });
+                        updateAttempt(correlationId, {
+                            status: retryable ? 'FAILED' : 'FAILED',
+                            ended_at_ms: Date.now(),
+                            error: msg,
+                        });
                     } catch (_) {
                         /* ignore */
                     }
@@ -371,7 +449,7 @@ class QueueWorker {
                     if (retryable) {
                         const executeAfterMs = Date.now() + Math.max(250, delayMs || 1000);
 
-                        updateTask(taskId, {
+                        this._safeUpdateTask(taskId, {
                             status: 'PENDING',
                             stage: TASK_STAGES.READY,
                             last_error: `DISPATCH_RETRY_SCHEDULED(${reason}): ${msg}`.slice(0, 2000),
@@ -384,11 +462,16 @@ class QueueWorker {
                             tsMs: Date.now(),
                             actorType: 'system',
                             eventType: 'TASK_RETRY_SCHEDULED',
-                            payload: { workerId: this.workerId, correlationId, reason, delayMs: Math.max(250, delayMs || 1000) },
+                            payload: {
+                                workerId: this.workerId,
+                                correlationId,
+                                reason,
+                                delayMs: Math.max(250, delayMs || 1000),
+                            },
                             dedupKey: `task:${taskId}:retry_scheduled:${correlationId}`,
                         });
                     } else {
-                        updateTask(taskId, {
+                        this._safeUpdateTask(taskId, {
                             status: 'FAILED',
                             last_error: `DISPATCH_FAILED(${reason}): ${msg}`.slice(0, 2000),
                             failed_at_ms: Date.now(),
