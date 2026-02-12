@@ -9,12 +9,23 @@ const TEMPLATE_DIR = path.join(ROOT, 'templates');
 
 // --- HELPERS DE INFRAESTRUTURA ---
 
+/**
+ * Grava conteúdo em um arquivo de forma atômica, evitando corrupção parcial.
+ * Side-effects: Cria arquivo temporário e renomeia para o destino final.
+ * @param {string} filepath - Caminho do arquivo de destino.
+ * @param {string} content - Conteúdo a ser gravado.
+ */
 function atomicWrite(filepath, content) {
     const tmp = `${filepath}.tmp.${crypto.randomBytes(4).toString('hex')}`;
     fs.writeFileSync(tmp, content, 'utf-8');
     fs.renameSync(tmp, filepath);
 }
 
+/**
+ * Gera um ID único para identificação de tarefas.
+ * @param {string} [prefix='TASK-CLI'] - Prefixo para o ID gerado.
+ * @returns {string} ID único no formato "prefix-timestamp-salt".
+ */
 function generateUniqueId(prefix = 'TASK-CLI') {
     const ts = Date.now();
     const salt = crypto.randomBytes(3).toString('hex');
@@ -32,7 +43,20 @@ function generateUniqueId(prefix = 'TASK-CLI') {
 const VALID_TARGETS = ['chatgpt', 'gemini', 'claude', 'perplexity'];
 const _VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claude-3-opus'];
 
-// --- PARSER DE ARGUMENTOS ---
+/**
+ * Parseia argumentos da linha de comando para opções de criação de tarefa.
+ * @param {string[]} args - Array de argumentos da linha de comando.
+ * @returns {Object} Opções parseadas com valores padrão.
+ * @property {number} prio - Prioridade da tarefa (0-100).
+ * @property {string} model - Modelo de IA a ser utilizado.
+ * @property {string} target - Plataforma alvo (chatgpt, gemini, etc).
+ * @property {string} system - Mensagem do sistema/persona.
+ * @property {string[]} tags - Tags para categorização.
+ * @property {string[]} prompt - Parte do prompt que não são argumentos.
+ * @property {string|null} template - Nome do template a ser usado.
+ * @property {string|null} after - Data/agendamento para execução.
+ * @property {boolean} interactive - Modo interativo ativado.
+ */
 function parseArgs(args) {
     const options = {
         prio: 5,
@@ -74,7 +98,12 @@ function parseArgs(args) {
     return options;
 }
 
-// --- HELPER DE AGENDAMENTO ---
+/**
+ * Parseia uma string de agendamento para uma data ISO.
+ * Suporta formatos como "10m" (10 minutos), "1h" (1 hora) ou datas ISO.
+ * @param {string|null} input - String de agendamento ou null.
+ * @returns {string|null} Data ISO se válida, null se inválida.
+ */
 function parseSchedule(input) {
     if (!input) {
         return null;
@@ -89,7 +118,18 @@ function parseSchedule(input) {
     return !isNaN(date.getTime()) ? date.toISOString() : null;
 }
 
-// --- CORE: CRIAÇÃO DA TAREFA ---
+/**
+ * Cria uma nova tarefa e a salva no diretório de fila.
+ * Side-effects: Cria arquivo JSON no diretório de fila, imprime informações no console.
+ * @param {Object} opts - Opções da tarefa.
+ * @param {number} opts.prio - Prioridade da tarefa (0-100).
+ * @param {string} opts.model - Modelo de IA a ser utilizado.
+ * @param {string} opts.target - Plataforma alvo (chatgpt, gemini, etc).
+ * @param {string} opts.system - Mensagem do sistema/persona.
+ * @param {string} opts.after - Data/agendamento para execução.
+ * @param {string[]} opts.tags - Tags para categorização.
+ * @param {string} promptText - Texto do prompt do usuário.
+ */
 function createTask(opts, promptText) {
     const id = generateUniqueId();
     const executeAfter = parseSchedule(opts.after);
@@ -137,7 +177,12 @@ function createTask(opts, promptText) {
     }
 }
 
-// --- MODO INTERATIVO (WIZARD) ---
+/**
+ * Executa o modo interativo (wizard) para criação de tarefas.
+ * Solicita informações ao usuário e cria uma tarefa com base nas entradas.
+ * Side-effects: Lê entrada do usuário via stdin, cria tarefa, pode encerrar o processo.
+ * @returns {Promise<void>} Promessa que resolve quando o wizard é concluído.
+ */
 async function runInteractive() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const ask = q =>
@@ -182,32 +227,41 @@ async function runInteractive() {
     rl.close();
 }
 
-// --- EXECUÇÃO ---
-const opts = parseArgs(process.argv.slice(2));
+/**
+ * Função principal que executa o script de acordo com os argumentos fornecidos.
+ * Pode rodar em modo interativo ou com argumentos da linha de comando.
+ * Side-effects: Lê argumentos, pode ler templates, cria tarefas, pode encerrar o processo.
+ */
+function main() {
+    const opts = parseArgs(process.argv.slice(2));
 
-if (opts.interactive) {
-    runInteractive();
-} else {
-    let promptText = opts.prompt.join(' ').trim();
+    if (opts.interactive) {
+        runInteractive();
+    } else {
+        let promptText = opts.prompt.join(' ').trim();
 
-    if (opts.template) {
-        const tplPath = path.join(
-            TEMPLATE_DIR,
-            opts.template.endsWith('.txt') ? opts.template : `${opts.template}.txt`
-        );
-        if (fs.existsSync(tplPath)) {
-            const tplContent = fs.readFileSync(tplPath, 'utf-8');
-            promptText = tplContent.replace(/{{INPUT}}/gi, promptText);
-        } else {
-            console.error(`❌ Template não encontrado: ${tplPath}`);
+        if (opts.template) {
+            const tplPath = path.join(
+                TEMPLATE_DIR,
+                opts.template.endsWith('.txt') ? opts.template : `${opts.template}.txt`
+            );
+            if (fs.existsSync(tplPath)) {
+                const tplContent = fs.readFileSync(tplPath, 'utf-8');
+                promptText = tplContent.replace(/{{INPUT}}/gi, promptText);
+            } else {
+                console.error(`❌ Template não encontrado: ${tplPath}`);
+                process.exit(1);
+            }
+        }
+
+        if (!promptText) {
+            console.error('❌ Erro: Prompt vazio. Use argumentos ou o modo interativo.');
             process.exit(1);
         }
-    }
 
-    if (!promptText) {
-        console.error('❌ Erro: Prompt vazio. Use argumentos ou o modo interativo.');
-        process.exit(1);
+        createTask(opts, promptText);
     }
-
-    createTask(opts, promptText);
 }
+
+// --- EXECUÇÃO ---
+main();

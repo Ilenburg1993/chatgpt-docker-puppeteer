@@ -37,12 +37,27 @@ const REQUIRED_ENV_VARS = {
     development: ['NODE_ENV']
 };
 
+/**
+ * Classe responsável por validar a configuração do sistema.
+ * Verifica a existência e integridade de arquivos de configuração,
+ * variáveis de ambiente e diretórios necessários.
+ */
 class ConfigValidator {
+    /**
+     * Cria uma nova instância do validador de configuração.
+     */
     constructor() {
+        /** @type {string[]} Lista de erros encontrados durante a validação */
         this.errors = [];
+        /** @type {string[]} Lista de avisos encontrados durante a validação */
         this.warnings = [];
     }
 
+    /**
+     * Registra uma mensagem com o nível especificado.
+     * @param {'ERROR'|'WARN'|'INFO'} level - Nível da mensagem.
+     * @param {string} message - Mensagem a ser registrada.
+     */
     log(level, message) {
         const prefix = {
             ERROR: '\x1b[31m[ERROR]\x1b[0m',
@@ -52,6 +67,11 @@ class ConfigValidator {
         console.log(`${prefix[level]} ${message}`);
     }
 
+    /**
+     * Valida se um arquivo existe no sistema de arquivos.
+     * @param {string} filepath - Caminho completo do arquivo a ser verificado.
+     * @returns {boolean} Verdadeiro se o arquivo existe, falso caso contrário.
+     */
     validateFileExists(filepath) {
         if (!fs.existsSync(filepath)) {
             this.errors.push(`Missing required file: ${filepath}`);
@@ -60,6 +80,11 @@ class ConfigValidator {
         return true;
     }
 
+    /**
+     * Valida se um arquivo contém JSON válido.
+     * @param {string} filepath - Caminho do arquivo JSON.
+     * @returns {any|null} Objeto JSON se válido, null se inválido.
+     */
     validateJSON(filepath) {
         try {
             const content = fs.readFileSync(filepath, 'utf8');
@@ -70,6 +95,15 @@ class ConfigValidator {
         }
     }
 
+    /**
+     * Valida um arquivo de configuração específico com base em sua especificação.
+     * @param {string} filename - Nome do arquivo a ser validado.
+     * @param {Object} spec - Especificação de validação do arquivo.
+     * @param {boolean} spec.required - Indica se o arquivo é obrigatório.
+     * @param {Object} [spec.schema] - Schema de validação para arquivos JSON.
+     * @param {string} [spec.warning] - Mensagem de aviso para arquivos opcionais.
+     * @returns {boolean} Verdadeiro se o arquivo é válido, falso caso contrário.
+     */
     validateConfigFile(filename, spec) {
         const filepath = path.join(process.cwd(), filename);
 
@@ -137,6 +171,11 @@ class ConfigValidator {
         return true;
     }
 
+    /**
+     * Valida as variáveis de ambiente necessárias para o ambiente atual.
+     * Verifica se as variáveis obrigatórias estão definidas e se têm valores válidos.
+     * Side-effects: Adiciona erros à lista de erros se variáveis estiverem ausentes ou inválidas.
+     */
     validateEnvironment() {
         const env = process.env.NODE_ENV || 'development';
         const required = REQUIRED_ENV_VARS[env] || [];
@@ -167,6 +206,11 @@ class ConfigValidator {
         }
     }
 
+    /**
+     * Valida os diretórios necessários para o funcionamento do sistema.
+     * Verifica se os diretórios existem e são graváveis.
+     * Side-effects: Adiciona avisos ou erros à lista conforme o resultado da validação.
+     */
     validateDirectories() {
         const dirs = ['fila', 'respostas', 'logs', 'profile'];
 
@@ -188,6 +232,11 @@ class ConfigValidator {
         }
     }
 
+    /**
+     * Valida o ponto de entrada principal do aplicativo (index.js).
+     * Verifica se o arquivo existe e parece ser um script Node.js válido.
+     * Side-effects: Adiciona erros ou avisos à lista conforme o resultado da validação.
+     */
     validateEntryPoint() {
         const entryPoint = 'index.js';
         if (!this.validateFileExists(entryPoint)) {
@@ -207,6 +256,13 @@ class ConfigValidator {
         }
     }
 
+    /**
+     * Executa a validação completa do sistema.
+     * Valida arquivos de configuração, variáveis de ambiente, diretórios e ponto de entrada.
+     * Imprime resultados e encerra o processo com código apropriado.
+     * Side-effects: Imprime resultados no console, pode encerrar o processo com exit(1) ou exit(0).
+     * @returns {Promise<void>} Promessa que resolve quando a validação é concluída.
+     */
     async run() {
         console.log('\n🔍 Configuration Validation\n');
         console.log(`${'='.repeat(60)}\n`);
@@ -253,13 +309,21 @@ class ConfigValidator {
     }
 }
 
-// Run validation
-if (import.meta.filename === process.argv[1]) {
+/**
+ * Função principal que executa a validação de configuração quando o script é chamado diretamente.
+ * Side-effects: Cria e executa uma instância de ConfigValidator, pode encerrar o processo.
+ */
+async function main() {
     const validator = new ConfigValidator();
-    validator.run().catch(error => {
+    await validator.run().catch(error => {
         console.error('Fatal error during validation:', error);
         process.exit(1);
     });
+}
+
+// Run validation
+if (import.meta.filename === process.argv[1]) {
+    main();
 }
 
 export default ConfigValidator;

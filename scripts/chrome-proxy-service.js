@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 // @ts-check
-// @ts-ignore - ESM subpath imports not recognized by TypeScript
 import _Impl from '#infra/proxy/chromeProxyService';
 import * as fs from 'node:fs';
 import * as dns from 'node:dns/promises';

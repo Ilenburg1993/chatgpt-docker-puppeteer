@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -9,39 +8,32 @@ const JSON_OUTPUT = process.argv.includes('--json');
 const constantsPath = path.join(import.meta.dirname, '..', 'src', 'shared', 'nerv', 'constants.js');
 const constants = await import(pathToFileURL(path.resolve(constantsPath)).href).then(m => m.default ?? m);
 
-// ActionCodes used in production code (manually curated)
-// TODO: Automate by parsing src/ with AST
-const usedActionCodes = [
-    'BROWSER_REBOOT',
-    'CACHE_CLEAR',
-    'DRIVER_ABORT',
-    'DRIVER_ANOMALY',
-    'DRIVER_ERROR',
-    'DRIVER_EXECUTE_TASK',
-    'DRIVER_HEALTH_CHECK',
-    'DRIVER_HEALTH_REPORT',
-    'DRIVER_STATE_OBSERVED',
-    'DRIVER_TASK_ABORTED',
-    'DRIVER_TASK_COMPLETED',
-    'DRIVER_TASK_FAILED',
-    'DRIVER_TASK_STARTED',
-    'DRIVER_VITAL',
-    'ENGINE_PAUSE',
-    'ENGINE_RESUME',
-    'ENGINE_STOP',
-    'KERNEL_HEALTH_CHECK',
-    'KERNEL_INTERNAL_ERROR',
-    'KERNEL_TELEMETRY',
-    'PROPOSE_TASK',
-    'SECURITY_VIOLATION',
-    'STALL_DETECTED',
-    'TASK_CANCEL',
-    'TASK_FAILED',
-    'TASK_REJECTED',
-    'TASK_RETRY',
-    'TASK_START',
-    'TELEMETRY_DISCARDED'
-];
+/**
+ * Extracts ActionCodes from JavaScript files using grep
+ * @returns {Promise<string[]>}
+ */
+async function extractUsedActionCodes() {
+    const { execa } = await import('execa');
+    try {
+        const { stdout } = await execa('grep', ['-r', 'ActionCode\\.', 'src/', '--include=*.js']);
+        const matches = stdout.split('\n').filter(line => line.trim());
+        const codes = new Set();
+        for (const line of matches) {
+            // Match ActionCode.SOMETHING, handling line breaks
+            const fullLine = line.replace(/\s+/g, '');
+            const match = fullLine.match(/ActionCode\.([A-Z_]+)(?:\(|,|\)|;|$)/);
+            if (match) {
+                codes.add(match[1]);
+            }
+        }
+        return Array.from(codes).sort();
+    } catch (_) {
+        return [];
+    }
+}
+
+// ActionCodes used in production code (automated extraction)
+const usedActionCodes = await extractUsedActionCodes();
 
 const defined = Object.keys(constants.ActionCode);
 const missing = usedActionCodes.filter(code => !defined.includes(code));
