@@ -1,0 +1,714 @@
+{
+  "src/nerv": {
+    "total": 24,
+    "withExports": 20,
+    "needsJSDoc": 0,
+    "hasJSDoc": 20,
+    "files": [
+      {
+        "path": "src/nerv/adapters/high_level_adapter.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/nerv/buffers/backpressure.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/buffers/buffers.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/buffers/inbound_queue.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/buffers/outbound_queue.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/core.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/correlation/correlation_context.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/correlation/correlation_store.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/discovery.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/nerv/emission/emission.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/emission/emit_ack.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/emission/emit_command.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/emission/emit_event.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/health/health.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/nerv.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/nerv/reception/receive.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/reception/reception.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/telemetry/ipc_telemetry.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/telemetry/metrics.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/transport/connection.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/transport/framing.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/nerv/transport/hybrid_transport.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/transport/reconnect.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/nerv/transport/transport.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  },
+  "src/server/api/controllers": {
+    "total": 13,
+    "withExports": 10,
+    "needsJSDoc": 0,
+    "hasJSDoc": 10,
+    "files": [
+      {
+        "path": "src/server/api/controllers/artifacts.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/dashboard.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/dashboard_events.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/dashboard_missions.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/dashboard_tasks.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/dna.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/health.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/server/api/controllers/metrics.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/server/api/controllers/missions.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/rag.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/server/api/controllers/results.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/system.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/api/controllers/tasks.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  },
+  "src/infra": {
+    "total": 40,
+    "withExports": 7,
+    "needsJSDoc": 0,
+    "hasJSDoc": 7,
+    "files": [
+      {
+        "path": "src/infra/ConnectionOrchestrator.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/browser_pool/PageLifecycleMonitor.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/browser_pool/PageValidator.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/browser_pool/PeriodicHealthMonitor.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/browser_pool/circuit_breaker.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/browser_pool/pool_manager.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/browser_pool/puppeteer_guard.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/artifact_repo.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/events_repo.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/legacy_import.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/migrations.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/mission_repo.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/sqlite.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/task_attempt_repo.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/db/task_repo.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/fs/atomic_write.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/fs/control_store.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/fs/fs_core.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/fs/fs_utils.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/fs/paths.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/fs/safe_read.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/io.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/ipc/buffer.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/locks/lock_manager.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/locks/process_guard.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/mock_chrome.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/proxy/chromeProxyService.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/queue/cache.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/queue/query_engine.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/queue/scheduler.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/queue/task_loader.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/artifact_store.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/dna_evolution.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/dna_store.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/response_adapter.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/response_store.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/response_store_v2.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/storage/task_store.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/system.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/transport/socket_io_adapter.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  },
+  "src/logic": {
+    "total": 7,
+    "withExports": 2,
+    "needsJSDoc": 0,
+    "hasJSDoc": 2,
+    "files": [
+      {
+        "path": "src/logic/adaptive.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/logic/validation/rules/format_rules.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/logic/validation/rules/physical_rules.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/logic/validation/rules/semantic_rules.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/logic/validation/scan_engine.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/logic/validation/validation_core.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/logic/validator.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  },
+  "src/validation": {
+    "total": 1,
+    "withExports": 1,
+    "needsJSDoc": 0,
+    "hasJSDoc": 1,
+    "files": [
+      {
+        "path": "src/validation/llm_judge.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  },
+  "src/orchestrator": {
+    "total": 6,
+    "withExports": 1,
+    "needsJSDoc": 0,
+    "hasJSDoc": 1,
+    "files": [
+      {
+        "path": "src/orchestrator/checkpoint_manager.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/orchestrator/context_manager.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/orchestrator/index.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/orchestrator/memory_store.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/orchestrator/orchestrator_engine.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/orchestrator/validation/validation_service.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      }
+    ]
+  },
+  "src/driver": {
+    "total": 16,
+    "withExports": 10,
+    "needsJSDoc": 0,
+    "hasJSDoc": 10,
+    "files": [
+      {
+        "path": "src/driver/DriverLifecycleManager.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/core/BaseDriver.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/core/TargetDriver.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/extractors/structured_extractor.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/factory.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/guards/DriverReadinessGuard.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/driver/modules/biomechanics_engine.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/driver/modules/frame_navigator.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/driver/modules/handle_manager.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/modules/input_resolver.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/driver/modules/recovery_system.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/modules/submission_controller.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/driver/modules/triage.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
+        "path": "src/driver/nerv_adapter/driver_nerv_adapter.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/targets/ChatGPTDriver.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/driver/trackers/PageSessionTracker.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  },
+  "src/server/handlers": {
+    "total": 1,
+    "withExports": 1,
+    "needsJSDoc": 0,
+    "hasJSDoc": 1,
+    "files": [
+      {
+        "path": "src/server/handlers/mcp-handler.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      }
+    ]
+  }
+}
