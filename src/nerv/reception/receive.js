@@ -49,15 +49,16 @@ function safeCall(handler, envelope, telemetry) {
 /**
  * Cria o módulo de recepção bruta do NERV.
  *
- * @param {Object} deps
- * @param {Object} deps.envelopes
- * Sistema de envelopes (normalização + validação estrutural).
+ * **Side-effects:** Registra envelopes na correlação histórica, notifica handlers.
+ * **Semântica:** Receptor técnico que processa frames inbound desserializados.
+ * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {Object} deps.correlation
- * Sistema de correlação histórica.
- *
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV.
+ * @param {object} deps - Dependências do receptor
+ * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
+ * @param {object} deps.correlation - Sistema de correlação histórica
+ * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @returns {object} Receptor com métodos onMessage, receive
+ * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createReception({ envelopes, correlation, telemetry }) {
     if (!envelopes || !correlation || !telemetry) {

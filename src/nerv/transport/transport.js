@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import createConnection from './connection.js';
-import createReconnect from './reconnect.js';
 import * as framing from './framing.js';
+import createReconnect from './reconnect.js';
 
 /* ===========================
    Fábrica do transporte
@@ -10,15 +10,16 @@ import * as framing from './framing.js';
 /**
  * Cria o subsistema de transporte físico do NERV.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV.
+ * **Side-effects:** Inicializa framing, conexão e reconexão automática.
+ * **Semântica:** Composição completa do plano físico de comunicação.
+ * **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
  *
- * @param {Object} deps.adapter
- * Adaptador físico concreto (IPC, socket, pipe etc).
- *
- * @param {Object} [deps.reconnect]
- * Política técnica opcional de reconexão.
+ * @param {object} deps - Dependências do transporte
+ * @param {object} deps.telemetry - Interface de telemetria do NERV
+ * @param {object} deps.adapter - Adaptador físico (IPC, socket, pipe)
+ * @param {object} [deps.reconnect] - Política de reconexão opcional
+ * @returns {object} Transporte com métodos send, start, stop, onReceive
+ * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

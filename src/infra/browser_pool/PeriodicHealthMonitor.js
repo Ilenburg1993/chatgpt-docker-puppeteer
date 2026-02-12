@@ -613,7 +613,47 @@ class PeriodicHealthMonitor extends EventEmitter {
 }
 
 export default PeriodicHealthMonitor;
+
+/**
+ * Constantes de status de saúde do browser
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de níveis de saúde para monitoramento de conexões browser.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
 export { HEALTH_STATUS };
+
+/**
+ * Tipos de verificações de saúde disponíveis
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração dos tipos de verificação implementados pelo monitor.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
 export { CHECK_TYPES };
+
+/**
+ * Eventos emitidos pelo monitor de saúde
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
 export { MONITOR_EVENTS };
+
+/**
+ * Configuração padrão do monitor de saúde
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações padrão para intervalos e limites de monitoramento.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, number>}
+ */
 export { MONITOR_CONFIG };

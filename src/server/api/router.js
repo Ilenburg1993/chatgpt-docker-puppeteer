@@ -1,28 +1,54 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import tasksController from './controllers/tasks.js';
-import dashboardController from './controllers/dashboard.js';
-import missionsController from './controllers/missions.js';
-import systemController from './controllers/system.js';
-import dnaController from './controllers/dna.js';
-import artifactsController from './controllers/artifacts.js';
-import resultsController from './controllers/results.js';
-import { notFound, errorHandler } from '../middleware/error_handler.js';
-import denyIfDelegated from '../middleware/deny_if_delegated.js';
-import { log } from '#core/logger';
 import { probeChromeConnection } from '#core/doctor';
+import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
+import denyIfDelegated from '../middleware/deny_if_delegated.js';
+import { errorHandler, notFound } from '../middleware/error_handler.js';
+import artifactsController from './controllers/artifacts.js';
+import dashboardController from './controllers/dashboard.js';
+import dnaController from './controllers/dna.js';
 import * as healthController from './controllers/health.js';
 import * as metricsController from './controllers/metrics.js';
+import missionsController from './controllers/missions.js';
 import * as ragController from './controllers/rag.js';
+import resultsController from './controllers/results.js';
+import systemController from './controllers/system.js';
+import tasksController from './controllers/tasks.js';
 
 /**
  * Aplica a malha de rotas à instância do Express.
  * Define a topologia lógica da API e injeta os escudos de integridade.
  *
- * @param {object} app - Instância do Express vinda de engine/app.js.
+ * @param {object} app - Instância do Express vinda de engine/app.js
+ * @throws {Error} - Se algum controller falhar ao inicializar
+ * @sideEffects - Registra rotas HTTP, middlewares, handlers de erro
  */
 async function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');
+
+    // FIXED (P1-14): Global request timeout middleware (30s default)
+    // Previne requests órfãos que bloqueiam workers indefinidamente
+    const REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT || '30000');
+    app.use((req, res, next) => {
+        // Set timeout on the request
+        req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+            if (!res.headersSent) {
+                log('WARN', `[API] Request timeout after ${REQUEST_TIMEOUT_MS}ms: ${req.method} ${req.path}`, req.id);
+                res.status(504).json({
+                    success: false,
+                    error: 'Request timeout',
+                    message: `Request exceeded ${REQUEST_TIMEOUT_MS}ms limit`,
+                    request_id: req.id
+                });
+            }
+        });
+
+        // Also set timeout on the response
+        res.setTimeout(REQUEST_TIMEOUT_MS);
+
+        next();
+    });
+
     // Bloqueio global para métodos mutantes quando o server roda em modo delegated.
     // Evita duplicar checks em todos os controllers: usa o middleware central `denyIfDelegated`.
     app.use((req, res, next) => {
@@ -218,6 +244,64 @@ async function applyRoutes(app) {
         } catch (e) {
             // noop
         }
+    }
+
+    // ========================================================================
+    // [4] OPENAI-COMPATIBLE API (v1/chat/completions for GitHub Copilot)
+    // ========================================================================
+    if (process.env.OPENAI_COMPATIBLE_ENABLED === 'true') {
+        log('INFO', '[OpenAI] OPENAI_COMPATIBLE_ENABLED=true, setting up handler...');
+        try {
+            // Dynamic import to avoid loading if disabled
+            const { setupOpenAIHandler } = await import('../handlers/openai-handler.js');
+
+            // Setup handler (uses OllamaClient directly)
+            setupOpenAIHandler(app);
+
+            // Observability hooks
+            try {
+                app.locals = app.locals || {};
+                app.locals.openai = {
+                    enabled: true,
+                    ready: true,
+                    endpoints: ['/v1/chat/completions', '/v1/models'],
+                    lastInitAt: new Date().toISOString()
+                };
+
+                app.locals.runtimeReadiness = Object.assign(
+                    {},
+                    app.locals.runtimeReadiness || null,
+                    { openai: true }
+                );
+            } catch (e) {
+                // Non-fatal observability failure
+            }
+
+            log('INFO', '[OpenAI] Handler registered at POST /v1/chat/completions, GET /v1/models');
+        } catch (error) {
+            log('ERROR', `[OpenAI] Failed to setup handler: ${error.message}`);
+            log('WARN', '[OpenAI] OpenAI-compatible features will be unavailable');
+
+            // Don't crash server, just disable feature
+            try {
+                app.locals = app.locals || {};
+                app.locals.openai = {
+                    enabled: true,
+                    ready: false,
+                    lastInitAt: new Date().toISOString(),
+                    lastInitError: error.message
+                };
+                app.locals.runtimeReadiness = Object.assign(
+                    {},
+                    app.locals.runtimeReadiness || null,
+                    { openai: false }
+                );
+            } catch (e) {
+                // noop
+            }
+        }
+    } else {
+        log('INFO', '[OpenAI] OPENAI_COMPATIBLE_ENABLED=false, skipping setup');
     }
 
     /* --------------------------------------------------------------------------

@@ -3,28 +3,19 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as io from '#infra/io';
-import { ARTIFACTS_DIR } from '#infra/fs/paths';
 import { getArtifactById } from '#infra/db/artifact_repo';
 import { getAttemptById } from '#infra/db/task_attempt_repo';
 import { getTaskById } from '#infra/db/task_repo';
-import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
+import { _resolveArtifactsRoot, _isUnderRoot } from '#infra/storage/artifact_store';
 import { log } from '#core/logger';
 
 const router = express.Router();
 const fsp = fs.promises;
 
 function _safeId(raw) {
-    return String(raw || '').replace(/[^a-zA-Z0-9._-]/g, '');
-}
-
-function _isUnderRoot(rootDir, filePath) {
-    try {
-        const root = path.resolve(rootDir);
-        const full = path.resolve(filePath);
-        return full === root || full.startsWith(root + path.sep);
-    } catch (_) {
-        return false;
-    }
+    const id = String(raw || '').replace(/[^a-zA-Z0-9._-]/g, '');
+    if (id.includes('..')) throw new Error('invalid id');
+    return id;
 }
 
 function _pickAttemptArtifactId(attempt, ext) {
@@ -69,7 +60,7 @@ router.get('/:id', async (req, res) => {
         };
         const ext = extByFormat[format] || '.txt';
 
-        const artifactsRoot = _resolveArtifactsRoot() || process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || ARTIFACTS_DIR;
+        const artifactsRoot = _resolveArtifactsRoot();
         const legacyRoot = io.RESPONSE_DIR;
 
         /** @type {string|null} */

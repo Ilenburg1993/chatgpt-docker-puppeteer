@@ -539,6 +539,36 @@ class PageSessionTracker {
 }
 
 export default PageSessionTracker;
+
+/**
+ * Níveis de saúde da sessão
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de níveis de saúde para avaliação de qualidade da sessão.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
 export { HEALTH_LEVELS };
+
+/**
+ * Multiplicadores de timeout adaptativos
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações para ajuste dinâmico de timeouts baseado no histórico da sessão.
+ * **Unidades:** Números decimais para multiplicadores.
+ *
+ * @type {Object<string, number>}
+ */
 export { TIMEOUT_MULTIPLIERS };
+
+/**
+ * Configurações do tracker de sessão
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de limites e intervalos para monitoramento de sessão.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, any>}
+ */
 export { TRACKER_CONFIG };

@@ -5,7 +5,14 @@ import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
 import fs from 'node:fs/promises';
 
 /**
- * GET /api/health - Health check geral do sistema
+ * GET /api/health - Health check geral do sistema.
+ *
+ * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID).
+ * **Semântica:** Verificação básica de saúde do processo Node.js.
+ * **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
+ *
+ * @param {object} req - Requisição HTTP
+ * @param {object} res - Resposta HTTP
  */
 async function getHealth(req, res) {
     try {
@@ -23,10 +30,14 @@ async function getHealth(req, res) {
 }
 
 /**
- * GET /api/health/chrome - Health check do Chrome remote debugging
+ * GET /api/health/chrome - Health check do Chrome remote debugging.
  *
- * Verifica se Chrome está acessível via browserEndpoint consolidado.
- * Usa checkChromeHealth() centralizado (boot_resilience_manager).
+ * **Side-effects:** Testa conectividade com Chrome via WebSocket endpoint.
+ * **Semântica:** Verifica se Chrome está acessível e respondendo.
+ * **Unidades:** Timeout de 3000ms para verificação.
+ *
+ * @param {object} req - Requisição HTTP
+ * @param {object} res - Resposta HTTP
  */
 async function getChromeHealth(req, res) {
     try {
@@ -169,4 +180,4 @@ async function getDiskHealth(req, res) {
     }
 }
 
-export { getHealth, getChromeHealth, getPm2Health, getKernelHealth, getDiskHealth };
+export { getChromeHealth, getDiskHealth, getHealth, getKernelHealth, getPm2Health };

@@ -15,18 +15,18 @@
  */
 
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import compression from 'compression';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import * as http from 'node:http';
 import * as net from 'node:net';
 import * as os from 'node:os';
-import express from 'express';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import compression from 'compression';
 // @ts-ignore - ESM subpath imports not recognized by TypeScript
 import * as logger from '#core/logger';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { v4 as uuidv4 } from 'uuid';
 import * as promClient from 'prom-client';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * @typedef {Object} ChromeProxyServiceConfig
@@ -479,7 +479,7 @@ class ChromeProxyService {
             this.logger.log(level.toUpperCase(), formattedMessage);
         } else {
             const timestamp = new Date().toISOString();
-            console.log(`[${timestamp}] [${level.toUpperCase().padEnd(5)}] ${formattedMessage}`);
+            logger.info(`[${timestamp}] [${level.toUpperCase().padEnd(5)}] ${formattedMessage}`);
         }
     }
 

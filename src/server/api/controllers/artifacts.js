@@ -1,23 +1,12 @@
 // @ts-check
 import express from 'express';
 import fs from 'node:fs';
-import path from 'node:path';
 import { log } from '#core/logger';
 import { getArtifactById } from '#infra/db/artifact_repo';
-import { _resolveArtifactsRoot, readText, stat as statArtifact } from '#infra/storage/artifact_store';
+import { _resolveArtifactsRoot, _isUnderRoot, readText, stat as statArtifact } from '#infra/storage/artifact_store';
 import { ok, fail } from '../utils/api_envelope.js';
 
 const router = express.Router();
-
-function _isUnderRoot(rootDir, filePath) {
-    try {
-        const root = path.resolve(rootDir);
-        const full = path.resolve(filePath);
-        return full === root || full.startsWith(root + path.sep);
-    } catch (_) {
-        return false;
-    }
-}
 
 router.get('/:id', async (req, res) => {
     try {
@@ -64,7 +53,8 @@ router.get('/:id/content', async (req, res) => {
 
         res.setHeader('Content-Type', String(row.mime || 'application/octet-stream'));
         res.setHeader('Content-Length', String(st.size));
-        res.setHeader('Content-Disposition', `${safeDisposition}; filename="${artifactId}"`);
+        const safeFilename = artifactId.replace(/[^a-zA-Z0-9._-]/g, '_');
+        res.setHeader('Content-Disposition', `${safeDisposition}; filename="${safeFilename}"`);
 
         const stream = fs.createReadStream(uri);
         stream.on('error', err => {

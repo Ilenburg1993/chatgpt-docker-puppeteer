@@ -788,5 +788,24 @@ class ChatGPTDriver extends BaseDriver {
 
 export default ChatGPTDriver;
 
+/**
+ * Configurações do driver ChatGPT
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de timeouts, intervalos e limites para operação do driver ChatGPT.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, any>}
+ */
 export { CHATGPT_CONFIG };
+
+/**
+ * Modelos suportados pelo driver ChatGPT
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Lista de identificadores de modelos LLM suportados pelo driver.
+ * **Unidades:** N/A
+ *
+ * @type {string[]}
+ */
 export { SUPPORTED_MODELS };

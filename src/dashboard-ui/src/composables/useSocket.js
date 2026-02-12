@@ -7,8 +7,8 @@
  * - Mantém status de conexão reativo
  */
 
-import { ref, onMounted, onUnmounted } from 'vue';
 import { io } from 'socket.io-client';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 // Singleton da conexão Socket.io
 let socketInstance = null;
@@ -95,14 +95,14 @@ export function useSocket(options = {}) {
             error.value = null;
             reconnectAttempts.value = 0;
             if (import.meta.env.DEV) {
-                console.log('[Socket.io] Connected');
+                console.info('[Socket.io] Connected');
             }
         });
 
         socket.on('disconnect', (reason) => {
             isConnected.value = false;
             if (import.meta.env.DEV) {
-                console.log('[Socket.io] Disconnected:', reason);
+                console.info('[Socket.io] Disconnected:', reason);
             }
         });
 
@@ -116,7 +116,7 @@ export function useSocket(options = {}) {
         socket.on('reconnect_attempt', (attempt) => {
             reconnectAttempts.value = attempt;
             if (import.meta.env.DEV) {
-                console.log('[Socket.io] Reconnect attempt:', attempt);
+                console.info('[Socket.io] Reconnect attempt:', attempt);
             }
         });
 
@@ -124,7 +124,7 @@ export function useSocket(options = {}) {
             isConnected.value = true;
             error.value = null;
             if (import.meta.env.DEV) {
-                console.log('[Socket.io] Reconnected');
+                console.info('[Socket.io] Reconnected');
             }
         });
     };

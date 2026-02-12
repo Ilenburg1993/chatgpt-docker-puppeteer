@@ -1,14 +1,14 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import express from 'express';
-import path from 'node:path';
-import fs from 'node:fs';
-import compression from 'compression';
-import rateLimit from 'express-rate-limit';
-import cors from 'cors';
-import helmet from 'helmet';
-import { ROOT, LOG_DIR } from '#infra/fs/fs_utils';
-import requestId from '../middleware/request_id.js';
 import * as hardware from '#core/hardware';
+import { LOG_DIR, ROOT } from '#infra/fs/fs_utils';
+import compression from 'compression';
+import cors from 'cors';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import fs from 'node:fs';
+import path from 'node:path';
+import requestId from '../middleware/request_id.js';
 
 /* --------------------------------------------------------------------------
    0. INSTÂNCIA SOBERANA
@@ -104,6 +104,13 @@ app.use(
 /* --------------------------------------------------------------------------
    4. RATE LIMITER (EXPORTÁVEL)
 -------------------------------------------------------------------------- */
+
+/**
+ * Rate limiter para endpoints da API.
+ * 100 requests por minuto por IP, com skip para desenvolvimento local.
+ *
+ * @type {import('express-rate-limit').RateLimit}
+ */
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,
@@ -144,7 +151,8 @@ app.use(express.urlencoded({ extended: false, limit: '1mb' }));
    6. STATIC ASSETS
 -------------------------------------------------------------------------- */
 
-app.use(express.static(path.join(ROOT, 'public')));
+// Mount static middleware at /static to avoid conflicts with API routes (/v1/*, /api/*)
+app.use('/static', express.static(path.join(ROOT, 'public')));
 
 const dashboardV2Path = path.join(ROOT, 'src', 'dashboard-ui', 'dist');
 const dashboardAssetsPath = path.join(dashboardV2Path, 'assets');
@@ -269,7 +277,8 @@ app.get('/ready', (req, res) => {
    8. FALLBACK CONTROLADO
 -------------------------------------------------------------------------- */
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    // Allow /api/* and /v1/* (OpenAI-compatible endpoints)
+    if (req.path.startsWith('/api') || req.path.startsWith('/v1')) return next();
     res.status(404).json({ error: 'Not found', request_id: req.id });
 });
 

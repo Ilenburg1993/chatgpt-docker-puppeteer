@@ -765,5 +765,24 @@ class BaseDriver extends TargetDriver {
 
 export default BaseDriver;
 
+/**
+ * Configuração padrão do BaseDriver
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de retry, timeouts e limites para operação do driver base.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, any>}
+ */
 export { BASEDRIVER_CONFIG };
+
+/**
+ * Classes de erro para classificação de falhas
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de tipos de erro para estratégia de recuperação adequada.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
 export { ERROR_CLASSES };

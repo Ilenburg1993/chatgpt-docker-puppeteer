@@ -8,15 +8,16 @@ import createReceive from './receive.js';
 /**
  * Cria o módulo de recepção do NERV.
  *
- * @param {Object} deps
- * @param {Object} deps.envelopes
- * Sistema de envelopes (normalização + validação estrutural).
+ * **Side-effects:** Inicializa receptor de mensagens e correlação histórica.
+ * **Semântica:** Composição de subsistemas de recepção para comunicação neural.
+ * **Unidades:** Dependências seguem contratos NERV (envelopes, correlation, telemetry).
  *
- * @param {Object} deps.correlation
- * Sistema de correlação histórica.
- *
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV.
+ * @param {object} deps - Dependências do módulo
+ * @param {object} deps.envelopes - Sistema de envelopes (normalização + validação)
+ * @param {object} deps.correlation - Sistema de correlação histórica
+ * @param {object} deps.telemetry - Interface de telemetria do NERV
+ * @returns {object} Módulo de recepção com método onMessage
+ * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createReception({ envelopes, correlation, telemetry }) {
     if (!envelopes || !correlation || !telemetry) {

@@ -1,22 +1,22 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { z } from 'zod';
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { WorkflowGenerator } from '#missions/workflow_generator';
-import { getDb } from '#infra/db/sqlite';
 import { recordEvent } from '#infra/db/events_repo';
 import {
     AUTONOMY_MODES,
-    MISSION_STATUS,
     createMission,
     deleteMission,
     getMissionById,
     listMissions,
+    MISSION_STATUS,
     updateMission,
 } from '#infra/db/mission_repo';
+import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
+import { WorkflowGenerator } from '#missions/workflow_generator';
+import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 import schemaGuard from '../../middleware/schema_guard.js';
 
 const router = express.Router();
@@ -265,7 +265,8 @@ router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
         }
 
         const title = req.body?.title !== undefined ? _asTrimmedString(req.body.title, '') : undefined;
-        const description = req.body?.description !== undefined ? _asTrimmedString(req.body.description, '') : undefined;
+        const description =
+            req.body?.description !== undefined ? _asTrimmedString(req.body.description, '') : undefined;
         const autonomyModeRaw = req.body?.autonomy_mode ?? req.body?.autonomyMode;
         const autonomy_mode = autonomyModeRaw !== undefined ? _coerceAutonomyMode(autonomyModeRaw) : undefined;
 
@@ -288,7 +289,12 @@ router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
         res.json({ success: true, mission: updated, request_id: req.id });
     } catch (err) {
         log('ERROR', `[MISSIONS_API] Erro ao atualizar missão: ${err?.message || String(err)}`, req.id);
-        res.status(500).json({ success: false, error: 'Erro ao atualizar missão', details: err?.message || String(err), request_id: req.id });
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao atualizar missão',
+            details: err?.message || String(err),
+            request_id: req.id,
+        });
     }
 });
 
@@ -502,7 +508,10 @@ router.post('/:id/resume', async (req, res) => {
 
         const now = Date.now();
 
-        const updated = updateMission(missionId, { status: MISSION_STATUS.RUNNING, started_at_ms: mission.started_at ? Date.parse(mission.started_at) : now });
+        const updated = updateMission(missionId, {
+            status: MISSION_STATUS.RUNNING,
+            started_at_ms: mission.started_at ? Date.parse(mission.started_at) : now,
+        });
 
         // Retoma tasks pausadas
         try {
@@ -565,7 +574,9 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
         }
 
-        const autonomy_mode = _coerceAutonomyMode(req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode);
+        const autonomy_mode = _coerceAutonomyMode(
+            req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode
+        );
         const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : null;
 
         const updated = updateMission(missionId, {
@@ -713,7 +724,10 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
         }
 
         const maxProposals = Math.max(1, Math.min(Number(req.body?.max_proposals || 5) || 5, 25));
-        const target = _pickAllowedTarget({ requested: req.body?.target, allowedTargets: mission.policy?.allowed_targets });
+        const target = _pickAllowedTarget({
+            requested: req.body?.target,
+            allowedTargets: mission.policy?.allowed_targets,
+        });
 
         const workflow = mission.context?.workflow || null;
         const progress = mission.context?.progress || {};
@@ -845,7 +859,9 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
 
         const proposals = Array.isArray(req.body?.proposals) ? req.body.proposals : null;
         if (!proposals) {
-            return res.status(400).json({ success: false, error: 'Body inválido: "proposals" é obrigatório', request_id: req.id });
+            return res
+                .status(400)
+                .json({ success: false, error: 'Body inválido: "proposals" é obrigatório', request_id: req.id });
         }
 
         const workflow = mission.context?.workflow || null;
@@ -859,7 +875,10 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
             if (!user_message) continue;
 
             const taskId = `task-${uuidv4()}`;
-            const target = _pickAllowedTarget({ requested: proposal?.target, allowedTargets: mission.policy?.allowed_targets });
+            const target = _pickAllowedTarget({
+                requested: proposal?.target,
+                allowedTargets: mission.policy?.allowed_targets,
+            });
 
             const taskV5 = schemas.core.TaskSchemaV5.parse({
                 meta: {
@@ -945,14 +964,18 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
         const now = Date.now();
         const all = Boolean(req.body?.all);
         const taskIdsRaw = Array.isArray(req.body?.task_ids) ? req.body.task_ids : null;
-        const taskIds = taskIdsRaw ? taskIdsRaw.map(t => String(t).replace(/[^a-zA-Z0-9._-]/g, '')).filter(Boolean) : [];
+        const taskIds = taskIdsRaw
+            ? taskIdsRaw.map(t => String(t).replace(/[^a-zA-Z0-9._-]/g, '')).filter(Boolean)
+            : [];
 
         const db = getDb();
         /** @type {string[]} */
         let ids = [];
         if (all) {
             ids = db
-                .prepare(`SELECT id FROM tasks WHERE mission_id = @mission_id AND stage = 'PROPOSED' ORDER BY created_at_ms ASC LIMIT 2000`)
+                .prepare(
+                    `SELECT id FROM tasks WHERE mission_id = @mission_id AND stage = 'PROPOSED' ORDER BY created_at_ms ASC LIMIT 2000`
+                )
                 .all({ mission_id: missionId })
                 .map(r => String(r.id));
         } else {
@@ -1016,10 +1039,21 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
             });
         }
 
-        res.json({ success: true, mission_id: missionId, rejected: rejectedIds.length, task_ids: rejectedIds, request_id: req.id });
+        res.json({
+            success: true,
+            mission_id: missionId,
+            rejected: rejectedIds.length,
+            task_ids: rejectedIds,
+            request_id: req.id,
+        });
     } catch (err) {
         log('ERROR', `[MISSIONS_API] Erro ao rejeitar proposals: ${err?.message || String(err)}`, req.id);
-        res.status(500).json({ success: false, error: 'Erro ao rejeitar proposals', details: err?.message || String(err), request_id: req.id });
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao rejeitar proposals',
+            details: err?.message || String(err),
+            request_id: req.id,
+        });
     }
 });
 
@@ -1118,14 +1152,29 @@ router.delete('/:id/purge', async (req, res) => {
     }
 });
 
+/**
+ * Controlador de API para missões
+ *
+ * **Side-effects:** Registra rotas Express para operações CRUD de missões.
+ * **Semântica:** Gerencia ciclo de vida completo de missões, incluindo criação, listagem, atualização e exclusão.
+ * **Unidades:** N/A
+ *
+ * @type {import('express').Router}
+ */
 export default router;
 
-/**
- * @deprecated Legacy hook (filesystem MissionManager injection).
- * Missions are now DB-driven (SQLite SSOT). Kept for backward compatibility.
- */
 function setMissionManager(_) {
     log('WARN', '[MISSIONS_API] setMissionManager() ignored (SSOT missions controller)');
 }
 
+/**
+ * @deprecated Legacy hook (filesystem MissionManager injection).
+ * Define gerenciador de missões (compatibilidade legado).
+ *
+ * **Side-effects:** Log de aviso sobre depreciação.
+ * **Semântica:** Interface legado mantida para compatibilidade, mas ignorada.
+ * **Unidades:** N/A
+ *
+ * @param {*} _ - Parâmetro ignorado (interface legado)
+ */
 export { setMissionManager };

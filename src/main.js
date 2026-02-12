@@ -33,32 +33,47 @@
 // @ts-nocheck - Suprime warnings TypeScript para propriedades dinâmicas e tipos implícitos
 
 // =========================================================================
+// ENVIRONMENT VARIABLES (load .env.local before imports)
+// =========================================================================
+// Load environment variables: .env.local (sensitive) overrides .env (defaults)
+import dotenv from 'dotenv';
+import fs from 'node:fs';
+
+// Load .env.local if exists (Ollama Cloud API keys, etc.)
+if (fs.existsSync('.env.local')) {
+    dotenv.config({ path: '.env.local' });
+}
+// Load .env (defaults, always exists)
+dotenv.config();
+
+// =========================================================================
 // ARCHITECTURAL GUARDS (process-wide, non-negotiable)
 // =========================================================================
 // Importa o guard correto que impede chamadas a `puppeteer.launch()` em runtime
 await import('./infra/browser_pool/puppeteer_guard.js');
-import { log } from './core/logger.js';
-import { ActorRole, ActionCode, MessageType } from './shared/nerv/constants.js';
+import { AgentLoop } from '#agent/agent_loop';
+import { AttemptWatchdog } from '#agent/attempt_watchdog';
+import { HeartbeatWatchdog } from '#agent/heartbeat_watchdog';
+import { MissionPlannerProcessor } from '#agent/mission_planner_processor';
+import { MissionRunner } from '#agent/mission_runner';
+import { QueueWorker } from '#agent/queue_worker';
+import { TaskControlWatcher } from '#agent/task_control_watcher';
+import { TaskOrchestrationWorker } from '#agent/task_orchestration_worker';
+import { TaskStateProjector } from '#agent/task_state_projector';
+import CONFIG from './core/config.js';
 import { CONNECTION_MODES } from './core/constants/browser.js';
 import { STATUS_VALUES } from './core/constants/tasks.js';
-import CONFIG from './core/config.js';
-import identityManager from './core/identity_manager.js';
-import { createNERV } from './nerv/nerv.js';
-import { createKernel } from './kernel/kernel.js';
-import { getDb } from './infra/db/sqlite.js';
-import { importLegacyQueueFromDisk } from './infra/db/legacy_import.js';
-import { QueueWorker } from '#agent/queue_worker';
-import { TaskStateProjector } from '#agent/task_state_projector';
-import { TaskControlWatcher } from '#agent/task_control_watcher';
-import { MissionRunner } from '#agent/mission_runner';
-import { MissionPlannerProcessor } from '#agent/mission_planner_processor';
-import { AttemptWatchdog } from '#agent/attempt_watchdog';
-import { TaskOrchestrationWorker } from '#agent/task_orchestration_worker';
-import { AgentLoop } from '#agent/agent_loop';
-import { ConnectionOrchestrator } from './infra/ConnectionOrchestrator.js';
 import * as forensics from './core/forensics.js';
-import { saveResponse } from './infra/storage/response_adapter.js';
+import identityManager from './core/identity_manager.js';
+import { log } from './core/logger.js';
 import { DriverNERVAdapter } from './driver/nerv_adapter/driver_nerv_adapter.js';
+import { ConnectionOrchestrator } from './infra/ConnectionOrchestrator.js';
+import { importLegacyQueueFromDisk } from './infra/db/legacy_import.js';
+import { getDb } from './infra/db/sqlite.js';
+import { saveResponse } from './infra/storage/response_adapter.js';
+import { createKernel } from './kernel/kernel.js';
+import { createNERV } from './nerv/nerv.js';
+import { ActionCode, ActorRole } from './shared/nerv/constants.js';
 // ServerNERVAdapter is lazy-loaded when the server/socket hub is available
 
 // ============================================================================
@@ -76,7 +91,8 @@ const SERVER_MODES = Object.freeze({
  * Retorna true se porta ocupada, false se disponível.
  *
  * @param {number} port - Porta a verificar
- * @returns {Promise<boolean>}
+ * @returns {Promise<boolean>} - Verdadeiro se porta está em uso, falso caso contrário
+ * Side-effects: Cria e fecha um servidor TCP temporário para testar a porta.
  */
 async function checkPortInUse(port) {
     const net = await import('node:net').then(m => m.default ?? m);
@@ -108,6 +124,9 @@ async function checkPortInUse(port) {
  *  1) argumento CLI `--authority=...` ou `--server-authority=...`
  *  2) variável de ambiente `SERVER_AUTHORITY`
  *  3) fallback: `standalone`
+ * 
+ * @returns {string} - Autoridade do processo ('standalone' ou 'delegated')
+ * Side-effects: Pode encerrar o processo com exit(1) se autoridade for inválida.
  */
 function resolveAuthority() {
     const ALLOWED = ['standalone', 'delegated'];
@@ -145,6 +164,9 @@ resolveAuthority();
  *   ✔ Valida contra enum fechado
  *   ✔ Fail-fast em valor inválido
  *   ✔ Loga origem
+ * 
+ * @returns {string} - Modo do servidor ('integrated', 'split' ou 'disabled')
+ * Side-effects: Pode encerrar o processo com exit(1) se o modo for inválido.
  */
 function resolveServerMode() {
     const raw = process.env.SERVER_MODE ?? CONFIG.SERVER_MODE ?? SERVER_MODES.INTEGRATED;
@@ -518,6 +540,7 @@ async function boot() {
         let missionRunner = null;
         let missionPlannerProcessor = null;
         let attemptWatchdog = null;
+        let heartbeatWatchdog = null;
         let taskOrchestrationWorker = null;
         let agentLoop = null;
 
@@ -559,6 +582,13 @@ async function boot() {
                 dispatchedStuckMs: Number(process.env.ATTEMPT_DISPATCHED_STUCK_MS || 30000) || 30000,
                 rescheduleDelayMs: Number(process.env.ATTEMPT_WATCHDOG_RESCHEDULE_DELAY_MS || 1000) || 1000,
             });
+
+            heartbeatWatchdog = new HeartbeatWatchdog({
+                workerId: `${workerId}-hb`,
+                intervalMs: Number(process.env.HEARTBEAT_WATCHDOG_INTERVAL_MS || 60000) || 60000, // 1min default
+                staleThresholdMs: Number(process.env.HEARTBEAT_STALE_THRESHOLD_MS || 180000) || 180000, // 3min default
+            });
+            heartbeatWatchdog.start();
 
             taskOrchestrationWorker = new TaskOrchestrationWorker({
                 browserPool,
@@ -853,6 +883,7 @@ async function boot() {
 	            missionRunner: missionRunner ?? null,
 	            missionPlannerProcessor: missionPlannerProcessor ?? null,
 	            attemptWatchdog: attemptWatchdog ?? null,
+	            heartbeatWatchdog: heartbeatWatchdog ?? null,
 	            agentLoop: agentLoop ?? null,
 
             // -------- SERVER LAYER --------
@@ -892,7 +923,7 @@ async function boot() {
     const phases = [];
     let failedPhases = 0;
 
-	    const { serverAdapter, driverAdapter, kernel, browserPool, nerv, httpServer, httpAuthority, queueWorker, taskProjector, taskControlWatcher, missionRunner, missionPlannerProcessor, attemptWatchdog, agentLoop } =
+	    const { serverAdapter, driverAdapter, kernel, browserPool, nerv, httpServer, httpAuthority, queueWorker, taskProjector, taskControlWatcher, missionRunner, missionPlannerProcessor, attemptWatchdog, heartbeatWatchdog, agentLoop } =
 	        context || {};
 
     const shutdownPhases = [
@@ -1055,6 +1086,14 @@ async function boot() {
                     }
                 } catch (err) {
                     log('WARN', `[SHUTDOWN] attemptWatchdog.stop falhou: ${err?.message || String(err)}`);
+                }
+
+                try {
+                    if (heartbeatWatchdog && typeof heartbeatWatchdog.stop === 'function') {
+                        heartbeatWatchdog.stop();
+                    }
+                } catch (err) {
+                    log('WARN', `[SHUTDOWN] heartbeatWatchdog.stop falhou: ${err?.message || String(err)}`);
                 }
             }
         },
@@ -1281,7 +1320,7 @@ function setupSignalHandlers(context) {
  */
 async function main() {
     try {
-        console.log(`
+        log.info(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║                                                               ║
 ║   MAESTRO SINGULARITY EDITION                                 ║
@@ -1329,4 +1368,4 @@ if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-export { boot, shutdown, main };
+export { boot, main, shutdown };

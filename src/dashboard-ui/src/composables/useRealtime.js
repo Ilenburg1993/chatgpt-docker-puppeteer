@@ -8,11 +8,11 @@
  * - Atualiza stores automaticamente
  */
 
-import { onMounted, onUnmounted, watch } from 'vue';
-import { useSocket } from './useSocket';
+import { useSystemStore } from '@/stores/system';
 import { useTaskStore } from '@/stores/tasks';
 import { useTelemetryStore } from '@/stores/telemetry';
-import { useSystemStore } from '@/stores/system';
+import { onMounted, onUnmounted, watch } from 'vue';
+import { useSocket } from './useSocket';
 
 /**
  * Composable para integração real-time com stores
@@ -67,7 +67,7 @@ export function useRealtime(options = {}) {
         Object.entries(handlers).forEach(([event, handler]) => {
             subscribe(event, handler);
         });
-        console.log('[useRealtime] Listeners registrados');
+        console.info('[useRealtime] Listeners registrados');
     };
 
     /**
@@ -77,7 +77,7 @@ export function useRealtime(options = {}) {
         Object.entries(handlers).forEach(([event, handler]) => {
             unsubscribe(event, handler);
         });
-        console.log('[useRealtime] Listeners removidos');
+        console.info('[useRealtime] Listeners removidos');
     };
 
     // Watch connection status

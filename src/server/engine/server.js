@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
 import http from 'node:http';
 import app from './app.js';
-import { log } from '#core/logger';
 
 /** @type {import('http').Server|null} */
 let httpServer = null;
@@ -39,9 +39,11 @@ const MAX_PORT_OFFSET = Number.parseInt(
  *   — limitado por MAX_PORT_OFFSET
  *   — falha determinística se faixa esgotar
  *
- * @param {number} port Porta base
- * @param {number} attempt Tentativa interna
- * @returns {Promise<{server: import('http').Server, port: number}>}
+ * @param {number} port - Porta base para bind
+ * @param {number} [attempt=0] - Tentativa interna (port hunting)
+ * @returns {Promise<{server: import('http').Server, port: number}>} - Servidor HTTP e porta efetiva
+ * @throws {Error} - Se nenhuma porta estiver disponível na faixa
+ * @sideEffects - Inicia servidor HTTP, registra listeners, log de inicialização
  */
 function start(port, attempt = 0) {
     return new Promise((resolve, reject) => {
@@ -60,15 +62,15 @@ function start(port, attempt = 0) {
         const requestTimeout = Number(process.env.SERVER_REQUEST_TIMEOUT || 120000);
         httpServer.setTimeout(requestTimeout);
 
-        console.error(`[Server] Request timeout set to ${requestTimeout}ms`);
+        log.error(`[Server] Request timeout set to ${requestTimeout}ms`);
 
         httpServer.listen(port, HOST, () => {
 
             log('INFO', `[ENGINE] HTTP bound ${HOST}:${port}`);
 
             // Mensagem humana — endereço real depende do forwarding
-            console.log(`\n🚀 MISSION CONTROL PRIME ONLINE`);
-            console.log(`🔗 http://localhost:${port}\n`);
+            log.info(`\n🚀 MISSION CONTROL PRIME ONLINE`);
+            log.info(`🔗 http://localhost:${port}\n`);
 
             resolve({ server: httpServer, port });
         });
@@ -112,8 +114,10 @@ function start(port, attempt = 0) {
  * Encerra servidor HTTP e libera porta.
  * Operação idempotente com timeout para force-close.
  *
- * @param {number} gracefulTimeout - Timeout em ms para esperar conexões fecharem (padrão: 30s)
+ * @param {number} [gracefulTimeout=30000] - Timeout em ms para esperar conexões fecharem
  * @returns {Promise<void>}
+ * @throws {Error} - Se shutdown falhar após timeout
+ * @sideEffects - Fecha servidor HTTP, notifica Socket.IO, limpa estado global
  */
 async function stop(gracefulTimeout = 30000) {
     log('INFO', `[ENGINE] Iniciando shutdown gracioso (timeout: ${gracefulTimeout}ms)...`);
@@ -178,9 +182,11 @@ async function stop(gracefulTimeout = 30000) {
 /**
  * Retorna instância HTTP bruta para camadas de transporte.
  * Somente leitura — não alterar lifecycle externamente.
+ *
+ * @returns {import('http').Server|null} - Instância HTTP ou null se não inicializado
  */
 function getRawServer() {
     return httpServer;
 }
 
-export { start, stop, getRawServer };
+export { getRawServer, start, stop };

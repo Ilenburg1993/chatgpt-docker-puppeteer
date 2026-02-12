@@ -2057,8 +2057,51 @@ class DriverNERVAdapter extends EventEmitter {
     }
 }
 
+ /**
+ * Factory function para criar instância do DriverNERVAdapter
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Cria nova instância do DriverNERVAdapter conectada ao NERV e pool de browsers.
+ * **Unidades:** N/A
+ *
+ * @param {object} nerv - Instância do sistema NERV
+ * @param {object} browserPool - Pool de browsers para alocação
+ * @param {object} config - Configuração do adapter
+ * @returns {DriverNERVAdapter} Nova instância do DriverNERVAdapter
+ */
 export const create = (nerv, browserPool, config) => {
     return new DriverNERVAdapter(nerv, browserPool, config);
 };
 
-export { DriverNERVAdapter, ADAPTER_CONFIG, ADAPTER_EVENTS };
+/**
+ * Classe do adapter NERV para drivers
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Classe principal para adaptação entre sistema NERV e drivers de LLM.
+ * **Unidades:** N/A
+ *
+ * @type {Function}
+ */
+export { DriverNERVAdapter };
+
+/**
+ * Configurações do adapter NERV
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Configurações de timeouts, limites e intervalos para operação do adapter.
+ * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ *
+ * @type {Object<string, number>}
+ */
+export { ADAPTER_CONFIG };
+
+/**
+ * Eventos emitidos pelo adapter NERV
+ *
+ * **Side-effects:** N/A
+ * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
+ * **Unidades:** N/A
+ *
+ * @type {Object<string, string>}
+ */
+export { ADAPTER_EVENTS };

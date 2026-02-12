@@ -46,12 +46,15 @@ function cloneRecords(records) {
 /**
  * Cria o contexto de leitura de correlações.
  *
- * @param {Object} deps
- * @param {Object} deps.store
- * Instância de correlation_store (armazenamento histórico).
+ * **Side-effects:** Emite telemetria para operações de leitura.
+ * **Semântica:** Camada de leitura/auditoria sobre correlações históricas.
+ * **Unidades:** correlationId como string não vazia, histórico como array de registros.
  *
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV (observação técnica).
+ * @param {object} deps - Dependências do contexto
+ * @param {object} deps.store - Instância de correlation_store
+ * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @returns {object} Contexto com métodos getHistory, getLatest, getStats
+ * @throws {Error} Se store ou telemetry forem inválidos
  */
 function createCorrelationContext({ store, telemetry }) {
     if (!store) {

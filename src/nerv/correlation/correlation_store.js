@@ -48,12 +48,17 @@ function emptyMap() {
 /**
  * Cria o armazenamento histórico de correlações.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV (observação técnica).
+ * **Side-effects:** Inicializa mapa de correlações vazio, configura limites.
+ * **Semântica:** Store histórico que preserva ordem de chegada dos fatos por correlation_id.
+ * **Unidades:** TTL em milissegundos (padrão 3600000), maxEntries como inteiro.
  *
- * @param {Object} [deps.limits]
- * Limites técnicos opcionais (ex.: maxEntries por correlação).
+ * @param {object} deps - Dependências do módulo
+ * @param {object} deps.telemetry - Interface de telemetria do NERV
+ * @param {object} [deps.limits={}] - Limites técnicos opcionais
+ * @param {number} [deps.limits.maxEntries] - Máximo de entradas por correlação
+ * @param {number} [deps.limits.ttl=3600000] - TTL em milissegundos (1 hora padrão)
+ * @returns {object} Store de correlação com métodos addEntry, getCorrelation, listCorrelations
+ * @throws {Error} Se telemetry não for fornecida ou inválida
  */
 function createCorrelationStore({ telemetry, limits = {} }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

@@ -1,15 +1,21 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
 import { CONNECTION_MODES } from '#core/constants/browser';
 import { getActionCode, getCorrelationId, getMessageType, getMsgId } from '#shared/nerv/envelope_reader';
+import EventEmitter from 'node:events';
 
 /**
  * Cria transporte híbrido com suporte local + remoto.
  *
- * @param {Object} config
- * @param {string} config.mode - 'local' | 'hybrid'
- * @param {Object} [config.socketAdapter] - Adapter Socket.io (se mode='hybrid')
- * @param {Object} config.telemetry - Interface de telemetria NERV
+ * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido.
+ * **Semântica:** Abstração unificada de transporte local/remoto via NERV.
+ * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
+ *
+ * @param {object} config - Configuração do transporte híbrido
+ * @param {string} [config.mode='LOCAL'] - Modo de conexão ('LOCAL'|'HYBRID')
+ * @param {object} [config.socketAdapter=null] - Adapter Socket.io para modo híbrido
+ * @param {object} config.telemetry - Interface de telemetria NERV
+ * @returns {object} Transporte híbrido com métodos send, onReceive, start, stop
+ * @throws {Error} Se telemetry não for fornecida
  */
 function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = null, telemetry }) {
     if (!telemetry) {
@@ -48,13 +54,13 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                                 error: err.message,
                                 correlationId: envelope.causality?.correlation_id,
                                 msgId: envelope.causality?.msg_id,
-                                actionCode: envelope.type?.action_code
+                                actionCode: envelope.type?.action_code,
                             });
                         }
                     });
                 } catch (err) {
                     telemetry.emit('hybrid_transport_parse_error', {
-                        error: err.message
+                        error: err.message,
                     });
                 }
             });
@@ -93,7 +99,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                 socketAdapter.send(frame);
             } catch (err) {
                 telemetry.emit('hybrid_transport_send_error', {
-                    error: err.message
+                    error: err.message,
                 });
             }
         }
@@ -104,11 +110,11 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
             msgId: getMsgId(envelope),
             correlationId: getCorrelationId(envelope),
             messageType: getMessageType(envelope),
-            mode: mode === CONNECTION_MODES.HYBRID ? 'local+remote' : CONNECTION_MODES.LOCAL
+            mode: mode === CONNECTION_MODES.HYBRID ? 'local+remote' : CONNECTION_MODES.LOCAL,
         });
     }
 
-     /**
+    /**
      * Registra handler para receber mensagens.
      *
      * @param {(envelope: any) => void} handler - (envelope) => void
@@ -132,7 +138,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         };
     }
 
-     /**
+    /**
      * Registra listener para actionCode específico.
      *
      * @param {string} actionCode - Código de ação (ex: 'TASK_START')
@@ -186,7 +192,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         const status = {
             mode,
             localBus: 'active',
-            handlers: handlers.size
+            handlers: handlers.size,
         };
 
         if (mode === CONNECTION_MODES.HYBRID && socketAdapter) {
@@ -203,7 +209,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         onReceive,
         onEvent,
         onActor,
-        getStatus
+        getStatus,
     });
 }
 

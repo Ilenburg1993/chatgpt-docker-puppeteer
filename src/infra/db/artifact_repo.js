@@ -55,5 +55,16 @@ function getArtifactById(artifactId) {
     return db.prepare('SELECT * FROM artifacts WHERE id = ?').get(artifactId) || null;
 }
 
-export { insertArtifact, getArtifactById };
+/**
+ * Deletes an artifact record by ID. Returns the number of rows deleted (0 or 1).
+ * @param {string} artifactId
+ * @returns {number}
+ */
+function deleteArtifactById(artifactId) {
+    const db = getDb();
+    const result = db.prepare('DELETE FROM artifacts WHERE id = ?').run(artifactId);
+    return result.changes;
+}
+
+export { insertArtifact, getArtifactById, deleteArtifactById };
 

@@ -47,8 +47,12 @@ function bufferToInt(buf) {
 /**
  * Empacota um frame opaco adicionando prefixo de tamanho.
  *
- * @param {Buffer|Uint8Array} payload
- * @returns {Buffer}
+ * **Side-effects:** Aloca novos buffers para header e concatenação.
+ * **Semântica:** Adiciona delimitação física (4 bytes big-endian) para transporte.
+ * **Unidades:** Tamanho em bytes como inteiro de 32 bits.
+ *
+ * @param {Buffer|Uint8Array} payload - Dados opacos a serem empacotados
+ * @returns {Buffer} Frame com header de tamanho + payload
  */
 function pack(payload) {
     if (!Buffer.isBuffer(payload)) {
@@ -66,9 +70,14 @@ function pack(payload) {
 =========================== */
 
 /**
- * Cria um desempacotador de frames.
+ * Cria um unpacker para processar stream de frames delimitados por tamanho.
  *
- * Mantém buffer interno apenas para reconstrução física.
+ * **Side-effects:** Mantém estado interno (buffer acumulado, estado de parsing).
+ * **Semântica:** Processa frames de forma incremental, emitindo frames completos via callback.
+ * **Unidades:** Tamanho em bytes como inteiro de 32 bits big-endian.
+ *
+ * @returns {Object} Unpacker com método push
+ * @property {function(Buffer|Uint8Array, function(Buffer): void): void} push - Processa chunk e invoca callback para frames completos
  */
 function createUnpacker() {
     let buffer = Buffer.alloc(0);
@@ -76,9 +85,12 @@ function createUnpacker() {
     /**
      * Processa chunk recebido do meio físico.
      *
-     * @param {Buffer|Uint8Array} chunk
-     * @param {Function} onFrame
-     * Callback chamado para cada frame completo reconstruído.
+     * **Side-effects:** Modifica buffer interno, invoca callback para frames completos.
+     * **Semântica:** Reconstrói frames de forma incremental até ter dados suficientes.
+     * **Unidades:** Tamanho em bytes como inteiro de 32 bits big-endian.
+     *
+     * @param {Buffer|Uint8Array} chunk - Dados recebidos do transporte
+     * @param {function(Buffer): void} onFrame - Callback invocado para cada frame completo
      */
     function push(chunk, onFrame) {
         if (!Buffer.isBuffer(chunk)) {
@@ -103,8 +115,8 @@ function createUnpacker() {
     }
 
     return Object.freeze({
-        push
+        push,
     });
 }
 
-export { pack, createUnpacker };
+export { createUnpacker, pack };

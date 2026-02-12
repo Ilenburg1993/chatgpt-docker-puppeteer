@@ -49,20 +49,19 @@ function now() {
 /**
  * Cria um controlador técnico de reconexão.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
- * Interface de telemetria do NERV.
+ * **Side-effects:** Agenda timers de reconexão, emite telemetria.
+ * **Semântica:** Política técnica de retry para transporte físico.
+ * **Unidades:** interval em ms (padrão 1000), maxAttempts como inteiro ou null.
  *
- * @param {Function} deps.start
- * Função técnica para iniciar o transporte.
- *
- * @param {Function} deps.stop
- * Função técnica para encerrar o transporte.
- *
- * @param {Object} [deps.policy]
- * Política técnica opcional:
- * - interval (ms)
- * - maxAttempts (null = infinito)
+ * @param {object} deps - Dependências do controlador
+ * @param {object} deps.telemetry - Interface de telemetria do NERV
+ * @param {function(): void} deps.start - Função para iniciar transporte
+ * @param {function(): void} deps.stop - Função para parar transporte
+ * @param {object} [deps.policy={}] - Política de reconexão
+ * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms)
+ * @param {number|null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito)
+ * @returns {object} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
+ * @throws {Error} Se dependências obrigatórias estiverem ausentes ou inválidas
  */
 function createReconnect({ telemetry, start, stop, policy = {} }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
