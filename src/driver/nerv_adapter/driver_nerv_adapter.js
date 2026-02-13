@@ -218,7 +218,8 @@ class DriverNERVAdapter extends EventEmitter {
                     taskId = undefined;
                 }
 
-                void this._emitBoth(
+                // ✅ P1-4: Removed 'void' to allow .catch() to work properly
+                this._emitBoth(
                     ADAPTER_EVENTS.ERROR,
                     ActionCode.DRIVER_ERROR,
                     {
@@ -246,7 +247,7 @@ class DriverNERVAdapter extends EventEmitter {
         const payload = getPayload(envelope);
         const correlationId = getCorrelationId(envelope);
 
-        let taskId = null;
+        let taskId;
         try {
             taskId = getTaskIdFromPayload(payload);
         } catch (taskIdError) {
@@ -524,8 +525,9 @@ class DriverNERVAdapter extends EventEmitter {
                 );
 
                 // Heartbeat while in-progress (including before STARTED) to keep leases alive.
+                // ✅ P1-4: Removed 'void' and upgraded log level (heartbeat failure is critical for observability)
                 activeEntry.heartbeatTimer = setInterval(() => {
-                    void this._emitBoth(
+                    this._emitBoth(
                         ADAPTER_EVENTS.TASK_STATE_OBSERVED,
                         ActionCode.DRIVER_TASK_HEARTBEAT,
                         {
@@ -535,7 +537,7 @@ class DriverNERVAdapter extends EventEmitter {
                         correlationId
                     ).catch(err => {
                         log(
-                            'DEBUG',
+                            'WARN', // ✅ P1-4: Upgraded from DEBUG - heartbeat failures are important
                             `[DriverNERVAdapter] Heartbeat emit failed for ${taskId}: ${err?.message || String(err)}`,
                             correlationId
                         );
@@ -910,7 +912,7 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     async _performHealthCheck(payload, correlationId) {
-        let browserPoolHealth = null;
+        let browserPoolHealth;
         let healthStatus = STATUS_VALUES.HEALTHY;
 
         try {
@@ -1010,8 +1012,9 @@ class DriverNERVAdapter extends EventEmitter {
     _attachDriverTelemetry(driver, taskId, correlationId) {
         const listeners = [];
 
+        // ✅ P1-4: Removed 'void' and added error handler - state changes are critical for observability
         const stateChangeListener = data => {
-            void this._emitBoth(
+            this._emitBoth(
                 ADAPTER_EVENTS.TASK_STATE_OBSERVED,
                 ActionCode.DRIVER_STATE_OBSERVED,
                 {
@@ -1020,7 +1023,9 @@ class DriverNERVAdapter extends EventEmitter {
                     timestamp: new Date().toISOString()
                 },
                 correlationId
-            );
+            ).catch(err => {
+                log('WARN', `[DriverNERVAdapter] Failed to emit state change for ${taskId}: ${err?.message}`, correlationId);
+            });
         };
         driver.on('state_change', stateChangeListener);
         listeners.push({ event: 'state_change', listener: stateChangeListener });
@@ -1042,8 +1047,9 @@ class DriverNERVAdapter extends EventEmitter {
         driver.on('progress', progressListener);
         listeners.push({ event: 'progress', listener: progressListener });
 
+        // ✅ P1-4: Removed 'void' and added error handler - anomalies are critical alerts
         const anomalyListener = data => {
-            void this._emitBoth(
+            this._emitBoth(
                 ADAPTER_EVENTS.ERROR,
                 ActionCode.DRIVER_ANOMALY,
                 {
@@ -1053,7 +1059,9 @@ class DriverNERVAdapter extends EventEmitter {
                     details: data.message
                 },
                 correlationId
-            );
+            ).catch(err => {
+                log('ERROR', `[DriverNERVAdapter] Failed to emit anomaly for ${taskId}: ${err?.message}`, correlationId);
+            });
         };
         driver.on('anomaly', anomalyListener);
         listeners.push({ event: 'anomaly', listener: anomalyListener });
@@ -1156,19 +1164,50 @@ class DriverNERVAdapter extends EventEmitter {
         }
     }
 
-    _flushTelemetry() {
+    /**
+     * ✅ P1-4: Now async to await all emissions before clearing buffer.
+     * Prevents data loss if emissions fail.
+     */
+    async _flushTelemetry() {
         if (this.telemetryBuffer.length === 0) return;
 
         const batch = [...this.telemetryBuffer];
-        this.telemetryBuffer = [];
 
-        for (const { actionCode, payload, correlationId } of batch) {
-            void this._emitEvent(actionCode, payload, correlationId).catch(err => {
-                log('WARN', `[DriverNERVAdapter] Error flushing telemetry: ${err.message}`);
-            });
+        // ✅ P1-4: Emit all events and wait for completion
+        const results = await Promise.allSettled(
+            batch.map(({ actionCode, payload, correlationId }) =>
+                this._emitEvent(actionCode, payload, correlationId)
+            )
+        );
+
+        // ✅ P1-4: Only clear buffer items that were successfully emitted
+        let successCount = 0;
+        let failCount = 0;
+        const failedItems = [];
+
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                successCount++;
+            } else {
+                failCount++;
+                failedItems.push(batch[index]);
+                log('WARN', `[DriverNERVAdapter] Telemetry emission failed: ${result.reason?.message}`);
+            }
+        });
+
+        // ✅ P1-4: Clear successfully emitted items from buffer
+        if (successCount > 0) {
+            // Remove successful items (first N items where N = successCount if no interleaving)
+            // Safer: rebuild buffer with only failed items to retry later
+            this.telemetryBuffer = [...failedItems, ...this.telemetryBuffer.slice(batch.length)];
         }
 
-        log('DEBUG', `[DriverNERVAdapter] Flushed ${batch.length} telemetry events`);
+        if (successCount > 0) {
+            log('DEBUG', `[DriverNERVAdapter] Flushed ${successCount}/${batch.length} telemetry events`);
+        }
+        if (failCount > 0) {
+            log('WARN', `[DriverNERVAdapter] ${failCount}/${batch.length} telemetry events failed, will retry`);
+        }
     }
 
     async _emitError(operation, error, taskId, correlationId, phase) {
@@ -1216,22 +1255,22 @@ class DriverNERVAdapter extends EventEmitter {
         try {
             url = page.url();
         } catch (_) {
-            url = null;
+            // Keep null;
         }
         try {
             title = await page.title();
         } catch (_) {
-            title = null;
+            // Keep null;
         }
         try {
             ua = await page.browser().userAgent();
         } catch (_) {
-            ua = null;
+            // Keep null;
         }
         try {
             viewport = page.viewport ? page.viewport() : null;
         } catch (_) {
-            viewport = null;
+            // Keep null;
         }
 
         /** @type {Record<string, string|null>} */
