@@ -224,13 +224,16 @@ function createSsotGatewayKernel(config = {}) {
      * @throws {Error} Se task.meta.id não for válido ou se ocorrer erro na emissão do comando.
      * Side-effects: Envia comando para o driver via NERV.
      */
+    /**
+     * ✅ P1-4: Agora aguarda emissão para garantir que comando foi enviado.
+     */
     async function executeTask(task, correlationId) {
         if (!task?.meta?.id) {
             throw new Error('executeTask requer task.meta.id válido');
         }
 
         try {
-            HighLevelNERV.sendCommand(
+            await HighLevelNERV.sendCommand( // ✅ P1-4: Added await
                 nerv,
                 ActorRole.KERNEL,
                 ActionCode.DRIVER_EXECUTE_TASK,

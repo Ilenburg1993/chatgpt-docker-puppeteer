@@ -241,7 +241,10 @@ class KernelNERVBridge {
      * @param {Object} params.payload
      * Payload opaco do comando.
      */
-    emitCommand({ target, correlationId, payload }) {
+    /**
+     * ✅ P1-4: Agora async para aguardar emissão e garantir telemetria correta.
+     */
+    async emitCommand({ target, correlationId, payload }) {
         if (!this.started) {
             throw new Error('KernelNERVBridge não iniciada');
         }
@@ -250,7 +253,7 @@ class KernelNERVBridge {
         const targetRole = target ? (ActorRole[target.toUpperCase()] || null) : null;
 
         try {
-            const envelope = HighLevelNERV.sendCommand(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole);
+            const envelope = await HighLevelNERV.sendCommand(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_command_emitted', {
@@ -283,7 +286,10 @@ class KernelNERVBridge {
      * @param {Object} params.payload
      * Payload opaco do evento.
      */
-    emitEvent({ target = null, correlationId, payload }) {
+    /**
+     * ✅ P1-4: Agora async para aguardar emissão e garantir telemetria correta.
+     */
+    async emitEvent({ target = null, correlationId, payload }) {
         if (!this.started) {
             throw new Error('KernelNERVBridge não iniciada');
         }
@@ -293,7 +299,7 @@ class KernelNERVBridge {
         const targetRole = target ? (ActorRole[target.toUpperCase()] || null) : null;
 
         try {
-            const envelope = HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole);
+            const envelope = await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_event_emitted', {
@@ -462,7 +468,7 @@ class KernelNERVBridge {
 		const retryTask = { ...task, spec: nextSpec };
 
         // Emite comando para re-executar task com feedback
-        this.emitCommand({
+        await this.emitCommand({
             target: 'driver',
             correlationId,
             payload: {
@@ -487,7 +493,7 @@ class KernelNERVBridge {
         // Cria nova task para próximo step
         // NOTA: Isso será implementado completamente quando integrarmos com MissionManager
         // Por ora, apenas logamos e emitimos evento
-        this.emitEvent({
+        await this.emitEvent({
             target: 'server',
             correlationId: task.meta.workflow_id || correlationId,
             payload: {

@@ -97,7 +97,7 @@ class OrchestratorEngine {
         const strategy = task.spec?.execution?.strategy || 'SINGLE_SHOT';
 
         // Emite evento NERV
-        this._emitNervEvent('ORCHESTRATION_STARTED', {
+        await this._emitNervEvent('ORCHESTRATION_STARTED', {
             task_id: task.meta.id,
             strategy,
             workflow_id: task.meta.workflow_id,
@@ -176,7 +176,7 @@ class OrchestratorEngine {
 
         // SINGLE_SHOT: Sempre DONE
         if (strategy === 'SINGLE_SHOT') {
-            this._emitNervEvent('ORCHESTRATION_COMPLETED', {
+            await this._emitNervEvent('ORCHESTRATION_COMPLETED', {
                 task_id: task.meta.id,
                 strategy: 'SINGLE_SHOT',
                 iterations: 1,
@@ -336,7 +336,7 @@ class OrchestratorEngine {
         iterationState.current_iteration++;
 
         // Emite evento de iteração
-        this._emitNervEvent('ITERATION_STARTED', {
+        await this._emitNervEvent('ITERATION_STARTED', {
             task_id: task.meta.id,
             iteration: iterationState.current_iteration,
             max_iterations: iterationState.max_iterations,
@@ -374,7 +374,7 @@ class OrchestratorEngine {
         });
 
         // Emite evento de iteração completada
-        this._emitNervEvent('ITERATION_COMPLETED', {
+        await this._emitNervEvent('ITERATION_COMPLETED', {
             task_id: task.meta.id,
             iteration: iterationState.current_iteration,
             quality_score: validationResult.overall_score,
@@ -390,7 +390,7 @@ class OrchestratorEngine {
             // Limpa state
             this.activeIterations.delete(task.meta.id);
 
-            this._emitNervEvent('ORCHESTRATION_COMPLETED', {
+            await this._emitNervEvent('ORCHESTRATION_COMPLETED', {
                 task_id: task.meta.id,
                 strategy: 'ITERATIVE',
                 iterations: iterationState.current_iteration,
@@ -413,7 +413,7 @@ class OrchestratorEngine {
             // Limpa state
             this.activeIterations.delete(task.meta.id);
 
-            this._emitNervEvent('ORCHESTRATION_COMPLETED', {
+            await this._emitNervEvent('ORCHESTRATION_COMPLETED', {
                 task_id: task.meta.id,
                 strategy: 'ITERATIVE',
                 iterations: iterationState.current_iteration,
@@ -498,7 +498,7 @@ class OrchestratorEngine {
             },
         });
 
-        this._emitNervEvent('WORKFLOW_STEP_COMPLETED', {
+        await this._emitNervEvent('WORKFLOW_STEP_COMPLETED', {
             workflow_id,
             step_id: currentStep.id,
             step_index: currentStepIndex,
@@ -516,7 +516,7 @@ class OrchestratorEngine {
             // Limpa contexto do workflow
             this.contextManager.clearContext(workflow_id);
 
-            this._emitNervEvent('ORCHESTRATION_COMPLETED', {
+            await this._emitNervEvent('ORCHESTRATION_COMPLETED', {
                 task_id: task.meta.id,
                 workflow_id,
                 strategy: 'MULTI_STEP',
@@ -538,7 +538,7 @@ class OrchestratorEngine {
             `[OrchestratorEngine] Workflow ${workflow_id} moving to step ${nextStepIndex + 1}/${workflowState.steps.length}: ${nextStep.name}`
         );
 
-        this._emitNervEvent('WORKFLOW_STEP_STARTED', {
+        await this._emitNervEvent('WORKFLOW_STEP_STARTED', {
             workflow_id,
             step_id: nextStep.id,
             step_index: nextStepIndex,
@@ -766,20 +766,26 @@ class OrchestratorEngine {
     /**
      * Emite evento NERV com suporte a diferentes APIs.
      *
+     * ✅ P1-4: Agora async para aguardar emissão e propagar erros corretamente.
      * Suporta API simples (nerv.emit) para testes e API canônica (nerv.emitEvent)
      * para produção. Usa HighLevelNERV para envelopes padronizados.
      *
      * @private
      * @param {string} actionCode - Código da ação (ex: 'ORCHESTRATION_STARTED')
      * @param {object} payload - Dados do evento
+     * @returns {Promise<void>}
      * @sideEffects - Emite evento via NERV system
      */
-    _emitNervEvent(actionCode, payload) {
+    async _emitNervEvent(actionCode, payload) {
         if (!this.nerv) return;
 
         // Unit tests and some adapters use a simple `nerv.emit(event, payload)` API.
         if (typeof this.nerv.emit === 'function') {
-            this.nerv.emit(actionCode, payload);
+            // Simple API - may or may not be async, handle both
+            const result = this.nerv.emit(actionCode, payload);
+            if (result && typeof result.then === 'function') {
+                await result;
+            }
             return;
         }
 
@@ -787,9 +793,11 @@ class OrchestratorEngine {
         if (typeof this.nerv.emitEvent === 'function') {
             try {
                 const code = ActionCode[actionCode] || actionCode;
-                HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload);
+                await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload); // ✅ P1-4: Added await
             } catch (e) {
                 logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', e.message);
+                // ✅ P1-4: Re-throw para que caller saiba da falha
+                throw e;
             }
         }
     }

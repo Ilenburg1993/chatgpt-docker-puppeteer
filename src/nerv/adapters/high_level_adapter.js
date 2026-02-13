@@ -6,7 +6,19 @@ function makeEnvelope({ actor, target = null, messageType, actionCode, payload =
     return createEnvelope({ actor, target, messageType, actionCode, payload, correlationId });
 }
 
-function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = null, target = null) {
+/**
+ * Send NERV event (async).
+ * ✅ P1-4: Now properly awaits emission and propagates errors.
+ * @param {object} nerv - NERV instance
+ * @param {string} actor - Actor role
+ * @param {string} actionCode - Action code
+ * @param {object} [payload={}] - Event payload
+ * @param {string|null} [correlationId=null] - Correlation ID
+ * @param {string|null} [target=null] - Target actor
+ * @returns {Promise<object>} Resolved envelope
+ * @throws {Error} If emission fails
+ */
+async function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = null, target = null) {
     const envelope = makeEnvelope({
         actor,
         target,
@@ -18,11 +30,23 @@ function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = null, 
     if (!nerv || typeof nerv.emitEvent !== 'function') {
         throw new Error('NERV instance with emitEvent required');
     }
-    nerv.emitEvent(envelope);
+    await nerv.emitEvent(envelope); // ✅ P1-4: Added await
     return envelope;
 }
 
-function sendCommand(nerv, actor, actionCode, payload = {}, correlationId = null, target = null) {
+/**
+ * Send NERV command (async).
+ * ✅ P1-4: Now properly awaits emission and propagates errors.
+ * @param {object} nerv - NERV instance
+ * @param {string} actor - Actor role
+ * @param {string} actionCode - Action code
+ * @param {object} [payload={}] - Command payload
+ * @param {string|null} [correlationId=null] - Correlation ID
+ * @param {string|null} [target=null] - Target actor
+ * @returns {Promise<object>} Resolved envelope
+ * @throws {Error} If emission fails
+ */
+async function sendCommand(nerv, actor, actionCode, payload = {}, correlationId = null, target = null) {
     const envelope = makeEnvelope({
         actor,
         target,
@@ -34,11 +58,22 @@ function sendCommand(nerv, actor, actionCode, payload = {}, correlationId = null
     if (!nerv || typeof nerv.emitCommand !== 'function') {
         throw new Error('NERV instance with emitCommand required');
     }
-    nerv.emitCommand(envelope);
+    await nerv.emitCommand(envelope); // ✅ P1-4: Added await
     return envelope;
 }
 
-function sendAck(nerv, actor, actionCode, correlationId = null, target = null) {
+/**
+ * Send NERV acknowledgment (async).
+ * ✅ P1-4: Now properly awaits emission and propagates errors.
+ * @param {object} nerv - NERV instance
+ * @param {string} actor - Actor role
+ * @param {string} actionCode - Action code
+ * @param {string|null} [correlationId=null] - Correlation ID
+ * @param {string|null} [target=null] - Target actor
+ * @returns {Promise<object>} Resolved envelope
+ * @throws {Error} If emission fails
+ */
+async function sendAck(nerv, actor, actionCode, correlationId = null, target = null) {
     const envelope = makeEnvelope({
         actor,
         target,
@@ -50,7 +85,7 @@ function sendAck(nerv, actor, actionCode, correlationId = null, target = null) {
     if (!nerv || typeof nerv.emitAck !== 'function') {
         throw new Error('NERV instance with emitAck required');
     }
-    nerv.emitAck(envelope);
+    await nerv.emitAck(envelope); // ✅ P1-4: Added await
     return envelope;
 }
 
