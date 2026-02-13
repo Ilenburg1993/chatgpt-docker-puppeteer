@@ -46,15 +46,16 @@ import * as logWatcher from './watchers/log_watcher.js';
  * processos (ex: Maestro).
  *
  * Propriedades:
- *   ✔ Escrita síncrona deliberada (barreira de boot)
- *   ✔ Commit atômico via arquivo temporário
+ *   ✔ Publicação via NERV (assíncrona, observável)
+ *   ✔ Commit atômico via arquivo temporário (fallback)
  *   ✔ Nunca retorna estado parcialmente gravado
  *
  * @param {number} port - Porta efetivamente bound pelo HTTP engine
  * @param {'standalone'|'delegated'} [authority='standalone'] - Modo de autoridade do servidor
  * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)
+ * @returns {Promise<void>}
  */
-function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
+async function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
     // Legacy compatibility hook: discovery is now canonical via NERV (SERVER_READY).
     // We delegate to the discovery helper which prefers NERV and only falls back
     // to file-based persistence if explicitly enabled via `ENABLE_STATE_FILE=true`.
@@ -70,7 +71,7 @@ function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STAND
     };
 
     try {
-        Discovery.publishServerReady(null, payload);
+        await Discovery.publishServerReady(null, payload);
         log('DEBUG', '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)');
     } catch (err) {
         log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);
@@ -145,7 +146,7 @@ async function bootstrap(options = {}) {
          pois o Maestro é responsável pela descoberta/coordenação.
       -------------------------------------------------------------- */
         if (Authority.isStandalone(authority)) {
-            persistServerState(port, authority);
+            await persistServerState(port, authority);
         } else {
             log('DEBUG', '[BOOT] persistServerState skip (delegated)');
         }
