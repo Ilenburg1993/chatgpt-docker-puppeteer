@@ -108,7 +108,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         // Evita enviar stack traces gigantescas pelo barramento Socket.io
         if (nervInstance) {
             try {
-                HighLevelNERV.sendEvent(
+                await HighLevelNERV.sendEvent(
                     nervInstance,
                     ActorRole.INFRA,
                     ActionCode.FORENSICS_DUMP_CREATED,

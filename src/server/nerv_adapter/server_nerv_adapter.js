@@ -345,9 +345,9 @@ class ServerNERVAdapter {
         return `${p[0]}:${p.slice(1).join('_')}`;
     }
 
-    _emitCommand(actionCode, payload, correlationId) {
+    async _emitCommand(actionCode, payload, correlationId) {
         try {
-            HighLevelNERV.sendCommand(this.nerv, ActorRole.SERVER, actionCode, payload, correlationId);
+            await HighLevelNERV.sendCommand(this.nerv, ActorRole.SERVER, actionCode, payload, correlationId);
             return true;
         } catch (err) {
             log('ERROR', `[ServerNERVAdapter] Falha ao emitir comando: ${err.message}`, correlationId);

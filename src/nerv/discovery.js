@@ -12,13 +12,13 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
  *
  * @param {object} [nerv] - Instância NERV para publicação (opcional)
  * @param {object} [payload={}] - Payload adicional do evento
- * @returns {object|null} Envelope enviado ou null se falhar
+ * @returns {Promise<object|null>} Envelope enviado ou null se falhar
  */
-function publishServerReady(nerv, payload = {}) {
+async function publishServerReady(nerv, payload = {}) {
     // Prefer NERV when available
     if (nerv) {
         try {
-            return HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
+            return await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
         } catch (err) {
             log('WARN', `[DISCOVERY] Falha ao publicar SERVER_READY via NERV: ${err.message}`);
         }
@@ -77,7 +77,7 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
                         if (typeof unsub === 'function') unsub();
                         resolve(envelope.payload || envelope);
                     }
-                } catch (err) {
+                } catch (_) {
                     // ignore malformed envelopes
                 }
             });
@@ -112,7 +112,7 @@ function listenForServerReady(nerv, handler) {
             if (action === ActionCode.SERVER_READY) {
                 handler(envelope.payload || envelope);
             }
-        } catch (err) {
+        } catch (_) {
             // ignore
         }
     });

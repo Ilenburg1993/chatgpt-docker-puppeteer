@@ -528,13 +528,13 @@ class ChromeProxyService {
         this.log('info', 'NERV integration enabled');
     }
 
-    _emitNervEvent(actionCode, payload = {}, correlationId = null) {
+    async _emitNervEvent(actionCode, payload = {}, correlationId = null) {
         try {
             if (!this.nerv || !HighLevelNERV || typeof HighLevelNERV.sendEvent !== 'function') {
                 return null;
             }
             const actor = ActorRole.INFRA || 'INFRA';
-            return HighLevelNERV.sendEvent(this.nerv, actor, actionCode, payload, correlationId, null);
+            return await HighLevelNERV.sendEvent(this.nerv, actor, actionCode, payload, correlationId, null);
         } catch (err) {
             this.log('debug', 'NERV publish failed (non-critical)', { error: err.message });
             return null;

@@ -1,5 +1,5 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
+import { ActorRole, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // ONDA 2.5: Removido EventEmitter, usa NERV para comunicação
@@ -79,10 +79,10 @@ class KernelTelemetry {
      * @param {string} [severity]
      * Severidade (INFO, WARNING, CRITICAL).
      *
-     * @returns {Object}
+     * @returns {Promise<Object>}
      * Evento criado.
      */
-    emitEvent(type, payload = {}, severity = TelemetrySeverity.INFO) {
+    async emitEvent(type, payload = {}, severity = TelemetrySeverity.INFO) {
         if (!this.enabled) {
             return null;
         }
@@ -111,11 +111,11 @@ class KernelTelemetry {
                 const discarded = this.buffer.shift();
                 // ONDA 2.5: Emitir via NERV (não mais EventEmitter interno)
                 try {
-                    HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.TELEMETRY_DISCARDED, {
+                    await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.TELEMETRY_DISCARDED, {
                         discardedAt: Date.now(),
                         discardedEventType: discarded.type
                     });
-                } catch (e) {
+                } catch (_) {
                     // Best-effort: don't crash telemetry on emit failures
                 }
             }
@@ -123,8 +123,8 @@ class KernelTelemetry {
 
         // ONDA 2.5: Emissão via NERV (desacoplado)
         try {
-            HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.KERNEL_TELEMETRY, event);
-        } catch (e) {
+            await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.KERNEL_TELEMETRY, event);
+        } catch (_) {
             // Best-effort: avoid failing kernel telemetry on emission errors
         }
 

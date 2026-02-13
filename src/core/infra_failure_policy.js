@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as system from '#infra/system';
 import { log, audit } from './logger.js';
-import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // NERV instance will be injected via setNERV()
@@ -82,7 +82,7 @@ class InfraFailurePolicy {
         // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura via NERV (ONDA 2 - Migrado)
         if (nervInstance) {
             try {
-                HighLevelNERV.sendEvent(
+                await HighLevelNERV.sendEvent(
                     nervInstance,
                     ActorRole.INFRA,
                     ActionCode.INFRA_EMERGENCY,

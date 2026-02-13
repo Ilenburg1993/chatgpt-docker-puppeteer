@@ -217,7 +217,7 @@ class ValidationService {
         // Emite evento NERV
         if (this.nerv) {
             try {
-                HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, ActionCode.VALIDATION_COMPLETED, {
+                await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, ActionCode.VALIDATION_COMPLETED, {
                     passed,
                     overall_score,
                     num_validators: validators.length,
