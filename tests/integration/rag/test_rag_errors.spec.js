@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { ragIndex, ragReset } from '../../../tools/rag/lib/facade.mjs';
+import { ragIndex, ragReset, ragHybridSearch } from '../../../tools/rag/lib/facade.mjs';
 
 // Fake embeddings provider for testing
 class FakeEmbeddingsProvider {
@@ -48,7 +48,8 @@ describe('RAG Error Scenarios', () => {
             await ragIndex({ 
                 root: ws, 
                 paths, 
-                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }) 
+                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
+                profile: 'full'
             });
 
             // Manually corrupt the manifest to simulate schema mismatch
@@ -63,7 +64,8 @@ describe('RAG Error Scenarios', () => {
                     await ragIndex({ 
                         root: ws, 
                         paths, 
-                        embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }) 
+                        embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
+                        profile: 'full'
                     });
                 },
                 (err) => {
@@ -93,7 +95,8 @@ describe('RAG Error Scenarios', () => {
             await ragIndex({ 
                 root: ws, 
                 paths, 
-                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }) 
+                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
+                profile: 'full'
             });
 
             // Try to index with different dimension - should fail fast
@@ -102,7 +105,8 @@ describe('RAG Error Scenarios', () => {
                     await ragIndex({ 
                         root: ws, 
                         paths, 
-                        embeddingsProvider: new FakeEmbeddingsProvider({ dim: 16 }) // Different!
+                        embeddingsProvider: new FakeEmbeddingsProvider({ dim: 16 }), // Different!
+                        profile: 'full'
                     });
                 },
                 (err) => {
@@ -150,7 +154,8 @@ describe('RAG Error Scenarios', () => {
             const result = await ragIndex({ 
                 root: ws, 
                 paths, 
-                embeddingsProvider: flakyProvider 
+                embeddingsProvider: flakyProvider,
+                profile: 'full'
             });
 
             assert.strictEqual(result.scanned_files, 1);
@@ -188,6 +193,43 @@ describe('RAG Error Scenarios', () => {
             // With yes flag - should succeed
             await ragReset({ paths, yes: true });
         } finally {
+            await fs.rm(store, { recursive: true, force: true });
+        }
+    });
+
+    it('falls back to lexical mode when embeddings are unavailable', async () => {
+        const ws = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-ws-'));
+        const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
+        const paths = {
+            dbDir: path.join(store, 'rag-db'),
+            indexDir: path.join(store, 'rag-index')
+        };
+
+        try {
+            await fs.writeFile(path.join(ws, 'src.ts'), 'export const PORT = 9224;\n', 'utf8');
+
+            await ragIndex({
+                root: ws,
+                paths,
+                profile: 'full',
+                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 })
+            });
+
+            const result = await ragHybridSearch({
+                query: 'PORT',
+                paths,
+                mode: 'auto',
+                degradedModeEnabled: true,
+                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8, shouldFail: true }),
+                topK: 3
+            });
+
+            assert.strictEqual(result.backend, 'lexical');
+            assert.strictEqual(result.degraded, true);
+            assert.strictEqual(result.reason_code, 'OLLAMA_UNAVAILABLE');
+            assert.ok(Array.isArray(result.results));
+        } finally {
+            await fs.rm(ws, { recursive: true, force: true });
             await fs.rm(store, { recursive: true, force: true });
         }
     });

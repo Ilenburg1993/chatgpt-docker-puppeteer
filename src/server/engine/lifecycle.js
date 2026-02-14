@@ -102,6 +102,17 @@ async function gracefulShutdown(signal) {
             log('DEBUG', `[LIFECYCLE] shutdownUpstreams skipped: ${e && e.message ? e.message : String(e)}`);
         }
 
+        // 2.3. LSP/tsserver daemon
+        try {
+            const { stopTsserverDaemon } = await import('../../integration/lsp/tsserver-daemon.mjs');
+            if (typeof stopTsserverDaemon === 'function') {
+                await stopTsserverDaemon();
+                log('DEBUG', '[LIFECYCLE] LSP daemon encerrado');
+            }
+        } catch (e) {
+            log('DEBUG', `[LIFECYCLE] stopTsserverDaemon skipped: ${e && e.message ? e.message : String(e)}`);
+        }
+
         // 2.5. DASHBOARD AGGREGATORS (realtime)
         // Para timers internos antes de desconectar o Hub.
         try {

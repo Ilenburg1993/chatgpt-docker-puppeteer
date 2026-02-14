@@ -113,18 +113,25 @@ export async function handleRagQuery(req, res) {
       success: true,
       results: result.results.map(r => ({
         path: r.path,
-        score: r._distance,
+        score: r.score,
         startLine: r.start_line,
         endLine: r.end_line,
         text: r.text,
         language: r.language || null,
         tags: r.tags || [],
-        ext: r.ext
+        ext: r.ext,
+        indexed_at: r.indexed_at || null,
+        indexed_at_iso: r.indexed_at_iso || null,
+        indexed_at_local: r.indexed_at_local || null
       })),
       metadata: {
         query,
         topK: result.topK,
         dim: result.dim,
+        index_mode: result.index_mode || 'full',
+        index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
+        index_updated_at_iso: result.index_updated_at_iso || null,
+        query_at_iso: result.query_at_iso || null,
         timestamp: Date.now()
       }
     });
@@ -272,7 +279,10 @@ export async function handleRagHybridSearch(req, res) {
         text: r.text,
         language: r.language || null,
         tags: r.tags || [],
-        ext: r.ext
+        ext: r.ext,
+        indexed_at: r.indexed_at || null,
+        indexed_at_iso: r.indexed_at_iso || null,
+        indexed_at_local: r.indexed_at_local || null
       })),
       metadata: {
         query: result.query,
@@ -283,6 +293,10 @@ export async function handleRagHybridSearch(req, res) {
         rerank: result.rerank,
         mmr: result.mmr,
         mmrLambda: result.mmrLambda,
+        index_mode: result.index_mode || 'full',
+        index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
+        index_updated_at_iso: result.index_updated_at_iso || null,
+        query_at_iso: result.query_at_iso || null,
         timestamp: Date.now()
       }
     });

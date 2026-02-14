@@ -1,3 +1,4 @@
+import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragIndex } from './lib/facade.mjs';
 
@@ -6,6 +7,7 @@ const { values } = parseArgs({
         root: { type: 'string' },
         'ollama-base-url': { type: 'string' },
         model: { type: 'string' },
+        profile: { type: 'string' },
         'max-file-bytes': { type: 'string' },
         json: { type: 'boolean', default: false }
     }
@@ -17,6 +19,7 @@ const report = await ragIndex({
     root: values.root,
     ollamaBaseUrl: values['ollama-base-url'],
     model: values.model,
+    profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
     maxFileBytes
 });
 
@@ -28,4 +31,3 @@ if (values.json) {
         `[RAG] scanned=${report.scanned_files} changed=${report.changed_files} skipped=${report.skipped_files} embedded=${report.embedded_chunks} inserted=${report.inserted_chunks}`
     );
 }
-

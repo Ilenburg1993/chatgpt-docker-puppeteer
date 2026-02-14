@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
-import { ragIndex, ragAsk } from '../../../tools/rag/lib/facade.mjs';
+import { ragIndex, ragAsk, ragIndexChanged, ragQuery } from '../../../tools/rag/lib/facade.mjs';
 
 class FakeEmbeddingsProvider {
     constructor(dim = 8) {
@@ -41,12 +41,12 @@ describe('RAG end-to-end (no Ollama)', () => {
                 'utf8'
             );
 
-            const r1 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings });
+            const r1 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings, profile: 'full' });
             assert.ok(r1.scanned_files >= 1);
             assert.strictEqual(r1.skipped_files, 0);
             assert.ok(r1.embedded_chunks >= 1);
 
-            const r2 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings });
+            const r2 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings, profile: 'full' });
             assert.strictEqual(r2.changed_files, 0);
             assert.strictEqual(r2.embedded_chunks, 0);
 
@@ -56,12 +56,26 @@ describe('RAG end-to-end (no Ollama)', () => {
                 'utf8'
             );
 
-            const r3 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings });
+            const r3 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings, profile: 'full' });
             assert.strictEqual(r3.changed_files, 1);
             assert.ok(r3.embedded_chunks >= 1);
 
+            await fs.writeFile(
+                path.join(ws, 'src.ts'),
+                'export const CHROME_PROXY_PORT = 9333;\n',
+                'utf8'
+            );
+            const inc = await ragIndexChanged({
+                root: ws,
+                paths,
+                changedPaths: ['src.ts'],
+                embeddingsProvider: embeddings,
+                profile: 'full'
+            });
+            assert.strictEqual(inc.changed_files, 1);
+
             const { markdown, result } = await ragAsk({
-                query: 'export const CHROME_PROXY_PORT = 9225;',
+                query: 'export const CHROME_PROXY_PORT = 9333;',
                 paths,
                 embeddingsProvider: embeddings,
                 topK: 3
@@ -70,10 +84,24 @@ describe('RAG end-to-end (no Ollama)', () => {
             assert.ok(Array.isArray(result.results));
             assert.ok(markdown.includes('CHROME_PROXY_PORT'));
             assert.ok(markdown.includes('src.ts:1-'));
+
+            const q = await ragQuery({
+                query: 'CHROME_PROXY_PORT',
+                paths,
+                embeddingsProvider: embeddings,
+                topK: 1
+            });
+            assert.ok(['full', 'incremental'].includes(q.index_mode));
+            assert.ok(Object.prototype.hasOwnProperty.call(q, 'index_freshness_ms'));
+            assert.ok(q.results[0].indexed_at_iso);
+            assert.ok(q.results[0].kind);
+            assert.ok(Object.prototype.hasOwnProperty.call(q.results[0], 'symbol'));
+            assert.ok(Object.prototype.hasOwnProperty.call(q.results[0], 'header_text'));
+            assert.ok(Object.prototype.hasOwnProperty.call(q.results[0], 'chunk_prev_id'));
+            assert.ok(Object.prototype.hasOwnProperty.call(q.results[0], 'chunk_next_id'));
         } finally {
             await fs.rm(ws, { recursive: true, force: true });
             await fs.rm(store, { recursive: true, force: true });
         }
     });
 });
-

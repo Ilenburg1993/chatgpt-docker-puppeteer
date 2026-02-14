@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragHybridSearch } from './lib/facade.mjs';
 
@@ -86,6 +87,9 @@ if (values.json) {
         }
 
         console.log(`    Language: ${r.language || 'unknown'} | Size: ${r.text.length} chars`);
+        if (r.indexed_at_iso) {
+            console.log(`    Indexed At: ${r.indexed_at_iso}`);
+        }
 
         // Preview first 120 chars
         const preview = r.text.slice(0, 120).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();

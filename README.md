@@ -84,6 +84,18 @@ npm run daemon:start
 npm run daemon:status
 ```
 
+### Pipeline Canônico RAG/MCP
+```bash
+# Sobe PM2 + valida MCP + reconstrói RAG do zero (profile full)
+npm run rag:rebuild:zero
+
+# Watch incremental contínuo (debounce + batch)
+npm run rag:watch
+
+# Expandir um resultado específico por chunk_id
+npm run rag:expand -- --chunk-id <chunk_id> --mode symbol
+```
+
 ### Docker
 ```bash
 # Build e execute
@@ -110,6 +122,20 @@ make logs
 | `OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK` | Fallback local quando cloud falhar (`true|false`) | true |
 | `OLLAMA_LOCAL_MODEL_PROFILE` | Perfil de segurança para modelos locais (`light|custom`) | light |
 | `OLLAMA_LOCAL_ALLOWED_MODELS` | Allowlist opcional de modelos locais (CSV) | - |
+| `RAG_PROFILE_DEFAULT` | Perfil de escopo RAG (`core|dev|full`) | core |
+| `RAG_DEGRADED_MODE_ENABLED` | Fallback lexical no RAG (`true|false`) | true |
+| `RAG_AST_CHUNK_ENABLED` | Ativa chunking AST-aware em JS/TS (`true|false`) | true |
+| `RAG_CHUNK_TARGET_CHARS` | Alvo de tamanho de chunk (chars) | 2400 |
+| `RAG_CHUNK_MAX_CHARS` | Limite máximo de chunk (chars) | 4200 |
+| `RAG_EXPAND_DEFAULT_LINES` | Linhas padrão para `rag_expand` | 40 |
+| `RAG_EXPAND_MAX_LINES` | Limite máximo de linhas para `rag_expand` | 240 |
+| `RAG_WATCH_ENABLED` | Liga/desliga watch incremental (`true|false`) | true |
+| `RAG_WATCH_DEBOUNCE_MS` | Debounce do watch incremental (ms) | 3000 |
+| `RAG_WATCH_BATCH_MAX` | Máximo de arquivos por lote incremental | 64 |
+| `LSP_ENABLED` | Habilita ferramentas MCP de LSP/tsserver | true |
+| `LSP_TOOL_TIMEOUT_MS` | Timeout por operação LSP (ms) | 15000 |
+| `LSP_MUTATIONS_ENABLED` | Permite apply de code action (`true|false`) | false |
+| `LSP_MAX_RESULTS` | Limite de resultados por ferramenta LSP | 200 |
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | Token GitHub | - |
 
 ### Arquivos de Configuração
@@ -135,6 +161,7 @@ make logs
 - **Dashboard em Tempo Real**: Status de tarefas, métricas, logs
 - **PM2 Monitor**: `npm run daemon:monit`
 - **Health Checks**: `npm run health:full`
+- **Diagnóstico MCP**: `npm run mcp:diagnose`
 
 ### Gerenciamento de Tarefas
 

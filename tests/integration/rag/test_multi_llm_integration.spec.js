@@ -2,7 +2,7 @@
 /**
  * Integration Tests: RAG v4.0 Multi-LLM Integration
  *
- * Tests MCP endpoint, Tool Registry, and all 5 tools
+ * Tests MCP endpoint, Tool Registry, and core tools
  *
  * Run: node --test tests/integration/rag/test_multi_llm_integration.spec.js
  */
@@ -75,10 +75,14 @@ describe('MCP Endpoint Discovery', () => {
         assert.strictEqual(data.name, 'chatgpt-docker-unified');
         assert.strictEqual(data.version, '4.0.0');
         assert.strictEqual(data.status, 'ready');
-        assert.strictEqual(data.toolCount, 5);
+        assert.ok(data.toolCount >= 5);
         assert.ok(Array.isArray(data.tools));
         assert.ok(data.tools.includes('rag_search'));
+        assert.ok(data.tools.includes('rag_expand'));
         assert.ok(data.tools.includes('ollama_models'));
+        if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+            assert.ok(data.tools.includes('lsp_definition'));
+        }
     });
 
     it('should expose core MCP methods', async () => {
@@ -136,20 +140,24 @@ describe('MCP Protocol - initialize', () => {
 });
 
 describe('MCP Protocol - tools/list', () => {
-    it('should return all 5 tools with metadata', async () => {
+    it('should return core tools with metadata', async () => {
         const result = await mcpRequest('tools/list');
 
         assert.strictEqual(result.jsonrpc, '2.0');
         assert.ok(result.result);
         assert.ok(Array.isArray(result.result.tools));
-        assert.strictEqual(result.result.tools.length, 5);
+        assert.ok(result.result.tools.length >= 5);
 
         const toolNames = result.result.tools.map(t => t.name);
         assert.ok(toolNames.includes('rag_search'));
         assert.ok(toolNames.includes('rag_health'));
+        assert.ok(toolNames.includes('rag_expand'));
         assert.ok(toolNames.includes('ollama_generate'));
         assert.ok(toolNames.includes('ollama_embed'));
         assert.ok(toolNames.includes('ollama_models'));
+        if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+            assert.ok(toolNames.includes('lsp_definition'));
+        }
     });
 
     it('each tool should have description and inputSchema', async () => {
@@ -184,6 +192,8 @@ describe('Tool: ollama_models', () => {
         assert.ok(result.result);
         assert.ok(Array.isArray(result.result.content));
         assert.strictEqual(result.result.content[0].type, 'text');
+        assert.ok(result.result.structuredContent);
+        assert.ok(result.result.structuredContent.flags);
 
         const text = result.result.content[0].text;
         assert.ok(text.includes('Available Ollama Models'));
@@ -331,6 +341,20 @@ describe('Tool: rag_search', () => {
         const text = result.result.content[0].text;
         assert.ok(text.includes('Search Results'));
         assert.ok(text.includes('CHROME_PROXY_PORT') || text.includes('No results'));
+
+        const data = result?.result?.structuredContent?.data;
+        assert.ok(data);
+        assert.ok(typeof data.index_mode === 'string');
+        assert.ok(Object.prototype.hasOwnProperty.call(data, 'index_freshness_ms'));
+        if (Array.isArray(data.results) && data.results.length > 0) {
+            const first = data.results[0];
+            assert.ok(typeof first.kind === 'string');
+            assert.ok(Object.prototype.hasOwnProperty.call(first, 'symbol'));
+            assert.ok(Object.prototype.hasOwnProperty.call(first, 'exported'));
+            assert.ok(Object.prototype.hasOwnProperty.call(first, 'header_text'));
+            assert.ok(Object.prototype.hasOwnProperty.call(first, 'chunk_prev_id'));
+            assert.ok(Object.prototype.hasOwnProperty.call(first, 'chunk_next_id'));
+        }
     });
 
     it('should respect topK parameter', async (t) => {
@@ -395,6 +419,46 @@ describe('Tool: rag_search', () => {
             return;
         }
         assert.ok(duration < 2000, `rag_search took ${duration}ms (expected <2000ms)`);
+    });
+});
+
+describe('Tool: rag_expand', () => {
+    it('should expand a chunk returned by rag_search', async (t) => {
+        const search = await mcpRequest('tools/call', {
+            name: 'rag_search',
+            arguments: {
+                query: 'CHROME_PROXY_PORT',
+                topK: 1,
+                mode: 'auto'
+            }
+        });
+
+        if (!search.result || search.result.isError) {
+            t.skip(`rag_search unavailable: ${search?.result?.content?.[0]?.text || search?.error?.message || 'unknown error'}`);
+            return;
+        }
+
+        const chunkId = search?.result?.structuredContent?.data?.results?.[0]?.chunk_id;
+        if (!chunkId) {
+            t.skip('rag_expand skipped: rag_search returned no chunk_id');
+            return;
+        }
+
+        const expanded = await mcpRequest('tools/call', {
+            name: 'rag_expand',
+            arguments: {
+                chunk_id: chunkId,
+                mode: 'lines',
+                before_lines: 20,
+                after_lines: 20
+            }
+        });
+
+        assert.strictEqual(expanded.jsonrpc, '2.0');
+        assert.ok(expanded.result);
+        assert.ok(Array.isArray(expanded.result.content));
+        assert.ok(expanded.result.content[0].text.includes('RAG Expand'));
+        assert.strictEqual(expanded?.result?.structuredContent?.data?.ok, true);
     });
 });
 
@@ -466,6 +530,9 @@ describe('MCP Protocol - resources/read', () => {
         assert.ok(typeof stats.hits === 'number');
         assert.ok(typeof stats.misses === 'number');
         assert.ok(typeof stats.hitRate === 'number');
+        assert.ok(stats.index);
+        assert.ok(stats.storage);
+        assert.ok(stats.expand_health);
     });
 
     it('should reject unknown resource', async () => {
@@ -495,9 +562,9 @@ describe('Tool Registry - Direct Access', () => {
     it('should return correct stats', () => {
         const stats = registry.getStats();
 
-        assert.strictEqual(stats.totalTools, 5);
+        assert.ok(stats.totalTools >= 5);
         assert.ok(Array.isArray(stats.tools));
-        assert.strictEqual(stats.tools.length, 5);
+        assert.ok(stats.tools.length >= 5);
     });
 });
 

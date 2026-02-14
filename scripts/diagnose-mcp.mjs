@@ -37,6 +37,7 @@ async function main() {
     if (ready.ok && ready.json && typeof ready.json === 'object') {
         const mcp = ready.json.mcp || (ready.json.runtime && ready.json.runtime.mcp !== undefined ? { runtime_mcp: ready.json.runtime.mcp } : null);
         if (mcp) console.log(`[MCP DIAG] ready.mcp: ${JSON.stringify(mcp)}`);
+        if (ready.json.rag) console.log(`[MCP DIAG] ready.rag: ${JSON.stringify(ready.json.rag)}`);
 
         const upstreams = mcp && Array.isArray(mcp.upstreams) ? mcp.upstreams : null;
         if (upstreams && upstreams.length > 0) {
@@ -80,6 +81,33 @@ async function main() {
         console.log(`[MCP DIAG] tools/list count: ${toolNames.length}`);
     }
 
+    const requiredCoreTools = ['rag_search', 'rag_health', 'rag_expand', 'ollama_generate', 'ollama_embed', 'ollama_models'];
+    for (const toolName of requiredCoreTools) {
+        if (!toolNames.includes(toolName)) {
+            console.error(`[MCP DIAG] FAIL: missing required tool "${toolName}"`);
+            fail = true;
+        }
+    }
+
+    if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+        const requiredLspTools = [
+            'lsp_definition',
+            'lsp_references',
+            'lsp_hover',
+            'lsp_document_symbols',
+            'lsp_workspace_symbols',
+            'lsp_diagnostics',
+            'lsp_code_actions',
+            'lsp_apply_code_action'
+        ];
+        for (const toolName of requiredLspTools) {
+            if (!toolNames.includes(toolName)) {
+                console.error(`[MCP DIAG] FAIL: missing LSP tool "${toolName}"`);
+                fail = true;
+            }
+        }
+    }
+
     // If /ready includes upstreams, show how many tools were imported per prefix.
     try {
         const upstreams = readyJson?.mcp?.upstreams;
@@ -107,7 +135,83 @@ async function main() {
         }
     }
 
-    if (!health.ok || !ready.ok || !discovery.ok || !ping.ok || !toolsList.ok || fail) process.exit(1);
+    // Validate rag_search structured output (backend/degraded shape)
+    const ragProbe = await fetchJson(`${BASE}/api/mcp`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: {
+                name: 'rag_search',
+                arguments: {
+                    query: 'CHROME_PROXY_PORT',
+                    topK: 1,
+                    mode: 'auto',
+                    includeDiagnostics: true
+                }
+            }
+        })
+    });
+    printResult('POST /api/mcp tools/call rag_search', ragProbe);
+    const ragStructured = ragProbe?.json?.result?.structuredContent;
+    if (ragProbe.ok && ragStructured?.flags) {
+        console.log(`[MCP DIAG] rag_search flags: ${JSON.stringify(ragStructured.flags)}`);
+    }
+    if (ragProbe.ok && ragStructured?.data) {
+        const backend = ragStructured.data.backend;
+        const degraded = ragStructured.data.degraded;
+        const indexMode = ragStructured.data.index_mode;
+        const freshness = ragStructured.data.index_freshness_ms;
+        const indexUpdatedAt = ragStructured.data.index_updated_at_iso;
+        console.log(
+            `[MCP DIAG] rag_search backend=${backend} degraded=${degraded} ` +
+            `index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`
+        );
+        if (indexUpdatedAt) {
+            console.log(`[MCP DIAG] rag_search index_updated_at=${indexUpdatedAt}`);
+        }
+    }
+
+    const firstChunkId = ragStructured?.data?.results?.[0]?.chunk_id || null;
+    const ragExpandProbe = await fetchJson(`${BASE}/api/mcp`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 4,
+            method: 'tools/call',
+            params: {
+                name: 'rag_expand',
+                arguments: firstChunkId
+                    ? {
+                        chunk_id: firstChunkId,
+                        mode: 'lines',
+                        before_lines: 20,
+                        after_lines: 20
+                    }
+                    : {
+                        chunk_id: '__diag_missing_chunk__',
+                        mode: 'lines',
+                        before_lines: 5,
+                        after_lines: 5
+                    }
+            }
+        })
+    });
+    printResult('POST /api/mcp tools/call rag_expand', ragExpandProbe);
+
+    const ragExpandStructured = ragExpandProbe?.json?.result?.structuredContent;
+    const ragExpandData = ragExpandStructured?.data || {};
+    if (ragExpandProbe.ok) {
+        console.log(
+            `[MCP DIAG] rag_expand ok=${Boolean(ragExpandData.ok)} ` +
+            `reason_code=${ragExpandData.reason_code || 'none'} mode=${ragExpandData.mode || 'n/a'}`
+        );
+    }
+
+    if (!health.ok || !ready.ok || !discovery.ok || !ping.ok || !toolsList.ok || !ragProbe.ok || !ragExpandProbe.ok || fail) process.exit(1);
     console.log('[MCP DIAG] OK');
 }
 

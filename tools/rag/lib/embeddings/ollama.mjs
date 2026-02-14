@@ -1,5 +1,22 @@
 import { DEFAULT_OLLAMA_BASE_URL, DEFAULT_EMBEDDING_MODEL } from '../contract.mjs';
 
+function normalizeEmbeddingBaseUrl(rawBaseUrl) {
+    const raw = String(rawBaseUrl || '').trim();
+    if (!raw) return '';
+    const trimmed = raw.replace(/\/+$/, '');
+    return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
+}
+
+function resolveEmbeddingBaseUrl(optionsBaseUrl) {
+    const fromOptions = normalizeEmbeddingBaseUrl(optionsBaseUrl);
+    if (fromOptions) return fromOptions;
+
+    const fromEnv = normalizeEmbeddingBaseUrl(process.env.OLLAMA_LOCAL_BASE_URL);
+    if (fromEnv) return fromEnv;
+
+    return normalizeEmbeddingBaseUrl(DEFAULT_OLLAMA_BASE_URL);
+}
+
 /**
  * Retry a function with exponential backoff
  * @param {Function} fn - Async function to retry
@@ -55,10 +72,9 @@ export class OllamaEmbeddingsProvider {
      * @param {number} options.timeoutMs - Request timeout in ms (default: 30000)
      */
     constructor(options = {}) {
-        // ALWAYS use local URL for embeddings (no cloud support)
-        this.baseURL = options.baseURL ||
-            process.env.OLLAMA_LOCAL_BASE_URL?.replace(/\/$/, '') + '/v1' ||
-            DEFAULT_OLLAMA_BASE_URL;
+        // ALWAYS use local URL for embeddings (no cloud support).
+        // Guaranteed to end with `/v1` and never produces "undefined/v1".
+        this.baseURL = resolveEmbeddingBaseUrl(options.baseURL);
         this.model = options.model || DEFAULT_EMBEDDING_MODEL;
         this.timeoutMs = options.timeoutMs || 30_000;
     }
@@ -142,4 +158,3 @@ async function fetchJson(url, options = {}) {
         clearTimeout(timeout);
     }
 }
-

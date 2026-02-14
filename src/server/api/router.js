@@ -162,6 +162,7 @@ async function applyRoutes(app) {
      * Tools disponíveis:
      * - rag_search: Hybrid semantic search (Vector + FTS + Reranking + MMR)
      * - rag_health: RAG system health check
+     * - rag_expand: Expand chunk context by chunk_id
      * - ollama_generate: Text generation (cloud-first, with optional local fallback)
      * - ollama_embed: Generate embeddings for arbitrary text
      * - ollama_models: List all available Ollama models

@@ -99,9 +99,10 @@ help:
 	@echo "  $(CYAN)make pm2-check$(NC)         Check completo (6 validações)"
 	@echo "  $(CYAN)make pm2-startup$(NC)       Startup seguro"
 	@echo "  $(CYAN)make validate$(NC)          Validar config.json"
-	@echo "  $(CYAN)make validate-all$(NC)      Validação completa (lint+test)"
+	@echo "  $(CYAN)make validate-all$(NC)      Validação completa (check+lint+format+test)"
 	@echo "  $(CYAN)make validate-env$(NC)      Validar arquivos .env"
 	@echo "  $(CYAN)make validate-git$(NC)      Validar configurações Git"
+	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
 	@echo ""
 	@echo "$(BLUE)$(BOLD)📊 Análise & Code Quality:$(NC)"
 	@echo "  $(CYAN)make analyze-deps$(NC)      Dependências circulares"
@@ -120,8 +121,20 @@ help:
 	@echo "  $(CYAN)make test$(NC)              Testes completos"
 	@echo "  $(CYAN)make test-unit$(NC)         Testes unitários"
 	@echo "  $(CYAN)make test-integration$(NC)  Testes de integração"
+	@echo "  $(CYAN)make test-regression$(NC)   Testes de regressão"
 	@echo "  $(CYAN)make test-e2e$(NC)          Testes E2E"
 	@echo "  $(CYAN)make test-coverage$(NC)     Com coverage"
+	@echo ""
+	@echo "$(BLUE)$(BOLD)🧠 RAG & MCP:$(NC)"
+	@echo "  $(CYAN)make rag-health$(NC)        Health do RAG"
+	@echo "  $(CYAN)make rag-index$(NC)         Reindexação RAG"
+	@echo "  $(CYAN)make rag-ask QUERY='...'$(NC)    Pergunta via RAG"
+	@echo "  $(CYAN)make rag-hybrid QUERY='...'$(NC) Busca híbrida RAG"
+	@echo "  $(CYAN)make rag-expand CHUNK_ID='...'$(NC) Expandir chunk por linhas/símbolo"
+	@echo "  $(CYAN)make rag-reset$(NC)         Reset de índices RAG"
+	@echo "  $(CYAN)make rag-watch$(NC)         Watch incremental contínuo do RAG"
+	@echo "  $(CYAN)make rag-full-rebuild$(NC)  Reset + reindex completo"
+	@echo "  $(CYAN)make rag-rebuild-zero$(NC)  Pipeline canônico completo (PM2/MCP/RAG)"
 	@echo ""
 	@echo "$(YELLOW)$(BOLD)🎨 Formatação & Lint:$(NC)"
 	@echo "  $(CYAN)make format$(NC)            Formatar código (Prettier)"
@@ -354,9 +367,19 @@ pm2-startup:
 
 pm2-validate:
 	@echo "$(CYAN)🔍 Validando configuração PM2 Sovereign...$(NC)"
-	@grep -q 'SERVER_MODE.*split' ecosystem.config.js && echo "$(GREEN)✓ SERVER_MODE=split configurado$(NC)" || echo "$(RED)✗ SERVER_MODE não encontrado$(NC)"
-	@grep -q 'SERVER_AUTHORITY.*standalone' ecosystem.config.js && echo "$(GREEN)✓ SERVER_AUTHORITY=standalone configurado$(NC)" || echo "$(RED)✗ SERVER_AUTHORITY não encontrado$(NC)"
-	@grep -q 'DAEMON_MODE.*true' ecosystem.config.js && echo "$(GREEN)✓ DAEMON_MODE=true configurado$(NC)" || echo "$(RED)✗ DAEMON_MODE não encontrado$(NC)"
+	@grep -q 'SERVER_MODE.*split' ecosystem.config.cjs && echo "$(GREEN)✓ SERVER_MODE=split configurado$(NC)" || echo "$(RED)✗ SERVER_MODE não encontrado$(NC)"
+	@grep -q 'SERVER_AUTHORITY.*standalone' ecosystem.config.cjs && echo "$(GREEN)✓ SERVER_AUTHORITY=standalone configurado$(NC)" || echo "$(RED)✗ SERVER_AUTHORITY não encontrado$(NC)"
+	@grep -q 'DAEMON_MODE.*true' ecosystem.config.cjs && echo "$(GREEN)✓ DAEMON_MODE=true configurado$(NC)" || echo "$(RED)✗ DAEMON_MODE não encontrado$(NC)"
+
+validate:
+	@echo "$(CYAN)🔍 Validando config.json$(NC)"
+	@$(NPM) run validate
+	@echo "$(GREEN)✅ Configuração validada$(NC)"
+
+validate-all:
+	@echo "$(CYAN)🔍 Validação completa (check+lint+format+test)$(NC)"
+	@$(NPM) run validate:all
+	@echo "$(GREEN)✅ Validação completa finalizada$(NC)"
 
 # =============================================================================
 # 6️⃣ ANÁLISE & CODE QUALITY
@@ -439,7 +462,7 @@ logs:
 # 9️⃣ TESTES
 # =============================================================================
 
-.PHONY: test test-unit test-integration test-e2e test-watch test-coverage test-all
+.PHONY: test test-unit test-integration test-regression test-e2e test-watch test-coverage test-all
 
 test:
 	@echo "$(GREEN)🧪 Testes Completos$(NC)"
@@ -456,6 +479,11 @@ test-integration:
 	@$(NPM) run test:integration
 	@echo "$(GREEN)✅ Testes de integração passaram$(NC)"
 
+test-regression:
+	@echo "$(GREEN)🧪 Testes de Regressão$(NC)"
+	@$(NPM) run test:regression
+	@echo "$(GREEN)✅ Testes de regressão passaram$(NC)"
+
 test-e2e:
 	@echo "$(GREEN)🧪 Testes E2E$(NC)"
 	@$(NPM) run test:e2e
@@ -471,6 +499,61 @@ test-coverage:
 	@echo "$(GREEN)✅ Coverage report gerado$(NC)"
 
 test-all: test test-unit test-integration test-e2e
+
+# =============================================================================
+# 9️⃣.1 RAG & MCP
+# =============================================================================
+
+.PHONY: mcp-diagnose rag-health rag-index rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero
+
+mcp-diagnose:
+	@echo "$(CYAN)🔍 Diagnóstico MCP$(NC)"
+	@$(NPM) run mcp:diagnose
+
+rag-health:
+	@echo "$(CYAN)🔍 RAG Health$(NC)"
+	@$(NPM) run rag:health
+
+rag-index:
+	@echo "$(CYAN)📚 RAG Index$(NC)"
+	@$(NPM) run rag:index
+
+rag-ask:
+	@if [ -z "$(QUERY)" ]; then \
+		echo "$(RED)❌ Informe QUERY. Ex: make rag-ask QUERY='mcp timeout'$(NC)"; \
+		exit 1; \
+	fi
+	@$(NPM) run rag:ask -- "$(QUERY)"
+
+rag-hybrid:
+	@if [ -z "$(QUERY)" ]; then \
+		echo "$(RED)❌ Informe QUERY. Ex: make rag-hybrid QUERY='tool registry'$(NC)"; \
+		exit 1; \
+	fi
+	@$(NPM) run rag:hybrid -- "$(QUERY)"
+
+rag-expand:
+	@if [ -z "$(CHUNK_ID)" ]; then \
+		echo "$(RED)❌ Informe CHUNK_ID. Ex: make rag-expand CHUNK_ID='abc123'$(NC)"; \
+		exit 1; \
+	fi
+	@$(NPM) run rag:expand -- --chunk-id "$(CHUNK_ID)" $(if $(MODE),--mode "$(MODE)",) $(if $(BEFORE),--before-lines "$(BEFORE)",) $(if $(AFTER),--after-lines "$(AFTER)",)
+
+rag-reset:
+	@echo "$(YELLOW)♻️  RAG Reset$(NC)"
+	@$(NPM) run rag:reset
+
+rag-watch:
+	@echo "$(CYAN)👀 RAG Watch (incremental)$(NC)"
+	@$(NPM) run rag:watch
+
+rag-full-rebuild:
+	@echo "$(YELLOW)♻️  RAG Full Rebuild$(NC)"
+	@$(NPM) run rag:full-rebuild
+
+rag-rebuild-zero:
+	@echo "$(YELLOW)♻️  RAG Rebuild Zero (PM2/MCP/RAG pipeline)$(NC)"
+	@$(NPM) run rag:rebuild:zero
 
 # =============================================================================
 # 🔟 FORMATAÇÃO & LINT
@@ -712,12 +795,14 @@ docs:
 	@echo "  • $(BOLD)DOCUMENTAÇÃO/DEPENDENCIES_ANALYSIS.md$(NC)"
 	@echo "  • $(BOLD)DOCUMENTAÇÃO/FINAL_CONSOLIDATED_REPORT.md$(NC)"
 	@echo "  • $(BOLD)DOCUMENTAÇÃO/MAKEFILE_UPGRADE_PROPOSAL.md$(NC)"
+	@echo "  • $(BOLD)docs/integration/RAG_MCP_LSP_PLAYBOOK_PTBR.md$(NC)"
 	@echo ""
-	@echo "$(CYAN)Use: $(BOLD)cat DOCUMENTAÇÃO/<arquivo>$(NC)"
+	@echo "$(CYAN)Use: $(BOLD)cat DOCUMENTAÇÃO/<arquivo>$(NC) ou $(BOLD)cat docs/integration/<arquivo>$(NC)"
 
 docs-list:
 	@echo "$(CYAN)📚 Lista completa de documentação:$(NC)"
 	@ls -1 DOCUMENTAÇÃO/*.md 2>/dev/null || echo "$(YELLOW)Sem arquivos .md em DOCUMENTAÇÃO/$(NC)"
+	@ls -1 docs/integration/*.md 2>/dev/null || echo "$(YELLOW)Sem arquivos .md em docs/integration/$(NC)"
 
 # =============================================================================
 # FIM DO MAKEFILE v4.0.0

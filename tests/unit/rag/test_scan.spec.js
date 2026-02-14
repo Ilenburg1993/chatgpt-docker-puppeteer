@@ -122,4 +122,43 @@ describe('RAG Workspace Scanning', () => {
             await fs.rm(tmpDir, { recursive: true, force: true });
         }
     });
+
+    it('supports profile=core filtering', async () => {
+        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
+
+        try {
+            await fs.mkdir(path.join(tmpDir, 'src'), { recursive: true });
+            await fs.mkdir(path.join(tmpDir, 'scripts'), { recursive: true });
+            await fs.writeFile(path.join(tmpDir, 'src', 'ok.ts'), 'export const x = 1;', 'utf8');
+            await fs.writeFile(path.join(tmpDir, 'scripts', 'skip.mjs'), 'console.log(1)', 'utf8');
+
+            const files = await scanWorkspace(tmpDir, { profile: 'core' });
+            const paths = files.map(f => f.relPath);
+            assert.ok(paths.includes('src/ok.ts'));
+            assert.ok(!paths.includes('scripts/skip.mjs'));
+        } finally {
+            await fs.rm(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    it('supports includeGlobs and excludeGlobs overrides', async () => {
+        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
+
+        try {
+            await fs.mkdir(path.join(tmpDir, 'custom'), { recursive: true });
+            await fs.writeFile(path.join(tmpDir, 'custom', 'a.js'), 'console.log(1)', 'utf8');
+            await fs.writeFile(path.join(tmpDir, 'custom', 'b.js'), 'console.log(2)', 'utf8');
+
+            const files = await scanWorkspace(tmpDir, {
+                profile: 'core',
+                includeGlobs: ['custom/**'],
+                excludeGlobs: ['custom/b.js']
+            });
+            const paths = files.map(f => f.relPath);
+            assert.ok(paths.includes('custom/a.js'));
+            assert.ok(!paths.includes('custom/b.js'));
+        } finally {
+            await fs.rm(tmpDir, { recursive: true, force: true });
+        }
+    });
 });

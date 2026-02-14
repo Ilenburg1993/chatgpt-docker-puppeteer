@@ -10,6 +10,9 @@ export function formatMarkdownResults(queryResult) {
     for (const r of queryResult.results) {
         const scoreStr = typeof r.distance === 'number' ? `distance=${r.distance}` : `score=${r.score}`;
         lines.push(`## ${r.path}:${r.start_line}-${r.end_line} (${scoreStr})`);
+        if (r.indexed_at_iso) {
+            lines.push(`IndexedAt: ${r.indexed_at_iso}`);
+        }
         lines.push('');
         lines.push('```');
         lines.push(r.text);

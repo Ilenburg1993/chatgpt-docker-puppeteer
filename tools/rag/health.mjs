@@ -1,3 +1,4 @@
+import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragHealth } from './lib/facade.mjs';
 
@@ -42,4 +43,3 @@ if (values.json) {
 }
 
 process.exit(report.ok ? 0 : 1);
-

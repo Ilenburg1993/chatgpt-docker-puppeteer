@@ -154,6 +154,90 @@ const ENV_SCHEMA = {
         default: '',
         message: 'Must be a comma-separated string (or empty)'
     },
+    RAG_PROFILE_DEFAULT: {
+        level: 'WARN',
+        validator: (val) => ['core', 'dev', 'full'].includes(String(val)),
+        default: 'core',
+        message: 'Must be one of: core, dev, full'
+    },
+    RAG_DEGRADED_MODE_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    RAG_AST_CHUNK_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    RAG_CHUNK_TARGET_CHARS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 800,
+        default: '2400',
+        message: 'Must be an integer >= 800'
+    },
+    RAG_CHUNK_MAX_CHARS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1200,
+        default: '4200',
+        message: 'Must be an integer >= 1200'
+    },
+    RAG_EXPAND_DEFAULT_LINES: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1,
+        default: '40',
+        message: 'Must be an integer >= 1'
+    },
+    RAG_EXPAND_MAX_LINES: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 40,
+        default: '240',
+        message: 'Must be an integer >= 40'
+    },
+    RAG_WATCH_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    RAG_WATCH_DEBOUNCE_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 250,
+        default: '3000',
+        message: 'Must be an integer >= 250 (milliseconds)'
+    },
+    RAG_WATCH_BATCH_MAX: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1,
+        default: '64',
+        message: 'Must be an integer >= 1'
+    },
+    LSP_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    LSP_TOOL_TIMEOUT_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0,
+        default: '15000',
+        message: 'Must be a positive integer (milliseconds)'
+    },
+    LSP_MUTATIONS_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'false',
+        message: 'Must be true or false'
+    },
+    LSP_MAX_RESULTS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0,
+        default: '200',
+        message: 'Must be a positive integer'
+    },
 
     // [4] MCP (Interop)
     MCP_ENABLED: {
@@ -432,6 +516,17 @@ export function validateEnv(options = {}) {
             level: 'WARN',
             message:
                 'OLLAMA_LOCAL_MODEL_PROFILE=custom without OLLAMA_LOCAL_ALLOWED_MODELS will allow any local model',
+        });
+    }
+
+    // LSP policy validation
+    const lspEnabled = String(resolvedEnv.LSP_ENABLED || 'true') === 'true';
+    const lspMutationsEnabled = String(resolvedEnv.LSP_MUTATIONS_ENABLED || 'false') === 'true';
+    if (!lspEnabled && lspMutationsEnabled) {
+        warnings.push({
+            key: 'LSP_MUTATIONS_ENABLED',
+            level: 'WARN',
+            message: 'LSP_MUTATIONS_ENABLED=true has no effect when LSP_ENABLED=false',
         });
     }
 

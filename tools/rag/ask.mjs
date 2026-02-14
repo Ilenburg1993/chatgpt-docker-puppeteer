@@ -1,3 +1,4 @@
+import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragAsk } from './lib/facade.mjs';
 
@@ -8,6 +9,9 @@ const { positionals, values } = parseArgs({
         ext: { type: 'string' },
         'path-prefix': { type: 'string' },
         tag: { type: 'string', multiple: true },
+        profile: { type: 'string' },
+        mode: { type: 'string' },
+        diagnostics: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
         'ollama-base-url': { type: 'string' },
         model: { type: 'string' }
@@ -23,6 +27,9 @@ if (!query) {
 const { markdown, result } = await ragAsk({
     query,
     topK: values.topk ? Number(values.topk) : 8,
+    profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
+    mode: values.mode || 'auto',
+    includeDiagnostics: values.diagnostics,
     filters: {
         pathPrefix: values['path-prefix'],
         ext: values.ext,
@@ -37,4 +44,3 @@ if (values.json) {
 } else {
     console.log(markdown);
 }
-

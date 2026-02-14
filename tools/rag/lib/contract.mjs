@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 export const SCHEMA_VERSION = 1;
-export const CHUNKER_VERSION = 'v1';
+export const CHUNKER_VERSION = 'v2';
 
 // Embedding model (LOCAL Ollama only - v5.0)
 // NOTE: Embeddings are NOT available on Ollama Cloud
@@ -15,10 +15,19 @@ export const DEFAULT_OLLAMA_BASE_URL =
     process.env.OLLAMA_LOCAL_BASE_URL ||
     'http://host.docker.internal:11434/v1';
 
-// Chunking limits optimized by file type
-export const MAX_CHUNK_CHARS_CODE = 800;  // Code: smaller chunks for precision
-export const MAX_CHUNK_CHARS_DOCS = 1200; // Docs: larger chunks for context
-export const MAX_CHUNK_CHARS = MAX_CHUNK_CHARS_CODE; // Default (backward compat)
+function parsePositiveInt(rawValue, fallback) {
+    const parsed = Number.parseInt(String(rawValue ?? ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// AST-aware chunking tuning knobs (overridable by env).
+export const RAG_CHUNK_TARGET_CHARS = parsePositiveInt(process.env.RAG_CHUNK_TARGET_CHARS, 2400);
+export const RAG_CHUNK_MAX_CHARS = parsePositiveInt(process.env.RAG_CHUNK_MAX_CHARS, 4200);
+
+// Backward-compatible constants consumed by legacy chunkers.
+export const MAX_CHUNK_CHARS_CODE = Math.min(RAG_CHUNK_TARGET_CHARS, RAG_CHUNK_MAX_CHARS);
+export const MAX_CHUNK_CHARS_DOCS = Math.min(RAG_CHUNK_TARGET_CHARS + 600, RAG_CHUNK_MAX_CHARS);
+export const MAX_CHUNK_CHARS = RAG_CHUNK_MAX_CHARS;
 
 export function sha256Hex(input) {
     return crypto.createHash('sha256').update(input).digest('hex');
@@ -40,4 +49,3 @@ export function buildChunkId({ relPath, startByte, endByte, contentSha256, chunk
     const base = `${normalizeRelPath(relPath)}:${startByte}:${endByte}:${contentSha256}:${chunkerVersion}`;
     return sha256HexForString(base);
 }
-

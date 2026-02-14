@@ -67,7 +67,7 @@ const handlers = {
      * Notification (no response expected).
      */
     'notifications/cancelled': async (params) => {
-        console.error('[MCP Handler] notifications/cancelled:', params);
+        console.error('[MCP Handler] notifications/cancelled (legacy handler):', params);
         return {};
     },
 
@@ -91,20 +91,17 @@ const handlers = {
     /**
      * tools/call: Execute a tool by name
      */
-    'tools/call': async (params, registry) => {
+    'tools/call': async (params, registry, context = {}) => {
         const { name, arguments: args = {} } = params;
 
         console.error(`[MCP Handler] tools/call: ${name}`);
 
-        // MCP layer timeout (90s by default, wraps Ollama 60s timeout)
-        const timeout = Number(process.env.MCP_TOOL_TIMEOUT || 90000);
-
-        // Create AbortController for cancellation
-        const controller = new AbortController();
+        // MCP layer timeout (90s by default, wraps TOOL_EXECUTION_TIMEOUT)
+        const timeout = Number(context.timeoutMs || process.env.MCP_TOOL_TIMEOUT || 90000);
+        const controller = context.controller || new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
-            // Pass signal to tool execution for proper cancellation
             const result = await registry.execute(name, args, {
                 signal: controller.signal
             });
@@ -116,14 +113,20 @@ const handlers = {
                 return result;
             }
 
-            // MCP expects content array format
+            const normalized = normalizeToolResultPayload(result);
+
+            // MCP-compatible payload + structured content
             return {
                 content: [
                     {
                         type: 'text',
-                        text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                        text: normalized.text
                     }
-                ]
+                ],
+                structuredContent: {
+                    ...(normalized.json !== undefined ? { data: normalized.json } : {}),
+                    flags: normalized.flags
+                }
             };
         } catch (error) {
             clearTimeout(timeoutId);
@@ -167,9 +170,9 @@ const handlers = {
             resources: [
                 {
                     uri: 'rag://stats',
-                    name: 'RAG Cache Statistics',
+                    name: 'RAG Runtime Statistics',
                     mimeType: 'application/json',
-                    description: 'Current RAG cache hit rate and performance stats'
+                    description: 'RAG cache, index freshness, chunk schema and expand health'
                 }
             ]
         };
@@ -186,15 +189,27 @@ const handlers = {
         if (uri === 'rag://stats') {
             try {
                 // Import facade dynamically to get cache stats
-                const { getRagCacheStats } = await import('../../../tools/rag/lib/facade.mjs');
+                const { getRagCacheStats, getRagIndexStatus, getRagStorageStats } = await import('../../../tools/rag/lib/facade.mjs');
                 const stats = getRagCacheStats();
+                const index = await getRagIndexStatus();
+                const storage = await getRagStorageStats();
+                const payload = {
+                    ...stats,
+                    index,
+                    storage,
+                    expand_health: {
+                        enabled: true,
+                        default_lines: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
+                        max_lines: Number(process.env.RAG_EXPAND_MAX_LINES || 240)
+                    }
+                };
 
                 return {
                     contents: [
                         {
                             uri,
                             mimeType: 'application/json',
-                            text: JSON.stringify(stats, null, 2)
+                            text: JSON.stringify(payload, null, 2)
                         }
                     ]
                 };
@@ -219,6 +234,8 @@ const handlers = {
  */
 export function setupMCPHandler(app, registry) {
     console.error('[MCP Handler] Setting up MCP endpoint...');
+    /** @type {Map<string, AbortController>} */
+    const pendingRequests = new Map();
 
     /**
      * POST /api/mcp: MCP JSON-RPC 2.0 endpoint
@@ -233,6 +250,7 @@ export function setupMCPHandler(app, registry) {
 
             const handleOne = async (msg) => {
                 const { jsonrpc, id, method, params = {} } = msg || {};
+                const requestKey = id === undefined || id === null ? null : String(id);
 
                 // Validate JSON-RPC version
                 if (jsonrpc !== '2.0') {
@@ -268,11 +286,37 @@ export function setupMCPHandler(app, registry) {
                 // Notifications (no id) should not return a JSON-RPC response
                 const isNotification = id === undefined || id === null;
                 if (isNotification) {
+                    if (method === 'notifications/cancelled') {
+                        const targetId = params?.requestId ?? params?.id ?? params?.request_id;
+                        const targetKey = targetId === undefined || targetId === null ? null : String(targetId);
+                        const controller = targetKey ? pendingRequests.get(targetKey) : null;
+                        if (controller) {
+                            controller.abort();
+                            pendingRequests.delete(targetKey);
+                            console.error(`[MCP Handler] Cancelled request ${targetKey}`);
+                        } else {
+                            console.error(`[MCP Handler] Cancellation received for unknown request ${targetKey}`);
+                        }
+                    }
                     await handler(params, registry);
                     return { httpStatus: 202, json: null };
                 }
 
-                const result = await handler(params, registry);
+                if (method === 'tools/call' && requestKey) {
+                    const controller = new AbortController();
+                    pendingRequests.set(requestKey, controller);
+                    try {
+                        const result = await handler(params, registry, {
+                            controller,
+                            timeoutMs: Number(process.env.MCP_TOOL_TIMEOUT || 90000)
+                        });
+                        return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
+                    } finally {
+                        pendingRequests.delete(requestKey);
+                    }
+                }
+
+                const result = await handler(params, registry, {});
                 return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
             };
 
@@ -336,4 +380,38 @@ export function setupMCPHandler(app, registry) {
 
     console.error('[MCP Handler] MCP endpoint ready at POST/GET /api/mcp');
     console.error(`[MCP Handler] Exposed ${registry.getStats().totalTools} tools`);
+}
+function normalizeToolResultPayload(value) {
+    if (value && typeof value === 'object' && Array.isArray(value.content)) {
+        return {
+            text: JSON.stringify(value, null, 2),
+            json: value.structuredContent,
+            flags: { degraded: false, mutating: false, partial: false }
+        };
+    }
+
+    if (value && typeof value === 'object' && typeof value.text === 'string') {
+        return {
+            text: value.text,
+            json: value.json,
+            flags: {
+                degraded: Boolean(value.flags?.degraded),
+                mutating: Boolean(value.flags?.mutating),
+                partial: Boolean(value.flags?.partial)
+            }
+        };
+    }
+
+    if (typeof value === 'string') {
+        return {
+            text: value,
+            flags: { degraded: false, mutating: false, partial: false }
+        };
+    }
+
+    return {
+        text: JSON.stringify(value, null, 2),
+        json: value,
+        flags: { degraded: false, mutating: false, partial: false }
+    };
 }

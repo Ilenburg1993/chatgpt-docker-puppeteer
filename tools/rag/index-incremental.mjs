@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/env-bootstrap.mjs';
 import { ragIndex } from './lib/facade.mjs';
 
 const BATCH_SIZE = 50; // Process 50 files at a time
@@ -15,24 +16,19 @@ async function indexIncremental() {
     console.log(`[RAG Incremental] Batch delay: ${BATCH_DELAY_MS}ms`);
     console.log(`[RAG Incremental] Excluding: ${excludeDirs.join(', ')}\n`);
 
-    let totalFiles = 0;
-    let totalChunks = 0;
-    let batchNumber = 1;
-
-    // Run indexing (facade will scan all and process incrementally)
-    // We'll rely on the throttling in facade.mjs for now
-    // TODO: Implement actual batching at scan level
-
     try {
         const report = await ragIndex({
             root: '/workspaces/chatgpt-docker-puppeteer',
             maxFileBytes: 5 * 1024 * 1024, // 5MB limit per file
+            profile: process.env.RAG_PROFILE_DEFAULT || 'core'
         });
 
         console.log('\n[RAG Incremental] ✅ Complete!');
-        console.log(`  Files processed: ${report.files_processed}`);
+        console.log(`  Files scanned: ${report.scanned_files}`);
+        console.log(`  Files changed: ${report.changed_files}`);
+        console.log(`  Files skipped: ${report.skipped_files}`);
         console.log(`  Chunks embedded: ${report.embedded_chunks}`);
-        console.log(`  Skipped (unchanged): ${report.files_skipped_unchanged}`);
+        console.log(`  Chunks inserted: ${report.inserted_chunks}`);
 
         process.exit(0);
     } catch (error) {

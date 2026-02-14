@@ -78,6 +78,65 @@ describe('RAG chunking determinism', () => {
         assert.deepStrictEqual(ranges, ranges2);
     });
 
+    it('chunks function with JSDoc as a semantic AST unit', () => {
+        const relPath = 'src/with-jsdoc.ts';
+        const text =
+            '/**\n' +
+            ' * Sums two numbers.\n' +
+            ' */\n' +
+            'export function sum(a, b) {\n' +
+            '  return a + b;\n' +
+            '}\n';
+
+        const buf = Buffer.from(text, 'utf8');
+        const { lines } = buildLineIndex(buf);
+        const ranges = chunkByType({ relPath, lines, maxChunkChars: 800 });
+        const fnChunk = ranges.find((r) => r.symbol === 'sum');
+
+        assert.ok(fnChunk, 'Expected AST chunk for symbol "sum"');
+        assert.strictEqual(fnChunk.kind, 'function');
+        assert.strictEqual(fnChunk.exported, true);
+        assert.strictEqual(fnChunk.startLine, 1, 'Chunk should include JSDoc leading block');
+        assert.ok(String(fnChunk.headerText || '').includes('jsdoc:'), 'Header should include JSDoc metadata');
+    });
+
+    it('splits large classes by method with semantic anchors', () => {
+        const relPath = 'src/large-class.ts';
+        const text =
+            'export class Service {\n' +
+            '  methodOne() {\n' +
+            '    return 1;\n' +
+            '  }\n' +
+            '  methodTwo() {\n' +
+            '    return 2;\n' +
+            '  }\n' +
+            '  methodThree() {\n' +
+            '    return 3;\n' +
+            '  }\n' +
+            '}\n';
+
+        const buf = Buffer.from(text, 'utf8');
+        const { lines } = buildLineIndex(buf);
+        const ranges = chunkByType({ relPath, lines, maxChunkChars: 80 });
+
+        const methodChunks = ranges.filter((r) => String(r.symbol || '').startsWith('Service.'));
+        assert.ok(methodChunks.length >= 2, 'Expected class to split into method chunks');
+        assert.ok(methodChunks.every((r) => r.kind === 'class_method' || String(r.kind).startsWith('class_method')));
+    });
+
+    it('falls back to heuristic chunking when AST parse fails', () => {
+        const relPath = 'src/invalid.js';
+        const text =
+            'export function broken( {\n' +
+            '  return 1;\n';
+        const buf = Buffer.from(text, 'utf8');
+        const { lines } = buildLineIndex(buf);
+
+        const ranges = chunkByType({ relPath, lines, maxChunkChars: 200 });
+        assert.ok(ranges.length >= 1, 'Fallback should still return chunks');
+        assert.ok(ranges.every((r) => r.kind), 'Fallback chunks should have kind metadata');
+    });
+
     it('handles plain text and JSON with line-based chunking', () => {
         const relPath = 'data.json';
         const text = '{\n' + '  "key": "value",\n'.repeat(100) + '}\n';

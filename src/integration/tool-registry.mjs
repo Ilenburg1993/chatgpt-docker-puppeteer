@@ -35,8 +35,67 @@
  * @property {Object} metadata - Tool metadata for MCP/LSP
  * @property {string} metadata.description - Human-readable description
  * @property {Object} metadata.inputSchema - JSON Schema for parameters
+ * @property {boolean} [metadata.allowMutations=false] - Tool may mutate files/state
+ * @property {boolean} [metadata.requiresConfirmationToken=false] - Tool requires explicit confirmation token
  * @property {Function} handler - Async function (params) => Promise<string|Object>
  */
+
+/**
+ * Normalize any tool output to a structured shape used by MCP adapters.
+ * Backward-compatible: plain strings/objects are still accepted.
+ *
+ * @param {any} value
+ * @returns {{ text: string, json?: any, flags: { degraded: boolean, mutating: boolean, partial: boolean } }}
+ */
+export function normalizeToolResultPayload(value) {
+    if (value && typeof value === 'object' && Array.isArray(value.content)) {
+        const textParts = value.content
+            .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+            .map((part) => part.text);
+        return {
+            text: textParts.join('\n').trim() || JSON.stringify(value, null, 2),
+            json: value.structuredContent,
+            flags: {
+                degraded: false,
+                mutating: false,
+                partial: false
+            }
+        };
+    }
+
+    if (value && typeof value === 'object' && typeof value.text === 'string') {
+        return {
+            text: value.text,
+            json: value.json,
+            flags: {
+                degraded: Boolean(value.flags?.degraded),
+                mutating: Boolean(value.flags?.mutating),
+                partial: Boolean(value.flags?.partial)
+            }
+        };
+    }
+
+    if (typeof value === 'string') {
+        return {
+            text: value,
+            flags: {
+                degraded: false,
+                mutating: false,
+                partial: false
+            }
+        };
+    }
+
+    return {
+        text: JSON.stringify(value, null, 2),
+        json: value,
+        flags: {
+            degraded: false,
+            mutating: false,
+            partial: false
+        }
+    };
+}
 
 /**
  * Tool Registry
@@ -86,7 +145,13 @@ export class ToolRegistry {
             console.warn(`[Tool Registry] Overwriting existing tool: ${name}`);
         }
 
-        this.tools.set(name, { metadata, handler });
+        const normalizedMetadata = {
+            ...metadata,
+            allowMutations: metadata.allowMutations === true,
+            requiresConfirmationToken: metadata.requiresConfirmationToken === true
+        };
+
+        this.tools.set(name, { metadata: normalizedMetadata, handler });
         console.error(`[Tool Registry] Registered tool: ${name}`);
     }
 
@@ -421,6 +486,12 @@ export async function initialize() {
             // Import and register Ollama tools
             const { registerOllamaTools } = await import('./tools/ollama-tools.mjs');
             await registerOllamaTools(registry);
+
+            // Optional: LSP/tsserver tools for semantic code navigation
+            if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+                const { registerLspTools } = await import('./tools/lsp-tools.mjs');
+                await registerLspTools(registry);
+            }
 
             // Optional: import upstream MCP tools (generic HTTP + stdio, plus GitHub preset).
             // This is designed to be best-effort: failures should degrade, not crash the server.

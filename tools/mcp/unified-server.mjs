@@ -34,7 +34,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Tool Registry (DRY Architecture)
-import { registry, initialize } from '../../src/integration/tool-registry.mjs';
+import { registry, initialize, normalizeToolResultPayload } from '../../src/integration/tool-registry.mjs';
 
 const server = new Server(
   {
@@ -48,6 +48,9 @@ const server = new Server(
     },
   }
 );
+
+/** @type {Map<string, AbortController>} */
+const activeRequests = new Map();
 
 /**
  * List all available tools from Tool Registry
@@ -64,11 +67,19 @@ server.setRequestHandler('tools/list', async () => {
 server.setRequestHandler('tools/call', async (request) => {
   const toolName = request.params.name;
   const args = request.params.arguments || {};
+  const requestId = request?.id !== undefined && request?.id !== null
+    ? String(request.id)
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   console.error(`[MCP] Calling tool: ${toolName} with args:`, JSON.stringify(args, null, 2));
 
+  const controller = new AbortController();
+  activeRequests.set(requestId, controller);
+  const timeoutMs = Number(process.env.MCP_TOOL_TIMEOUT || 90000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const result = await registry.execute(toolName, args);
+    const result = await registry.execute(toolName, args, { signal: controller.signal });
 
     // MCP expects content array format
     // If result is already in MCP format, return as-is
@@ -76,16 +87,33 @@ server.setRequestHandler('tools/call', async (request) => {
       return result;
     }
 
+    const normalized = normalizeToolResultPayload(result);
+
     // Otherwise, wrap in MCP format
     return {
       content: [
         {
           type: 'text',
-          text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+          text: normalized.text
         }
-      ]
+      ],
+      structuredContent: {
+        ...(normalized.json !== undefined ? { data: normalized.json } : {}),
+        flags: normalized.flags
+      }
     };
   } catch (error) {
+    if (controller.signal.aborted) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Tool "${toolName}" timed out/cancelled after ${timeoutMs}ms`
+          }
+        ],
+        isError: true
+      };
+    }
     console.error(`[MCP] Tool error:`, error);
     return {
       content: [
@@ -96,8 +124,26 @@ server.setRequestHandler('tools/call', async (request) => {
       ],
       isError: true,
     };
+  } finally {
+    clearTimeout(timeoutId);
+    activeRequests.delete(requestId);
   }
 });
+
+if (typeof server.setNotificationHandler === 'function') {
+  server.setNotificationHandler('notifications/cancelled', async (notification) => {
+    const targetId = notification?.params?.requestId ?? notification?.params?.id ?? notification?.params?.request_id;
+    const key = targetId !== undefined && targetId !== null ? String(targetId) : null;
+    if (!key) return {};
+    const controller = activeRequests.get(key);
+    if (controller) {
+      controller.abort();
+      activeRequests.delete(key);
+      console.error(`[MCP] Cancelled active request ${key}`);
+    }
+    return {};
+  });
+}
 
 /**
  * List available resources (optional - for future use)
@@ -107,9 +153,9 @@ server.setRequestHandler('resources/list', async () => {
     resources: [
       {
         uri: 'rag://stats',
-        name: 'RAG Cache Statistics',
+        name: 'RAG Runtime Statistics',
         mimeType: 'application/json',
-        description: 'Current RAG cache hit rate and performance stats',
+        description: 'RAG cache, index freshness, chunk schema and expand health',
       },
     ],
   };
@@ -122,15 +168,26 @@ server.setRequestHandler('resources/read', async (request) => {
   const uri = request.params.uri;
 
   if (uri === 'rag://stats') {
-    const { getRagCacheStats } = await import('../rag/lib/facade.mjs');
+    const { getRagCacheStats, getRagIndexStatus, getRagStorageStats } = await import('../rag/lib/facade.mjs');
     const stats = getRagCacheStats();
+    const index = await getRagIndexStatus();
+    const storage = await getRagStorageStats();
 
     return {
       contents: [
         {
           uri,
           mimeType: 'application/json',
-          text: JSON.stringify(stats, null, 2),
+          text: JSON.stringify({
+            ...stats,
+            index,
+            storage,
+            expand_health: {
+              enabled: true,
+              default_lines: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
+              max_lines: Number(process.env.RAG_EXPAND_MAX_LINES || 240)
+            }
+          }, null, 2),
         },
       ],
     };

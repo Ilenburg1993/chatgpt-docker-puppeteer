@@ -1,10 +1,10 @@
 import { connect, Index } from '@lancedb/lancedb';
-import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List } from 'apache-arrow';
+import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List, Bool } from 'apache-arrow';
 import { rerank } from '../retrieve/reranker.mjs';
 import { maximalMarginalRelevance } from '../retrieve/diversity.mjs';
 import { withTimeout } from '../../../../src/infra/abort_controller_utils.js';
 
-export const TABLE_NAME = 'chunks_v1';
+export const TABLE_NAME = 'chunks_v2';
 
 export async function openDb(dbDir) {
     return connect(dbDir);
@@ -17,12 +17,19 @@ export function buildSchema(embeddingDim) {
         new Field('path', new Utf8(), false),
         new Field('ext', new Utf8(), false),
         new Field('language', new Utf8(), true),
+        new Field('kind', new Utf8(), true),
+        new Field('symbol', new Utf8(), true),
+        new Field('exported', new Bool(), false),
         new Field('start_line', new Int32(), false),
         new Field('end_line', new Int32(), false),
         new Field('start_byte', new Int32(), false),
         new Field('end_byte', new Int32(), false),
         new Field('tags', new List(new Field('item', new Utf8(), true)), true),
+        new Field('header_text', new Utf8(), true),
         new Field('text', new Utf8(), false),
+        new Field('embed_text', new Utf8(), false),
+        new Field('chunk_prev_id', new Utf8(), true),
+        new Field('chunk_next_id', new Utf8(), true),
         new Field('content_sha256', new Utf8(), false),
         new Field('embedding_model', new Utf8(), false),
         new Field('vector', new FixedSizeList(embeddingDim, new Field('item', new Float32(), true)), false),
@@ -30,9 +37,6 @@ export function buildSchema(embeddingDim) {
     ]);
 }
 
-/**
- * ✅ P1-1: Wrapped with timeout (15s) to prevent hanging on table operations
- */
 export async function ensureTable(db, embeddingDim) {
     return await withTimeout(
         async () => {
@@ -49,31 +53,21 @@ export async function ensureTable(db, embeddingDim) {
     );
 }
 
-/**
- * Create Full-Text Search index on 'text' column
- * @param {Table} table - LanceDB table
- * @param {object} options - Index options (currently unused, reserved for future)
- * @returns {Promise<void>}
- */
-export async function createFTSIndex(table, options = {}) {
-    console.log('[RAG] Creating FTS index on "text" column...');
+export async function createFTSIndex(table) {
+    console.log('[RAG] Creating FTS index on "embed_text" column...');
     try {
-        // LanceDB v0.24 API: await table.createIndex(columnName, { config: Index.fts() })
-        await table.createIndex('text', { config: Index.fts() });
+        await table.createIndex('embed_text', { config: Index.fts() });
         console.log('[RAG] ✓ FTS index created successfully');
     } catch (err) {
-        if (err.message && (err.message.includes('already exists') || err.message.includes('Index already exists'))) {
+        if (err?.message && (err.message.includes('already exists') || err.message.includes('Index already exists'))) {
             console.log('[RAG] FTS index already exists, skipping');
         } else {
-            console.error('[RAG] Failed to create FTS index:', err.message);
+            console.error('[RAG] Failed to create FTS index:', err?.message || err);
             throw err;
         }
     }
 }
 
-/**
- * ✅ P1-1: Wrapped with timeout (30s) to prevent hanging on delete operations
- */
 export async function deleteByPath(table, relPath) {
     return await withTimeout(
         async () => {
@@ -85,9 +79,6 @@ export async function deleteByPath(table, relPath) {
     );
 }
 
-/**
- * ✅ P1-1: Wrapped with timeout (60s) to prevent hanging on batch inserts
- */
 export async function addChunks(table, rows, { batchSize = 32 } = {}) {
     return await withTimeout(
         async () => {
@@ -105,6 +96,57 @@ export async function addChunks(table, rows, { batchSize = 32 } = {}) {
     );
 }
 
+export async function getChunkById(table, chunkId) {
+    return await withTimeout(
+        async () => {
+            const safe = String(chunkId || '').replace(/'/g, "''");
+            const rows = await table
+                .query()
+                .where(`chunk_id = '${safe}'`)
+                .limit(1)
+                .toArray();
+            if (!rows.length) return null;
+            return formatResult(rows[0]);
+        },
+        15000,
+        'LANCEDB_GET_CHUNK_BY_ID_TIMEOUT'
+    );
+}
+
+export async function getChunkStats(table) {
+    return await withTimeout(
+        async () => {
+            let chunkCount = null;
+            const counters = ['countRows', 'count_rows', 'count'];
+            for (const fn of counters) {
+                if (typeof table?.[fn] === 'function') {
+                    try {
+                        const value = await table[fn]();
+                        if (typeof value === 'number' && Number.isFinite(value)) {
+                            chunkCount = value;
+                            break;
+                        }
+                    } catch {
+                        // ignore unsupported counters
+                    }
+                }
+            }
+
+            const sample = await table.query().limit(1).toArray();
+            const sampleRow = sample[0] || null;
+            return {
+                chunk_count: chunkCount,
+                has_rows: Boolean(sampleRow),
+                sample_has_v2_fields: sampleRow
+                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every((k) => Object.prototype.hasOwnProperty.call(sampleRow, k))
+                    : null
+            };
+        },
+        15000,
+        'LANCEDB_CHUNK_STATS_TIMEOUT'
+    );
+}
+
 function buildWhere({ pathPrefix, ext, tags }) {
     const parts = [];
     if (pathPrefix) {
@@ -116,23 +158,17 @@ function buildWhere({ pathPrefix, ext, tags }) {
         parts.push(`ext = '${safe}'`);
     }
     if (tags && tags.length > 0) {
-        // DataFusion supports `array_has` for list? Not guaranteed. We'll client-filter tags.
+        // tag filtering is performed client-side for compatibility.
     }
     return parts.length ? parts.join(' AND ') : null;
 }
 
-/**
- * ✅ P1-1: Wrapped with timeout (45s) to prevent hanging on vector searches
- */
 export async function search(table, vector, { topK = 8, filters = {}, distanceRange } = {}) {
     return await withTimeout(
         async () => {
             const where = buildWhere(filters);
             let q = table.search(vector);
 
-            // LanceDB v0.24: Distance range filtering (discard irrelevant results)
-            // distanceRange: { min, max } or [min, max]
-            // Example: distanceRange: [0, 0.8] filters out results with distance > 0.8
             if (distanceRange) {
                 const [min, max] = Array.isArray(distanceRange)
                     ? distanceRange
@@ -147,93 +183,9 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
+                filtered = rows.filter((r) => Array.isArray(r.tags) && [...required].every((t) => r.tags.includes(t)));
             }
 
-            filtered.sort((a, b) => {
-                const da = typeof a._distance === 'number' ? a._distance : 0;
-                const db = typeof b._distance === 'number' ? b._distance : 0;
-                if (da !== db) return da - db; // smaller distance first
-                if (a.path !== b.path) return String(a.path).localeCompare(String(b.path));
-                if (a.start_line !== b.start_line) return (a.start_line || 0) - (b.start_line || 0);
-                return String(a.chunk_id).localeCompare(String(b.chunk_id));
-            });
-
-            const sliced = filtered.slice(0, topK);
-            return sliced.map(formatResult);
-        },
-        45000,
-        'LANCEDB_SEARCH_TIMEOUT'
-    );
-}
-
-/**
- * Hybrid search: Vector (semantic) + FTS (lexical) + Reranking + MMR
- * Combines vector similarity with full-text search for better precision
- *
- * ✅ P1-1: Wrapped with timeout (60s) to prevent hanging on hybrid searches
- *
- * @param {Table} table - LanceDB table
- * @param {number[]} vector - Query embedding
- * @param {string} textQuery - Original query text for FTS
- * @param {object} options - Search options
- * @param {number} options.topK - Number of results to return (default: 8)
- * @param {object} options.filters - Path, ext, tags filters
- * @param {object} options.distanceRange - Min/max distance range
- * @param {boolean} options.rerank - Enable multi-signal reranking (default: true)
- * @param {object} options.rerankWeights - Custom rerank weights (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
- * @param {boolean} options.mmr - Enable MMR for diversity (default: true)
- * @param {number} options.mmrLambda - MMR lambda parameter (default: 0.7, 1.0 = only relevance, 0.0 = only diversity)
- * @returns {Promise<object[]>} - Ranked results with rerank_score and rerank_signals
- */
-export async function hybridSearch(table, vector, textQuery, options = {}) {
-    return await withTimeout(
-        async () => {
-            const {
-                topK = 8,
-                filters = {},
-                distanceRange,
-                rerank: shouldRerank = true,     // Enable reranking by default
-                rerankWeights,                    // Custom rerank weights (optional)
-                mmr: shouldMMR = true,            // Enable MMR by default
-                mmrLambda = 0.7                   // MMR lambda (0.7 = 70% relevance, 30% diversity)
-            } = options;
-
-            // LanceDB v0.24 API: query().fullTextSearch().nearestTo()
-            let q = table
-                .query()
-                .fullTextSearch(textQuery)  // FTS search on indexed 'text' column
-                .nearestTo(vector);         // Vector search (HNSW)
-
-            // Apply distance range filter (if specified)
-            if (distanceRange) {
-                const [min, max] = Array.isArray(distanceRange)
-                    ? distanceRange
-                    : [distanceRange.min || 0, distanceRange.max || 1];
-                q = q.distanceRange(min, max);
-            }
-
-            // Over-fetch for reranking: get 2x topK to have more candidates
-            const fetchLimit = shouldRerank ? topK * 2 : topK * 5;
-            q = q.limit(fetchLimit);
-
-            // Apply WHERE filters (path, ext)
-            const where = buildWhere(filters);
-            if (where) q = q.where(where);
-
-            // Execute query
-            const rows = await q.toArray();
-
-            // Client-side tag filtering (LanceDB WHERE doesn't support array contains well)
-            let filtered = rows;
-            if (filters?.tags?.length) {
-                const required = new Set(filters.tags.map(String));
-                filtered = rows.filter(r =>
-                    Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t))
-                );
-            }
-
-            // Sort by combined score (LanceDB already blended vector + FTS)
             filtered.sort((a, b) => {
                 const da = typeof a._distance === 'number' ? a._distance : 0;
                 const db = typeof b._distance === 'number' ? b._distance : 0;
@@ -243,16 +195,68 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
                 return String(a.chunk_id).localeCompare(String(b.chunk_id));
             });
 
-            // Format results first (needed for reranking)
+            return filtered.slice(0, topK).map(formatResult);
+        },
+        45000,
+        'LANCEDB_SEARCH_TIMEOUT'
+    );
+}
+
+export async function hybridSearch(table, vector, textQuery, options = {}) {
+    return await withTimeout(
+        async () => {
+            const {
+                topK = 8,
+                filters = {},
+                distanceRange,
+                rerank: shouldRerank = true,
+                rerankWeights,
+                mmr: shouldMMR = true,
+                mmrLambda = 0.7
+            } = options;
+
+            let q = table
+                .query()
+                .fullTextSearch(textQuery)
+                .nearestTo(vector);
+
+            if (distanceRange) {
+                const [min, max] = Array.isArray(distanceRange)
+                    ? distanceRange
+                    : [distanceRange.min || 0, distanceRange.max || 1];
+                q = q.distanceRange(min, max);
+            }
+
+            const fetchLimit = shouldRerank ? topK * 2 : topK * 5;
+            q = q.limit(fetchLimit);
+
+            const where = buildWhere(filters);
+            if (where) q = q.where(where);
+
+            const rows = await q.toArray();
+
+            let filtered = rows;
+            if (filters?.tags?.length) {
+                const required = new Set(filters.tags.map(String));
+                filtered = rows.filter((r) => Array.isArray(r.tags) && [...required].every((t) => r.tags.includes(t)));
+            }
+
+            filtered.sort((a, b) => {
+                const da = typeof a._distance === 'number' ? a._distance : 0;
+                const db = typeof b._distance === 'number' ? b._distance : 0;
+                if (da !== db) return da - db;
+                if (a.path !== b.path) return String(a.path).localeCompare(String(b.path));
+                if (a.start_line !== b.start_line) return (a.start_line || 0) - (b.start_line || 0);
+                return String(a.chunk_id).localeCompare(String(b.chunk_id));
+            });
+
             let results = filtered.map(formatResult);
 
-            // Apply reranking (if enabled and we have results)
             if (shouldRerank && results.length > 0) {
                 console.log(`[RAG] Reranking ${results.length} results with 6 signals...`);
                 results = rerank(results, textQuery, { weights: rerankWeights });
             }
 
-            // Apply MMR for diversity (if enabled and we have more results than topK)
             if (shouldMMR && results.length > topK) {
                 console.log(`[RAG] Applying MMR for diversity (lambda=${mmrLambda})...`);
                 results = maximalMarginalRelevance(results, {
@@ -260,7 +264,6 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
                     topK
                 });
             } else {
-                // Just slice to topK if MMR disabled
                 results = results.slice(0, topK);
             }
 
@@ -271,24 +274,96 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
     );
 }
 
-function formatResult(r) {
+export async function lexicalSearch(table, textQuery, options = {}) {
+    return await withTimeout(
+        async () => {
+            const { topK = 8, filters = {} } = options;
+
+            let q = table
+                .query()
+                .fullTextSearch(textQuery)
+                .limit(topK * 5);
+
+            const where = buildWhere(filters);
+            if (where) q = q.where(where);
+
+            const rows = await q.toArray();
+
+            let filtered = rows;
+            if (filters?.tags?.length) {
+                const required = new Set(filters.tags.map(String));
+                filtered = rows.filter((r) =>
+                    Array.isArray(r.tags) && [...required].every((t) => r.tags.includes(t))
+                );
+            }
+
+            filtered.sort((a, b) => {
+                const sa = typeof a._score === 'number' ? a._score : 0;
+                const sb = typeof b._score === 'number' ? b._score : 0;
+                if (sa !== sb) return sb - sa;
+                if (a.path !== b.path) return String(a.path).localeCompare(String(b.path));
+                if (a.start_line !== b.start_line) return (a.start_line || 0) - (b.start_line || 0);
+                return String(a.chunk_id).localeCompare(String(b.chunk_id));
+            });
+
+            return filtered.slice(0, topK).map((row) => ({
+                ...formatResult(row),
+                score: typeof row._score === 'number' ? row._score : 0
+            }));
+        },
+        45000,
+        'LANCEDB_LEXICAL_SEARCH_TIMEOUT'
+    );
+}
+
+function formatResult(row) {
+    const indexedAtMs = normalizeIndexedAtMs(row.indexed_at);
     return {
-        score: typeof r._distance === 'number' ? -r._distance : 0,
-        distance: r._distance,
-        chunk_id: r.chunk_id,
-        file_id: r.file_id,
-        path: r.path,
-        ext: r.ext,
-        language: r.language ?? undefined,
-        start_line: r.start_line,
-        end_line: r.end_line,
-        start_byte: r.start_byte,
-        end_byte: r.end_byte,
-        tags: r.tags || [],
-        text: r.text,
-        content_sha256: r.content_sha256,
-        embedding_model: r.embedding_model,
-        indexed_at: r.indexed_at
+        score: typeof row._distance === 'number' ? -row._distance : 0,
+        distance: row._distance,
+        chunk_id: row.chunk_id,
+        file_id: row.file_id,
+        path: row.path,
+        ext: row.ext,
+        language: row.language ?? undefined,
+        kind: row.kind ?? undefined,
+        symbol: row.symbol ?? undefined,
+        exported: Boolean(row.exported),
+        start_line: row.start_line,
+        end_line: row.end_line,
+        start_byte: row.start_byte,
+        end_byte: row.end_byte,
+        tags: row.tags || [],
+        header_text: row.header_text ?? undefined,
+        text: row.text,
+        embed_text: row.embed_text,
+        chunk_prev_id: row.chunk_prev_id ?? null,
+        chunk_next_id: row.chunk_next_id ?? null,
+        content_sha256: row.content_sha256,
+        embedding_model: row.embedding_model,
+        indexed_at: indexedAtMs,
+        indexed_at_iso: indexedAtMs ? toIsoSecond(indexedAtMs) : null,
+        indexed_at_local: indexedAtMs ? toLocalSecond(indexedAtMs) : null
     };
 }
 
+function normalizeIndexedAtMs(value) {
+    if (typeof value === 'bigint') return Number(value);
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+}
+
+function toIsoSecond(epochMs) {
+    const iso = new Date(epochMs).toISOString();
+    return iso.replace(/\.\d{3}Z$/, 'Z');
+}
+
+function toLocalSecond(epochMs) {
+    const d = new Date(epochMs);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}

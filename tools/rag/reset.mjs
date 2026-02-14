@@ -1,3 +1,4 @@
+import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragReset } from './lib/facade.mjs';
 
@@ -9,4 +10,3 @@ const { values } = parseArgs({
 
 await ragReset({ yes: values.yes });
 console.log('[RAG] reset OK');
-

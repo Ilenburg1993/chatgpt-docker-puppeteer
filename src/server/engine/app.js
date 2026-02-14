@@ -15,6 +15,36 @@ import requestId from '../middleware/request_id.js';
 -------------------------------------------------------------------------- */
 
 const app = express();
+const RAG_MANIFEST_PATH = process.env.RAG_MANIFEST_PATH || '/home/node/.local/share/rag-index/manifest.v1.json';
+
+function formatIsoSecond(epochMs) {
+    if (!Number.isFinite(epochMs)) return null;
+    return new Date(epochMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function readRagReadiness() {
+    try {
+        const raw = fs.readFileSync(RAG_MANIFEST_PATH, 'utf8');
+        const manifest = JSON.parse(raw);
+        const updatedAt = Number(manifest?.updated_at);
+        const now = Date.now();
+        return {
+            available: true,
+            index_mode: manifest?.last_index_mode || 'full',
+            index_updated_at: Number.isFinite(updatedAt) ? updatedAt : null,
+            index_updated_at_iso: Number.isFinite(updatedAt) ? formatIsoSecond(updatedAt) : null,
+            index_freshness_ms: Number.isFinite(updatedAt) ? Math.max(0, now - updatedAt) : null
+        };
+    } catch {
+        return {
+            available: false,
+            index_mode: null,
+            index_updated_at: null,
+            index_updated_at_iso: null,
+            index_freshness_ms: null
+        };
+    }
+}
 
 /* --------------------------------------------------------------------------
    0.5 PROXY AWARENESS (OBRIGATÓRIO EM CONTAINER / LB)
@@ -287,7 +317,7 @@ app.get('/ready', (req, res) => {
             status = allReady ? 'ready' : 'not-ready';
         }
 
-        const payload = Object.assign({ status, ts: Date.now(), runtime, mcp }, hardwareMetrics || {});
+        const payload = Object.assign({ status, ts: Date.now(), runtime, mcp, rag: readRagReadiness() }, hardwareMetrics || {});
         res.json(payload);
     } catch (err) {
         res.status(500).json({ status: 'unknown', error: err && err.message ? err.message : String(err) });

@@ -25,14 +25,30 @@ Os comandos já estão expostos no `package.json`:
 
 - `npm run rag:health` — sanity check (paths, manifesto, Ollama, LanceDB)
 - `npm run rag:index` — indexação incremental do workspace
+- `npm run rag:watch` — daemon incremental contínuo (debounce + batch)
 - `npm run rag:ask -- "sua query"` — busca semântica e construção de contexto (Markdown)
+- `npm run rag:expand -- --chunk-id <id>` — expande um chunk retornado por `rag_search`
 - `npm run rag:reset -- --yes` — apaga **somente** o estado do RAG (DB + index)
+- `npm run rag:rebuild:zero` — pipeline canônico: preflight PM2/MCP + reset + index + validações
 
 Flags úteis:
 
 - `rag:health`: `--json`, `--ollama-base-url`, `--model`
-- `rag:index`: `--root`, `--max-file-bytes`, `--json`, `--ollama-base-url`, `--model`
-- `rag:ask`: `--topk`, `--ext`, `--path-prefix`, `--tag` (repetível), `--json`, `--ollama-base-url`, `--model`
+- `rag:index`: `--root`, `--profile`, `--max-file-bytes`, `--json`, `--ollama-base-url`, `--model`
+- `rag:watch`: `--root`, `--profile`, `--debounce-ms`, `--batch-max`
+- `rag:ask`: `--topk`, `--ext`, `--path-prefix`, `--tag` (repetível), `--profile`, `--mode`, `--diagnostics`, `--json`, `--ollama-base-url`, `--model`
+- `rag:expand`: `--chunk-id`, `--mode lines|symbol`, `--before-lines`, `--after-lines`, `--json`
+
+Perfis de escopo:
+
+- `core`: foco em código (`src/`, `tests/`, configs) para latência menor
+- `dev`: `core` + scripts e docs técnicas essenciais
+- `full`: escopo amplo (comportamento legado)
+
+Fallback degradado:
+
+- `mode=auto` tenta semântico/híbrido e cai para lexical quando embeddings indisponíveis
+- o resultado expõe `backend`, `degraded` e `reason_code`
 
 ## Arquitetura (camadas)
 
@@ -44,7 +60,7 @@ Flags úteis:
 - Defaults:
   - modelo embeddings: `nomic-embed-text:latest`
   - baseURL Ollama: `http://host.docker.internal:11434/v1`
-  - `SCHEMA_VERSION=1`, `CHUNKER_VERSION="v1"`
+  - `SCHEMA_VERSION=1`, `CHUNKER_VERSION="v2"`
 
 ### Camada B — Paths, manifesto e lock
 
@@ -70,7 +86,7 @@ O manifesto guarda:
   - `POST /v1/embeddings` com `{ model, input }`
 - Normaliza vetor para `number[]` e valida `dim` contra o manifesto.
 
-### Camada D — Chunking determinístico
+### Camada D — Chunking determinístico (AST-aware v2)
 
 `tools/rag/lib/chunking/*`
 
@@ -83,6 +99,7 @@ Princípios:
 
 Estratégias:
 
+- JS/TS/MJS/CJS: chunking semântico por AST (Babel) com metadados `kind/symbol/exported/header_text`
 - Markdown: quebra por headings e preserva cercas ``` quando possível (`chunk_md.mjs`)
 - Code: quebra por âncoras heurísticas (export/class/function/etc) (`chunk_code.mjs`)
 - Plain/JSON/YAML: quebra por blocos de linhas (`chunk_plain.mjs`)
@@ -93,11 +110,13 @@ Estratégias:
 `tools/rag/lib/storage/lancedb.mjs`
 
 - DB: abre via `connect(dbDir)`
-- Tabela: `chunks_v1`
+- Tabela: `chunks_v2`
 - Schema Arrow (colunas relevantes):
   - `chunk_id`, `file_id`, `path`, `ext`, `language`
+  - `kind`, `symbol`, `exported`
   - `start_line/end_line`, `start_byte/end_byte`
   - `tags` (list<string>)
+  - `header_text`, `embed_text`, `chunk_prev_id`, `chunk_next_id`
   - `text` (chunk bruto)
   - `content_sha256`, `embedding_model`
   - `vector` (FixedSizeList<Float32>, dimensão fixa)
@@ -120,6 +139,7 @@ Operações:
 - `ragHealth()`: valida diretórios, manifesto, Ollama e LanceDB
 - `ragIndex()`: scan → fingerprint → chunk → embed → delete+insert → update manifesto
 - `ragQuery()`: embed(query) → search → retorno estruturado
+- `ragExpand()`: expansão por `chunk_id` com `mode=lines|symbol`
 - `ragAsk()`: `ragQuery()` + formatação Markdown (`tools/rag/lib/format.mjs`)
 - `ragReset(--yes)`: remove somente o conteúdo dentro de `rag-db` e `rag-index`
 
@@ -181,6 +201,7 @@ Além disso:
 - ✅ **Health Check Visual**: Output com checkmarks ✅/❌ e troubleshooting automático
 - ✅ **Indexing Summary**: Estatísticas visuais ao final (arquivos, chunks, taxa de skip)
 - ✅ **Script Rebuild**: `npm run rag:full-rebuild` para reset + index em um comando
+- ✅ **Pipeline Operacional Canônico**: `npm run rag:rebuild:zero` para validar PM2/MCP e rebuild completo
 
 ## Extensibilidade
 

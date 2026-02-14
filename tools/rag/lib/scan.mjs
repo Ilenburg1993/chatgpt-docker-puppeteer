@@ -21,6 +21,35 @@ const DENY_DIR_PREFIXES = [
     'analysis/' // Exclude heavy analysis docs (1.1MB+) to reduce indexing load
 ];
 
+export const RAG_SCAN_PROFILES = {
+    core: [
+        'src/**',
+        'tests/**',
+        'package.json',
+        'config*.json',
+        '*.config.js',
+        '*.config.cjs',
+        '*.config.mjs',
+        'jsconfig.json',
+        'tsconfig.json'
+    ],
+    dev: [
+        'src/**',
+        'tests/**',
+        'scripts/**',
+        'tools/rag/**',
+        'README.md',
+        'package.json',
+        'config*.json',
+        '*.config.js',
+        '*.config.cjs',
+        '*.config.mjs',
+        'jsconfig.json',
+        'tsconfig.json'
+    ],
+    full: []
+};
+
 function isAllowedByExt(relPath) {
     const base = path.posix.basename(relPath);
     if (ALWAYS_ALLOW_BASENAMES.has(base)) return true;
@@ -65,7 +94,102 @@ export async function findProjectRoot(startDir = process.cwd()) {
     }
 }
 
-export async function scanWorkspace(rootDir, { maxFileBytes = 2_000_000 } = {}) {
+function globToRegExp(pattern) {
+    const escaped = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*\*/g, '::DOUBLE_STAR::')
+        .replace(/\*/g, '[^/]*')
+        .replace(/::DOUBLE_STAR::/g, '.*')
+        .replace(/\?/g, '[^/]');
+    return new RegExp(`^${escaped}$`);
+}
+
+function compileGlobs(globs = []) {
+    return globs
+        .map((g) => String(g || '').trim())
+        .filter(Boolean)
+        .map((g) => ({ raw: g, re: globToRegExp(g) }));
+}
+
+function matchesAny(relPath, compiledGlobs) {
+    if (!compiledGlobs || compiledGlobs.length === 0) return false;
+    return compiledGlobs.some(({ re }) => re.test(relPath));
+}
+
+function normalizeRelPathInput(relPath) {
+    return String(relPath || '')
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/^\.?\//, '');
+}
+
+function buildCompiledGlobs({ profile = 'full', includeGlobs = [], excludeGlobs = [] } = {}) {
+    const profileName = String(profile || 'full');
+    const profileGlobs = RAG_SCAN_PROFILES[profileName] ?? RAG_SCAN_PROFILES.full;
+    const compiledInclude = compileGlobs([...profileGlobs, ...(includeGlobs || [])]);
+    const compiledExclude = compileGlobs(excludeGlobs || []);
+    return {
+        compiledInclude,
+        compiledExclude,
+        shouldFilterByInclude: compiledInclude.length > 0
+    };
+}
+
+export function isRagIndexableRelPath(relPath, options = {}) {
+    const normalized = normalizeRelPathInput(relPath);
+    if (!normalized) return false;
+    if (isDenied(normalized)) return false;
+    if (!isAllowedByExt(normalized)) return false;
+
+    const { compiledInclude, compiledExclude, shouldFilterByInclude } = buildCompiledGlobs(options);
+    if (matchesAny(normalized, compiledExclude)) return false;
+    if (shouldFilterByInclude && !matchesAny(normalized, compiledInclude)) return false;
+
+    return true;
+}
+
+export async function loadWorkspaceFile(rootDir, relPath, options = {}) {
+    const normalized = normalizeRelPathInput(relPath);
+    if (!normalized) return null;
+    if (!isRagIndexableRelPath(normalized, options)) return null;
+
+    const root = path.resolve(rootDir);
+    const fullPath = path.join(root, normalized);
+    let stat;
+    try {
+        stat = await fs.stat(fullPath);
+    } catch {
+        return null;
+    }
+    if (!stat.isFile()) return null;
+
+    const maxFileBytes = Number(options.maxFileBytes || 2_000_000);
+    if (stat.size > maxFileBytes) return null;
+
+    try {
+        const buffer = await fs.readFile(fullPath);
+        if (isProbablyBinary(buffer)) return null;
+        return {
+            relPath: normalized,
+            fullPath,
+            size: stat.size,
+            mtimeMs: stat.mtimeMs,
+            buffer
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function scanWorkspace(
+    rootDir,
+    {
+        profile = 'full',
+        includeGlobs = [],
+        excludeGlobs = [],
+        maxFileBytes = 2_000_000
+    } = {}
+) {
     const root = path.resolve(rootDir);
     const ig = ignore();
     try {
@@ -74,6 +198,12 @@ export async function scanWorkspace(rootDir, { maxFileBytes = 2_000_000 } = {}) 
     } catch (_) {
         // no .gitignore
     }
+
+    const { compiledInclude, compiledExclude, shouldFilterByInclude } = buildCompiledGlobs({
+        profile,
+        includeGlobs,
+        excludeGlobs
+    });
 
     const results = [];
 
@@ -102,6 +232,8 @@ export async function scanWorkspace(rootDir, { maxFileBytes = 2_000_000 } = {}) 
 
             if (!ent.isFile()) continue;
             if (!isAllowedByExt(relPathPosix)) continue;
+            if (matchesAny(relPathPosix, compiledExclude)) continue;
+            if (shouldFilterByInclude && !matchesAny(relPathPosix, compiledInclude)) continue;
 
             const fullPath = path.join(root, relPathPosix);
             let stat;
