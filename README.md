@@ -106,6 +106,10 @@ make logs
 | `FORCE_HTTPS` | Forçar HTTPS em produção | true (produção) |
 | `MAX_CONCURRENT_TASKS` | Máximo de tarefas simultâneas | 1 |
 | `OLLAMA_CLOUD_API_KEY` | Chave API Ollama Cloud | - |
+| `OLLAMA_NON_EMBEDDING_RUNTIME` | Roteamento de geração/chat (`auto|cloud|local`) | auto |
+| `OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK` | Fallback local quando cloud falhar (`true|false`) | true |
+| `OLLAMA_LOCAL_MODEL_PROFILE` | Perfil de segurança para modelos locais (`light|custom`) | light |
+| `OLLAMA_LOCAL_ALLOWED_MODELS` | Allowlist opcional de modelos locais (CSV) | - |
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | Token GitHub | - |
 
 ### Arquivos de Configuração

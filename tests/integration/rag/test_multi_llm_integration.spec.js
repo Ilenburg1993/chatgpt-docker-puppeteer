@@ -162,6 +162,14 @@ describe('MCP Protocol - tools/list', () => {
             assert.ok(tool.inputSchema, `Tool ${tool.name} missing inputSchema`);
             assert.strictEqual(tool.inputSchema.type, 'object', `Tool ${tool.name} inputSchema not object`);
         }
+
+        const generateTool = tools.find(t => t.name === 'ollama_generate');
+        assert.ok(generateTool, 'ollama_generate metadata not found');
+        assert.ok(generateTool.inputSchema.properties.runtime, 'ollama_generate.runtime schema missing');
+        assert.deepEqual(
+            generateTool.inputSchema.properties.runtime.enum,
+            ['auto', 'cloud', 'local']
+        );
     });
 });
 
@@ -179,7 +187,9 @@ describe('Tool: ollama_models', () => {
 
         const text = result.result.content[0].text;
         assert.ok(text.includes('Available Ollama Models'));
-        assert.ok(text.includes('nomic-embed-text') || text.includes('qwen'));
+        assert.ok(text.includes('priority'));
+        assert.ok(text.includes('cloud_models'));
+        assert.ok(text.includes('local_models'));
     });
 
     it('should complete in <5 seconds', async () => {

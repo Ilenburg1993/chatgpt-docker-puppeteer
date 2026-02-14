@@ -100,6 +100,12 @@ const ENV_SCHEMA = {
     },
 
     // [3] TIMEOUTS (Cascade validation)
+    OLLAMA_CLOUD_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
     OLLAMA_GENERATE_TIMEOUT: {
         level: 'WARN',
         validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0,
@@ -123,6 +129,30 @@ const ENV_SCHEMA = {
         validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0,
         default: '120000',
         message: 'Must be a positive number (milliseconds)'
+    },
+    OLLAMA_NON_EMBEDDING_RUNTIME: {
+        level: 'WARN',
+        validator: (val) => ['auto', 'cloud', 'local'].includes(String(val)),
+        default: 'auto',
+        message: 'Must be one of: auto, cloud, local'
+    },
+    OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    OLLAMA_LOCAL_MODEL_PROFILE: {
+        level: 'WARN',
+        validator: (val) => ['light', 'custom'].includes(String(val)),
+        default: 'light',
+        message: 'Must be one of: light, custom'
+    },
+    OLLAMA_LOCAL_ALLOWED_MODELS: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: '',
+        message: 'Must be a comma-separated string (or empty)'
     },
 
     // [4] MCP (Interop)
@@ -366,6 +396,42 @@ export function validateEnv(options = {}) {
             key: 'SERVER_REQUEST_TIMEOUT',
             level: 'WARN',
             message: `SERVER_REQUEST_TIMEOUT (${serverTimeout}ms) should be > MCP_TOOL_TIMEOUT (${mcpTimeout}ms) for proper timeout cascade`,
+        });
+    }
+
+    // Ollama non-embedding routing policy validation
+    const cloudEnabled = String(resolvedEnv.OLLAMA_CLOUD_ENABLED || 'true') === 'true';
+    const nonEmbeddingRuntime = String(resolvedEnv.OLLAMA_NON_EMBEDDING_RUNTIME || 'auto');
+    const localFallbackEnabled = String(resolvedEnv.OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK || 'true') === 'true';
+    const localModelProfile = String(resolvedEnv.OLLAMA_LOCAL_MODEL_PROFILE || 'light');
+    const localAllowedModelsRaw = String(resolvedEnv.OLLAMA_LOCAL_ALLOWED_MODELS || '').trim();
+
+    if (nonEmbeddingRuntime === 'cloud' && !cloudEnabled && !localFallbackEnabled) {
+        errors.push({
+            key: 'OLLAMA_NON_EMBEDDING_RUNTIME',
+            level: 'ERROR',
+            message:
+                'OLLAMA_NON_EMBEDDING_RUNTIME=cloud is invalid when OLLAMA_CLOUD_ENABLED=false and ' +
+                'OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK=false',
+        });
+    }
+
+    if (nonEmbeddingRuntime === 'auto' && !cloudEnabled && !localFallbackEnabled) {
+        errors.push({
+            key: 'OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK',
+            level: 'ERROR',
+            message:
+                'Cloud-first auto mode requires at least one backend: enable OLLAMA_CLOUD_ENABLED ' +
+                'or OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK',
+        });
+    }
+
+    if (localModelProfile === 'custom' && !localAllowedModelsRaw) {
+        warnings.push({
+            key: 'OLLAMA_LOCAL_ALLOWED_MODELS',
+            level: 'WARN',
+            message:
+                'OLLAMA_LOCAL_MODEL_PROFILE=custom without OLLAMA_LOCAL_ALLOWED_MODELS will allow any local model',
         });
     }
 

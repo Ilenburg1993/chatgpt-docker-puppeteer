@@ -1,105 +1,294 @@
 /**
- * Ollama HTTP Client (Dual-URL Architecture v5.0)
+ * Ollama HTTP Client (Dual-URL Architecture v5.1)
  *
- * Provides access to Ollama Cloud (generation) and Local (embeddings):
- * - Cloud: https://ollama.com (qwen3-coder-next, qwen3-next) - requires API key
- * - Local: http://host.docker.internal:11434 (nomic-embed-text)
- *
- * Used by:
- * - Tool Registry (ollama_generate, ollama_embed, ollama_models tools)
- * - Program logic (direct calls for intelligent decisions)
- *
- * @example
- * import { ollama } from './tools/ollama/client.mjs';
- *
- * // Generation (uses cloud if enabled)
- * const text = await ollama.generate('Write a function', 'qwen3-coder-next');
- *
- * // Embeddings (always uses local)
- * const embedding = await ollama.embed('some text', 'nomic-embed-text');
- *
- * // List models (cloud if enabled, local otherwise)
- * const models = await ollama.listModels();
+ * Policy:
+ * - Embeddings: ALWAYS local (cloud has no embedding endpoint)
+ * - Non-embedding: cloud-first by default, local as optional fallback
  */
 
+const DEFAULT_LIGHT_LOCAL_MODELS = [
+    'qwen2.5-coder:0.5b',
+    'qwen2.5-coder:1.5b',
+    'qwen2.5-coder:3b',
+    'qwen2.5:0.5b',
+    'qwen2.5:1.5b',
+    'qwen2.5:3b-instruct',
+    'qwen2.5:3b',
+    'llama3.2:1b',
+    'llama3.2:3b',
+    'gemma2:2b',
+    'phi3:mini',
+    'tinyllama:1.1b',
+    'deepseek-r1:1.5b'
+];
+
 /**
- * Ollama HTTP Client with Dual-URL Support
+ * Ollama HTTP Client with dual runtime routing.
  */
 export class OllamaClient {
     /**
-     * @param {Object} options - Configuration options
-     * @param {string} options.cloudBaseUrl - Ollama Cloud URL (default: https://ollama.com)
-     * @param {string} options.cloudApiKey - Ollama Cloud API key (required for cloud)
-     * @param {boolean} options.cloudEnabled - Enable cloud generation (default: true)
-     * @param {string} options.localBaseUrl - Ollama Local URL (default: host.docker.internal:11434)
+     * @param {Object} options
+     * @param {string} [options.cloudBaseUrl]
+     * @param {string} [options.cloudApiKey]
+     * @param {boolean} [options.cloudEnabled]
+     * @param {string} [options.localBaseUrl]
+     * @param {'auto'|'cloud'|'local'} [options.nonEmbeddingRuntime]
+     * @param {boolean} [options.nonEmbeddingLocalFallback]
+     * @param {'light'|'custom'} [options.localModelProfile]
+     * @param {string|string[]} [options.localAllowedModels]
+     * @param {typeof fetch} [options.fetch]
      */
     constructor(options = {}) {
-        // Cloud configuration (generation/chat)
-        this.cloudBaseUrl = options.cloudBaseUrl ||
+        this.cloudBaseUrl =
+            options.cloudBaseUrl ||
             process.env.OLLAMA_CLOUD_BASE_URL ||
             'https://ollama.com';
-        this.cloudApiKey = options.cloudApiKey ||
+        this.cloudApiKey =
+            options.cloudApiKey ||
             process.env.OLLAMA_CLOUD_API_KEY ||
             '';
-        this.cloudEnabled = options.cloudEnabled !== undefined ?
-            options.cloudEnabled :
-            (process.env.OLLAMA_CLOUD_ENABLED === 'true');
+        this.cloudEnabled =
+            options.cloudEnabled !== undefined
+                ? options.cloudEnabled
+                : process.env.OLLAMA_CLOUD_ENABLED === 'true';
 
-        // Local configuration (embeddings)
-        this.localBaseUrl = options.localBaseUrl ||
+        this.localBaseUrl =
+            options.localBaseUrl ||
             process.env.OLLAMA_LOCAL_BASE_URL ||
-            process.env.OLLAMA_BASE_URL ||  // Backward compat (deprecated)
+            process.env.OLLAMA_BASE_URL ||
             'http://host.docker.internal:11434';
 
-        // Configurable timeouts (from ENV)
         this.generateTimeout = Number(process.env.OLLAMA_GENERATE_TIMEOUT || 60000);
         this.embedTimeout = Number(process.env.OLLAMA_EMBED_TIMEOUT || 30000);
         this.listTimeout = Number(process.env.OLLAMA_LIST_TIMEOUT || 10000);
         this.healthTimeout = Number(process.env.OLLAMA_HEALTH_TIMEOUT || 5000);
 
-        // Warn if cloud enabled but no API key
+        this.nonEmbeddingRuntime = this._normalizeRuntimePreference(
+            options.nonEmbeddingRuntime || process.env.OLLAMA_NON_EMBEDDING_RUNTIME || 'auto'
+        );
+
+        this.nonEmbeddingLocalFallback =
+            options.nonEmbeddingLocalFallback !== undefined
+                ? Boolean(options.nonEmbeddingLocalFallback)
+                : this._parseBoolean(process.env.OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK, true);
+
+        this.localModelProfile =
+            options.localModelProfile ||
+            process.env.OLLAMA_LOCAL_MODEL_PROFILE ||
+            'light';
+
+        this.localAllowedModels = this._buildLocalAllowedModels(
+            options.localAllowedModels || process.env.OLLAMA_LOCAL_ALLOWED_MODELS || ''
+        );
+
+        this.lightLocalModels = new Set(DEFAULT_LIGHT_LOCAL_MODELS);
+        this.fetch = options.fetch || globalThis.fetch;
+
+        if (typeof this.fetch !== 'function') {
+            throw new Error('Fetch API is not available in current runtime');
+        }
+
         if (this.cloudEnabled && !this.cloudApiKey) {
             console.warn('[OllamaClient] Cloud enabled but OLLAMA_CLOUD_API_KEY is not set');
             console.warn('[OllamaClient] Get your API key at: https://ollama.com/settings/api-keys');
         }
     }
 
-    /**
-     * Get headers for cloud API requests
-     * @private
-     * @returns {Object} Headers object with Authorization if API key exists
-     */
+    _parseBoolean(value, defaultValue = false) {
+        if (value === undefined || value === null || value === '') {
+            return defaultValue;
+        }
+        return String(value).toLowerCase() === 'true';
+    }
+
+    _normalizeRuntimePreference(value) {
+        const raw = String(value || 'auto').trim().toLowerCase();
+        if (raw === 'cloud' || raw === 'local' || raw === 'auto') {
+            return raw;
+        }
+        return 'auto';
+    }
+
+    _buildLocalAllowedModels(value) {
+        if (Array.isArray(value)) {
+            return new Set(
+                value
+                    .map(v => String(v || '').trim())
+                    .filter(Boolean)
+            );
+        }
+
+        const text = String(value || '').trim();
+        if (!text) return new Set();
+
+        return new Set(
+            text
+                .split(',')
+                .map(v => v.trim())
+                .filter(Boolean)
+        );
+    }
+
+    _assertLocalModelAllowed(model) {
+        if (!model) return;
+
+        if (this.localAllowedModels.size > 0 && !this.localAllowedModels.has(model)) {
+            throw new Error(
+                `Local model "${model}" is not allowed by OLLAMA_LOCAL_ALLOWED_MODELS. ` +
+                    `Allowed: ${Array.from(this.localAllowedModels).join(', ')}`
+            );
+        }
+
+        if (this.localAllowedModels.size === 0 && this.localModelProfile === 'light' && !this.lightLocalModels.has(model)) {
+            throw new Error(
+                `Local model "${model}" is blocked by light profile (CPU-only 16GB policy). ` +
+                    `Use one of: ${Array.from(this.lightLocalModels).join(', ')} ` +
+                    `or configure OLLAMA_LOCAL_MODEL_PROFILE=custom.`
+            );
+        }
+    }
+
     _getCloudHeaders() {
         const headers = { 'Content-Type': 'application/json' };
         if (this.cloudApiKey) {
-            headers['Authorization'] = `Bearer ${this.cloudApiKey}`;
+            headers.Authorization = `Bearer ${this.cloudApiKey}`;
         }
         return headers;
     }
 
+    _isAbortError(error) {
+        return error?.name === 'AbortError' || String(error?.message || '').includes('cancelled by user');
+    }
+
     /**
-     * Generate text using Ollama Cloud (or fallback to local)
+     * Resolve execution runtime according to policy.
      *
-     * Uses cloud (https://ollama.com) if enabled, otherwise uses local endpoint.
-     * Cloud models: qwen3-coder-next (coding), qwen3-next (chat)
-     *
-     * @param {string} prompt - The prompt to generate from
-     * @param {string} model - Model name (default: qwen3-coder-next from ENV)
-     * @param {object} options - Generation options
-     * @param {number} options.temperature - Temperature (0-1, default: 0.7)
-     * @param {number} options.num_predict - Max tokens to generate (default: 1000 from ENV)
-     * @param {number} options.top_p - Top-p sampling (default: 0.9)
-     * @param {boolean} options.stream - Stream response (default: false)
-     * @returns {Promise<string>} Generated text
-     *
-     * @example
-     * // Cloud generation (qwen3-coder-next)
-     * const text = await ollama.generate('Write a docstring', 'qwen3-coder-next');
-     *
-     * // Chat (qwen3-next)
-     * const chat = await ollama.generate('Explain closures', 'qwen3-next');
+     * @param {{ operation: 'embedding'|'generate'|'models'|'model_info', runtimePreference?: 'auto'|'cloud'|'local' }} options
+     * @returns {{ runtime: 'cloud'|'local', requested: 'auto'|'cloud'|'local', operation: string, reason: string, cloudEnabled: boolean, localFallbackEnabled: boolean }}
      */
-    async generate(prompt, model, options = {}) {
+    resolveRuntime(options = {}) {
+        const operation = options.operation || 'generate';
+        const requested = this._normalizeRuntimePreference(
+            options.runtimePreference || this.nonEmbeddingRuntime
+        );
+
+        if (operation === 'embedding') {
+            return {
+                runtime: 'local',
+                requested,
+                operation,
+                reason: 'embedding_local_only',
+                cloudEnabled: this.cloudEnabled,
+                localFallbackEnabled: this.nonEmbeddingLocalFallback
+            };
+        }
+
+        if (requested === 'local') {
+            return {
+                runtime: 'local',
+                requested,
+                operation,
+                reason: 'explicit_local',
+                cloudEnabled: this.cloudEnabled,
+                localFallbackEnabled: this.nonEmbeddingLocalFallback
+            };
+        }
+
+        if (requested === 'cloud') {
+            if (!this.cloudEnabled) {
+                throw new Error(
+                    'Cloud runtime requested but OLLAMA_CLOUD_ENABLED=false. ' +
+                        'Use runtime=local or runtime=auto with fallback enabled.'
+                );
+            }
+            return {
+                runtime: 'cloud',
+                requested,
+                operation,
+                reason: 'explicit_cloud',
+                cloudEnabled: this.cloudEnabled,
+                localFallbackEnabled: this.nonEmbeddingLocalFallback
+            };
+        }
+
+        if (this.cloudEnabled) {
+            return {
+                runtime: 'cloud',
+                requested,
+                operation,
+                reason: 'auto_cloud_first',
+                cloudEnabled: this.cloudEnabled,
+                localFallbackEnabled: this.nonEmbeddingLocalFallback
+            };
+        }
+
+        if (this.nonEmbeddingLocalFallback) {
+            return {
+                runtime: 'local',
+                requested,
+                operation,
+                reason: 'auto_fallback_cloud_disabled',
+                cloudEnabled: this.cloudEnabled,
+                localFallbackEnabled: this.nonEmbeddingLocalFallback
+            };
+        }
+
+        throw new Error(
+            'Cloud-first runtime is unavailable: OLLAMA_CLOUD_ENABLED=false and local fallback is disabled '
+            + '(OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK=false).'
+        );
+    }
+
+    async _requestGenerateAtRuntime(runtime, requestBody, signal) {
+        const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
+        const headers = runtime === 'cloud' ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
+
+        if (runtime === 'local') {
+            this._assertLocalModelAllowed(requestBody.model);
+        }
+
+        console.error(`[OllamaClient] generate() runtime=${runtime} base=${baseUrl}`);
+
+        const timeoutSignal = AbortSignal.timeout(this.generateTimeout);
+        const abortSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+
+        const response = await this.fetch(`${baseUrl}/api/generate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+
+            if (runtime === 'cloud' && (response.status === 401 || response.status === 403)) {
+                throw new Error(
+                    `Ollama Cloud authentication failed (${response.status}). ` +
+                        'Configure OLLAMA_CLOUD_API_KEY at https://ollama.com/settings/api-keys.'
+                );
+            }
+
+            throw new Error(`Ollama generate failed at ${runtime} (${response.status}): ${errorText}`);
+        }
+
+        const data = await response.json();
+        if (!data.response) {
+            throw new Error(`Ollama generate returned empty response at ${runtime}`);
+        }
+
+        return data.response;
+    }
+
+    /**
+     * Generate with runtime metadata (cloud-first for non-embedding).
+     *
+     * @param {string} prompt
+     * @param {string} model
+     * @param {object} options
+     * @returns {Promise<{response: string, runtime: 'cloud'|'local', primaryRuntime: 'cloud'|'local', fallbackUsed: boolean, routingReason: string, attempts: string[]}>}
+     */
+    async generateWithMetadata(prompt, model, options = {}) {
         const defaultModel = process.env.OLLAMA_DEFAULT_MODEL || 'qwen3-coder-next';
         const defaultMaxTokens = Number(process.env.OLLAMA_MAX_TOKENS || 1000);
 
@@ -108,18 +297,12 @@ export class OllamaClient {
             num_predict = defaultMaxTokens,
             top_p = 0.9,
             stream = false,
-            signal,  // External abort signal for cancellation
+            runtime,
+            signal,
             ...otherOptions
         } = options;
 
-        // Use provided model or ENV default
         const selectedModel = model || defaultModel;
-
-        // Determine which base URL to use (cloud or local)
-        const baseUrl = this.cloudEnabled ? this.cloudBaseUrl : this.localBaseUrl;
-        const headers = this.cloudEnabled ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
-
-        console.error(`[OllamaClient] generate() using ${this.cloudEnabled ? 'cloud' : 'local'}: ${baseUrl}`);
 
         const requestBody = {
             model: selectedModel,
@@ -133,93 +316,107 @@ export class OllamaClient {
             }
         };
 
+        const resolved = this.resolveRuntime({ operation: 'generate', runtimePreference: runtime });
+        const attempts = [resolved.runtime];
+
         try {
-            // Combine external signal (if provided) with internal timeout
-            const timeoutSignal = AbortSignal.timeout(this.generateTimeout);
-            const abortSignal = signal
-                ? AbortSignal.any([signal, timeoutSignal])
-                : timeoutSignal;
+            const response = await this._requestGenerateAtRuntime(resolved.runtime, requestBody, signal);
+            return {
+                response,
+                runtime: resolved.runtime,
+                primaryRuntime: resolved.runtime,
+                fallbackUsed: false,
+                routingReason: resolved.reason,
+                attempts
+            };
+        } catch (primaryError) {
+            const canFallback =
+                resolved.runtime === 'cloud' &&
+                resolved.requested === 'auto' &&
+                this.nonEmbeddingLocalFallback &&
+                !this._isAbortError(primaryError) &&
+                !signal?.aborted;
 
-            const response = await fetch(`${baseUrl}/api/generate`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(requestBody),
-                signal: abortSignal
-            });
+            if (!canFallback) {
+                const fallbackDisabledCase =
+                    resolved.runtime === 'cloud' &&
+                    resolved.requested === 'auto' &&
+                    !this.nonEmbeddingLocalFallback &&
+                    !this._isAbortError(primaryError);
 
-            if (!response.ok) {
-                const errorText = await response.text().catch(() => 'Unknown error');
-
-                // Special handling for cloud auth errors
-                if (this.cloudEnabled && (response.status === 401 || response.status === 403)) {
+                if (fallbackDisabledCase) {
                     throw new Error(
-                        `❌ Ollama Cloud authentication failed (${response.status})\n` +
-                        `Please configure OLLAMA_CLOUD_API_KEY in your .env file.\n` +
-                        `Get your API key at: https://ollama.com/settings/api-keys\n\n` +
-                        `Fallback: Set OLLAMA_CLOUD_ENABLED=false to use local Ollama only.`
+                        'Cloud-first generation failed and local fallback is disabled. ' +
+                            `cloud_error=\"${primaryError.message}\"`
                     );
                 }
 
-                throw new Error(`Ollama generate failed (${response.status}): ${errorText}`);
-            }
-
-            const data = await response.json();
-
-            if (!data.response) {
-                throw new Error('Ollama generate returned empty response');
-            }
-
-            return data.response;
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                // Check which signal caused the abort
-                if (signal?.aborted) {
-                    throw new Error('Ollama generate cancelled by user');
+                if (this._isAbortError(primaryError)) {
+                    if (signal?.aborted) {
+                        throw new Error('Ollama generate cancelled by user');
+                    }
+                    throw new Error(`Ollama generate timeout (>${this.generateTimeout}ms)`);
                 }
-                throw new Error(`Ollama generate timeout (>${this.generateTimeout}ms)`);
+                throw new Error(`Ollama generate error: ${primaryError.message}`);
             }
-            // Re-throw with context if already formatted
-            if (error.message.includes('❌')) {
-                throw error;
+
+            attempts.push('local');
+            console.warn('[OllamaClient] Cloud generation failed, attempting local fallback');
+
+            try {
+                const response = await this._requestGenerateAtRuntime('local', requestBody, signal);
+                return {
+                    response,
+                    runtime: 'local',
+                    primaryRuntime: 'cloud',
+                    fallbackUsed: true,
+                    routingReason: 'auto_cloud_first_local_fallback',
+                    attempts
+                };
+            } catch (fallbackError) {
+                throw new Error(
+                    'Cloud-first generation failed and local fallback also failed. ' +
+                        `cloud_error="${primaryError.message}"; local_error="${fallbackError.message}"`
+                );
             }
-            throw new Error(`Ollama generate error: ${error.message}`);
         }
     }
 
     /**
-     * Generate embeddings using LOCAL Ollama only
+     * Backward-compatible generate API.
      *
-     * ALWAYS uses local endpoint (http://host.docker.internal:11434).
-     * Embeddings are NOT available on Ollama Cloud.
+     * @param {string} prompt
+     * @param {string} model
+     * @param {object} options
+     * @returns {Promise<string>}
+     */
+    async generate(prompt, model, options = {}) {
+        const metadata = await this.generateWithMetadata(prompt, model, options);
+        return metadata.response;
+    }
+
+    /**
+     * Embeddings are always local.
      *
-     * @param {string} text - Text to embed
-     * @param {string} model - Embedding model name (default: nomic-embed-text)
-     * @returns {Promise<number[]>} Embedding vector (768D for nomic-embed-text)
-     *
-     * @example
-     * // Local embeddings (RAG system)
-     * const embedding = await ollama.embed('kernel loop implementation');
-     * console.log(embedding.length); // 768
+     * @param {string} text
+     * @param {string} [model='nomic-embed-text']
+     * @param {object} [options]
+     * @returns {Promise<number[]>}
      */
     async embed(text, model = 'nomic-embed-text', options = {}) {
         if (!text || typeof text !== 'string') {
             throw new Error('Text must be a non-empty string');
         }
 
-        const { signal } = options;  // External abort signal for cancellation
-
-        // ALWAYS use local URL for embeddings (no cloud support)
+        const { signal } = options;
         const baseUrl = this.localBaseUrl;
         console.error(`[OllamaClient] embed() using local: ${baseUrl}`);
 
         try {
-            // Combine external signal (if provided) with internal timeout
             const timeoutSignal = AbortSignal.timeout(this.embedTimeout);
-            const abortSignal = signal
-                ? AbortSignal.any([signal, timeoutSignal])
-                : timeoutSignal;
+            const abortSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
-            const response = await fetch(`${baseUrl}/api/embeddings`, {
+            const response = await this.fetch(`${baseUrl}/api/embeddings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model, prompt: text }),
@@ -229,12 +426,11 @@ export class OllamaClient {
             if (!response.ok) {
                 const errorText = await response.text().catch(() => 'Unknown error');
 
-                // Provide helpful error if local Ollama not running
                 if (response.status >= 500 || response.status === 0) {
                     throw new Error(
-                        `❌ Local Ollama not accessible at ${baseUrl}\n` +
-                        `Please ensure Ollama is running: docker-compose up ollama OR ollama serve\n` +
-                        `Error: ${errorText}`
+                        `Local Ollama not accessible at ${baseUrl}. ` +
+                            'Ensure Ollama is running (docker-compose up ollama OR ollama serve). ' +
+                            `Error: ${errorText}`
                     );
                 }
 
@@ -242,83 +438,104 @@ export class OllamaClient {
             }
 
             const data = await response.json();
-
             if (!data.embedding || !Array.isArray(data.embedding)) {
                 throw new Error('Ollama embed returned invalid embedding');
             }
 
             return data.embedding;
         } catch (error) {
-            if (error.name === 'AbortError') {
-                // Check which signal caused the abort
+            if (error?.name === 'AbortError') {
                 if (signal?.aborted) {
                     throw new Error('Ollama embed cancelled by user');
                 }
                 throw new Error(`Ollama embed timeout (>${this.embedTimeout}ms)`);
             }
-            // Re-throw with context if already formatted
-            if (error.message.includes('❌')) {
-                throw error;
-            }
             throw new Error(`Ollama embed error: ${error.message}`);
         }
     }
 
-    /**
-     * List available models (cloud if enabled, local otherwise)
-     *
-     * Returns models from Ollama Cloud (if enabled) or local Ollama.
-     * Cloud: qwen3-coder-next, qwen3-next
-     * Local: qwen2.5-coder:3b, nomic-embed-text
-     *
-     * @returns {Promise<Array<{name: string, size: number, modified_at: string}>>} List of models
-     *
-     * @example
-     * const models = await ollama.listModels();
-     * console.log(models.map(m => m.name));
-     */
-    async listModels() {
-        // Determine which base URL to use
-        const baseUrl = this.cloudEnabled ? this.cloudBaseUrl : this.localBaseUrl;
-        const headers = this.cloudEnabled ? this._getCloudHeaders() : {};
+    async _listModelsAtRuntime(runtime) {
+        const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
+        const headers = runtime === 'cloud' ? this._getCloudHeaders() : {};
 
-        console.error(`[OllamaClient] listModels() using ${this.cloudEnabled ? 'cloud' : 'local'}: ${baseUrl}`);
+        const response = await this.fetch(`${baseUrl}/api/tags`, {
+            method: 'GET',
+            headers,
+            signal: AbortSignal.timeout(this.listTimeout)
+        });
 
-        try {
-            const response = await fetch(`${baseUrl}/api/tags`, {
-                method: 'GET',
-                headers,
-                signal: AbortSignal.timeout(this.listTimeout)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text().catch(() => 'Unknown error');
-                throw new Error(`Ollama list models failed (${response.status}): ${errorText}`);
-            }
-
-            const data = await response.json();
-
-            if (!data.models || !Array.isArray(data.models)) {
-                throw new Error('Ollama list models returned invalid data');
-            }
-
-            return data.models;
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new Error(`Ollama list models timeout (>${this.listTimeout}ms)`);
-            }
-            throw new Error(`Ollama list models error: ${error.message}`);
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Ollama list models failed at ${runtime} (${response.status}): ${errorText}`);
         }
+
+        const data = await response.json();
+        if (!data.models || !Array.isArray(data.models)) {
+            throw new Error(`Ollama list models returned invalid data at ${runtime}`);
+        }
+
+        return data.models;
     }
 
     /**
-     * Check health of Ollama endpoints (cloud and/or local)
+     * Returns both cloud and local model inventories.
      *
-     * @returns {Promise<{cloud: boolean, local: boolean, overall: boolean}>} Health status
+     * @returns {Promise<{priority: 'cloud-first-non-embedding', cloud_enabled: boolean, fallback_local_enabled: boolean, non_embedding_runtime: 'auto'|'cloud'|'local', local_model_profile: 'light'|'custom'|string, cloud_models: any[], local_models: any[], errors: { cloud?: string, local?: string }}>} 
+     */
+    async listModelsDetailed() {
+        const details = {
+            priority: 'cloud-first-non-embedding',
+            cloud_enabled: this.cloudEnabled,
+            fallback_local_enabled: this.nonEmbeddingLocalFallback,
+            non_embedding_runtime: this.nonEmbeddingRuntime,
+            local_model_profile: this.localModelProfile,
+            cloud_models: [],
+            local_models: [],
+            errors: {}
+        };
+
+        if (this.cloudEnabled) {
+            try {
+                details.cloud_models = await this._listModelsAtRuntime('cloud');
+            } catch (error) {
+                details.errors.cloud = error.message;
+            }
+        }
+
+        try {
+            details.local_models = await this._listModelsAtRuntime('local');
+        } catch (error) {
+            details.errors.local = error.message;
+        }
+
+        return details;
+    }
+
+    /**
+     * Backward-compatible list API: returns cloud list when available, else local list.
      *
-     * @example
-     * const health = await ollama.health();
-     * if (!health.overall) console.error('Ollama not fully accessible');
+     * @returns {Promise<Array<{name: string, size: number, modified_at: string}>>}
+     */
+    async listModels() {
+        const details = await this.listModelsDetailed();
+
+        if (details.cloud_models.length > 0) {
+            return details.cloud_models;
+        }
+
+        if (details.local_models.length > 0) {
+            return details.local_models;
+        }
+
+        const cloudError = details.errors.cloud ? `cloud=${details.errors.cloud}` : null;
+        const localError = details.errors.local ? `local=${details.errors.local}` : null;
+        const suffix = [cloudError, localError].filter(Boolean).join('; ') || 'unknown cause';
+
+        throw new Error(`Ollama list models error: ${suffix}`);
+    }
+
+    /**
+     * @returns {Promise<{cloud: boolean, local: boolean, overall: boolean}>}
      */
     async health() {
         const health = {
@@ -327,10 +544,9 @@ export class OllamaClient {
             overall: false
         };
 
-        // Check cloud health (if enabled)
         if (this.cloudEnabled) {
             try {
-                const response = await fetch(`${this.cloudBaseUrl}/api/tags`, {
+                const response = await this.fetch(`${this.cloudBaseUrl}/api/tags`, {
                     method: 'GET',
                     headers: this._getCloudHeaders(),
                     signal: AbortSignal.timeout(this.healthTimeout)
@@ -341,9 +557,8 @@ export class OllamaClient {
             }
         }
 
-        // Check local health (always)
         try {
-            const response = await fetch(`${this.localBaseUrl}/api/tags`, {
+            const response = await this.fetch(`${this.localBaseUrl}/api/tags`, {
                 method: 'GET',
                 signal: AbortSignal.timeout(this.healthTimeout)
             });
@@ -352,59 +567,72 @@ export class OllamaClient {
             health.local = false;
         }
 
-        // Overall: cloud OK (if enabled) OR local OK
-        health.overall = this.cloudEnabled ? (health.cloud || health.local) : health.local;
+        health.overall = this.cloudEnabled ? health.cloud || health.local : health.local;
 
         return health;
     }
 
     /**
-     * Get detailed information about a specific model (cloud or local)
-     *
-     * @param {string} modelName - Name of the model
-     * @returns {Promise<object>} Model information
-     *
-     * @example
-     * const info = await ollama.modelInfo('qwen3-coder-next');
+     * @param {string} modelName
+     * @param {{runtime?: 'auto'|'cloud'|'local', signal?: AbortSignal}} [options]
+     * @returns {Promise<object>}
      */
-    async modelInfo(modelName) {
-        // Determine which base URL to use
-        const baseUrl = this.cloudEnabled ? this.cloudBaseUrl : this.localBaseUrl;
-        const headers = this.cloudEnabled ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
+    async modelInfo(modelName, options = {}) {
+        const resolved = this.resolveRuntime({
+            operation: 'model_info',
+            runtimePreference: options.runtime
+        });
 
-        try {
-            const response = await fetch(`${baseUrl}/api/show`, {
+        const tryRuntime = async (runtime) => {
+            const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
+            const headers = runtime === 'cloud' ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
+
+            const timeoutSignal = AbortSignal.timeout(this.listTimeout);
+            const abortSignal = options.signal
+                ? AbortSignal.any([options.signal, timeoutSignal])
+                : timeoutSignal;
+
+            const response = await this.fetch(`${baseUrl}/api/show`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ name: modelName }),
-                signal: AbortSignal.timeout(this.listTimeout)
+                signal: abortSignal
             });
 
             if (!response.ok) {
                 const errorText = await response.text().catch(() => 'Unknown error');
-                throw new Error(`Ollama model info failed (${response.status}): ${errorText}`);
+                throw new Error(`Ollama model info failed at ${runtime} (${response.status}): ${errorText}`);
             }
 
             return await response.json();
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new Error(`Ollama model info timeout (>${this.listTimeout}ms)`);
+        };
+
+        try {
+            return await tryRuntime(resolved.runtime);
+        } catch (primaryError) {
+            const canFallback =
+                resolved.runtime === 'cloud' &&
+                resolved.requested === 'auto' &&
+                this.nonEmbeddingLocalFallback &&
+                !this._isAbortError(primaryError);
+
+            if (!canFallback) {
+                if (primaryError?.name === 'AbortError') {
+                    throw new Error(`Ollama model info timeout (>${this.listTimeout}ms)`);
+                }
+                throw new Error(`Ollama model info error: ${primaryError.message}`);
             }
-            throw new Error(`Ollama model info error: ${error.message}`);
+
+            try {
+                return await tryRuntime('local');
+            } catch (fallbackError) {
+                throw new Error(
+                    'Ollama model info failed in cloud and local fallback. ' +
+                        `cloud_error="${primaryError.message}"; local_error="${fallbackError.message}"`
+                );
+            }
         }
     }
 }
 
-/**
- * Default Ollama client instance (singleton)
- *
- * Dual-URL Architecture:
- * - Cloud: https://ollama.com (generation - qwen3-coder-next, qwen3-next)
- * - Local: http://host.docker.internal:11434 (embeddings - nomic-embed-text)
- *
- * Configuration via ENV:
- * - OLLAMA_CLOUD_ENABLED=true (enable cloud generation)
- * - OLLAMA_CLOUD_API_KEY=your_key (required for cloud)
- * - OLLAMA_LOCAL_BASE_URL=http://host.docker.internal:11434 (embeddings)
- */
 export const ollama = new OllamaClient();
