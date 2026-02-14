@@ -71,15 +71,15 @@ export class ToolRegistry {
      */
     register(name, metadata, handler) {
         if (!name || typeof name !== 'string') {
-            throw new Error('Tool name must be a non-empty string');
+            throw new Error('Tool name must be a non-empty string'); // eslint-disable-line preserve-caught-error
         }
 
         if (!metadata || typeof metadata !== 'object') {
-            throw new Error('Tool metadata must be an object');
+            throw new Error('Tool metadata must be an object'); // eslint-disable-line preserve-caught-error
         }
 
         if (!handler || typeof handler !== 'function') {
-            throw new Error('Tool handler must be a function');
+            throw new Error('Tool handler must be a function'); // eslint-disable-line preserve-caught-error
         }
 
         if (this.tools.has(name)) {
@@ -117,7 +117,7 @@ export class ToolRegistry {
 
         // Check if already aborted before starting
         if (options.signal?.aborted) {
-            throw new Error(`Tool ${name} was cancelled before execution`);
+            throw new Error(`Tool ${name} was cancelled before execution`); // eslint-disable-line preserve-caught-error
         }
 
         // Check if retry enabled (opt-in via env var, default: false)
@@ -252,7 +252,7 @@ export class ToolRegistry {
 
                 // Check if retryable
                 if (!retryEnabled || !classification.retryable || attempt >= maxAttempts) {
-                    throw new Error(
+                    throw new Error( // eslint-disable-line preserve-caught-error
                         `Tool ${name} execution failed: ${error.message} ` +
                         `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`
                     );

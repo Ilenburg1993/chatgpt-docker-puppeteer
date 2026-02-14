@@ -2,25 +2,28 @@ import fs from 'fs';
 import path from 'path';
 
 // Função simples para listar arquivos recursivamente
-function findFiles(dir, pattern) {
+function findFiles(dir) {
     const results = [];
-    
+
     function walk(currentDir) {
         try {
             const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-            
+
             for (const entry of entries) {
                 const fullPath = path.join(currentDir, entry.name);
-                
+
                 if (entry.isDirectory()) {
                     walk(fullPath);
                 } else if (entry.isFile() && entry.name.endsWith('.js')) {
                     results.push(fullPath);
                 }
             }
-        } catch (_) {}
+        } catch (e) {
+            // Ignorar erros de permissão ou diretórios inacessíveis
+            void e;
+        }
     }
-    
+
     walk(dir);
     return results;
 }
@@ -53,24 +56,24 @@ let added = 0;
 for (const file of files) {
     try {
         let content = fs.readFileSync(file, 'utf8');
-        
+
         // Skip se já tem @ts-check ou @ts-nocheck
         if (content.includes('@ts-check') || content.includes('@ts-nocheck')) {
             continue;
         }
-        
+
         const lines = content.split('\n');
         let insertIdx = 0;
-        
+
         // Skip shebang
         if (lines[0] && lines[0].startsWith('#!')) insertIdx = 1;
-        
+
         // Inserir @ts-check logo no início (após shebang)
         lines.splice(insertIdx, 0, '// @ts-check - Type checking rigoroso habilitado (arquivo core)');
-        
+
         fs.writeFileSync(file, lines.join('\n'));
         added++;
-        
+
         if (added <= 15) {
             console.log(`✅ ${file}`);
         }

@@ -109,6 +109,61 @@ const LAYOUTS = {
 let _gaussianCache = null;
 
 /**
+ * Generate a typo by transposing characters or using neighboring keys.
+ * @param {string} char - Original character
+ * @returns {string} Typo character
+ */
+function _generateTypo(char) {
+    // Keyboard layout mapping for common typos
+    const keyboardMap = {
+        'a': ['s', 'q', 'w', 'z'],
+        'b': ['v', 'n', 'g', 'h'],
+        'c': ['x', 'v', 'f', 'd'],
+        'd': ['s', 'f', 'c', 'e'],
+        'e': ['w', 'r', 'd', 's'],
+        'f': ['d', 'g', 'r', 't'],
+        'g': ['f', 'h', 't', 'y'],
+        'h': ['g', 'j', 'y', 'u'],
+        'i': ['u', 'o', 'k', 'j'],
+        'j': ['h', 'k', 'u', 'i'],
+        'k': ['j', 'l', 'i', 'o'],
+        'l': ['k', ';', 'o', 'p'],
+        'm': ['n', ',', 'j', 'k'],
+        'n': ['b', 'm', 'h', 'j'],
+        'o': ['i', 'p', 'l', 'k'],
+        'p': ['o', '[', ';', 'l'],
+        'q': ['w', 'a', '1', '2'],
+        'r': ['e', 't', 'f', 'g'],
+        's': ['a', 'd', 'w', 'x'],
+        't': ['r', 'y', 'g', 'h'],
+        'u': ['y', 'i', 'j', 'h'],
+        'v': ['c', 'b', 'f', 'g'],
+        'w': ['q', 'e', 's', 'a'],
+        'x': ['z', 'c', 's', 'd'],
+        'y': ['t', 'u', 'h', 'j'],
+        'z': ['a', 'x', 's', 'd']
+    };
+
+    const lowerChar = char.toLowerCase();
+    const neighbors = keyboardMap[lowerChar];
+
+    if (neighbors && neighbors.length > 0) {
+        // 70% chance of transposing with adjacent character, 30% chance of neighbor key
+        if (Math.random() < 0.7) {
+            // Simple transpose: swap with next character if exists
+            return char === lowerChar ? neighbors[0] : neighbors[0].toUpperCase();
+        } else {
+            // Neighbor key
+            const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+            return char === lowerChar ? randomNeighbor : randomNeighbor.toUpperCase();
+        }
+    }
+
+    // Fallback: return original character if no mapping found
+    return char;
+}
+
+/**
  * Generate gaussian random with Box-Muller transform.
  * v2.0: Caches second sample for 2x performance, clamps outliers.
  * @param {number} mean - Mean value

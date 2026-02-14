@@ -131,7 +131,8 @@ function _computeProgressView(mission) {
     };
 }
 
-function _pickAllowedTarget({ requested, allowedTargets = null } = {}) {
+function _pickAllowedTarget(options = /** @type {{requested?: any, allowedTargets?: any}} */ ({})) {
+    const { requested, allowedTargets = null } = options;
     const requestedNormalized = requested ? String(requested).toLowerCase().trim() : null;
     const allowed = Array.isArray(allowedTargets) ? allowedTargets.map(t => String(t).toLowerCase().trim()) : null;
 
@@ -199,7 +200,9 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             });
         }
 
-        const autonomyMode = _coerceAutonomyMode(req.body?.autonomy_mode ?? req.body?.autonomyMode);
+        const autonomyMode = /** @type {string} */ (
+            _coerceAutonomyMode(req.body?.autonomy_mode ?? req.body?.autonomyMode)
+        );
         const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : {};
 
         let workflow = null;
@@ -207,24 +210,26 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             workflow = await workflowGenerator.generateWorkflow(templateId, params);
         }
 
-        const mission = createMission({
-            title,
-            description,
-            autonomy_mode: autonomyMode,
-            policy,
-            context: {
-                workflow,
-                progress: {
-                    current_step_index: 0,
-                    current_task_id: null,
-                    created_count: 0,
-                    completed: [],
-                    failed: [],
+        const mission = /** @type {any} */ (
+            createMission({
+                title,
+                description,
+                autonomy_mode: autonomyMode,
+                policy,
+                context: {
+                    workflow,
+                    progress: {
+                        current_step_index: 0,
+                        current_task_id: null,
+                        created_count: 0,
+                        completed: [],
+                        failed: [],
+                    },
+                    feedback: [],
+                    mission_context: {},
                 },
-                feedback: [],
-                mission_context: {},
-            },
-        });
+            })
+        );
 
         recordEvent({
             entityType: 'mission',

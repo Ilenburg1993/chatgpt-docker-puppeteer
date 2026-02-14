@@ -62,21 +62,42 @@ app.use(
 );
 
 /* --------------------------------------------------------------------------
+   2.1 HSTS (HTTP Strict Transport Security) - FORÇADO EM PRODUÇÃO
+-------------------------------------------------------------------------- */
+if (process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === 'true') {
+    app.use((req, res, next) => {
+        // HSTS: força HTTPS por 1 ano, inclui subdomínios, permite preload
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+        next();
+    });
+}
+
+/* --------------------------------------------------------------------------
    3. CORS DINÂMICO COM FALHA EXPLÍCITA
 -------------------------------------------------------------------------- */
 
 const allowedOrigins = new Set(
     [
         'http://localhost:3008',
+        'https://localhost:3008',
         'http://127.0.0.1:3008',
+        'https://127.0.0.1:3008',
         'http://localhost:5173', // Vite dev server (porta padrão)
+        'https://localhost:5173',
         'http://localhost:5174', // Vite dev server (porta alternativa)
+        'https://localhost:5174',
         'http://localhost:5175', // Vite dev server (porta alternativa 2)
+        'https://localhost:5175',
         'http://localhost:5176', // Vite dev server (porta alternativa 3)
+        'https://localhost:5176',
         'http://172.17.0.2:5173', // Vite network access
+        'https://172.17.0.2:5173',
         'http://172.17.0.2:5174', // Vite network access (alt)
+        'https://172.17.0.2:5174',
         'http://172.17.0.2:5175', // Vite network access (alt 2)
+        'https://172.17.0.2:5175',
         'http://172.17.0.2:5176', // Vite network access (alt 3)
+        'https://172.17.0.2:5176',
         process.env.DASHBOARD_ORIGIN,
     ].filter(Boolean)
 );

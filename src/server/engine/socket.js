@@ -1,10 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
+import { ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
+import { validateIPCEnvelope, validateRobotIdentity } from '#shared/nerv/schemas';
+import EventEmitter from 'node:events';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-import EventEmitter from 'node:events';
-import { log } from '#core/logger';
-import { validateRobotIdentity, validateIPCEnvelope } from '#shared/nerv/schemas';
-import { PROTOCOL_VERSION, ActorRole } from '#shared/nerv/constants';
 
 /**
  * Instância única do barramento (Singleton).
@@ -355,8 +355,8 @@ function notifyAgent(event, data = {}) {
  * P9.8: Broadcast de task update com debouncing de 50ms.
  * Acumula updates em buffer e envia em batch para reduzir overhead.
  *
- * @param {string} taskId - ID da task
- * @param {Object} data - Dados do update
+ * @param {string|Object} taskId - ID da task ou objeto {taskId, state}
+ * @param {Object} [data] - Dados do update (opcional se taskId for objeto)
  */
 function broadcastTaskUpdate(taskId, data) {
     if (!ioInstance) {
@@ -461,4 +461,20 @@ export const connectExternal = async (port = 3008) => {
     };
 };
 
-export { init, sendCommand, notify, notifyAgent, stop, broadcastTaskUpdate };
+/**
+ * Notifica todos os clientes conectados sobre shutdown iminente do servidor.
+ * @param {number} timeoutMs - Tempo em ms até o shutdown forçado
+ */
+function notifyShutdown(timeoutMs) {
+    if (!ioInstance) {
+        return;
+    }
+
+    notify('system:shutdown', {
+        message: 'Servidor será encerrado em breve',
+        timeoutMs,
+        timestamp: Date.now()
+    });
+}
+
+export { broadcastTaskUpdate, init, notify, notifyAgent, notifyShutdown, sendCommand, stop };

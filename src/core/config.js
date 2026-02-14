@@ -368,14 +368,12 @@ class ConfigurationManager extends EventEmitter {
         return this.currentConfig.CHROME_PROXY_PORT;
     }
 
-    /**
-     * Getter genérico para acessar valores de configuração com fallback padrão.
-     * @param {string} key - Chave da configuração.
-     * @param {*} defaultValue - Valor padrão se chave não encontrada.
-     * @returns {*} Valor da configuração ou padrão.
-     */
-    get(key, defaultValue) {
-        return this.currentConfig[key] !== undefined ? this.currentConfig[key] : defaultValue;
+    // --- Server Configuration Getters ---
+    get SERVER_PORT() {
+        return this.currentConfig.SERVER_PORT || 3008;
+    }
+    get ENABLE_TASK_SYNC_BRIDGE() {
+        return this.currentConfig.ENABLE_TASK_SYNC_BRIDGE || false;
     }
 }
 

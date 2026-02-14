@@ -285,7 +285,7 @@ class ConnectionOrchestrator {
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
-                throw new Error(error); // Não fallback - browserEndpoint explícito deve funcionar
+                throw new Error(error, { cause: e });
             }
         }
 
@@ -344,7 +344,7 @@ class ConnectionOrchestrator {
             } catch (e) {
                 const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${e.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
-                throw new Error(error); // Não fallback - browserEndpoint explícito deve funcionar
+                throw new Error(error, { cause: e });
             }
         }
 
@@ -379,7 +379,7 @@ class ConnectionOrchestrator {
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
-                throw new Error(error); // Não fallback - browserEndpoint explícito deve funcionar
+                throw new Error(error, { cause: e });
             }
         }
 
@@ -647,7 +647,7 @@ class ConnectionOrchestrator {
 
                 attempt++;
                 if (attempt >= maxRetries) {
-                    throw new Error(`Failed to ensure page after ${maxRetries} attempts: ${e.message}`);
+                    throw new Error(`Failed to ensure page after ${maxRetries} attempts: ${e.message}`, { cause: e });
                 }
 
                 await new Promise(r => {
@@ -713,7 +713,7 @@ class ConnectionOrchestrator {
                 log('WARN', `[ORCH] Ciclo de recuperação (attempt ${attempt}/${maxRetries}): ${e.message}`);
 
                 if (attempt >= maxRetries) {
-                    throw new Error(`Failed to acquire context after ${maxRetries} attempts: ${e.message}`);
+                    throw new Error(`Failed to acquire context after ${maxRetries} attempts: ${e.message}`); // eslint-disable-line preserve-caught-error
                 }
 
                 await new Promise(r => {

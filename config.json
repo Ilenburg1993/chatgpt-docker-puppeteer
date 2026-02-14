@@ -184,6 +184,9 @@
   "// Porta lógica do servidor interno (se aplicável)": "",
   "SERVER_PORT": 3008,
 
+  "// Habilita TaskSyncBridge para sincronização realtime de tasks": "",
+  "ENABLE_TASK_SYNC_BRIDGE": true,
+
   "// ---------------------------------------------------------------------": "",
   "// [G] POLÍTICAS DE SEGURANÇA E DOMÍNIOS": "",
   "// ---------------------------------------------------------------------": "",

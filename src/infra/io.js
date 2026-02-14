@@ -39,7 +39,7 @@ export const sanitizeFilename = fsCore.sanitizeFilename;
 
 /**
  * Escreve arquivo de forma atômica.
- * @type {function(string, *): Promise<void>}
+ * @type {function(string, string|Buffer|Uint8Array, BufferEncoding?): Promise<boolean>}
  */
 export const atomicWrite = fsCore.atomicWrite;
 
@@ -194,13 +194,13 @@ export const getDna = dnaStore.getDna;
 
 /**
  * Salva DNA.
- * @type {function(object): Promise<void>}
+ * @type {function(object, string?): Promise<boolean>}
  */
 export const saveDna = dnaStore.saveDna;
 
 /**
  * Obtém regras de target do DNA.
- * @type {function(): Promise<object>}
+ * @type {function(string): Promise<object>}
  */
 export const getTargetRules = dnaStore.getTargetRules;
 
@@ -218,19 +218,19 @@ export const rollbackDna = dnaStore.rollbackDna;
 
 /**
  * Obtém histórico do DNA.
- * @type {function(): Promise<Array<object>>}
+ * @type {function(): Array<object>}
  */
 export const getDnaHistory = dnaStore.getDnaHistory;
 
 /**
  * Evolui DNA usando protocolo SADI.
- * @type {function(object, object): Promise<object>}
+ * @type {function(object, string, string): Promise<{accepted: boolean, reason?: string, stats?: object, error?: string}>}
  */
 export const evolveWithSadiProtocol = dnaEvolution.evolveWithSadiProtocol;
 
 /**
  * Evolui DNA usando protocolo completo.
- * @type {function(object, object): Promise<object>}
+ * @type {function(object, string, string): Promise<boolean>}
  */
 export const evolveWithFullProtocol = dnaEvolution.evolveWithFullProtocol;
 

@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
 import { getCorrelationId, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
+import EventEmitter from 'node:events';
 
 /* ===========================
    Estrutura de Registro de Observação
@@ -14,7 +14,7 @@ import { getCorrelationId, getMsgId, getPayload } from '#shared/nerv/envelope_re
  * @returns {Object}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {
-    let payloadSerialized = null;
+    let payloadSerialized;
     try {
         payloadSerialized = JSON.stringify(payload ?? null);
     } catch (_) {

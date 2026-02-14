@@ -8,7 +8,7 @@
     "target": "ES2024",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "lib": ["ES2024"],
+    "lib": ["ES2024", "ES2022.Error"],
 
     // ============================================================
     // [B] JAVASCRIPT PURO (SEM TYPESCRIPT)

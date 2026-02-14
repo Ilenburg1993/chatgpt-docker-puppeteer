@@ -4,10 +4,19 @@ import { getActionCode, getCorrelationId, getMessageType, getMsgId } from '#shar
 import EventEmitter from 'node:events';
 
 /**
- * Cria transporte híbrido com suporte local + remoto.
+ * Estados do Circuit Breaker
+ */
+const CIRCUIT_STATES = {
+    CLOSED: 'CLOSED',     // Funcionando normalmente
+    OPEN: 'OPEN',         // Falhando, só local
+    HALF_OPEN: 'HALF_OPEN' // Testando recuperação
+};
+
+/**
+ * Cria transporte híbrido com suporte local + remoto + circuit breaker.
  *
  * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido.
- * **Semântica:** Abstração unificada de transporte local/remoto via NERV.
+ * **Semântica:** Abstração unificada de transporte local/remoto via NERV com resiliência.
  * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
  *
  * @param {object} config - Configuração do transporte híbrido
@@ -29,6 +38,65 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     // Handlers registrados
     const handlers = new Map();
     let handlerIdCounter = 0;
+
+    // Circuit Breaker State
+    let circuitState = CIRCUIT_STATES.CLOSED;
+    let failureCount = 0;
+    let _lastFailureTime = 0;
+    let nextAttemptTime = 0;
+
+    // Circuit Breaker Configuration
+    const FAILURE_THRESHOLD = 5;    // Falhas consecutivas para abrir
+    const TIMEOUT_MS = 60000;       // 1 minuto para tentar recuperação
+
+    /**
+     * Atualiza estado do circuit breaker baseado em sucesso/falha.
+     */
+    function updateCircuitBreaker(success) {
+        const now = Date.now();
+
+        if (success) {
+            failureCount = 0;
+            circuitState = CIRCUIT_STATES.CLOSED;
+            telemetry.emit('circuit_breaker_success', { state: circuitState });
+        } else {
+            failureCount++;
+            _lastFailureTime = now;
+
+            if (failureCount >= FAILURE_THRESHOLD) {
+                circuitState = CIRCUIT_STATES.OPEN;
+                nextAttemptTime = now + TIMEOUT_MS;
+                telemetry.emit('circuit_breaker_open', {
+                    state: circuitState,
+                    failureCount,
+                    nextAttemptTime
+                });
+            }
+        }
+    }
+
+    /**
+     * Verifica se deve tentar conexão remota (circuit breaker logic).
+     */
+    function shouldAttemptRemote() {
+        const now = Date.now();
+
+        if (circuitState === CIRCUIT_STATES.CLOSED) {
+            return true;
+        }
+
+        if (circuitState === CIRCUIT_STATES.OPEN) {
+            if (now >= nextAttemptTime) {
+                circuitState = CIRCUIT_STATES.HALF_OPEN;
+                telemetry.emit('circuit_breaker_half_open', { state: circuitState });
+                return true;
+            }
+            return false;
+        }
+
+        // HALF_OPEN: permite uma tentativa
+        return true;
+    }
 
     /**
      * Inicia transporte (conecta Socket.io se híbrido).
@@ -84,7 +152,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     }
 
     /**
-     * Envia mensagem (local via EventEmitter, remoto via Socket.io).
+     * Envia mensagem (local via EventEmitter, remoto via Socket.io com circuit breaker).
      *
      * @param {Object} envelope - Envelope NERV normalizado
      */
@@ -92,18 +160,32 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         // 1. SEMPRE emite local (fast-path para mesmos processo)
         localBus.emit('message', envelope);
 
-        // 2. Se híbrido, também envia via Socket.io
+        // 2. Se híbrido, também envia via Socket.io (com circuit breaker)
         if (mode === CONNECTION_MODES.HYBRID && socketAdapter) {
-            try {
-                const frame = JSON.stringify(envelope);
-                socketAdapter.send(frame);
-            } catch (err) {
-                telemetry.emit('hybrid_transport_send_error', {
-                    error: err.message,
+            if (shouldAttemptRemote()) {
+                try {
+                    const frame = JSON.stringify(envelope);
+                    socketAdapter.send(frame);
+                    updateCircuitBreaker(true); // Sucesso na tentativa
+                } catch (err) {
+                    telemetry.emit('hybrid_transport_send_error', {
+                        error: err.message,
+                        correlationId: envelope.causality?.correlation_id,
+                        msgId: envelope.causality?.msg_id,
+                        actionCode: envelope.type?.action_code,
+                    });
+                    updateCircuitBreaker(false); // Falha na tentativa
+                }
+            } else {
+                telemetry.emit('hybrid_transport_skipped', {
+                    reason: 'circuit_breaker_open',
+                    state: circuitState,
+                    correlationId: envelope.causality?.correlation_id,
                 });
             }
         }
 
+        // Telemetria de envio bem-sucedido
         telemetry.emit('hybrid_transport_sent', {
             actor: envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null,
             actionCode: getActionCode(envelope),

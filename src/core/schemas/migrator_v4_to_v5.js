@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { TaskSchemaV5 } from './task_schema_v5.js';
 import * as logger from '../logger.js';
+import { TaskSchemaV5 } from './task_schema_v5.js';
 
 /**
  * Detecta se task é V4 baseado na versão.
@@ -222,7 +222,7 @@ function migrateTaskV4toV5(taskV4) {
             error,
             taskV4
         });
-        throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${error.message}`);
+        throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${error.message}`, { cause: error });
     }
 }
 
@@ -382,4 +382,4 @@ function autoMigrateTask(task) {
     return migrateTaskV4toV5(task);
 }
 
-export { isV4Task, isV5Task, migrateTaskV4toV5, migrateBatchV4toV5, validateV5Task, downgradeV5toV4, autoMigrateTask };
+export { autoMigrateTask, downgradeV5toV4, isV4Task, isV5Task, migrateBatchV4toV5, migrateTaskV4toV5, validateV5Task };

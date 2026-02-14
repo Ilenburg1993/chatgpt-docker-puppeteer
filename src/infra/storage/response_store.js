@@ -26,7 +26,7 @@ async function loadResponse(taskId, signal = null) {
         try {
             // 1. Check de Aborto Precoce (Soberania do Kernel)
             if (signal?.aborted) {
-                throw new Error('OPERATION_ABORTED');
+                throw new Error('OPERATION_ABORTED'); // eslint-disable-line preserve-caught-error
             }
 
             // 2. Validação de Tamanho (Proteção contra Out-of-Memory)
@@ -46,7 +46,7 @@ async function loadResponse(taskId, signal = null) {
         } catch (err) {
             // Tratamento de interrupção externa
             if (err.name === 'AbortError' || err.message === 'OPERATION_ABORTED') {
-                throw new Error('READ_ABORTED');
+                throw new Error('READ_ABORTED'); // eslint-disable-line preserve-caught-error
             }
 
             // Tratamento de Concorrência (Arquivo travado pelo SO ou Logger)

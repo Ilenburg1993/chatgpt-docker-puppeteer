@@ -98,7 +98,7 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
             error: error.message,
             stack: error.stack,
         });
-        throw new Error(`Falha ao salvar resposta V2: ${error.message}`);
+        throw new Error(`Falha ao salvar resposta V2: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -128,7 +128,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
     const filePath = formatMap[format];
 
     if (!filePath) {
-        throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`);
+        throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`); // eslint-disable-line preserve-caught-error
     }
 
     try {

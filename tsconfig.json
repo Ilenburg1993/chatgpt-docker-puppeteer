@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./jsconfig.json",
+  "compilerOptions": {
+    // ============================================================
+    // [A] OVERRIDES PARA TYPESCRIPT — Mantém compatibilidade com jsconfig.json
+    // ============================================================
+
+    // ✅ Habilita verificação de tipos em arquivos JavaScript
+    // Override necessário: jsconfig.json tem checkJs: false para evitar falsos positivos
+    "checkJs": true,
+
+    // ✅ Não emite arquivos (apenas verificação)
+    "noEmit": true,
+
+    // ✅ Target mais conservador para compatibilidade máxima
+    // jsconfig.json usa ES2024, mas mantemos ES2020 para compatibilidade
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+
+    // ✅ Iteração moderna habilitada
+    "downlevelIteration": true,
+
+    // ✅ Tipos Node.js incluídos
+    "types": ["node"]
+
+    // ============================================================
+    // [B] CONFIGURAÇÕES HERDADAS DO JSCONFIG.JSON (não precisam override)
+    // ============================================================
+    // allowJs: true (herdado)
+    // strict: false (herdado)
+    // noImplicitAny: false (herdado)
+    // noImplicitThis: false (herdado)
+    // esModuleInterop: true (herdado)
+    // allowSyntheticDefaultImports: true (herdado)
+    // resolveJsonModule: true (herdado)
+    // forceConsistentCasingInFileNames: true (herdado)
+    // skipLibCheck: true (herdado)
+    // baseUrl: "." (herdado)
+    // paths: {...} (herdado)
+    // typeRoots: [...] (herdado)
+  },
+
+  // ==============================================================
+  // [C] ESCOPO DO PROJETO — Alinhado com jsconfig.json mas focado em TypeScript
+  // ==============================================================
+  "include": [
+    // Arquivos TypeScript/JavaScript do projeto
+    "src/**/*",
+    "tests/**/*",
+    "scripts/**/*",
+
+    // Arquivos de configuração que podem ter tipos
+    "*.config.js",
+    "*.config.mjs",
+    "*.config.cjs",
+    "ecosystem.config.js",
+    ".puppeteerrc.cjs",
+    "eslint.config.mjs"
+  ],
+
+  // ==============================================================
+  // [D] EXCLUSÕES — Complementa jsconfig.json com exclusões específicas do TypeScript
+  // ==============================================================
+  "exclude": [
+    // Exclusões do jsconfig.json são herdadas via extends
+    // Adicionamos apenas exclusões específicas do TypeScript
+    "node_modules",
+    "logs",
+    "tmp",
+    "respostas",
+    "artifacts",
+    "diagnostics",
+    "analysis",
+    "monitoring",
+
+    // Exclusões específicas para evitar conflitos de tipos
+    "**/*.d.ts.map",
+    "**/*.js.map"
+  ]
+}

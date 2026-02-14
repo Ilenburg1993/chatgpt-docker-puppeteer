@@ -333,7 +333,7 @@ async function runFullCheck() {
     ]);
 
     // Additional probe: check configured proxy/hosts via ConnectionOrchestrator
-    let proxyReport = null;
+    let proxyReport;
     try {
         proxyReport = await ConnectionOrchestrator.synchronize();
     } catch (err) {

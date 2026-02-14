@@ -794,5 +794,7 @@
   // ----------------------------------------------------------------------------
   // - Desliga o cSpell no workspace.
   // ============================================================================
-  "cSpell.enabled": false
+  "cSpell.enabled": false,
+  "diffEditor.codeLens": true,
+  "geminicodeassist.outlines.automaticOutlineGeneration": true
 }

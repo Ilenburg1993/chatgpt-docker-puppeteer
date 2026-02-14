@@ -13,6 +13,9 @@ interface Error {
   /** Detalhes adicionais do erro */
   details?: string | Record<string, unknown>;
 
+  /** Causa raiz do erro (ES2022+) */
+  cause?: Error | unknown;
+
   /** Histórico de tentativas (recovery systems) */
   history?: Array<{
     attempt?: number;

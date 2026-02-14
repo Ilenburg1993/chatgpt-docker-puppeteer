@@ -9,7 +9,7 @@ async function fetchJson(url, init) {
     let json = null;
     try {
         json = text ? JSON.parse(text) : null;
-    } catch (e) {
+    } catch (_e) {
         // keep null
     }
     return { ok: res.ok, status: res.status, text, json };

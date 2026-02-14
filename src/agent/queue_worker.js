@@ -59,7 +59,7 @@ async function _readTextFromTaskLatestResult(taskId) {
     const db = getDb();
     const row = db.prepare('SELECT result_json FROM tasks WHERE id = ?').get(taskId);
     if (!row?.result_json) return '';
-    let parsed = null;
+    let parsed;
     try {
         parsed = JSON.parse(row.result_json);
     } catch (_) {
@@ -131,7 +131,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
         if (type === 'artifact_text') {
             const artifactId = input?.artifact_id ? String(input.artifact_id) : null;
             if (!artifactId) continue;
-            let text = '';
+            let text;
             try {
                 const raw = await readText(artifactId);
                 text = typeof raw === 'string' ? raw : '';

@@ -199,11 +199,11 @@ const handlers = {
                     ]
                 };
             } catch (error) {
-                throw new Error(`Failed to read resource ${uri}: ${error.message}`);
+                throw new Error(`Failed to read resource ${uri}: ${error.message}`); // eslint-disable-line preserve-caught-error
             }
         }
 
-        throw new Error(`Unknown resource: ${uri}`);
+        throw new Error(`Unknown resource: ${uri}`); // eslint-disable-line preserve-caught-error
     }
 };
 

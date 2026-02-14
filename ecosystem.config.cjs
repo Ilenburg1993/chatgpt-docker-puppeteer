@@ -82,6 +82,7 @@ module.exports = {
             error_file: './logs/agente-error.log',
             out_file: './logs/agente-out.log',
             log_rotate_interval: '1d',    // Rotacionar diariamente
+            log_rotate_size: '100M',      // Ou a cada 100MB
             log_rotate_max: 7,            // Manter últimos 7 dias
 
             // Ambiente
@@ -147,6 +148,7 @@ module.exports = {
             error_file: './logs/dashboard-error.log',
             out_file: './logs/dashboard-out.log',
             log_rotate_interval: '1d',    // Rotacionar diariamente
+            log_rotate_size: '100M',      // Ou a cada 100MB
             log_rotate_max: 7,            // Manter últimos 7 dias
 
             // Load .env.local for sensitive configs (Ollama Cloud API keys, etc.)
@@ -198,7 +200,8 @@ module.exports = {
                 '--expose-gc',                  // Manual GC control
                 '--unhandled-rejections=strict', // Crash on unhandled promises
                 '--enable-source-maps',          // Correct stack traces
-                '--trace-warnings'               // Never silent warnings
+                '--trace-warnings',              // Never silent warnings
+                '--optimize-for-size'          // Otimiza para uso de memória
             ],
 
             // Environment variables
@@ -239,6 +242,7 @@ module.exports = {
             error_file: './logs/chrome-proxy-error.log',
             out_file: './logs/chrome-proxy-out.log',
             log_rotate_interval: '1d',      // Rotate daily
+            log_rotate_size: '100M',        // Ou a cada 100MB
             log_rotate_max: 7,              // Keep last 7 days
 
             // PM2 Runtime Timing

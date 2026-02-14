@@ -121,7 +121,7 @@ export class MCPUpstreamStdio extends EventEmitter {
 
         } catch (error) {
             this.stop();
-            throw new Error(`Failed to initialize upstream: ${error.message}`);
+            throw new Error(`Failed to initialize upstream: ${error.message}`); // eslint-disable-line preserve-caught-error
         }
     }
 
@@ -271,7 +271,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      */
     async listTools() {
         if (!this.initialized) {
-            throw new Error('MCP Upstream not initialized');
+            throw new Error('MCP Upstream not initialized'); // eslint-disable-line preserve-caught-error
         }
 
         return this._sendRequest('tools/list');
@@ -287,7 +287,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      */
     async callTool(name, args = {}) {
         if (!this.initialized) {
-            throw new Error('MCP Upstream not initialized');
+            throw new Error('MCP Upstream not initialized'); // eslint-disable-line preserve-caught-error
         }
 
         return this._sendRequest('tools/call', {

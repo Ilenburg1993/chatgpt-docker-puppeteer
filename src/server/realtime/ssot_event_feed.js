@@ -10,6 +10,19 @@ let _lastEventId = null;
 let _lastErrorLogAtMs = 0;
 let _errorCount = 0;
 
+/**
+ * @typedef {object} TickOptions
+ * @property {object} socketHub - Instância do SocketHub para emissão de eventos
+ * @property {number} [batchLimit=500] - Número máximo de eventos por lote
+ */
+
+/**
+ * @typedef {object} StartOptions
+ * @property {object} socketHub - Instância do SocketHub para emissão de eventos
+ * @property {number} [intervalMs=250] - Intervalo em ms entre verificações
+ * @property {number} [batchLimit=500] - Número máximo de eventos por lote
+ */
+
 function _asInt(raw, fallback) {
     const n = Number(raw);
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
@@ -66,7 +79,16 @@ function _getInitialLastEventId(db, { fromStart = false } = {}) {
     }
 }
 
-async function _tick({ socketHub, batchLimit = 500 } = {}) {
+/**
+ * Executa um ciclo de polling de eventos SSOT e os emite via Socket.io.
+ * Busca novos eventos no banco de dados e os envia para clientes conectados.
+ *
+ * @param {TickOptions} options - Opções do ciclo de polling
+ * @returns {Promise<void>}
+ * @sideEffects - Emite eventos 'ssot:events_batch' e 'mission:updates_batch' via Socket.io
+ */
+async function _tick(options) {
+    const { socketHub, batchLimit = 500 } = options || {};
     if (_stopped) return;
     if (_running) return;
     _running = true;
@@ -231,7 +253,17 @@ async function _tick({ socketHub, batchLimit = 500 } = {}) {
     }
 }
 
-function start({ socketHub, intervalMs = 250, batchLimit = 500 } = {}) {
+/**
+ * Inicia o feed de eventos SSOT (Single Source of Truth) em tempo real.
+ * Monitora mudanças no banco de dados SQLite e emite eventos via Socket.io para dashboards conectados.
+ *
+ * @param {StartOptions} options - Opções de configuração do feed
+ * @throws {Error} Se socketHub não for fornecido
+ * @sideEffects - Inicia timer de polling, registra listeners de Socket.io, emite eventos 'ssot:events_batch' e 'mission:updates_batch'
+ * @returns {void}
+ */
+function start(options) {
+    const { socketHub, intervalMs = 250, batchLimit = 500 } = options || {};
     if (_timer) return;
     if (!socketHub) throw new Error('SSOTEventFeed.start requires socketHub');
 
@@ -263,6 +295,13 @@ function start({ socketHub, intervalMs = 250, batchLimit = 500 } = {}) {
     log('INFO', `[SSOTEventFeed] started (interval=${interval}ms, batchLimit=${lim})`);
 }
 
+/**
+ * Para o feed de eventos SSOT e limpa todos os recursos associados.
+ * Interrompe o polling de eventos, cancela timers e marca o feed como parado.
+ *
+ * @sideEffects - Cancela timer de polling, limpa estado interno, emite log de parada
+ * @returns {void}
+ */
 function stop() {
     _stopped = true;
     if (_timer) {

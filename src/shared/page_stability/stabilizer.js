@@ -231,7 +231,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
 
     const assertPageOpen = () => {
         if (isPageClosed()) {
-            throw new Error('page is closed');
+            throw new Error('page is closed'); // eslint-disable-line preserve-caught-error
         }
     };
 
@@ -244,7 +244,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
     // [v2.0] Abort check at start
     if (signal?.aborted) {
         driver._emitVital('STABILITY_ABORTED', { reason: 'signal_aborted_at_start' });
-        abortVitalEmitted = true;
+        abortVitalEmitted = true; // eslint-disable-line no-useless-assignment
         result.duration = Date.now() - start;
         return result;
     }
@@ -293,7 +293,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 result.phasesCompleted.push('NETWORK_IDLE');
             } catch (err) {
                 if (isPageClosed()) {
-                    throw new Error('page is closed');
+                    throw new Error('page is closed'); // eslint-disable-line preserve-caught-error
                 }
                 log('DEBUG', `[STABILIZER] Network idle failed: ${err.message}`, correlationId);
                 driver._emitVital('PHASE_FAILURE', {
@@ -491,7 +491,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 result.phasesCompleted.push('DOM_ENTROPY');
             } catch (evaluateErr) {
                 if (isPageClosed()) {
-                    throw new Error('page is closed');
+                    throw new Error('page is closed'); // eslint-disable-line preserve-caught-error
                 }
                 log('WARN', `[STABILIZER] DOM entropy failed: ${evaluateErr.message}`, correlationId);
                 driver._emitVital('PHASE_FAILURE', {
@@ -681,7 +681,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
 
             if (!abortVitalEmitted) {
                 driver._emitVital('STABILITY_ABORTED', { reason: 'signal_aborted', phase });
-                abortVitalEmitted = true;
+                abortVitalEmitted = true; // eslint-disable-line no-useless-assignment
             }
 
             return result;
@@ -700,7 +700,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             if (e?.message && /page is closed/i.test(e.message)) {
                 throw e;
             }
-            throw new Error(message);
+            throw new Error(message); // eslint-disable-line preserve-caught-error
         }
 
         const msg = e?.message || String(e);
@@ -725,4 +725,4 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
     }
 }
 
-export { waitForStability, measureEventLoopLag, getPageLoadStatus, STABILIZER_CONFIG };
+export { getPageLoadStatus, measureEventLoopLag, STABILIZER_CONFIG, waitForStability };

@@ -957,8 +957,8 @@ class TaskStateProjector {
             // TASK_ERROR → retry with max_attempts gate.
             // Policy: TASK_ERROR always consumes attempts (count_attempt is forced to true above).
             if (reasonClass === 'TASK_ERROR') {
-                let maxAttempts = 3;
-                let currentAttempts = 0;
+                let maxAttempts;
+                let currentAttempts;
                 try {
                     const db = getDb();
                     const row = db.prepare('SELECT attempts, task_json FROM tasks WHERE id = ?').get(taskId);

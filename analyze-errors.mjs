@@ -22,14 +22,6 @@ sorted.forEach(({ file, count, codes }) => {
   console.log(`        Códigos: ${codes.join(', ')}\n`);
 });
 
-// Categorização de erros
-const errorCategories = {
-  browser: ['TS2304', 'TS2584'], // document, window, HTMLElement
-  types: ['TS2339'],              // Property does not exist
-  schemas: ['TS2769'],            // No overload matches (Object.freeze)
-  assignments: ['TS2322', 'TS2345'], // Type mismatches
-};
-
 console.log('\n📈 Categorização de erros:');
 console.log('\nBrowser globals (TS2304, TS2584):');
 const browserErrors = data.errors.filter(d =>

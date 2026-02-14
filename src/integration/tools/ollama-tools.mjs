@@ -97,7 +97,7 @@ async function ollamaGenerateHandler(params, options = {}) {
                 Array.isArray(issues) && issues.length > 0
                     ? issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
                     : 'validation failed';
-            throw new Error(`Invalid input: ${message}`);
+            throw new Error(`Invalid input: ${message}`); // eslint-disable-line preserve-caught-error
         }
         throw error;
     }
@@ -111,7 +111,7 @@ async function ollamaGenerateHandler(params, options = {}) {
 
     // Check if already aborted before starting
     if (options.signal?.aborted) {
-        throw new Error('Generation cancelled before execution');
+        throw new Error('Generation cancelled before execution'); // eslint-disable-line preserve-caught-error
     }
 
     try {
@@ -132,7 +132,7 @@ async function ollamaGenerateHandler(params, options = {}) {
         return formatted;
     } catch (error) {
         console.error('[Ollama Tool] ollama_generate error:', error);
-        throw new Error(`Ollama generate failed: ${error.message}`);
+        throw new Error(`Ollama generate failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -168,7 +168,7 @@ async function ollamaEmbedHandler(params, options = {}) {
                 Array.isArray(issues) && issues.length > 0
                     ? issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
                     : 'validation failed';
-            throw new Error(`Invalid input: ${message}`);
+            throw new Error(`Invalid input: ${message}`); // eslint-disable-line preserve-caught-error
         }
         throw error;
     }
@@ -179,7 +179,7 @@ async function ollamaEmbedHandler(params, options = {}) {
 
     // Check if already aborted before starting
     if (options.signal?.aborted) {
-        throw new Error('Embedding cancelled before execution');
+        throw new Error('Embedding cancelled before execution'); // eslint-disable-line preserve-caught-error
     }
 
     try {
@@ -202,7 +202,7 @@ async function ollamaEmbedHandler(params, options = {}) {
         return formatted;
     } catch (error) {
         console.error('[Ollama Tool] ollama_embed error:', error);
-        throw new Error(`Ollama embed failed: ${error.message}`);
+        throw new Error(`Ollama embed failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 

@@ -35,6 +35,19 @@ const KernelLoopState = Object.freeze({
 
 import { DecisionKind } from '../execution_engine/execution_engine.js';
 
+/**
+ * @typedef {object} KernelLoopOptions
+ * @property {object} executionEngine - Motor semântico que avalia e produz decisões
+ * @property {object} nervBridge - Ponte de integração com NERV
+ * @property {object} telemetry - Sistema de telemetria
+ * @property {object} [browserPool=null] - Pool de browsers
+ * @property {object} [scheduler=global] - Scheduler para setInterval
+ * @property {number} [baseIntervalMs=50] - Intervalo base entre ciclos
+ * @property {function|null} [onActivateTask=null] - Callback para ativação de tarefa
+ * @property {function|null} [onTerminateTask=null] - Callback para terminação de tarefa
+ * @property {function|null} [onSuspendTask=null] - Callback para suspensão de tarefa
+ */
+
 /* ===========================
    Fábrica do KernelLoop
 =========================== */
@@ -59,6 +72,15 @@ class KernelLoop {
      *
      * @param {number} [params.baseIntervalMs]
      * Intervalo base entre ciclos (padrão: 50ms).
+     *
+     * @param {function|null} [params.onActivateTask]
+     * Callback para ativação de tarefa.
+     *
+     * @param {function|null} [params.onTerminateTask]
+     * Callback para terminação de tarefa.
+     *
+     * @param {function|null} [params.onSuspendTask]
+     * Callback para suspensão de tarefa.
      */
     constructor({
         executionEngine,
@@ -69,7 +91,7 @@ class KernelLoop {
         baseIntervalMs = 50,
         onActivateTask = null,
         onTerminateTask = null,
-        onSuspendTask = null
+        onSuspendTask = null,
     }) {
         if (!executionEngine || typeof executionEngine.evaluate !== 'function') {
             throw new Error('KernelLoop requer executionEngine.evaluate()');
@@ -111,7 +133,7 @@ class KernelLoop {
     start({ autoSchedule = true } = {}) {
         if (this.state === KernelLoopState.ACTIVE) {
             this.telemetry.warning('kernel_loop_already_active', {
-                at: Date.now()
+                at: Date.now(),
             });
             return;
         }
@@ -120,7 +142,7 @@ class KernelLoop {
         this._running = true;
 
         this.telemetry.info('kernel_loop_started', {
-            at: Date.now()
+            at: Date.now(),
         });
 
         if (autoSchedule) {
@@ -134,7 +156,7 @@ class KernelLoop {
     stop() {
         if (this.state === KernelLoopState.INACTIVE) {
             this.telemetry.warning('kernel_loop_already_inactive', {
-                at: Date.now()
+                at: Date.now(),
             });
             return;
         }
@@ -149,7 +171,7 @@ class KernelLoop {
 
         this.telemetry.info('kernel_loop_stopped', {
             ticks: this._tickCounter,
-            at: Date.now()
+            at: Date.now(),
         });
 
         this.state = KernelLoopState.INACTIVE;
@@ -188,7 +210,7 @@ class KernelLoop {
         this.telemetry.info('kernel_loop_tick_start', {
             tickId,
             state: this.state,
-            at: startedAt
+            at: startedAt,
         });
 
         try {
@@ -207,7 +229,7 @@ class KernelLoop {
                 this.telemetry.info('kernel_loop_paused', {
                     tickId,
                     reason: 'Circuit Breaker OPEN',
-                    at: startedAt
+                    at: startedAt,
                 });
 
                 this._drainOutbound();
@@ -217,7 +239,7 @@ class KernelLoop {
             // 2. Avaliação semântica (produz propostas de decisão)
             const proposals = this.executionEngine.evaluate({
                 tickId,
-                at: startedAt
+                at: startedAt,
             });
 
             // 3. Aplicação de decisões
@@ -233,7 +255,7 @@ class KernelLoop {
                 tickId,
                 error: error.message || String(error),
                 stack: error.stack,
-                at: Date.now()
+                at: Date.now(),
             });
         } finally {
             const endedAt = Date.now();
@@ -242,7 +264,7 @@ class KernelLoop {
             this.telemetry.info('kernel_loop_tick_end', {
                 tickId,
                 durationMs,
-                at: endedAt
+                at: endedAt,
             });
         }
     }
@@ -262,12 +284,12 @@ class KernelLoop {
             this.state = KernelLoopState.PAUSED;
             this.telemetry.warning('kernel_paused_by_circuit_breaker', {
                 cause: this.browserPool.circuitBreaker.lastCause,
-                at: Date.now()
+                at: Date.now(),
             });
         } else if (!shouldPause && this.state === KernelLoopState.PAUSED) {
             this.state = KernelLoopState.ACTIVE;
             this.telemetry.info('kernel_resumed_circuit_recovered', {
-                at: Date.now()
+                at: Date.now(),
             });
         }
 
@@ -305,7 +327,7 @@ class KernelLoop {
         if (drained > 0) {
             this.telemetry.info('kernel_loop_inbound_drained', {
                 count: drained,
-                at: Date.now()
+                at: Date.now(),
             });
         }
     }
@@ -350,7 +372,7 @@ class KernelLoop {
                 } catch (fallbackError) {
                     this.telemetry.critical('kernel_loop_outbound_send_failed', {
                         error: fallbackError?.message || error?.message || String(fallbackError || error),
-                        at: Date.now()
+                        at: Date.now(),
                     });
                 }
             }
@@ -359,7 +381,7 @@ class KernelLoop {
         if (drained > 0) {
             this.telemetry.info('kernel_loop_outbound_drained', {
                 count: drained,
-                at: Date.now()
+                at: Date.now(),
             });
         }
     }
@@ -387,7 +409,7 @@ class KernelLoop {
         this.telemetry.info('kernel_loop_applying_decisions', {
             count: proposals.length,
             tickId: context.tickId,
-            at: context.at
+            at: context.at,
         });
 
         // P9.4: Timeout wrapper para prevenir blocking
@@ -403,7 +425,7 @@ class KernelLoop {
                     this.telemetry.critical('kernel_loop_decision_application_failed', {
                         proposal,
                         error: error.message,
-                        at: Date.now()
+                        at: Date.now(),
                     });
                 }
             })
@@ -418,7 +440,7 @@ class KernelLoop {
                     count: proposals.length,
                     tickId: context.tickId,
                     error: error.message,
-                    at: Date.now()
+                    at: Date.now(),
                 });
             } else {
                 throw error;
@@ -437,7 +459,7 @@ class KernelLoop {
             taskId,
             reason,
             tickId: context.tickId,
-            at: context.at
+            at: context.at,
         });
 
         // Exemplo de decisão implementada
@@ -448,7 +470,7 @@ class KernelLoop {
                 } else {
                     this.telemetry.warning('kernel_loop_activate_handler_not_configured', {
                         taskId,
-                        at: context.at
+                        at: context.at,
                     });
                 }
                 break;
@@ -459,7 +481,7 @@ class KernelLoop {
                 } else {
                     this.telemetry.warning('kernel_loop_terminate_handler_not_configured', {
                         taskId,
-                        at: context.at
+                        at: context.at,
                     });
                 }
                 break;
@@ -475,7 +497,7 @@ class KernelLoop {
             default:
                 this.telemetry.warning('kernel_loop_unknown_decision_kind', {
                     kind,
-                    at: context.at
+                    at: context.at,
                 });
         }
     }
@@ -525,7 +547,7 @@ class KernelLoop {
             ticks: this._tickCounter,
             lastTickAt: this._lastTickAt,
             running: this._running,
-            baseIntervalMs: this.baseIntervalMs
+            baseIntervalMs: this.baseIntervalMs,
         });
     }
 }

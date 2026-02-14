@@ -10,7 +10,8 @@ function ok(res, req, data, meta = {}) {
     });
 }
 
-function fail(res, req, httpStatus, { code, error, details } = {}) {
+function fail(res, req, httpStatus, options = {}) {
+    const { code, error, details } = /** @type {{code?: string, error?: string, details?: any}} */ (options);
     res.status(httpStatus).json({
         success: false,
         request_id: req.id,
@@ -52,5 +53,4 @@ function parseIncludeParam(raw) {
     return set;
 }
 
-export { ok, fail, encodeCursor, decodeCursor, parseIncludeParam };
-
+export { decodeCursor, encodeCursor, fail, ok, parseIncludeParam };

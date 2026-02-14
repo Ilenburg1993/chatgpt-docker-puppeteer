@@ -1,14 +1,14 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs';
 import { STATUS_VALUES } from '#core/constants/tasks';
-
-const fsp = fs.promises;
-import path from 'node:path';
-import * as PATHS from '../fs/paths.js';
-import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';
+import * as logger from '#core/logger';
 import { parseTask } from '#core/schemas';
 import { autoMigrateTask } from '#core/schemas/migrator_v4_to_v5';
-import * as logger from '#core/logger';
+import fs from 'node:fs';
+import path from 'node:path';
+import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';
+import * as PATHS from '../fs/paths.js';
+
+const fsp = fs.promises;
 
 /**
  * Salva uma tarefa no disco após validação V5.
@@ -28,6 +28,7 @@ async function saveTask(task) {
         }
 
         // Valida schema V5 (parseTask já usa V5 se meta.version === '5.0')
+        /** @type {import('#core/schemas').TaskV5} */
         const validatedTask = parseTask(taskV5);
         const filepath = path.join(PATHS.QUEUE, `${validatedTask.meta.id}.json`);
 
@@ -41,7 +42,7 @@ async function saveTask(task) {
 
         return validatedTask;
     } catch (e) {
-        throw new Error(`[TASK_STORE] Falha ao persistir tarefa: ${e.message}`);
+        throw new Error(`[TASK_STORE] Falha ao persistir tarefa: ${e.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -83,7 +84,7 @@ async function deleteTask(id) {
             await fsp.unlink(filepath);
         }
     } catch (e) {
-        throw new Error(`[TASK_STORE] Erro ao remover arquivo: ${e.message}`);
+        throw new Error(`[TASK_STORE] Erro ao remover arquivo: ${e.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -132,4 +133,4 @@ async function clearQueue() {
     return { deleted, preserved };
 }
 
-export { saveTask, loadTask, deleteTask, listTaskFiles, clearQueue };
+export { clearQueue, deleteTask, listTaskFiles, loadTask, saveTask };

@@ -4,6 +4,7 @@
 // Order matters: .env.local must be loaded first to take precedence
 import dotenv from 'dotenv';
 import fs from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Load .env.local if exists (Ollama Cloud API keys, etc.)
@@ -14,6 +15,7 @@ if (fs.existsSync('.env.local')) {
 dotenv.config();
 
 import * as Authority from '#core/authority';
+import CONFIG from '#core/config';
 import { CONNECTION_MODES } from '#core/constants/browser';
 import { log } from '#core/logger';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
@@ -22,6 +24,7 @@ import * as NERV from '#nerv/nerv';
 import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
 import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
 import { ActionCode, ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
+import * as snapshot from '#shared/telemetry/snapshot';
 import * as router from './api/router.js';
 import app from './engine/app.js';
 import * as lifecycle from './engine/lifecycle.js';
@@ -50,12 +53,13 @@ import * as logWatcher from './watchers/log_watcher.js';
  *   ✔ Commit atômico via arquivo temporário (fallback)
  *   ✔ Nunca retorna estado parcialmente gravado
  *
+ * @param {object} nerv - Instância NERV para publicação de eventos
  * @param {number} port - Porta efetivamente bound pelo HTTP engine
  * @param {'standalone'|'delegated'} [authority='standalone'] - Modo de autoridade do servidor
  * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)
  * @returns {Promise<void>}
  */
-async function persistServerState(port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
+async function persistServerState(nerv, port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
     // Legacy compatibility hook: discovery is now canonical via NERV (SERVER_READY).
     // We delegate to the discovery helper which prefers NERV and only falls back
     // to file-based persistence if explicitly enabled via `ENABLE_STATE_FILE=true`.
@@ -67,7 +71,7 @@ async function persistServerState(port, authority = Authority.SERVER_AUTHORITIES
         protocol: PROTOCOL_VERSION || '2.0.0',
         mode: CONNECTION_MODES.SINGULARITY,
         role: 'server',
-        authority
+        authority,
     };
 
     try {
@@ -136,8 +140,13 @@ async function bootstrap(options = {}) {
            FASE 2 — Fundação HTTP
            Único ponto de bind de rede.
         -------------------------------------------------------------- */
-        const basePort = Number(process.env.SERVER_PORT || process.env.PORT || 3008);
-        const { server: httpServer, port } = await serverEngine.start(basePort);
+        const basePort = /** @type {number} */ (CONFIG.SERVER_PORT);
+        const { server: httpServer, port, protocol } = await serverEngine.start(basePort);
+
+        // Log protocol info
+        if (protocol) {
+            log('INFO', `[SERVER] Servidor iniciado com protocolo: ${protocol}`);
+        }
 
         /* --------------------------------------------------------------
          FASE 3 — Estado IPC
@@ -145,11 +154,7 @@ async function bootstrap(options = {}) {
          Em modo delegated, evitamos escrita do arquivo de discovery
          pois o Maestro é responsável pela descoberta/coordenação.
       -------------------------------------------------------------- */
-        if (Authority.isStandalone(authority)) {
-            await persistServerState(port, authority);
-        } else {
-            log('DEBUG', '[BOOT] persistServerState skip (delegated)');
-        }
+        // Movido para depois da criação do NERV (FASE 8)
 
         /* --------------------------------------------------------------
            FASE 4 — Socket Hub
@@ -195,24 +200,54 @@ async function bootstrap(options = {}) {
         /* --------------------------------------------------------------
            FASE 6 — Telemetria
         -------------------------------------------------------------- */
-        pm2Bridge.init();
-        logTail.init();
-        hardwareTelemetry.init();
-        // TODO: Inicia snapshot de telemetria em background para respostas rápidas
-        // try {
-        //     const intervalMs = parseInt(process.env.SNAPSHOT_INTERVAL_MS || '60000', 10);
-        //     snapshot.start(intervalMs);
-        // } catch (e) {
-        //     log('WARN', `[BOOT] Falha ao iniciar snapshot de telemetria: ${e.message}`);
-        // }
+        try {
+            pm2Bridge.init();
+            log('DEBUG', '[BOOT] PM2 Bridge inicializado');
+        } catch (err) {
+            log('WARN', `[BOOT] PM2 Bridge init falhou: ${err.message}`);
+        }
 
-        log('DEBUG', '[BOOT] Telemetria online (sem snapshot - módulo pendente)');
+        try {
+            logTail.init();
+            log('DEBUG', '[BOOT] LogTail inicializado');
+        } catch (err) {
+            log('WARN', `[BOOT] LogTail init falhou: ${err.message}`);
+        }
+
+        try {
+            hardwareTelemetry.init();
+            log('DEBUG', '[BOOT] Hardware Telemetry inicializado');
+        } catch (err) {
+            log('WARN', `[BOOT] Hardware Telemetry init falhou: ${err.message}`);
+        }
+
+        // Inicia snapshot de telemetria em background para respostas rápidas
+        try {
+            const intervalMs = parseInt(process.env.SNAPSHOT_INTERVAL_MS || '60000', 10);
+            snapshot.start(intervalMs);
+        } catch (e) {
+            log('WARN', `[BOOT] Falha ao iniciar snapshot de telemetria: ${e.message}`);
+        }
+
+        log('DEBUG', '[BOOT] Telemetria online com snapshot');
 
         /* --------------------------------------------------------------
            FASE 7 — Watchers
         -------------------------------------------------------------- */
-        fsWatcher.init();
-        logWatcher.init();
+        try {
+            fsWatcher.init();
+            log('DEBUG', '[BOOT] FS Watcher inicializado');
+        } catch (err) {
+            log('WARN', `[BOOT] FS Watcher init falhou: ${err.message}`);
+        }
+
+        try {
+            logWatcher.init();
+            log('DEBUG', '[BOOT] Log Watcher inicializado');
+        } catch (err) {
+            log('WARN', `[BOOT] Log Watcher init falhou: ${err.message}`);
+        }
+
         log('DEBUG', '[BOOT] Watchers ativos');
 
         /* --------------------------------------------------------------
@@ -232,7 +267,7 @@ async function bootstrap(options = {}) {
                 mode: 'hybrid',
                 correlation: true,
                 bufferSize: 1000,
-                telemetry: true
+                telemetry: true,
             });
 
             log('DEBUG', '[BOOT] NERV local criado (standalone)');
@@ -241,7 +276,7 @@ async function bootstrap(options = {}) {
         }
 
         // Dashboard V2: TaskSyncBridge (realtime task updates via NERV)
-        if (process.env.ENABLE_TASK_SYNC_BRIDGE === 'true') {
+        if (CONFIG.ENABLE_TASK_SYNC_BRIDGE) {
             try {
                 taskSyncBridge.initialize({ socketHub, nervClient: nerv });
                 log('INFO', '[BOOT] TaskSyncBridge inicializado (NERV → Dashboard)');
@@ -249,7 +284,7 @@ async function bootstrap(options = {}) {
                 log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
             }
         } else {
-            log('INFO', '[BOOT] TaskSyncBridge desativado (ENABLE_TASK_SYNC_BRIDGE!=true)');
+            log('INFO', '[BOOT] TaskSyncBridge desativado (ENABLE_TASK_SYNC_BRIDGE=false)');
         }
 
         // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)
@@ -263,17 +298,48 @@ async function bootstrap(options = {}) {
                     protocol: PROTOCOL_VERSION || 'unknown',
                     mode: CONNECTION_MODES.SINGULARITY,
                     role: 'server',
-                    httpAuthority: Boolean(port)
+                    httpAuthority: Boolean(port),
                 };
 
+                // Tenta publicar SERVER_READY via NERV com retry
+                let nervPublished = false;
                 try {
-                    HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
+                    await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
                     log('DEBUG', '[BOOT] Evento NERV SERVER_READY publicado (standalone)');
+                    nervPublished = true;
                 } catch (err) {
-                    log('WARN', `[BOOT] Falha ao publicar SERVER_READY via HighLevelNERV: ${err.message}`);
+                    log('WARN', `[BOOT] NERV SERVER_READY falhou na primeira tentativa: ${err.message}`);
+
+                    // Retry após 2s
+                    try {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
+                        log('INFO', '[BOOT] Evento NERV SERVER_READY publicado (retry bem-sucedido)');
+                        nervPublished = true;
+                    } catch (retryErr) {
+                        log('ERROR', `[BOOT] CRITICAL: SERVER_READY falhou após retry: ${retryErr.message}`);
+
+                        // Se em modo standalone, discovery é crítica
+                        if (Authority.isStandalone(authority)) {
+                            throw new Error(`Discovery crítica falhou: ${retryErr.message}`, { cause: retryErr });
+                        }
+                    }
+                }
+
+                // Fallback: persistServerState (file-based discovery)
+                try {
+                    await persistServerState(nerv, port, authority);
+                } catch (persistErr) {
+                    log('ERROR', `[BOOT] persistServerState falhou: ${persistErr.message}`);
+                    if (!nervPublished && Authority.isStandalone(authority)) {
+                        throw new Error('Discovery falhou completamente (NERV + persistServerState)', {
+                            cause: persistErr,
+                        });
+                    }
                 }
             } catch (err) {
-                log('WARN', `[BOOT] Não foi possível publicar SERVER_READY via NERV: ${err.message}`);
+                log('ERROR', `[BOOT] Falha crítica na publicação SERVER_READY: ${err.message}`);
+                throw err; // Re-throw para abortar boot se standalone
             }
         } else {
             log('DEBUG', '[BOOT] SERVER_READY skip (delegated) — Maestro é responsável pela publicação');
@@ -326,7 +392,7 @@ async function bootstrap(options = {}) {
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, {
                     nerv: Boolean(nerv),
                     serverAdapter: Boolean(serverAdapter),
-                    httpServer: Boolean(httpServer)
+                    httpServer: Boolean(httpServer),
                 });
                 app.locals.requiredReadiness = app.locals.requiredReadiness || ['nerv'];
                 log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
@@ -345,11 +411,11 @@ async function bootstrap(options = {}) {
             httpServer,
             nerv,
             serverAdapter,
-            authority
+            authority,
         };
     } catch (err) {
         log('FATAL', `[BOOT] Falha crítica de bootstrap: ${err.message}`);
-        if (typeof authority !== 'undefined' && Authority.isStandalone(authority)) {
+        if (Authority.isStandalone(authority)) {
             process.exit(1);
         }
         throw err;
@@ -358,7 +424,7 @@ async function bootstrap(options = {}) {
 
 
 /* ==========================================================================
-   ENTRYPOINT CONTROL
+   ENTRYPOINT CONTROL — COMPATIBILITY LAYER
 ========================================================================== */
 
 const __entryFile = fileURLToPath(import.meta.url);
@@ -366,7 +432,7 @@ let __isDirectRun = false;
 try {
     const argvFile = process.argv[1];
     if (argvFile) {
-        __isDirectRun = fs.realpathSync(argvFile) === fs.realpathSync(__entryFile);
+        __isDirectRun = resolve(argvFile) === resolve(__entryFile);
     }
 } catch (err) {
     __isDirectRun = false;
@@ -391,3 +457,6 @@ if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
 }
 
 export default bootstrap;
+
+// Compatibility exports for main.js integration
+export { bootstrap as serverBootstrap };

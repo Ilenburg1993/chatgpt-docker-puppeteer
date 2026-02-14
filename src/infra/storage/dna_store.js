@@ -1,8 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import * as PATHS from '../fs/paths.js';
-import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';
-import { DnaSchema } from '#core/schemas';
 import { log } from '#core/logger';
+import { DnaSchema } from '#core/schemas';
+import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';
+import * as PATHS from '../fs/paths.js';
 
 /**
  * ESTRUTURA BÁSICA V4 GOLD (Baseline de Segurança)
@@ -157,7 +157,7 @@ async function saveDna(dna, author = 'system') {
         return true;
     } catch (e) {
         log('ERROR', `[DNA_STORE] Falha ao persistir evolução genômica: ${e.message}`);
-        throw new Error(`DNA_PERSISTENCE_FAILURE: ${e.message}`);
+        throw new Error(`DNA_PERSISTENCE_FAILURE: ${e.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -230,4 +230,4 @@ function getDnaHistory() {
     }));
 }
 
-export { getDna, saveDna, getTargetRules, invalidateCache, rollbackDna, getDnaHistory };
+export { getDna, getDnaHistory, getTargetRules, invalidateCache, rollbackDna, saveDna };

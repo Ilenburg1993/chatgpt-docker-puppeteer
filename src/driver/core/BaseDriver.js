@@ -1,8 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import TargetDriver from './TargetDriver.js';
 import { log } from '#core/logger';
 import { DriverReadinessGuard } from '../guards/DriverReadinessGuard.js';
 import PageSessionTracker from '../trackers/PageSessionTracker.js';
+import TargetDriver from './TargetDriver.js';
 
 /* ==========================================================================
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
@@ -46,11 +46,11 @@ const ERROR_PATTERNS = Object.freeze({
     [ERROR_CLASSES.SELECTOR]: ['No node found', 'selector', 'querySelector', 'failed to find element']
 });
 
-import { RecoverySystem } from '../modules/recovery_system.js';
+import { BiomechanicsEngine } from '../modules/biomechanics_engine.js';
+import { FrameNavigator } from '../modules/frame_navigator.js';
 import { HandleManager } from '../modules/handle_manager.js';
 import { InputResolver } from '../modules/input_resolver.js';
-import { FrameNavigator } from '../modules/frame_navigator.js';
-import { BiomechanicsEngine } from '../modules/biomechanics_engine.js';
+import { RecoverySystem } from '../modules/recovery_system.js';
 import { SubmissionController } from '../modules/submission_controller.js';
 
 class BaseDriver extends TargetDriver {
@@ -103,7 +103,7 @@ class BaseDriver extends TargetDriver {
             this._propagateCorrelationToModules();
         } catch (err) {
             log('ERROR', `[BASEDRIVER] Module instantiation failed: ${err.message}`, this.correlationId);
-            throw new Error(`MODULE_INSTANTIATION_FAILED: ${err.message}`);
+            throw new Error(`MODULE_INSTANTIATION_FAILED: ${err.message}`, { cause: err });
         }
     }
 
@@ -785,4 +785,4 @@ export { BASEDRIVER_CONFIG };
  *
  * @type {Object<string, string>}
  */
-export { ERROR_CLASSES };
+    export { ERROR_CLASSES };

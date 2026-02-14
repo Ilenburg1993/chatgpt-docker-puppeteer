@@ -20,17 +20,17 @@ let files = 0;
 
 for (const [file, errors] of Object.entries(byFile)) {
     console.log(`📄 ${file} (${errors.length} duplicações)`);
-    
+
     let content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
-    
+
     // Marcar linhas para remover (evitar duplicados)
     const toRemove = new Set();
-    
+
     for (const err of errors) {
         const lineIdx = err.line - 1;
         const line = lines[lineIdx];
-        
+
         // Se a linha tem @returns, marcar para remoção
         if (line && line.includes('@returns')) {
             // Verificar se há outro @returns próximo
@@ -45,9 +45,10 @@ for (const [file, errors] of Object.entries(byFile)) {
                     break;
                 }
             }
+            void foundDuplicate; // Indicar que a variável é intencionalmente definida mas pode não ser usada
         }
     }
-    
+
     if (toRemove.size > 0) {
         const newLines = lines.filter((_, idx) => !toRemove.has(idx));
         fs.writeFileSync(file, newLines.join('\n'));

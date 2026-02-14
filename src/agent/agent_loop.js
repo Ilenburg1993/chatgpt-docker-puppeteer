@@ -50,18 +50,19 @@ class AgentLoop {
      * @param {AgentLoopOptions} options - Opções de configuração.
      * @throws {Error} Se kernel.step() não estiver disponível.
      */
-    constructor({
-        kernel,
-        browserPool = null,
-        queueWorker = null,
-        taskControlWatcher = null,
-        missionRunner = null,
-        missionPlannerProcessor = null,
-        attemptWatchdog = null,
-        taskOrchestrationWorker = null,
-        intervals = {},
-        baseTickMs = 25,
-    } = {}) {
+    constructor(options) {
+        const {
+            kernel,
+            browserPool = null,
+            queueWorker = null,
+            taskControlWatcher = null,
+            missionRunner = null,
+            missionPlannerProcessor = null,
+            attemptWatchdog = null,
+            taskOrchestrationWorker = null,
+            intervals = {},
+            baseTickMs = 25,
+        } = options || {};
         if (!kernel || typeof kernel.step !== 'function') {
             throw new Error('[AgentLoop] kernel.step() required');
         }

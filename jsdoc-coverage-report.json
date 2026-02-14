@@ -238,16 +238,28 @@
     ]
   },
   "src/infra": {
-    "total": 40,
-    "withExports": 7,
+    "total": 44,
+    "withExports": 10,
     "needsJSDoc": 0,
-    "hasJSDoc": 7,
+    "hasJSDoc": 10,
     "files": [
       {
         "path": "src/infra/ConnectionOrchestrator.js",
         "hasExports": false,
         "needsJSDoc": false,
         "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/abort_controller_utils.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/infra/async_init.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
       },
       {
         "path": "src/infra/browser_pool/PageLifecycleMonitor.js",
@@ -370,6 +382,12 @@
         "hasProperJSDoc": false
       },
       {
+        "path": "src/infra/http_client_utils.js",
+        "hasExports": false,
+        "needsJSDoc": false,
+        "hasProperJSDoc": false
+      },
+      {
         "path": "src/infra/io.js",
         "hasExports": true,
         "needsJSDoc": false,
@@ -392,6 +410,12 @@
         "hasExports": false,
         "needsJSDoc": false,
         "hasProperJSDoc": false
+      },
+      {
+        "path": "src/infra/locks/resilient_lock.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
       },
       {
         "path": "src/infra/mock_chrome.js",
@@ -698,13 +722,25 @@
     ]
   },
   "src/server/handlers": {
-    "total": 1,
-    "withExports": 1,
+    "total": 3,
+    "withExports": 3,
     "needsJSDoc": 0,
-    "hasJSDoc": 1,
+    "hasJSDoc": 3,
     "files": [
       {
         "path": "src/server/handlers/mcp-handler.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/handlers/openai-handler.js",
+        "hasExports": true,
+        "needsJSDoc": false,
+        "hasProperJSDoc": true
+      },
+      {
+        "path": "src/server/handlers/openai-transformer.js",
         "hasExports": true,
         "needsJSDoc": false,
         "hasProperJSDoc": true

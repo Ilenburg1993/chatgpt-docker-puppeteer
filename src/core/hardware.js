@@ -45,9 +45,9 @@ function getHeapStats() {
         used_heap_size_mb: heap_used_mb,
         malloced_memory_mb: Math.round(heapStats.malloced_memory / 1024 / 1024),
         peak_malloced_memory_mb: Math.round(heapStats.peak_malloced_memory / 1024 / 1024),
-        does_zap_garbage: heapStats.does_zap_garbage,
+        does_zap_garbage: /** @type {boolean} */ (/** @type {unknown} */ (heapStats.does_zap_garbage)),
         number_of_native_contexts: heapStats.number_of_native_contexts,
-        number_of_detached_contexts: heapStats.number_of_detached_contexts
+        number_of_detached_contexts: heapStats.number_of_detached_contexts,
     };
 }
 

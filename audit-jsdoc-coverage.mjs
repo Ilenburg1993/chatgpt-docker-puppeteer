@@ -22,9 +22,6 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Pastas a serem auditadas
@@ -131,13 +128,6 @@ function hasProperJSDoc(content) {
     }
 
     return hasAllJSDoc;
-}
-
-/**
- * Verifica se arquivo precisa de JSDoc
- */
-function needsJSDoc(content) {
-    return hasExports(content) && !hasProperJSDoc(content);
 }
 
 /**

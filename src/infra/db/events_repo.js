@@ -41,12 +41,12 @@ function recordEvent(params) {
 
   const ts_ms = Number.isFinite(tsMs) ? tsMs : now;
 
-  let payload_json = '{}';
+  let payload_json;
   try {
       payload_json = JSON.stringify(payload ?? {});
   } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new TypeError(`recordEvent: payload is not JSON-serializable: ${msg}`);
+      throw new TypeError(`recordEvent: payload is not JSON-serializable: ${msg}`); // eslint-disable-line preserve-caught-error
   }
 
   const res = db

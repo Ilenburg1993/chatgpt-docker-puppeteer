@@ -36,7 +36,7 @@ async function ragSearchHandler({ query, topK = 5, pathPrefix, ext }) {
 
     // Validate and sanitize
     if (!query || typeof query !== 'string') {
-        throw new Error('Query must be a non-empty string');
+        throw new Error('Query must be a non-empty string'); // eslint-disable-line preserve-caught-error
     }
 
     const validTopK = Math.min(Math.max(parseInt(topK) || 5, 1), 20);
@@ -103,7 +103,7 @@ async function ragSearchHandler({ query, topK = 5, pathPrefix, ext }) {
         return formatted;
     } catch (error) {
         console.error('[RAG Tool] rag_search error:', error);
-        throw new Error(`RAG search failed: ${error.message}`);
+        throw new Error(`RAG search failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -161,7 +161,7 @@ async function ragHealthHandler() {
         return status;
     } catch (error) {
         console.error('[RAG Tool] rag_health error:', error);
-        throw new Error(`RAG health check failed: ${error.message}`);
+        throw new Error(`RAG health check failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 

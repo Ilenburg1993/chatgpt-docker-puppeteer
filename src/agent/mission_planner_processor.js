@@ -26,8 +26,8 @@ import { v4 as uuidv4 } from 'uuid';
  * @property {string} description - Descrição da missão.
  * @property {string} status - Status da missão.
  * @property {string} autonomy_mode - Modo de autonomia.
- * @property {Record<string, unknown>} policy - Política da missão.
- * @property {Record<string, unknown>} context - Contexto da missão.
+ * @property {any} policy - Política da missão.
+ * @property {any} context - Contexto da missão.
  * @property {string} created_at - Data de criação.
  * @property {string} updated_at - Data de atualização.
  * @property {string|null} started_at - Data de início.
@@ -261,13 +261,14 @@ class MissionPlannerProcessor {
      * @returns {Promise<void>}
      */
     async _processPlannerResult({ missionId, taskId }) {
+        /** @type {Mission} */
         const mission = getMissionById(missionId);
         if (!mission) {
             return;
         }
 
         // Read full response text (best-effort).
-        let text = '';
+        let text;
         try {
             const db = getDb();
             const row = db.prepare('SELECT result_json FROM tasks WHERE id = ?').get(taskId);

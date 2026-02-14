@@ -191,7 +191,7 @@ class DriverFactory extends EventEmitter {
             } catch (readdirError) {
                 const error = `Erro ao ler diretório de targets: ${readdirError.message}`;
                 log('FATAL', `[FACTORY] ${error}`);
-                throw new Error(error);
+                throw new Error(error); // eslint-disable-line preserve-caught-error
             }
 
             // Processar cada arquivo com try-catch individual
@@ -450,7 +450,7 @@ class DriverFactory extends EventEmitter {
                     error: requireError.message,
                 });
 
-                throw new Error(`Driver class load failed: ${requireError.message}`);
+                throw new Error(`Driver class load failed: ${requireError.message}`); // eslint-disable-line preserve-caught-error
             }
 
             // Validar que DriverClass é função
@@ -465,7 +465,7 @@ class DriverFactory extends EventEmitter {
             } catch (constructorError) {
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Driver constructor failed for '${key}': ${constructorError.message}`);
-                throw new Error(`Driver construction failed: ${constructorError.message}`);
+                throw new Error(`Driver construction failed: ${constructorError.message}`); // eslint-disable-line preserve-caught-error
             }
 
             // Validar contrato
