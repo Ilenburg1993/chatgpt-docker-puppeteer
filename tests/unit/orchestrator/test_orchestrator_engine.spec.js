@@ -224,7 +224,7 @@ describe('OrchestratorEngine', () => {
     });
 
     describe('beforeExecution', () => {
-        it('deve inicializar iteration state para ITERATIVE', () => {
+        it('deve inicializar iteration state para ITERATIVE', async () => {
             const task = {
                 meta: { id: 'task-iter', version: '5.0' },
                 spec: {
@@ -240,7 +240,7 @@ describe('OrchestratorEngine', () => {
                 result: {}
             };
 
-            const result = orchestrator.beforeExecution(task);
+            const result = await orchestrator.beforeExecution(task);
 
             assert.ok(result.state.iteration_state, 'Deve ter iteration_state');
             assert.strictEqual(result.state.iteration_state.current_iteration, 0);
@@ -252,7 +252,7 @@ describe('OrchestratorEngine', () => {
             assert.strictEqual(startEvent.payload.strategy, 'ITERATIVE');
         });
 
-        it('deve inicializar workflow state para MULTI_STEP', () => {
+        it('deve inicializar workflow state para MULTI_STEP', async () => {
             const task = {
                 meta: { id: 'task-workflow', workflow_id: 'workflow-1', version: '5.0' },
                 spec: {
@@ -272,7 +272,7 @@ describe('OrchestratorEngine', () => {
                 result: {}
             };
 
-            const result = orchestrator.beforeExecution(task);
+            const result = await orchestrator.beforeExecution(task);
 
             assert.ok(result.state.workflow_state, 'Deve ter workflow_state');
             assert.strictEqual(result.state.workflow_state.current_step_index, 0);
@@ -330,17 +330,17 @@ describe('OrchestratorEngine', () => {
             };
 
             // Inicializa iteration state
-            orchestrator.beforeExecution(task);
+            const preparedTask = await orchestrator.beforeExecution(task);
 
             const executionResult = {
                 output: 'This is a good response with sufficient length and quality'
             };
 
-            const decision = await orchestrator.afterExecution(task, executionResult);
+            const decision = await orchestrator.afterExecution(preparedTask, executionResult);
 
             assert.strictEqual(decision.action, 'DONE', 'Deve retornar DONE');
-            assert.ok(task.state.quality_metrics, 'Deve ter quality_metrics');
-            assert.strictEqual(task.state.quality_metrics.validation_passed, true);
+            assert.ok(preparedTask.state.quality_metrics, 'Deve ter quality_metrics');
+            assert.strictEqual(preparedTask.state.quality_metrics.validation_passed, true);
         });
 
         it('deve retornar RETRY se validação falhar mas ainda tem iterações', async () => {
@@ -367,13 +367,13 @@ describe('OrchestratorEngine', () => {
                 result: {}
             };
 
-            orchestrator.beforeExecution(task);
+            const preparedTask = await orchestrator.beforeExecution(task);
 
             const executionResult = {
                 output: 'Short' // Muito curto
             };
 
-            const decision = await orchestrator.afterExecution(task, executionResult);
+            const decision = await orchestrator.afterExecution(preparedTask, executionResult);
 
             assert.strictEqual(decision.action, 'RETRY', 'Deve retornar RETRY');
             assert.ok(decision.feedback, 'Deve ter feedback');
@@ -404,16 +404,16 @@ describe('OrchestratorEngine', () => {
                 result: {}
             };
 
-            orchestrator.beforeExecution(task);
+            const preparedTask = await orchestrator.beforeExecution(task);
 
             // Iteração 1: Falha
             let executionResult = { output: 'Short 1' };
-            let decision = await orchestrator.afterExecution(task, executionResult);
+            let decision = await orchestrator.afterExecution(preparedTask, executionResult);
             assert.strictEqual(decision.action, 'RETRY');
 
             // Iteração 2: Falha (última)
             executionResult = { output: 'Short 2' };
-            decision = await orchestrator.afterExecution(task, executionResult);
+            decision = await orchestrator.afterExecution(preparedTask, executionResult);
             assert.strictEqual(decision.action, 'DONE', 'Deve retornar DONE após max_iterations');
             assert.ok(decision.feedback.includes('Max iterations'), 'Feedback deve mencionar max iterations');
         });
@@ -441,14 +441,14 @@ describe('OrchestratorEngine', () => {
                 result: {}
             };
 
-            orchestrator.beforeExecution(task);
+            const preparedTask = await orchestrator.beforeExecution(task);
 
             // Executa step 1
             const executionResult = {
                 output: 'Result from step 1'
             };
 
-            const decision = await orchestrator.afterExecution(task, executionResult);
+            const decision = await orchestrator.afterExecution(preparedTask, executionResult);
 
             assert.strictEqual(decision.action, 'NEXT_STEP', 'Deve retornar NEXT_STEP');
             assert.ok(decision.nextStep, 'Deve ter nextStep');
@@ -457,8 +457,8 @@ describe('OrchestratorEngine', () => {
             assert.ok(decision.feedback.includes('Result from step 1'), 'Deve injetar contexto do step anterior');
 
             // Verifica state
-            assert.ok(task.state.workflow_state.completed_steps.includes('step-1'));
-            assert.strictEqual(task.state.workflow_state.current_step_index, 1);
+            assert.ok(preparedTask.state.workflow_state.completed_steps.includes('step-1'));
+            assert.strictEqual(preparedTask.state.workflow_state.current_step_index, 1);
         });
 
         it('deve retornar DONE quando todos steps completarem', async () => {
@@ -481,10 +481,10 @@ describe('OrchestratorEngine', () => {
                 result: {}
             };
 
-            orchestrator.beforeExecution(task);
+            const preparedTask = await orchestrator.beforeExecution(task);
 
             const executionResult = { output: 'Done!' };
-            const decision = await orchestrator.afterExecution(task, executionResult);
+            const decision = await orchestrator.afterExecution(preparedTask, executionResult);
 
             assert.strictEqual(decision.action, 'DONE', 'Deve retornar DONE quando workflow completo');
             assert.ok(decision.feedback.includes('Workflow completed'));
@@ -492,7 +492,7 @@ describe('OrchestratorEngine', () => {
     });
 
     describe('Cleanup', () => {
-        it('deve limpar states ao chamar cleanup', () => {
+        it('deve limpar states ao chamar cleanup', async () => {
             const task1 = {
                 meta: { id: 'task-1' },
                 spec: { execution: { strategy: 'ITERATIVE' } },
@@ -504,8 +504,8 @@ describe('OrchestratorEngine', () => {
                 state: {}
             };
 
-            orchestrator.beforeExecution(task1);
-            orchestrator.beforeExecution(task2);
+            await orchestrator.beforeExecution(task1);
+            await orchestrator.beforeExecution(task2);
 
             assert.ok(orchestrator.activeIterations.size > 0);
             assert.ok(orchestrator.activeWorkflows.size > 0);

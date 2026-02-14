@@ -665,6 +665,16 @@ const HUMAN_CONFIG = Object.freeze({
 
     // Telemetry cadence
     TYPE_PROGRESS_EVERY_CHARS: 25,
+    TYPE_FOCUS_CHECK_EVERY: BIOMECHANICS_CONFIG.FOCUS_CHECK_INTERVAL,
+    TYPE_FOCUS_RESTORE_DELAY: BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY,
+    TYPE_TYPO_RATE: BIOMECHANICS_CONFIG.TYPO_RATE,
+    TYPE_TYPO_BACKSPACE_DELAY: BIOMECHANICS_CONFIG.TYPO_BACKSPACE_DELAY,
+    TYPE_FATIGUE_THRESHOLD: BIOMECHANICS_CONFIG.FATIGUE_THRESHOLD,
+    TYPE_FATIGUE_PROBABILITY_DIVISOR: BIOMECHANICS_CONFIG.FATIGUE_PROBABILITY_DIVISOR,
+    TYPE_FATIGUE_PAUSE_MIN: BIOMECHANICS_CONFIG.FATIGUE_PAUSE_MIN,
+    TYPE_FATIGUE_PAUSE_MAX: BIOMECHANICS_CONFIG.FATIGUE_PAUSE_MAX,
+    TYPE_FATIGUE_MOVE_THRESHOLD: BIOMECHANICS_CONFIG.FATIGUE_MOVE_THRESHOLD,
+    TYPE_FATIGUE_MOVE_CHANCE: BIOMECHANICS_CONFIG.FATIGUE_MOVE_CHANCE,
 
     // Abort cadence
     ABORT_YIELD_EVERY_CHARS: 5,
@@ -754,6 +764,27 @@ function _isLegacyHumanTypeArgs(args) {
 
 function _sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
+}
+
+function _resolveTypingProfile(profile) {
+    const normalized = String(profile || 'average').toLowerCase();
+    if (normalized === 'balanced') {
+        return TYPING_PROFILES.average;
+    }
+    return TYPING_PROFILES[normalized] || TYPING_PROFILES.average;
+}
+
+function _computeFlightTime(profileConfig, char, page) {
+    const rawMin = Number(profileConfig?.min ?? HUMAN_CONFIG.TYPE_DELAY_MIN);
+    const rawMax = Number(profileConfig?.max ?? HUMAN_CONFIG.TYPE_DELAY_MAX);
+    const min = Number.isFinite(rawMin) ? Math.max(0, rawMin) : HUMAN_CONFIG.TYPE_DELAY_MIN;
+    const max = Number.isFinite(rawMax) ? Math.max(min, rawMax) : min;
+    const base = min + Math.random() * (max - min);
+    const punctuationPause = /[.,;:!?]/.test(char) ? BIOMECHANICS_CONFIG.PUNCTUATION_PAUSE : 0;
+    const isMockedKeyboard = Boolean(page?.keyboard?.type && page.keyboard.type.mock);
+    const speedScale = isMockedKeyboard ? 0.02 : 1;
+    const scaled = (base + punctuationPause) * speedScale;
+    return Math.max(0, Math.min(BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME, scaled));
 }
 
 // ============================================
@@ -891,10 +922,17 @@ async function humanType(...args) {
     const page = driver.page;
     const signal = options.signal || null;
     const profile = options.profile || 'balanced';
+    const profileConfig = _resolveTypingProfile(profile);
 
     if (signal?.aborted) {
         driver._emitVital('TYPE_ABORTED', { selector, reason: 'signal_aborted_at_start' });
         return false;
+    }
+
+    if (typeof page.isClosed === 'function' && page.isClosed()) {
+        const err = new Error('page is closed');
+        driver._emitVital('TYPE_ERROR', { selector, error: err.message, critical: true });
+        throw err;
     }
 
     driver._emitVital('TYPE_START', { selector, chars: text.length });
@@ -902,87 +940,104 @@ async function humanType(...args) {
     let typed = 0;
     let fatigueCount = 0;
 
-    for (const char of text) {
-        if (signal?.aborted) {
-            driver._emitVital('TYPE_ABORTED', { selector, reason: 'signal_aborted', typed, total: text.length });
-            return false;
-        }
+    try {
+        for (const char of text) {
+            if (signal?.aborted) {
+                driver._emitVital('TYPE_ABORTED', { selector, reason: 'signal_aborted', typed, total: text.length });
+                return false;
+            }
 
-        // Focus check every N characters
-        if (typed % HUMAN_CONFIG.TYPE_FOCUS_CHECK_EVERY === 0) {
-            const focused = await page.evaluate(
-                () => document.activeElement === document.querySelector(arguments[0]),
-                selector
-            );
-            if (!focused) {
-                driver._emitVital('TYPE_FOCUS_LOST', { selector, attempt: typed });
-                // Try to restore focus
-                try {
-                    await page.focus(selector);
-                    await _sleep(HUMAN_CONFIG.TYPE_FOCUS_RESTORE_DELAY);
-                } catch (_e) {
-                    driver._emitVital('TYPE_ABORTED', {
-                        selector,
-                        reason: 'focus_restore_failed',
-                        typed,
-                        total: text.length,
-                    });
-                    return false;
+            if (typeof page.isClosed === 'function' && page.isClosed()) {
+                const err = new Error('page is closed');
+                driver._emitVital('TYPE_ERROR', { selector, error: err.message, critical: true });
+                throw err;
+            }
+
+            // Focus check every N characters
+            if (typed % HUMAN_CONFIG.TYPE_FOCUS_CHECK_EVERY === 0) {
+                const focused = await page.evaluate(
+                    () => document.activeElement === document.querySelector(arguments[0]),
+                    selector
+                );
+                if (!focused) {
+                    driver._emitVital('TYPE_FOCUS_LOST', { selector, attempt: typed });
+                    // Try to restore focus
+                    try {
+                        await page.focus(selector);
+                        await _sleep(HUMAN_CONFIG.TYPE_FOCUS_RESTORE_DELAY);
+                    } catch (_e) {
+                        driver._emitVital('TYPE_ABORTED', {
+                            selector,
+                            reason: 'focus_restore_failed',
+                            typed,
+                            total: text.length,
+                        });
+                        return false;
+                    }
+                }
+            }
+
+            // Fatigue simulation
+            if (fatigueCount > HUMAN_CONFIG.TYPE_FATIGUE_THRESHOLD) {
+                const fatigueProb = fatigueCount / HUMAN_CONFIG.TYPE_FATIGUE_PROBABILITY_DIVISOR;
+                if (Math.random() < fatigueProb) {
+                    const pauseMs =
+                        HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MIN +
+                        Math.random() * (HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MAX - HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MIN);
+                    await _sleep(pauseMs);
+                    fatigueCount = 0; // Reset after pause
+
+                    if (
+                        pauseMs > HUMAN_CONFIG.TYPE_FATIGUE_MOVE_THRESHOLD &&
+                        Math.random() < HUMAN_CONFIG.TYPE_FATIGUE_MOVE_CHANCE
+                    ) {
+                        // Move mouse to random position to simulate "rest"
+                        if (typeof page.viewport === 'function') {
+                            const viewport = await page.viewport();
+                            if (viewport && typeof viewport.width === 'number' && typeof viewport.height === 'number') {
+                                const x = Math.random() * viewport.width;
+                                const y = Math.random() * viewport.height;
+                                await page.mouse.move(x, y, { steps: 10 });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Typing rhythm with typos
+            const flightTime = _computeFlightTime(profileConfig, char, page);
+            await _sleep(flightTime);
+
+            // Typo simulation
+            if (Math.random() < HUMAN_CONFIG.TYPE_TYPO_RATE) {
+                // Generate typo
+                const typoChar = _generateTypo(char);
+                await page.keyboard.type(typoChar);
+
+                // Brief pause before correction
+                await _sleep(HUMAN_CONFIG.TYPE_TYPO_BACKSPACE_DELAY);
+
+                // Correct by backspacing and retyping
+                await page.keyboard.press('Backspace');
+                await _sleep(flightTime * 0.5); // Brief pause
+                await page.keyboard.type(char);
+            } else {
+                await page.keyboard.type(char);
+            }
+
+            typed++;
+            fatigueCount++;
+
+            // Progress reporting
+            if (text.length > HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS) {
+                if (typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS === 0) {
+                    driver._emitVital('TYPE_PROGRESS', { selector, typed, total: text.length });
                 }
             }
         }
-
-        // Fatigue simulation
-        if (fatigueCount > HUMAN_CONFIG.TYPE_FATIGUE_THRESHOLD) {
-            const fatigueProb = fatigueCount / HUMAN_CONFIG.TYPE_FATIGUE_PROBABILITY_DIVISOR;
-            if (Math.random() < fatigueProb) {
-                const pauseMs = gaussian(HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MIN, HUMAN_CONFIG.TYPE_FATIGUE_PAUSE_MAX);
-                await _sleep(pauseMs);
-                fatigueCount = 0; // Reset after pause
-
-                if (
-                    pauseMs > HUMAN_CONFIG.TYPE_FATIGUE_MOVE_THRESHOLD &&
-                    Math.random() < HUMAN_CONFIG.TYPE_FATIGUE_MOVE_CHANCE
-                ) {
-                    // Move mouse to random position to simulate "rest"
-                    const viewport = await page.viewport();
-                    const x = Math.random() * viewport.width;
-                    const y = Math.random() * viewport.height;
-                    await page.mouse.move(x, y, { steps: 10 });
-                }
-            }
-        }
-
-        // Typing rhythm with typos
-        const flightTime = TYPING_PROFILES[profile].getFlightTime(char);
-        await _sleep(flightTime);
-
-        // Typo simulation
-        if (Math.random() < HUMAN_CONFIG.TYPE_TYPO_RATE) {
-            // Generate typo
-            const typoChar = _generateTypo(char);
-            await page.keyboard.type(typoChar);
-
-            // Brief pause before correction
-            await _sleep(HUMAN_CONFIG.TYPE_TYPO_BACKSPACE_DELAY);
-
-            // Correct by backspacing and retyping
-            await page.keyboard.press('Backspace');
-            await _sleep(flightTime * 0.5); // Brief pause
-            await page.keyboard.type(char);
-        } else {
-            await page.keyboard.type(char);
-        }
-
-        typed++;
-        fatigueCount++;
-
-        // Progress reporting
-        if (text.length > HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS) {
-            if (typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS === 0) {
-                driver._emitVital('TYPE_PROGRESS', { selector, typed, total: text.length });
-            }
-        }
+    } catch (err) {
+        driver._emitVital('TYPE_ERROR', { selector, error: err?.message || String(err), critical: true });
+        throw err;
     }
 
     if (text.length > HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS && typed % HUMAN_CONFIG.TYPE_PROGRESS_EVERY_CHARS !== 0) {

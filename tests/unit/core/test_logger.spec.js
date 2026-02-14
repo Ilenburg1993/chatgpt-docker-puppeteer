@@ -64,53 +64,57 @@ describe('Logger - Sistema de Logging Unificado', () => {
     });
 
     describe('2. Formatação de Mensagens', () => {
-        it('deve incluir timestamp no formato ISO', () => {
+        it('deve incluir timestamp no formato ISO', async () => {
             const spy = sinon.spy(console, 'log');
+            try {
+                await logger.log('INFO', 'Teste timestamp');
 
-            logger.log('INFO', 'Teste timestamp');
+                assert.ok(spy.called, 'Console.log deve ser chamado');
+                const output = spy.firstCall.args[0];
 
-            assert.ok(spy.called, 'Console.log deve ser chamado');
-            const output = spy.firstCall.args[0];
-
-            // Verificar formato ISO: YYYY-MM-DDTHH:mm:ss.sssZ
-            const isoRegex = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/;
-            assert.match(output, isoRegex, 'Deve conter timestamp ISO');
-
-            spy.restore();
+                // Verificar formato ISO: YYYY-MM-DDTHH:mm:ss.sssZ
+                const isoRegex = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/;
+                assert.match(output, isoRegex, 'Deve conter timestamp ISO');
+            } finally {
+                spy.restore();
+            }
         });
 
-        it('deve incluir nível de log na mensagem', () => {
+        it('deve incluir nível de log na mensagem', async () => {
             const spy = sinon.spy(console, 'log');
+            try {
+                await logger.log('ERROR', 'Teste nível');
 
-            logger.log('ERROR', 'Teste nível');
-
-            const output = spy.firstCall.args[0];
-            assert.match(output, /ERROR/, 'Deve conter o nível ERROR');
-
-            spy.restore();
+                const output = spy.firstCall.args[0];
+                assert.match(output, /ERROR/, 'Deve conter o nível ERROR');
+            } finally {
+                spy.restore();
+            }
         });
 
-        it('deve incluir mensagem fornecida', () => {
+        it('deve incluir mensagem fornecida', async () => {
             const spy = sinon.spy(console, 'log');
+            try {
+                const mensagem = 'Esta é uma mensagem de teste';
+                await logger.log('INFO', mensagem);
 
-            const mensagem = 'Esta é uma mensagem de teste';
-            logger.log('INFO', mensagem);
-
-            const output = spy.firstCall.args[0];
-            assert.match(output, new RegExp(mensagem), 'Deve conter a mensagem');
-
-            spy.restore();
+                const output = spy.firstCall.args[0];
+                assert.match(output, new RegExp(mensagem), 'Deve conter a mensagem');
+            } finally {
+                spy.restore();
+            }
         });
 
-        it('deve aceitar taskId opcional', () => {
+        it('deve aceitar taskId opcional', async () => {
             const spy = sinon.spy(console, 'log');
+            try {
+                await logger.log('INFO', 'Teste com taskId', 'task-123');
 
-            logger.log('INFO', 'Teste com taskId', 'task-123');
-
-            const output = spy.firstCall.args[0];
-            assert.match(output, /task-123/, 'Deve conter o taskId');
-
-            spy.restore();
+                const output = spy.firstCall.args[0];
+                assert.match(output, /task-123/, 'Deve conter o taskId');
+            } finally {
+                spy.restore();
+            }
         });
     });
 
@@ -218,15 +222,15 @@ describe('Logger - Sistema de Logging Unificado', () => {
             });
         });
 
-        it('deve continuar funcionando se escrita falhar', () => {
+        it('deve continuar funcionando se escrita falhar', async () => {
             // Simular falha de escrita (sem throw)
             const spy = sinon.spy(console, 'log');
-
-            logger.log('ERROR', 'Teste de resiliência');
-
-            assert.ok(spy.called, 'Deve logar no console mesmo se arquivo falhar');
-
-            spy.restore();
+            try {
+                await logger.log('ERROR', 'Teste de resiliência');
+                assert.ok(spy.called, 'Deve logar no console mesmo se arquivo falhar');
+            } finally {
+                spy.restore();
+            }
         });
     });
 

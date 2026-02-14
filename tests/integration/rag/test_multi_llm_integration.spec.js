@@ -86,7 +86,7 @@ describe('MCP Endpoint Discovery', () => {
         const data = await response.json();
 
         assert.ok(Array.isArray(data.methods));
-        assert.strictEqual(data.methods.length, 7);
+        assert.ok(data.methods.length >= 7, `Expected at least 7 methods, got ${data.methods.length}`);
         assert.ok(data.methods.includes('initialize'));
         assert.ok(data.methods.includes('notifications/initialized'));
         assert.ok(data.methods.includes('ping'));

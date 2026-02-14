@@ -53,7 +53,7 @@ test('publishServerReady uses NERV emitEvent', async () => {
     };
 
     const payload = { port: 3008 };
-    Discovery.publishServerReady(mock, payload);
+    await Discovery.publishServerReady(mock, payload);
 
     assert.ok(captured, 'envelope should be emitted');
     assert.strictEqual(captured.type.action_code, ActionCode.SERVER_READY);
@@ -94,7 +94,7 @@ test('publish/unpublish no-op when NERV absent (file fallback removed)', async (
 
     try {
         // publish with null nerv should NO-OP and return null
-        const res = Discovery.publishServerReady(null, { port: 3020, pid: 12345 });
+        const res = await Discovery.publishServerReady(null, { port: 3020, pid: 12345 });
         assert.strictEqual(res, null, 'publishServerReady should return null when NERV absent');
 
         // STATE file must not be created

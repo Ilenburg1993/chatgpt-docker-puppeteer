@@ -781,14 +781,14 @@ class TaskStateProjector {
             const delayMs = _safeDelayMs(payload);
             const reasonClass = payload?.reason_class || payload?.reasonClass || null;
 
-            // Policy: TASK_ERROR always counts attempts regardless of payload.
-            // Transient/operational failures should use ENV_UNAVAILABLE instead.
+            const reasonCode = payload?.reason_code || payload?.reasonCode || payload?.reason || null;
+            const normalizedReasonCode = reasonCode ? String(reasonCode).toUpperCase() : null;
+            // Policy: TASK_ERROR generally consumes attempts.
+            // Exception: operational LLM timeout is treated as transient (no strategic attempt consumption).
             let countAttempt = Boolean(payload?.count_attempt ?? payload?.countAttempt ?? false);
-            if (reasonClass === 'TASK_ERROR') {
+            if (reasonClass === 'TASK_ERROR' && normalizedReasonCode !== 'LLM_TIMEOUT') {
                 countAttempt = true;
             }
-
-            const reasonCode = payload?.reason_code || payload?.reasonCode || payload?.reason || null;
             const causeLayer = payload?.cause_layer || payload?.causeLayer || null;
 
             const diagStorage = payload?.details?.diagnostic_storage || payload?.details?.diagnosticStorage || null;
@@ -1037,9 +1037,8 @@ class TaskStateProjector {
                     }
                 }
 
-                // Unreachable for TASK_ERROR (count_attempt is forced to true).
-                // This branch is defensive for future reason_class values.
-                if (!countAttempt) {
+            // Operational TASK_ERRORs (e.g., LLM_TIMEOUT) and future no-count policies.
+            if (!countAttempt) {
                     const base = 30000;
                     const max = 120000;
                     const jitter = Math.floor(Math.random() * 500);
