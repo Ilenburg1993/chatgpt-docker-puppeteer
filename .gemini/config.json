@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/gemini-config",
+  "project_name": "chatgpt-docker-puppeteer",
+  "version": "1.0",
+  "description": "Configuration and guidelines for the Gemini AI agent working on this project.",
+  "commands": {
+    "lint": {
+      "command": "npm run lint",
+      "description": "Runs ESLint to check for code quality and style issues."
+    },
+    "lint_fix": {
+      "command": "npm run lint:fix",
+      "description": "Runs ESLint and automatically fixes issues."
+    },
+    "format": {
+      "command": "npm run format",
+      "description": "Runs Prettier to format all project files."
+    },
+    "format_check": {
+      "command": "npm run format:check",
+      "description": "Runs Prettier to check for formatting issues without modifying files."
+    },
+    "test": {
+      "command": "npm test",
+      "description": "Runs the full test suite (unit, integration, regression)."
+    },
+    "test_unit": {
+      "command": "npm run test:unit",
+      "description": "Runs only the unit tests."
+    },
+    "test_integration": {
+      "command": "npm run test:integration",
+      "description": "Runs only the integration tests."
+    },
+    "validate": {
+      "command": "npm run validate:all",
+      "description": "Runs a full validation suite: env check, lint, format check, and tests."
+    },
+    "start_daemon": {
+      "command": "npx pm2 start ecosystem.config.cjs",
+      "description": "Starts all applications in daemon mode using PM2."
+    },
+    "stop_daemon": {
+      "command": "npx pm2 stop all",
+      "description": "Stops all applications managed by PM2."
+    },
+    "daemon_status": {
+      "command": "npx pm2 status",
+      "description": "Checks the status of applications managed by PM2."
+    }
+  }
+}
