@@ -3,56 +3,83 @@
   "extends": "./jsconfig.json",
   "compilerOptions": {
     // ============================================================
-    // [A] OVERRIDES PARA TYPESCRIPT — Mantém compatibilidade com jsconfig.json
+    // [A] NODE 24 + ESM (TS SERVER / JS TYPECHECK) — CANÔNICO
     // ============================================================
 
-    // ✅ Habilita verificação de tipos em arquivos JavaScript
-    // Override necessário: jsconfig.json tem checkJs: false para evitar falsos positivos
+    // JS typechecking (ponto central)
     "checkJs": true,
+    "allowJs": true,
 
-    // ✅ Não emite arquivos (apenas verificação)
+    // Só verificação (sem build)
     "noEmit": true,
 
-    // ✅ Target mais conservador para compatibilidade máxima
-    // jsconfig.json usa ES2024, mas mantemos ES2020 para compatibilidade
-    "target": "ES2020",
-    "module": "ES2020",
-    "moduleResolution": "node",
-    "lib": ["ES2020"],
+    // Node 24: alinhar linguagem/runtime
+    "target": "ES2024",
 
-    // ✅ Iteração moderna habilitada
+    // Alinha com jsconfig (inclui Error.cause e afins)
+    "lib": ["ES2024", "ES2022.Error"],
+
+    // ESM real no ecossistema Node
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    // Evita “mágicas” na sintaxe ESM
+    "verbatimModuleSyntax": true,
+
+    // Resolução moderna de pacotes (exports/imports maps)
+    "resolvePackageJsonExports": true,
+    "resolvePackageJsonImports": true,
+
+    // Iteração moderna (ok manter)
     "downlevelIteration": true,
 
-    // ✅ Tipos Node.js incluídos
-    "types": ["node"]
+    // Tipos Node + custom declarations do projeto (alinhado ao jsconfig)
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
 
     // ============================================================
-    // [B] CONFIGURAÇÕES HERDADAS DO JSCONFIG.JSON (não precisam override)
+    // [B] PERFORMANCE / RUÍDO — alinhado ao jsconfig
     // ============================================================
-    // allowJs: true (herdado)
-    // strict: false (herdado)
-    // noImplicitAny: false (herdado)
-    // noImplicitThis: false (herdado)
-    // esModuleInterop: true (herdado)
-    // allowSyntheticDefaultImports: true (herdado)
-    // resolveJsonModule: true (herdado)
-    // forceConsistentCasingInFileNames: true (herdado)
-    // skipLibCheck: true (herdado)
-    // baseUrl: "." (herdado)
-    // paths: {...} (herdado)
-    // typeRoots: [...] (herdado)
+    "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0,
+
+    // ============================================================
+    // [C] ALIASES — fixar aqui evita drift em Program/Project selection
+    // ============================================================
+    "baseUrl": ".",
+    "paths": {
+      "#core/*": ["src/core/*"],
+      "#shared/*": ["src/shared/*"],
+      "#nerv/*": ["src/nerv/*"],
+      "#kernel/*": ["src/kernel/*"],
+      "#driver/*": ["src/driver/*"],
+      "#agent/*": ["src/agent/*"],
+      "#infra/*": ["src/infra/*"],
+      "#integration/*": ["src/integration/*"],
+      "#types/*": ["src/types/*"],
+      "#main": ["src/main.js"],
+      "#server/*": ["src/server/*"],
+      "#logic/*": ["src/logic/*"],
+      "#orchestrator/*": ["src/orchestrator/*"],
+      "#missions/*": ["src/missions/*"],
+      "#validation/*": ["src/validation/*"]
+    }
+
+    // ============================================================
+    // [D] HERDADO DO JSCONFIG (mantido lá para consistência)
+    // ============================================================
+    // strict, esModuleInterop, allowSyntheticDefaultImports, resolveJsonModule, etc.
   },
 
   // ==============================================================
-  // [C] ESCOPO DO PROJETO — Alinhado com jsconfig.json mas focado em TypeScript
+  // [E] ESCOPO DO PROJETO — cobre o que o tsserver precisa indexar
   // ==============================================================
   "include": [
-    // Arquivos TypeScript/JavaScript do projeto
     "src/**/*",
     "tests/**/*",
     "scripts/**/*",
 
-    // Arquivos de configuração que podem ter tipos
+    // configs comuns em Node ESM/Tooling
     "*.config.js",
     "*.config.mjs",
     "*.config.cjs",
@@ -62,21 +89,34 @@
   ],
 
   // ==============================================================
-  // [D] EXCLUSÕES — Complementa jsconfig.json com exclusões específicas do TypeScript
+  // [F] EXCLUSÕES — reduz ruído e custo de indexação
   // ==============================================================
   "exclude": [
-    // Exclusões do jsconfig.json são herdadas via extends
-    // Adicionamos apenas exclusões específicas do TypeScript
     "node_modules",
+    "dist",
+    "build",
+    "coverage",
     "logs",
-    "tmp",
+    "fila",
     "respostas",
     "artifacts",
-    "diagnostics",
-    "analysis",
+    "profile",
+    "public",
+    "backups",
     "monitoring",
+    "tmp",
+    "analysis",
+    "local-login",
+    "DOCUMENTAÇÃO",
+    "src/dashboard-ui",
+    ".git",
 
-    // Exclusões específicas para evitar conflitos de tipos
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.map",
+    "**/bundle.js",
+    "**/*.bundle.js",
+
     "**/*.d.ts.map",
     "**/*.js.map"
   ]

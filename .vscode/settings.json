@@ -205,11 +205,11 @@
   "typescript.validate.enable": true,
   "typescript.disableAutomaticTypeAcquisition": false,
 
-  "typescript.tsserver.maxTsServerMemory": 4096,
+  "typescript.tsserver.maxTsServerMemory": 6144,
   "typescript.tsserver.useSeparateSyntaxServer": true,
   "typescript.tsserver.watchOptions": {
-    "watchFile": "useFsEvents",
-    "watchDirectory": "useFsEvents",
+    "watchFile": "dynamicPriorityPolling",
+    "watchDirectory": "dynamicPriorityPolling",
     "fallbackPolling": "dynamicPriorityPolling"
   },
 
@@ -234,6 +234,8 @@
   // ============================================================================
   "js/ts.implicitProjectConfig.checkJs": true,
   "js/ts.implicitProjectConfig.module": "NodeNext",
+  "js/ts.implicitProjectConfig.moduleResolution": "NodeNext",
+  "js/ts.implicitProjectConfig.target": "ES2024",
 
   // ============================================================================
   // 11) JSON — FORMATAÇÃO / VALIDAÇÃO / SUGGEST / SCHEMAS / PERFORMANCE

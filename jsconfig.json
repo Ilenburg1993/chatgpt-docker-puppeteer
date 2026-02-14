@@ -9,6 +9,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "lib": ["ES2024", "ES2022.Error"],
+    "verbatimModuleSyntax": true,
 
     // ============================================================
     // [B] JAVASCRIPT PURO (SEM TYPESCRIPT)
@@ -39,7 +40,7 @@
     // ============================================================
     "baseUrl": ".",
     "paths": {
-            "#core/*": ["src/core/*"],
+      "#core/*": ["src/core/*"],
       "#shared/*": ["src/shared/*"],
       "#nerv/*": ["src/nerv/*"],
       "#kernel/*": ["src/kernel/*"],
