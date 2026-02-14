@@ -37,6 +37,8 @@ pids
 *.pid.lock
 data/
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Task queue and results (sensitive data)
 fila/
@@ -58,6 +60,7 @@ local-login/profile/
 .tmp.drivedownload/
 .tmp.driveupdate/
 tests/tmp/
+tmp/
 
 # Build outputs
 dist/
@@ -155,3 +158,6 @@ missions-test-boot/**/state.json
 .claude/
 .npm/_update-notifier-last-checked
 ${containerUserHome}/
+
+# Local TLS material
+ssl/
