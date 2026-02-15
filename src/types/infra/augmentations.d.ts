@@ -86,6 +86,7 @@ declare module '#shared/sadi/analyzer' {
   export type SADIProtocol = {
     selector: string;
     framePath?: string[];
+    context?: string;
     [key: string]: unknown;
   };
 
@@ -98,7 +99,10 @@ declare module '#shared/sadi/analyzer' {
   };
 
   export function findChatInputSelector(page: unknown, langCode?: string): Promise<SADIDetectionResult | null>;
-  export function findSendButtonSelector(page: unknown, inputProtocol: SADIProtocol): Promise<SADIDetectionResult | null>;
+  export function findInputSelector(page: unknown, langCode?: string): Promise<SADIDetectionResult | null>;
+  export function findSendButtonSelector(page: unknown, inputProtocol?: SADIProtocol | null): Promise<SADIDetectionResult | null>;
+  export function findResponseArea(page: unknown, langCode?: string): Promise<SADIDetectionResult | null>;
+  export function findFrameByPath(page: unknown, framePath?: string[] | string): Promise<unknown>;
 }
 
 // ============================================================
@@ -167,11 +171,14 @@ declare module '#infra/browser_pool/puppeteer_guard' {
 declare module '#infra/browser_pool/pool_manager' {
   export interface PoolConfig {
     size?: number;
+    poolSize?: number;
     maxSize?: number;
     minSize?: number;
     strategy?: 'round-robin' | 'least-used' | 'random';
+    allocationStrategy?: 'round-robin' | 'least-loaded' | 'target-affinity';
     healthCheckInterval?: number;
     timeout?: number;
+    browserEndpoint?: { url?: string; wsEndpoint?: string; [key: string]: unknown };
     [key: string]: unknown;
   }
 
@@ -190,8 +197,33 @@ declare module '#infra/browser_pool/pool_manager' {
     getStats(): PoolStats;
     cleanup(): Promise<void>;
     initialize?(): Promise<void>;
+    shutdown?(): Promise<void>;
+    removePageFromPool?(taskId: string): void;
     getHealth?(): Promise<{ healthy: number; poolSize: number; [key: string]: unknown }>;
-    [key: string]: unknown;
+    initialized?: boolean;
+    shuttingDown?: boolean;
+    stats?: Record<string, any>;
+    pool?: Array<{
+      id: string;
+      browser: any;
+      pages: Map<string, any>;
+      health: { status: string; lastCheck: number; consecutiveFailures: number };
+      stats: { allocations: number; activeTasks: number; totalUptime: number };
+    }>;
+    browser?: any;
+    nerv?: { emit?: (event: unknown) => void; [key: string]: any } | null;
+    circuitBreaker?:
+      | {
+          state?: string;
+          getState?: () => unknown;
+          shouldPauseSystem?: () => boolean;
+          registerFailure?: (instanceId: string, error: Error, context?: Record<string, unknown>) => unknown;
+          registerRecovery?: (instanceId: string) => unknown;
+          getStatus?: () => { state?: string; lastCause?: string; [key: string]: unknown };
+          [key: string]: any;
+        }
+      | null;
+    [key: string]: any;
   }
   export default BrowserPoolManager;
 }

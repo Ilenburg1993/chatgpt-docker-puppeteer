@@ -9,8 +9,8 @@
  * Promotes results from different files/locations
  * @param {object[]} results - Reranked results (must have rerank_score)
  * @param {object} options - MMR options
- * @param {number} options.lambda - Balance between relevance and diversity (1.0 = only relevance, 0.0 = only diversity, default: 0.7)
- * @param {number} options.topK - Number of results to return (default: 8)
+ * @param {number} [options.lambda] - Balance between relevance and diversity (1.0 = only relevance, 0.0 = only diversity, default: 0.7)
+ * @param {number} [options.topK] - Number of results to return (default: 8)
  * @returns {object[]} - Diversified results
  */
 export function maximalMarginalRelevance(results, options = {}) {

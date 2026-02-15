@@ -247,7 +247,7 @@ export function chunkJsAst({ relPath, lines, language = 'js', maxChunkChars = RA
     const ast = parse(source, {
         sourceType: 'module',
         errorRecovery: true,
-        plugins: parserPlugins(language),
+        plugins: /** @type {any} */ (parserPlugins(language)),
         attachComment: true
     });
 

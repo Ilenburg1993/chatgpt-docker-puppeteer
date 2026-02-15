@@ -197,7 +197,7 @@ function validateBrowserPool(browserPool) {
 /**
  * Valida se browser instance está conectada e utilizável.
  *
- * @param {Browser} browser - Puppeteer Browser
+ * @param {any} browser - Puppeteer Browser
  * @returns {Object} ValidationResult
  */
 function validateBrowserConnection(browser) {
@@ -207,7 +207,7 @@ function validateBrowserConnection(browser) {
         });
     }
 
-    if (!browser.isConnected()) {
+    if (!/** @type {any} */ (browser).isConnected()) {
         return ValidationResult.fail('BROWSER_DISCONNECTED', {
             message: 'Browser não está conectado',
             suggestion: 'Verifique se Chrome está rodando e acessível'
@@ -252,9 +252,9 @@ async function validateDriverExecution({ browserPool, page }) {
  * Valida pré-requisitos para execução do Kernel Loop.
  *
  * @param {Object} options
- * @param {ExecutionEngine} options.executionEngine
- * @param {NERVBridge} options.nervBridge
- * @param {Telemetry} options.telemetry
+ * @param {any} options.executionEngine
+ * @param {any} options.nervBridge
+ * @param {any} options.telemetry
  * @returns {Object} ValidationResult
  */
 function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {

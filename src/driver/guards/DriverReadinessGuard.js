@@ -3,6 +3,10 @@ import * as stabilizer from '#shared/page_stability/stabilizer';
 import { Triage } from '../modules/triage.js';
 
 /**
+ * @typedef {import('#driver/core/BaseDriver').default} BaseDriver
+ */
+
+/**
  * Check types para readiness validation.
  * @readonly
  * @enum {string}

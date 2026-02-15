@@ -361,7 +361,7 @@ class BaseDriver extends TargetDriver {
      * ✅ v2.0: Telemetria completa (18+ eventos), timing metrics, signal propagation
      *
      * @param {string} text - Conteúdo do prompt a enviar
-     * @param {string} taskId - UUID da task (para correlação)
+     * @param {string|{ taskId?: string, [key: string]: unknown }} [taskId] - UUID da task ou objeto de contexto
      * @param {AbortSignal} [signal] - Sinal de cancelamento (opcional)
      * @returns {Promise<void>}
      *
@@ -382,6 +382,13 @@ class BaseDriver extends TargetDriver {
      * @emits TRIAGE_ALERT - Falha em tentativa individual
      */
     async sendPrompt(text, taskId, signal) {
+        const resolvedTaskId =
+            typeof taskId === 'string'
+                ? taskId
+                : taskId && typeof taskId === 'object' && typeof taskId.taskId === 'string'
+                    ? taskId.taskId
+                    : 'task-unknown';
+
         // ✅ v2.0: Timing metrics
         const startTime = Date.now();
         const timings = {};
@@ -392,7 +399,7 @@ class BaseDriver extends TargetDriver {
 
         // ✅ v2.0: Emit execution start
         this._emitVital('EXECUTION_START', {
-            taskId,
+            taskId: resolvedTaskId,
             textLength: text.length,
             correlationId: this.correlationId,
             turnNumber, // ✅ Phase 2: Include turn number
@@ -464,7 +471,7 @@ class BaseDriver extends TargetDriver {
         // 1. CHECK DE ABORTO PRECOCE
         // ====================================================================
         if (signal?.aborted) {
-            this._emitVital('EXECUTION_ABORTED', { stage: 'pre-start', taskId });
+            this._emitVital('EXECUTION_ABORTED', { stage: 'pre-start', taskId: resolvedTaskId });
             throw new Error('OPERATION_ABORTED');
         }
 
@@ -472,7 +479,7 @@ class BaseDriver extends TargetDriver {
         // 2. AGUARDA OCIOSIDADE
         // ====================================================================
         stepStart = Date.now();
-        await this.biomechanics.waitIfBusy(taskId);
+        await this.biomechanics.waitIfBusy(resolvedTaskId);
         timings.waitBusy = Date.now() - stepStart;
 
         // ✅ v2.0: Update domain with event emission
@@ -489,7 +496,7 @@ class BaseDriver extends TargetDriver {
                 // CHECK DE INTERRUPÇÃO ENTRE TENTATIVAS
                 // ================================================================
                 if (signal?.aborted) {
-                    this._emitVital('EXECUTION_ABORTED', { stage: 'retry-loop', attempt: attempts, taskId });
+                    this._emitVital('EXECUTION_ABORTED', { stage: 'retry-loop', attempt: attempts, taskId: resolvedTaskId });
                     throw new Error('OPERATION_ABORTED');
                 }
 
@@ -521,7 +528,7 @@ class BaseDriver extends TargetDriver {
 
                 // ✅ v2.0: Signal check after resolution
                 if (signal?.aborted) {
-                    this._emitVital('EXECUTION_ABORTED', { stage: 'post-resolution', taskId });
+                    this._emitVital('EXECUTION_ABORTED', { stage: 'post-resolution', taskId: resolvedTaskId });
                     throw new Error('OPERATION_ABORTED');
                 }
 
@@ -541,7 +548,7 @@ class BaseDriver extends TargetDriver {
 
                 // ✅ v2.0: Signal check after navigation
                 if (signal?.aborted) {
-                    this._emitVital('EXECUTION_ABORTED', { stage: 'post-navigation', taskId });
+                    this._emitVital('EXECUTION_ABORTED', { stage: 'post-navigation', taskId: resolvedTaskId });
                     throw new Error('OPERATION_ABORTED');
                 }
 
@@ -562,7 +569,7 @@ class BaseDriver extends TargetDriver {
                 // ✅ v2.0: Emit typing start
                 this._emitVital('TYPING_START', {
                     textLength: text.length,
-                    taskId,
+                    taskId: resolvedTaskId,
                 });
 
                 // ✅ v2.0: Propagate signal to biomechanics
@@ -571,7 +578,7 @@ class BaseDriver extends TargetDriver {
 
                 // ✅ v2.0: Signal check after typing
                 if (signal?.aborted) {
-                    this._emitVital('EXECUTION_ABORTED', { stage: 'post-typing', taskId });
+                    this._emitVital('EXECUTION_ABORTED', { stage: 'post-typing', taskId: resolvedTaskId });
                     throw new Error('OPERATION_ABORTED');
                 }
 
@@ -579,12 +586,12 @@ class BaseDriver extends TargetDriver {
                 // 7. SUBMISSÃO ATÔMICA (Prevenção de duplicidade)
                 // ================================================================
                 stepStart = Date.now();
-                await this.submission.submit(execContext.ctx, proto.selector, taskId);
+                await this.submission.submit(execContext.ctx, proto.selector, resolvedTaskId);
                 timings.submission = Date.now() - stepStart;
 
                 // ✅ v2.0: Emit submission success
                 this._emitVital('SUBMISSION_SUCCESS', {
-                    taskId,
+                    taskId: resolvedTaskId,
                     duration: timings.submission,
                 });
 
@@ -611,7 +618,7 @@ class BaseDriver extends TargetDriver {
                 });
 
                 this._emitVital('EXECUTION_SUCCESS', {
-                    taskId,
+                    taskId: resolvedTaskId,
                     attempts: attempts + 1,
                     totalDuration,
                     timings: {
@@ -671,7 +678,7 @@ class BaseDriver extends TargetDriver {
                 // ================================================================
                 // 9. RECUPERAÇÃO ESCALONADA (Tiers 0-3)
                 // ================================================================
-                await this.recovery.applyTier(err, attempts, taskId);
+                await this.recovery.applyTier(err, attempts, resolvedTaskId);
 
                 // ✅ v2.0: Apply backoff before next attempt
                 if (attempts < MAX_RETRY_ATTEMPTS - 1) {
@@ -698,7 +705,7 @@ class BaseDriver extends TargetDriver {
         finalErr.attempts = attempts;
 
         this._emitVital('EXECUTION_FAILED', {
-            taskId,
+            taskId: resolvedTaskId,
             attempts,
             errorHistory,
             totalDuration,

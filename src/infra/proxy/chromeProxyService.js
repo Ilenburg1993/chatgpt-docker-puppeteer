@@ -37,6 +37,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @property {string | null} [PUBLIC_IP] - Public IP for external access (auto-detect if null)
  * @property {string} [LOG_LEVEL] - Logging level (default: 'info')
  * @property {string[]} [ALLOWED_ORIGINS] - CORS allowed origins
+ * @property {boolean} [AUTO_HANDLE_SIGNALS] - Register SIGINT/SIGTERM handlers internally (default: true)
  */
 
 /**
@@ -73,6 +74,7 @@ const LOCAL_CONFIG = {
     PROXY_BIND: String(process.env.CHROME_PROXY_BIND || CONFIG.CHROME_PROXY_BIND || '0.0.0.0'),
     PUBLIC_IP: process.env.PUBLIC_IP || null,
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+    AUTO_HANDLE_SIGNALS: String(process.env.CHROME_PROXY_AUTO_HANDLE_SIGNALS || 'true').toLowerCase() !== 'false',
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',')
         : ['http://localhost:3008', 'http://127.0.0.1:3008', 'http://localhost:8080', 'http://127.0.0.1:8080']
@@ -231,6 +233,12 @@ class ChromeProxyService {
         this.server = null;
         this.app = null;
         this.activeConnections = new Set();
+        this._stopPromise = null;
+        this._signalHandlersInstalled = false;
+        this._signalHandlers = {
+            sigint: null,
+            sigterm: null
+        };
         this.stats = {
             httpRequests: 0,
             wsUpgrades: 0,
@@ -1604,10 +1612,44 @@ class ChromeProxyService {
                 }
             });
 
-            // Graceful shutdown handlers
-            process.on('SIGINT', () => this._handleShutdown('SIGINT'));
-            process.on('SIGTERM', () => this._handleShutdown('SIGTERM'));
+            // Graceful shutdown handlers (only in standalone ownership mode)
+            this._registerSignalHandlers();
         });
+    }
+
+    _registerSignalHandlers() {
+        if (this._signalHandlersInstalled || this.config.AUTO_HANDLE_SIGNALS === false) {
+            return;
+        }
+
+        this._signalHandlers.sigint = () => {
+            void this._handleShutdown('SIGINT');
+        };
+        this._signalHandlers.sigterm = () => {
+            void this._handleShutdown('SIGTERM');
+        };
+
+        process.on('SIGINT', this._signalHandlers.sigint);
+        process.on('SIGTERM', this._signalHandlers.sigterm);
+        this._signalHandlersInstalled = true;
+    }
+
+    _unregisterSignalHandlers() {
+        if (!this._signalHandlersInstalled) {
+            return;
+        }
+
+        if (this._signalHandlers.sigint) {
+            process.removeListener('SIGINT', this._signalHandlers.sigint);
+            this._signalHandlers.sigint = null;
+        }
+
+        if (this._signalHandlers.sigterm) {
+            process.removeListener('SIGTERM', this._signalHandlers.sigterm);
+            this._signalHandlers.sigterm = null;
+        }
+
+        this._signalHandlersInstalled = false;
     }
 
     /* ======================================================================
@@ -1622,8 +1664,13 @@ class ChromeProxyService {
      */
     async _handleShutdown(signal) {
         this.log('warn', `Received ${signal}, shutting down gracefully...`);
-        await this.stop();
-        process.exit(0);
+        try {
+            await this.stop();
+            process.exit(0);
+        } catch (err) {
+            this.log('error', 'Shutdown handler failed', { signal, error: err && err.message ? err.message : String(err) });
+            process.exit(1);
+        }
     }
 
     /**
@@ -1642,64 +1689,79 @@ class ChromeProxyService {
      * console.log('Proxy stopped gracefully');
      */
     async stop() {
-        this.log('info', 'Shutting down proxy...');
-
-        const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
-        this.log('info', 'Final statistics:', {
-            uptime: `${uptime}s`,
-            httpRequests: this.stats.httpRequests,
-            wsUpgrades: this.stats.wsUpgrades,
-            errors: this.stats.errors,
-            activeConnections: this.activeConnections.size,
-            cacheHits: this.stats.cacheHits,
-            cacheMisses: this.stats.cacheMisses
-        });
-
-        // Clear idle check interval
-        if (this._idleCheckInterval) {
-            clearInterval(this._idleCheckInterval);
+        if (this._stopPromise) {
+            return this._stopPromise;
         }
 
-        // ✅ P1.5: Clear IP cleanup interval
-        if (this._ipCleanupInterval) {
-            clearInterval(this._ipCleanupInterval);
-        }
+        this._stopPromise = (async () => {
+            this.log('info', 'Shutting down proxy...');
+            this._unregisterSignalHandlers();
 
-        // Gracefully close active connections (10s timeout)
-        const closePromises = Array.from(this.activeConnections).map(socket => {
-            return new Promise(resolve => {
-                socket.on('close', resolve);
-                socket.end(); // Graceful close
-
-                // Force after 10s
-                setTimeout(() => {
-                    if (!socket.destroyed) {
-                        socket.destroy();
-                    }
-                    resolve();
-                }, 10000);
+            const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
+            this.log('info', 'Final statistics:', {
+                uptime: `${uptime}s`,
+                httpRequests: this.stats.httpRequests,
+                wsUpgrades: this.stats.wsUpgrades,
+                errors: this.stats.errors,
+                activeConnections: this.activeConnections.size,
+                cacheHits: this.stats.cacheHits,
+                cacheMisses: this.stats.cacheMisses
             });
-        });
 
-        await Promise.all(closePromises);
-        this.activeConnections.clear();
-
-        // Close server
-        return new Promise(resolve => {
-            if (this.server) {
-                this.server.close(() => {
-                    this.log('info', '✅ Proxy stopped');
-                    resolve();
-                });
-
-                // Force after 5s
-                setTimeout(() => {
-                    this.log('warn', 'Forcing server shutdown after timeout');
-                    resolve();
-                }, 5000);
-            } else {
-                resolve();
+            // Clear idle check interval
+            if (this._idleCheckInterval) {
+                clearInterval(this._idleCheckInterval);
             }
+
+            // ✅ P1.5: Clear IP cleanup interval
+            if (this._ipCleanupInterval) {
+                clearInterval(this._ipCleanupInterval);
+            }
+
+            // Gracefully close active connections (10s timeout)
+            const closePromises = Array.from(this.activeConnections).map(socket => {
+                return new Promise(resolve => {
+                    const forceSocketTimeout = setTimeout(() => {
+                        if (!socket.destroyed) {
+                            socket.destroy();
+                        }
+                        resolve();
+                    }, 10000);
+
+                    socket.once('close', () => {
+                        clearTimeout(forceSocketTimeout);
+                        resolve();
+                    });
+                    socket.end(); // Graceful close
+                });
+            });
+
+            await Promise.all(closePromises);
+            this.activeConnections.clear();
+
+            // Close server
+            await new Promise(resolve => {
+                if (this.server) {
+                    const forceServerTimeout = setTimeout(() => {
+                        this.log('warn', 'Forcing server shutdown after timeout');
+                        resolve();
+                    }, 5000);
+
+                    this.server.close(() => {
+                        clearTimeout(forceServerTimeout);
+                        this.log('info', '✅ Proxy stopped');
+                        resolve();
+                    });
+                } else {
+                    resolve();
+                }
+            });
+
+            this.server = null;
+        })();
+
+        return this._stopPromise.finally(() => {
+            this._stopPromise = null;
         });
     }
 }

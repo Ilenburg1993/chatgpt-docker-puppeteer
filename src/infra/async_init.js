@@ -13,7 +13,7 @@
  * Subsequent calls wait for the same initialization promise.
  *
  * @param {Function} initFn - Async function to run on first access
- * @returns {{ready: Promise<void>, reset: Function}} Initialization control
+ * @returns {{ready: Promise<void>, reset: Function, isInitialized: () => boolean}} Initialization control
  *
  * @example
  * const { ready } = createAsyncInit(async () => {
@@ -300,7 +300,7 @@ export async function initWithTimeout(initFn, timeoutMs, name = 'Initialization'
  * @param {Function} initFn - Initialization function
  * @param {Function} healthCheckFn - Function that returns Promise<boolean>
  * @param {number} [intervalMs=60000] - Health check interval
- * @returns {{ready: Promise<void>, stop: Function}} Init control
+ * @returns {{ready: Promise<void>, stop: Function, isHealthy: () => boolean}} Init control
  *
  * @example
  * const { ready, stop } = initWithHealthCheck(

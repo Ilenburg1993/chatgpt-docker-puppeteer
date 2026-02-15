@@ -67,7 +67,7 @@ export async function safeHttpRequest(url, options = {}) {
             complete(() => {
                 const error = new Error(`HTTP request timed out after ${timeout}ms`);
                 error.code = 'ETIMEDOUT';
-                error.url = url;
+                error.url = String(url);
                 reject(error);
             });
         }, timeout);
@@ -113,7 +113,7 @@ export async function safeHttpRequest(url, options = {}) {
             complete(() => {
                 const error = new Error(`HTTP request timed out after ${timeout}ms`);
                 error.code = 'ETIMEDOUT';
-                error.url = url;
+                error.url = String(url);
                 reject(error);
             });
         });
@@ -134,7 +134,7 @@ export async function safeHttpRequest(url, options = {}) {
  *
  * @param {string|URL} url - URL to check
  * @param {number} [timeout=5000] - Timeout in milliseconds
- * @returns {Promise<{ok: boolean, statusCode: number|string, latencyMs: number}>}
+ * @returns {Promise<{ok: boolean, statusCode: number|string, latencyMs: number, error?: string}>}
  *
  * @example
  * const { ok, statusCode, latencyMs } = await checkUrlHealth('http://localhost:9222');
@@ -251,7 +251,7 @@ export async function retryHttpRequest(url, options = {}) {
     error.code = 'MAX_RETRIES_EXCEEDED';
     error.lastError = lastError;
     error.attempts = maxRetries + 1;
-    error.url = url;
+    error.url = String(url);
     throw error;
 }
 

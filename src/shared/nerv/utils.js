@@ -81,9 +81,9 @@ export async function safeNERVOperation(nerv, operation, operationFn) {
  * @param {object} nerv - Instância do NERV
  * @param {string} event - Nome do evento
  * @param {Function} handler - Handler do evento
- * @returns {boolean} true se registrado com sucesso
+ * @returns {Promise<boolean>} true se registrado com sucesso
  */
-export function safeOnEvent(nerv, event, handler) {
+export async function safeOnEvent(nerv, event, handler) {
     return safeNERVOperation(nerv, `onEvent(${event})`, () => {
         nerv.onEvent(event, handler);
         return true;

@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
+import { SSL_OP_NO_TLSv1, SSL_OP_NO_TLSv1_1 } from 'node:constants';
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
@@ -70,8 +71,7 @@ function getSSLOptions() {
             key: fs.readFileSync(sslKeyPath),
             cert: fs.readFileSync(sslCertPath),
             // Configurações de segurança adicionais
-            secureOptions: require('node:constants').SSL_OP_NO_TLSv1 |
-                          require('node:constants').SSL_OP_NO_TLSv1_1,
+            secureOptions: SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1,
             ciphers: [
                 'ECDHE-RSA-AES128-GCM-SHA256',
                 'ECDHE-RSA-AES256-GCM-SHA384',

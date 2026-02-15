@@ -33,6 +33,7 @@ declare module '#server/engine/socket' {
     on: (event: string, handler: (...args: unknown[]) => void) => void;
     off: (event: string, handler: (...args: unknown[]) => void) => void;
     emit: (event: string, data: unknown) => void;
+    sendToClient: (clientId: string, eventName: string, data: unknown) => void;
     connected: () => boolean;
     disconnect: () => void;
   }>;

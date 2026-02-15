@@ -190,6 +190,7 @@ export async function handleRagHealth(req, res) {
  */
 export async function handleRagIndex(req, res) {
   try {
+    const body = /** @type {any} */ (req.body || {});
     const {
       root,
       profile,
@@ -197,7 +198,7 @@ export async function handleRagIndex(req, res) {
       excludeGlobs,
       docsMode,
       maxFileBytes
-    } = req.body || {};
+    } = body;
 
     const normalizedIncludeGlobs = Array.isArray(includeGlobs)
       ? includeGlobs

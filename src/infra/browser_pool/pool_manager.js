@@ -8,11 +8,12 @@ import PeriodicHealthMonitor from './PeriodicHealthMonitor.js';
 
 class BrowserPoolManager {
     /**
-     * @param {Object} config - Configuração do pool
-     * @param {number} config.poolSize - Número de instâncias no pool (padrão: 3)
-     * @param {string} config.allocationStrategy - round-robin | least-loaded | target-affinity (padrão: round-robin)
-     * @param {number} config.healthCheckInterval - Intervalo de health check em ms (padrão: 30000)
-     * @param {Object} config.browserEndpoint - Configuração canônica do browser externo (url, optional wsEndpoint)
+     * @param {{
+     *   poolSize?: number,
+     *   allocationStrategy?: 'round-robin'|'least-loaded'|'target-affinity',
+     *   healthCheckInterval?: number,
+     *   browserEndpoint?: { url?: string, wsEndpoint?: string, [key: string]: unknown }
+     * }} [config={}] - Configuração do pool
      */
     constructor(config = {}) {
         this.config = {
@@ -64,6 +65,8 @@ class BrowserPoolManager {
         // ✅ Phase 3: Periodic health monitoring (CDP-only)
         this.healthMonitor = null; // Inicializado após pool ready
         this.reconnectionInProgress = false;
+        this.browser = null;
+        this.nerv = null;
     }
 
     /**
@@ -111,7 +114,7 @@ class BrowserPoolManager {
         }
 
         // ✅ Bug #3: Validar proxy ANTES de tentar conectar
-        const CONFIG = await import('#core/config').then(m => m.default ?? m);
+        const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
         if (CONFIG.CHROME_PROXY_ENABLED !== false) {
             await this._validateProxyAvailability();
         }
@@ -144,6 +147,9 @@ class BrowserPoolManager {
                 };
 
                 this.pool.push(poolEntry);
+                if (!this.browser) {
+                    this.browser = browser;
+                }
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} conectada e adicionada ao pool`);
             } catch (error) {
@@ -213,7 +219,10 @@ class BrowserPoolManager {
                 }
 
                 // Marca como falha no circuit breaker
-                this.circuitBreaker.recordFailure(poolEntry.id, FailureCause.PAGE_VALIDATION_FAILED);
+                const validationError = new Error('PAGE_VALIDATION_FAILED');
+                this.circuitBreaker.registerFailure(poolEntry.id, validationError, {
+                    cause: FailureCause.TECHNICAL_CRASH,
+                });
 
                 // Retry allocation (recursivo)
                 if (poolEntry.health.consecutiveFailures < 3) {
@@ -292,9 +301,10 @@ class BrowserPoolManager {
         }
 
         const poolEntry = page._poolEntry;
+        const tempTaskId = page._tempTaskId;
 
         // Remove temp ID
-        poolEntry.pages.delete(page._tempTaskId);
+        poolEntry.pages.delete(tempTaskId);
 
         // Add real ID
         poolEntry.pages.set(realTaskId, page);
@@ -303,7 +313,7 @@ class BrowserPoolManager {
         page._poolMetadata.taskId = realTaskId;
         delete page._tempTaskId;
 
-        log('DEBUG', `[BrowserPool] Updated taskId: ${page._tempTaskId} → ${realTaskId}`);
+        log('DEBUG', `[BrowserPool] Updated taskId: ${tempTaskId} → ${realTaskId}`);
     }
 
     /**
@@ -563,12 +573,13 @@ class BrowserPoolManager {
      * TTL: 1 hour (3600000ms) - configurable via BROWSER_PAGE_TTL_MS
      */
     async _cleanupZombiePages() {
-        const CONFIG = await import('#core/config').then(m => m.default ?? m);
+        const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
         const ttlMs = Number(CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000);
         const now = Date.now();
         let zombieCount = 0;
 
         for (const poolEntry of this.pool) {
+            /** @type {Array<{ taskId: string, page: any, reason: string, age: number | 'unknown' }>} */
             const zombiePages = [];
 
             // Find pages that exceeded TTL
@@ -654,7 +665,7 @@ class BrowserPoolManager {
      * @throws {Error} Se proxy não estiver disponível ou unhealthy
      */
     async _validateProxyAvailability() {
-        const CONFIG = await import('#core/config').then(m => m.default ?? m);
+        const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
 
         /*
          * CONTRATO DE TOPOLOGIA (CANÔNICO):
@@ -766,6 +777,7 @@ class BrowserPoolManager {
         }
 
         this.pool = [];
+        this.browser = null;
         this.initialized = false;
 
         log('INFO', '[BrowserPool] Shutdown concluído');
@@ -1147,6 +1159,14 @@ class BrowserPoolManager {
         }
 
         return pages;
+    }
+
+    /**
+     * Retorna snapshot das métricas atuais do pool.
+     * @returns {Record<string, number>}
+     */
+    getStats() {
+        return { ...this.stats };
     }
 }
 

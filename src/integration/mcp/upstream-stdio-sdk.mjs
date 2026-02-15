@@ -53,7 +53,7 @@ export class MCPStdioUpstreamClient {
 
         const client = new Client(
             { name: 'chatgpt-docker-upstream', version: '1.0.0' },
-            { capabilities: { tools: {} } }
+            /** @type {any} */ ({ capabilities: { tools: {} } })
         );
 
         try {
@@ -81,7 +81,13 @@ export class MCPStdioUpstreamClient {
         return this.client.listTools();
     }
 
+    /**
+     * @param {{ name?: string, arguments?: Record<string, unknown>, signal?: AbortSignal }} [payload]
+     */
     async callTool({ name, arguments: args = {}, signal } = {}) {
+        if (!name) {
+            throw new Error(`[MCP stdio:${this.alias}] tools/call requires name`);
+        }
         if (signal?.aborted) {
             throw new Error(`[MCP stdio:${this.alias}] call aborted before start`);
         }
@@ -116,4 +122,3 @@ export class MCPStdioUpstreamClient {
         }
     }
 }
-

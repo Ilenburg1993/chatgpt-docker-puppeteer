@@ -161,7 +161,7 @@ app.use(
  * Rate limiter para endpoints da API.
  * 100 requests por minuto por IP, com skip para desenvolvimento local.
  *
- * @type {import('express-rate-limit').RateLimit}
+ * @type {ReturnType<typeof rateLimit>}
  */
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,

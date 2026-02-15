@@ -59,37 +59,33 @@ function sanitizeToolMetadata(tool) {
 }
 
 /**
- * @typedef {{
- *   alias: string,
- *   transport: 'http'|'stdio',
- *   toolPrefix: string,
- *   required?: boolean,
- *   // http
- *   url?: string,
- *   headers?: Record<string,string>,
- *   // stdio
- *   command?: string,
- *   args?: string[],
- *   envFrom?: string[],
- *   initTimeoutMs?: number,
- *   callTimeoutMs?: number,
- * }} UpstreamConfig
+ * @typedef {object} UpstreamConfig
+ * @property {string} alias
+ * @property {'http'|'stdio'} transport
+ * @property {string} toolPrefix
+ * @property {boolean} [required]
+ * @property {string} [url]
+ * @property {Record<string,string>} [headers]
+ * @property {string} [command]
+ * @property {string[]} [args]
+ * @property {string[]} [envFrom]
+ * @property {number} [initTimeoutMs]
+ * @property {number} [callTimeoutMs]
  */
 
 /**
- * @typedef {{
- *   alias: string,
- *   transport: 'http'|'stdio',
- *   toolPrefix: string,
- *   target: string,
- *   enabled: boolean,
- *   required: boolean,
- *   ready: boolean,
- *   registeredCount: number,
- *   lastInitAt: string | null,
- *   lastError: string | null,
- *   state: 'ready'|'not-ready'|'disabled',
- * }} UpstreamStatus
+ * @typedef {object} UpstreamStatus
+ * @property {string} alias
+ * @property {'http'|'stdio'} transport
+ * @property {string} toolPrefix
+ * @property {string} target
+ * @property {boolean} enabled
+ * @property {boolean} required
+ * @property {boolean} ready
+ * @property {number} registeredCount
+ * @property {string | null} lastInitAt
+ * @property {string | null} lastError
+ * @property {'ready'|'not-ready'|'disabled'} state
  */
 
 /** @type {{ upstreams: UpstreamStatus[] }} */
@@ -106,10 +102,14 @@ const _retryState = new Map();
 
 /** @type {boolean} */
 let _shutdownHookInstalled = false;
+const _shutdownHookHandlers = {
+    exit: null,
+    sigint: null,
+    sigterm: null
+};
 
 function ensureShutdownHook() {
     if (_shutdownHookInstalled) return;
-    _shutdownHookInstalled = true;
 
     const handler = () => {
         // Best-effort: avoid async waits in signal handler.
@@ -118,9 +118,34 @@ function ensureShutdownHook() {
         }
     };
 
-    process.on('exit', handler);
-    process.on('SIGINT', handler);
-    process.on('SIGTERM', handler);
+    _shutdownHookHandlers.exit = handler;
+    _shutdownHookHandlers.sigint = handler;
+    _shutdownHookHandlers.sigterm = handler;
+
+    process.on('exit', _shutdownHookHandlers.exit);
+    process.on('SIGINT', _shutdownHookHandlers.sigint);
+    process.on('SIGTERM', _shutdownHookHandlers.sigterm);
+
+    _shutdownHookInstalled = true;
+}
+
+function cleanupShutdownHook() {
+    if (!_shutdownHookInstalled) return;
+
+    if (_shutdownHookHandlers.exit) {
+        process.removeListener('exit', _shutdownHookHandlers.exit);
+        _shutdownHookHandlers.exit = null;
+    }
+    if (_shutdownHookHandlers.sigint) {
+        process.removeListener('SIGINT', _shutdownHookHandlers.sigint);
+        _shutdownHookHandlers.sigint = null;
+    }
+    if (_shutdownHookHandlers.sigterm) {
+        process.removeListener('SIGTERM', _shutdownHookHandlers.sigterm);
+        _shutdownHookHandlers.sigterm = null;
+    }
+
+    _shutdownHookInstalled = false;
 }
 
 function setStatus(next) {
@@ -491,17 +516,18 @@ function markUpstreamCallFailure(cfg, err, registry, env, restart) {
  * @returns {Promise<{upstreams: UpstreamStatus[]}>}
  */
 export async function registerUpstreams(registry, options = {}) {
-    ensureShutdownHook();
-
     const env = options.env || process.env;
     const refresh = String(env.MCP_UPSTREAM_REFRESH || '') === 'true';
     const restart = getRestartConfig(env);
 
     const configs = parseUpstreamsFromEnv(env);
     if (configs.length === 0) {
+        cleanupShutdownHook();
         setStatus([]);
         return getUpstreamStatus();
     }
+
+    ensureShutdownHook();
 
     /** @type {UpstreamStatus[]} */
     const statuses = [];
@@ -527,4 +553,5 @@ export async function shutdownUpstreams() {
     _stdioClients.clear();
     _registeredAliases.clear();
     setStatus([]);
+    cleanupShutdownHook();
 }

@@ -136,6 +136,9 @@ class DriverNERVAdapter extends EventEmitter {
 
         // ✅ MUST exist (era bug crítico)
         this.abortedTasks = new Map();
+        this._nervUnsubscribe = null;
+        this._shutdownPromise = null;
+        this._shutdownResult = null;
 
         this.performanceMetrics = {
             poolAcquireTimes: [],
@@ -195,7 +198,7 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     _setupListeners() {
-        this.nerv.onReceive(envelope => {
+        const unsubscribe = this.nerv.onReceive(envelope => {
             const messageType = getMessageType(envelope);
             const actionCode = getActionCode(envelope);
             const correlationId = getCorrelationId(envelope);
@@ -239,6 +242,7 @@ class DriverNERVAdapter extends EventEmitter {
             });
         });
 
+        this._nervUnsubscribe = typeof unsubscribe === 'function' ? unsubscribe : null;
         log('DEBUG', '[DriverNERVAdapter] Listeners configurados para DRIVER_* commands');
     }
 
@@ -1240,6 +1244,19 @@ class DriverNERVAdapter extends EventEmitter {
         this.stats.tasksRejected++;
     }
 
+    /**
+     * Captura artefatos de diagnóstico para falhas de execução.
+     *
+     * @param {{
+     *   taskId?: string,
+     *   correlationId?: string,
+     *   target?: string,
+     *   driver?: any,
+     *   page?: any,
+     *   phase?: string,
+     *   diagnosis?: any
+     * }} [context={}]
+     */
     async _captureDiagnostics({ taskId, correlationId, target, driver, page, phase = 'unknown', diagnosis = null } = {}) {
         if (!page || (page.isClosed && page.isClosed())) {
             return null;
@@ -1355,6 +1372,18 @@ class DriverNERVAdapter extends EventEmitter {
         return { storage, summary };
     }
 
+    /**
+     * Executa preflight mínimo antes do driver entrar no loop principal.
+     *
+     * @param {{
+     *   driver?: any,
+     *   page?: any,
+     *   task?: any,
+     *   taskId?: string,
+     *   target?: string,
+     *   signal?: AbortSignal | null
+     * }} [context={}]
+     */
     async _runPreflight({ driver, page, task, taskId, target, signal } = {}) {
         const diagnosis = {
             stability: null,
@@ -2016,57 +2045,97 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     async shutdown(options = {}) {
+        if (this._shutdownResult) {
+            return this._shutdownResult;
+        }
+
+        if (this._shutdownPromise) {
+            return this._shutdownPromise;
+        }
+
         const timeout = options.timeout || ADAPTER_CONFIG.SHUTDOWN_TIMEOUT_MS;
         const startTime = Date.now();
 
-        log(
-            'INFO',
-            `[DriverNERVAdapter] Iniciando shutdown (${this.activeDrivers.size} drivers ativos, timeout: ${timeout}ms)`
-        );
+        this._shutdownPromise = (async () => {
+            log(
+                'INFO',
+                `[DriverNERVAdapter] Iniciando shutdown (${this.activeDrivers.size} drivers ativos, timeout: ${timeout}ms)`
+            );
 
-        if (this.healthCheckInterval) clearInterval(this.healthCheckInterval);
-        if (this.telemetryFlushInterval) clearInterval(this.telemetryFlushInterval);
-        if (this.degradedModeInterval) clearInterval(this.degradedModeInterval);
+            if (this.healthCheckInterval) {
+                clearInterval(this.healthCheckInterval);
+                this.healthCheckInterval = null;
+            }
+            if (this.telemetryFlushInterval) {
+                clearInterval(this.telemetryFlushInterval);
+                this.telemetryFlushInterval = null;
+            }
+            if (this.degradedModeInterval) {
+                clearInterval(this.degradedModeInterval);
+                this.degradedModeInterval = null;
+            }
 
-        if (this.telemetryBuffer.length > 0) {
-            this._flushTelemetry();
-        }
-
-        const entries = Array.from(this.activeDrivers.entries());
-        const shutdownPromises = entries.map(([taskId, entry]) => {
-            return (async () => {
+            if (this._nervUnsubscribe) {
                 try {
-                    const p = this._finallyCleanup(taskId, entry.page, entry.driver, entry.listeners);
-                    const t = new Promise((_, reject) => setTimeout(() => reject(new Error('Shutdown timeout')), timeout));
-                    await Promise.race([p, t]);
-                    return { taskId, success: true };
+                    this._nervUnsubscribe();
                 } catch (err) {
-                    log('ERROR', `[DriverNERVAdapter] Erro ao liberar driver ${taskId}: ${err.message}`);
-                    return { taskId, success: false, error: err.message };
+                    log('WARN', `[DriverNERVAdapter] Falha ao remover listener NERV: ${err.message}`);
+                } finally {
+                    this._nervUnsubscribe = null;
                 }
-            })();
-        });
+            }
 
-        const results = await Promise.allSettled(shutdownPromises);
+            if (this.telemetryBuffer.length > 0) {
+                this._flushTelemetry();
+            }
 
-        const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-        const failedCount = results.length - successCount;
-        const duration = Date.now() - startTime;
+            const entries = Array.from(this.activeDrivers.entries());
+            const shutdownPromises = entries.map(([taskId, entry]) => {
+                return (async () => {
+                    try {
+                        const p = this._finallyCleanup(taskId, entry.page, entry.driver, entry.listeners);
+                        const t = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Shutdown timeout')), timeout)
+                        );
+                        await Promise.race([p, t]);
+                        return { taskId, success: true };
+                    } catch (err) {
+                        log('ERROR', `[DriverNERVAdapter] Erro ao liberar driver ${taskId}: ${err.message}`);
+                        return { taskId, success: false, error: err.message };
+                    }
+                })();
+            });
 
-        this.activeDrivers.clear();
+            const results = await Promise.allSettled(shutdownPromises);
 
-        const shutdownResult = {
-            total: results.length,
-            success: successCount,
-            failed: failedCount,
-            duration
-        };
+            const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+            const failedCount = results.length - successCount;
+            const duration = Date.now() - startTime;
 
-        this.emit(ADAPTER_EVENTS.SHUTDOWN, shutdownResult);
+            this.activeDrivers.clear();
 
-        log('INFO', `[DriverNERVAdapter] Shutdown concluído (${successCount}/${results.length} success, ${duration}ms)`);
+            this._shutdownResult = {
+                total: results.length,
+                success: successCount,
+                failed: failedCount,
+                duration
+            };
 
-        return shutdownResult;
+            this.emit(ADAPTER_EVENTS.SHUTDOWN, this._shutdownResult);
+
+            log(
+                'INFO',
+                `[DriverNERVAdapter] Shutdown concluído (${successCount}/${results.length} success, ${duration}ms)`
+            );
+
+            return this._shutdownResult;
+        })();
+
+        try {
+            return await this._shutdownPromise;
+        } finally {
+            this._shutdownPromise = null;
+        }
     }
 
     getStats() {

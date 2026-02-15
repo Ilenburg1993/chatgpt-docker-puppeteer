@@ -56,6 +56,9 @@ function _statSizeBytes(filePath) {
     }
 }
 
+/**
+ * @param {{ storage?: Record<string, any>|null, actor?: string }} [arg0]
+ */
 function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */
     const ids = {
@@ -95,6 +98,9 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
     return ids;
 }
 
+/**
+ * @param {{ storage?: Record<string, any>|null, actor?: string }} [arg0]
+ */
 function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */
     const ids = {
@@ -292,7 +298,7 @@ class TaskStateProjector {
             ActionCode.DRIVER_TASK_RETRYING,
             ActionCode.DRIVER_ERROR,
         ]);
-        if (!supported.has(actionCode)) {
+        if (!supported.has(/** @type {any} */ (actionCode))) {
             return;
         }
 

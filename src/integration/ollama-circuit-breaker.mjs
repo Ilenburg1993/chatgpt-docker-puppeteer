@@ -68,6 +68,7 @@ export class OllamaCircuitBreaker {
         timeout = 60000,
         windowSize = 10,
     } = {}) {
+        /** @type {'CLOSED'|'OPEN'|'HALF_OPEN'} */
         this.state = CircuitState.CLOSED;
         this.failureCount = 0;
         this.successCount = 0;

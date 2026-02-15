@@ -343,7 +343,7 @@ class DriverFactory extends EventEmitter {
     async _createWarmDriver(target) {
         try {
             // Criar driver sem context (UNATTACHED)
-            const driver = this.createDriver(target, this.config);
+            const driver = await this.createDriver(target, this.config);
 
             // Adicionar ao pool
             const pool = this.pool.get(target);

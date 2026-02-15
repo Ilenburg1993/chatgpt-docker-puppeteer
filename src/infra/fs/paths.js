@@ -159,8 +159,6 @@ export const LOG_DIR = DIRS.LOGS;
  * **Semântica:** Estruturas de dados com caminhos absolutos para diretórios e arquivos do sistema.
  * **Unidades:** N/A
  *
- * @type {Object} DIRS - Diretórios do sistema
- * @type {Object} FILES - Arquivos de estado e configuração
- * @type {Object} LIMITS - Limites técnicos físicos
+ * Exporta `DIRS`, `FILES` e `LIMITS` como constantes nomeadas.
  */
 export { DIRS, FILES, LIMITS };

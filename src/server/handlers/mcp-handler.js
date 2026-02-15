@@ -218,7 +218,7 @@ const handlers = {
             }
         }
 
-        throw new Error(`Unknown resource: ${uri}`); // eslint-disable-line preserve-caught-error
+        throw new Error(`Unknown resource: ${uri}`);  
     }
 };
 

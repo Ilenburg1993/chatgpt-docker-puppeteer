@@ -147,7 +147,10 @@ export async function getChunkStats(table) {
     );
 }
 
-function buildWhere({ pathPrefix, ext, tags }) {
+/**
+ * @param {{ pathPrefix?: string, ext?: string, tags?: string[] }} [filters]
+ */
+function buildWhere({ pathPrefix, ext, tags } = {}) {
     const parts = [];
     if (pathPrefix) {
         const safe = pathPrefix.replace(/'/g, "''");
@@ -163,6 +166,11 @@ function buildWhere({ pathPrefix, ext, tags }) {
     return parts.length ? parts.join(' AND ') : null;
 }
 
+/**
+ * @param {any} table
+ * @param {number[]} vector
+ * @param {{ topK?: number, filters?: { pathPrefix?: string, ext?: string, tags?: string[] }, distanceRange?: [number, number] | { min?: number, max?: number } }} [options]
+ */
 export async function search(table, vector, { topK = 8, filters = {}, distanceRange } = {}) {
     return await withTimeout(
         async () => {

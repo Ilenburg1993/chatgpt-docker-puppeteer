@@ -166,6 +166,8 @@ export class MCPUpstreamStdio extends EventEmitter {
      * @param {number|string} msg.id - Request ID (undefined for notifications)
      * @param {Object} msg.result - Result (for responses)
      * @param {Object} msg.error - Error (for error responses)
+     * @param {string} [msg.method] - Notification method
+     * @param {Object} [msg.params] - Notification params
      * @private
      */
     _handleMessage(msg) {
@@ -271,7 +273,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      */
     async listTools() {
         if (!this.initialized) {
-            throw new Error('MCP Upstream not initialized'); // eslint-disable-line preserve-caught-error
+            throw new Error('MCP Upstream not initialized');  
         }
 
         return this._sendRequest('tools/list');
@@ -287,7 +289,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      */
     async callTool(name, args = {}) {
         if (!this.initialized) {
-            throw new Error('MCP Upstream not initialized'); // eslint-disable-line preserve-caught-error
+            throw new Error('MCP Upstream not initialized');  
         }
 
         return this._sendRequest('tools/call', {

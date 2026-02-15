@@ -139,12 +139,12 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
  * Side-effects: Escreve arquivos screenshot.jpg e dom_snapshot.html no folder.
  * @param {Object} page - Instância da página Puppeteer.
  * @param {string} folder - Caminho do diretório para salvar evidências.
- * @param {string} correlationId - ID de correlação para logs.
+ * @param {string} _correlationId - ID de correlação para logs.
  * @returns {Promise<void>}
  * @private
  */
 /* global document */
-async function _captureVisualEvidence(page, folder, _) {
+async function _captureVisualEvidence(page, folder, _correlationId) {
     // A. Screenshot (JPEG comprimido para performance)
     await page.screenshot({
         path: path.join(folder, 'screenshot.jpg'),
@@ -155,7 +155,7 @@ async function _captureVisualEvidence(page, folder, _) {
     // B. Snapshot do DOM (Legibilidade Preservada)
     // Removemos scripts e iframes, mas mantemos o CSS para análise visual humana.
     const html = await page.evaluate(() => {
-        const clone = document.documentElement.cloneNode(true);
+        const clone = /** @type {any} */ (document.documentElement.cloneNode(true));
         // Limpeza de elementos ativos que podem quebrar o visualizador offline
         const selectorsToRemove = 'script, iframe, noscript, link[rel="prefetch"], link[rel="preload"]';
         clone.querySelectorAll(selectorsToRemove).forEach(e => e.remove());

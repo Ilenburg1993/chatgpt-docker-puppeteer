@@ -56,9 +56,9 @@ const ENV_SCHEMA = {
     },
     SERVER_MODE: {
         level: 'FATAL',
-        validator: (val) => ['split', 'integrated'].includes(val),
+        validator: (val) => ['split', 'integrated', 'disabled'].includes(val),
         default: 'split',
-        message: 'Must be one of: split, integrated'
+        message: 'Must be one of: split, integrated, disabled'
     },
     SERVER_AUTHORITY: {
         level: 'FATAL',

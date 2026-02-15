@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport path from 'node:path';
+#!/usr/bin/env node
+import path from 'node:path';
 
 console.log('\n🧪 SADI Analyzer v4.0 - Upgrade Validation\n');
 

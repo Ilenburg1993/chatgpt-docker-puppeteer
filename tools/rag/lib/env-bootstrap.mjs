@@ -13,6 +13,7 @@ function projectRootFromHere() {
 export function bootstrapRagEnv(options = {}) {
     const root = options.rootDir ? path.resolve(options.rootDir) : projectRootFromHere();
     const useGlobalFlag = options.useGlobalFlag !== false;
+    const quiet = options.quiet !== false;
 
     if (useGlobalFlag && globalThis[RAG_ENV_BOOTSTRAP_FLAG]) {
         return { root, loaded: [] };
@@ -24,11 +25,11 @@ export function bootstrapRagEnv(options = {}) {
 
     // Load sensitive/local overrides first, then defaults.
     if (fs.existsSync(envLocalPath)) {
-        dotenv.config({ path: envLocalPath });
+        dotenv.config({ path: envLocalPath, quiet });
         loaded.push(envLocalPath);
     }
     if (fs.existsSync(envPath)) {
-        dotenv.config({ path: envPath });
+        dotenv.config({ path: envPath, quiet });
         loaded.push(envPath);
     }
 

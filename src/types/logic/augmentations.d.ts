@@ -23,6 +23,16 @@ declare module '#logic/adaptive' {
     [key: string]: unknown;
   }
 
+  export interface AdaptiveTimeoutResult {
+    timeout: number;
+    circuit_broken?: boolean;
+    breakdown?: Record<string, unknown>;
+    phase?: string;
+    target?: string;
+    warning?: string;
+    [key: string]: unknown;
+  }
+
   export class AdaptiveEngine {
     constructor(config?: AdaptiveConfig);
     learn(input: unknown): Promise<void>;
@@ -32,7 +42,20 @@ declare module '#logic/adaptive' {
     [key: string]: unknown;
   }
 
-  const adaptiveEngine: AdaptiveEngine;
+  export function getAdjustedTimeout(target: string, attempt?: number, phase?: string): Promise<AdaptiveTimeoutResult>;
+  export function getToolTimeout(
+    tool?: string,
+    options?: { contextSize?: number; [key: string]: unknown }
+  ): Promise<AdaptiveTimeoutResult>;
+  export function recordMetric(type: string, ms: number, target?: string): Promise<void>;
+  export function getStabilityMetrics(target?: string): Promise<{ score: number; status: string; samples: number }>;
+  export function getHealthStatus(): Promise<Record<string, unknown>>;
+  export function getPercentileTimeout(stats: { avg: number; var: number }, percentile?: number): number;
+  export const getSnapshot: () => Record<string, unknown>;
+  export const forcePersist: () => Promise<void>;
+  export const values: Record<string, number>;
+
+  const adaptiveEngine: AdaptiveEngine & Record<string, unknown>;
   export default adaptiveEngine;
 }
 

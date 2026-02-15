@@ -120,7 +120,8 @@ class TsserverDaemon {
         this.timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
         this.started = false;
         this.requestSeq = 0;
-        this.queue = Promise.resolve();
+        /** @type {Promise<any>} */
+        this.queue = Promise.resolve(undefined);
         /** @type {Map<string, AbortController>} */
         this.activeRequests = new Map();
     }
@@ -243,14 +244,15 @@ class TsserverDaemon {
                 if (!sourceFile) return null;
                 const start = offsetToLineChar(sourceFile, ref.textSpan.start);
                 const end = offsetToLineChar(sourceFile, ref.textSpan.start + ref.textSpan.length);
+                const refAny = /** @type {any} */ (ref);
                 return {
                     filePath: ref.fileName,
                     line: start.line,
                     character: start.character,
                     endLine: end.line,
                     endCharacter: end.character,
-                    isDefinition: Boolean(ref.isDefinition),
-                    isWriteAccess: Boolean(ref.isWriteAccess)
+                    isDefinition: Boolean(refAny.isDefinition),
+                    isWriteAccess: Boolean(refAny.isWriteAccess)
                 };
             }).filter(Boolean);
         } finally {

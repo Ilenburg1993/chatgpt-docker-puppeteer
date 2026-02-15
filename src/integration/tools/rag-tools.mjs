@@ -52,10 +52,10 @@ async function ragSearchHandler({
         throw new Error('Query must be a non-empty string');
     }
 
-    const validTopK = Math.min(Math.max(parseInt(topK) || 5, 1), 20);
+    const validTopK = Math.min(Math.max(Number(topK) || 5, 1), 20);
 
     try {
-        const result = await ragHybridSearch({
+        const result = await ragHybridSearch(/** @type {any} */ ({
             query,
             topK: validTopK,
             profile,
@@ -65,7 +65,7 @@ async function ragSearchHandler({
             rerank: true,
             mmr: true,
             mmrLambda: 0.7
-        });
+        }));
 
         console.error(`[RAG Tool] Found ${result.results.length} results`);
 
@@ -288,12 +288,12 @@ async function ragExpandHandler({
 }) {
     console.error(`[RAG Tool] rag_expand: chunk_id=${chunk_id} mode=${mode}`);
 
-    const expanded = await ragExpand({
+    const expanded = /** @type {any} */ (await ragExpand({
         chunkId: chunk_id,
         beforeLines: before_lines,
         afterLines: after_lines,
         mode
-    });
+    }));
 
     if (!expanded?.ok) {
         return {
@@ -344,7 +344,7 @@ async function ragExpandHandler({
 /**
  * Register RAG tools in the Tool Registry
  *
- * @param {ToolRegistry} registry - Tool registry instance
+ * @param {any} registry - Tool registry instance
  */
 export async function registerRagTools(registry) {
     console.error('[RAG Tools] Registering tools...');

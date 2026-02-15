@@ -1047,10 +1047,10 @@ export async function ragQuery(options = {}) {
             const filters = options.filters || {};
             const query = String(options.query || '');
 
-            const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
+            const embeddings = /** @type {any} */ (options.embeddingsProvider || new OllamaEmbeddingsProvider({
                 baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
                 model: options.model || manifest.embedding.model
-            });
+            }));
 
             const db = await openDb(paths.dbDir);
             let dbClosed = false;
@@ -1187,12 +1187,19 @@ export async function ragQuery(options = {}) {
  * ✅ P1-1: Wrapped with timeout (90s) to prevent hanging on slow hybrid searches
  *
  * @param {object} options - Search options
- * @param {string} options.query - Query text
+ * @param {string} [options.query] - Query text
  * @param {number} [options.topK] - Number of results (default: 8)
  * @param {string} [options.pathPrefix] - Filter by path prefix
  * @param {string} [options.ext] - Filter by file extension
  * @param {string[]} [options.tags] - Filter by tags
  * @param {object|array} [options.distanceRange] - Min/max distance range
+ * @param {object} [options.paths] - Caminhos customizados de índice
+ * @param {string} [options.profile] - Perfil de busca
+ * @param {string} [options.mode] - Modo de busca (`auto|lexical-only`)
+ * @param {boolean} [options.degradedModeEnabled] - Permite fallback degradado
+ * @param {unknown} [options.embeddingsProvider] - Provider de embeddings injetado
+ * @param {string} [options.ollamaBaseUrl] - Base URL local do Ollama
+ * @param {string} [options.model] - Modelo de embedding
  * @param {boolean} [options.rerank] - Enable reranking (default: true)
  * @param {object} [options.rerankWeights] - Custom rerank weights
  * @param {boolean} [options.mmr] - Enable MMR diversity (default: true)
@@ -1212,10 +1219,10 @@ export async function ragHybridSearch(options = {}) {
             const lastIndexScope = copyScope(manifest?.last_scope);
             const scopeHash = manifest?.last_scope_hash || null;
 
-            const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
+            const embeddings = /** @type {any} */ (options.embeddingsProvider || new OllamaEmbeddingsProvider({
                 baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
                 model: options.model || manifest.embedding.model
-            });
+            }));
 
             const {
                 query,
@@ -1229,6 +1236,10 @@ export async function ragHybridSearch(options = {}) {
                 mmr = true,            // Enable MMR by default
                 mmrLambda = 0.7        // MMR lambda (0.7 = 70% relevance, 30% diversity)
             } = options;
+            const queryText = String(query || '').trim();
+            if (!queryText) {
+                throw new Error('RAG_QUERY_REQUIRED');
+            }
 
             const db = await openDb(paths.dbDir);
             let dbClosed = false;
@@ -1263,7 +1274,7 @@ export async function ragHybridSearch(options = {}) {
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = await lexicalSearch(table, query, { topK, filters });
+                        results = await lexicalSearch(table, queryText, { topK, filters });
                     } catch (lexicalError) {
                         console.warn(`[RAG] Lexical fallback failed: ${lexicalError?.message || lexicalError}`);
                     }
@@ -1272,7 +1283,7 @@ export async function ragHybridSearch(options = {}) {
                         topK,
                         dim: manifest.embedding.dim,
                         model: manifest.embedding.model || embeddings.model,
-                        query,
+                            query: queryText,
                         profile,
                         last_index_scope: lastIndexScope,
                         scope_hash: scopeHash,
@@ -1294,7 +1305,7 @@ export async function ragHybridSearch(options = {}) {
                 }
 
                 try {
-                    const normalizedQuery = normalizeQuery(query);
+                    const normalizedQuery = normalizeQuery(queryText);
                     let vector;
                     if (!options.embeddingsProvider) {
                         vector = queryEmbedCache.get(normalizedQuery, embeddings.model);
@@ -1307,7 +1318,7 @@ export async function ragHybridSearch(options = {}) {
                         if (!options.embeddingsProvider) {
                             console.log('[RAG] Query embedding: cache miss, generating...');
                         }
-                        vector = await embeddings.embed(query);
+                        vector = await embeddings.embed(queryText);
                         if (!options.embeddingsProvider) {
                             queryEmbedCache.set(normalizedQuery, embeddings.model, vector);
                         }
@@ -1318,8 +1329,8 @@ export async function ragHybridSearch(options = {}) {
                     }
 
                     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-                    console.log(`[RAG] Hybrid search: query="${query}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
-                    const results = await hybridSearch(table, vector, query, {
+                    console.log(`[RAG] Hybrid search: query="${queryText}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
+                    const results = await hybridSearch(table, vector, queryText, {
                         topK,
                         filters,
                         distanceRange,
@@ -1334,7 +1345,7 @@ export async function ragHybridSearch(options = {}) {
                         topK,
                         dim: manifest.embedding.dim,
                         model: manifest.embedding.model || embeddings.model,
-                        query,
+                        query: queryText,
                         profile,
                         last_index_scope: lastIndexScope,
                         scope_hash: scopeHash,

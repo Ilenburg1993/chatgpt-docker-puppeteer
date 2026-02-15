@@ -815,7 +815,7 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Otimiza a página para performance.
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean|void>}
      */
     async optimizePage() {
         return Promise.resolve();
@@ -830,7 +830,7 @@ class TargetDriver extends EventEmitter {
     /**
      * Valida se página está pronta para execução.
      * @abstract
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean|void>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async validatePage() {
@@ -930,7 +930,7 @@ class TargetDriver extends EventEmitter {
      * Envia prompt para LLM.
      * @abstract
      * @param {string} _text - Texto do prompt
-     * @param {string} _taskId - ID da task
+     * @param {any} _taskId - ID da task ou objeto de opções
      * @param {AbortSignal} _signal - Sinal de cancelamento
      * @returns {Promise<void>}
      * @throws {Error} Sempre - deve ser implementado
@@ -947,7 +947,7 @@ class TargetDriver extends EventEmitter {
      * @abstract
      * @param {object} _startSnapshot - Snapshot inicial
      * @param {AbortSignal} _signal - Sinal de cancelamento
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async waitForCompletion(_startSnapshot, _signal) {
@@ -973,7 +973,7 @@ class TargetDriver extends EventEmitter {
     /**
      * Para geração em andamento.
      * @abstract
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean|void>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async stopGeneration() {

@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport http from 'node:http';
+#!/usr/bin/env node
+import http from 'node:http';
 
 console.log('\n=== TEST: Health Endpoint Validation ===');
 

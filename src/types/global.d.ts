@@ -46,6 +46,13 @@ interface Error {
 
   /** Status HTTP ou custom */
   status?: number | string;
+  statusCode?: number | string;
+  timeoutMs?: number;
+  lastError?: unknown;
+  url?: string;
+  body?: unknown;
+  openaiError?: unknown;
+  reason_code?: string;
 }
 
 // ============================================================
@@ -58,6 +65,9 @@ interface Navigator {
     brands: Array<{ brand: string; version: string }>;
     mobile: boolean;
     platform: string;
+  };
+  keyboard?: {
+    getLayoutMap?: () => Promise<Map<string, string>>;
   };
 }
 
@@ -72,14 +82,28 @@ declare class Page {
   waitForSelector(selector: string, options?: unknown): Promise<unknown>;
   url(): string;
   close(): Promise<void>;
-  [key: string]: unknown;
+  on(event: string, listener: (...args: any[]) => void): this;
+  once(event: string, listener: (...args: any[]) => void): this;
+  removeListener(event: string, listener: (...args: any[]) => void): this;
+  click(selector: string, options?: unknown): Promise<void>;
+  type(selector: string, text: string, options?: unknown): Promise<void>;
+  content(): Promise<string>;
+  title(): Promise<string>;
+  screenshot(options?: unknown): Promise<Buffer>;
+  viewport(): { width: number; height: number } | null;
+  browser(): Browser;
+  isClosed(): boolean;
+  [key: string]: any;
 }
 
 declare class Browser {
   close(): Promise<void>;
   pages(): Promise<Page[]>;
   wsEndpoint(): string;
-  [key: string]: unknown;
+  isConnected(): boolean;
+  disconnect(): Promise<void> | void;
+  userAgent(): Promise<string>;
+  [key: string]: any;
 }
 
 declare class BrowserPoolManager {
@@ -87,6 +111,38 @@ declare class BrowserPoolManager {
   allocate(options?: unknown): Promise<unknown>;
   release(page: unknown): Promise<void>;
   getStats(): unknown;
+  initialize?(): Promise<void>;
+  removePageFromPool?(taskId: string): void;
+  initialized?: boolean;
+  shuttingDown?: boolean;
+  stats?: Record<string, any>;
+  circuitBreaker?: {
+    shouldPauseSystem: () => boolean;
+    getStatus: () => Record<string, any>;
+    registerFailure?: (...args: any[]) => any;
+    registerRecovery?: (...args: any[]) => any;
+    [key: string]: any;
+  } | null;
+  [key: string]: any;
+}
+
+declare namespace Express {
+  interface Application {
+    [key: string]: any;
+  }
+  interface Request {
+    [key: string]: any;
+  }
+  interface Response {
+    [key: string]: any;
+  }
+  interface NextFunction {
+    (...args: any[]): any;
+  }
+}
+
+declare class ToolRegistry {
+  [key: string]: any;
 }
 
 // ============================================================

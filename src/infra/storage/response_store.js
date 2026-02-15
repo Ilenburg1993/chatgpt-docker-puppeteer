@@ -26,7 +26,7 @@ async function loadResponse(taskId, signal = null) {
         try {
             // 1. Check de Aborto Precoce (Soberania do Kernel)
             if (signal?.aborted) {
-                throw new Error('OPERATION_ABORTED'); // eslint-disable-line preserve-caught-error
+                throw new Error('OPERATION_ABORTED');  
             }
 
             // 2. Validação de Tamanho (Proteção contra Out-of-Memory)

@@ -13,6 +13,17 @@ function _asInt(raw, fallback) {
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+/**
+ * @param {{
+ *   status?: string | null,
+ *   stage?: string | null,
+ *   missionId?: string | null,
+ *   target?: string | null,
+ *   blocked?: boolean | null,
+ *   search?: string | null,
+ *   priorityGte?: number | string | null
+ * }} [filters={}]
+ */
 function _buildTasksWhere({ status, stage, missionId, target, blocked, search, priorityGte } = {}) {
     const where = [];
     /** @type {Record<string, any>} */

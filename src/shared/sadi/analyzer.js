@@ -748,4 +748,13 @@ async function validateCandidateInteractivity(page, protocol) {
     }
 }
 
-export { findChatInputSelector, findFrameByPath, findResponseArea, findSendButtonSelector, validateCandidateInteractivity };
+const findInputSelector = findChatInputSelector;
+
+export {
+    findChatInputSelector,
+    findFrameByPath,
+    findInputSelector,
+    findResponseArea,
+    findSendButtonSelector,
+    validateCandidateInteractivity,
+};

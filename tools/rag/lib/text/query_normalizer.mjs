@@ -73,7 +73,7 @@ export function expandQuery(query) {
  *
  * @param {string} query - Raw query text
  * @param {object} options - Processing options
- * @param {boolean} options.expand - Whether to expand with synonyms (default: false)
+ * @param {boolean} [options.expand] - Whether to expand with synonyms (default: false)
  * @returns {string} - Processed query
  *
  * @example

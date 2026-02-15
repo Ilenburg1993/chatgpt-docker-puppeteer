@@ -38,6 +38,13 @@ class ResilientLockManager {
          * @private
          */
         this._cleanupHandlersRegistered = false;
+        this._cleanupHandlers = {
+            beforeExit: null,
+            sigint: null,
+            sigterm: null,
+            uncaughtException: null,
+            unhandledRejection: null
+        };
 
         /**
          * Stats for monitoring
@@ -70,27 +77,60 @@ class ResilientLockManager {
             }
         };
 
-        // Register handlers for graceful shutdown
-        process.once('beforeExit', cleanup);
-        process.once('SIGINT', cleanup);
-        process.once('SIGTERM', cleanup);
-
-        // Register handler for crashes
-        process.once('uncaughtException', async (err) => {
+        this._cleanupHandlers.beforeExit = cleanup;
+        this._cleanupHandlers.sigint = cleanup;
+        this._cleanupHandlers.sigterm = cleanup;
+        this._cleanupHandlers.uncaughtException = async (err) => {
             console.error('[ResilientLock] Uncaught exception, cleaning up locks before exit:', err.message);
             await this.releaseAll();
             // Re-throw to maintain normal crash behavior
             process.exit(1);
-        });
-
-        process.once('unhandledRejection', async (reason) => {
+        };
+        this._cleanupHandlers.unhandledRejection = async (reason) => {
             console.error('[ResilientLock] Unhandled rejection, cleaning up locks:', reason);
             await this.releaseAll();
             process.exit(1);
-        });
+        };
+
+        // Register handlers for graceful shutdown
+        process.once('beforeExit', this._cleanupHandlers.beforeExit);
+        process.once('SIGINT', this._cleanupHandlers.sigint);
+        process.once('SIGTERM', this._cleanupHandlers.sigterm);
+        process.once('uncaughtException', this._cleanupHandlers.uncaughtException);
+        process.once('unhandledRejection', this._cleanupHandlers.unhandledRejection);
 
         this._cleanupHandlersRegistered = true;
         log('DEBUG', '[ResilientLock] Cleanup handlers registered');
+    }
+
+    _unregisterCleanupHandlers() {
+        if (!this._cleanupHandlersRegistered) {
+            return;
+        }
+
+        if (this._cleanupHandlers.beforeExit) {
+            process.removeListener('beforeExit', this._cleanupHandlers.beforeExit);
+            this._cleanupHandlers.beforeExit = null;
+        }
+        if (this._cleanupHandlers.sigint) {
+            process.removeListener('SIGINT', this._cleanupHandlers.sigint);
+            this._cleanupHandlers.sigint = null;
+        }
+        if (this._cleanupHandlers.sigterm) {
+            process.removeListener('SIGTERM', this._cleanupHandlers.sigterm);
+            this._cleanupHandlers.sigterm = null;
+        }
+        if (this._cleanupHandlers.uncaughtException) {
+            process.removeListener('uncaughtException', this._cleanupHandlers.uncaughtException);
+            this._cleanupHandlers.uncaughtException = null;
+        }
+        if (this._cleanupHandlers.unhandledRejection) {
+            process.removeListener('unhandledRejection', this._cleanupHandlers.unhandledRejection);
+            this._cleanupHandlers.unhandledRejection = null;
+        }
+
+        this._cleanupHandlersRegistered = false;
+        log('DEBUG', '[ResilientLock] Cleanup handlers removed');
     }
 
     /**
@@ -178,6 +218,9 @@ class ResilientLockManager {
             this.activeLocks.delete(lockKey);
 
             this._stats.totalReleased++;
+            if (this.activeLocks.size === 0) {
+                this._unregisterCleanupHandlers();
+            }
 
             log('DEBUG', `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`, lock.metadata);
             return true;
@@ -188,6 +231,9 @@ class ResilientLockManager {
 
             // Remove from map anyway to prevent memory leak
             this.activeLocks.delete(lockKey);
+            if (this.activeLocks.size === 0) {
+                this._unregisterCleanupHandlers();
+            }
             return false;
         }
     }
@@ -209,6 +255,7 @@ class ResilientLockManager {
         let failed = 0;
 
         if (total === 0) {
+            this._unregisterCleanupHandlers();
             return { total: 0, released: 0, failed: 0 };
         }
 
@@ -224,8 +271,18 @@ class ResilientLockManager {
         }
 
         log('INFO', `[ResilientLock] Released ${released}/${total} locks (${failed} failed)`);
+        if (this.activeLocks.size === 0) {
+            this._unregisterCleanupHandlers();
+        }
 
         return { total, released, failed };
+    }
+
+    /**
+     * Explicit cleanup hook for global listeners (used by tests and controlled teardown).
+     */
+    cleanupGlobalListeners() {
+        this._unregisterCleanupHandlers();
     }
 
     /**

@@ -75,7 +75,7 @@ const TargetProfileSchema = z.object({
 });
 
 const AdaptiveStateSchema = z.object({
-    targets: z.record(TargetProfileSchema),
+    targets: z.record(z.string(), TargetProfileSchema),
     infra: StatsSchema,
     last_adjustment_at: z.number()
 });

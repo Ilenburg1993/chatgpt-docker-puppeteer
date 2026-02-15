@@ -91,9 +91,11 @@ function sleep(ms) {
 export class OllamaEmbeddingsProvider {
     /**
      * @param {Object} options - Configuration options
-     * @param {string} options.baseURL - LOCAL Ollama base URL (default: host.docker.internal:11434/v1)
-     * @param {string} options.model - Embedding model (default: nomic-embed-text:latest)
-     * @param {number} options.timeoutMs - Request timeout in ms (default: 30000)
+     * @param {string} [options.baseURL] - LOCAL Ollama base URL (default: host.docker.internal:11434/v1)
+     * @param {string} [options.model] - Embedding model (default: nomic-embed-text:latest)
+     * @param {number} [options.timeoutMs] - Request timeout in ms (default: 30000)
+     * @param {number} [options.maxChars] - Máximo de caracteres por embedding
+     * @param {boolean} [options.contextFastShrink] - Redução agressiva quando overflow de contexto
      */
     constructor(options = {}) {
         // ALWAYS use local URL for embeddings (no cloud support).

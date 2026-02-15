@@ -66,6 +66,9 @@ class ChatGPTDriver extends BaseDriver {
      * @param {string} config.target - Must be 'chatgpt'
      * @param {string} [config.DEFAULT_MODEL_ID] - Default model (default: gpt-5.2)
      * @param {number} [config.STABLE_CYCLES] - Stable cycles target (default: 3)
+     * @param {boolean} [config.LLM_JUDGE_ENABLED] - Ativa validação LLM-as-Judge.
+     * @param {string} [config.LLM_JUDGE_MODEL] - Modelo para validação.
+     * @param {number} [config.LLM_JUDGE_TIMEOUT] - Timeout da validação em ms.
      */
     constructor(config) {
         super(config);
@@ -115,7 +118,7 @@ class ChatGPTDriver extends BaseDriver {
      * Executa 1 prompt → 1 resposta (contrato do TargetDriver).
      *
      * @param {string} prompt
-     * @returns {Promise<string>}
+     * @returns {Promise<any>}
      * @override
      */
     async execute(prompt) {
@@ -163,7 +166,7 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         // Valida interface carregada
-        const interfaceValidation = await validateLLMInterface(this.page);
+        const interfaceValidation = await validateLLMInterface(/** @type {any} */ (this.page));
         if (!interfaceValidation.valid) {
             const err = new Error(`PREREQUISITE_FAILED: ${interfaceValidation.reason}`);
             err.details = interfaceValidation.details;
@@ -244,10 +247,10 @@ class ChatGPTDriver extends BaseDriver {
 
             try {
                 // ✅ BUG #4: Validar navegação
-                const response = await this.page.goto(targetUrl, {
+                const response = /** @type {any} */ (await this.page.goto(targetUrl, {
                     waitUntil: 'networkidle2',
                     timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
-                });
+                }));
 
                 if (!response.ok()) {
                     throw new Error(`Navigation failed: HTTP ${response.status()}`);
@@ -290,7 +293,7 @@ class ChatGPTDriver extends BaseDriver {
         this.continuationCount = 0;
         this.thoughtBlocksPruned = 0;
 
-        const { humanTyping = true, delay = 0 } = options;
+        const { humanTyping = true, delay = 0 } = /** @type {{ humanTyping?: boolean, delay?: number }} */ (options || {});
 
         this._emitVital('PROGRESS_UPDATE', {
             step: 'SENDING_PROMPT',
@@ -299,12 +302,12 @@ class ChatGPTDriver extends BaseDriver {
         });
 
         // 1. Encontrar textarea via SADI
-        const inputProtocol = await analyzer.findInputSelector(this.page);
+        const inputProtocol = await analyzer.findChatInputSelector(this.page);
         if (!inputProtocol || !inputProtocol.protocol) {
             throw new Error('Textarea not found');
         }
 
-        const { ctx } = await this.frameNavigator.getExecutionContext(inputProtocol.protocol);
+        const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {any} */ (inputProtocol.protocol), this.signal);
 
         // 2. Limpar textarea
         await ctx.evaluate(proto => {
@@ -317,7 +320,7 @@ class ChatGPTDriver extends BaseDriver {
 
         // 3. Digitar prompt
         if (humanTyping) {
-            await this.biomechanics.typeHumanized(ctx, inputProtocol.protocol.selector, prompt);
+            await this.biomechanics.typeText(ctx, inputProtocol.protocol.selector, prompt, this.signal);
         } else {
             await ctx.type(inputProtocol.protocol.selector, prompt);
         }
@@ -328,12 +331,15 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         // 5. Encontrar e clicar botão send
-        const sendProtocol = await analyzer.findSendButtonSelector(this.page);
+        const sendProtocol = await analyzer.findSendButtonSelector(this.page, inputProtocol.protocol);
         if (!sendProtocol || !sendProtocol.protocol) {
             throw new Error('Send button not found');
         }
 
-        const { ctx: sendCtx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(sendProtocol.protocol);
+        const { ctx: sendCtx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
+            /** @type {any} */ (sendProtocol.protocol),
+            this.signal
+        );
         const rect = await this.biomechanics.getStableRect(sendCtx, sendProtocol.protocol.selector);
 
         if (!rect) {
@@ -359,7 +365,7 @@ class ChatGPTDriver extends BaseDriver {
      *
      * @param {number} startSnapshot - Estado inicial (message count)
      * @param {AbortSignal} [signal] - Sinal de cancelamento externo
-     * @returns {Promise<string>} Texto da resposta completa (sem thought blocks)
+     * @returns {Promise<any>} Resposta completa com metadados de captura
      * @throws {Error} OPERATION_ABORTED, STALL_DETECTED, LIMIT_REACHED, EMPTY_RESPONSE, etc
      * @override
      */
@@ -422,7 +428,7 @@ class ChatGPTDriver extends BaseDriver {
                 let currentText = '';
 
                 if (responseArea && responseArea.protocol) {
-                    const { ctx } = await this.frameNavigator.getExecutionContext(responseArea.protocol);
+                    const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {any} */ (responseArea.protocol), this.signal);
 
                     // Extração com Poda de Pensamento (NASA Standard Pruning)
                     const extractionResult = await ctx.evaluate(proto => {
@@ -708,7 +714,10 @@ class ChatGPTDriver extends BaseDriver {
         });
 
         if (stopProtocol && stopProtocol.protocol) {
-            const { ctx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(stopProtocol.protocol);
+            const { ctx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
+                /** @type {any} */ (stopProtocol.protocol),
+                this.signal
+            );
             const rect = await this.biomechanics.getStableRect(ctx, stopProtocol.protocol.selector);
 
             if (rect) {

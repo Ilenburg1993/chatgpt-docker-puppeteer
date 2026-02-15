@@ -11,7 +11,7 @@ let singletonDb = null;
 
 function resolveDbPath() {
     const fromEnv = process.env.MAESTRO_DB_PATH || process.env.DB_PATH || null;
-    const fromConfig = CONFIG?.all?.DB_PATH || null;
+    const fromConfig = typeof CONFIG?.all?.DB_PATH === 'string' ? CONFIG.all.DB_PATH : null;
     const raw = fromEnv || fromConfig || path.join(process.cwd(), 'data', 'maestro.sqlite');
 
     // If a directory is provided, place default filename inside it.

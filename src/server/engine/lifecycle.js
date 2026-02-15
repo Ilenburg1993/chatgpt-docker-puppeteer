@@ -27,9 +27,42 @@ let isShuttingDown = false;
  * Em modo 'delegated' o processo chamador (Maestro) deve controlar o exit.
  */
 let allowProcessExit = true;
+let signalsListening = false;
+const signalHandlers = {
+    sigint: null,
+    sigterm: null,
+    sigusr2: null,
+    sigquit: null,
+    sigbreak: null,
+    sigpipe: null,
+    sigchld: null,
+    uncaughtException: null,
+    unhandledRejection: null,
+};
 
 function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
+}
+
+function registerSignalSafely(signal, key, handler) {
+    try {
+        process.on(signal, handler);
+        signalHandlers[key] = handler;
+        return true;
+    } catch (err) {
+        signalHandlers[key] = null;
+        log('DEBUG', `[LIFECYCLE] ${signal} não suportado nesta plataforma: ${err.message}`);
+        return false;
+    }
+}
+
+function removeSignalListenerSafely(signal, key) {
+    if (!signalHandlers[key]) {
+        return;
+    }
+
+    process.removeListener(signal, signalHandlers[key]);
+    signalHandlers[key] = null;
 }
 
 /**
@@ -40,6 +73,7 @@ function setAllowProcessExit(flag) {
  */
 async function gracefulShutdown(signal) {
     if (isShuttingDown) {
+        log('DEBUG', `[LIFECYCLE] ${signal} ignorado; shutdown já em andamento.`);
         return;
     }
     isShuttingDown = true;
@@ -175,8 +209,6 @@ async function gracefulShutdown(signal) {
 
         log('INFO', '[LIFECYCLE] Subsistema Mission Control encerrado com sucesso.');
 
-        clearTimeout(forceExitTimeout);
-
         // Encerramento do processo com código de sucesso.
         if (allowProcessExit) {
             process.exit(0);
@@ -190,6 +222,11 @@ async function gracefulShutdown(signal) {
         } else {
             log('ERROR', '[LIFECYCLE] Falha no shutdown (exit suprimido por allowProcessExit=false)');
         }
+    } finally {
+        clearTimeout(forceExitTimeout);
+        if (!allowProcessExit) {
+            isShuttingDown = false;
+        }
     }
 }
 
@@ -198,20 +235,98 @@ async function gracefulShutdown(signal) {
  * Deve ser invocado no início do bootstrap em main.js.
  */
 function listenToSignals() {
-    // Sinais de interrupção padrão (Ctrl+C, PM2 Stop)
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    if (signalsListening) {
+        log('DEBUG', '[LIFECYCLE] listenToSignals já ativo; registro duplicado ignorado');
+        return;
+    }
+
+    // Sinais de interrupção padrão (Ctrl+C, PM2 Stop/Reload)
+    signalHandlers.sigint = () => gracefulShutdown('SIGINT');
+    signalHandlers.sigterm = () => gracefulShutdown('SIGTERM');
+    signalHandlers.sigusr2 = () => gracefulShutdown('SIGUSR2');
+
+    registerSignalSafely('SIGINT', 'sigint', signalHandlers.sigint);
+    registerSignalSafely('SIGTERM', 'sigterm', signalHandlers.sigterm);
+    registerSignalSafely('SIGUSR2', 'sigusr2', signalHandlers.sigusr2);
+
+    signalHandlers.sigquit = () => gracefulShutdown('SIGQUIT');
+    signalHandlers.sigbreak = () => gracefulShutdown('SIGBREAK');
+
+    if (process.platform === 'win32') {
+        registerSignalSafely('SIGBREAK', 'sigbreak', signalHandlers.sigbreak);
+        signalHandlers.sigquit = null;
+    } else {
+        registerSignalSafely('SIGQUIT', 'sigquit', signalHandlers.sigquit);
+        signalHandlers.sigbreak = null;
+    }
+
+    // Sinais auxiliares de subprocesso (não encerram o processo principal)
+    signalHandlers.sigpipe = () => {
+        if (isShuttingDown) {
+            return;
+        }
+        log('DEBUG', '[LIFECYCLE] SIGPIPE recebido; mantendo runtime ativo.');
+    };
+    signalHandlers.sigchld = () => {
+        if (isShuttingDown) {
+            return;
+        }
+        log('DEBUG', '[LIFECYCLE] SIGCHLD recebido; subprocesso finalizado.');
+    };
+
+    if (process.platform === 'win32') {
+        signalHandlers.sigpipe = null;
+        signalHandlers.sigchld = null;
+    } else {
+        registerSignalSafely('SIGPIPE', 'sigpipe', signalHandlers.sigpipe);
+        registerSignalSafely('SIGCHLD', 'sigchld', signalHandlers.sigchld);
+    }
 
     // Captura de falhas catastróficas para evitar encerramento "sujo" da infraestrutura
-    process.on('uncaughtException', err => {
+    signalHandlers.uncaughtException = err => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
         gracefulShutdown('UNCAUGHT_EXCEPTION');
-    });
+    };
+    process.on('uncaughtException', signalHandlers.uncaughtException);
 
-    process.on('unhandledRejection', reason => {
+    signalHandlers.unhandledRejection = reason => {
         log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
         gracefulShutdown('UNHANDLED_REJECTION');
-    });
+    };
+    process.on('unhandledRejection', signalHandlers.unhandledRejection);
+
+    signalsListening = true;
 }
 
-export { gracefulShutdown, listenToSignals, setAllowProcessExit };
+function cleanupSignalListeners() {
+    if (!signalsListening) {
+        return;
+    }
+
+    removeSignalListenerSafely('SIGINT', 'sigint');
+    removeSignalListenerSafely('SIGTERM', 'sigterm');
+    removeSignalListenerSafely('SIGUSR2', 'sigusr2');
+    removeSignalListenerSafely('SIGQUIT', 'sigquit');
+    removeSignalListenerSafely('SIGBREAK', 'sigbreak');
+    removeSignalListenerSafely('SIGPIPE', 'sigpipe');
+    removeSignalListenerSafely('SIGCHLD', 'sigchld');
+    removeSignalListenerSafely('uncaughtException', 'uncaughtException');
+    removeSignalListenerSafely('unhandledRejection', 'unhandledRejection');
+
+    signalsListening = false;
+}
+
+function __resetLifecycleStateForTests() {
+    cleanupSignalListeners();
+    isShuttingDown = false;
+    allowProcessExit = true;
+}
+
+const __lifecycleTestHooks = Object.freeze({
+    getSignalHandlers: () => signalHandlers,
+    isShuttingDown: () => isShuttingDown,
+    isSignalsListening: () => signalsListening,
+    resetState: __resetLifecycleStateForTests,
+});
+
+export { __lifecycleTestHooks, cleanupSignalListeners, gracefulShutdown, listenToSignals, setAllowProcessExit };

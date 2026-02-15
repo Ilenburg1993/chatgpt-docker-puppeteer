@@ -1,18 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
-// Load environment variables: .env.local (sensitive) overrides .env (defaults)
-// Order matters: .env.local must be loaded first to take precedence
-import dotenv from 'dotenv';
-import fs from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// Load .env.local if exists (Ollama Cloud API keys, etc.)
-if (fs.existsSync('.env.local')) {
-    dotenv.config({ path: '.env.local' });
-}
-// Load .env (defaults, always exists)
-dotenv.config();
+import '#core/env_bootstrap';
 
 import * as Authority from '#core/authority';
 import CONFIG from '#core/config';
@@ -75,7 +65,7 @@ async function persistServerState(nerv, port, authority = Authority.SERVER_AUTHO
     };
 
     try {
-        await Discovery.publishServerReady(null, payload);
+        await Discovery.publishServerReady(nerv, payload);
         log('DEBUG', '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)');
     } catch (err) {
         log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);

@@ -163,7 +163,7 @@ export class OllamaClient {
     /**
      * Resolve execution runtime according to policy.
      *
-     * @param {{ operation: 'embedding'|'generate'|'models'|'model_info', runtimePreference?: 'auto'|'cloud'|'local' }} options
+     * @param {{ operation?: 'embedding'|'generate'|'models'|'model_info', runtimePreference?: 'auto'|'cloud'|'local' }} [options]
      * @returns {{ runtime: 'cloud'|'local', requested: 'auto'|'cloud'|'local', operation: string, reason: string, cloudEnabled: boolean, localFallbackEnabled: boolean }}
      */
     resolveRuntime(options = {}) {
@@ -480,7 +480,7 @@ export class OllamaClient {
     /**
      * Returns both cloud and local model inventories.
      *
-     * @returns {Promise<{priority: 'cloud-first-non-embedding', cloud_enabled: boolean, fallback_local_enabled: boolean, non_embedding_runtime: 'auto'|'cloud'|'local', local_model_profile: 'light'|'custom'|string, cloud_models: any[], local_models: any[], errors: { cloud?: string, local?: string }}>} 
+     * @returns {Promise<{priority: string, cloud_enabled: boolean, fallback_local_enabled: boolean, non_embedding_runtime: string, local_model_profile: string, cloud_models: any[], local_models: any[], errors: { cloud?: string, local?: string }}>}
      */
     async listModelsDetailed() {
         const details = {

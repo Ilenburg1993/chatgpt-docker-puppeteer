@@ -37,6 +37,15 @@ function _normalizePolicy(policy) {
     return { ...base, ...policy };
 }
 
+/**
+ * @param {{
+ *   title?: string,
+ *   description?: string,
+ *   autonomy_mode?: string,
+ *   policy?: Record<string, unknown>,
+ *   context?: Record<string, unknown>
+ * }} [input={}]
+ */
 function createMission({
     title,
     description = '',
@@ -194,4 +203,3 @@ function deleteMission(missionId) {
 }
 
 export { MISSION_STATUS, AUTONOMY_MODES, createMission, listMissions, getMissionById, updateMission, deleteMission };
-

@@ -25,8 +25,8 @@ class StructuredExtractor {
     /**
      * Extrai resposta em múltiplos formatos
      *
-     * @param {Page} page - Puppeteer page instance
-     * @param {Object} protocol - SADI protocol (selector, etc)
+     * @param {any} page - Puppeteer page instance
+     * @param {any} protocol - SADI protocol (selector, etc)
      * @returns {Promise<Object>} - { text, markdown, html, json }
      */
     async extract(page, protocol) {
@@ -139,7 +139,7 @@ class StructuredExtractor {
      */
     _parseStructured(html) {
         try {
-            const root = parseHTML(html);
+            const root = /** @type {any} */ (parseHTML(html));
 
             return {
                 sections: this._extractSections(root),
@@ -163,7 +163,7 @@ class StructuredExtractor {
     /**
      * Extrai seções (headings)
      *
-     * @param {HTMLElement} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {Array} - [{ level, text, content }]
      * @private
      */
@@ -196,7 +196,7 @@ class StructuredExtractor {
     /**
      * Extrai code blocks
      *
-     * @param {HTMLElement} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {Array} - [{ language, code, isInline }]
      * @private
      */
@@ -239,7 +239,7 @@ class StructuredExtractor {
     /**
      * Detecta linguagem de code block
      *
-     * @param {HTMLElement} codeEl - Code element
+     * @param {any} codeEl - Code element
      * @returns {string} - Language (python, javascript, etc)
      * @private
      */
@@ -264,7 +264,7 @@ class StructuredExtractor {
     /**
      * Extrai links
      *
-     * @param {HTMLElement} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {Array} - [{ text, href, title }]
      * @private
      */
@@ -288,7 +288,7 @@ class StructuredExtractor {
     /**
      * Extrai images
      *
-     * @param {HTMLElement} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {Array} - [{ src, alt, title }]
      * @private
      */
@@ -312,7 +312,7 @@ class StructuredExtractor {
     /**
      * Extrai tables
      *
-     * @param {HTMLElement} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {Array} - [{ headers, rows }]
      * @private
      */

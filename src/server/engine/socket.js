@@ -421,6 +421,8 @@ export const sendToClient = (clientId, eventName, data) => {
 export const connectExternal = async (port = 3008) => {
     const { io: ioClient } = await import('socket.io-client');
     const url = `http://localhost:${port}`;
+    const connectTimeoutMs = Number(process.env.SPLIT_CONNECT_TIMEOUT_MS || 5000) || 5000;
+    const handshakeTimeoutMs = Number(process.env.SPLIT_HANDSHAKE_TIMEOUT_MS || 5000) || 5000;
 
     log('INFO', `[HUB] Conectando a servidor externo: ${url}`);
 
@@ -432,18 +434,126 @@ export const connectExternal = async (port = 3008) => {
         reconnectionAttempts: 5
     });
 
-    // Aguardar conexão
+    const handshakeIdentity = {
+        robot_id: process.env.ROBOT_ID || `maestro-${process.pid}`,
+        instance_id: process.env.NODE_APP_INSTANCE || String(process.pid),
+        role: ActorRole.MAESTRO,
+        version: PROTOCOL_VERSION,
+        capabilities: ['split-mode', 'external-socket']
+    };
+
+    const performHandshake = async () =>
+        new Promise((resolve, reject) => {
+            const onAuthorized = () => {
+                cleanup();
+                resolve();
+            };
+
+            const onRejected = payload => {
+                cleanup();
+                reject(new Error(`Handshake rejected: ${payload?.reason || 'unknown reason'}`));
+            };
+
+            const onDisconnect = reason => {
+                cleanup();
+                reject(new Error(`Disconnected before handshake authorization: ${reason}`));
+            };
+
+            const timer = setTimeout(() => {
+                cleanup();
+                reject(new Error(`Timeout waiting for handshake authorization (${handshakeTimeoutMs}ms)`));
+            }, handshakeTimeoutMs);
+
+            function cleanup() {
+                clearTimeout(timer);
+                clientSocket.off('handshake:authorized', onAuthorized);
+                clientSocket.off('handshake:rejected', onRejected);
+                clientSocket.off('disconnect', onDisconnect);
+            }
+
+            clientSocket.on('handshake:authorized', onAuthorized);
+            clientSocket.on('handshake:rejected', onRejected);
+            clientSocket.on('disconnect', onDisconnect);
+            clientSocket.emit('handshake:present', { identity: handshakeIdentity });
+        });
+
+    // Reaplica handshake a cada (re)conexão para evitar queda por timeout no servidor.
+    let handshakeInFlight = null;
+    const runHandshake = async () => {
+        if (!handshakeInFlight) {
+            handshakeInFlight = performHandshake().finally(() => {
+                handshakeInFlight = null;
+            });
+        }
+        return handshakeInFlight;
+    };
+
+    let initialReadySettled = false;
     await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Timeout connecting to external server')), 5000);
-        clientSocket.on('connect', () => {
-            clearTimeout(timeout);
-            log('INFO', `[HUB] ✅ Conectado a servidor externo (${url})`);
+        const initialReadyTimeoutMs = connectTimeoutMs + handshakeTimeoutMs;
+        const timer = setTimeout(() => {
+            settleReject(new Error(`Timeout connecting and authorizing external server (${initialReadyTimeoutMs}ms)`));
+        }, initialReadyTimeoutMs);
+
+        const settleResolve = () => {
+            if (initialReadySettled) {
+                return;
+            }
+            initialReadySettled = true;
+            clearTimeout(timer);
+            clientSocket.off('connect_error', onConnectError);
             resolve();
-        });
-        clientSocket.on('connect_error', err => {
-            clearTimeout(timeout);
+        };
+
+        const settleReject = err => {
+            if (initialReadySettled) {
+                return;
+            }
+            initialReadySettled = true;
+            clearTimeout(timer);
+            clientSocket.off('connect_error', onConnectError);
             reject(err);
-        });
+        };
+
+        const onConnectError = err => {
+            if (!initialReadySettled) {
+                settleReject(err);
+            }
+        };
+
+        const onConnect = async () => {
+            log('INFO', `[HUB] ✅ Conectado a servidor externo (${url})`);
+            try {
+                await runHandshake();
+                log('INFO', '[HUB] ✅ Handshake autorizado pelo servidor externo');
+                settleResolve();
+            } catch (err) {
+                if (!initialReadySettled) {
+                    settleReject(err);
+                } else {
+                    log('WARN', `[HUB] Handshake em reconexão falhou: ${err?.message || String(err)}`);
+                }
+            }
+        };
+
+        clientSocket.on('connect', onConnect);
+        clientSocket.on('connect_error', onConnectError);
+    });
+
+    clientSocket.on('reconnect_attempt', attempt => {
+        log('DEBUG', `[HUB] Tentativa de reconexão ao servidor externo (#${attempt})`);
+    });
+
+    clientSocket.on('reconnect', attempt => {
+        log('INFO', `[HUB] Reconectado ao servidor externo (#${attempt})`);
+    });
+
+    clientSocket.on('reconnect_error', err => {
+        log('WARN', `[HUB] Erro de reconexão ao servidor externo: ${err?.message || String(err)}`);
+    });
+
+    clientSocket.on('reconnect_failed', () => {
+        log('ERROR', '[HUB] Falha definitiva de reconexão ao servidor externo');
     });
 
     // Bridge events do cliente para o internalEmitter
@@ -456,6 +566,8 @@ export const connectExternal = async (port = 3008) => {
         on: (event, handler) => clientSocket.on(event, handler),
         off: (event, handler) => clientSocket.off(event, handler),
         emit: (event, data) => clientSocket.emit(event, data),
+        // Best-effort in split mode: preserve API shape even without direct server-side socket lookup.
+        sendToClient: (clientId, event, data) => clientSocket.emit(event, { clientId, payload: data }),
         connected: () => clientSocket.connected,
         disconnect: () => clientSocket.disconnect()
     };

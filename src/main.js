@@ -35,11 +35,9 @@
 // =========================================================================
 // ENVIRONMENT VARIABLES (load .env.local before imports)
 // =========================================================================
-// Load environment variables: .env.local (sensitive) overrides .env (defaults)
-// Order matters: .env.local must be loaded first to take precedence
-import dotenv from 'dotenv';
-import fs from 'node:fs';
 import { resolve } from 'node:path';
+import * as Authority from './core/authority.js';
+import './core/env_bootstrap.js';
 import CONFIG from './core/config.js';
 import { CONNECTION_MODES } from './core/constants/browser.js';
 import { STATUS_VALUES } from './core/constants/tasks.js';
@@ -55,13 +53,6 @@ import { createKernel } from './kernel/kernel.js';
 import { createNERV } from './nerv/nerv.js';
 import { ActionCode, ActorRole } from './shared/nerv/constants.js';
 
-// Load .env.local if exists (Ollama Cloud API keys, etc.)
-if (fs.existsSync('.env.local')) {
-    dotenv.config({ path: '.env.local' });
-}
-// Load .env (defaults, always exists)
-dotenv.config();
-
 import { AgentLoop } from '#agent/agent_loop';
 import { AttemptWatchdog } from '#agent/attempt_watchdog';
 import { HeartbeatWatchdog } from '#agent/heartbeat_watchdog';
@@ -71,8 +62,6 @@ import { QueueWorker } from '#agent/queue_worker';
 import { TaskControlWatcher } from '#agent/task_control_watcher';
 import { TaskOrchestrationWorker } from '#agent/task_orchestration_worker';
 import { TaskStateProjector } from '#agent/task_state_projector';
-// Load .env (defaults, always exists)
-dotenv.config();
 
 // =========================================================================
 // ARCHITECTURAL GUARDS (process-wide, non-negotiable)
@@ -167,18 +156,20 @@ async function checkPortInUse(port) {
  * - Não modifica estado global
  */
 function resolveAuthority() {
-    const ALLOWED = ['standalone', 'delegated'];
-
     // CLI override (ex: --authority=delegated)
     const arg = process.argv.slice(2).find(a => a.startsWith('--authority=') || a.startsWith('--server-authority='));
     const rawFromArg = arg ? arg.split('=')[1] : undefined;
 
-    const raw = rawFromArg ?? process.env.SERVER_AUTHORITY ?? 'standalone';
-    const authority = String(raw).toLowerCase().trim();
+    const raw = rawFromArg ?? process.env.SERVER_AUTHORITY ?? Authority.SERVER_AUTHORITIES.STANDALONE;
+    const allowed = Object.values(Authority.SERVER_AUTHORITIES);
+    let authority = null;
 
-    if (!ALLOWED.includes(authority)) {
+    try {
+        authority = Authority.resolveAuthority(raw);
+    } catch (err) {
         log('FATAL', `[CONFIG] SERVER_AUTHORITY inválido: "${raw}"`);
-        log('FATAL', `[CONFIG] Valores válidos: ${ALLOWED.join(', ')}`);
+        log('FATAL', `[CONFIG] Valores válidos: ${allowed.join(', ')}`);
+        log('FATAL', `[CONFIG] Detalhe: ${err?.message || String(err)}`);
         process.exit(1);
     }
 
@@ -436,6 +427,8 @@ async function boot() {
                         PROXY_PORT: proxyPort,
                         PROXY_BIND: CONFIG.CHROME_PROXY_BIND,
                         LOG_LEVEL: CONFIG.LOG_LEVEL || 'INFO',
+                        // Signal lifecycle is centralized in src/main.js
+                        AUTO_HANDLE_SIGNALS: false,
                     });
 
                     // Injeta NERV no proxy para telemetria
@@ -707,7 +700,7 @@ async function boot() {
 
             await Promise.race([
                 // Inicialização normal
-                async () => {
+                (async () => {
                     // Ensure DB is ready (migrations) and import legacy filesystem queue once (best-effort).
                     getDb();
                     try {
@@ -812,7 +805,7 @@ async function boot() {
                     }
 
                     log('INFO', '[BOOT] ✅ SSOT workers online (SQLite queue)');
-                },
+                })(),
 
                 // Timeout watchdog
                 new Promise((_, reject) =>
@@ -832,7 +825,7 @@ async function boot() {
         // ======================================================================
         // Modos suportados:
         //
-        //   integrated → Maestro sobe HTTP server local
+        //   integrated → Maestro delega bootstrap HTTP/socket para src/server/main.js
         //   split      → Maestro NÃO sobe HTTP — conecta em server externo
         //   disabled   → Maestro não usa camada server/socket
         //
@@ -844,7 +837,6 @@ async function boot() {
         // Apenas logamos aqui para clareza
         log('INFO', `[BOOT] Server mode (determinístico): ${SERVER_MODE}`);
 
-        const serverEngine = await import('./server/engine/server.js').then(m => m.default ?? m);
         const socketModule = await import('./server/engine/socket.js').then(m => m.default ?? m);
 
         let socketHub = null;
@@ -852,6 +844,8 @@ async function boot() {
         let boundPort = undefined;
         let httpServer = undefined;
         let httpAuthority = false;
+        let serverLifecycle = null;
+        let serverLifecycleManaged = false;
 
         // ----------------------------------------------------------------------
         // SPLIT MODE — conecta em server externo já conhecido
@@ -932,84 +926,73 @@ async function boot() {
         }
 
         // ----------------------------------------------------------------------
-        // INTEGRATED MODE — Maestro sobe server local
+        // INTEGRATED MODE — delega para bootstrap canônico do Server Process
         // ----------------------------------------------------------------------
         else if (SERVER_MODE === 'integrated') {
-            const serverPort = process.env.PORT || CONFIG.SERVER_PORT || 3008;
+            /**
+             * Em modo integrado, o Maestro NÃO monta manualmente HTTP/socket.
+             * O bootstrap canônico do servidor (`src/server/main.js`) é reutilizado
+             * para garantir:
+             *  - mesmo contrato de inicialização entre processo dedicado e integrado
+             *  - um único caminho de configuração de telemetria/watchers/router
+             *  - menor divergência de comportamento operacional
+             *
+             * A autoridade é forçada para `delegated` neste contexto porque:
+             *  - sinais e exit policy já são coordenados por `src/main.js`;
+             *  - o NERV principal já existe e deve ser injetado.
+             */
+            const { serverBootstrap } = await import('./server/main.js');
+            const serverRuntime = await serverBootstrap({
+                authority: Authority.SERVER_AUTHORITIES.DELEGATED,
+                nerv,
+            });
 
-            const instance = await serverEngine.start(serverPort);
-
-            if (!instance || typeof instance !== 'object' || !instance.server || !instance.port) {
-                log('FATAL', '[BOOT] serverEngine.start retornou shape inválido');
+            if (!serverRuntime || typeof serverRuntime !== 'object') {
+                log('FATAL', '[BOOT] serverBootstrap retornou shape inválido (integrated mode)');
                 process.exit(1);
             }
 
-            httpServer = instance.server;
-            boundPort = Number.parseInt(instance.port, 10);
-
-            // Log protocol info if available
-            if (instance.protocol) {
-                log('INFO', `[BOOT] Servidor iniciado com protocolo: ${instance.protocol}`);
-            }
-
-            socketHub = socketModule.init(httpServer);
-
-            // Validação básica do socket hub
-            if (!socketHub || typeof socketHub.on !== 'function' || typeof socketHub.emit !== 'function') {
-                log('FATAL', '[BOOT] socketHub inválido após init');
+            const runtimePort = Number.parseInt(String(serverRuntime.port), 10);
+            if (!serverRuntime.httpServer || !Number.isInteger(runtimePort) || runtimePort < 1 || runtimePort > 65535) {
+                log('FATAL', '[BOOT] serverBootstrap retornou runtime incompleto (httpServer/port)');
                 process.exit(1);
             }
 
-            // Fornece wrapper fallback para "sendToClient" caso o hub não exponha a função
-            let socketHubWrapper = socketHub;
-            if (typeof socketHub.sendToClient !== 'function') {
-                socketHubWrapper = Object.create(socketHub);
-                socketHubWrapper.sendToClient = (clientId, event, payload) => {
-                    try {
-                        const io = typeof socketModule.getIO === 'function' ? socketModule.getIO() : null;
-                        if (io) {
-                            io.to(clientId).emit(event, payload);
-                            return true;
-                        }
-                    } catch (e) {
-                        /* fallback */
-                    }
-                    if (typeof socketHub.emit === 'function') {
-                        socketHub.emit(event, payload);
-                        return true;
-                    }
-                    return false;
-                };
-                log('WARN', '[BOOT] sendToClient não disponível — usando fallback baseado em emit');
-            }
-            // assegura que o contexto exporte o wrapper com sendToClient
-            socketHub = socketHubWrapper;
-
-            const ServerNERVAdapter = await import('./server/nerv_adapter/server_nerv_adapter.js').then(
-                m => m.default ?? m
-            );
-            serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
-
-            // BUG-011: Validação pós-instantiation
-            if (!serverAdapter || typeof serverAdapter !== 'object') {
-                log('FATAL', '[BOOT] ServerNERVAdapter initialization falhou (integrated mode)');
-                process.exit(1);
-            }
-            if (typeof serverAdapter.shutdown !== 'function') {
-                log('FATAL', '[BOOT] ServerNERVAdapter inválido: método shutdown ausente');
+            if (serverRuntime.nerv !== nerv) {
+                log('FATAL', '[BOOT] serverBootstrap retornou instância NERV divergente da injetada');
                 process.exit(1);
             }
 
+            if (!serverRuntime.serverAdapter || typeof serverRuntime.serverAdapter.shutdown !== 'function') {
+                log('FATAL', '[BOOT] serverBootstrap retornou serverAdapter inválido');
+                process.exit(1);
+            }
+
+            httpServer = serverRuntime.httpServer;
+            boundPort = runtimePort;
+            serverAdapter = serverRuntime.serverAdapter;
             httpAuthority = true;
 
-            // Normalize boundPort
-            boundPort = Number.parseInt(instance.port, 10);
-            if (!Number.isInteger(boundPort) || boundPort < 1 || boundPort > 65535) {
-                log('WARN', `[BOOT] boundPort inválida: ${instance.port}`);
-                boundPort = null;
+            // Mantém shape compatível do contexto: em integrated o hub canônico é o módulo de socket.
+            socketHub = socketModule;
+
+            try {
+                serverLifecycle = await import('./server/engine/lifecycle.js').then(m => m.default ?? m);
+                if (serverLifecycle && typeof serverLifecycle.gracefulShutdown === 'function') {
+                    serverLifecycleManaged = true;
+                } else {
+                    serverLifecycle = null;
+                }
+            } catch (err) {
+                serverLifecycle = null;
+                serverLifecycleManaged = false;
+                log('WARN', `[BOOT] Lifecycle do server indisponível para shutdown coordenado: ${err.message}`);
             }
 
-            log('INFO', `[BOOT] Server integrado iniciado (porta=${boundPort ?? 'n/a'})`);
+            log(
+                'INFO',
+                `[BOOT] Server integrado via serverBootstrap (porta=${boundPort}, lifecycleManaged=${serverLifecycleManaged})`
+            );
         }
 
         // ----------------------------------------------------------------------
@@ -1126,6 +1109,8 @@ async function boot() {
             httpServer: httpServer ?? null,
             httpAuthority: Boolean(httpAuthority),
             httpPort: boundPort ?? null,
+            serverLifecycle: serverLifecycle ?? null,
+            serverLifecycleManaged: Boolean(serverLifecycleManaged),
 
             // -------- METRICS --------
             bootDuration,
@@ -1173,6 +1158,8 @@ async function boot() {
  * @param {Object} context.nerv - Sistema de comunicação NERV
  * @param {Object} context.httpServer - Servidor HTTP (se integrado)
  * @param {boolean} context.httpAuthority - Se este processo é dono do bind HTTP
+ * @param {Object} context.serverLifecycle - Módulo de lifecycle do server (opcional)
+ * @param {boolean} context.serverLifecycleManaged - Se lifecycle do server deve coordenar teardown de infraestrutura
  * @param {Object} context.queueWorker - Worker da fila SSOT
  * @param {Object} context.taskProjector - Projetor de estado de tarefas
  * @param {Object} context.taskControlWatcher - Watcher de controle de tarefas
@@ -1181,7 +1168,9 @@ async function boot() {
  * @param {Object} context.attemptWatchdog - Watchdog de tentativas
  * @param {Object} context.heartbeatWatchdog - Watchdog de heartbeat
  * @param {Object} context.agentLoop - Loop principal do agente
- * @returns {Promise<void>}
+ * @param {Object} [options] - Opções de shutdown
+ * @param {boolean} [options.exitOnComplete=false] - Se verdadeiro, encerra processo ao concluir
+ * @returns {Promise<{ok: boolean, failedPhases: number, totalPhases: number, duration: number}>}
  *
  * @throws {Error} Se alguma fase crítica do shutdown falhar
  *
@@ -1191,11 +1180,9 @@ async function boot() {
  * - Limpa recursos globais
  * - Process.exit() com código apropriado
  */
-	async function shutdown(context) {
+async function shutdown(context, options = {}) {
         log('WARN', '[SHUTDOWN] Iniciando shutdown gracioso coordenado...');
-
-        // Remove signal handlers para evitar re-entrada e memory leaks
-        cleanupSignalHandlers();
+        const exitOnComplete = options.exitOnComplete === true;
 
         const shutdownStartTime = Date.now();
         const phases = [];
@@ -1209,6 +1196,8 @@ async function boot() {
             nerv,
             httpServer,
             httpAuthority,
+            serverLifecycle,
+            serverLifecycleManaged,
             queueWorker,
             taskProjector,
             taskControlWatcher,
@@ -1228,6 +1217,18 @@ async function boot() {
                 fn: async () => {
                     if (serverAdapter && typeof serverAdapter.shutdown === 'function') {
                         await serverAdapter.shutdown();
+                    }
+
+                    // Em modo integrado via serverBootstrap, lifecycle do server é responsável
+                    // por encerrar watchers/telemetria/socket/http de forma canônica.
+                    if (
+                        serverLifecycleManaged &&
+                        serverLifecycle &&
+                        typeof serverLifecycle.gracefulShutdown === 'function'
+                    ) {
+                        await serverLifecycle.gracefulShutdown('MAESTRO_COORDINATED_SHUTDOWN');
+                        log('DEBUG', '[SHUTDOWN] Server lifecycle encerrado via gracefulShutdown coordenado');
+                        return;
                     }
 
                     // auxiliares — best effort
@@ -1314,6 +1315,11 @@ async function boot() {
                 fn: async () => {
                     if (!httpAuthority) {
                         log('DEBUG', '[SHUTDOWN] HTTPServer skip — não é autoridade HTTP');
+                        return;
+                    }
+
+                    if (serverLifecycleManaged) {
+                        log('DEBUG', '[SHUTDOWN] HTTPServer skip — encerrado pelo server lifecycle');
                         return;
                     }
 
@@ -1449,9 +1455,18 @@ async function boot() {
             {
                 name: 'TempProfiles',
                 fn: async () => {
-                    const cleaned = await ConnectionOrchestrator.cleanupTempProfiles();
-                    if (cleaned > 0) {
-                        log('INFO', `[SHUTDOWN] Removidos ${cleaned} profiles temporários`);
+                    const cleanupTempProfiles = ConnectionOrchestrator?.cleanupTempProfiles;
+                    if (typeof cleanupTempProfiles !== 'function') {
+                        log(
+                            'DEBUG',
+                            '[SHUTDOWN] ConnectionOrchestrator.cleanupTempProfiles indisponível; limpeza de perfil temporário ignorada'
+                        );
+                        return;
+                    }
+
+                    const cleaned = await cleanupTempProfiles();
+                    if (Number(cleaned) > 0) {
+                        log('INFO', `[SHUTDOWN] Removidos ${cleaned} profiles temporarios`);
                     }
                 },
             },
@@ -1494,9 +1509,21 @@ async function boot() {
         const shutdownDuration = Date.now() - shutdownStartTime;
         const successCount = phases.filter(p => p.status === STATUS_VALUES.SUCCESS).length;
 
+        // Remove signal handlers ao final para evitar janela de fallback para signal default
+        // enquanto o shutdown coordenado ainda está em execução.
+        cleanupSignalHandlers();
+
         if (failedPhases === 0) {
             log('INFO', `[SHUTDOWN] ✅ Shutdown completo: ${successCount}/${total} fases OK em ${shutdownDuration}ms`);
-            process.exit(0);
+            if (exitOnComplete) {
+                process.exit(0);
+            }
+            return {
+                ok: true,
+                failedPhases: 0,
+                totalPhases: total,
+                duration: shutdownDuration,
+            };
         }
 
         log(
@@ -1510,7 +1537,15 @@ async function boot() {
                 log('ERROR', `   ❌ ${p.name}: ${p.error}`);
             });
 
-        process.exit(1);
+        if (exitOnComplete) {
+            process.exit(1);
+        }
+        return {
+            ok: false,
+            failedPhases,
+            totalPhases: total,
+            duration: shutdownDuration,
+        };
     }
 
 /* ==========================================================================
@@ -1529,6 +1564,11 @@ let _shutdownPromise = null;
 const _signalHandlers = {
     sigterm: null,
     sigint: null,
+    sigusr2: null,
+    sigquit: null,
+    sigbreak: null,
+    sigpipe: null,
+    sigchld: null,
     sighup: null,
     uncaughtException: null,
     unhandledRejection: null
@@ -1540,7 +1580,8 @@ const _signalHandlers = {
 /**
  * Remove todos os signal handlers registrados.
  *
- * Limpa handlers para SIGINT, SIGTERM, SIGHUP, SIGUSR2.
+ * Limpa handlers para SIGINT, SIGTERM, SIGHUP, SIGUSR2, SIGQUIT/SIGBREAK
+ * e sinais opcionais de subprocesso (SIGPIPE/SIGCHLD).
  * Essencial para evitar memory leaks e comportamento inesperado
  * durante shutdown ou reinicialização.
  *
@@ -1563,6 +1604,26 @@ function cleanupSignalHandlers() {
         if (_signalHandlers.sighup) {
             process.removeListener('SIGHUP', _signalHandlers.sighup);
             _signalHandlers.sighup = null;
+        }
+        if (_signalHandlers.sigusr2) {
+            process.removeListener('SIGUSR2', _signalHandlers.sigusr2);
+            _signalHandlers.sigusr2 = null;
+        }
+        if (_signalHandlers.sigquit) {
+            process.removeListener('SIGQUIT', _signalHandlers.sigquit);
+            _signalHandlers.sigquit = null;
+        }
+        if (_signalHandlers.sigbreak) {
+            process.removeListener('SIGBREAK', _signalHandlers.sigbreak);
+            _signalHandlers.sigbreak = null;
+        }
+        if (_signalHandlers.sigpipe) {
+            process.removeListener('SIGPIPE', _signalHandlers.sigpipe);
+            _signalHandlers.sigpipe = null;
+        }
+        if (_signalHandlers.sigchld) {
+            process.removeListener('SIGCHLD', _signalHandlers.sigchld);
+            _signalHandlers.sigchld = null;
         }
         if (_signalHandlers.uncaughtException) {
             process.removeListener('uncaughtException', _signalHandlers.uncaughtException);
@@ -1588,6 +1649,10 @@ function cleanupSignalHandlers() {
  * Handlers registrados:
  * - SIGINT (Ctrl+C): Inicia shutdown gracioso
  * - SIGTERM: Inicia shutdown gracioso
+ * - SIGQUIT (POSIX): Inicia shutdown gracioso
+ * - SIGBREAK (Windows): Inicia shutdown gracioso
+ * - SIGPIPE (POSIX): Ignora pipe quebrado sem encerrar processo
+ * - SIGCHLD (POSIX): Observa ciclo de subprocessos sem encerrar processo
  * - SIGHUP: Inicia shutdown gracioso (terminal hangup)
  * - SIGUSR2: Inicia shutdown gracioso (PM2 graceful reload)
  *
@@ -1599,6 +1664,16 @@ function cleanupSignalHandlers() {
  * - Pode sobrescrever handlers existentes
  */
 function setupSignalHandlers(context) {
+    const registerOptionalSignal = (signal, key, handler) => {
+        try {
+            process.on(signal, handler);
+            _signalHandlers[key] = handler;
+        } catch (err) {
+            _signalHandlers[key] = null;
+            log('DEBUG', `[SIGNAL] ${signal} não suportado nesta plataforma: ${err.message}`);
+        }
+    };
+
     const triggerShutdown = async (reason, meta = {}) => {
         // Se já há shutdown em andamento, retorna a mesma Promise
         if (_shutdownPromise) {
@@ -1607,7 +1682,7 @@ function setupSignalHandlers(context) {
         }
 
         // Cria Promise de shutdown (garante que múltiplos signals aguardam o mesmo shutdown)
-        _shutdownPromise = async () => {
+        _shutdownPromise = (async () => {
             log(
                 'WARN',
                 `[SIGNAL] Shutdown disparado (${reason}) — serverMode=${context?.serverMode ?? 'n/a'} httpAuthority=${context?.httpAuthority ?? false} port=${context?.httpPort ?? 'n/a'}`
@@ -1623,16 +1698,16 @@ function setupSignalHandlers(context) {
             }
 
             try {
-                await shutdown(context);
-                process.exit(0);
+                const result = await shutdown(context, { exitOnComplete: false });
+                process.exit(result?.ok ? 0 : 1);
             } catch (err) {
                 log('FATAL', `[SIGNAL] Falha durante shutdown: ${err.message}`);
                 process.exit(1);
             }
-        };
+        })();
 
         return _shutdownPromise;
-    };;
+    };
 
     /* -----------------------------------------------------------
        Sinais de término operacional
@@ -1640,9 +1715,44 @@ function setupSignalHandlers(context) {
 
     _signalHandlers.sigterm = () => triggerShutdown('SIGTERM');
     _signalHandlers.sigint = () => triggerShutdown('SIGINT');
+    _signalHandlers.sigusr2 = () => triggerShutdown('SIGUSR2');
+    _signalHandlers.sigquit = () => triggerShutdown('SIGQUIT');
+    _signalHandlers.sigbreak = () => triggerShutdown('SIGBREAK');
 
     process.on('SIGTERM', _signalHandlers.sigterm);
     process.on('SIGINT', _signalHandlers.sigint);
+    process.on('SIGUSR2', _signalHandlers.sigusr2);
+    if (process.platform === 'win32') {
+        process.on('SIGBREAK', _signalHandlers.sigbreak);
+    } else {
+        process.on('SIGQUIT', _signalHandlers.sigquit);
+    }
+
+    /* -----------------------------------------------------------
+       Sinais opcionais de subprocesso (não encerram processo)
+    ----------------------------------------------------------- */
+
+    _signalHandlers.sigpipe = () => {
+        if (_shutdownPromise) {
+            return;
+        }
+        log('DEBUG', '[SIGNAL] SIGPIPE recebido — ignorando para manter processo ativo');
+    };
+
+    _signalHandlers.sigchld = () => {
+        if (_shutdownPromise) {
+            return;
+        }
+        log('DEBUG', '[SIGNAL] SIGCHLD recebido — subprocesso finalizado');
+    };
+
+    if (process.platform === 'win32') {
+        _signalHandlers.sigpipe = null;
+        _signalHandlers.sigchld = null;
+    } else {
+        registerOptionalSignal('SIGPIPE', 'sigpipe', _signalHandlers.sigpipe);
+        registerOptionalSignal('SIGCHLD', 'sigchld', _signalHandlers.sigchld);
+    }
 
     /* -----------------------------------------------------------
        Reload de configuração (não encerra)
@@ -1699,6 +1809,18 @@ function setupSignalHandlers(context) {
     process.on('uncaughtException', _signalHandlers.uncaughtException);
     process.on('unhandledRejection', _signalHandlers.unhandledRejection);
 }
+
+function __resetShutdownStateForTests() {
+    _shutdownPromise = null;
+}
+
+const __mainTestHooks = Object.freeze({
+    setupSignalHandlers,
+    cleanupSignalHandlers,
+    resetShutdownState: __resetShutdownStateForTests,
+    getShutdownPromise: () => _shutdownPromise,
+    getSignalHandlers: () => _signalHandlers,
+});
 
 /* ==========================================================================
    MAIN ENTRY POINT — CANONICAL
@@ -1806,7 +1928,7 @@ if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
     });
 }
 
-export { boot, main, shutdown };
+export { boot, main, resolveServerMode, shutdown, __mainTestHooks };
 
 // Compatibility exports for server integration
     export { main as maestroBootstrap };

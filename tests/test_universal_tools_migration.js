@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport fs from 'node:fs';
+#!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';

@@ -202,7 +202,9 @@ async function applyRoutes(app) {
 
             // Expose upstream status dynamically (if upstream-manager is present).
             try {
-                const { getUpstreamStatus } = await import('../../integration/mcp/upstream-manager.mjs').catch(() => ({}));
+                const { getUpstreamStatus } = /** @type {{ getUpstreamStatus?: () => { upstreams?: any[] } }} */ (
+                    await import('../../integration/mcp/upstream-manager.mjs').catch(() => ({}))
+                );
                 if (typeof getUpstreamStatus === 'function') {
                     app.locals = app.locals || {};
                     app.locals.getMcpUpstreamsStatus = () => getUpstreamStatus().upstreams;

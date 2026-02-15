@@ -14,6 +14,7 @@ export interface ChromeProxyServiceConfig {
     PUBLIC_IP?: string | null;
     LOG_LEVEL?: string;
     ALLOWED_ORIGINS?: string[];
+    AUTO_HANDLE_SIGNALS?: boolean;
 }
 
 export interface CircuitBreakerState {

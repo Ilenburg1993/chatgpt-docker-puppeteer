@@ -26,6 +26,10 @@ function normalizeHeaders(extraHeaders) {
 }
 
 export class MCPUpstreamError extends Error {
+    /**
+     * @param {string} message
+     * @param {{ code?: number|string, data?: any, status?: number }} [meta]
+     */
     constructor(message, { code, data, status } = {}) {
         super(message);
         this.name = 'MCPUpstreamError';
@@ -35,13 +39,20 @@ export class MCPUpstreamError extends Error {
     }
 }
 
-export function createMcpHttpClient({ url, headers } = {}) {
+/**
+ * @param {{ url?: string, headers?: Headers | Record<string, string> }} [config]
+ */
+export function createMcpHttpClient(config = {}) {
+    const { url, headers } = /** @type {{ url?: string, headers?: Headers | Record<string, string> }} */ (config);
     if (!url || typeof url !== 'string') {
         throw new Error('createMcpHttpClient: url must be a non-empty string');
     }
 
     const baseHeaders = normalizeHeaders(headers);
 
+    /**
+     * @param {{ method: string, params?: Record<string, unknown>, signal?: AbortSignal }} payload
+     */
     async function request({ method, params, signal }) {
         const id = Math.random().toString(16).slice(2);
         const body = {
@@ -103,16 +114,27 @@ export function createMcpHttpClient({ url, headers } = {}) {
     }
 
     return {
+        /** @param {{ signal?: AbortSignal }} [payload] */
         listTools: ({ signal } = {}) => request({ method: 'tools/list', params: {}, signal }),
+        /** @param {{ name?: string, arguments?: Record<string, unknown>, signal?: AbortSignal }} [payload] */
         callTool: ({ name, arguments: args = {}, signal } = {}) => {
+            if (!name) {
+                throw new Error('tools/call requires name');
+            }
             return request({
                 method: 'tools/call',
                 params: { name, arguments: args },
                 signal
             });
         },
+        /** @param {{ signal?: AbortSignal }} [payload] */
         listResources: ({ signal } = {}) => request({ method: 'resources/list', params: {}, signal }),
-        readResource: ({ uri, signal } = {}) => request({ method: 'resources/read', params: { uri }, signal })
+        /** @param {{ uri?: string, signal?: AbortSignal }} [payload] */
+        readResource: ({ uri, signal } = {}) => {
+            if (!uri) {
+                throw new Error('resources/read requires uri');
+            }
+            return request({ method: 'resources/read', params: { uri }, signal });
+        }
     };
 }
-

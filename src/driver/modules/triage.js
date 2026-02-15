@@ -300,7 +300,7 @@ class Triage extends EventEmitter {
                          * Varredura Consolidada em passagem única (Single-Pass Scan).
                          */
                         scan: (
-                            root = document,
+                            /** @type {Document|ShadowRoot} */ root = document,
                             acc = { textParts: [], nodeCount: 0, hasPassword: false, spinners: [], buttons: [] },
                             depth = 0
                         ) => {

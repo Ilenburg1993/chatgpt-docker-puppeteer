@@ -39,20 +39,20 @@ async function test1_StabilizerCleanup() {
 
     const checks = [
         {
-            name: 'Tem wrapper externo com try-catch',
-            pass: content.includes('P4.1 FIX') && content.includes('try {')
-        },
-        {
             name: 'Registra observers globalmente',
             pass: content.includes('__STABILIZER_OBSERVERS')
         },
         {
-            name: 'Force cleanup no finally',
-            pass: content.includes('finally {') && content.includes('disconnect')
+            name: 'Cleanup local em finally',
+            pass: content.includes('finally {') && content.includes('observers.forEach')
         },
         {
-            name: 'Best-effort cleanup com catch',
-            pass: content.includes('best-effort') && content.includes('.catch(()')
+            name: 'Force cleanup global com best-effort',
+            pass: content.includes('window.__STABILIZER_OBSERVERS') && content.includes('.catch(() => {})')
+        },
+        {
+            name: 'Desconecta observers explicitamente',
+            pass: content.includes('obs.disconnect')
         }
     ];
 
@@ -79,20 +79,20 @@ async function test2_ServerShutdown() {
 
     const checks = [
         {
-            name: 'P4.2 FIX presente',
-            pass: content.includes('P4.2 FIX')
-        },
-        {
-            name: 'Chama reconcilier.stop()',
-            pass: content.includes('reconcilier.stop()')
+            name: 'Chama reconciler.stop()',
+            pass: content.includes("reconciler.stop")
         },
         {
             name: 'Chama hardwareTelemetry.stop()',
-            pass: content.includes('hardwareTelemetry.stop()')
+            pass: content.includes('hardwareTelemetry.stop')
         },
         {
-            name: 'Tem error handling para stops',
-            pass: content.includes('Falha ao parar reconcilier')
+            name: 'Tem error handling para reconciler',
+            pass: content.includes('Erro ao parar reconciler')
+        },
+        {
+            name: 'Tem fallback de import/stop para telemetria',
+            pass: content.includes('hardwareTelemetry.stop falhou') || content.includes('hardwareTelemetry.stop threw')
         }
     ];
 
@@ -119,20 +119,20 @@ async function test3_SignalGuard() {
 
     const checks = [
         {
-            name: 'P4.3 FIX presente',
-            pass: content.includes('P4.3 FIX')
+            name: 'Guarda por _shutdownPromise declarada',
+            pass: content.includes('let _shutdownPromise = null')
         },
         {
-            name: 'Flag _shutdownInProgress declarada',
-            pass: content.includes('_shutdownInProgress')
+            name: 'Guard check no início do triggerShutdown',
+            pass: content.includes('if (_shutdownPromise)')
         },
         {
-            name: 'gracefulShutdown function existe',
-            pass: content.includes('const gracefulShutdown = async')
+            name: 'Signals concorrentes reutilizam mesma Promise',
+            pass: content.includes('shutdown já em andamento')
         },
         {
-            name: 'Guard check no início',
-            pass: content.includes('if (_shutdownInProgress)')
+            name: 'Promise é criada como IIFE',
+            pass: content.includes('_shutdownPromise = (async () =>')
         },
         {
             name: 'SIGHUP também tem guard',
@@ -206,32 +206,31 @@ async function test5_CacheInvalidation() {
     const content = await fs.readFile(ioPath, 'utf-8');
 
     // Verificar ordem dentro das funções saveTask e deleteTask
-    // Procura por: async saveTask() { ... markDirty() ... taskStore.saveTask() }
-    const saveTaskFuncMatch = content.match(/async saveTask\([^)]*\)\s*\{[\s\S]{1,500}\}/);
-    const deleteTaskFuncMatch = content.match(/async deleteTask\([^)]*\)\s*\{[\s\S]{1,500}\}/);
+    const saveTaskFuncMatch = content.match(
+        /export const saveTask\s*=\s*async function\s*\(task\)\s*\{([\s\S]*?)\n\};/
+    );
+    const deleteTaskFuncMatch = content.match(
+        /export const deleteTask\s*=\s*async function\s*\(id\)\s*\{([\s\S]*?)\n\};/
+    );
 
     let saveTaskOrderCorrect = false;
     let deleteTaskOrderCorrect = false;
 
     if (saveTaskFuncMatch) {
-        const funcBody = saveTaskFuncMatch[0];
+        const funcBody = saveTaskFuncMatch[1];
         const markDirtyIndex = funcBody.indexOf('markDirty');
         const saveTaskIndex = funcBody.indexOf('taskStore.saveTask');
         saveTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < saveTaskIndex;
     }
 
     if (deleteTaskFuncMatch) {
-        const funcBody = deleteTaskFuncMatch[0];
+        const funcBody = deleteTaskFuncMatch[1];
         const markDirtyIndex = funcBody.indexOf('markDirty');
         const deleteTaskIndex = funcBody.indexOf('taskStore.deleteTask');
         deleteTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < deleteTaskIndex;
     }
 
     const checks = [
-        {
-            name: 'P5.2 FIX presente em saveTask',
-            pass: content.includes('P5.2 FIX')
-        },
         {
             name: 'saveTask: markDirty ANTES de taskStore.saveTask',
             pass: saveTaskOrderCorrect
@@ -241,8 +240,8 @@ async function test5_CacheInvalidation() {
             pass: deleteTaskOrderCorrect
         },
         {
-            name: 'Comentário "defensivo" presente',
-            pass: content.includes('defensivo')
+            name: 'Invalidação antecipada documentada',
+            pass: content.includes('Invalida primeiro')
         }
     ];
 
@@ -422,9 +421,11 @@ async function runAllTests() {
         console.log('  • TOTAL: 22/22 testes críticos validados');
         console.log('');
         console.log(`${colors.green}✨ Resiliência do Sistema: 99.8/100${colors.reset}`);
+        process.exit(0);
     } else {
         console.log('');
         console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
+        process.exit(1);
     }
 
     console.log('');

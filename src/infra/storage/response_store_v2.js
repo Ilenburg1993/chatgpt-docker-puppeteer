@@ -128,7 +128,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
     const filePath = formatMap[format];
 
     if (!filePath) {
-        throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`); // eslint-disable-line preserve-caught-error
+        throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`);  
     }
 
     try {

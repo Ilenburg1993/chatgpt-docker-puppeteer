@@ -110,7 +110,7 @@ export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operatio
  *
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout
- * @returns {{promise: Promise<never>, controller: AbortController, cleanup: Function}}
+ * @returns {{promise: Promise<any>, controller: AbortController, cleanup: Function}}
  *
  * @example
  * const { promise: timeoutPromise, cleanup } = createSharedTimeout(5000, 'FOCUS_TIMEOUT');
@@ -189,9 +189,9 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
  *
  * @param {Function} operation - Function that returns a Promise
  * @param {Object} options - Configuration options
- * @param {number} options.maxRetries - Maximum number of retry attempts (default: 3)
- * @param {number} options.timeoutMs - Timeout per attempt in milliseconds (default: 5000)
- * @param {number} options.backoffMs - Base backoff delay in milliseconds (default: 100)
+ * @param {number} [options.maxRetries] - Maximum number of retry attempts (default: 3)
+ * @param {number} [options.timeoutMs] - Timeout per attempt in milliseconds (default: 5000)
+ * @param {number} [options.backoffMs] - Base backoff delay in milliseconds (default: 100)
  * @param {Function} [options.shouldRetry] - Function to determine if error is retryable (default: all errors retry)
  * @returns {Promise<*>} Result of the operation
  * @throws {Error} If all retries fail

@@ -216,8 +216,6 @@ function getCursor(page) {
         page.once('close', () => {
             cursorCache.delete(page);
             _log('DEBUG', '[HUMAN] Cursor cache auto-cleanup on page close');
-        }).catch(() => {
-            // Ignore errors if page already closed
         });
     }
     return cursorCache.get(page);
@@ -793,13 +791,7 @@ function _computeFlightTime(profileConfig, char, page) {
 
 /**
  * Executa clique humano realista em elemento usando biometria comportamental
- * @param {object} driver - Instância do driver com page e métodos _emitVital
- * @param {string} selector - Seletor CSS do elemento alvo
- * @param {object} [options={}] - Opções de configuração
- * @param {AbortSignal} [options.signal] - Sinal para cancelar operação
- * @param {Function} [options.onPulse] - Callback para progresso (pulsos)
- * @param {number} [options.offsetX=0] - Offset X relativo ao centro do elemento
- * @param {number} [options.offsetY=0] - Offset Y relativo ao centro do elemento
+ * @param {...any} args - Driver-first `(driver, selector, options?)` ou legacy `(page, ctx, selector, ...)`
  * @returns {Promise<boolean>} true se clique foi executado com sucesso
  * @throws {TypeError} Se parâmetros obrigatórios estiverem ausentes ou inválidos
  * @sideEffects Move mouse, executa clique, emite eventos vitais - operação I/O
@@ -807,7 +799,10 @@ function _computeFlightTime(profileConfig, char, page) {
 async function humanClick(...args) {
     if (_isLegacyHumanClickArgs(args)) {
         // Legacy API used by biomechanics_engine.
-        return humanClickCore(...args);
+        /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */
+        const legacyArgs = /** @type {any} */ (args);
+        await humanClickCore(...legacyArgs);
+        return true;
     }
 
     const driver = args[0];
@@ -888,7 +883,10 @@ async function humanClick(...args) {
 async function humanType(...args) {
     if (_isLegacyHumanTypeArgs(args)) {
         // Legacy API used by biomechanics_engine.
-        return humanTypeCore(...args);
+        /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */
+        const legacyArgs = /** @type {any} */ (args);
+        await humanTypeCore(...legacyArgs);
+        return true;
     }
 
     const driver = args[0];

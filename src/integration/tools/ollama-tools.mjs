@@ -82,7 +82,7 @@ async function ollamaGenerateHandler(params, options = {}) {
     const selectedMaxTokens = max_tokens || Number(process.env.OLLAMA_MAX_TOKENS || 1000);
 
     if (options.signal?.aborted) {
-        throw new Error('Generation cancelled before execution'); // eslint-disable-line preserve-caught-error
+        throw new Error('Generation cancelled before execution');  
     }
 
     try {
@@ -131,7 +131,7 @@ async function ollamaEmbedHandler(params, options = {}) {
     const { text, model = 'nomic-embed-text' } = validated;
 
     if (options.signal?.aborted) {
-        throw new Error('Embedding cancelled before execution'); // eslint-disable-line preserve-caught-error
+        throw new Error('Embedding cancelled before execution');  
     }
 
     try {

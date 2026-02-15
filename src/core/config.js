@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as PATHS from '#infra/fs/paths';
 import { safeReadJSON } from '#infra/fs/safe_read';
-import 'dotenv/config';
+import './env_bootstrap.js';
 import EventEmitter from 'node:events';
 import { z } from 'zod';
 import { log } from './logger.js';

@@ -1,6 +1,5 @@
 import EventEmitter from 'node:events';
 import * as human from '#shared/biomechanics/human';
-import { STATUS_VALUES } from '#core/constants/tasks';
 import * as analyzer from '#shared/sadi/analyzer';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import * as adaptive from '#logic/adaptive';
@@ -161,6 +160,7 @@ class BiomechanicsEngine extends EventEmitter {
      * @param {Function} driver._assertPageAlive - Validação de page alive
      * @param {string} driver.correlationId - ID de correlação para logs
      * @param {AbortSignal} [driver.signal] - AbortSignal para cancelamento (pode ser null até attachContext)
+     * @param {string} [driver.currentDomain] - Domínio atual da sessão (opcional)
      *
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver.page não existir
@@ -349,8 +349,8 @@ class BiomechanicsEngine extends EventEmitter {
 
             const responseInfo = await analyzer.findResponseArea(this.driver.page).catch(() => null);
             if (!responseInfo || !responseInfo.isBusy) {
-                const loadStatus = await stabilizer.getPageLoadStatus(this.driver.page);
-                if (loadStatus === STATUS_VALUES.IDLE) {
+                const isBusy = await stabilizer.getPageLoadStatus(this.driver.page);
+                if (!isBusy) {
                     this.driver._emitVital('PROGRESS_UPDATE', { step: 'IA_IDLE_CONFIRMED', taskId });
                     this.emit(BIOMECH_EVENTS.WAIT_COMPLETED, { taskId, iterations });
                     return;

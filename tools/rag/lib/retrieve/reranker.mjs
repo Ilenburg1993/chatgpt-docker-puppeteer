@@ -9,7 +9,7 @@
  * @param {object[]} results - Search results from hybrid search
  * @param {string} query - Original query text
  * @param {object} options - Reranking options
- * @param {object} options.weights - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
+ * @param {object} [options.weights] - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
  * @returns {object[]} - Reranked results with rerank_score and rerank_signals
  */
 export function rerank(results, query, options = {}) {

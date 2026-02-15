@@ -318,9 +318,11 @@ async function runAllTests() {
     if (passedTests === totalTests) {
         console.log('');
         console.log(`${colors.green}🎉 TODAS AS CORREÇÕES P3 VALIDADAS COM SUCESSO!${colors.reset}`);
+        process.exit(0);
     } else {
         console.log('');
         console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
+        process.exit(1);
     }
 
     console.log('');

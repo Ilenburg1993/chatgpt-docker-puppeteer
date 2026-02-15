@@ -111,17 +111,19 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
  * v2.0: Enhanced error handling, false positive filter, optimizations.
  * @param {object} page - Puppeteer Page instance
  * @param {number} retries - Max retry attempts (default: 3)
- * @returns {Promise<string>} Status: 'IDLE', 'BUSY_SPINNER', 'BUSY_NETWORK', 'UNKNOWN'
+ * @returns {Promise<boolean>} `true` quando ainda há atividade de carregamento
  */
 async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
     for (let i = 0; i < retries; i++) {
         try {
             const busy = await page.evaluate(config => {
                 // Returns true when the page still appears "busy" (spinner OR recent network).
+                /** @param {Document | ShadowRoot} [root=document] */
                 const checkSpinnersDeep = (root = document) => {
                     const selector =
                         '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
                     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+                    /** @type {any} */
                     let node = walker.currentNode;
 
                     while (node) {
@@ -157,8 +159,11 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
 
                 const entries = performance.getEntriesByType('resource');
                 if (entries.length > 0) {
-                    const latest = entries.reduce((a, b) => (b.responseEnd > a.responseEnd ? b : a), entries[0]);
-                    if (performance.now() - latest.responseEnd < config.RECENT_NETWORK_THRESHOLD) {
+                    const latest = /** @type {PerformanceResourceTiming[]} */ (entries).reduce(
+                        (a, b) => (b.responseEnd > a.responseEnd ? b : a),
+                        /** @type {PerformanceResourceTiming} */ (entries[0])
+                    );
+                    if (performance.now() - Number(latest.responseEnd || 0) < config.RECENT_NETWORK_THRESHOLD) {
                         return true;
                     }
                 }
@@ -231,7 +236,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
 
     const assertPageOpen = () => {
         if (isPageClosed()) {
-            throw new Error('page is closed'); // eslint-disable-line preserve-caught-error
+            throw new Error('page is closed');  
         }
     };
 
@@ -412,11 +417,15 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                     }
                                 };
 
+                                /** @type {(Document | ShadowRoot)[]} */
                                 const roots = [document];
+                                /** @type {(Document | ShadowRoot)[]} */
                                 const queue = [document];
                                 while (queue.length > 0) {
                                     const curr = queue.shift();
+                                    if (!curr) break;
                                     const walker = document.createTreeWalker(curr, NodeFilter.SHOW_ELEMENT);
+                                    /** @type {any} */
                                     let node = walker.nextNode();
                                     while (node) {
                                         if (node.nodeType === 1) {
