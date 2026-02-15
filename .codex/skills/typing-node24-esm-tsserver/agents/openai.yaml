@@ -1,0 +1,4 @@
+interface:
+  display_name: "Typing Node24 ESM TS Server"
+  short_description: "Hardening de tipagem JS/TS para Node 24 ESM com NodeNext."
+  default_prompt: "Use $typing-node24-esm-tsserver para estabilizar typecheck:node, garantir compatibilidade TS Server e aplicar padrões robustos de JSDoc/augmentations no projeto."

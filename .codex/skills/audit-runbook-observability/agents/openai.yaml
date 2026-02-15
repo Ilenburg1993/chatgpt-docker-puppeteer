@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Runbook Observability"
+  short_description: "Operação diária da auditoria com telemetria."
+  default_prompt: "Use $audit-runbook-observability para rodar preflight, executar auditoria e diagnosticar artefatos/events de forma padronizada."

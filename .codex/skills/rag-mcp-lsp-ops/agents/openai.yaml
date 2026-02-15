@@ -1,0 +1,4 @@
+interface:
+  display_name: "RAG MCP LSP Ops"
+  short_description: "Operate RAG/MCP/LSP rebuild and diagnostics"
+  default_prompt: "Use $rag-mcp-lsp-ops to run the canonical PM2/MCP/RAG operation workflow for this repository."
