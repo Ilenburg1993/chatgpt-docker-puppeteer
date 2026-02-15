@@ -444,8 +444,8 @@ echo ""
 # ---------------------------------------------------------------------------
 info "Configuração de ambiente (arquitetura remoteEnv):"
 
-# Validar vars críticas injetadas (4 estruturais mínimas)
-CRITICAL_VARS_INJECTED=("NODE_ENV" "SERVER_MODE" "BROWSER_MODE" "SERVER_PORT")
+# Validar vars críticas injetadas (5 estruturais mínimas)
+CRITICAL_VARS_INJECTED=("NODE_ENV" "SERVER_MODE" "SERVER_AUTHORITY" "BROWSER_MODE" "SERVER_PORT")
 MISSING_COUNT=0
 
 for var in "${CRITICAL_VARS_INJECTED[@]}"; do
@@ -505,8 +505,8 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
     echo ""
 
     echo "1️⃣  Configuração de ambiente"
-    echo "   • O projeto utiliza variáveis ENV via arquivo .env"
-    echo "   • Templates estão disponíveis (.env.example, .env.development, etc.)"
+    echo "   • Fonte primária: remoteEnv (devcontainer.json) + runArgs (--env-file)"
+    echo "   • Arquivo .env local é opcional (suplementar)"
     echo ""
 
     echo "2️⃣  Dependência externa: Chrome (Windows host)"
@@ -665,7 +665,13 @@ info "Chrome Proxy (endpoint local — observação passiva):"
 # Endpoint canônico do proxy
 # • Derivado de PUPPETEER_WS_ENDPOINT
 # • Fallback seguro: http://localhost:9224
-CHROME_PROXY_ENDPOINT="${PUPPETEER_WS_ENDPOINT:-http://localhost:9224}"
+RAW_CHROME_PROXY_ENDPOINT="${PUPPETEER_WS_ENDPOINT:-http://localhost:9224}"
+CHROME_PROXY_ENDPOINT="${RAW_CHROME_PROXY_ENDPOINT}"
+if [[ "${RAW_CHROME_PROXY_ENDPOINT}" == ws://* ]]; then
+    CHROME_PROXY_ENDPOINT="http://${RAW_CHROME_PROXY_ENDPOINT#ws://}"
+elif [[ "${RAW_CHROME_PROXY_ENDPOINT}" == wss://* ]]; then
+    CHROME_PROXY_ENDPOINT="https://${RAW_CHROME_PROXY_ENDPOINT#wss://}"
+fi
 CHROME_CDP_PATH="/json/version"
 CHROME_CDP_TIMEOUT_SECONDS=2
 

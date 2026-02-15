@@ -227,6 +227,10 @@
   "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
   "typescript.inlayHints.variableTypes.enabled": false,
 
+  "javascript.implicitProjectConfig.checkJs": true,
+  "typescript.implicitProjectConfig.checkJs": true,
+
+
   // ============================================================================
   // 10) JS/TS — IMPLICIT PROJECT CONFIG (SEM TSCONFIG/JSCONFIG)
   // ----------------------------------------------------------------------------
@@ -594,7 +598,25 @@
         "copilot/gpt-5.2-codex",
         "copilot/grok-code-fast-1",
         "copilot/oswe-vscode-prime",
-        "customoai/Qwen 3 Coder (Ollama Cloud)/qwen3-coder-next"
+        "copilot/claude-haiku-4.5",
+        "copilot/claude-opus-4.6",
+        "copilot/gemini-3-flash-preview",
+        "copilot/gemini-3-pro-preview",
+        "copilot/gpt-5.3-codex"
+      ]
+    },
+    "chatgpt-docker-puppeteer/.vscode/mcp.json: context7": {
+      "allowedModels": [
+        "copilot/auto",
+        "copilot/claude-opus-4.5",
+        "copilot/claude-opus-4.6",
+        "copilot/claude-sonnet-4",
+        "copilot/claude-sonnet-4.5",
+        "copilot/gpt-5-mini",
+        "copilot/gemini-3-flash-preview",
+        "copilot/gemini-3-pro-preview",
+        "copilot/gpt-5.3-codex",
+        "copilot/grok-code-fast-1"
       ]
     }
   },

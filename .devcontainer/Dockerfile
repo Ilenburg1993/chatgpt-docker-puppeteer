@@ -23,7 +23,7 @@
 # + Removidas duplicações de pacotes (libnss-wrapper, curl, ca-certificates)
 # + Adicionado apt-get clean em todas as layers (-30MB)
 # + Cache layers reorganizadas (build incremental 2-3x mais rápido)
-# + HEALTHCHECK implementado
+# + Registro de HEALTHCHECK alinhado (não há instrução HEALTHCHECK neste Dockerfile)
 # + BUILD_ARGs usados em mensagens
 # + Adicionado bubblewrap (sandbox isolation para GitHub Copilot Agent)
 # ✅ v5.1 (anteriormente):
@@ -44,12 +44,12 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
 # ---------------------------------------------------------------------------
 # Build-time metadata (OCI)
 # ---------------------------------------------------------------------------
-ARG VERSION
-ARG BUILD_DATE
-ARG VCS_REF
-ARG IMAGE_NAME
-ARG IMAGE_VENDOR
-ARG BUILD_ENV
+ARG VERSION=dev
+ARG BUILD_DATE=unknown
+ARG VCS_REF=unknown
+ARG IMAGE_NAME=chatgpt-docker-puppeteer
+ARG IMAGE_VENDOR=unknown
+ARG BUILD_ENV=dev
 
 LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.vendor="${IMAGE_VENDOR}" \
@@ -139,8 +139,6 @@ RUN mkdir -p ${APP_DIR} \
 # =============================================================================
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=America/Sao_Paulo \
-    LANG=pt_BR.UTF-8 \
-    LC_MESSAGES=pt_BR.UTF-8 \
     LANGUAGE=pt_BR:pt:en
 
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime \
@@ -153,9 +151,12 @@ RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime \
     && sed -i 's/^# *pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen \
     && sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen \
     && locale-gen pt_BR.UTF-8 en_US.UTF-8 \
-    && update-locale LANG=pt_BR.UTF-8 \
+    && update-locale LANG=pt_BR.UTF-8 LC_MESSAGES=pt_BR.UTF-8 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV LANG=pt_BR.UTF-8 \
+    LC_MESSAGES=pt_BR.UTF-8
 
 # =============================================================================
 # SECTION 3 — NODE NATIVE BUILD TOOLCHAIN (CANONICAL)

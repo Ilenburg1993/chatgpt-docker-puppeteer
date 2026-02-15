@@ -46,6 +46,28 @@ PM2  := npx pm2
 CURL := curl
 
 # =============================================================================
+# RAG SCOPE CONFIG (aditivo, compatível com defaults atuais)
+# =============================================================================
+
+EMPTY :=
+SPACE := $(EMPTY) $(EMPTY)
+COMMA := ,
+
+RAG_PROFILE ?=
+RAG_DOCS_MODE ?=
+RAG_MAX_FILE_BYTES ?=
+RAG_INCLUDE_GLOBS ?=
+RAG_EXCLUDE_GLOBS ?=
+
+RAG_INCLUDE_GLOBS_LIST = $(strip $(subst $(COMMA),$(SPACE),$(RAG_INCLUDE_GLOBS)))
+RAG_EXCLUDE_GLOBS_LIST = $(strip $(subst $(COMMA),$(SPACE),$(RAG_EXCLUDE_GLOBS)))
+RAG_SCOPE_ARGS = $(if $(RAG_PROFILE),--profile "$(RAG_PROFILE)",) \
+	$(if $(RAG_DOCS_MODE),--docs-mode "$(RAG_DOCS_MODE)",) \
+	$(if $(RAG_MAX_FILE_BYTES),--max-file-bytes "$(RAG_MAX_FILE_BYTES)",) \
+	$(foreach glob,$(RAG_INCLUDE_GLOBS_LIST),--include-glob "$(glob)") \
+	$(foreach glob,$(RAG_EXCLUDE_GLOBS_LIST),--exclude-glob "$(glob)")
+
+# =============================================================================
 # DETECÇÃO DE PLATAFORMA
 # =============================================================================
 
@@ -135,6 +157,9 @@ help:
 	@echo "  $(CYAN)make rag-watch$(NC)         Watch incremental contínuo do RAG"
 	@echo "  $(CYAN)make rag-full-rebuild$(NC)  Reset + reindex completo"
 	@echo "  $(CYAN)make rag-rebuild-zero$(NC)  Pipeline canônico completo (PM2/MCP/RAG)"
+	@echo "  $(CYAN)make rag-index RAG_DOCS_MODE=exclude$(NC)  Indexar sem MD/MDX"
+	@echo "  $(CYAN)make rag-index RAG_DOCS_MODE=only$(NC)     Indexar somente MD/MDX"
+	@echo "  $(CYAN)make rag-watch RAG_INCLUDE_GLOBS='src/**,config/**'$(NC)  Escopo custom"
 	@echo ""
 	@echo "$(YELLOW)$(BOLD)🎨 Formatação & Lint:$(NC)"
 	@echo "  $(CYAN)make format$(NC)            Formatar código (Prettier)"
@@ -516,7 +541,7 @@ rag-health:
 
 rag-index:
 	@echo "$(CYAN)📚 RAG Index$(NC)"
-	@$(NPM) run rag:index
+	@$(NPM) run rag:index -- $(RAG_SCOPE_ARGS)
 
 rag-ask:
 	@if [ -z "$(QUERY)" ]; then \
@@ -545,15 +570,16 @@ rag-reset:
 
 rag-watch:
 	@echo "$(CYAN)👀 RAG Watch (incremental)$(NC)"
-	@$(NPM) run rag:watch
+	@$(NPM) run rag:watch -- $(RAG_SCOPE_ARGS)
 
 rag-full-rebuild:
 	@echo "$(YELLOW)♻️  RAG Full Rebuild$(NC)"
-	@$(NPM) run rag:full-rebuild
+	@$(NPM) run rag:reset -- --yes
+	@$(NPM) run rag:index -- $(RAG_SCOPE_ARGS)
 
 rag-rebuild-zero:
 	@echo "$(YELLOW)♻️  RAG Rebuild Zero (PM2/MCP/RAG pipeline)$(NC)"
-	@$(NPM) run rag:rebuild:zero
+	@$(NPM) run rag:rebuild:zero -- $(RAG_SCOPE_ARGS)
 
 # =============================================================================
 # 🔟 FORMATAÇÃO & LINT

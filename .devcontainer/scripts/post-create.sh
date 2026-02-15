@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # post-create.sh — Inicialização Estrutural do DevContainer
-# Version: v6.0
+# Version: v6.1
 #
 # SUMÁRIO EXECUTIVO:
 #   • Valida identidade canônica do runtime (user, UID, GID)
@@ -23,6 +23,12 @@
 # NOTA ARQUITETURAL:
 #   Este script NÃO é um "setup convenience".
 #   Ele é um INSTRUMENTO DE VERIFICAÇÃO ESTRUTURAL.
+#
+# CHANGELOG v6.1 (2026-02-15):
+# ✅ INFRA VALIDATION: Loop de validação de infraestrutura ativado (FATAL em prod, WARNING em dev/test)
+# ✅ ERROR SUMMARY: Contadores de infraestrutura agora incluem warnings explícitos
+# ✅ TRAP HARDENING: Snapshot definido antes do primeiro uso em mensagens de erro
+# ✅ CRITICAL VOLUMES: RAG removido da lista crítica de bootstrap (tratado como operacional)
 #
 # CHANGELOG v6.0 (2026-02-03):
 # ✅ ENV TAXONOMY: Nova categorização (STRUCTURAL → INFRASTRUCTURE → OPERATIONAL → FLAGS)
@@ -68,6 +74,7 @@ set -euo pipefail
 cleanup_on_error() {
     local exit_code=$?
     local line_num="${BASH_LINENO[0]:-unknown}"
+    local snapshot="${LOG_DIR:-/tmp}/env_error_snapshot_$(date +%s).txt"
 
     # Exit 0 = sucesso normal, não fazer nada
     [[ $exit_code -eq 0 ]] && return 0
@@ -106,7 +113,6 @@ cleanup_on_error() {
     echo ""
 
     # ENV snapshot (v6.0)
-    local snapshot="${LOG_DIR:-/tmp}/env_error_snapshot_$(date +%s).txt"
     {
         echo "=== ENV SNAPSHOT AT ERROR ==="
         echo "Exit Code: ${exit_code}"
@@ -167,7 +173,7 @@ trap cleanup_on_error ERR EXIT
 # 1.1 Identidade Canônica do Script
 # ---------------------------------------------------------------------------
 readonly SCRIPT_NAME="post-create.sh"
-readonly SCRIPT_VERSION="6.0"
+readonly SCRIPT_VERSION="6.1"
 
 # Hash defensivo (best-effort, nunca fatal)
 SCRIPT_HASH="unknown"
@@ -398,6 +404,7 @@ readonly FEATURE_FLAG_ENV_VARS=(
 # Contadores explícitos (robustos sob set -u)
 STRUCT_ERRORS=0
 INFRA_ERRORS=0
+INFRA_WARNINGS=0
 OPER_WARNINGS=0
 FLAG_INFO=0
 
@@ -437,7 +444,26 @@ for var in "${STRUCTURAL_ENV_VARS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 3.3.1 Validação SEMÂNTICA de NODE_ENV (NÃO fatal)
+# 3.7 Validação de INFRAESTRUTURA (estratificada por NODE_ENV)
+# ---------------------------------------------------------------------------
+for var in "${INFRASTRUCTURE_ENV_VARS[@]}"; do
+    value="${!var:-}"
+
+    if [[ -z "${value}" ]]; then
+        if [[ "${INFRA_VALIDATION_MODE}" == "FATAL" ]]; then
+            error "ENV infraestrutura ausente (FATAL): ${var}"
+            INFRA_ERRORS=$((INFRA_ERRORS + 1))
+        else
+            warn "ENV infraestrutura ausente (${INFRA_VALIDATION_MODE}): ${var}"
+            INFRA_WARNINGS=$((INFRA_WARNINGS + 1))
+        fi
+    else
+        log "ENV infraestrutura OK: ${var}=${value}"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# 3.8 Validação SEMÂNTICA de NODE_ENV (NÃO fatal)
 # ---------------------------------------------------------------------------
 if [[ -n "${NODE_ENV:-}" ]]; then
     case "${NODE_ENV}" in
@@ -553,11 +579,17 @@ if [[ "${TOTAL_FATAL_ERRORS}" -gt 0 ]]; then
     error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     error "→ Estruturais : ${STRUCT_ERRORS} erro(s)"
     error "→ Infraestrutura : ${INFRA_ERRORS} erro(s)"
+    error "→ Infraestrutura (warning) : ${INFRA_WARNINGS} aviso(s)"
     error ""
     error "Fonte de verdade: devcontainer.json (remoteEnv) + .env files"
     error "Referência: .devcontainer/ENV_ANALYSIS_V6.md"
     error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     exit 1
+fi
+
+if [[ "${INFRA_WARNINGS}" -gt 0 ]]; then
+    warn "Validação ENV: ${INFRA_WARNINGS} aviso(s) de infraestrutura"
+    warn "→ Estado aceitável em NODE_ENV=${NODE_ENV:-development}"
 fi
 
 if [[ "${OPER_WARNINGS}" -gt 0 ]]; then
@@ -897,10 +929,6 @@ readonly CRITICAL_VOLUMES=(
     "${USER_HOME}/.config"
     "${USER_HOME}/.claude"
     "${USER_HOME}/.local/state"
-
-    # RAG (LanceDB) — crítico para o subsistema de memória local
-    "${USER_HOME}/.local/share/rag-db"
-    "${USER_HOME}/.local/share/rag-index"
 )
 
 # ---------------------------------------------------------------------------

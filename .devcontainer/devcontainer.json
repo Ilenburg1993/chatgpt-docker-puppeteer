@@ -103,8 +103,10 @@
   "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
   // PORT deprecated v6.0: Use apenas SERVER_PORT
   "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
+  "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
   "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
   "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
+  "HOST": "${localEnv:HOST:0.0.0.0}",
   // Browser (contrato estrutural)
   "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
   // Logging
@@ -440,8 +442,8 @@
   // O postCreateCommand agora assume a responsabilidade de linkar o
   // histórico imortal e preparar o Claude/Puppeteer.
   "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh",
-  // Roda toda vez que o container sobe (Validação técnica)
-  "postStartCommand": "make info",
+  // Roda toda vez que o container sobe (não-bloqueante por contrato)
+  "postStartCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh",
   // Roda quando você "entra" no terminal (Feedback visual humano)
   "postAttachCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-attach.sh",
   // ============================================================
@@ -1040,5 +1042,5 @@
   // LIFECYCLE FINALIZATION
   // ============================================================
   "shutdownAction": "stopContainer",
-  "waitFor": "postStartCommand"
+  "waitFor": "postCreateCommand"
 }
