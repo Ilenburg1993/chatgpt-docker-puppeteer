@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "name": "audit-contract-registry",
+  "default_mode": "hybrid",
+  "default_enforce_level": "warn",
+  "domains": [
+    "domains/runtime.json",
+    "domains/network.json",
+    "domains/config_env.json",
+    "domains/schemas.json",
+    "domains/api_dashboard.json",
+    "domains/logic.json"
+  ],
+  "allowlists": [
+    "allowlists/static_allowlist.json"
+  ]
+}

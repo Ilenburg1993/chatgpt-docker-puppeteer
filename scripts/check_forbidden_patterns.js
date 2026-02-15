@@ -1,146 +1,169 @@
-#!/usr/bin/env nodeimport fs from 'node:fs';
+#!/usr/bin/env node
 import path from 'node:path';
+import { parseArgs } from 'node:util';
+import { evaluateStaticContracts } from './audit/contracts/evaluate_static.mjs';
+import { getLegacyStaticContracts } from './audit/contracts/legacy_adapter.mjs';
+import { loadContractRegistry } from './audit/contracts/load_registry.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'src');
 
-const IGNORED_DIRS = ['node_modules', 'backups', 'tests', 'backups', '.git'];
+const { values } = parseArgs({
+    options: {
+        json: { type: 'boolean', default: false },
+        'contracts-mode': { type: 'string', default: 'hybrid' },
+        'parity-mode': { type: 'boolean', default: true },
+    },
+});
 
-const patterns = [
-    {
-        id: 'puppeteer-launch',
-        regex: /\bpuppeteer\.launch\s*\(/g,
-        message: 'Uso de puppeteer.launch() detectado — arquitetura exige connect-only (puppeteer.connect()).',
-        allowFiles: []
-    },
-    {
-        id: 'process-exit',
-        regex: /process\.exit\s*\(/g,
-        message: 'Uso de process.exit() detectado — permitido apenas em entrypoints autorizados.',
-        allowFiles: [
-            path.join('src', 'main.js'),
-            path.join('src', 'server', 'main.js'),
-            path.join('src', 'server', 'engine', 'lifecycle.js')
-        ]
-    },
-    {
-        id: 'hardcoded-ports',
-        regex: /\b9222\b|\b9224\b/g,
-        message: 'Porta hardcoded detectada (9222/9224) — use configuração via env/CONFIG.',
-        allowFiles: [
-            path.join('src', 'core', 'config.js'),
-            path.join('src', 'infra', 'ConnectionOrchestrator.js'),
-            path.join('src', 'core', 'boot_resilience_manager.js'),
-            path.join('src', 'core', 'doctor.js'),
-            path.join('src', 'infra', 'browser_pool', 'pool_manager.js'),
-            path.join('src', 'driver', 'nerv_adapter', 'driver_nerv_adapter.js'),
-            path.join('src', 'server', 'main.js')
-        ]
-    },
-    {
-        id: 'file-ipc',
-        regex: /estado\.json/g,
-        message: 'Uso de discovery por arquivo (estado.json) detectado — migre para NERV SERVER_READY.',
-        allowFiles: []
+/**
+ * @param {any[]} findings
+ */
+function mapOutputFindings(findings) {
+    return findings.map(item => ({
+        contract_id: item.contract_id || 'CONTRACT-UNKNOWN',
+        domain: item.domain || 'unknown',
+        file: item.file || null,
+        line: Number.isInteger(item.line) ? item.line : null,
+        evidence: item.evidence || 'n/a',
+        severity: item.severity_hint || 'P2',
+        type: item.type || 'falha de contrato',
+        owner: item.owner || 'unknown',
+        enforcement: item.enforcement_state || 'warn',
+        message: item.impact || `Violação de contrato ${item.contract_id || 'desconhecido'}.`,
+    }));
+}
+
+/**
+ * @param {any[]} dslFindings
+ * @param {any[]} legacyFindings
+ */
+function parityReport(dslFindings, legacyFindings) {
+    /** @type {Map<string, number>} */
+    const dslMap = new Map();
+    /** @type {Map<string, number>} */
+    const legacyMap = new Map();
+    for (const item of dslFindings) {
+        dslMap.set(item.contract_id, (dslMap.get(item.contract_id) || 0) + 1);
     }
-];
+    for (const item of legacyFindings) {
+        legacyMap.set(item.contract_id, (legacyMap.get(item.contract_id) || 0) + 1);
+    }
 
-function walk(dir) {
-    let results = [];
-    const list = fs.readdirSync(dir);
-    for (const file of list) {
-        const full = path.join(dir, file);
-        const stat = fs.statSync(full);
-        if (stat && stat.isDirectory()) {
-            if (IGNORED_DIRS.includes(file)) continue;
-            results = results.concat(walk(full));
-        } else {
-            if (!file.endsWith('.js') && !file.endsWith('.ts')) continue;
-            results.push(full);
+    /** @type {Array<{ contract_id: string, dsl: number, legacy: number }>} */
+    const mismatches = [];
+    const allKeys = new Set([...dslMap.keys(), ...legacyMap.keys()]);
+    for (const key of allKeys) {
+        const dslCount = dslMap.get(key) || 0;
+        const legacyCount = legacyMap.get(key) || 0;
+        if (dslCount !== legacyCount) {
+            mismatches.push({ contract_id: key, dsl: dslCount, legacy: legacyCount });
         }
     }
-    return results;
+
+    return {
+        enabled: true,
+        dsl_findings: dslFindings.length,
+        legacy_findings: legacyFindings.length,
+        mismatches,
+    };
 }
 
-function relative(p) {
-    return path.relative(ROOT, p).split(path.sep).join('/');
-}
+function main() {
+    const mode = ['legacy', 'hybrid', 'strict'].includes(values['contracts-mode']) ? values['contracts-mode'] : 'hybrid';
+    const parityEnabled = values['parity-mode'] === true;
 
-const files = walk(SRC);
-const findings = [];
+    const registry = loadContractRegistry();
+    const activeDslContracts = registry.contracts.filter(item => item.kind === 'static' && item.status === 'active');
+    const legacyContracts = getLegacyStaticContracts();
 
-for (const file of files) {
-    const rel = relative(file);
-    const content = fs.readFileSync(file, 'utf8');
-    const lines = content.split(/\r?\n/);
+    let primaryContracts = legacyContracts;
+    if (mode === 'strict' || mode === 'hybrid') {
+        primaryContracts = activeDslContracts;
+    }
 
-    for (const pat of patterns) {
-        if (pat.allowFiles && pat.allowFiles.includes(rel)) {
-            continue; // arquivo permitido
+    const primaryEval = evaluateStaticContracts({
+        rootDir: ROOT,
+        scanDir: SRC,
+        contracts: primaryContracts,
+        allowlists: registry.allowlists,
+    });
+
+    let parity = {
+        enabled: false,
+        dsl_findings: 0,
+        legacy_findings: 0,
+        mismatches: [],
+    };
+
+    if (mode === 'hybrid' && parityEnabled) {
+        const dslEval = evaluateStaticContracts({
+            rootDir: ROOT,
+            scanDir: SRC,
+            contracts: activeDslContracts,
+            allowlists: registry.allowlists,
+        });
+        const legacyEval = evaluateStaticContracts({
+            rootDir: ROOT,
+            scanDir: SRC,
+            contracts: legacyContracts,
+            allowlists: {},
+        });
+        parity = parityReport(dslEval.findings, legacyEval.findings);
+    }
+
+    const findings = mapOutputFindings(primaryEval.findings);
+    const hasRegistryError = registry.errors.length > 0;
+    const payload = {
+        ok: findings.length === 0 && !(mode === 'strict' && hasRegistryError),
+        mode,
+        parity,
+        registry: {
+            path: registry.registryPath,
+            contracts_loaded: registry.contracts.length,
+            errors: registry.errors,
+            warnings: registry.warnings,
+        },
+        summary: {
+            total_findings: findings.length,
+            files_scanned: primaryEval.files_scanned,
+            contracts_scanned: primaryEval.contracts_scanned,
+            by_contract: primaryEval.hits_by_contract,
+        },
+        findings,
+    };
+
+    if (values.json) {
+        console.log(JSON.stringify(payload, null, 2));
+    } else if (findings.length > 0) {
+        console.error('\n[check_forbidden_patterns] Foram detectadas violações de contrato:');
+        for (const f of findings) {
+            console.error(`- [${f.contract_id}] ${f.file || 'n/a'}#L${f.line || 1}: ${f.evidence}`);
+            console.error(`  -> ${f.message}`);
+            console.error(`  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`);
         }
-
-        let match;
-        const re = new RegExp(pat.regex);
-        while ((match = re.exec(content)) !== null) {
-            // compute line number
-            const idx = match.index;
-            let lineNum = 1;
-            let acc = 0;
-            for (let i = 0; i < lines.length; i++) {
-                acc += lines[i].length + 1; // +1 for newline
-                if (acc > idx) {
-                    lineNum = i + 1;
-                    break;
-                }
+        if (parity.enabled && parity.mismatches.length > 0) {
+            console.error('[check_forbidden_patterns] Parity mismatch (DSL vs legado):');
+            for (const mismatch of parity.mismatches) {
+                console.error(`  - ${mismatch.contract_id}: dsl=${mismatch.dsl} legacy=${mismatch.legacy}`);
             }
-
-            // Determine if match is in a comment or inside a string/template;
-            // if so, ignore it (we only want runtime occurrences).
-            const line = lines[lineNum - 1] || '';
-            const lineStart = acc - ((lines[lineNum - 1] || '').length + 1);
-            const column = idx - (lineStart >= 0 ? lineStart : 0);
-            const pre = line.slice(0, Math.max(0, column));
-
-            // Inline comment (//) after code — if match occurs after //, skip
-            const inlineCommentIdx = line.indexOf('//');
-            if (inlineCommentIdx !== -1 && column >= inlineCommentIdx) {
-                continue;
-            }
-
-            // Block comment style lines often start with '*', skip those
-            const trimmed = line.trim();
-            if (trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('*/')) {
-                continue;
-            }
-
-            // If the match is inside quotes/backticks, skip (string literal)
-            const dq = (pre.match(/"/g) || []).length;
-            const sq = (pre.match(/'/g) || []).length;
-            const bt = (pre.match(/`/g) || []).length;
-            if (dq % 2 === 1 || sq % 2 === 1 || bt % 2 === 1) {
-                continue;
-            }
-
-            findings.push({
-                id: pat.id,
-                file: rel,
-                line: lineNum,
-                excerpt: line.trim(),
-                message: pat.message
-            });
+            console.error('');
+        }
+        console.error('[check_forbidden_patterns] Falha: remova ou justifique itens antes de prosseguir.');
+    } else {
+        console.log(`[check_forbidden_patterns] OK — nenhum contrato violado em src/ (mode=${mode}).`);
+        if (parity.enabled) {
+            console.log(`[check_forbidden_patterns] parity: mismatches=${parity.mismatches.length}`);
+        }
+        if (mode === 'strict' && hasRegistryError) {
+            console.error('[check_forbidden_patterns] Falha: registry inválido em modo strict.');
         }
     }
-}
 
-if (findings.length > 0) {
-    console.error('\n[check_forbidden_patterns] Foram detectados padrões proibidos:');
-    for (const f of findings) {
-        console.error(`- [${f.id}] ${f.file}#L${f.line}: ${f.excerpt}`);
-        console.error(`  -> ${f.message}\n`);
+    if (!payload.ok) {
+        process.exit(2);
     }
-    console.error('[check_forbidden_patterns] Falha: remova ou justifique itens antes de prosseguir.');
-    process.exit(2);
+    process.exit(0);
 }
 
-console.log('[check_forbidden_patterns] OK — nenhum padrão proibido encontrado em src/.');
-process.exit(0);
+main();

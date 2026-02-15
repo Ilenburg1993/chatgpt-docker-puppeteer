@@ -64,6 +64,112 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
+  audit-lite:
+    name: Audit lite (non-blocking)
+    runs-on: ubuntu-latest
+    needs: validate
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          rm -rf node_modules
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Run audit quick (JSON artifact)
+        run: |
+          npm run audit:preflight
+          npm run audit:quick -- --json --publish-master false --publish-snapshot false --output-dir artifacts/audit --focus bug-first --contracts-mode hybrid --enforce-level warn --proposal-depth standard --chaos-profile off --cloud-fallback off --log-format jsonl --progress false --eta false --shadow-gate true
+
+      - name: Build audit summary
+        id: audit_summary
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import path from "node:path";
+            const dir = "artifacts/audit";
+            const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".json")) : [];
+            if (files.length === 0) {
+              fs.writeFileSync("artifacts/audit/audit-summary.md", "## Audit Lite\n\nNo JSON artifact was generated.\n");
+              process.exit(0);
+            }
+            files.sort();
+            const latest = files[files.length - 1];
+            const payload = JSON.parse(fs.readFileSync(path.join(dir, latest), "utf8"));
+            const report = payload?.report || payload;
+            const summary = report?.summary || {};
+            const telemetry = report?.telemetry || {};
+            const md = [
+              "## Audit Lite (non-blocking)",
+              "",
+              `- run_id: ${report?.run_id || "n/a"}`,
+              `- profile: ${report?.profile || "n/a"}`,
+              `- findings: ${summary?.total_findings ?? 0}`,
+              `- findings(primary): ${summary?.total_primary ?? 0} | findings(backlog): ${summary?.total_backlog ?? 0}`,
+              `- partial: ${summary?.partial ?? false}`,
+              `- P0: ${summary?.by_severity?.P0 ?? 0} | P1: ${summary?.by_severity?.P1 ?? 0} | P2: ${summary?.by_severity?.P2 ?? 0} | P3: ${summary?.by_severity?.P3 ?? 0}`,
+              `- MCP: ${telemetry?.mcp?.ok ? "OK" : "FAIL"} | RAG: ${telemetry?.rag?.ok ? "OK" : "FAIL"} | LSP: ${telemetry?.lsp?.ok ? "OK" : "WARN"}`,
+              `- Semantic preflight: ${report?.semantic_preflight?.ok ? "OK" : "FAIL"} | Shadow would_block: ${report?.shadow_gate?.would_block ? "YES" : "NO"}`,
+            ].join("\\n");
+            fs.writeFileSync("artifacts/audit/audit-summary.md", `${md}\\n`);
+          '
+          cat artifacts/audit/audit-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment PR with audit summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const summaryPath = 'artifacts/audit/audit-summary.md';
+            if (!fs.existsSync(summaryPath)) {
+              core.info('audit-summary.md not found, skipping PR comment');
+              return;
+            }
+            const body = fs.readFileSync(summaryPath, 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Upload audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-lite-${{ github.run_id }}
+          path: artifacts/audit
+          if-no-files-found: warn
+
   integration:
     name: Integration tests (Node 24)
     runs-on: ubuntu-latest
@@ -102,3 +208,42 @@ jobs:
 
       - name: Integration tests
         run: npm run test:integration
+
+  regression:
+    name: Regression tests (Node 24)
+    runs-on: ubuntu-latest
+    needs: integration
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          rm -rf node_modules
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Regression tests
+        run: npm run test:regression

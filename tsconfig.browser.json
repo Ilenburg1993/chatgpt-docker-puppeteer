@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/dashboard-ui/src/*"]
+    }
+  },
+  "include": [
+    "src/core/forensics.js",
+    "src/driver/extractors/**/*",
+    "src/driver/modules/**/*",
+    "src/driver/targets/**/*",
+    "src/shared/sadi/**/*",
+    "src/shared/page_stability/**/*",
+    "src/shared/biomechanics/**/*",
+    "src/dashboard-ui/src/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "logs",
+    "fila",
+    "respostas",
+    "artifacts",
+    "profile",
+    "public",
+    "backups",
+    "monitoring",
+    "tmp",
+    "analysis",
+    "local-login",
+    "DOCUMENTAÇÃO",
+    "src/dashboard-ui/node_modules",
+    "src/dashboard-ui/dist",
+    ".git",
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.map",
+    "**/*.d.ts.map",
+    "**/*.js.map"
+  ]
+}

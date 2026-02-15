@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport fs from 'node:fs';
+#!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 
 const inputFile = process.argv[2] || '/tmp/unused-vars.txt';

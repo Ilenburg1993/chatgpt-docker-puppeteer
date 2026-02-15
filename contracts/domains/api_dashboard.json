@@ -1,0 +1,32 @@
+{
+  "domain": "api",
+  "contracts": [
+    {
+      "id": "CONTRACT-API-HEALTH-ENDPOINT",
+      "title": "Health endpoint estável",
+      "domain": "api",
+      "description": "Endpoint de health da API deve permanecer estável em integração.",
+      "kind": "runtime",
+      "severity_default": "P2",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "api.health.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/integration/api/test_health_endpoint.spec.js"
+      ],
+      "owner": "server-api",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    }
+  ]
+}

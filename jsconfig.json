@@ -1,114 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/jsconfig",
-
-  "compilerOptions": {
-    // ============================================================
-    // [A] PLATAFORMA E MÓDULOS — Node.js 24+ (ESM)
-    // ============================================================
-    "target": "ES2024",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "lib": ["ES2024", "ES2022.Error"],
-    "verbatimModuleSyntax": true,
-
-    // ============================================================
-    // [B] JAVASCRIPT PURO (SEM TYPESCRIPT)
-    // ============================================================
-    "allowJs": true,
-
-    // ✅ ESTRATÉGIA: Type checking seletivo
-    // - checkJs: false → Desabilita checking global (evita 600+ falsos positivos)
-    // - IntelliSense continua funcionando 100% (autocomplete, navegação, refactor)
-    // - Use // @ts-check em arquivos CORE críticos para habilitar checking seletivo
-    "checkJs": false,
-
-    // Mantém JS dinâmico permissivo
-    "strict": false,
-    "noImplicitAny": false,
-    "noImplicitThis": false,
-
-    // ============================================================
-    // [C] INTEROPERABILIDADE E COMPATIBILIDADE
-    // ============================================================
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true,
-
-    // ============================================================
-    // [D] INTELLISENSE / ALIASES DE CAMINHO
-    // ============================================================
-    "baseUrl": ".",
-    "paths": {
-      "#core/*": ["src/core/*"],
-      "#shared/*": ["src/shared/*"],
-      "#nerv/*": ["src/nerv/*"],
-      "#kernel/*": ["src/kernel/*"],
-      "#driver/*": ["src/driver/*"],
-      "#agent/*": ["src/agent/*"],
-      "#infra/*": ["src/infra/*"],
-      "#integration/*": ["src/integration/*"],
-      "#types/*": ["src/types/*"],
-      "#main": ["src/main.js"],
-      "#server/*": ["src/server/*"],
-      "#logic/*": ["src/logic/*"],
-      "#orchestrator/*": ["src/orchestrator/*"],
-      "#missions/*": ["src/missions/*"],
-      "#validation/*": ["src/validation/*"]
-    },
-
-    // ============================================================
-    // [E] TIPOS (NODE + CUSTOM DECLARATIONS)
-    // ============================================================
-    // typeRoots aponta para pastas com index.d.ts ou package.json
-    // Inclui node_modules/@types E src/types para custom declarations
-    "typeRoots": ["./node_modules/@types", "./src/types"],
-    "types": ["node"],
-
-    // ============================================================
-    // [F] QUALIDADE (diagnósticos úteis sem "punição" excessiva)
-    // ============================================================
-    "skipLibCheck": true,
-    "maxNodeModuleJsDepth": 0,
-
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
-    "noFallthroughCasesInSwitch": true,
-
-    // Mantidos permissivos por design
-    "noImplicitReturns": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    // ============================================================
-    // [G] PERFORMANCE DO LANGUAGE SERVICE
-    // ============================================================
-    "disableSizeLimit": false,
-    "assumeChangesOnlyAffectDirectDependencies": true
-  },
-
-  // ==============================================================
-  // [H] ESCOPO DO PROJETO — ARQUIVOS MONITORADOS
-  // ==============================================================
+  "extends": "./tsconfig.json",
   "include": [
-    "src/**/*.js",
-    "src/**/*.mjs",
-    "src/**/*.d.ts",
-    "scripts/**/*.js",
-    "scripts/**/*.mjs",
-    "tests/**/*.js",
-
-    "*.js",
-    "*.mjs",
-    "*.cjs",
-
+    "src/**/*",
+    "tests/**/*",
+    "scripts/**/*",
+    "tools/**/*",
+    "*.config.js",
+    "*.config.mjs",
+    "*.config.cjs",
     "ecosystem.config.js",
     ".puppeteerrc.cjs",
     "eslint.config.mjs"
   ],
-
-  // ==============================================================
-  // [I] EXCLUSÕES — ARTEFATOS, DADOS E RUÍDO
-  // ==============================================================
   "exclude": [
     "node_modules",
     "dist",
@@ -126,21 +30,14 @@
     "analysis",
     "local-login",
     "DOCUMENTAÇÃO",
-    "src/dashboard-ui/node_modules",
-    "src/dashboard-ui/dist",
-
+    "src/dashboard-ui/**",
     ".git",
-
-    ".tmp.drivedownload",
-    ".tmp.driveupload",
-
     "**/node_modules/**",
-    "**/.tmp.*/**",
-    "**/.*",
-
     "**/*.min.js",
     "**/*.map",
     "**/bundle.js",
-    "**/*.bundle.js"
+    "**/*.bundle.js",
+    "**/*.d.ts.map",
+    "**/*.js.map"
   ]
 }

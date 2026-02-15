@@ -1,0 +1,59 @@
+{
+  "domain": "network",
+  "contracts": [
+    {
+      "id": "CONTRACT-NETWORK-SPLIT-HANDSHAKE",
+      "title": "Split Mode Handshake",
+      "domain": "network",
+      "description": "Conexão externa em split mode deve completar handshake dentro do timeout.",
+      "kind": "protocol",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "network.split_handshake.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/integration/server/test_socket_split_handshake.spec.js"
+      ],
+      "owner": "server-network",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-NETWORK-SPLIT-RECONNECT",
+      "title": "Split Mode Reconnect",
+      "domain": "network",
+      "description": "Reconexão em split mode deve manter semântica de estabilidade e anti-storm.",
+      "kind": "runtime",
+      "severity_default": "P2",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "network.split_reconnect.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/integration/server/test_socket_split_reconnect.spec.js tests/integration/server/test_socket_split_reconnect_storm.spec.js"
+      ],
+      "owner": "server-network",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    }
+  ]
+}

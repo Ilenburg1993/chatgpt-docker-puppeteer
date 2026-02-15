@@ -125,6 +125,8 @@ help:
 	@echo "  $(CYAN)make validate-env$(NC)      Validar arquivos .env"
 	@echo "  $(CYAN)make validate-git$(NC)      Validar configurações Git"
 	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
+	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
+	@echo "  $(CYAN)make semantic-preflight$(NC) Preflight PM2+MCP+RAG+LSP"
 	@echo ""
 	@echo "$(BLUE)$(BOLD)📊 Análise & Code Quality:$(NC)"
 	@echo "  $(CYAN)make analyze-deps$(NC)      Dependências circulares"
@@ -157,6 +159,12 @@ help:
 	@echo "  $(CYAN)make rag-watch$(NC)         Watch incremental contínuo do RAG"
 	@echo "  $(CYAN)make rag-full-rebuild$(NC)  Reset + reindex completo"
 	@echo "  $(CYAN)make rag-rebuild-zero$(NC)  Pipeline canônico completo (PM2/MCP/RAG)"
+	@echo "  $(CYAN)make audit-preflight$(NC)   Preflight semântico estruturado (JSON)"
+	@echo "  $(CYAN)make audit-ready$(NC)       Checklist de prontidão antes da auditoria"
+	@echo "  $(CYAN)make audit-shadow$(NC)      Auditoria rápida em modo shadow gate"
+	@echo "  $(CYAN)make audit-quick$(NC)       Auditoria bug-first rápida (delta + ETA/progresso)"
+	@echo "  $(CYAN)make audit-deep$(NC)        Auditoria bug-first completa local (com proposals)"
+	@echo "  $(CYAN)make audit-nightly$(NC)     Auditoria noturna v3.2 (contracts + chaos + shadow gate)"
 	@echo "  $(CYAN)make rag-index RAG_DOCS_MODE=exclude$(NC)  Indexar sem MD/MDX"
 	@echo "  $(CYAN)make rag-index RAG_DOCS_MODE=only$(NC)     Indexar somente MD/MDX"
 	@echo "  $(CYAN)make rag-watch RAG_INCLUDE_GLOBS='src/**,config/**'$(NC)  Escopo custom"
@@ -166,6 +174,9 @@ help:
 	@echo "  $(CYAN)make format-check$(NC)      Verificar formatação"
 	@echo "  $(CYAN)make lint$(NC)              Linting (ESLint)"
 	@echo "  $(CYAN)make lint-fix$(NC)          Fix automático"
+	@echo "  $(CYAN)make typecheck-node$(NC)    Typecheck canônico (Node/Audit)"
+	@echo "  $(CYAN)make typecheck-browser$(NC) Typecheck browser/UI isolado"
+	@echo "  $(CYAN)make typecheck-full$(NC)    Typecheck completo (node + browser)"
 	@echo ""
 	@echo "$(MAGENTA)$(BOLD)🛠️  Manutenção:$(NC)"
 	@echo "  $(CYAN)make clean$(NC)             Limpar temporários"
@@ -529,11 +540,19 @@ test-all: test test-unit test-integration test-e2e
 # 9️⃣.1 RAG & MCP
 # =============================================================================
 
-.PHONY: mcp-diagnose rag-health rag-index rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero
+.PHONY: mcp-diagnose lsp-health semantic-preflight rag-health rag-index rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero
 
 mcp-diagnose:
 	@echo "$(CYAN)🔍 Diagnóstico MCP$(NC)"
 	@$(NPM) run mcp:diagnose
+
+lsp-health:
+	@echo "$(CYAN)🔍 Diagnóstico funcional LSP$(NC)"
+	@$(NPM) run lsp:health -- --json
+
+semantic-preflight:
+	@echo "$(CYAN)🧭 Preflight semântico (PM2/MCP/RAG/LSP)$(NC)"
+	@$(NPM) run audit:preflight
 
 rag-health:
 	@echo "$(CYAN)🔍 RAG Health$(NC)"
@@ -585,7 +604,7 @@ rag-rebuild-zero:
 # 🔟 FORMATAÇÃO & LINT
 # =============================================================================
 
-.PHONY: format format-check lint lint-fix lint-quiet lint-report lint-src lint-tests
+.PHONY: format format-check lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full
 
 format:
 	@echo "$(CYAN)🎨 Formatando código (Prettier)$(NC)"
@@ -623,6 +642,18 @@ lint-src:
 lint-tests:
 	@echo "$(CYAN)🔍 Linting tests/$(NC)"
 	@$(NPM) run lint:tests
+
+typecheck-node:
+	@echo "$(CYAN)🔎 Typecheck Node/Audit (tsconfig.json)$(NC)"
+	@$(NPM) run typecheck:node
+
+typecheck-browser:
+	@echo "$(CYAN)🔎 Typecheck Browser/UI (tsconfig.browser.json)$(NC)"
+	@$(NPM) run typecheck:browser
+
+typecheck-full:
+	@echo "$(CYAN)🔎 Typecheck completo (Node + Browser/UI)$(NC)"
+	@$(NPM) run typecheck:full
 
 # =============================================================================
 # 1️⃣1️⃣ MANUTENÇÃO & LIMPEZA
@@ -743,7 +774,7 @@ check-bindings:
 # 1️⃣3️⃣ DEVELOPMENT SHORTCUTS
 # =============================================================================
 
-.PHONY: dev dev-debug quick-test quick-check check-forbidden
+.PHONY: dev dev-debug quick-test quick-check check-forbidden audit-preflight audit-ready audit-shadow audit-quick audit-deep audit-nightly
 
 dev:
 	@echo "$(GREEN)🚀 Iniciando modo desenvolvimento$(NC)"
@@ -762,6 +793,29 @@ quick-check: format-check lint-quiet
 check-forbidden:
 	@echo "$(CYAN)🔍 Verificando padrões proibidos$(NC)"
 	@$(NPM) run check:forbidden
+
+audit-preflight:
+	@echo "$(CYAN)🧭 Audit preflight semântico$(NC)"
+	@$(NPM) run audit:preflight
+
+audit-ready: semantic-preflight
+	@echo "$(GREEN)✅ Prontidão semântica coletada. Rode make audit-shadow/audit-quick conforme necessidade.$(NC)"
+
+audit-shadow:
+	@echo "$(CYAN)🧪 Auditoria rápida em shadow gate$(NC)"
+	@$(NPM) run audit:quick:shadow
+
+audit-quick:
+	@echo "$(CYAN)🧪 Auditoria bug-first rápida (delta)$(NC)"
+	@$(NPM) run audit:quick
+
+audit-deep:
+	@echo "$(CYAN)🧪 Auditoria bug-first completa local$(NC)"
+	@$(NPM) run audit:deep
+
+audit-nightly:
+	@echo "$(CYAN)🌙 Auditoria noturna v3.2 (contracts + chaos + shadow gate + logs)$(NC)"
+	@$(NPM) run audit:nightly
 
 # =============================================================================
 # 1️⃣4️⃣ GIT & QUALIDADE

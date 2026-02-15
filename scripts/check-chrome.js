@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
+#!/usr/bin/env node
+import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 (async () => {
     try {
         const report = await ConnectionOrchestrator.synchronize();

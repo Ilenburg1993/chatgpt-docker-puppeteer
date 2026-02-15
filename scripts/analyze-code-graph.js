@@ -1,9 +1,11 @@
-#!/usr/bin/env nodeimport ts from 'typescript';
+#!/usr/bin/env node
 // @ts-nocheck
+import ts from 'typescript';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+const TSCONFIG = path.join(ROOT, 'tsconfig.json');
 const JSCONFIG = path.join(ROOT, 'jsconfig.json');
 
 // Parse command line arguments
@@ -18,13 +20,17 @@ const options = {
     exportDot: args.includes('--export-dot')
 };
 
-// Read jsconfig.json
-const configFile = ts.readConfigFile(JSCONFIG, ts.sys.readFile);
+// Resolve config in canonical order: tsconfig first, jsconfig fallback.
+const configPath = fs.existsSync(TSCONFIG) ? TSCONFIG : JSCONFIG;
+const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+if (configFile.error) {
+    throw new Error(`Failed to read ${configPath}`);
+}
 const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, ROOT);
 
 console.log('🔍 TypeScript Language Server Analysis\n');
 console.log(`📁 Root: ${ROOT}`);
-console.log(`📝 Config: ${JSCONFIG}`);
+console.log(`📝 Config: ${configPath}`);
 console.log(`📦 Files: ${parsedConfig.fileNames.length}\n`);
 
 // Create TypeScript program

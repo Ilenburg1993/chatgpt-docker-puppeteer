@@ -1,0 +1,94 @@
+{
+  "domain": "logic",
+  "contracts": [
+    {
+      "id": "CONTRACT-STATIC-PUPPETEER-LAUNCH",
+      "title": "Puppeteer launch proibido",
+      "domain": "logic",
+      "description": "Arquitetura exige connect-only, sem puppeteer.launch em produção.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "\\bpuppeteer\\.launch\\s*\\(",
+        "flags": "g",
+        "scope": "src",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "core-runtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-STATIC-PROCESS-EXIT",
+      "title": "process.exit restrito",
+      "domain": "logic",
+      "description": "Uso de process.exit permitido apenas em entrypoints autorizados.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "process\\.exit\\s*\\(",
+        "flags": "g",
+        "scope": "src",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "allowlist_id": "allowlist-static-core",
+        "allowlist_key": "CONTRACT-STATIC-PROCESS-EXIT",
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "core-runtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-STATIC-FILE-IPC-ESTADO",
+      "title": "estado.json proibido em discovery",
+      "domain": "logic",
+      "description": "Discovery por arquivo estado.json está deprecado em favor de NERV SERVER_READY.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "estado\\.json",
+        "flags": "g",
+        "scope": "src",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "core-runtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    }
+  ]
+}

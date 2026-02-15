@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport { spawnSync } from 'node:child_process';
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 
 const platform = os.platform();

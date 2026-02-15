@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
+#!/usr/bin/env node
+import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';

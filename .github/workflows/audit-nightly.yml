@@ -1,0 +1,88 @@
+name: Audit Nightly
+
+on:
+  schedule:
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-nightly:
+    name: Automated audit nightly (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          rm -rf node_modules
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Run audit nightly (artifact mode)
+        run: |
+          npm run audit:preflight
+          npm run audit:nightly -- --json --publish-master false --publish-snapshot false --output-dir artifacts/audit --focus bug-first --contracts-mode hybrid --enforce-level warn --proposal-depth deep --chaos-profile full --cloud-fallback on --log-format jsonl --progress false --eta false --refresh-context smart --shadow-gate true
+
+      - name: Build nightly audit summary
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import path from "node:path";
+            const dir = "artifacts/audit";
+            const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".json")) : [];
+            if (files.length === 0) {
+              console.log("No audit JSON artifact found.");
+              process.exit(0);
+            }
+            files.sort();
+            const latest = files[files.length - 1];
+            const payload = JSON.parse(fs.readFileSync(path.join(dir, latest), "utf8"));
+            const report = payload?.report || payload;
+            const lines = [
+              "## Audit Nightly",
+              "",
+              `- run_id: ${report?.run_id || "n/a"}`,
+              `- findings: ${report?.summary?.total_findings ?? 0}`,
+              `- primary: ${report?.summary?.total_primary ?? 0} | backlog: ${report?.summary?.total_backlog ?? 0}`,
+              `- partial: ${report?.summary?.partial ?? false}`,
+              `- semantic_preflight_ok: ${report?.semantic_preflight?.ok ?? false}`,
+              `- shadow_would_block: ${report?.shadow_gate?.would_block ?? false}`
+            ];
+            fs.writeFileSync("artifacts/audit/nightly-summary.md", `${lines.join("\\n")}\\n`);
+          '
+          cat artifacts/audit/nightly-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-nightly-${{ github.run_id }}
+          path: artifacts/audit
+          if-no-files-found: warn

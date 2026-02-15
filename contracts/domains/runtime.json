@@ -1,0 +1,140 @@
+{
+  "domain": "runtime",
+  "contracts": [
+    {
+      "id": "CONTRACT-RUNTIME-MCP-DIAG",
+      "title": "MCP Diagnose Disponível",
+      "domain": "runtime",
+      "description": "O comando mcp:diagnose deve executar com sucesso para preservar triagem semântica.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.mcp_diagnose.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run mcp:diagnose"
+      ],
+      "owner": "infra-runtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-RAG-HEALTH",
+      "title": "RAG Health Saudável",
+      "domain": "runtime",
+      "description": "RAG deve responder health ok para contexto local-first.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.rag_health.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run rag:health -- --json"
+      ],
+      "owner": "infra-rag",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-LSP-TOOLS",
+      "title": "Sinais de Ferramentas LSP",
+      "domain": "runtime",
+      "description": "Diagnóstico MCP deve expor sinais mínimos de ferramentas LSP.",
+      "kind": "operational",
+      "severity_default": "P2",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.lsp_tools.missing"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run mcp:diagnose"
+      ],
+      "owner": "infra-lsp",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-LSP-FUNCTIONAL",
+      "title": "LSP funcional via MCP",
+      "domain": "runtime",
+      "description": "Ferramentas LSP devem responder funcionalmente via MCP (diagnostics/definition).",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.lsp_functional.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run lsp:health -- --json"
+      ],
+      "owner": "infra-lsp",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-PROTOCOL-RUNTIME-SMOKE",
+      "title": "Smoke Protocolar de Lifecycle",
+      "domain": "runtime",
+      "description": "Smoke de lifecycle/main-server deve passar em perfis deep/nightly.",
+      "kind": "protocol",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.smoke.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave10_lifecycle_signal_matrix.spec.js tests/regression/test_wave11_main_server_bootstrap_unification.spec.js"
+      ],
+      "owner": "runtime-lifecycle",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    }
+  ]
+}

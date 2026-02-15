@@ -1,0 +1,63 @@
+{
+  "domain": "config",
+  "contracts": [
+    {
+      "id": "CONTRACT-CONFIG-ENV-PRECEDENCE",
+      "title": "Precedência de .env.local",
+      "domain": "config",
+      "description": "Bootstrap deve garantir precedência de .env.local para módulos críticos.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "config.env_precedence.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave4_runtime_resilience.spec.js"
+      ],
+      "owner": "core-config",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-STATIC-HARDCODED-PORTS",
+      "title": "Portas hardcoded proibidas",
+      "domain": "config",
+      "description": "Valores de portas fixas devem ser configuráveis por ENV/CONFIG.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "\\b9222\\b|\\b9224\\b",
+        "flags": "g",
+        "scope": "src",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "allowlist_id": "allowlist-static-core",
+        "allowlist_key": "CONTRACT-STATIC-HARDCODED-PORTS",
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "core-config",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "domain": "schemas",
+  "contracts": [
+    {
+      "id": "CONTRACT-SCHEMA-TYPECHECK",
+      "title": "Typecheck sem erros",
+      "domain": "schemas",
+      "description": "Compilação TypeScript deve manter contratos de tipo consistentes.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "static.typecheck.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run typecheck"
+      ],
+      "owner": "core-schema",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-SCHEMA-TASK-V5",
+      "title": "Schema Task v5 válido",
+      "domain": "schemas",
+      "description": "Schemas canônicos de task devem permanecer válidos e cobertos por testes unitários.",
+      "kind": "runtime",
+      "severity_default": "P2",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "schemas.task_v5.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/unit/core/test_schema_v5.spec.js"
+      ],
+      "owner": "core-schema",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    }
+  ]
+}

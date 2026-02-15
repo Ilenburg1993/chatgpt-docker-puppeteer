@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport { spawn } from 'node:child_process';
+#!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 

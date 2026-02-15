@@ -1,4 +1,5 @@
-#!/usr/bin/env nodeimport fs from 'node:fs';
+#!/usr/bin/env node
+import fs from 'node:fs';
 // @ts-nocheck
 import path from 'node:path';
 
