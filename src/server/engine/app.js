@@ -28,12 +28,13 @@ function readRagReadiness() {
         const manifest = JSON.parse(raw);
         const updatedAt = Number(manifest?.updated_at);
         const now = Date.now();
+        const hasIndexTimestamp = Number.isFinite(updatedAt);
         return {
-            available: true,
+            available: hasIndexTimestamp,
             index_mode: manifest?.last_index_mode || 'full',
-            index_updated_at: Number.isFinite(updatedAt) ? updatedAt : null,
-            index_updated_at_iso: Number.isFinite(updatedAt) ? formatIsoSecond(updatedAt) : null,
-            index_freshness_ms: Number.isFinite(updatedAt) ? Math.max(0, now - updatedAt) : null
+            index_updated_at: hasIndexTimestamp ? updatedAt : null,
+            index_updated_at_iso: hasIndexTimestamp ? formatIsoSecond(updatedAt) : null,
+            index_freshness_ms: hasIndexTimestamp ? Math.max(0, now - updatedAt) : null
         };
     } catch {
         return {

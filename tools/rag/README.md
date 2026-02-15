@@ -34,10 +34,11 @@ Os comandos já estão expostos no `package.json`:
 Flags úteis:
 
 - `rag:health`: `--json`, `--ollama-base-url`, `--model`
-- `rag:index`: `--root`, `--profile`, `--max-file-bytes`, `--json`, `--ollama-base-url`, `--model`
-- `rag:watch`: `--root`, `--profile`, `--debounce-ms`, `--batch-max`
+- `rag:index`: `--root`, `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--json`, `--ollama-base-url`, `--model`
+- `rag:watch`: `--root`, `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--debounce-ms`, `--batch-max`
 - `rag:ask`: `--topk`, `--ext`, `--path-prefix`, `--tag` (repetível), `--profile`, `--mode`, `--diagnostics`, `--json`, `--ollama-base-url`, `--model`
 - `rag:expand`: `--chunk-id`, `--mode lines|symbol`, `--before-lines`, `--after-lines`, `--json`
+- `rag:rebuild:zero`: `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--skip-pm2`, `--json`
 
 Perfis de escopo:
 
@@ -49,6 +50,24 @@ Fallback degradado:
 
 - `mode=auto` tenta semântico/híbrido e cai para lexical quando embeddings indisponíveis
 - o resultado expõe `backend`, `degraded` e `reason_code`
+
+Configuração de escopo (unificada em index/full/incremental/watch/rebuild):
+
+- `RAG_DOCS_MODE=include|exclude|only` (default: `include`)
+- `RAG_INCLUDE_GLOBS` (CSV opcional)
+- `RAG_EXCLUDE_GLOBS` (CSV opcional)
+- `RAG_INDEX_MAX_FILE_BYTES` (default `2000000`)
+- Throttle adaptativo de indexação (performance vs CPU):
+  - `RAG_THROTTLE_ENABLED=true|false`
+  - `RAG_THROTTLE_METRIC=auto|system|process` (recomendado: `auto`)
+  - `RAG_THROTTLE_TARGET_CPU` (default `72`)
+  - `RAG_THROTTLE_MIN_DELAY_MS` / `RAG_THROTTLE_MAX_DELAY_MS` / `RAG_THROTTLE_INITIAL_DELAY_MS`
+  - `RAG_THROTTLE_SAMPLE_INTERVAL_MS` / `RAG_THROTTLE_SAMPLE_SIZE`
+
+Exemplos de fase:
+
+- Fase 1 (código/config sem markdown): `RAG_DOCS_MODE=exclude`
+- Fase 2 (somente docs markdown): `RAG_DOCS_MODE=only`
 
 ## Arquitetura (camadas)
 
@@ -85,6 +104,8 @@ O manifesto guarda:
   - `GET /v1/models`
   - `POST /v1/embeddings` com `{ model, input }`
 - Normaliza vetor para `number[]` e valida `dim` contra o manifesto.
+- Limite de segurança de entrada por embedding configurável via `OLLAMA_EMBED_MAX_CHARS` (default `8000`).
+- Em overflow de contexto, reduz input automaticamente e aprende `runtime_safe_chars` na execução (controlável por `OLLAMA_EMBED_CONTEXT_FAST_SHRINK`, default `true`).
 
 ### Camada D — Chunking determinístico (AST-aware v2)
 
@@ -104,6 +125,7 @@ Estratégias:
 - Code: quebra por âncoras heurísticas (export/class/function/etc) (`chunk_code.mjs`)
 - Plain/JSON/YAML: quebra por blocos de linhas (`chunk_plain.mjs`)
 - `merge_ranges.mjs`: junta chunks muito pequenos com o vizinho quando couber no limite
+- Defaults recomendados para estabilidade de embedding: `RAG_CHUNK_TARGET_CHARS=1800` e `RAG_CHUNK_MAX_CHARS=2800` (ambos ajustáveis via env)
 
 ### Camada E — Storage (LanceDB)
 

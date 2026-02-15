@@ -160,6 +160,30 @@ const ENV_SCHEMA = {
         default: 'core',
         message: 'Must be one of: core, dev, full'
     },
+    RAG_DOCS_MODE: {
+        level: 'WARN',
+        validator: (val) => ['include', 'exclude', 'only'].includes(String(val)),
+        default: 'include',
+        message: 'Must be one of: include, exclude, only'
+    },
+    RAG_INCLUDE_GLOBS: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: '',
+        message: 'Must be a comma-separated glob string (or empty)'
+    },
+    RAG_EXCLUDE_GLOBS: {
+        level: 'WARN',
+        validator: (val) => typeof val === 'string',
+        default: '',
+        message: 'Must be a comma-separated glob string (or empty)'
+    },
+    RAG_INDEX_MAX_FILE_BYTES: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1000,
+        default: '2000000',
+        message: 'Must be an integer >= 1000'
+    },
     RAG_DEGRADED_MODE_ENABLED: {
         level: 'WARN',
         validator: (val) => ['true', 'false'].includes(String(val)),
@@ -175,14 +199,104 @@ const ENV_SCHEMA = {
     RAG_CHUNK_TARGET_CHARS: {
         level: 'WARN',
         validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 800,
-        default: '2400',
+        default: '1800',
         message: 'Must be an integer >= 800'
     },
     RAG_CHUNK_MAX_CHARS: {
         level: 'WARN',
         validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1200,
-        default: '4200',
+        default: '2800',
         message: 'Must be an integer >= 1200'
+    },
+    RAG_THROTTLE_ENABLED: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
+    },
+    RAG_THROTTLE_METRIC: {
+        level: 'WARN',
+        validator: (val) => ['auto', 'system', 'process'].includes(String(val)),
+        default: 'auto',
+        message: 'Must be one of: auto, system, process'
+    },
+    RAG_THROTTLE_TARGET_CPU: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 20 && parseFloat(val) <= 95,
+        default: '72',
+        message: 'Must be a number between 20 and 95'
+    },
+    RAG_THROTTLE_MIN_DELAY_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 0,
+        default: '60',
+        message: 'Must be an integer >= 0'
+    },
+    RAG_THROTTLE_MAX_DELAY_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 100,
+        default: '5000',
+        message: 'Must be an integer >= 100'
+    },
+    RAG_THROTTLE_INITIAL_DELAY_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 0,
+        default: '260',
+        message: 'Must be an integer >= 0'
+    },
+    RAG_THROTTLE_SAMPLE_INTERVAL_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 100,
+        default: '1000',
+        message: 'Must be an integer >= 100 (milliseconds)'
+    },
+    RAG_THROTTLE_SAMPLE_SIZE: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 3,
+        default: '8',
+        message: 'Must be an integer >= 3'
+    },
+    RAG_THROTTLE_SLOWDOWN_FACTOR: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 1 && parseFloat(val) <= 3,
+        default: '1.28',
+        message: 'Must be a number > 1 and <= 3'
+    },
+    RAG_THROTTLE_SPEEDUP_FACTOR: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0 && parseFloat(val) < 1,
+        default: '0.92',
+        message: 'Must be a number > 0 and < 1'
+    },
+    RAG_THROTTLE_HIGH_WATERMARK_PCT: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 1 && parseFloat(val) <= 40,
+        default: '8',
+        message: 'Must be a number between 1 and 40'
+    },
+    RAG_THROTTLE_LOW_WATERMARK_PCT: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 1 && parseFloat(val) <= 40,
+        default: '15',
+        message: 'Must be a number between 1 and 40'
+    },
+    RAG_THROTTLE_LOG_COOLDOWN_MS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 500,
+        default: '4000',
+        message: 'Must be an integer >= 500 (milliseconds)'
+    },
+    OLLAMA_EMBED_MAX_CHARS: {
+        level: 'WARN',
+        validator: (val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 1000,
+        default: '8000',
+        message: 'Must be an integer >= 1000'
+    },
+    OLLAMA_EMBED_CONTEXT_FAST_SHRINK: {
+        level: 'WARN',
+        validator: (val) => ['true', 'false'].includes(String(val)),
+        default: 'true',
+        message: 'Must be true or false'
     },
     RAG_EXPAND_DEFAULT_LINES: {
         level: 'WARN',

@@ -1,4 +1,8 @@
-import { DEFAULT_OLLAMA_BASE_URL, DEFAULT_EMBEDDING_MODEL } from '../contract.mjs';
+import {
+    DEFAULT_OLLAMA_BASE_URL,
+    DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_OLLAMA_EMBED_MAX_CHARS
+} from '../contract.mjs';
 
 function normalizeEmbeddingBaseUrl(rawBaseUrl) {
     const raw = String(rawBaseUrl || '').trim();
@@ -17,31 +21,51 @@ function resolveEmbeddingBaseUrl(optionsBaseUrl) {
     return normalizeEmbeddingBaseUrl(DEFAULT_OLLAMA_BASE_URL);
 }
 
-/**
- * Retry a function with exponential backoff
- * @param {Function} fn - Async function to retry
- * @param {Object} options - Retry options
- * @returns {Promise} Result of fn()
- */
-async function retryWithBackoff(fn, options = {}) {
-    const { maxRetries = 3, initialDelay = 1000, maxDelay = 10000, onRetry } = options;
-    let lastError;
+function parsePositiveInt(rawValue, fallback) {
+    const parsed = Number.parseInt(String(rawValue ?? ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            return await fn();
-        } catch (error) {
-            lastError = error;
-            if (attempt < maxRetries - 1) {
-                const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
-                if (onRetry) {
-                    onRetry(error, attempt + 1, maxRetries, delay);
-                }
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
+function parseBoolean(rawValue, fallback = true) {
+    const normalized = String(rawValue ?? '').trim().toLowerCase();
+    if (!normalized) return fallback;
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return fallback;
+}
+
+function isContextLengthError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    return message.includes('context length') || message.includes('input length exceeds');
+}
+
+function parseHttpStatus(error) {
+    const message = String(error?.message || '');
+    const match = message.match(/HTTP_(\d{3}):/);
+    if (!match) return null;
+    const status = Number.parseInt(match[1], 10);
+    return Number.isFinite(status) ? status : null;
+}
+
+function isTransientError(error) {
+    if (isContextLengthError(error)) return false;
+    const status = parseHttpStatus(error);
+    if (status !== null) {
+        return status === 408 || status === 429 || status >= 500;
     }
-    throw lastError;
+    const message = String(error?.message || '').toLowerCase();
+    return (
+        message.includes('timeout') ||
+        message.includes('abort') ||
+        message.includes('fetch failed') ||
+        message.includes('network') ||
+        message.includes('econnreset') ||
+        message.includes('socket hang up')
+    );
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -77,6 +101,16 @@ export class OllamaEmbeddingsProvider {
         this.baseURL = resolveEmbeddingBaseUrl(options.baseURL);
         this.model = options.model || DEFAULT_EMBEDDING_MODEL;
         this.timeoutMs = options.timeoutMs || 30_000;
+        this.maxChars = parsePositiveInt(options.maxChars ?? process.env.OLLAMA_EMBED_MAX_CHARS, DEFAULT_OLLAMA_EMBED_MAX_CHARS);
+        this.contextFastShrink = parseBoolean(
+            options.contextFastShrink ?? process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK,
+            true
+        );
+        this.runtimeSafeChars = null;
+        this.contextOverflowCount = 0;
+        this.maxAcceptedChars = 0;
+        this.embedCalls = 0;
+        this.lastStatsCall = 0;
     }
 
     async health() {
@@ -94,47 +128,105 @@ export class OllamaEmbeddingsProvider {
     }
 
     async embed(text) {
-        // SAFETY: Truncate excessively long texts (conservative limit for nomic-embed-text)
-        // nomic-embed-text supports 8192 tokens (~32k chars), but being conservative with 3k chars
-        const MAX_SAFE_CHARS = 3000;
-        let truncatedText = text;
-        let wasTruncated = false;
+        this.embedCalls++;
+        const originalText = String(text ?? '');
+        const effectiveCap = this.runtimeSafeChars
+            ? Math.min(this.maxChars, this.runtimeSafeChars)
+            : this.maxChars;
+        let truncatedText = originalText;
 
-        if (text.length > MAX_SAFE_CHARS) {
-            truncatedText = text.slice(0, MAX_SAFE_CHARS);
-            wasTruncated = true;
-            console.warn(`[RAG] Text truncated: ${text.length} → ${MAX_SAFE_CHARS} chars (model context limit)`);
+        if (truncatedText.length > effectiveCap) {
+            truncatedText = truncatedText.slice(0, effectiveCap);
+            const reason = this.runtimeSafeChars ? 'runtime safe cap' : 'model context limit';
+            console.warn(`[RAG] Text truncated: ${originalText.length} → ${effectiveCap} chars (${reason})`);
         }
 
-        return retryWithBackoff(
-            async () => {
-                const body = { model: this.model, input: truncatedText };
-                console.log(`[RAG]     • Sending to Ollama: ${truncatedText.length} chars, model=${this.model}`);
+        let currentInput = truncatedText;
+        const minChars = 1000;
+        const maxContextAdjustments = 8;
+        let hadContextOverflow = false;
+        const initialInputLength = currentInput.length;
+        let contextOverflowsThisCall = 0;
 
-                const startTime = Date.now();
-                const resp = await fetchJson(`${this.baseURL}/embeddings`, {
-                    timeoutMs: this.timeoutMs,
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                const elapsed = Date.now() - startTime;
-
-                const vector = resp?.data?.[0]?.embedding;
-                if (!Array.isArray(vector) || vector.length === 0) {
-                    throw new Error('OLLAMA_EMBEDDINGS_BAD_RESPONSE');
+        for (let adjustment = 0; adjustment < maxContextAdjustments; adjustment++) {
+            try {
+                const vector = await this.embedWithTransientRetries(currentInput);
+                this.maxAcceptedChars = Math.max(this.maxAcceptedChars, currentInput.length);
+                if (hadContextOverflow) {
+                    console.warn(
+                        `[RAG] Context limit adapted input ${initialInputLength} → ${currentInput.length} chars ` +
+                        `(${contextOverflowsThisCall} reductions, runtime_safe_chars=${this.runtimeSafeChars})`
+                    );
                 }
-                console.log(`[RAG]     ✓ Ollama response: ${vector.length}D vector in ${elapsed}ms`);
-                return vector.map(n => Number(n));
-            },
-            {
-                maxRetries: 3,
-                initialDelay: 1000,
-                maxDelay: 10000,
-                onRetry: (err, attempt, max, delay) => {
-                    console.warn(`[RAG] Embed retry ${attempt}/${max} after ${delay}ms: ${err.message}`);
+                if (hadContextOverflow || this.embedCalls - this.lastStatsCall >= 100) {
+                    this.logContextStats();
                 }
+                return vector;
+            } catch (error) {
+                if (!isContextLengthError(error)) throw error;
+                hadContextOverflow = true;
+                contextOverflowsThisCall++;
+                this.contextOverflowCount++;
+                if (currentInput.length <= minChars) throw error;
+                const shrinkFactor = this.contextFastShrink ? 0.7 : 0.85;
+                const nextLength = Math.max(minChars, Math.floor(currentInput.length * shrinkFactor));
+                if (nextLength >= currentInput.length) throw error;
+                this.runtimeSafeChars = this.runtimeSafeChars
+                    ? Math.min(this.runtimeSafeChars, nextLength)
+                    : nextLength;
+                currentInput = currentInput.slice(0, this.runtimeSafeChars);
             }
+        }
+
+        throw new Error('OLLAMA_EMBEDDINGS_CONTEXT_RETRY_EXHAUSTED');
+    }
+
+    async embedWithTransientRetries(input) {
+        const maxRetries = 3;
+        const initialDelay = 1000;
+        const maxDelay = 10000;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await this.embedOnce(input);
+            } catch (error) {
+                if (isContextLengthError(error)) throw error;
+                if (!isTransientError(error) || attempt === maxRetries) throw error;
+                const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), maxDelay);
+                console.warn(`[RAG] Embed retry ${attempt}/${maxRetries} after ${delay}ms: ${error.message}`);
+                await sleep(delay);
+            }
+        }
+
+        throw new Error('OLLAMA_EMBEDDINGS_TRANSIENT_RETRY_EXHAUSTED');
+    }
+
+    async embedOnce(input) {
+        const body = { model: this.model, input };
+        console.log(`[RAG]     • Sending to Ollama: ${input.length} chars, model=${this.model}`);
+
+        const startTime = Date.now();
+        const resp = await fetchJson(`${this.baseURL}/embeddings`, {
+            timeoutMs: this.timeoutMs,
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const elapsed = Math.max(0, Date.now() - startTime);
+
+        const vector = resp?.data?.[0]?.embedding;
+        if (!Array.isArray(vector) || vector.length === 0) {
+            throw new Error('OLLAMA_EMBEDDINGS_BAD_RESPONSE');
+        }
+        console.log(`[RAG]     ✓ Ollama response: ${vector.length}D vector in ${elapsed}ms`);
+        return vector.map(n => Number(n));
+    }
+
+    logContextStats() {
+        this.lastStatsCall = this.embedCalls;
+        console.log(
+            `[RAG] Embed context stats overflows=${this.contextOverflowCount} ` +
+            `max_ok_chars=${this.maxAcceptedChars} runtime_safe_chars=${this.runtimeSafeChars ?? 'n/a'}`
         );
     }
 }

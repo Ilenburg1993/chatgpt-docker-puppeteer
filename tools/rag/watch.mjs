@@ -125,6 +125,10 @@ async function main() {
         options: {
             root: { type: 'string' },
             profile: { type: 'string' },
+            'include-glob': { type: 'string', multiple: true },
+            'exclude-glob': { type: 'string', multiple: true },
+            'docs-mode': { type: 'string' },
+            'max-file-bytes': { type: 'string' },
             'debounce-ms': { type: 'string' },
             'batch-max': { type: 'string' }
         }
@@ -137,6 +141,10 @@ async function main() {
 
     const root = path.resolve(values.root || ROOT_DEFAULT);
     const profile = values.profile || process.env.RAG_PROFILE_DEFAULT || 'core';
+    const includeGlobs = values['include-glob'];
+    const excludeGlobs = values['exclude-glob'];
+    const docsMode = values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include';
+    const maxFileBytes = values['max-file-bytes'] ? Number(values['max-file-bytes']) : undefined;
     const debounceMs = Number(values['debounce-ms'] || DEFAULT_DEBOUNCE_MS);
     const batchMax = Number(values['batch-max'] || DEFAULT_BATCH_MAX);
 
@@ -150,6 +158,10 @@ async function main() {
             const report = await ragIndexChanged({
                 root,
                 profile,
+                includeGlobs,
+                excludeGlobs,
+                docsMode,
+                maxFileBytes,
                 changedPaths: batch
             });
             const tookMs = Date.now() - started;
@@ -179,6 +191,9 @@ async function main() {
     console.log('[RAG Watch] running');
     console.log(`[RAG Watch] root=${root}`);
     console.log(`[RAG Watch] profile=${profile}`);
+    console.log(`[RAG Watch] docsMode=${docsMode}`);
+    if (includeGlobs?.length) console.log(`[RAG Watch] includeGlobs=${includeGlobs.join(',')}`);
+    if (excludeGlobs?.length) console.log(`[RAG Watch] excludeGlobs=${excludeGlobs.join(',')}`);
     console.log(`[RAG Watch] debounce=${debounceMs}ms batchMax=${batchMax}`);
 
     const shutdown = async (signal) => {

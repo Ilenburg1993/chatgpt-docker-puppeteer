@@ -8,6 +8,9 @@ const { values } = parseArgs({
         'ollama-base-url': { type: 'string' },
         model: { type: 'string' },
         profile: { type: 'string' },
+        'include-glob': { type: 'string', multiple: true },
+        'exclude-glob': { type: 'string', multiple: true },
+        'docs-mode': { type: 'string' },
         'max-file-bytes': { type: 'string' },
         json: { type: 'boolean', default: false }
     }
@@ -20,6 +23,9 @@ const report = await ragIndex({
     ollamaBaseUrl: values['ollama-base-url'],
     model: values.model,
     profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
+    includeGlobs: values['include-glob'],
+    excludeGlobs: values['exclude-glob'],
+    docsMode: values['docs-mode'],
     maxFileBytes
 });
 

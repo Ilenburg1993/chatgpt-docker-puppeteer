@@ -19,6 +19,10 @@ const EXIT = Object.freeze({
 const { values } = parseArgs({
     options: {
         profile: { type: 'string', default: 'full' },
+        'include-glob': { type: 'string', multiple: true },
+        'exclude-glob': { type: 'string', multiple: true },
+        'docs-mode': { type: 'string' },
+        'max-file-bytes': { type: 'string' },
         'skip-pm2': { type: 'boolean', default: false },
         json: { type: 'boolean', default: false }
     }
@@ -233,8 +237,27 @@ async function main() {
         }
 
         try {
-            await runCommand('rag:index', 'npm', ['run', 'rag:index', '--', '--profile', profile]);
-            addStep('rag-index', true, { profile });
+            const ragIndexArgs = ['run', 'rag:index', '--', '--profile', profile];
+            if (values['docs-mode']) {
+                ragIndexArgs.push('--docs-mode', String(values['docs-mode']));
+            }
+            if (values['max-file-bytes']) {
+                ragIndexArgs.push('--max-file-bytes', String(values['max-file-bytes']));
+            }
+            for (const includeGlob of values['include-glob'] || []) {
+                ragIndexArgs.push('--include-glob', String(includeGlob));
+            }
+            for (const excludeGlob of values['exclude-glob'] || []) {
+                ragIndexArgs.push('--exclude-glob', String(excludeGlob));
+            }
+            await runCommand('rag:index', 'npm', ragIndexArgs);
+            addStep('rag-index', true, {
+                profile,
+                docsMode: values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include',
+                includeGlobs: values['include-glob'] || [],
+                excludeGlobs: values['exclude-glob'] || [],
+                maxFileBytes: values['max-file-bytes'] ? Number(values['max-file-bytes']) : null
+            });
         } catch (error) {
             addStep('rag-index', false, { reason: error.message, profile });
             throw Object.assign(error, { exitCode: EXIT.RAG_INDEX_FAILED });

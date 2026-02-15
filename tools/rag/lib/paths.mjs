@@ -28,6 +28,18 @@ export async function atomicWriteJson(filePath, data) {
     await fs.rename(tmpPath, filePath);
 }
 
+function isProcessAlive(pid) {
+    const parsed = Number.parseInt(String(pid ?? ''), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    try {
+        process.kill(parsed, 0);
+        return true;
+    } catch (error) {
+        if (error?.code === 'ESRCH') return false;
+        return true;
+    }
+}
+
 export async function acquireIndexLock(paths, { staleAfterMs = 6 * 60 * 60 * 1000 } = {}) {
     const now = Date.now();
     try {
@@ -43,9 +55,23 @@ export async function acquireIndexLock(paths, { staleAfterMs = 6 * 60 * 60 * 100
 
     try {
         const stat = await fs.stat(paths.lockPath);
+        const lockRaw = await fs.readFile(paths.lockPath, 'utf8').catch(() => null);
+        let lockJson = null;
+        if (lockRaw) {
+            try {
+                lockJson = JSON.parse(lockRaw);
+            } catch {
+                lockJson = null;
+            }
+        }
+        const alive = isProcessAlive(lockJson?.pid);
+        if (alive === false) {
+            await fs.unlink(paths.lockPath);
+            return acquireIndexLock(paths, { staleAfterMs });
+        }
         const ageMs = now - stat.mtimeMs;
         if (ageMs <= staleAfterMs) {
-            return { acquired: false, staleRecovered: false, reason: 'LOCKED', ageMs };
+            return { acquired: false, staleRecovered: false, reason: 'LOCKED', ageMs, lock: lockJson || null };
         }
         await fs.unlink(paths.lockPath);
         return acquireIndexLock(paths, { staleAfterMs });
@@ -57,4 +83,3 @@ export async function acquireIndexLock(paths, { staleAfterMs = 6 * 60 * 60 * 100
 export async function releaseIndexLock(paths) {
     await fs.unlink(paths.lockPath).catch(() => {});
 }
-

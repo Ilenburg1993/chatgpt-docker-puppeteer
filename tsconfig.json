@@ -108,7 +108,8 @@
     "analysis",
     "local-login",
     "DOCUMENTAÇÃO",
-    "src/dashboard-ui",
+    "src/dashboard-ui/node_modules",
+    "src/dashboard-ui/dist",
     ".git",
 
     "**/node_modules/**",

@@ -10,6 +10,8 @@ export function createEmptyManifest() {
         fingerprint: { xxhash64: true, sha256: true },
         chunker_version: CHUNKER_VERSION,
         embedding: { model: DEFAULT_EMBEDDING_MODEL, dim: null, base_url_default: DEFAULT_OLLAMA_BASE_URL },
+        last_scope: null,
+        last_scope_hash: null,
         files: {}
     };
 }
@@ -42,6 +44,12 @@ export async function loadManifest(paths) {
         if (!parsed.embedding.base_url_default) {
             parsed.embedding.base_url_default = DEFAULT_OLLAMA_BASE_URL;
         }
+        if (!Object.prototype.hasOwnProperty.call(parsed, 'last_scope')) {
+            parsed.last_scope = null;
+        }
+        if (!Object.prototype.hasOwnProperty.call(parsed, 'last_scope_hash')) {
+            parsed.last_scope_hash = null;
+        }
         if (!parsed.chunker_version) {
             parsed.chunker_version = CHUNKER_VERSION;
         }
@@ -53,4 +61,3 @@ export async function loadManifest(paths) {
         throw err;
     }
 }
-

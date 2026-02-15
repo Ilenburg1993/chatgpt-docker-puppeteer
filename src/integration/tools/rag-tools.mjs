@@ -49,7 +49,7 @@ async function ragSearchHandler({
 
     // Validate and sanitize
     if (!query || typeof query !== 'string') {
-        throw new Error('Query must be a non-empty string'); // eslint-disable-line preserve-caught-error
+        throw new Error('Query must be a non-empty string');
     }
 
     const validTopK = Math.min(Math.max(parseInt(topK) || 5, 1), 20);
@@ -147,6 +147,9 @@ async function ragSearchHandler({
             if (result.query_at_iso) {
                 formatted += `- query_at_iso: ${result.query_at_iso}\n`;
             }
+            if (result.scope_hash) {
+                formatted += `- scope_hash: ${result.scope_hash}\n`;
+            }
             if (result.reason_code) {
                 formatted += `- reason_code: ${result.reason_code}\n`;
             }
@@ -168,6 +171,8 @@ async function ragSearchHandler({
                 index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
                 index_updated_at: result.index_updated_at || null,
                 index_updated_at_iso: result.index_updated_at_iso || null,
+                last_index_scope: result.last_index_scope || null,
+                scope_hash: result.scope_hash || null,
                 query_at: result.query_at || null,
                 query_at_iso: result.query_at_iso || null,
                 ...(result.reason_code ? { reason_code: result.reason_code } : {}),
@@ -231,7 +236,14 @@ async function ragHealthHandler() {
         status += `- **Ollama:** ${health.ollama.ok ? '✅' : '❌'} ${health.ollama.ok ? 'Connected' : 'Unreachable'}\n`;
         status += `- **Embedding Model:** ${health.ollama.hasModel ? '✅' : '❌'} ${health.ollama.model || 'Not found'}\n`;
         status += `- **LanceDB:** ${health.lancedb.ok ? '✅' : '❌'} ${health.lancedb.ok ? 'Accessible' : 'Error'}\n\n`;
+        status += `- **Index Available:** ${health.available ? '✅' : '❌'} ${health.available ? 'Ready' : 'Not ready'}\n`;
         status += `- **Index Mode:** ${health.index_mode || 'full'}\n`;
+        if (health.active_scope_defaults) {
+            status += `- **Active Scope Defaults:** profile=${health.active_scope_defaults.profile} docs=${health.active_scope_defaults.docs_mode}\n`;
+        }
+        if (health.last_index_scope) {
+            status += `- **Last Index Scope:** profile=${health.last_index_scope.profile} docs=${health.last_index_scope.docs_mode}\n`;
+        }
         if (typeof health.index_freshness_ms === 'number') {
             status += `- **Index Freshness:** ${health.index_freshness_ms}ms\n`;
         }

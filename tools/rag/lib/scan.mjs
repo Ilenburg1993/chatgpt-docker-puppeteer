@@ -8,6 +8,7 @@ import { isProbablyBinary } from './text.mjs';
 const ALLOW_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.json', '.yml', '.yaml', '.sh', '.ps1', '.md', '.mdx']);
 const ALWAYS_ALLOW_BASENAMES = new Set(['Dockerfile', 'Makefile']);
 const ALWAYS_DENY_BASENAMES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']);
+const DOC_EXTENSIONS = new Set(['.md', '.mdx']);
 
 const DENY_DIR_PREFIXES = [
     'node_modules/',
@@ -57,6 +58,17 @@ function isAllowedByExt(relPath) {
     if (base.endsWith('.env.example')) return true;
     const ext = path.posix.extname(base).toLowerCase();
     return ALLOW_EXT.has(ext);
+}
+
+function resolveDocsMode(rawMode) {
+    const normalized = String(rawMode || '').trim().toLowerCase();
+    if (normalized === 'exclude' || normalized === 'only') return normalized;
+    return 'include';
+}
+
+function isDocLikePath(relPath) {
+    const ext = path.posix.extname(String(relPath || '')).toLowerCase();
+    return DOC_EXTENSIONS.has(ext);
 }
 
 function isDenied(relPath) {
@@ -140,6 +152,9 @@ export function isRagIndexableRelPath(relPath, options = {}) {
     if (!normalized) return false;
     if (isDenied(normalized)) return false;
     if (!isAllowedByExt(normalized)) return false;
+    const docsMode = resolveDocsMode(options.docsMode ?? process.env.RAG_DOCS_MODE ?? 'include');
+    if (docsMode === 'exclude' && isDocLikePath(normalized)) return false;
+    if (docsMode === 'only' && !isDocLikePath(normalized)) return false;
 
     const { compiledInclude, compiledExclude, shouldFilterByInclude } = buildCompiledGlobs(options);
     if (matchesAny(normalized, compiledExclude)) return false;
@@ -187,7 +202,8 @@ export async function scanWorkspace(
         profile = 'full',
         includeGlobs = [],
         excludeGlobs = [],
-        maxFileBytes = 2_000_000
+        maxFileBytes = 2_000_000,
+        docsMode = process.env.RAG_DOCS_MODE || 'include'
     } = {}
 ) {
     const root = path.resolve(rootDir);
@@ -204,6 +220,7 @@ export async function scanWorkspace(
         includeGlobs,
         excludeGlobs
     });
+    const resolvedDocsMode = resolveDocsMode(docsMode);
 
     const results = [];
 
@@ -232,6 +249,8 @@ export async function scanWorkspace(
 
             if (!ent.isFile()) continue;
             if (!isAllowedByExt(relPathPosix)) continue;
+            if (resolvedDocsMode === 'exclude' && isDocLikePath(relPathPosix)) continue;
+            if (resolvedDocsMode === 'only' && !isDocLikePath(relPathPosix)) continue;
             if (matchesAny(relPathPosix, compiledExclude)) continue;
             if (shouldFilterByInclude && !matchesAny(relPathPosix, compiledInclude)) continue;
 

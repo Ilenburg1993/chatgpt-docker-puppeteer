@@ -21,6 +21,7 @@ import {
     ragIndex,
     ragQuery,
 } from '../../../../tools/rag/lib/facade.mjs';
+import { resolveRagScopeConfig } from '../../../../tools/rag/lib/scope_config.mjs';
 
 /**
  * Handler para POST /api/rag/ask - Busca semântica com output em Markdown.
@@ -131,6 +132,8 @@ export async function handleRagQuery(req, res) {
         index_mode: result.index_mode || 'full',
         index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
         index_updated_at_iso: result.index_updated_at_iso || null,
+        last_index_scope: result.last_index_scope || null,
+        scope_hash: result.scope_hash || null,
         query_at_iso: result.query_at_iso || null,
         timestamp: Date.now()
       }
@@ -187,10 +190,39 @@ export async function handleRagHealth(req, res) {
  */
 export async function handleRagIndex(req, res) {
   try {
-    const { root } = req.body;
+    const {
+      root,
+      profile,
+      includeGlobs,
+      excludeGlobs,
+      docsMode,
+      maxFileBytes
+    } = req.body || {};
+
+    const normalizedIncludeGlobs = Array.isArray(includeGlobs)
+      ? includeGlobs
+      : (typeof includeGlobs === 'string' && includeGlobs.trim() ? [includeGlobs.trim()] : undefined);
+    const normalizedExcludeGlobs = Array.isArray(excludeGlobs)
+      ? excludeGlobs
+      : (typeof excludeGlobs === 'string' && excludeGlobs.trim() ? [excludeGlobs.trim()] : undefined);
+    const normalizedMaxFileBytes = Number.isFinite(Number(maxFileBytes)) ? Number(maxFileBytes) : undefined;
+    const resolvedScope = resolveRagScopeConfig({
+      profile,
+      includeGlobs: normalizedIncludeGlobs,
+      excludeGlobs: normalizedExcludeGlobs,
+      docsMode,
+      maxFileBytes: normalizedMaxFileBytes
+    });
 
     // Inicia indexação em background (não aguarda conclusão)
-    ragIndex({ root })
+    ragIndex({
+      root,
+      profile: resolvedScope.profile,
+      includeGlobs: resolvedScope.includeGlobs,
+      excludeGlobs: resolvedScope.excludeGlobs,
+      docsMode: resolvedScope.docsMode,
+      maxFileBytes: resolvedScope.maxFileBytes
+    })
       .then(() => {
         log.info('[RAG API] Background indexing completed successfully');
       })
@@ -201,6 +233,7 @@ export async function handleRagIndex(req, res) {
     return res.json({
       success: true,
       message: 'RAG indexing started in background',
+      scope: resolvedScope.scope,
       timestamp: Date.now()
     });
   } catch (error) {
@@ -296,6 +329,8 @@ export async function handleRagHybridSearch(req, res) {
         index_mode: result.index_mode || 'full',
         index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
         index_updated_at_iso: result.index_updated_at_iso || null,
+        last_index_scope: result.last_index_scope || null,
+        scope_hash: result.scope_hash || null,
         query_at_iso: result.query_at_iso || null,
         timestamp: Date.now()
       }

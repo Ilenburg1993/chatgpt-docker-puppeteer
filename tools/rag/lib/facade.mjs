@@ -2,7 +2,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { getRagPaths, ensureDirs, atomicWriteJson, acquireIndexLock, releaseIndexLock } from './paths.mjs';
 import { createEmptyManifest, loadManifest } from './manifest.mjs';
-import { scanWorkspace, findProjectRoot, RAG_SCAN_PROFILES, loadWorkspaceFile } from './scan.mjs';
+import { scanWorkspace, findProjectRoot, RAG_SCAN_PROFILES, loadWorkspaceFile, isRagIndexableRelPath } from './scan.mjs';
 import { fingerprintBuffer } from './fingerprint.mjs';
 import { buildLineIndex, sliceByLines } from './text.mjs';
 import {
@@ -16,7 +16,7 @@ import {
 import { chunkByType, detectLanguage, buildTags } from './chunking/chunk_dispatcher.mjs';
 import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
 import { EmbeddingCache } from './embeddings/embed_cache.mjs';
-import { AdaptiveThrottler } from './adaptive_throttler.mjs';
+import { createRagAdaptiveThrottler } from './adaptive_throttler.mjs';
 import {
     openDb,
     ensureTable,
@@ -32,6 +32,7 @@ import {
 } from './storage/lancedb.mjs';
 import { formatMarkdownResults } from './format.mjs';
 import { normalizeQuery } from './text/query_normalizer.mjs';
+import { resolveRagScopeConfig } from './scope_config.mjs';
 import { withTimeout } from '../../../src/infra/abort_controller_utils.js';
 
 // Singleton query embedding cache
@@ -125,12 +126,116 @@ function buildIndexStatus(manifest, nowMs = Date.now()) {
     };
 }
 
+function hasManifestIndexTimestamp(manifest) {
+    return normalizeTimestampMs(manifest?.updated_at) !== null;
+}
+
+function hasAvailableIndex({ manifest, tableNames }) {
+    const hasManifest = Boolean(manifest) && !manifest?.error && hasManifestIndexTimestamp(manifest);
+    const hasTable = Array.isArray(tableNames) && tableNames.includes(TABLE_NAME);
+    return hasManifest && hasTable;
+}
+
 function buildQueryStatus(nowMs = Date.now()) {
     return {
         query_at: nowMs,
         query_at_iso: toIsoSecond(nowMs),
         query_at_local: toLocalSecond(nowMs)
     };
+}
+
+function clampPercent(value) {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(100, value));
+}
+
+function formatDurationMs(durationMs) {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return 'n/a';
+    const totalSeconds = Math.ceil(durationMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) return `${hours}h${String(minutes).padStart(2, '0')}m`;
+    if (minutes > 0) return `${minutes}m${String(seconds).padStart(2, '0')}s`;
+    return `${seconds}s`;
+}
+
+function buildProgressSnapshot({ startedAtMs, processedFiles, totalFiles, embeddedChunks, estimatedTotalChunks }) {
+    const elapsedMs = Math.max(1, Date.now() - startedAtMs);
+    const filesPct = totalFiles > 0 ? clampPercent((processedFiles / totalFiles) * 100) : 100;
+    const filesRemainingPct = clampPercent(100 - filesPct);
+
+    const safeEstimatedChunks = Math.max(embeddedChunks, Number.isFinite(estimatedTotalChunks) ? estimatedTotalChunks : embeddedChunks);
+    const chunksPct = safeEstimatedChunks > 0 ? clampPercent((embeddedChunks / safeEstimatedChunks) * 100) : 0;
+    const chunksRemainingPct = clampPercent(100 - chunksPct);
+
+    const filesPerMs = processedFiles > 0 ? (processedFiles / elapsedMs) : 0;
+    const remainingFiles = Math.max(0, totalFiles - processedFiles);
+    const etaMs = filesPerMs > 0 ? Math.ceil(remainingFiles / filesPerMs) : null;
+    const throughputFilesPerMin = filesPerMs > 0 ? filesPerMs * 60000 : 0;
+
+    return {
+        filesPct,
+        filesRemainingPct,
+        chunksPct,
+        chunksRemainingPct,
+        etaMs,
+        throughputFilesPerMin
+    };
+}
+
+function buildScopeOptionsFromResolved(resolvedScope) {
+    return {
+        profile: resolvedScope.profile,
+        docsMode: resolvedScope.docsMode,
+        includeGlobs: resolvedScope.includeGlobs,
+        excludeGlobs: resolvedScope.excludeGlobs,
+        maxFileBytes: resolvedScope.maxFileBytes
+    };
+}
+
+function copyScope(scope) {
+    if (!scope || typeof scope !== 'object') return null;
+    return {
+        profile: scope.profile,
+        docs_mode: scope.docs_mode,
+        include_globs: Array.isArray(scope.include_globs) ? [...scope.include_globs] : [],
+        exclude_globs: Array.isArray(scope.exclude_globs) ? [...scope.exclude_globs] : [],
+        max_file_bytes: scope.max_file_bytes,
+        scope_hash: scope.scope_hash
+    };
+}
+
+function applyScopeToManifest(manifest, resolvedScope) {
+    manifest.last_scope = copyScope(resolvedScope.scope);
+    manifest.last_scope_hash = resolvedScope.scopeHash;
+}
+
+function isSameScope(manifest, resolvedScope) {
+    return String(manifest?.last_scope_hash || '') === String(resolvedScope.scopeHash || '');
+}
+
+async function reconcileScopeChanges({ manifest, resolvedScope, table, report }) {
+    if (isSameScope(manifest, resolvedScope)) return;
+
+    const scopeOptions = buildScopeOptionsFromResolved(resolvedScope);
+    const paths = Object.keys(manifest.files || {});
+    if (paths.length === 0) return;
+
+    report.scope_reconciled = true;
+    report.pruned_files = report.pruned_files || 0;
+    report.pruned_delete_ops = report.pruned_delete_ops || 0;
+
+    for (const relPath of paths) {
+        if (isRagIndexableRelPath(relPath, scopeOptions)) continue;
+        if (table) {
+            await deleteByPath(table, relPath);
+            report.deleted_chunks += 1;
+            report.pruned_delete_ops += 1;
+        }
+        delete manifest.files[relPath];
+        report.pruned_files += 1;
+    }
 }
 
 function buildIndexLockError(lock) {
@@ -291,19 +396,26 @@ export async function ragHealth(options = {}) {
                 }
             }
 
+            const available = hasAvailableIndex({ manifest, tableNames });
+            const activeScopeDefaults = resolveRagScopeConfig({});
             const ok =
                 writable &&
                 !(manifest && manifest.error) &&
                 embHealth.ok &&
                 embHealth.hasModel &&
-                !('error' in db);
+                !('error' in db) &&
+                available;
 
             return {
                 ok,
+                available,
                 paths,
                 writable,
                 manifest_ok: !(manifest && manifest.error),
                 manifest,
+                active_scope_defaults: activeScopeDefaults.scope,
+                last_index_scope: copyScope(manifest?.last_scope),
+                scope_hash: manifest?.last_scope_hash || null,
                 ...buildIndexStatus(manifest),
                 ollama: embHealth,
                 lancedb: { ok: !('error' in db), tableNames }
@@ -353,13 +465,14 @@ export async function ragIndex(options = {}) {
             model: options.model || manifest.embedding.model
         });
 
-        const resolvedProfile = resolveDefaultProfile(options.profile);
-        const files = await scanWorkspace(root, {
-            profile: resolvedProfile,
+        const resolvedScope = resolveRagScopeConfig({
+            profile: options.profile,
             includeGlobs: options.includeGlobs,
             excludeGlobs: options.excludeGlobs,
+            docsMode: options.docsMode,
             maxFileBytes: options.maxFileBytes
         });
+        const files = await scanWorkspace(root, buildScopeOptionsFromResolved(resolvedScope));
 
         // Validate embedding dimension early (fail-fast if model changed)
         if (manifest.embedding.dim !== null && files.length > 0) {
@@ -378,33 +491,70 @@ export async function ragIndex(options = {}) {
         }
 
         const db = await openDb(paths.dbDir);
+        const tableNames = await db.tableNames().catch(() => []);
+        let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
 
-        // Adaptive throttler to prevent CPU overload
-        const throttler = new AdaptiveThrottler({
-            targetCPU: 40,      // Target 40% CPU (safe for most systems)
-            minDelay: 100,      // Min 100ms between embeddings
-            maxDelay: 5000,     // Max 5s (if CPU very high)
-            initialDelay: 500,  // Start conservative
-            enabled: true       // Enable adaptive throttling
-        });
+        const throttler = createRagAdaptiveThrottler({ mode: 'full' });
+        const throttleStats = throttler.getStats();
+        console.log(
+            `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
+            `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
+            `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
+        );
 
         const report = {
             root,
+            profile: resolvedScope.profile,
+            scope: copyScope(resolvedScope.scope),
             scanned_files: files.length,
             changed_files: 0,
             skipped_files: 0,
             embedded_chunks: 0,
             inserted_chunks: 0,
-            deleted_chunks: 0
+            deleted_chunks: 0,
+            pruned_files: 0,
+            pruned_delete_ops: 0,
+            scope_reconciled: false
         };
 
-        // Lazily ensure table after we have embedding dim
-        let table = null;
+        await reconcileScopeChanges({ manifest, resolvedScope, table, report });
 
         console.log(`[RAG] Indexing: ${files.length} files scanned, processing changes...`);
+        if (report.scope_reconciled) {
+            console.log(`[RAG] Scope changed, pruned ${report.pruned_files} files outside active scope`);
+        }
 
         let processedCount = 0;
         let changedCount = 0;
+        let observedTotalChunksInChangedFiles = 0;
+        const startedAtMs = Date.now();
+
+        const logProgress = ({ force = false } = {}) => {
+            if (!force && processedCount > 0 && processedCount % 25 !== 0) return;
+            const estimatedChangedFiles = processedCount > 0
+                ? Math.max(report.changed_files, Math.round((report.changed_files / processedCount) * files.length))
+                : report.changed_files;
+            const avgChunksPerChangedFile = report.changed_files > 0
+                ? (observedTotalChunksInChangedFiles / report.changed_files)
+                : 0;
+            const estimatedTotalChunks = estimatedChangedFiles > 0
+                ? Math.max(report.embedded_chunks, Math.round(avgChunksPerChangedFile * estimatedChangedFiles))
+                : report.embedded_chunks;
+            const snapshot = buildProgressSnapshot({
+                startedAtMs,
+                processedFiles: processedCount,
+                totalFiles: files.length,
+                embeddedChunks: report.embedded_chunks,
+                estimatedTotalChunks
+            });
+            console.log(
+                `[RAG] progress files=${snapshot.filesPct.toFixed(1)}% remaining=${snapshot.filesRemainingPct.toFixed(1)}%` +
+                ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
+                ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
+                ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
+                ` | scanned=${processedCount}/${files.length} changed=${report.changed_files} skipped=${report.skipped_files}`
+            );
+        };
 
         for (const f of files) {
             processedCount++;
@@ -414,15 +564,7 @@ export async function ragIndex(options = {}) {
 
             if (prev && prev.sha256 === fp.sha256 && prev.xxhash64 === fp.xxhash64 && prev.size === f.size) {
                 report.skipped_files++;
-
-                // Progress report every 25 files OR at the end
-                if (processedCount % 25 === 0 || processedCount === files.length) {
-                    console.log(
-                        `[RAG] Progress: ${processedCount}/${files.length} scanned ` +
-                        `(${report.changed_files} changed, ${report.skipped_files} skipped, ` +
-                        `${report.embedded_chunks} chunks embedded)`
-                    );
-                }
+                logProgress();
                 continue;
             }
 
@@ -452,12 +594,14 @@ export async function ragIndex(options = {}) {
                 language,
                 tags
             })));
+            observedTotalChunksInChangedFiles += descriptors.length;
 
             const chunkRows = [];
-            for (const descriptor of descriptors) {
+            for (let fileChunkIndex = 0; fileChunkIndex < descriptors.length; fileChunkIndex++) {
+                const descriptor = descriptors[fileChunkIndex];
                 // Embed with retry logic (handles transient failures)
                 console.log(
-                    `[RAG]   → Embedding chunk ${report.embedded_chunks + 1}/${descriptors.length}: ` +
+                    `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
                     `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
                 );
                 const vector = await retryWithBackoff(
@@ -526,7 +670,11 @@ export async function ragIndex(options = {}) {
                 sha256: fp.sha256,
                 ...buildTimeFields(indexedAtMs)
             };
+
+            logProgress({ force: true });
         }
+
+        logProgress({ force: true });
 
         if (table) {
             try {
@@ -540,6 +688,8 @@ export async function ragIndex(options = {}) {
 
         manifest.updated_at = Date.now();
         manifest.last_index_mode = RAG_INDEX_MODE.FULL;
+        applyScopeToManifest(manifest, resolvedScope);
+        report.scope = copyScope(resolvedScope.scope);
 
         // Display indexing summary
         console.log('\n[RAG] ═══ Indexing Summary ═══');
@@ -615,7 +765,13 @@ export async function ragIndexChanged(options = {}) {
                     model: options.model || manifest.embedding.model
                 });
 
-                const resolvedProfile = resolveDefaultProfile(options.profile);
+                const resolvedScope = resolveRagScopeConfig({
+                    profile: options.profile,
+                    includeGlobs: options.includeGlobs,
+                    excludeGlobs: options.excludeGlobs,
+                    docsMode: options.docsMode,
+                    maxFileBytes: options.maxFileBytes
+                });
                 const changedPaths = [...new Set(
                     (
                         Array.isArray(options.changedPaths)
@@ -630,7 +786,8 @@ export async function ragIndexChanged(options = {}) {
 
                 const report = {
                     root,
-                    profile: resolvedProfile,
+                    profile: resolvedScope.profile,
+                    scope: copyScope(resolvedScope.scope),
                     requested_paths: changedPaths.length,
                     processed_paths: 0,
                     changed_files: 0,
@@ -638,35 +795,75 @@ export async function ragIndexChanged(options = {}) {
                     skipped_files: 0,
                     embedded_chunks: 0,
                     inserted_chunks: 0,
-                    deleted_chunks: 0
+                    deleted_chunks: 0,
+                    pruned_files: 0,
+                    pruned_delete_ops: 0,
+                    scope_reconciled: false
                 };
-
-                if (changedPaths.length === 0) {
-                    return report;
-                }
 
                 const db = await openDb(paths.dbDir);
                 const tableNames = await db.tableNames().catch(() => []);
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
                 let dimValidated = manifest.embedding.dim === null;
+                await reconcileScopeChanges({ manifest, resolvedScope, table, report });
+                if (report.scope_reconciled) {
+                    console.log(`[RAG] Scope changed, pruned ${report.pruned_files} files outside active scope`);
+                }
 
-                const throttler = new AdaptiveThrottler({
-                    targetCPU: 40,
-                    minDelay: 100,
-                    maxDelay: 5000,
-                    initialDelay: 250,
-                    enabled: true
-                });
+                if (changedPaths.length === 0) {
+                    manifest.updated_at = Date.now();
+                    manifest.last_index_mode = RAG_INDEX_MODE.INCREMENTAL;
+                    applyScopeToManifest(manifest, resolvedScope);
+                    await atomicWriteJson(paths.manifestPath, manifest);
+                    try {
+                        await db.close();
+                    } catch (_) {
+                        // ignore
+                    }
+                    return report;
+                }
+
+                const throttler = createRagAdaptiveThrottler({ mode: 'incremental' });
+                const throttleStats = throttler.getStats();
+                console.log(
+                    `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
+                    `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
+                    `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
+                );
+                const startedAtMs = Date.now();
+                let observedTotalChunksInChangedFiles = 0;
+
+                const logChangedProgress = ({ force = false } = {}) => {
+                    if (!force && report.processed_paths > 0 && report.processed_paths % 10 !== 0) return;
+                    const estimatedTotalChunks = report.changed_files > 0
+                        ? Math.max(
+                            report.embedded_chunks,
+                            Math.round((observedTotalChunksInChangedFiles / report.changed_files) * Math.max(report.changed_files, changedPaths.length))
+                        )
+                        : report.embedded_chunks;
+                    const snapshot = buildProgressSnapshot({
+                        startedAtMs,
+                        processedFiles: report.processed_paths,
+                        totalFiles: changedPaths.length,
+                        embeddedChunks: report.embedded_chunks,
+                        estimatedTotalChunks
+                    });
+                    console.log(
+                        `[RAG] progress files=${snapshot.filesPct.toFixed(1)}% remaining=${snapshot.filesRemainingPct.toFixed(1)}%` +
+                        ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
+                        ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
+                        ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
+                        ` | processed=${report.processed_paths}/${changedPaths.length} changed=${report.changed_files}` +
+                        ` deleted=${report.deleted_files} skipped=${report.skipped_files}`
+                    );
+                };
 
                 for (const relPath of changedPaths) {
                     report.processed_paths++;
                     const prev = manifest.files[relPath];
 
                     const file = await loadWorkspaceFile(root, relPath, {
-                        profile: resolvedProfile,
-                        includeGlobs: options.includeGlobs,
-                        excludeGlobs: options.excludeGlobs,
-                        maxFileBytes: options.maxFileBytes
+                        ...buildScopeOptionsFromResolved(resolvedScope)
                     });
 
                     // Deleted or now excluded file: remove from index + manifest.
@@ -681,12 +878,14 @@ export async function ragIndexChanged(options = {}) {
                         } else {
                             report.skipped_files++;
                         }
+                        logChangedProgress();
                         continue;
                     }
 
                     const fp = await fingerprintBuffer(file.buffer);
                     if (prev && prev.sha256 === fp.sha256 && prev.xxhash64 === fp.xxhash64 && prev.size === file.size) {
                         report.skipped_files++;
+                        logChangedProgress();
                         continue;
                     }
 
@@ -725,9 +924,15 @@ export async function ragIndexChanged(options = {}) {
                         language,
                         tags
                     })));
+                    observedTotalChunksInChangedFiles += descriptors.length;
 
                     const chunkRows = [];
-                    for (const descriptor of descriptors) {
+                    for (let fileChunkIndex = 0; fileChunkIndex < descriptors.length; fileChunkIndex++) {
+                        const descriptor = descriptors[fileChunkIndex];
+                        console.log(
+                            `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
+                            `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
+                        );
                         const vector = await retryWithBackoff(
                             () => embeddings.embed(descriptor.embed_text),
                             {
@@ -788,7 +993,10 @@ export async function ragIndexChanged(options = {}) {
                         sha256: fp.sha256,
                         ...buildTimeFields(indexedAtMs)
                     };
+                    logChangedProgress({ force: true });
                 }
+
+                logChangedProgress({ force: true });
 
                 if (table) {
                     try {
@@ -800,6 +1008,8 @@ export async function ragIndexChanged(options = {}) {
 
                 manifest.updated_at = Date.now();
                 manifest.last_index_mode = RAG_INDEX_MODE.INCREMENTAL;
+                applyScopeToManifest(manifest, resolvedScope);
+                report.scope = copyScope(resolvedScope.scope);
                 await atomicWriteJson(paths.manifestPath, manifest);
 
                 try {
@@ -831,6 +1041,8 @@ export async function ragQuery(options = {}) {
             const mode = String(options.mode || 'auto');
             const degradedModeEnabled = isDegradedEnabled(options.degradedModeEnabled);
             const indexStatus = buildIndexStatus(manifest);
+            const lastIndexScope = copyScope(manifest?.last_scope);
+            const scopeHash = manifest?.last_scope_hash || null;
             const topK = options.topK ?? 8;
             const filters = options.filters || {};
             const query = String(options.query || '');
@@ -854,6 +1066,8 @@ export async function ragQuery(options = {}) {
                             topK,
                             filters,
                             profile,
+                            last_index_scope: lastIndexScope,
+                            scope_hash: scopeHash,
                             ...indexStatus,
                             ...buildQueryStatus(),
                             backend: 'lexical',
@@ -877,6 +1091,8 @@ export async function ragQuery(options = {}) {
                         topK,
                         filters,
                         profile,
+                        last_index_scope: lastIndexScope,
+                        scope_hash: scopeHash,
                         ...indexStatus,
                         ...buildQueryStatus(),
                         backend: 'lexical',
@@ -930,6 +1146,8 @@ export async function ragQuery(options = {}) {
                         topK,
                         filters,
                         profile,
+                        last_index_scope: lastIndexScope,
+                        scope_hash: scopeHash,
                         ...indexStatus,
                         ...buildQueryStatus(),
                         backend: 'hybrid',
@@ -991,6 +1209,8 @@ export async function ragHybridSearch(options = {}) {
             const mode = String(options.mode || 'auto');
             const degradedModeEnabled = isDegradedEnabled(options.degradedModeEnabled);
             const indexStatus = buildIndexStatus(manifest);
+            const lastIndexScope = copyScope(manifest?.last_scope);
+            const scopeHash = manifest?.last_scope_hash || null;
 
             const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
                 baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
@@ -1026,6 +1246,8 @@ export async function ragHybridSearch(options = {}) {
                             model: manifest.embedding.model || embeddings.model,
                             query,
                             profile,
+                            last_index_scope: lastIndexScope,
+                            scope_hash: scopeHash,
                             ...indexStatus,
                             ...buildQueryStatus(),
                             backend: 'lexical',
@@ -1052,6 +1274,8 @@ export async function ragHybridSearch(options = {}) {
                         model: manifest.embedding.model || embeddings.model,
                         query,
                         profile,
+                        last_index_scope: lastIndexScope,
+                        scope_hash: scopeHash,
                         ...indexStatus,
                         ...buildQueryStatus(),
                         backend: 'lexical',
@@ -1112,6 +1336,8 @@ export async function ragHybridSearch(options = {}) {
                         model: manifest.embedding.model || embeddings.model,
                         query,
                         profile,
+                        last_index_scope: lastIndexScope,
+                        scope_hash: scopeHash,
                         ...indexStatus,
                         ...buildQueryStatus(),
                         backend: 'hybrid',

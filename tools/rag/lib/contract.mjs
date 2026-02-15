@@ -20,9 +20,11 @@ function parsePositiveInt(rawValue, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+export const DEFAULT_OLLAMA_EMBED_MAX_CHARS = parsePositiveInt(process.env.OLLAMA_EMBED_MAX_CHARS, 8000);
+
 // AST-aware chunking tuning knobs (overridable by env).
-export const RAG_CHUNK_TARGET_CHARS = parsePositiveInt(process.env.RAG_CHUNK_TARGET_CHARS, 2400);
-export const RAG_CHUNK_MAX_CHARS = parsePositiveInt(process.env.RAG_CHUNK_MAX_CHARS, 4200);
+export const RAG_CHUNK_TARGET_CHARS = parsePositiveInt(process.env.RAG_CHUNK_TARGET_CHARS, 1800);
+export const RAG_CHUNK_MAX_CHARS = parsePositiveInt(process.env.RAG_CHUNK_MAX_CHARS, 2800);
 
 // Backward-compatible constants consumed by legacy chunkers.
 export const MAX_CHUNK_CHARS_CODE = Math.min(RAG_CHUNK_TARGET_CHARS, RAG_CHUNK_MAX_CHARS);
