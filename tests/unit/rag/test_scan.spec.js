@@ -161,4 +161,38 @@ describe('RAG Workspace Scanning', () => {
             await fs.rm(tmpDir, { recursive: true, force: true });
         }
     });
+
+    it('supports docsMode=exclude', async () => {
+        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
+
+        try {
+            await fs.writeFile(path.join(tmpDir, 'readme.md'), '# docs', 'utf8');
+            await fs.writeFile(path.join(tmpDir, 'main.js'), 'export const x = 1;', 'utf8');
+
+            const files = await scanWorkspace(tmpDir, { profile: 'full', docsMode: 'exclude' });
+            const paths = files.map((f) => f.relPath);
+            assert.ok(paths.includes('main.js'));
+            assert.ok(!paths.includes('readme.md'));
+        } finally {
+            await fs.rm(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    it('supports docsMode=only', async () => {
+        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
+
+        try {
+            await fs.writeFile(path.join(tmpDir, 'readme.md'), '# docs', 'utf8');
+            await fs.writeFile(path.join(tmpDir, 'notes.mdx'), '# docsx', 'utf8');
+            await fs.writeFile(path.join(tmpDir, 'main.js'), 'export const x = 1;', 'utf8');
+
+            const files = await scanWorkspace(tmpDir, { profile: 'full', docsMode: 'only' });
+            const paths = files.map((f) => f.relPath);
+            assert.ok(paths.includes('readme.md'));
+            assert.ok(paths.includes('notes.mdx'));
+            assert.ok(!paths.includes('main.js'));
+        } finally {
+            await fs.rm(tmpDir, { recursive: true, force: true });
+        }
+    });
 });
