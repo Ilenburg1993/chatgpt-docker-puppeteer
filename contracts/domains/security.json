@@ -1,0 +1,63 @@
+{
+  "domain": "security",
+  "contracts": [
+    {
+      "id": "CONTRACT-SECURITY-HARDCODED-SECRETS",
+      "title": "Secrets Hardcoded Proibidos",
+      "domain": "security",
+      "description": "Chaves API, tokens, senhas não podem estar hardcoded no código.",
+      "kind": "static",
+      "severity_default": "P0",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "(api[_-]?key|secret|token|password)\\s*[=:]\\s*['\"][^'\"]{8,}['\"]",
+        "flags": "gi",
+        "scope": "src",
+        "ignore_comment_like": false,
+        "ignore_string_like": false
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "security-core",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p0"
+      }
+    },
+    {
+      "id": "CONTRACT-SECURITY-SQL-INJECTION",
+      "title": "SQL Injection Prevention",
+      "domain": "security",
+      "description": "Queries SQL devem usar prepared statements ou ORM seguro.",
+      "kind": "static",
+      "severity_default": "P0",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "(\\$\\{[^}]+\\}|\\+\\s*[^+]*\\$|\\bSELECT\\b.*\\$\\{)",
+        "flags": "gi",
+        "scope": "src",
+        "ignore_comment_like": true,
+        "ignore_string_like": false
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "security-db",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p0"
+      }
+    }
+  ]
+}

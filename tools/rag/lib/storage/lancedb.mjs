@@ -2,6 +2,7 @@ import { connect, Index } from '@lancedb/lancedb';
 import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List, Bool } from 'apache-arrow';
 import { rerank } from '../retrieve/reranker.mjs';
 import { maximalMarginalRelevance } from '../retrieve/diversity.mjs';
+import { normalizeContentClass } from '../content_class.mjs';
 import { withTimeout } from '../../../../src/infra/abort_controller_utils.js';
 
 export const TABLE_NAME = 'chunks_v2';
@@ -16,6 +17,7 @@ export function buildSchema(embeddingDim) {
         new Field('file_id', new Utf8(), false),
         new Field('path', new Utf8(), false),
         new Field('ext', new Utf8(), false),
+        new Field('content_class', new Utf8(), true),
         new Field('language', new Utf8(), true),
         new Field('kind', new Utf8(), true),
         new Field('symbol', new Utf8(), true),
@@ -83,10 +85,25 @@ export async function addChunks(table, rows, { batchSize = 32 } = {}) {
     return await withTimeout(
         async () => {
             let total = 0;
+            let retriedWithoutContentClass = false;
             for (let i = 0; i < rows.length; i += batchSize) {
                 const batch = rows.slice(i, i + batchSize);
                 if (batch.length === 0) continue;
-                await table.add(batch);
+                try {
+                    await table.add(batch);
+                } catch (error) {
+                    const message = String(error?.message || '');
+                    const schemaCompatIssue = message.includes('content_class') || message.includes('Unknown column');
+                    if (!schemaCompatIssue) {
+                        throw error;
+                    }
+                    const fallbackBatch = batch.map(({ content_class: _contentClass, ...rest }) => rest);
+                    await table.add(fallbackBatch);
+                    if (!retriedWithoutContentClass) {
+                        retriedWithoutContentClass = true;
+                        console.warn('[RAG] Table schema without content_class detected; writing fallback rows (rebuild recommended).');
+                    }
+                }
                 total += batch.length;
             }
             return total;
@@ -139,6 +156,9 @@ export async function getChunkStats(table) {
                 has_rows: Boolean(sampleRow),
                 sample_has_v2_fields: sampleRow
                     ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every((k) => Object.prototype.hasOwnProperty.call(sampleRow, k))
+                    : null,
+                sample_has_content_class: sampleRow
+                    ? Object.prototype.hasOwnProperty.call(sampleRow, 'content_class')
                     : null
             };
         },
@@ -210,6 +230,12 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
     );
 }
 
+/**
+ * @param {any} table
+ * @param {number[]} vector
+ * @param {string} textQuery
+ * @param {{ topK?: number, filters?: { pathPrefix?: string, ext?: string, tags?: string[] }, distanceRange?: [number, number] | { min?: number, max?: number }, rerank?: boolean, rerankWeights?: object, intentScope?: 'code-first'|'docs-first'|'all', mmr?: boolean, mmrLambda?: number }} [options]
+ */
 export async function hybridSearch(table, vector, textQuery, options = {}) {
     return await withTimeout(
         async () => {
@@ -219,6 +245,7 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
                 distanceRange,
                 rerank: shouldRerank = true,
                 rerankWeights,
+                intentScope = 'code-first',
                 mmr: shouldMMR = true,
                 mmrLambda = 0.7
             } = options;
@@ -262,7 +289,7 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
 
             if (shouldRerank && results.length > 0) {
                 console.log(`[RAG] Reranking ${results.length} results with 6 signals...`);
-                results = rerank(results, textQuery, { weights: rerankWeights });
+                results = rerank(results, textQuery, { weights: rerankWeights, intentScope });
             }
 
             if (shouldMMR && results.length > topK) {
@@ -333,6 +360,7 @@ function formatResult(row) {
         file_id: row.file_id,
         path: row.path,
         ext: row.ext,
+        content_class: normalizeContentClass(row.content_class, row.path, row.ext),
         language: row.language ?? undefined,
         kind: row.kind ?? undefined,
         symbol: row.symbol ?? undefined,

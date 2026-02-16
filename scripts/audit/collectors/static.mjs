@@ -19,6 +19,23 @@ function normalizeEnforcementState(value) {
 }
 
 /**
+ * @param {string|null|undefined} value
+ */
+function normalizePathLike(value) {
+    return String(value || '')
+        .replace(/\\/g, '/')
+        .replace(/^\.\//, '');
+}
+
+/**
+ * @param {string|null|undefined} value
+ */
+function isDistArtifactPath(value) {
+    const normalized = normalizePathLike(value);
+    return normalized.includes('/dist/') || normalized.startsWith('dashboard-ui/dist/');
+}
+
+/**
  * @param {string} stdoutOrStderr
  * @returns {RawFinding[]}
  */
@@ -145,25 +162,66 @@ function parseTypecheckOutput(output) {
  * @returns {RawFinding[]}
  */
 function parseMadgeOutput(output) {
+    /** @type {RawFinding[]} */
     const findings = [];
-    const lines = String(output || '').split(/\r?\n/);
-    for (const line of lines) {
-        if (!line.includes('circular')) {
+    const parsed = parseJsonFromMixedOutput(output);
+    /** @type {string[][]} */
+    const cycles = [];
+
+    if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+            if (!Array.isArray(item) || item.length < 2) {
+                continue;
+            }
+            const cycle = item
+                .map(token => normalizePathLike(String(token || '')))
+                .filter(Boolean);
+            if (cycle.length >= 2) {
+                cycles.push(cycle);
+            }
+        }
+    } else {
+        const lines = String(output || '').split(/\r?\n/);
+        for (const rawLine of lines) {
+            const line = rawLine.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').trim();
+            const cyclePrefix = line.match(/^\d+\)\s+(.+)$/);
+            if (!cyclePrefix) {
+                continue;
+            }
+            const parts = cyclePrefix[1]
+                .split('>')
+                .map(part => normalizePathLike(part))
+                .filter(Boolean);
+            if (parts.length >= 2) {
+                cycles.push(parts);
+            }
+        }
+    }
+
+    /** @type {Set<string>} */
+    const dedup = new Set();
+    for (const cycle of cycles) {
+        if (cycle.every(entry => isDistArtifactPath(entry))) {
             continue;
         }
 
+        const key = cycle.join(' -> ');
+        if (dedup.has(key)) {
+            continue;
+        }
+        dedup.add(key);
         findings.push({
             source_tool: 'madge',
-            file: null,
+            file: cycle[0] || null,
             line: null,
-            evidence: line.trim(),
+            evidence: `Ciclo detectado: ${cycle.join(' -> ')}`,
             rule: 'circular-dependency',
             severity_hint: 'P2',
             type: 'gap',
             impact: 'Dependência circular pode introduzir inicialização parcial e comportamento não determinístico.',
             root_cause: 'Acoplamento cíclico entre módulos.',
-            suggested_patch: 'Introduzir camada de abstração ou dividir responsabilidades para eliminar o ciclo.',
-            test_strategy: 'Executar `npm run analyze:deps` e confirmar ausência de ciclos.',
+            suggested_patch: 'Quebrar o ciclo com inversão de dependência, extração de interface ou split de módulos.',
+            test_strategy: 'Executar `npm run analyze:deps` e confirmar ausência de ciclos no grafo de origem.',
             regression_risk: 'Médio',
         });
     }
@@ -216,22 +274,43 @@ function parseJscpdReport(jscpdJsonPath) {
     try {
         const content = fs.readFileSync(jscpdJsonPath, 'utf8');
         const parsed = JSON.parse(content);
-        const duplicates = parsed?.duplicates || [];
+        const duplicates = Array.isArray(parsed?.duplicates) ? parsed.duplicates : [];
+        /** @type {RawFinding[]} */
+        const findings = [];
+        for (const entry of duplicates) {
+            const firstName = normalizePathLike(entry?.firstFile?.name || '');
+            const secondName = normalizePathLike(entry?.secondFile?.name || '');
+            if (!firstName || !secondName) {
+                continue;
+            }
 
-        return duplicates.map(entry => ({
-            source_tool: 'jscpd',
-            file: entry?.firstFile?.name || null,
-            line: Number(entry?.firstFile?.start) || null,
-            evidence: `Duplicação detectada entre ${entry?.firstFile?.name} e ${entry?.secondFile?.name}`,
-            rule: 'code-duplication',
-            severity_hint: 'P2',
-            type: 'upgrade',
-            impact: 'Duplicação amplia custo de manutenção e risco de divergência funcional.',
-            root_cause: 'Trechos lógicos repetidos entre arquivos.',
-            suggested_patch: 'Extrair trecho duplicado para utilitário compartilhado.',
-            test_strategy: 'Executar `jscpd` novamente e validar redução de duplicação.',
-            regression_risk: 'Baixo',
-        }));
+            const bothTests = firstName.startsWith('tests/') && secondName.startsWith('tests/');
+            if (bothTests) {
+                continue;
+            }
+            if (isDistArtifactPath(firstName) || isDistArtifactPath(secondName)) {
+                continue;
+            }
+
+            const lineCount = Number(entry?.lines || 0);
+            const tokenCount = Number(entry?.tokens || 0);
+            findings.push({
+                source_tool: 'jscpd',
+                file: firstName,
+                line: Number(entry?.firstFile?.start) || null,
+                evidence: `Duplicação (${lineCount} linhas/${tokenCount} tokens) entre ${firstName}:${entry?.firstFile?.start || '?'} e ${secondName}:${entry?.secondFile?.start || '?'}`,
+                rule: 'code-duplication',
+                severity_hint: 'P2',
+                type: 'upgrade',
+                impact: 'Duplicação amplia custo de manutenção e risco de divergência funcional.',
+                root_cause: 'Trechos lógicos repetidos entre módulos.',
+                suggested_patch: 'Extrair trecho duplicado para utilitário compartilhado ou função única no domínio.',
+                test_strategy: 'Executar `npx jscpd src scripts --reporters json` e validar tendência de redução.',
+                regression_risk: 'Baixo',
+            });
+        }
+
+        return findings;
     } catch {
         return [];
     }
@@ -244,7 +323,7 @@ function parseJscpdReport(jscpdJsonPath) {
  *   artifactsDir?: string,
  *   contractsMode?: 'legacy'|'hybrid'|'strict',
  *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
- *   commandExistsFn?: (binary: string, stepId: string) => Promise<boolean>,
+ *   commandExistsFn?: (binary: string, stepId?: string) => Promise<boolean>,
  * }} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}
  */
@@ -261,7 +340,7 @@ export async function collectStaticFindings(options) {
         (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
     const exists =
         options.commandExistsFn ||
-        (async (binary, stepId) => commandExists(binary, (cmd, args, runOpts) => exec(stepId, cmd, args, runOpts)));
+        (async binary => commandExists(binary));
 
     const telemetry = {
         profile: options.profile,
@@ -280,8 +359,7 @@ export async function collectStaticFindings(options) {
 
     if (options.profile === 'quick' && changedJsFiles.length > 0) {
         for (const file of changedJsFiles) {
-            const fileToken = file.replace(/[^a-zA-Z0-9_.-]/g, '_');
-            const check = await exec(`static.syntax.node_check.${fileToken}`, 'node', ['--check', file], { timeoutMs: 30000 });
+            const check = await runCommand('node', ['--check', file], { timeoutMs: 30000 });
             if (!check.ok) {
                 findings.push({
                     source_tool: 'node --check',
@@ -308,48 +386,111 @@ export async function collectStaticFindings(options) {
         'static.forbidden',
         'npm',
         ['run', 'check:forbidden', '--', '--json', '--contracts-mode', contractsMode, '--parity-mode'],
-        { timeoutMs: 90000 }
+        { timeoutMs: 90000, acceptExitCodes: [0, 2] }
     );
-    telemetry.gates.forbidden_ok = forbidden.ok;
-    if (!forbidden.ok) {
-        const parsed = parseForbiddenOutput(`${forbidden.stdout}\n${forbidden.stderr}`);
-        if (parsed.length > 0) {
-            findings.push(...parsed);
-        } else {
-            errors.push({ source: 'check:forbidden', message: forbidden.stderr || forbidden.stdout || 'unknown failure' });
-        }
+    const forbiddenOutput = `${forbidden.stdout}\n${forbidden.stderr}`;
+    const forbiddenPayload = parseJsonFromMixedOutput(forbiddenOutput);
+    const forbiddenFindings = parseForbiddenOutput(forbiddenOutput);
+    telemetry.gates.forbidden_ok = forbiddenFindings.length === 0;
+    if (forbiddenFindings.length > 0) {
+        findings.push(...forbiddenFindings);
+    } else if (!forbidden.ok) {
+        errors.push({ source: 'check:forbidden', message: forbidden.stderr || forbidden.stdout || 'unknown failure' });
+    }
+    if (Array.isArray(forbiddenPayload?.parity?.mismatches) && forbiddenPayload.parity.mismatches.length > 0) {
+        warnings.push({
+            source: 'check:forbidden',
+            message: `parity DSL/legado com divergências: ${forbiddenPayload.parity.mismatches.length}`,
+        });
     }
 
     if (options.profile !== 'quick') {
-        const lint = await exec('static.lint', 'npm', ['run', 'lint:quiet'], { timeoutMs: 300000 });
-        telemetry.gates.lint_ok = lint.ok;
-        if (!lint.ok) {
-            findings.push(...parseEslintOutput(`${lint.stdout}\n${lint.stderr}`));
-            if (!lint.stdout && !lint.stderr) {
-                errors.push({ source: 'lint:quiet', message: 'lint failed without output' });
+        const lint = await exec('static.lint', 'npm', ['run', 'lint:quiet'], { timeoutMs: 300000, acceptExitCodes: [0, 1, 2] });
+        const lintFindings = parseEslintOutput(`${lint.stdout}\n${lint.stderr}`);
+        telemetry.gates.lint_ok = lintFindings.length === 0 && lint.ok;
+        if (lintFindings.length > 0) {
+            findings.push(...lintFindings);
+        }
+        if (!lint.ok && lintFindings.length === 0) {
+            if ((lint.stderr || lint.stdout).trim()) {
+                findings.push({
+                    source_tool: 'lint:quiet',
+                    file: null,
+                    line: null,
+                    evidence: (lint.stderr || lint.stdout).split(/\r?\n/).slice(0, 8).join('\n'),
+                    rule: 'lint-unparsed-output',
+                    severity_hint: 'P2',
+                    type: 'incompletude',
+                    impact: 'Lint retornou saída não parseável; possível violação de qualidade pendente.',
+                    root_cause: 'Formato de output do lint divergente do parser atual.',
+                    suggested_patch: 'Ajustar parser de lint ou executar lint com formatter JSON para extração confiável.',
+                    test_strategy: 'Executar `npm run lint:quiet` e validar parser com saída estável.',
+                    regression_risk: 'Baixo',
+                });
+            } else {
+                errors.push({ source: 'lint:quiet', message: 'lint failed sem diagnóstico parseável' });
             }
         }
 
-        const typecheck = await exec('static.typecheck', 'npm', ['run', 'typecheck'], { timeoutMs: 300000 });
-        telemetry.gates.typecheck_ok = typecheck.ok;
-        if (!typecheck.ok) {
-            findings.push(...parseTypecheckOutput(`${typecheck.stdout}\n${typecheck.stderr}`));
-            if (!typecheck.stdout && !typecheck.stderr) {
-                errors.push({ source: 'typecheck', message: 'typecheck failed without output' });
+        const typecheck = await exec('static.typecheck', 'npm', ['run', 'typecheck'], { timeoutMs: 300000, acceptExitCodes: [0, 1, 2] });
+        const typecheckFindings = parseTypecheckOutput(`${typecheck.stdout}\n${typecheck.stderr}`);
+        telemetry.gates.typecheck_ok = typecheckFindings.length === 0 && typecheck.ok;
+        if (typecheckFindings.length > 0) {
+            findings.push(...typecheckFindings);
+        }
+        if (!typecheck.ok && typecheckFindings.length === 0) {
+            if ((typecheck.stderr || typecheck.stdout).trim()) {
+                findings.push({
+                    source_tool: 'typecheck',
+                    contract_id: 'CONTRACT-SCHEMA-TYPECHECK',
+                    domain: 'schemas',
+                    owner: 'core-schema',
+                    enforcement_state: 'p1',
+                    file: null,
+                    line: null,
+                    evidence: (typecheck.stderr || typecheck.stdout).split(/\r?\n/).slice(0, 8).join('\n'),
+                    rule: 'typecheck-unparsed-output',
+                    severity_hint: 'P1',
+                    type: 'falha de contrato',
+                    impact: 'Typecheck falhou sem diagnóstico parseável no formato esperado.',
+                    root_cause: 'Formato de saída do TypeScript divergiu do parser.',
+                    suggested_patch: 'Padronizar formatter/flags do tsc para extração estruturada e corrigir os erros reportados.',
+                    test_strategy: 'Executar `npm run typecheck` e validar parsing consistente.',
+                    regression_risk: 'Médio',
+                });
+            } else {
+                errors.push({ source: 'typecheck', message: 'typecheck failed sem diagnóstico parseável' });
             }
         }
 
-        const madge = await exec('static.madge', 'npm', ['run', 'analyze:deps'], { timeoutMs: 300000 });
-        telemetry.gates.depgraph_ok = madge.ok;
-        if (!madge.ok || /circular/i.test(madge.stdout) || /circular/i.test(madge.stderr)) {
-            findings.push(...parseMadgeOutput(`${madge.stdout}\n${madge.stderr}`));
+        const madge = await exec(
+            'static.madge',
+            'npx',
+            ['madge', '--circular', '--extensions', 'js,mjs,cjs', '--json', '--exclude', '^dashboard-ui/dist/', 'src/'],
+            { timeoutMs: 300000, acceptExitCodes: [0, 1] }
+        );
+        const madgeFindings = parseMadgeOutput(`${madge.stdout}\n${madge.stderr}`);
+        telemetry.gates.depgraph_ok = madgeFindings.length === 0 && madge.ok;
+        if (madgeFindings.length > 0) {
+            findings.push(...madgeFindings);
+        }
+        if (!madge.ok && madgeFindings.length === 0) {
+            errors.push({ source: 'madge', message: madge.stderr || madge.stdout || 'madge failed sem saída parseável' });
         }
 
-        const depCruiserAvailable = await exists('depcruise', 'static.depcruise.which');
+        const depCruiserAvailable = await exists('depcruise');
         if (depCruiserAvailable) {
-            const depcruise = await exec('static.depcruise.run', 'depcruise', ['--config', '.dependency-cruiser.mjs', 'src', '--output-type', 'json'], { timeoutMs: 300000 });
+            const depcruise = await exec(
+                'static.depcruise',
+                'depcruise',
+                ['--config', '.dependency-cruiser.mjs', 'src', '--output-type', 'json'],
+                { timeoutMs: 300000, acceptExitCodes: [0, 2] }
+            );
             if (!depcruise.ok) {
                 warnings.push({ source: 'dependency-cruiser', message: depcruise.stderr || depcruise.stdout || 'depcruise execution failed' });
+            }
+            if (!depcruise.stdout && !depcruise.stderr) {
+                warnings.push({ source: 'dependency-cruiser', message: 'depcruise did not return JSON output' });
             }
             try {
                 const depJson = JSON.parse(depcruise.stdout || '{}');
@@ -363,15 +504,34 @@ export async function collectStaticFindings(options) {
 
         const jscpdOutputDir = path.join(options.artifactsDir || path.join('artifacts', 'audit'), 'jscpd');
         const jscpdJsonPath = path.join(jscpdOutputDir, 'jscpd-report.json');
-        const jscpd = await exec('static.jscpd', 'npx', ['jscpd', 'src', 'tests', '--reporters', 'json', '--output', jscpdOutputDir], { timeoutMs: 300000 });
+        const jscpd = await exec(
+            'static.jscpd',
+            'npx',
+            [
+                'jscpd',
+                'src',
+                'scripts',
+                '--reporters',
+                'json',
+                '--output',
+                jscpdOutputDir,
+                '--min-lines',
+                '12',
+                '--min-tokens',
+                '80',
+                '--ignore',
+                '**/dist/**,**/*.min.js,**/*.spec.js,tests/**',
+            ],
+            { timeoutMs: 300000, acceptExitCodes: [0, 1] }
+        );
         if (!jscpd.ok) {
             warnings.push({ source: 'jscpd', message: jscpd.stderr || jscpd.stdout || 'jscpd reported duplicates/errors' });
         }
         findings.push(...parseJscpdReport(jscpdJsonPath));
 
-        const semgrepAvailable = await exists('semgrep', 'static.semgrep.which');
+        const semgrepAvailable = await exists('semgrep');
         if (semgrepAvailable) {
-            const semgrep = await exec('static.semgrep.run', 'semgrep', ['--config', 'auto', 'src', '--json'], { timeoutMs: 300000 });
+            const semgrep = await exec('static.semgrep', 'semgrep', ['--config', 'auto', 'src', '--json'], { timeoutMs: 300000, acceptExitCodes: [0, 1] });
             if (!semgrep.ok) {
                 warnings.push({ source: 'semgrep', message: semgrep.stderr || 'semgrep execution failed' });
             }

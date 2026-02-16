@@ -27,7 +27,12 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 
 /**
  * @typedef {Object} HardwareMetrics
- * @property {string} cpu_load - Carga de CPU em porcentagem.
+ * @property {string} cpu_load - [LEGACY] Carga de CPU em porcentagem.
+ * @property {string} cpu_usage_percent - Uso real de CPU em porcentagem.
+ * @property {string} cpu_load_1min - Load average de 1 minuto.
+ * @property {string} cpu_load_5min - Load average de 5 minutos.
+ * @property {string} cpu_load_15min - Load average de 15 minutos.
+ * @property {number} cpu_cores - Número de núcleos.
  * @property {string} ram_usage_pct - Uso de RAM em porcentagem.
  * @property {string} ram_free_gb - RAM livre em GB (formato string com 'GB').
  * @property {number} ts - Timestamp da coleta em ms.
@@ -223,8 +228,19 @@ async function saveTrends(trends) {
 function getHardwareMetrics() {
     const freeMem = os.freemem();
     const totalMem = os.totalmem();
+    const cpus = os.cpus();
+    const load = os.loadavg();
+    const cores = Math.max(1, cpus.length || 1);
+    const normalizedLoadPct = Math.max(0, Math.min(100, (load[0] / cores) * 100));
+    const cpuUsagePercent = normalizedLoadPct.toFixed(1);
+
     return {
-        cpu_load: os.loadavg()[0].toFixed(2),
+        cpu_load: cpuUsagePercent,
+        cpu_usage_percent: cpuUsagePercent,
+        cpu_load_1min: load[0].toFixed(2),
+        cpu_load_5min: load[1].toFixed(2),
+        cpu_load_15min: load[2].toFixed(2),
+        cpu_cores: cores,
         ram_usage_pct: ((1 - freeMem / totalMem) * 100).toFixed(1),
         ram_free_gb: `${(freeMem / 1024 / 1024 / 1024).toFixed(2)}GB`,
         ts: Date.now()
@@ -356,7 +372,7 @@ async function runFullCheck() {
     const metrics = getHardwareMetrics();
 
     trends.ram.push(parseFloat(metrics.ram_usage_pct));
-    trends.cpu.push(parseFloat(metrics.cpu_load));
+    trends.cpu.push(parseFloat(metrics.cpu_usage_percent || metrics.cpu_load));
     trends.io.push(storage.latency_ms);
     await saveTrends(trends);
 

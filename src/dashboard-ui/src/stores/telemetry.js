@@ -58,7 +58,7 @@ export const useTelemetryStore = defineStore('telemetry', {
         // Métricas atuais
         current: {
             timestamp: null,
-            cpu: { load_1min: 0, load_5min: 0, load_15min: 0, cores: 1 },
+            cpu: { usage_percent: 0, load_1min: 0, load_5min: 0, load_15min: 0, cores: 1 },
             memory: { total_mb: 0, used_mb: 0, free_mb: 0, usage_percent: 0 },
             heap: { used_mb: 0, total_mb: 0, limit_mb: 0, usage_percent: 0 },
             event_loop: { lag_ms: 0 },
@@ -90,9 +90,14 @@ export const useTelemetryStore = defineStore('telemetry', {
 
     getters: {
         /**
-         * CPU load atual (1min)
+         * Uso de CPU atual (% real)
          */
-        cpuLoad: (state) => state.current.cpu.load_1min,
+        cpuLoad: (state) => state.current.cpu.usage_percent,
+
+        /**
+         * Load average de 1 min (não percentual)
+         */
+        cpuLoad1m: (state) => state.current.cpu.load_1min,
 
         /**
          * Uso de memória em %
@@ -244,7 +249,7 @@ export const useTelemetryStore = defineStore('telemetry', {
             };
 
             // Adiciona aos buffers locais
-            this.history.cpu.push(metrics.cpu?.load_1min || 0, metrics.timestamp);
+            this.history.cpu.push(metrics.cpu?.usage_percent || 0, metrics.timestamp);
             this.history.memory.push(metrics.memory?.usage_percent || 0, metrics.timestamp);
             this.history.heap.push(metrics.heap?.usage_percent || 0, metrics.timestamp);
             this.history.eventLoop.push(metrics.event_loop?.lag_ms || 0, metrics.timestamp);

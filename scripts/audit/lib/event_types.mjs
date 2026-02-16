@@ -19,6 +19,9 @@ export const AUDIT_EVENT_TYPES = Object.freeze({
     PROPOSAL_GENERATED: 'proposal_generated',
     GATE_DECISION_MADE: 'gate_decision_made',
     RETENTION_PRUNED: 'retention_pruned',
+    SECURITY_ANALYSIS_COMPLETED: 'security_analysis_completed',
+    PERFORMANCE_ANALYSIS_COMPLETED: 'performance_analysis_completed',
+    ARCHITECTURE_ANALYSIS_COMPLETED: 'architecture_analysis_completed',
 });
 
 export const AUDIT_PHASES = Object.freeze({

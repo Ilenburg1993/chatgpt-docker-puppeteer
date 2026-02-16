@@ -1,0 +1,87 @@
+{
+  "domain": "architecture",
+  "contracts": [
+    {
+      "id": "CONTRACT-ARCH-CIRCULAR-DEPENDENCY",
+      "title": "Dependências Circulares Proibidas",
+      "domain": "architecture",
+      "description": "Módulos não podem ter dependências circulares.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "tool",
+        "tool": "madge",
+        "args": ["--circular", "--format", "json", "src/"],
+        "scope": "src"
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npx madge --circular src/"
+      ],
+      "owner": "architecture-core",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-GOD-CLASS",
+      "title": "Classes God Proibidas",
+      "domain": "architecture",
+      "description": "Classes com mais de 1000 linhas indicam responsabilidade excessiva.",
+      "kind": "static",
+      "severity_default": "P2",
+      "type_default": "upgrade",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "^class\\s+\\w+\\s*{\\s*(?:.|\\n){1000,}",
+        "flags": "gm",
+        "scope": "src",
+        "ignore_comment_like": false,
+        "ignore_string_like": false
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run check:forbidden"
+      ],
+      "owner": "architecture-maintainability",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-TIGHT-COUPLING",
+      "title": "Acoplamento Excessivo",
+      "domain": "architecture",
+      "description": "Módulos com mais de 20 imports indicam acoplamento alto.",
+      "kind": "static",
+      "severity_default": "P2",
+      "type_default": "upgrade",
+      "matcher": {
+        "engine": "custom",
+        "script": "analyze-coupling.mjs",
+        "scope": "src"
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node scripts/audit/collectors/architecture.mjs"
+      ],
+      "owner": "architecture-coupling",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    }
+  ]
+}

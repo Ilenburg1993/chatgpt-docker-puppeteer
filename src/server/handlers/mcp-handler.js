@@ -114,6 +114,10 @@ const handlers = {
             }
 
             const normalized = normalizeToolResultPayload(result);
+            const isRagTool = typeof name === 'string' && name.startsWith('rag_');
+            const normalizedData = normalized.json !== undefined
+                ? normalized.json
+                : (isRagTool ? { fallback: true } : undefined);
 
             // MCP-compatible payload + structured content
             return {
@@ -124,7 +128,7 @@ const handlers = {
                     }
                 ],
                 structuredContent: {
-                    ...(normalized.json !== undefined ? { data: normalized.json } : {}),
+                    ...(normalizedData !== undefined ? { data: normalizedData } : {}),
                     flags: normalized.flags
                 }
             };

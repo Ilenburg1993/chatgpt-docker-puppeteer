@@ -15,3 +15,14 @@ test('runCommand truncates oversized stdout and reports metadata', async () => {
     assert.ok(result.stdout.includes('[stdout truncated]'));
     assert.ok(result.stdoutBytes >= 200000);
 });
+
+test('runCommand supports accepted non-zero exit codes for signal-only tools', async () => {
+    const result = await runCommand(
+        'node',
+        ['-e', 'process.exit(2)'],
+        { acceptExitCodes: [0, 2], timeoutMs: 30000 }
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.exitCode, 2);
+});

@@ -19,6 +19,47 @@ function readTargetLine(filePath, line) {
 }
 
 /**
+ * @param {string} line
+ */
+function getIndentation(line) {
+    const match = String(line || '').match(/^\s*/);
+    return match ? match[0] : '';
+}
+
+/**
+ * @param {any} finding
+ * @param {string} oldLine
+ * @param {string} fallback
+ */
+function buildContractAwareReplacement(finding, oldLine, fallback) {
+    const contractId = String(finding?.contract_id || '');
+    const indent = getIndentation(oldLine);
+    const trimmed = String(oldLine || '').trim();
+
+    if (contractId === 'CONTRACT-STATIC-HARDCODED-PORTS') {
+        const assignment = trimmed.match(/^const\s+([A-Za-z0-9_$]+)\s*=/);
+        if (assignment) {
+            const variable = assignment[1];
+            return `${indent}const ${variable} = Number(CONFIG.CHROME_PROXY_PORT ?? process.env.CHROME_PROXY_PORT);`;
+        }
+        if (/\b9222\b|\b9224\b/.test(trimmed)) {
+            return `${indent}${trimmed.replace(/\b9222\b|\b9224\b/g, 'Number(CONFIG.CHROME_PROXY_PORT ?? process.env.CHROME_PROXY_PORT)')}`;
+        }
+    }
+
+    if (contractId === 'CONTRACT-STATIC-PROCESS-EXIT' && /process\.exit\s*\(/.test(trimmed)) {
+        const exitCodeMatch = trimmed.match(/process\.exit\s*\(\s*([^)]+)\s*\)/);
+        const exitCode = exitCodeMatch ? String(exitCodeMatch[1]).trim() : '1';
+        if (exitCode === '0') {
+            return `${indent}return; // graceful shutdown delegado ao entrypoint`;
+        }
+        return `${indent}throw new Error('Encerramento solicitado (exit ${exitCode}) fora de entrypoint; delegue para lifecycle/shutdown central.');`;
+    }
+
+    return fallback;
+}
+
+/**
  * @param {any} finding
  * @param {{ title?: string, cause?: string, replacementHint?: string }} [context]
  */
@@ -43,11 +84,12 @@ export function buildSuggestedDiff(finding, context = {}) {
     const replacementHint = context.replacementHint
         ? String(context.replacementHint)
         : `${oldLine} // FIX(${title}): ${cause}`;
+    const semanticReplacement = buildContractAwareReplacement(finding, oldLine, replacementHint);
 
     return [
         `diff --git a/${file} b/${file}`,
         `@@ -${line},1 +${line},1 @@`,
         `-${oldLine}`,
-        `+${replacementHint}`,
+        `+${semanticReplacement}`,
     ].join('\n');
 }

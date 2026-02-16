@@ -9,7 +9,9 @@
     "domains/config_env.json",
     "domains/schemas.json",
     "domains/api_dashboard.json",
-    "domains/logic.json"
+    "domains/logic.json",
+    "domains/security.json",
+    "domains/architecture.json"
   ],
   "allowlists": [
     "allowlists/static_allowlist.json"

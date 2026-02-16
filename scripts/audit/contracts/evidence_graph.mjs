@@ -3,7 +3,10 @@
  */
 function groupKey(finding) {
     if (finding.contract_id) {
-        return `contract:${finding.contract_id}`;
+        const fileToken = finding.file
+            ? String(finding.file).replace(/\\/g, '/').split('/').slice(0, 3).join('/')
+            : 'global';
+        return `contract:${finding.contract_id}:${fileToken}`;
     }
     if (finding.file) {
         const normalized = String(finding.file).replace(/\\/g, '/');

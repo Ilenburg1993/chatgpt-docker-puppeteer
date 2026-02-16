@@ -166,6 +166,8 @@
  * @property {AuditFindingV3[]} backlog_findings
  * @property {Array<{ source: string, message: string }>} errors
  * @property {Array<{ source: string, message: string }>} warnings
+ * @property {number} [errors_count]
+ * @property {number} [warnings_count]
  */
 
 export const SCHEMA_VERSION = /** @type {'3.2'} */ ('3.2');
@@ -205,6 +207,8 @@ export function validateAuditRun(run) {
     if (!Array.isArray(run.backlog_findings)) errors.push('backlog_findings must be an array');
     if (!Array.isArray(run.errors)) errors.push('errors must be an array');
     if (!Array.isArray(run.warnings)) errors.push('warnings must be an array');
+    if (run.errors_count != null && typeof run.errors_count !== 'number') errors.push('errors_count must be a number');
+    if (run.warnings_count != null && typeof run.warnings_count !== 'number') errors.push('warnings_count must be a number');
     if (!Array.isArray(run.phase_status)) errors.push('phase_status must be an array');
     if (!run.contract_coverage || typeof run.contract_coverage !== 'object') errors.push('contract_coverage is required');
     if (!run.contract_drift || typeof run.contract_drift !== 'object') errors.push('contract_drift is required');

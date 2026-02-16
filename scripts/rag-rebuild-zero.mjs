@@ -34,6 +34,18 @@ const report = {
     profile: values.profile || 'full',
     skipPm2: Boolean(values['skip-pm2']),
     baseUrl,
+    defaults: {
+        intent_scope: 'code-first',
+        auto_expand: false,
+        expand_mode: 'symbol',
+        expand_top_n: 0
+    },
+    effective_scope: {
+        docs_mode: values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include',
+        include_globs: values['include-glob'] || [],
+        exclude_globs: values['exclude-glob'] || [],
+        max_file_bytes: values['max-file-bytes'] ? Number(values['max-file-bytes']) : null
+    },
     steps: [],
     startedAt: new Date().toISOString(),
     finishedAt: null
@@ -253,10 +265,11 @@ async function main() {
             await runCommand('rag:index', 'npm', ragIndexArgs);
             addStep('rag-index', true, {
                 profile,
-                docsMode: values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include',
-                includeGlobs: values['include-glob'] || [],
-                excludeGlobs: values['exclude-glob'] || [],
-                maxFileBytes: values['max-file-bytes'] ? Number(values['max-file-bytes']) : null
+                docsMode: report.effective_scope.docs_mode,
+                includeGlobs: report.effective_scope.include_globs,
+                excludeGlobs: report.effective_scope.exclude_globs,
+                maxFileBytes: report.effective_scope.max_file_bytes,
+                intentDefaults: report.defaults
             });
         } catch (error) {
             addStep('rag-index', false, { reason: error.message, profile });

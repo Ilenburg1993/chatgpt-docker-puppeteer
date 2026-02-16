@@ -29,8 +29,8 @@
             <div class="metric-card">
                 <div class="metric-icon">⚡</div>
                 <div class="metric-content">
-                    <div class="metric-value">{{ telemetry.cpuLoad.toFixed(2) }}</div>
-                    <div class="metric-label">CPU Load (1m)</div>
+                    <div class="metric-value">{{ telemetry.cpuLoad.toFixed(1) }}%</div>
+                    <div class="metric-label">CPU Usage</div>
                 </div>
             </div>
 

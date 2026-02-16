@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-02-15T15:09:26.128Z",
+  "results": [
+    {
+      "scenario": "Basic Execution Test",
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "stdout": 5443,
+      "stderr": 0,
+      "duration": 10015,
+      "hasErrors": false,
+      "hasWarnings": false,
+      "success": false
+    },
+    {
+      "scenario": "Error Simulation",
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "stdout": 5455,
+      "stderr": 0,
+      "duration": 8012,
+      "hasErrors": false,
+      "hasWarnings": false,
+      "success": false
+    },
+    {
+      "scenario": "Memory Stress",
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "stdout": 5461,
+      "stderr": 0,
+      "duration": 12018,
+      "hasErrors": false,
+      "hasWarnings": false,
+      "success": false
+    }
+  ],
+  "summary": {
+    "successful": 0,
+    "failed": 3,
+    "withErrors": 0,
+    "withWarnings": 0
+  }
+}

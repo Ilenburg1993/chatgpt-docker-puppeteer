@@ -56,10 +56,58 @@ function getHeapStats() {
  * @typedef {Object} CPUStats
  * @property {string} model - Modelo do processador.
  * @property {number} cores - Número de núcleos.
+ * @property {number} usage_percent - Uso de CPU em percentual real (0..100).
  * @property {string} load_1min - Carga média de 1 minuto.
  * @property {string} load_5min - Carga média de 5 minutos.
  * @property {string} load_15min - Carga média de 15 minutos.
  */
+
+/** @type {{ idle: number, total: number } | null} */
+let previousCpuSnapshot = null;
+
+function snapshotCpuTimes() {
+    const cpus = os.cpus();
+    let idle = 0;
+    let total = 0;
+    for (const cpu of cpus) {
+        const times = cpu?.times;
+        if (!times) continue;
+        idle += Number(times.idle || 0);
+        total += Number(times.user || 0) + Number(times.nice || 0) + Number(times.sys || 0) + Number(times.idle || 0) + Number(times.irq || 0);
+    }
+    if (total <= 0) return null;
+    return { idle, total };
+}
+
+function estimateCpuUsageFromLoadAvg() {
+    const load1 = os.loadavg()[0] || 0;
+    const cores = Math.max(1, os.cpus().length || 1);
+    const normalized = (load1 / cores) * 100;
+    return Math.max(0, Math.min(100, normalized));
+}
+
+function measureCpuUsagePercent() {
+    const current = snapshotCpuTimes();
+    if (!current) {
+        return Number(estimateCpuUsageFromLoadAvg().toFixed(1));
+    }
+    if (!previousCpuSnapshot) {
+        previousCpuSnapshot = current;
+        return Number(estimateCpuUsageFromLoadAvg().toFixed(1));
+    }
+
+    const totalDelta = current.total - previousCpuSnapshot.total;
+    const idleDelta = current.idle - previousCpuSnapshot.idle;
+    previousCpuSnapshot = current;
+
+    if (totalDelta <= 0) {
+        return Number(estimateCpuUsageFromLoadAvg().toFixed(1));
+    }
+
+    const activeDelta = Math.max(0, totalDelta - Math.max(0, idleDelta));
+    const usage = (activeDelta / totalDelta) * 100;
+    return Number(Math.max(0, Math.min(100, usage)).toFixed(1));
+}
 
 /**
  * Retorna estatísticas de CPU.
@@ -68,10 +116,12 @@ function getHeapStats() {
 function getCPUStats() {
     const cpus = os.cpus();
     const loadAvg = os.loadavg();
+    const usagePercent = measureCpuUsagePercent();
 
     return {
         model: cpus[0]?.model || 'unknown',
         cores: cpus.length,
+        usage_percent: usagePercent,
         load_1min: loadAvg[0].toFixed(2),
         load_5min: loadAvg[1].toFixed(2),
         load_15min: loadAvg[2].toFixed(2)

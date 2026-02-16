@@ -91,6 +91,8 @@ function buildAutomationSection(report) {
         `- total_findings: ${report.summary.total_findings}`,
         `- total_primary: ${report.summary.total_primary}`,
         `- total_backlog: ${report.summary.total_backlog}`,
+        `- errors_count: ${report.errors_count ?? report.errors.length}`,
+        `- warnings_count: ${report.warnings_count ?? report.warnings.length}`,
         `- plano_canônico: \`${PLAN_PATH}\``,
         '',
         '### Progresso e ETA',

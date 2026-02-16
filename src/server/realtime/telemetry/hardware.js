@@ -54,12 +54,19 @@ function _pushMetrics() {
 
         /**
          * PAYLOAD DE TRANSMISSÃO (IPC 2.0 Standard)
-         * - cpu_load: Carga média (0.00 a N.NN)
+         * - cpu_usage_percent: Uso real de CPU em percentual (0..100)
+         * - cpu_load_1min/5min/15min: load average bruto
+         * - cpu_load: [LEGACY] alias para cpu_usage_percent
          * - ram_free: [LEGACY] Espaço livre em GB (para Dashboard atual)
          * - ram_usage_pct: [NEW] Percentual de uso (para Dashboard V2)
          */
         const payload = {
-            cpu_load: metrics.cpu_load,
+            cpu_usage_percent: Number(metrics.cpu_usage_percent ?? metrics.cpu_load ?? 0),
+            cpu_load_1min: Number(metrics.cpu_load_1min ?? 0),
+            cpu_load_5min: Number(metrics.cpu_load_5min ?? 0),
+            cpu_load_15min: Number(metrics.cpu_load_15min ?? 0),
+            cpu_cores: Number(metrics.cpu_cores ?? 1),
+            cpu_load: Number(metrics.cpu_usage_percent ?? metrics.cpu_load ?? 0), // legado
             ram_free: metrics.ram_free_gb,
             ram_usage_pct: metrics.ram_usage_pct,
             ts: metrics.ts || Date.now()

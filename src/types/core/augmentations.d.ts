@@ -162,6 +162,11 @@ declare module '#core/doctor' {
   export function runFullCheck(): Promise<HealthCheckResult & Record<string, unknown>>;
   export function getHardwareMetrics(): {
     cpu_load: string;
+    cpu_usage_percent: string;
+    cpu_load_1min: string;
+    cpu_load_5min: string;
+    cpu_load_15min: string;
+    cpu_cores: number;
     ram_usage_pct: string;
     ram_free_gb: string;
     ts: number;

@@ -30,6 +30,7 @@ Os comandos já estão expostos no `package.json`:
 - `npm run rag:expand -- --chunk-id <id>` — expande um chunk retornado por `rag_search`
 - `npm run rag:reset -- --yes` — apaga **somente** o estado do RAG (DB + index)
 - `npm run rag:rebuild:zero` — pipeline canônico: preflight PM2/MCP + reset + index + validações
+- `npm run rag:rebuild:code-config` — rebuild completo focado em código/config (`docs-mode=exclude`)
 
 Flags úteis:
 
@@ -39,6 +40,13 @@ Flags úteis:
 - `rag:ask`: `--topk`, `--ext`, `--path-prefix`, `--tag` (repetível), `--profile`, `--mode`, `--diagnostics`, `--json`, `--ollama-base-url`, `--model`
 - `rag:expand`: `--chunk-id`, `--mode lines|symbol`, `--before-lines`, `--after-lines`, `--json`
 - `rag:rebuild:zero`: `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--skip-pm2`, `--json`
+
+Parâmetros importantes do `rag_search` (via MCP):
+
+- `intent_scope`: `code-first|docs-first|all` (default: `code-first`)
+- `auto_expand`: expande automaticamente contexto dos top resultados
+- `expand_mode`: `lines|symbol` (default: `symbol`)
+- `expand_top_n`: quantos resultados expandir automaticamente
 
 Perfis de escopo:
 
@@ -50,6 +58,12 @@ Fallback degradado:
 
 - `mode=auto` tenta semântico/híbrido e cai para lexical quando embeddings indisponíveis
 - o resultado expõe `backend`, `degraded` e `reason_code`
+
+Política de consumo da LLM:
+
+- Fonte primária: `structuredContent.data` (metadados completos)
+- Fallback legível: `content[].text`
+- Metadados por resultado incluem `path_root_rel`, `file_mtime_*`, `indexed_at_*`, `content_class` e sinais de ranking
 
 Configuração de escopo (unificada em index/full/incremental/watch/rebuild):
 
@@ -68,6 +82,23 @@ Exemplos de fase:
 
 - Fase 1 (código/config sem markdown): `RAG_DOCS_MODE=exclude`
 - Fase 2 (somente docs markdown): `RAG_DOCS_MODE=only`
+
+Exemplo rebuild code/config (sem docs):
+
+```bash
+npm run rag:rebuild:code-config
+```
+
+Exemplo strict por extensão (quando quiser limitar apenas arquivos de código/config):
+
+```bash
+npm run rag:rebuild:zero -- --profile full --docs-mode exclude \
+  --include-glob "**/*.js" --include-glob "**/*.mjs" --include-glob "**/*.cjs" \
+  --include-glob "**/*.ts" --include-glob "**/*.json" \
+  --include-glob "**/*.yml" --include-glob "**/*.yaml" \
+  --include-glob "**/*.sh" --include-glob "**/*.ps1" \
+  --include-glob "**/Dockerfile" --include-glob "**/Makefile"
+```
 
 ## Arquitetura (camadas)
 

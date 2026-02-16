@@ -27,6 +27,35 @@ test('static contract engine detects process.exit violation outside allowlist', 
     assert.equal(result.findings[0].line, 1);
 });
 
+test('static contract engine ignores hardcoded-port pattern inside template literal text', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'contract-engine-template-'));
+    const srcDir = path.join(tmpDir, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    const target = path.join(srcDir, 'module.js');
+    fs.writeFileSync(
+        target,
+        [
+            'const msg = `',
+            'Proxy down on port 9224',
+            '`;',
+            'const proxyPort = CONFIG.CHROME_PROXY_PORT || 9224;',
+            '',
+        ].join('\n'),
+        'utf8'
+    );
+
+    const contracts = getLegacyStaticContracts().filter(item => item.id === 'CONTRACT-STATIC-HARDCODED-PORTS');
+    const result = evaluateStaticContracts({
+        rootDir: tmpDir,
+        scanDir: srcDir,
+        contracts,
+        allowlists: {},
+    });
+
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].line, 4);
+});
+
 test('evidence graph correlates findings into clusters', () => {
     const findings = [
         { id: 'BUG-1', contract_id: 'CONTRACT-A', source_tool: 'x', file: 'src/a.js', root_cause_candidates: [] },

@@ -18,7 +18,11 @@ export function buildPhasePlan(options) {
         ],
     });
 
-    if (options.profile === 'nightly' || options.refreshContextMode === 'force') {
+    if (
+        options.profile === 'nightly' ||
+        options.refreshContextMode === 'force' ||
+        options.refreshContextMode === 'skip'
+    ) {
         phases.push({
             id: AUDIT_PHASES.CONTEXT_REFRESH,
             planned_steps: ['context.rag_health', 'context.rag_index_core', 'context.rag_index_docs'],

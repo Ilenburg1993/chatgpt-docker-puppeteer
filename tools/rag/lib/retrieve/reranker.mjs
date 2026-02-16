@@ -1,3 +1,5 @@
+import { normalizeContentClass, normalizeIntentScope } from '../content_class.mjs';
+
 /**
  * Multi-signal reranking for RAG search results
  * Combines 6 signals: semantic, lexical, recency, fileType, length, position
@@ -9,11 +11,13 @@
  * @param {object[]} results - Search results from hybrid search
  * @param {string} query - Original query text
  * @param {object} options - Reranking options
+ * @param {'code-first'|'docs-first'|'all'} [options.intentScope] - Ranking bias by content class
  * @param {object} [options.weights] - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
  * @returns {object[]} - Reranked results with rerank_score and rerank_signals
  */
 export function rerank(results, query, options = {}) {
     const {
+        intentScope: rawIntentScope = 'all',
         weights = {
             semantic: 0.5,      // Base: vector distance (inverted)
             lexical: 0.2,       // Exact term matches in text
@@ -23,6 +27,7 @@ export function rerank(results, query, options = {}) {
             position: 0.05      // Boost early chunks in file
         }
     } = options;
+    const intentScope = normalizeIntentScope(rawIntentScope);
 
     if (results.length === 0) return [];
 
@@ -62,8 +67,17 @@ export function rerank(results, query, options = {}) {
         signals.recency = recencyScore.toFixed(3);
 
         // 4. File type score
+        const contentClass = normalizeContentClass(r.content_class, r.path, r.ext);
         let fileTypeScore = 0;
-        if (r.language === 'javascript' || r.language === 'typescript') {
+        if (intentScope === 'docs-first') {
+            if (contentClass === 'docs') fileTypeScore = 1.0;
+            else if (contentClass === 'config') fileTypeScore = 0.45;
+            else fileTypeScore = 0.35;
+        } else if (intentScope === 'code-first') {
+            if (contentClass === 'code') fileTypeScore = 1.0;
+            else if (contentClass === 'config') fileTypeScore = 0.8;
+            else fileTypeScore = 0.2;
+        } else if (r.language === 'javascript' || r.language === 'typescript') {
             fileTypeScore = 1.0;  // Boost code files
         } else if (r.ext === '.json' || r.ext === '.yml' || r.ext === '.yaml') {
             fileTypeScore = 0.5;  // Half boost for config
@@ -72,10 +86,13 @@ export function rerank(results, query, options = {}) {
         }
         score += weights.fileType * fileTypeScore;
         signals.fileType = fileTypeScore.toFixed(3);
+        signals.contentClass = contentClass;
+        signals.intentScope = intentScope;
 
         // 5. Length score (ideal ~600 chars)
-        const idealLength = 600;
-        const lengthRatio = Math.min(r.text.length / idealLength, 1);
+        const idealLength = contentClass === 'docs' ? 900 : 600;
+        const textLength = String(r.text || '').length;
+        const lengthRatio = Math.min(textLength / idealLength, 1);
         score += weights.length * lengthRatio;
         signals.length = lengthRatio.toFixed(3);
 

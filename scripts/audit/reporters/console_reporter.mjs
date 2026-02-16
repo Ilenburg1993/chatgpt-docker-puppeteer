@@ -5,11 +5,13 @@ export function printProgress(payload) {
     const pct = Number(payload.progress?.progress_pct || 0).toFixed(2);
     const remaining = payload.progress?.remaining_steps ?? 0;
     const etaSec = Math.max(0, Math.round((payload.eta?.eta_ms || 0) / 1000));
+    const activeStep = payload.progress?.step_id ? String(payload.progress.step_id) : null;
+    const activeText = activeStep ? ` ativo=${activeStep}` : '';
     const remainingKeys = Array.isArray(payload.progress?.remaining_step_keys)
         ? payload.progress.remaining_step_keys.slice(0, 4).join(', ')
         : '';
     const pendingText = remainingKeys ? ` pendentes=[${remainingKeys}]` : '';
-    console.log(`[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${pendingText} ${payload.message}`);
+    console.log(`[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`);
 }
 
 /**
@@ -27,6 +29,8 @@ export function printFinalReport(report, outputs) {
     console.log(`findings(total): ${report.summary.total_findings}`);
     console.log(`findings(primary): ${report.summary.total_primary}`);
     console.log(`findings(backlog): ${report.summary.total_backlog}`);
+    console.log(`errors(count): ${report.errors_count ?? report.errors?.length ?? 0}`);
+    console.log(`warnings(count): ${report.warnings_count ?? report.warnings?.length ?? 0}`);
     console.log(`partial: ${report.summary.partial}`);
     console.log(`run_outcome: ${report.run_outcome}`);
     console.log(`abort_reason: ${report.abort_reason}`);

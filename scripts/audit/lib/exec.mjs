@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
  *   cwd?: string,
  *   env?: Record<string,string|undefined>,
  *   timeoutMs?: number,
+ *   acceptExitCodes?: number[],
  *   maxStdoutBytes?: number,
  *   maxStderrBytes?: number,
  *   truncationHeadRatio?: number,
@@ -24,6 +25,11 @@ export async function runCommand(command, args = [], options = {}) {
     const maxStdoutBytes = Math.max(65536, Number(options.maxStdoutBytes || 1024 * 1024));
     const maxStderrBytes = Math.max(65536, Number(options.maxStderrBytes || 1024 * 1024));
     const headRatio = Math.max(0.2, Math.min(0.8, Number(options.truncationHeadRatio || 0.6)));
+    const acceptExitCodes = Array.isArray(options.acceptExitCodes)
+        ? options.acceptExitCodes
+            .map(value => Number(value))
+            .filter(Number.isInteger)
+        : [];
 
     return new Promise(resolve => {
         const child = spawn(command, args, {
@@ -114,8 +120,9 @@ export async function runCommand(command, args = [], options = {}) {
             if (timeout) {
                 clearTimeout(timeout);
             }
+            const accepted = Number.isInteger(code) && acceptExitCodes.includes(Number(code));
             resolve({
-                ok: code === 0 && !timedOut,
+                ok: (code === 0 || accepted) && !timedOut,
                 exitCode: code,
                 stdout,
                 stderr,
@@ -210,14 +217,15 @@ function tryParseJson(text) {
 }
 
 /**
- * Extracts balanced JSON object blocks from a mixed output stream.
- * Scans with string-escape awareness to avoid braces inside quoted strings.
+ * Extracts balanced JSON blocks (objects/arrays) from a mixed output stream.
+ * Scans with string-escape awareness to avoid braces/brackets inside quoted strings.
  * @param {string} text
  * @returns {string[]}
  */
-function extractBalancedJsonObjectBlocks(text) {
+function extractBalancedJsonBlocks(text) {
     /** @type {string[]} */
     const blocks = [];
+    /** @type {Array<{ start: number, opener: '{'|'[' }>} */
     const stack = [];
     let inString = false;
     let stringQuote = '';
@@ -249,15 +257,23 @@ function extractBalancedJsonObjectBlocks(text) {
             continue;
         }
 
-        if (ch === '{') {
-            stack.push(index);
+        if (ch === '{' || ch === '[') {
+            stack.push({
+                start: index,
+                opener: /** @type {'{'|'['} */ (ch),
+            });
             continue;
         }
 
-        if (ch === '}' && stack.length > 0) {
-            const start = stack.pop();
-            if (stack.length === 0 && Number.isInteger(start)) {
-                blocks.push(text.slice(start, index + 1));
+        if ((ch === '}' || ch === ']') && stack.length > 0) {
+            const top = stack.pop();
+            const expected = top?.opener === '{' ? '}' : ']';
+            if (ch !== expected) {
+                stack.length = 0;
+                continue;
+            }
+            if (stack.length === 0 && Number.isInteger(top?.start)) {
+                blocks.push(text.slice(top.start, index + 1));
             }
         }
     }
@@ -286,16 +302,19 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
 
     const preferLast = options.preferLast !== false;
 
-    // Prefer complete JSON object blocks. By default, parse the last valid block first.
-    const blocks = extractBalancedJsonObjectBlocks(text);
+    // Prefer complete JSON blocks. By default, parse the last valid block first.
+    const blocks = extractBalancedJsonBlocks(text);
     const orderedBlocks = preferLast ? [...blocks].reverse() : blocks;
     /** @type {any[]} */
     const parsedCandidates = [];
     for (const block of orderedBlocks) {
         const parsed = tryParseJson(block);
-        if (parsed && typeof parsed === 'object') {
+        if (parsed && (typeof parsed === 'object' || Array.isArray(parsed))) {
             parsedCandidates.push(parsed);
-            if (Object.prototype.hasOwnProperty.call(parsed, 'ok') || Object.prototype.hasOwnProperty.call(parsed, 'result')) {
+            if (
+                !Array.isArray(parsed) &&
+                (Object.prototype.hasOwnProperty.call(parsed, 'ok') || Object.prototype.hasOwnProperty.call(parsed, 'result'))
+            ) {
                 return parsed;
             }
         }

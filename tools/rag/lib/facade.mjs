@@ -17,6 +17,7 @@ import { chunkByType, detectLanguage, buildTags } from './chunking/chunk_dispatc
 import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
 import { EmbeddingCache } from './embeddings/embed_cache.mjs';
 import { createRagAdaptiveThrottler } from './adaptive_throttler.mjs';
+import { classifyContentClass, isPreferredByIntent, normalizeContentClass, normalizeIntentScope } from './content_class.mjs';
 import {
     openDb,
     ensureTable,
@@ -213,6 +214,178 @@ function applyScopeToManifest(manifest, resolvedScope) {
 
 function isSameScope(manifest, resolvedScope) {
     return String(manifest?.last_scope_hash || '') === String(resolvedScope.scopeHash || '');
+}
+
+function normalizeTopK(rawTopK, fallback = 8) {
+    const parsed = Number(rawTopK);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(1, Math.min(Math.trunc(parsed), 20));
+}
+
+function normalizeExpandTopN(rawExpandTopN, topK) {
+    const parsed = Number(rawExpandTopN);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.min(Math.trunc(parsed), topK));
+}
+
+function toIsoSecondOrNull(epochMs) {
+    const normalized = normalizeTimestampMs(epochMs);
+    return normalized ? toIsoSecond(normalized) : null;
+}
+
+function normalizeFileMtimeMs(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    return normalizeTimestampMs(entry.mtime_ms);
+}
+
+function decorateResultsWithSourceMetadata(results, manifest) {
+    const manifestFiles = manifest?.files && typeof manifest.files === 'object'
+        ? manifest.files
+        : {};
+    return results.map((result) => {
+        const contentClass = normalizeContentClass(result.content_class, result.path, result.ext);
+        const pathRootRel = normalizeRelPath(result.path || '');
+        const manifestEntry = manifestFiles[pathRootRel] || null;
+        const fileMtimeMs = normalizeFileMtimeMs(manifestEntry);
+        return {
+            ...result,
+            content_class: contentClass,
+            path_root_rel: pathRootRel,
+            file_mtime_ms: fileMtimeMs,
+            file_mtime_iso: toIsoSecondOrNull(fileMtimeMs)
+        };
+    });
+}
+
+function applyIntentScopePolicy(results, intentScope, topK) {
+    const normalizedScope = normalizeIntentScope(intentScope);
+    if (normalizedScope === 'all') {
+        return {
+            result_policy: {
+                intent_scope: normalizedScope,
+                docs_filtered: false
+            },
+            results: results.slice(0, topK)
+        };
+    }
+
+    const preferred = [];
+    const secondary = [];
+    let docsInPool = 0;
+    for (const result of results) {
+        const cls = normalizeContentClass(result.content_class, result.path, result.ext);
+        const enriched = { ...result, content_class: cls };
+        if (cls === 'docs') docsInPool += 1;
+        if (isPreferredByIntent(cls, normalizedScope)) preferred.push(enriched);
+        else secondary.push(enriched);
+    }
+
+    const merged = [...preferred, ...secondary];
+    const sliced = merged.slice(0, topK);
+    const docsInOutput = sliced.filter((result) => result.content_class === 'docs').length;
+    const docsFiltered = normalizedScope === 'code-first' && docsInPool > docsInOutput;
+
+    return {
+        result_policy: {
+            intent_scope: normalizedScope,
+            docs_filtered: docsFiltered
+        },
+        results: sliced
+    };
+}
+
+async function maybeAutoExpandResults(baseResults, options = {}) {
+    const autoExpand = Boolean(options.autoExpand);
+    if (!autoExpand || baseResults.length === 0) {
+        return {
+            results: baseResults,
+            auto_expand_applied: false,
+            expanded_results: 0,
+            expand_mode: options.expandMode || 'symbol',
+            expand_top_n: 0,
+            expand_budget_chars: options.expandBudgetChars || 0
+        };
+    }
+
+    const expandMode = String(options.expandMode || 'symbol');
+    const expandTopN = normalizeExpandTopN(options.expandTopN ?? 1, baseResults.length);
+    const expandBudgetChars = Math.max(1000, Number(options.expandBudgetChars || 16_000));
+    const beforeLines = Number.isFinite(Number(options.beforeLines))
+        ? Math.max(0, Math.trunc(Number(options.beforeLines)))
+        : undefined;
+    const afterLines = Number.isFinite(Number(options.afterLines))
+        ? Math.max(0, Math.trunc(Number(options.afterLines)))
+        : undefined;
+
+    if (expandTopN <= 0) {
+        return {
+            results: baseResults,
+            auto_expand_applied: false,
+            expanded_results: 0,
+            expand_mode: expandMode,
+            expand_top_n: 0,
+            expand_budget_chars: expandBudgetChars
+        };
+    }
+
+    let usedChars = 0;
+    let expandedCount = 0;
+    const out = [];
+
+    for (let idx = 0; idx < baseResults.length; idx += 1) {
+        const result = { ...baseResults[idx] };
+        const shouldExpand = idx < expandTopN && Boolean(result.chunk_id);
+        if (!shouldExpand) {
+            out.push(result);
+            continue;
+        }
+
+        try {
+            const expanded = /** @type {any} */ (await ragExpand({
+                chunkId: result.chunk_id,
+                mode: expandMode,
+                beforeLines,
+                afterLines,
+                paths: options.paths,
+                root: options.root
+            }));
+
+            if (!expanded?.ok) {
+                result.expanded_context_error = expanded?.message || 'expand_failed';
+                out.push(result);
+                continue;
+            }
+
+            const text = String(expanded.text || '');
+            if (usedChars + text.length > expandBudgetChars) {
+                result.expanded_context_skipped = 'budget_exceeded';
+                out.push(result);
+                continue;
+            }
+
+            result.expanded_context = {
+                mode: expanded.mode_used || expanded.mode || expandMode,
+                chars_returned: expanded.chars_returned || text.length,
+                range: expanded.range,
+                text
+            };
+            usedChars += text.length;
+            expandedCount += 1;
+            out.push(result);
+        } catch (error) {
+            result.expanded_context_error = String(error?.message || error);
+            out.push(result);
+        }
+    }
+
+    return {
+        results: out,
+        auto_expand_applied: expandedCount > 0,
+        expanded_results: expandedCount,
+        expand_mode: expandMode,
+        expand_top_n: expandTopN,
+        expand_budget_chars: expandBudgetChars
+    };
 }
 
 async function reconcileScopeChanges({ manifest, resolvedScope, table, report }) {
@@ -631,12 +804,13 @@ export async function ragIndex(options = {}) {
                     table = await ensureTable(db, manifest.embedding.dim);
                 }
 
-                chunkRows.push({
-                    chunk_id: descriptor.chunk_id,
-                    file_id,
-                    path: relPath,
-                    ext,
-                    language: language ?? null,
+                    chunkRows.push({
+                        chunk_id: descriptor.chunk_id,
+                        file_id,
+                        path: relPath,
+                        ext,
+                        content_class: classifyContentClass(relPath, ext),
+                        language: language ?? null,
                     kind: descriptor.kind,
                     symbol: descriptor.symbol,
                     exported: descriptor.exported,
@@ -959,6 +1133,7 @@ export async function ragIndexChanged(options = {}) {
                             file_id,
                             path: relPath,
                             ext,
+                            content_class: classifyContentClass(relPath, ext),
                             language: language ?? null,
                             kind: descriptor.kind,
                             symbol: descriptor.symbol,
@@ -1043,7 +1218,9 @@ export async function ragQuery(options = {}) {
             const indexStatus = buildIndexStatus(manifest);
             const lastIndexScope = copyScope(manifest?.last_scope);
             const scopeHash = manifest?.last_scope_hash || null;
-            const topK = options.topK ?? 8;
+            const intentScope = normalizeIntentScope(options.intentScope || options.intent_scope || 'code-first');
+            const requestedTopK = normalizeTopK(options.topK, 8);
+            const fetchTopK = intentScope === 'all' ? requestedTopK : Math.min(requestedTopK * 4, 80);
             const filters = options.filters || {};
             const query = String(options.query || '');
 
@@ -1051,6 +1228,45 @@ export async function ragQuery(options = {}) {
                 baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
                 model: options.model || manifest.embedding.model
             }));
+
+            /** @param {object} base */
+            const finalizeResult = async (base) => {
+                const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
+                const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
+                const expanded = await maybeAutoExpandResults(scoped.results, {
+                    autoExpand: options.autoExpand || options.auto_expand,
+                    expandMode: options.expandMode || options.expand_mode,
+                    expandTopN: options.expandTopN || options.expand_top_n,
+                    expandBudgetChars: options.expandBudgetChars || options.expand_budget_chars,
+                    beforeLines: options.beforeLines || options.before_lines,
+                    afterLines: options.afterLines || options.after_lines,
+                    paths: options.paths,
+                    root: options.root
+                });
+
+                return {
+                    ...base,
+                    topK: requestedTopK,
+                    fetch_topk: fetchTopK,
+                    intent_scope: intentScope,
+                    query_meta: {
+                        scope_hash: scopeHash,
+                        index_updated_at: indexStatus.index_updated_at,
+                        index_updated_at_iso: indexStatus.index_updated_at_iso,
+                        index_freshness_ms: indexStatus.index_freshness_ms,
+                        last_index_scope: lastIndexScope
+                    },
+                    result_policy: {
+                        ...scoped.result_policy,
+                        auto_expand_applied: expanded.auto_expand_applied,
+                        expanded_results: expanded.expanded_results,
+                        expand_mode: expanded.expand_mode,
+                        expand_top_n: expanded.expand_top_n,
+                        expand_budget_chars: expanded.expand_budget_chars
+                    },
+                    results: expanded.results
+                };
+            };
 
             const db = await openDb(paths.dbDir);
             let dbClosed = false;
@@ -1060,10 +1276,10 @@ export async function ragQuery(options = {}) {
 
                 const lexicalOnly = async (reasonCode, degradedReason) => {
                     if (!tableNames.includes(TABLE_NAME)) {
-                        return {
+                        return finalizeResult({
                             query,
                             embedding_model: embeddings.model,
-                            topK,
+                            topK: requestedTopK,
                             filters,
                             profile,
                             last_index_scope: lastIndexScope,
@@ -1075,20 +1291,20 @@ export async function ragQuery(options = {}) {
                             ...(reasonCode ? { reason_code: reasonCode } : {}),
                             ...(degradedReason ? { degraded_reason: degradedReason } : {}),
                             results: []
-                        };
+                        });
                     }
 
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = await lexicalSearch(table, query, { topK, filters });
+                        results = await lexicalSearch(table, query, { topK: fetchTopK, filters });
                     } catch (lexicalError) {
                         console.warn(`[RAG] Lexical fallback failed: ${lexicalError?.message || lexicalError}`);
                     }
-                    return {
+                    return finalizeResult({
                         query,
                         embedding_model: embeddings.model,
-                        topK,
+                        topK: requestedTopK,
                         filters,
                         profile,
                         last_index_scope: lastIndexScope,
@@ -1100,7 +1316,7 @@ export async function ragQuery(options = {}) {
                         ...(reasonCode ? { reason_code: reasonCode } : {}),
                         ...(degradedReason ? { degraded_reason: degradedReason } : {}),
                         results
-                    };
+                    });
                 };
 
                 if (mode === 'lexical-only') {
@@ -1136,14 +1352,14 @@ export async function ragQuery(options = {}) {
 
                     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
                     const results = await search(table, vector, {
-                        topK,
+                        topK: fetchTopK,
                         filters
                     });
 
-                    return {
+                    return finalizeResult({
                         query,
                         embedding_model: embeddings.model,
-                        topK,
+                        topK: requestedTopK,
                         filters,
                         profile,
                         last_index_scope: lastIndexScope,
@@ -1153,7 +1369,7 @@ export async function ragQuery(options = {}) {
                         backend: 'hybrid',
                         degraded: false,
                         results
-                    };
+                    });
                 } catch (error) {
                     const reasonCode = classifyRagReasonCode(error);
                     if (mode === 'auto' && degradedModeEnabled && shouldDegrade(error)) {
@@ -1200,6 +1416,21 @@ export async function ragQuery(options = {}) {
  * @param {unknown} [options.embeddingsProvider] - Provider de embeddings injetado
  * @param {string} [options.ollamaBaseUrl] - Base URL local do Ollama
  * @param {string} [options.model] - Modelo de embedding
+ * @param {'code-first'|'docs-first'|'all'} [options.intentScope] - Política de prioridade por classe de conteúdo
+ * @param {'code-first'|'docs-first'|'all'} [options.intent_scope] - Alias snake_case de intentScope
+ * @param {boolean} [options.autoExpand] - Habilita expansão automática de contexto
+ * @param {boolean} [options.auto_expand] - Alias snake_case de autoExpand
+ * @param {'lines'|'symbol'} [options.expandMode] - Modo de expansão automática
+ * @param {'lines'|'symbol'} [options.expand_mode] - Alias snake_case de expandMode
+ * @param {number} [options.expandTopN] - Quantidade de resultados para auto expansão
+ * @param {number} [options.expand_top_n] - Alias snake_case de expandTopN
+ * @param {number} [options.expandBudgetChars] - Orçamento máximo de caracteres para auto expansão
+ * @param {number} [options.expand_budget_chars] - Alias snake_case de expandBudgetChars
+ * @param {number} [options.beforeLines] - Linhas antes na auto expansão
+ * @param {number} [options.before_lines] - Alias snake_case de beforeLines
+ * @param {number} [options.afterLines] - Linhas depois na auto expansão
+ * @param {number} [options.after_lines] - Alias snake_case de afterLines
+ * @param {string} [options.root] - Root path explícito para auto expansão
  * @param {boolean} [options.rerank] - Enable reranking (default: true)
  * @param {object} [options.rerankWeights] - Custom rerank weights
  * @param {boolean} [options.mmr] - Enable MMR diversity (default: true)
@@ -1218,6 +1449,7 @@ export async function ragHybridSearch(options = {}) {
             const indexStatus = buildIndexStatus(manifest);
             const lastIndexScope = copyScope(manifest?.last_scope);
             const scopeHash = manifest?.last_scope_hash || null;
+            const intentScope = normalizeIntentScope(options.intentScope || options.intent_scope || 'code-first');
 
             const embeddings = /** @type {any} */ (options.embeddingsProvider || new OllamaEmbeddingsProvider({
                 baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
@@ -1240,6 +1472,47 @@ export async function ragHybridSearch(options = {}) {
             if (!queryText) {
                 throw new Error('RAG_QUERY_REQUIRED');
             }
+            const requestedTopK = normalizeTopK(topK, 8);
+            const fetchTopK = intentScope === 'all' ? requestedTopK : Math.min(requestedTopK * 4, 80);
+
+            /** @param {object} base */
+            const finalizeResult = async (base) => {
+                const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
+                const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
+                const expanded = await maybeAutoExpandResults(scoped.results, {
+                    autoExpand: options.autoExpand || options.auto_expand,
+                    expandMode: options.expandMode || options.expand_mode,
+                    expandTopN: options.expandTopN || options.expand_top_n,
+                    expandBudgetChars: options.expandBudgetChars || options.expand_budget_chars,
+                    beforeLines: options.beforeLines || options.before_lines,
+                    afterLines: options.afterLines || options.after_lines,
+                    paths: options.paths,
+                    root: options.root
+                });
+
+                return {
+                    ...base,
+                    topK: requestedTopK,
+                    fetch_topk: fetchTopK,
+                    intent_scope: intentScope,
+                    query_meta: {
+                        scope_hash: scopeHash,
+                        index_updated_at: indexStatus.index_updated_at,
+                        index_updated_at_iso: indexStatus.index_updated_at_iso,
+                        index_freshness_ms: indexStatus.index_freshness_ms,
+                        last_index_scope: lastIndexScope
+                    },
+                    result_policy: {
+                        ...scoped.result_policy,
+                        auto_expand_applied: expanded.auto_expand_applied,
+                        expanded_results: expanded.expanded_results,
+                        expand_mode: expanded.expand_mode,
+                        expand_top_n: expanded.expand_top_n,
+                        expand_budget_chars: expanded.expand_budget_chars
+                    },
+                    results: expanded.results
+                };
+            };
 
             const db = await openDb(paths.dbDir);
             let dbClosed = false;
@@ -1250,9 +1523,9 @@ export async function ragHybridSearch(options = {}) {
 
                 const runLexical = async (reasonCode, degradedReason) => {
                     if (!tableNames.includes(TABLE_NAME)) {
-                        return {
+                        return finalizeResult({
                             results: [],
-                            topK,
+                            topK: requestedTopK,
                             dim: manifest.embedding.dim,
                             model: manifest.embedding.model || embeddings.model,
                             query,
@@ -1269,21 +1542,21 @@ export async function ragHybridSearch(options = {}) {
                             rerank,
                             mmr,
                             mmrLambda
-                        };
+                        });
                     }
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = await lexicalSearch(table, queryText, { topK, filters });
+                        results = await lexicalSearch(table, queryText, { topK: fetchTopK, filters });
                     } catch (lexicalError) {
                         console.warn(`[RAG] Lexical fallback failed: ${lexicalError?.message || lexicalError}`);
                     }
-                    return {
+                    return finalizeResult({
                         results,
-                        topK,
+                        topK: requestedTopK,
                         dim: manifest.embedding.dim,
                         model: manifest.embedding.model || embeddings.model,
-                            query: queryText,
+                        query: queryText,
                         profile,
                         last_index_scope: lastIndexScope,
                         scope_hash: scopeHash,
@@ -1297,7 +1570,7 @@ export async function ragHybridSearch(options = {}) {
                         rerank,
                         mmr,
                         mmrLambda
-                    };
+                    });
                 };
 
                 if (mode === 'lexical-only') {
@@ -1329,20 +1602,21 @@ export async function ragHybridSearch(options = {}) {
                     }
 
                     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-                    console.log(`[RAG] Hybrid search: query="${queryText}", topK=${topK}, rerank=${rerank}, mmr=${mmr}`);
+                    console.log(`[RAG] Hybrid search: query="${queryText}", topK=${requestedTopK}, rerank=${rerank}, mmr=${mmr}, intent=${intentScope}`);
                     const results = await hybridSearch(table, vector, queryText, {
-                        topK,
+                        topK: fetchTopK,
                         filters,
                         distanceRange,
                         rerank,
                         rerankWeights,
+                        intentScope,
                         mmr,
                         mmrLambda
                     });
 
-                    return {
+                    return finalizeResult({
                         results,
-                        topK,
+                        topK: requestedTopK,
                         dim: manifest.embedding.dim,
                         model: manifest.embedding.model || embeddings.model,
                         query: queryText,
@@ -1357,7 +1631,7 @@ export async function ragHybridSearch(options = {}) {
                         rerank,
                         mmr,
                         mmrLambda
-                    };
+                    });
                 } catch (error) {
                     const reasonCode = classifyRagReasonCode(error);
                     if (mode === 'auto' && degradedModeEnabled && shouldDegrade(error)) {
@@ -1497,8 +1771,10 @@ export async function ragExpand(options = {}) {
             ok: true,
             chunk_id: chunk.chunk_id,
             mode,
+            mode_used: mode,
             expansion_basis: expansionBasis,
             path: chunk.path,
+            content_class: normalizeContentClass(chunk.content_class, chunk.path, chunk.ext),
             language: chunk.language || detectLanguage(chunk.path) || null,
             kind: chunk.kind || null,
             symbol: chunk.symbol || null,
@@ -1519,6 +1795,7 @@ export async function ragExpand(options = {}) {
             indexed_at: chunk.indexed_at || null,
             indexed_at_iso: chunk.indexed_at_iso || null,
             indexed_at_local: chunk.indexed_at_local || null,
+            chars_returned: expandedSlice.text.length,
             query_at: nowMs,
             query_at_iso: toIsoSecond(nowMs),
             query_at_local: toLocalSecond(nowMs),

@@ -2,30 +2,32 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { collectStaticFindings } from './collectors/static.mjs';
+import { collectArchitectureFindings } from './collectors/architecture.mjs';
+import { collectPerformanceFindings } from './collectors/performance.mjs';
 import { collectRuntimeFindings } from './collectors/runtime.mjs';
+import { collectStaticFindings } from './collectors/static.mjs';
 import { collectTestFindings } from './collectors/tests.mjs';
-import { getChangedFiles } from './lib/git.mjs';
+import { evaluateChaosContracts } from './contracts/evaluate_chaos.mjs';
+import { buildEvidenceGraph } from './contracts/evidence_graph.mjs';
+import { getLegacyStaticContracts } from './contracts/legacy_adapter.mjs';
+import { loadContractRegistry } from './contracts/load_registry.mjs';
+import { createEtaEstimator } from './lib/eta_estimator.mjs';
+import { AUDIT_EVENT_TYPES } from './lib/event_types.mjs';
 import { parseJsonFromMixedOutput, runCommand } from './lib/exec.mjs';
+import { getChangedFiles } from './lib/git.mjs';
+import { createAuditLogger } from './lib/logger.mjs';
+import { buildPhasePlan, flattenPlannedStepKeys } from './lib/phase_plan.mjs';
+import { createProgressTracker } from './lib/progress_tracker.mjs';
+import { pruneAuditRuns } from './lib/retention.mjs';
+import { createRunStateStore } from './lib/run_state_store.mjs';
 import { SCHEMA_VERSION, validateAuditRun } from './lib/schema.mjs';
 import { normalizeFindings } from './normalize/findings.mjs';
-import { triageFindings } from './triage_llm.mjs';
 import { publishJson } from './publish_json.mjs';
 import { publishMasterMarkdown } from './publish_md.mjs';
 import { publishSnapshot } from './publish_snapshot.mjs';
-import { createAuditLogger } from './lib/logger.mjs';
-import { createProgressTracker } from './lib/progress_tracker.mjs';
-import { createEtaEstimator } from './lib/eta_estimator.mjs';
-import { createRunStateStore } from './lib/run_state_store.mjs';
-import { AUDIT_EVENT_TYPES } from './lib/event_types.mjs';
-import { buildPhasePlan, flattenPlannedStepKeys } from './lib/phase_plan.mjs';
 import { printFinalReport, printProgress } from './reporters/console_reporter.mjs';
-import { pruneAuditRuns } from './lib/retention.mjs';
-import { loadContractRegistry } from './contracts/load_registry.mjs';
-import { getLegacyStaticContracts } from './contracts/legacy_adapter.mjs';
-import { evaluateChaosContracts } from './contracts/evaluate_chaos.mjs';
-import { buildEvidenceGraph } from './contracts/evidence_graph.mjs';
 import { renderContractCoverage } from './reporters/contract_coverage_reporter.mjs';
+import { triageFindings } from './triage_llm.mjs';
 
 /** @typedef {'quick'|'deep'|'nightly'} Profile */
 /** @typedef {'bug-first'|'all'} FocusMode */
@@ -61,6 +63,7 @@ const cliOptions = {
     'max-findings': { type: 'string', default: '0' },
     'max-stdout-bytes': { type: 'string', default: '1048576' },
     'max-stderr-bytes': { type: 'string', default: '1048576' },
+    'triage-timeout-ms': { type: 'string', default: '0' },
     'resume-run': { type: 'string', default: '' },
     'retention-max-runs': { type: 'string', default: '30' },
     'log-level': { type: 'string', default: 'info' },
@@ -216,7 +219,9 @@ async function resolveChangedFiles(profile, changedOnly) {
 }
 
 async function main() {
-    const profile = /** @type {Profile} */ (['quick', 'deep', 'nightly'].includes(values.profile) ? values.profile : 'quick');
+    const profile = /** @type {Profile} */ (
+        ['quick', 'deep', 'nightly'].includes(values.profile) ? values.profile : 'quick'
+    );
     const scope = String(values.scope || 'repo');
     const changedOnly = values['changed-only'] || profile === 'quick';
     const focusMode = parseFocusMode(String(values.focus || 'bug-first'));
@@ -240,11 +245,15 @@ async function main() {
     const maxFindings = Math.max(0, Number(values['max-findings'] || 0));
     const maxStdoutBytes = Math.max(65536, Number(values['max-stdout-bytes'] || 1048576));
     const maxStderrBytes = Math.max(65536, Number(values['max-stderr-bytes'] || 1048576));
+    const triageTimeoutCli = Math.max(0, Number(values['triage-timeout-ms'] || 0));
+    const triageTimeoutMs =
+        triageTimeoutCli > 0 ? triageTimeoutCli : profile === 'nightly' ? 600000 : profile === 'deep' ? 300000 : 120000;
     const retentionMaxRuns = Math.max(1, Number(values['retention-max-runs'] || 30));
 
     const startedAtDate = new Date();
     const resumeRun = String(values['resume-run'] || '').trim();
-    const runId = resumeRun || `WAVE_AUDIT_${profile.toUpperCase()}_${startedAtDate.toISOString().replace(/[:.]/g, '-')}`;
+    const runId =
+        resumeRun || `WAVE_AUDIT_${profile.toUpperCase()}_${startedAtDate.toISOString().replace(/[:.]/g, '-')}`;
     const resumeEnabled = Boolean(resumeRun);
 
     const outputRoot = String(values['output-dir'] || OUTPUT_DIR);
@@ -403,6 +412,21 @@ async function main() {
         };
     }
 
+    function getRemainingStepKeys() {
+        return plannedStepKeys.filter(key => !completedStepKeys.has(key));
+    }
+
+    /**
+     * @param {number} etaMs
+     */
+    function persistProgressSnapshot(etaMs) {
+        const remainingKeys = getRemainingStepKeys();
+        const snap = progress.snapshot(etaMs);
+        snap.remaining_step_keys = remainingKeys.slice(0, 10);
+        stateStore.writeProgress(snap);
+        return { snap, remainingKeys };
+    }
+
     /**
      * @param {string} phase
      */
@@ -423,7 +447,7 @@ async function main() {
             status: 'running',
             message: `Phase started: ${phase}`,
         });
-        const remainingKeys = plannedStepKeys.filter(key => !completedStepKeys.has(key));
+        const remainingKeys = getRemainingStepKeys();
         const eta = etaEstimator.estimateRemaining(remainingKeys);
         logger.emit({
             level: 'debug',
@@ -459,7 +483,7 @@ async function main() {
             status,
             message: `Phase finished: ${phase} (${status})`,
         });
-        const remainingKeys = plannedStepKeys.filter(key => !completedStepKeys.has(key));
+        const remainingKeys = getRemainingStepKeys();
         const eta = etaEstimator.estimateRemaining(remainingKeys);
         logger.emit({
             level: status === 'failed' ? 'warn' : 'debug',
@@ -472,6 +496,169 @@ async function main() {
             remaining_step_keys: remainingKeys.slice(0, 8),
             message: `Phase boundary finish: ${phase}`,
         });
+    }
+
+    /**
+     * @param {string} phase
+     * @param {string} stepId
+     * @param {string} reason
+     */
+    function markStepSkipped(phase, stepId, reason) {
+        if (completedStepKeys.has(stepId)) {
+            return;
+        }
+
+        progress.stepStarted(stepId);
+        completedStepKeys.add(stepId);
+        progress.stepFinished(stepId);
+        const eta = etaEstimator.estimateRemaining(getRemainingStepKeys());
+        const { snap, remainingKeys } = persistProgressSnapshot(eta.eta_ms);
+
+        logger.emit({
+            level: 'info',
+            event_type: AUDIT_EVENT_TYPES.STEP_FINISHED,
+            phase,
+            step_id: stepId,
+            status: 'skipped',
+            progress_pct: snap.progress_pct,
+            eta_ms: eta.eta_ms,
+            message: reason || `Step skipped: ${stepId}`,
+        });
+        logger.emit({
+            level: 'debug',
+            event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
+            phase,
+            step_id: stepId,
+            status: 'skipped',
+            progress_pct: snap.progress_pct,
+            eta_ms: eta.eta_ms,
+            remaining_step_keys: remainingKeys.slice(0, 8),
+            message: `Progress after skip ${stepId}: ${snap.steps_done}/${snap.steps_total}`,
+        });
+    }
+
+    /**
+     * @template T
+     * @param {string} phase
+     * @param {string} stepId
+     * @param {string} message
+     * @param {() => Promise<T>} action
+     * @param {{ timeoutMs?: number }} [options]
+     * @returns {Promise<T>}
+     */
+    async function runInternalStep(phase, stepId, message, action, options = {}) {
+        if (abortRequested) {
+            markStepSkipped(phase, stepId, abortMessage || `Step skipped due to lifecycle abort: ${stepId}`);
+            throw new Error(`Audit aborted before internal step ${stepId}: ${abortMessage || 'abort requested'}`);
+        }
+
+        etaEstimator.beginStep(stepId);
+        progress.stepStarted(stepId);
+        const remainingKeysBefore = getRemainingStepKeys();
+        const etaBefore = etaEstimator.estimateRemaining(remainingKeysBefore);
+
+        logger.emit({
+            level: 'info',
+            event_type: AUDIT_EVENT_TYPES.STEP_STARTED,
+            phase,
+            step_id: stepId,
+            status: 'running',
+            command: 'internal',
+            message,
+            progress_pct: progress.snapshot(etaBefore.eta_ms).progress_pct,
+            eta_ms: etaBefore.eta_ms,
+        });
+
+        const timeoutMs = Math.max(0, Number(options.timeoutMs || 0));
+        const started = Date.now();
+        let timedOut = false;
+
+        /** @type {T} */
+        let payload;
+        try {
+            if (timeoutMs > 0) {
+                let timeoutId = null;
+                payload = await Promise.race([
+                    action(),
+                    new Promise((_, reject) => {
+                        timeoutId = setTimeout(() => {
+                            timedOut = true;
+                            reject(new Error(`Internal step timeout (${timeoutMs}ms): ${stepId}`));
+                        }, timeoutMs);
+                    }),
+                ]);
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                }
+            } else {
+                payload = await action();
+            }
+        } catch (error) {
+            etaEstimator.endStep(stepId);
+            completedStepKeys.add(stepId);
+            progress.stepFinished(stepId);
+
+            const etaAfterFail = etaEstimator.estimateRemaining(getRemainingStepKeys());
+            const { snap: failSnap, remainingKeys: failRemaining } = persistProgressSnapshot(etaAfterFail.eta_ms);
+
+            logger.emit({
+                level: 'error',
+                event_type: AUDIT_EVENT_TYPES.STEP_FINISHED,
+                phase,
+                step_id: stepId,
+                status: 'failed',
+                command: 'internal',
+                duration_ms: Date.now() - started,
+                progress_pct: failSnap.progress_pct,
+                eta_ms: etaAfterFail.eta_ms,
+                message: timedOut ? `Internal step timed out: ${stepId}` : `Internal step failed: ${stepId}`,
+            });
+            logger.emit({
+                level: 'debug',
+                event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
+                phase,
+                step_id: stepId,
+                status: 'failed',
+                progress_pct: failSnap.progress_pct,
+                eta_ms: etaAfterFail.eta_ms,
+                remaining_step_keys: failRemaining.slice(0, 8),
+                message: `Progress after ${stepId}: ${failSnap.steps_done}/${failSnap.steps_total}`,
+            });
+            throw error;
+        }
+
+        etaEstimator.endStep(stepId);
+        completedStepKeys.add(stepId);
+        progress.stepFinished(stepId);
+
+        const etaAfter = etaEstimator.estimateRemaining(getRemainingStepKeys());
+        const { snap, remainingKeys } = persistProgressSnapshot(etaAfter.eta_ms);
+
+        logger.emit({
+            level: 'info',
+            event_type: AUDIT_EVENT_TYPES.STEP_FINISHED,
+            phase,
+            step_id: stepId,
+            status: 'completed',
+            command: 'internal',
+            duration_ms: Date.now() - started,
+            progress_pct: snap.progress_pct,
+            eta_ms: etaAfter.eta_ms,
+            message: `Step completed: ${stepId}`,
+        });
+        logger.emit({
+            level: 'debug',
+            event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
+            phase,
+            step_id: stepId,
+            status: 'completed',
+            progress_pct: snap.progress_pct,
+            eta_ms: etaAfter.eta_ms,
+            remaining_step_keys: remainingKeys.slice(0, 8),
+            message: `Progress after ${stepId}: ${snap.steps_done}/${snap.steps_total}`,
+        });
+
+        return payload;
     }
 
     /**
@@ -512,11 +699,9 @@ async function main() {
                         completedStepKeys.add(stepId);
                         progress.stepFinished(stepId);
 
-                        const remainingKeysAfterCache = plannedStepKeys.filter(key => !completedStepKeys.has(key));
+                        const remainingKeysAfterCache = getRemainingStepKeys();
                         const etaAfterCache = etaEstimator.estimateRemaining(remainingKeysAfterCache);
-                        const snapAfterCache = progress.snapshot(etaAfterCache.eta_ms);
-                        snapAfterCache.remaining_step_keys = remainingKeysAfterCache.slice(0, 10);
-                        stateStore.writeProgress(snapAfterCache);
+                        const { snap: snapAfterCache } = persistProgressSnapshot(etaAfterCache.eta_ms);
 
                         logger.emit({
                             level: 'info',
@@ -555,7 +740,7 @@ async function main() {
         etaEstimator.beginStep(stepId);
         progress.stepStarted(stepId);
 
-        const remainingKeysBefore = plannedStepKeys.filter(key => !completedStepKeys.has(key));
+        const remainingKeysBefore = getRemainingStepKeys();
         const etaBefore = etaEstimator.estimateRemaining(remainingKeysBefore);
 
         logger.emit({
@@ -619,11 +804,9 @@ async function main() {
             logStats.steps_with_overflow += 1;
         }
 
-        const remainingKeysAfter = plannedStepKeys.filter(key => !completedStepKeys.has(key));
+        const remainingKeysAfter = getRemainingStepKeys();
         const etaAfter = etaEstimator.estimateRemaining(remainingKeysAfter);
-        const snap = progress.snapshot(etaAfter.eta_ms);
-        snap.remaining_step_keys = remainingKeysAfter.slice(0, 10);
-        stateStore.writeProgress(snap);
+        const { snap } = persistProgressSnapshot(etaAfter.eta_ms);
 
         logger.emit({
             level: result.ok ? 'info' : 'error',
@@ -677,6 +860,7 @@ async function main() {
             propose_diffs: proposeDiffs,
             heartbeat_ms: heartbeatMs,
             max_findings: maxFindings,
+            triage_timeout_ms: triageTimeoutMs,
             max_stdout_bytes: maxStdoutBytes,
             max_stderr_bytes: maxStderrBytes,
             retention_max_runs: retentionMaxRuns,
@@ -715,7 +899,7 @@ async function main() {
     });
 
     heartbeat = setInterval(() => {
-        const remainingKeys = plannedStepKeys.filter(key => !completedStepKeys.has(key));
+        const remainingKeys = getRemainingStepKeys();
         const eta = etaEstimator.estimateRemaining(remainingKeys);
         const snap = progress.snapshot(eta.eta_ms);
         snap.remaining_step_keys = remainingKeys.slice(0, 10);
@@ -769,7 +953,10 @@ async function main() {
     }
     stateStore.writeSemanticPreflight(semanticPreflight);
 
-    await execStep('preflight', 'preflight.contract_registry', 'node', ['-e', 'process.stdout.write("contract-registry-ok")']);
+    await execStep('preflight', 'preflight.contract_registry', 'node', [
+        '-e',
+        'process.stdout.write("contract-registry-ok")',
+    ]);
 
     contractRegistry = loadContractRegistry({
         domainsFilter: selectedDomains.length > 0 ? selectedDomains : undefined,
@@ -826,7 +1013,7 @@ async function main() {
             'preflight.contract_parity',
             'node',
             ['scripts/check_forbidden_patterns.js', '--json', '--contracts-mode', 'hybrid', '--parity-mode'],
-            { timeoutMs: 180000 }
+            { timeoutMs: 180000, acceptExitCodes: [0, 2] }
         );
         const parityPayload =
             parseJsonFromMixedOutput(parityStep.stdout) ||
@@ -840,7 +1027,10 @@ async function main() {
             });
         }
     } else {
-        await execStep('preflight', 'preflight.contract_parity', 'node', ['-e', 'process.stdout.write("parity-skipped-non-hybrid")']);
+        await execStep('preflight', 'preflight.contract_parity', 'node', [
+            '-e',
+            'process.stdout.write("parity-skipped-non-hybrid")',
+        ]);
     }
     stateStore.writeContractParity(contractParity);
 
@@ -852,18 +1042,39 @@ async function main() {
         const shouldRefresh = refreshContextMode === 'force' || profile === 'nightly';
         if (shouldRefresh) {
             startPhase('context-refresh');
-            const ragHealth = await execStep('context-refresh', 'context.rag_health', 'npm', ['run', 'rag:health', '--', '--json'], { timeoutMs: 180000 });
+            const ragHealth = await execStep(
+                'context-refresh',
+                'context.rag_health',
+                'npm',
+                ['run', 'rag:health', '--', '--json'],
+                { timeoutMs: 180000 }
+            );
             const ragJson = parseJsonFromMixedOutput(`${ragHealth.stdout}\n${ragHealth.stderr}`);
 
             if (refreshContextMode === 'force' || !ragHealth.ok || !ragJson?.ok || !ragJson?.available) {
-                const rebuild = await execStep('context-refresh', 'context.rag_index_core', 'npm', ['run', 'rag:index', '--', '--profile', 'core', '--docs-mode', 'exclude'], { timeoutMs: 900000 });
+                const rebuild = await execStep(
+                    'context-refresh',
+                    'context.rag_index_core',
+                    'npm',
+                    ['run', 'rag:index', '--', '--profile', 'core', '--docs-mode', 'exclude'],
+                    { timeoutMs: 900000 }
+                );
                 if (!rebuild.ok) {
-                    warnings.push({ source: 'context-refresh', message: 'Failed to refresh RAG index in nightly preflight' });
+                    warnings.push({
+                        source: 'context-refresh',
+                        message: 'Failed to refresh RAG index in nightly preflight',
+                    });
                 }
             }
 
             if (profile === 'nightly') {
-                const docsPass = await execStep('context-refresh', 'context.rag_index_docs', 'npm', ['run', 'rag:index', '--', '--profile', 'full', '--docs-mode', 'only'], { timeoutMs: 900000 });
+                const docsPass = await execStep(
+                    'context-refresh',
+                    'context.rag_index_docs',
+                    'npm',
+                    ['run', 'rag:index', '--', '--profile', 'full', '--docs-mode', 'only'],
+                    { timeoutMs: 900000 }
+                );
                 if (!docsPass.ok) {
                     warnings.push({ source: 'context-refresh', message: 'Docs-only nightly index pass failed' });
                 }
@@ -872,6 +1083,10 @@ async function main() {
             finishPhase('context-refresh', 'completed');
         }
     } else {
+        startPhase('context-refresh');
+        for (const stepId of ['context.rag_health', 'context.rag_index_core', 'context.rag_index_docs']) {
+            markStepSkipped('context-refresh', stepId, `Step skipped by --refresh-context=${refreshContextMode}`);
+        }
         finishPhase('context-refresh', 'skipped');
     }
 
@@ -887,7 +1102,24 @@ async function main() {
     rawFindings = rawFindings.concat(staticResult.findings);
     errors.push(...staticResult.errors);
     warnings.push(...staticResult.warnings);
-    const staticFailed = staticResult.errors.length > 0 || staticResult.telemetry?.gates?.forbidden_ok === false;
+    if (profile === 'quick') {
+        markStepSkipped('collect-static', 'static.syntax', 'Step resolved by quick per-file syntax checks');
+    }
+    if (
+        staticResult.warnings.some(
+            item => item.source === 'dependency-cruiser' && /not installed/i.test(String(item.message || ''))
+        )
+    ) {
+        markStepSkipped('collect-static', 'static.depcruise', 'Step skipped: dependency-cruiser não instalado');
+    }
+    if (
+        staticResult.warnings.some(
+            item => item.source === 'semgrep' && /not installed/i.test(String(item.message || ''))
+        )
+    ) {
+        markStepSkipped('collect-static', 'static.semgrep', 'Step skipped: semgrep não instalado');
+    }
+    const staticFailed = staticResult.errors.length > 0;
     finishPhase('collect-static', staticFailed ? 'failed' : 'completed');
 
     // runtime
@@ -922,20 +1154,73 @@ async function main() {
         runDir,
         exec: (stepId, command, args, opts) => execStep('collect-chaos', stepId, command, args, opts),
     });
-    rawFindings = rawFindings.concat(/** @type {import('./normalize/findings.mjs').RawFinding[]} */ (chaosResult.findings));
+    rawFindings = rawFindings.concat(
+        /** @type {import('./normalize/findings.mjs').RawFinding[]} */ (chaosResult.findings)
+    );
     errors.push(...chaosResult.errors);
     warnings.push(...chaosResult.warnings);
     finishPhase('collect-chaos', chaosResult.errors.length > 0 ? 'failed' : 'completed');
+
+    // performance
+    startPhase('collect-performance');
+    const performanceResult = await collectPerformanceFindings(process.cwd());
+    rawFindings = rawFindings.concat(performanceResult.findings);
+    errors.push(...performanceResult.errors);
+    warnings.push(...performanceResult.warnings);
+    if (performanceResult.findings.length > 0) {
+        logger.emit({
+            level: 'info',
+            event_type: AUDIT_EVENT_TYPES.PERFORMANCE_ANALYSIS_COMPLETED,
+            phase: 'collect-performance',
+            message: `Performance analysis completed with ${performanceResult.findings.length} issues found`,
+            domain: 'performance',
+            findings_count: performanceResult.findings.length,
+            warnings_count: performanceResult.warnings.length,
+            errors_count: performanceResult.errors.length,
+        });
+    }
+    finishPhase('collect-performance', performanceResult.errors.length > 0 ? 'failed' : 'completed');
+
+    // architecture
+    startPhase('collect-architecture');
+    const architectureResult = await collectArchitectureFindings(process.cwd());
+    rawFindings = rawFindings.concat(architectureResult.findings);
+    errors.push(...architectureResult.errors);
+    warnings.push(...architectureResult.warnings);
+    if (architectureResult.findings.length > 0) {
+        logger.emit({
+            level: 'info',
+            event_type: AUDIT_EVENT_TYPES.ARCHITECTURE_ANALYSIS_COMPLETED,
+            phase: 'collect-architecture',
+            message: `Architecture analysis completed with ${architectureResult.findings.length} issues found`,
+            domain: 'architecture',
+            findings_count: architectureResult.findings.length,
+            warnings_count: architectureResult.warnings.length,
+            errors_count: architectureResult.errors.length,
+        });
+    }
+    finishPhase('collect-architecture', architectureResult.errors.length > 0 ? 'failed' : 'completed');
 
     stateStore.writeFindingsRaw(rawFindings);
 
     // normalize
     startPhase('normalize-correlate');
-    let findings = normalizeFindings(rawFindings, {
-        masterPath: MASTER_PATH,
-        now: startedAtDate,
-    });
-    const evidencePack = buildEvidenceGraph(findings);
+    let findings = await runInternalStep(
+        'normalize-correlate',
+        'normalize.findings',
+        'Normalizing findings',
+        async () =>
+            normalizeFindings(rawFindings, {
+                masterPath: MASTER_PATH,
+                now: startedAtDate,
+            })
+    );
+    const evidencePack = await runInternalStep(
+        'normalize-correlate',
+        'normalize.evidence_graph',
+        'Building evidence graph',
+        async () => buildEvidenceGraph(findings)
+    );
     findings = evidencePack.findings;
     stateStore.writeEvidenceGraph(evidencePack.graph);
     logger.emit({
@@ -950,15 +1235,64 @@ async function main() {
     // triage
     startPhase('triage-intelligence');
     const triageBudget = profile === 'quick' ? 40 : profile === 'deep' ? 120 : 200;
-    const triage = await triageFindings(findings, {
-        enabled: values.triage,
-        maxMcpFindings: triageBudget,
-        proposeDiffs,
-        focusMode,
-        proposalDepth,
-        cloudFallback,
-        masterPath: MASTER_PATH,
-    });
+    let lastTriageProgressTs = 0;
+    let triage;
+    try {
+        triage = await runInternalStep(
+            'triage-intelligence',
+            'triage.enrich',
+            `Running triage intelligence (budget=${triageBudget}, timeout=${triageTimeoutMs}ms)`,
+            async () =>
+                triageFindings(findings, {
+                    enabled: values.triage,
+                    maxMcpFindings: triageBudget,
+                    proposeDiffs,
+                    focusMode,
+                    proposalDepth,
+                    cloudFallback,
+                    masterPath: MASTER_PATH,
+                    maxDurationMs: triageTimeoutMs,
+                    onProgress: payload => {
+                        const now = Date.now();
+                        const shouldEmit =
+                            payload.processed <= 2 ||
+                            payload.processed === payload.total ||
+                            payload.processed % 20 === 0 ||
+                            now - lastTriageProgressTs >= 5000;
+                        if (!shouldEmit) {
+                            return;
+                        }
+                        lastTriageProgressTs = now;
+                        const triageRemaining = getRemainingStepKeys();
+                        const triageEta = etaEstimator.estimateRemaining(triageRemaining);
+                        const triageSnap = progress.snapshot(triageEta.eta_ms);
+                        logger.emit({
+                            level: 'debug',
+                            event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
+                            phase: 'triage-intelligence',
+                            step_id: 'triage.enrich',
+                            status: 'running',
+                            progress_pct: triageSnap.progress_pct,
+                            eta_ms: triageSnap.eta_ms,
+                            message: `triage progress ${payload.processed}/${payload.total} (${payload.percent}%) mode=${payload.mode}`,
+                        });
+                    },
+                }),
+            { timeoutMs: triageTimeoutMs + 15000 }
+        );
+    } catch (error) {
+        warnings.push({
+            source: 'triage_llm',
+            message: `triage internal step failed; deterministic fallback used (${error instanceof Error ? error.message : String(error)})`,
+        });
+        triage = await triageFindings(findings, {
+            enabled: false,
+            focusMode,
+            proposalDepth,
+            cloudFallback,
+            masterPath: MASTER_PATH,
+        });
+    }
     findings = triage.findings;
     warnings.push(...triage.warnings.map(message => ({ source: 'triage_llm', message })));
     logger.emit({
@@ -974,12 +1308,9 @@ async function main() {
         findings = findings.slice(0, maxFindings);
     }
 
-    const primaryFindings = focusMode === 'bug-first'
-        ? findings.filter(f => f.finding_channel === 'primary')
-        : findings;
-    const backlogFindings = focusMode === 'bug-first'
-        ? findings.filter(f => f.finding_channel === 'backlog')
-        : [];
+    const primaryFindings =
+        focusMode === 'bug-first' ? findings.filter(f => f.finding_channel === 'primary') : findings;
+    const backlogFindings = focusMode === 'bug-first' ? findings.filter(f => f.finding_channel === 'backlog') : [];
 
     stateStore.writeFindingsNormalized(findings);
     stateStore.writeProposals(
@@ -1074,7 +1405,7 @@ async function main() {
     }
 
     const staleContracts = activeContracts
-        .filter(contract => contract.status === 'active' && eligibleContracts.has(contract.id) && !violatedContracts.has(contract.id))
+        .filter(contract => contract.status === 'active' && !eligibleContracts.has(contract.id))
         .map(contract => contract.id);
     const unownedCritical = activeContracts
         .filter(
@@ -1098,7 +1429,10 @@ async function main() {
             return false;
         }
         if (enforceLevel === 'p1') {
-            return (item.severity === 'P0' || item.severity === 'P1') && (item.enforcement_state === 'p1' || item.enforcement_state === 'p0');
+            return (
+                (item.severity === 'P0' || item.severity === 'P1') &&
+                (item.enforcement_state === 'p1' || item.enforcement_state === 'p0')
+            );
         }
         return item.severity === 'P0' && item.enforcement_state === 'p0';
     });
@@ -1107,10 +1441,11 @@ async function main() {
         blocking: blockingFindings.length > 0,
         blocking_findings: blockingFindings.map(item => item.id),
     };
-    const shadowBlockingFindings = findings.filter(item =>
-        (item.severity === 'P0' || item.severity === 'P1') &&
-        (item.type === 'bug' || item.type === 'gap' || item.type === 'falha de contrato') &&
-        (item.enforcement_state === 'p1' || item.enforcement_state === 'p0')
+    const shadowBlockingFindings = findings.filter(
+        item =>
+            (item.severity === 'P0' || item.severity === 'P1') &&
+            (item.type === 'bug' || item.type === 'gap' || item.type === 'falha de contrato') &&
+            (item.enforcement_state === 'p1' || item.enforcement_state === 'p0')
     );
     const shadowGate = {
         enabled: shadowGateEnabled,
@@ -1138,121 +1473,146 @@ async function main() {
         level: gateDecision.blocking || shadowGate.would_block ? 'warn' : 'info',
         event_type: AUDIT_EVENT_TYPES.GATE_DECISION_MADE,
         phase: 'publish',
-        status: gateDecision.blocking || shadowGate.would_block ? 'failed' : 'completed',
+        status: gateDecision.blocking ? 'failed' : 'completed',
         message: `Gate decision: blocking=${gateDecision.blocking} shadow_would_block=${shadowGate.would_block} level=${enforceLevel}`,
     });
 
-    progress.complete();
-    const finishedAtIso = new Date().toISOString();
-    const durationMsTotal = Date.now() - startedAtDate.getTime();
-    const finalRemainingStepKeys = plannedStepKeys.filter(key => !completedStepKeys.has(key));
-    const eta = {
-        eta_ms: 0,
-        eta_confidence: 0.98,
-        model: 'history+online',
-        eta_error_ms: Math.abs(Number(plannedStartEta.eta_ms || 0) - durationMsTotal),
-        confidence_reason: plannedStartEta.confidence_reason || null,
-    };
-    const progressSnapshot = progress.snapshot(eta.eta_ms);
-    progressSnapshot.remaining_step_keys = finalRemainingStepKeys.slice(0, 10);
     const schemaToken = String(SCHEMA_VERSION).replace(/\./g, '_');
     if (abortRequested) {
         runOutcome = 'aborted';
     }
-    if (errors.length > 0 || normalizedWarnings.length > 0 || findings.some(f => f.partial === true)) {
-        runOutcome = (String(runOutcome) === 'fatal' || String(runOutcome) === 'aborted') ? runOutcome : 'partial';
+    const hasFailedPhase = () => phaseStatus.some(item => item.status === 'failed');
+    const hasExecutionErrors = () =>
+        errors.length > 0 || findings.some(item => item.partial === true) || hasFailedPhase();
+
+    /**
+     * @param {{
+     *   finishedAtIso: string,
+     *   durationMsTotal: number,
+     *   remainingStepKeys: string[],
+     *   progressSnapshot: ReturnType<typeof progress.snapshot>,
+     *   eta: { eta_ms: number, eta_confidence: number, model: string, eta_error_ms: number, confidence_reason: string|null },
+     * }} metrics
+     */
+    function buildAuditReport(metrics) {
+        const summaryPartial = runOutcome === 'aborted' || runOutcome === 'fatal' || hasExecutionErrors();
+        if (runOutcome !== 'aborted' && runOutcome !== 'fatal') {
+            runOutcome = summaryPartial ? 'partial' : 'success';
+        }
+        return /** @type {import('./lib/schema.mjs').AuditRunV3 & { errors_count: number, warnings_count: number }} */ ({
+            schema_version: SCHEMA_VERSION,
+            run_id: runId,
+            profile,
+            scope,
+            focus_mode: focusMode,
+            contracts_mode: contractsMode,
+            enforce_level: enforceLevel,
+            proposal_depth: proposalDepth,
+            started_at: startedAtDate.toISOString(),
+            finished_at: metrics.finishedAtIso,
+            run_outcome: runOutcome,
+            abort_reason: abortReason,
+            duration_ms_total: metrics.durationMsTotal,
+            remaining_step_keys: metrics.remainingStepKeys,
+            tool_versions: toolVersions,
+            summary: {
+                total_findings: findings.length,
+                total_primary: primaryFindings.length,
+                total_backlog: backlogFindings.length,
+                by_severity: bySeverity,
+                by_status: byStatus,
+                partial: summaryPartial,
+            },
+            progress: {
+                steps_done: metrics.progressSnapshot.steps_done,
+                steps_total: metrics.progressSnapshot.steps_total,
+                progress_pct: metrics.progressSnapshot.progress_pct,
+                remaining_steps: metrics.progressSnapshot.remaining_steps,
+            },
+            eta: metrics.eta,
+            phase_status: phaseStatus,
+            findings,
+            primary_findings: primaryFindings,
+            backlog_findings: backlogFindings,
+            errors,
+            warnings: normalizedWarnings,
+            errors_count: errors.length,
+            warnings_count: normalizedWarnings.length,
+            telemetry: runtimeResult.telemetry,
+            semantic_preflight: semanticPreflight,
+            shadow_gate: shadowGate,
+            telemetry_noise: telemetryNoise,
+            log_stats: logStats,
+            degradation: {
+                mcp_degraded: !runtimeResult.telemetry.mcp.ok,
+                rag_degraded: !runtimeResult.telemetry.rag.ok || runtimeResult.telemetry.rag.degraded === true,
+                lsp_degraded: !runtimeResult.telemetry.lsp.ok,
+                tooling_degraded: staticResult.errors.length > 0 || testsResult.errors.length > 0,
+            },
+            quality_gates: {
+                forbidden_ok: staticResult.telemetry?.gates?.forbidden_ok ?? null,
+                typecheck_ok: staticResult.telemetry?.gates?.typecheck_ok ?? null,
+                runtime_smoke_ok:
+                    profile === 'quick'
+                        ? null
+                        : runtimeResult.findings.every(item => item.source_tool !== 'runtime-smoke'),
+                tests_ok: testsResult.errors.length === 0,
+            },
+            contract_coverage: contractCoverage,
+            contract_drift: contractDrift,
+            contract_parity: contractParity,
+            gate_decision: gateDecision,
+            chaos_summary: chaosResult.summary,
+            artifacts: {
+                run_dir: runDir,
+                events_jsonl: logger.eventsPath,
+                progress_json: stateStore.paths.progressPath,
+                phase_timeline_json: stateStore.paths.phaseTimelinePath,
+                findings_raw_json: stateStore.paths.findingsRawPath,
+                findings_normalized_json: stateStore.paths.findingsNormalizedPath,
+                proposals_json: stateStore.paths.proposalsPath,
+                audit_report_json: path.join(runDir, `audit_report_v${schemaToken}.json`),
+                summary_md: stateStore.paths.summaryPath,
+                contract_registry_snapshot_json: stateStore.paths.contractRegistrySnapshotPath,
+                semantic_preflight_json: stateStore.paths.semanticPreflightPath,
+                log_stats_json: stateStore.paths.logStatsPath,
+                contract_coverage_json: stateStore.paths.contractCoveragePath,
+                contract_drift_json: stateStore.paths.contractDriftPath,
+                contract_parity_json: stateStore.paths.contractParityPath,
+                evidence_graph_json: stateStore.paths.evidenceGraphPath,
+                gate_decisions_json: stateStore.paths.gateDecisionsPath,
+                chaos_events_jsonl: chaosResult.eventsPath,
+            },
+        });
     }
 
-    const report = /** @type {import('./lib/schema.mjs').AuditRunV3} */ ({
-        schema_version: SCHEMA_VERSION,
-        run_id: runId,
-        profile,
-        scope,
-        focus_mode: focusMode,
-        contracts_mode: contractsMode,
-        enforce_level: enforceLevel,
-        proposal_depth: proposalDepth,
-        started_at: startedAtDate.toISOString(),
-        finished_at: finishedAtIso,
-        run_outcome: runOutcome,
-        abort_reason: abortReason,
-        duration_ms_total: durationMsTotal,
-        remaining_step_keys: finalRemainingStepKeys,
-        tool_versions: toolVersions,
-        summary: {
-            total_findings: findings.length,
-            total_primary: primaryFindings.length,
-            total_backlog: backlogFindings.length,
-            by_severity: bySeverity,
-            by_status: byStatus,
-            partial: errors.length > 0 || normalizedWarnings.length > 0 || findings.some(f => f.partial === true),
-        },
-        progress: {
-            steps_done: progressSnapshot.steps_done,
-            steps_total: progressSnapshot.steps_total,
-            progress_pct: progressSnapshot.progress_pct,
-            remaining_steps: progressSnapshot.remaining_steps,
-        },
-        eta,
-        phase_status: phaseStatus,
-        findings,
-        primary_findings: primaryFindings,
-        backlog_findings: backlogFindings,
-        errors,
-        warnings: normalizedWarnings,
-        telemetry: runtimeResult.telemetry,
-        semantic_preflight: semanticPreflight,
-        shadow_gate: shadowGate,
-        telemetry_noise: telemetryNoise,
-        log_stats: logStats,
-        degradation: {
-            mcp_degraded: !runtimeResult.telemetry.mcp.ok,
-            rag_degraded: !runtimeResult.telemetry.rag.ok || runtimeResult.telemetry.rag.degraded === true,
-            lsp_degraded: !runtimeResult.telemetry.lsp.ok,
-            tooling_degraded: staticResult.errors.length > 0 || testsResult.errors.length > 0,
-        },
-        quality_gates: {
-            forbidden_ok: staticResult.telemetry?.gates?.forbidden_ok ?? null,
-            typecheck_ok: staticResult.telemetry?.gates?.typecheck_ok ?? null,
-            runtime_smoke_ok: profile === 'quick' ? null : runtimeResult.findings.every(item => item.source_tool !== 'runtime-smoke'),
-            tests_ok: testsResult.errors.length === 0,
-        },
-        contract_coverage: contractCoverage,
-        contract_drift: contractDrift,
-        contract_parity: contractParity,
-        gate_decision: gateDecision,
-        chaos_summary: chaosResult.summary,
-        artifacts: {
-            run_dir: runDir,
-            events_jsonl: logger.eventsPath,
-            progress_json: stateStore.paths.progressPath,
-            phase_timeline_json: stateStore.paths.phaseTimelinePath,
-            findings_raw_json: stateStore.paths.findingsRawPath,
-            findings_normalized_json: stateStore.paths.findingsNormalizedPath,
-            proposals_json: stateStore.paths.proposalsPath,
-            audit_report_json: path.join(runDir, `audit_report_v${schemaToken}.json`),
-            summary_md: stateStore.paths.summaryPath,
-            contract_registry_snapshot_json: stateStore.paths.contractRegistrySnapshotPath,
-            semantic_preflight_json: stateStore.paths.semanticPreflightPath,
-            log_stats_json: stateStore.paths.logStatsPath,
-            contract_coverage_json: stateStore.paths.contractCoveragePath,
-            contract_drift_json: stateStore.paths.contractDriftPath,
-            contract_parity_json: stateStore.paths.contractParityPath,
-            evidence_graph_json: stateStore.paths.evidenceGraphPath,
-            gate_decisions_json: stateStore.paths.gateDecisionsPath,
-            chaos_events_jsonl: chaosResult.eventsPath,
-        },
+    const prePublishDurationMs = Date.now() - startedAtDate.getTime();
+    const prePublishRemainingStepKeys = getRemainingStepKeys();
+    const prePublishEta = {
+        eta_ms: Math.max(0, Math.round(etaEstimator.estimateRemaining(prePublishRemainingStepKeys).eta_ms || 0)),
+        eta_confidence: 0.98,
+        model: 'history+online',
+        eta_error_ms: Math.abs(Number(plannedStartEta.eta_ms || 0) - prePublishDurationMs),
+        confidence_reason: plannedStartEta.confidence_reason || null,
+    };
+    const prePublishProgressSnapshot = progress.snapshot(prePublishEta.eta_ms);
+    prePublishProgressSnapshot.remaining_step_keys = prePublishRemainingStepKeys.slice(0, 10);
+
+    let report = buildAuditReport({
+        finishedAtIso: new Date().toISOString(),
+        durationMsTotal: prePublishDurationMs,
+        remainingStepKeys: prePublishRemainingStepKeys,
+        progressSnapshot: prePublishProgressSnapshot,
+        eta: prePublishEta,
     });
 
-    const validation = validateAuditRun(report);
-    if (!validation.ok) {
-        errors.push({ source: 'schema', message: validation.errors.join('; ') });
-        report.summary.partial = true;
-        report.errors = errors;
-    }
-
     startPhase('publish');
-    const publishedJson = publishJson(report, { outputDir: outputRoot, runDir });
+    const publishedJson = await runInternalStep(
+        'publish',
+        'publish.json',
+        'Publishing JSON report artifacts',
+        async () => publishJson(report, { outputDir: outputRoot, runDir })
+    );
     const outputs = {
         json: publishedJson.path,
         run_json: publishedJson.runReportPath,
@@ -1261,57 +1621,150 @@ async function main() {
     };
 
     if (publishMaster) {
-        outputs.master = publishMasterMarkdown(report, { masterPath: MASTER_PATH }).path;
+        const masterPublished = await runInternalStep(
+            'publish',
+            'publish.master',
+            'Publishing BUG_AUDIT_MASTER.md',
+            async () => publishMasterMarkdown(report, { masterPath: MASTER_PATH })
+        );
+        outputs.master = masterPublished.path;
+    } else {
+        markStepSkipped('publish', 'publish.master', 'Step skipped: publish-master desabilitado');
     }
 
     if (shouldPublishSnapshot && outputs.master) {
-        outputs.snapshot = publishSnapshot({ masterPath: MASTER_PATH, snapshotsDir: SNAPSHOTS_DIR, report }).path;
+        const snapshotPublished = await runInternalStep(
+            'publish',
+            'publish.snapshot',
+            'Publishing immutable snapshot',
+            async () => publishSnapshot({ masterPath: MASTER_PATH, snapshotsDir: SNAPSHOTS_DIR, report })
+        );
+        outputs.snapshot = snapshotPublished.path;
+    } else {
+        markStepSkipped('publish', 'publish.snapshot', 'Step skipped: snapshot desabilitado ou master indisponível');
+    }
+
+    if (contractCoverageReport) {
+        await runInternalStep(
+            'publish',
+            'publish.contract_reports',
+            'Rendering contract coverage report summary',
+            async () => renderContractCoverage(contractCoverage, contractDrift)
+        );
+    } else {
+        markStepSkipped('publish', 'publish.contract_reports', 'Step skipped: contract coverage report desabilitado');
     }
 
     finishPhase('publish', 'completed');
 
-    stateStore.writeSummary([
-        `# Audit v3.2 Summary`,
-        ``,
-        `- run_id: ${report.run_id}`,
-        `- profile: ${report.profile}`,
-        `- focus_mode: ${report.focus_mode}`,
-        `- contracts_mode: ${report.contracts_mode}`,
-        `- enforce_level: ${report.enforce_level}`,
-        `- proposal_depth: ${report.proposal_depth}`,
-        `- run_outcome: ${report.run_outcome}`,
-        `- abort_reason: ${report.abort_reason}`,
-        `- partial: ${report.summary.partial}`,
-        `- duration_ms_total: ${report.duration_ms_total}`,
-        `- total_findings: ${report.summary.total_findings}`,
-        `- total_primary: ${report.summary.total_primary}`,
-        `- total_backlog: ${report.summary.total_backlog}`,
-        `- progress_pct: ${report.progress.progress_pct}`,
-        `- eta_ms: ${report.eta.eta_ms}`,
-        `- eta_error_ms: ${report.eta.eta_error_ms ?? 'n/a'}`,
-        `- mcp_ok: ${report.telemetry.mcp.ok}`,
-        `- rag_ok: ${report.telemetry.rag.ok}`,
-        `- lsp_ok: ${report.telemetry.lsp.ok}`,
-        `- semantic_preflight_ok: ${report.semantic_preflight.ok}`,
-        `- shadow_would_block: ${report.shadow_gate.would_block}`,
-        `- telemetry_noise_ignored: ${report.telemetry_noise.ignored_warning_lines}`,
-        `- remaining_step_keys: ${(report.remaining_step_keys || []).slice(0, 8).join(', ') || 'none'}`,
-        `- log_overflow_steps: ${report.log_stats.steps_with_overflow}`,
-        `- gate_blocking: ${report.gate_decision.blocking}`,
-        `- chaos_enabled: ${report.chaos_summary.enabled}`,
-        `- chaos_violations: ${report.chaos_summary.violations}`,
-        ``,
-        contractCoverageReport ? renderContractCoverage(contractCoverage, contractDrift) : null,
-        ``,
-        `## Artifacts`,
-        `- report_json: ${outputs.json}`,
-        `- run_report_json: ${outputs.run_json}`,
-        `- semantic_preflight_json: ${report.artifacts.semantic_preflight_json}`,
-        `- log_stats_json: ${report.artifacts.log_stats_json}`,
-        `- contract_parity_json: ${report.artifacts.contract_parity_json}`,
-        outputs.master ? `- master_md: ${outputs.master}` : null,
-        outputs.snapshot ? `- snapshot_md: ${outputs.snapshot}` : null,
-    ].filter(Boolean).join('\n') + '\n');
+    const finalDurationMs = Date.now() - startedAtDate.getTime();
+    const finalRemainingStepKeys = getRemainingStepKeys();
+    const finalEta = {
+        eta_ms: 0,
+        eta_confidence: 0.98,
+        model: 'history+online',
+        eta_error_ms: Math.abs(Number(plannedStartEta.eta_ms || 0) - finalDurationMs),
+        confidence_reason: plannedStartEta.confidence_reason || null,
+    };
+    const finalProgressSnapshot = progress.snapshot(finalEta.eta_ms);
+    finalProgressSnapshot.remaining_step_keys = finalRemainingStepKeys.slice(0, 10);
+    stateStore.writeProgress(finalProgressSnapshot);
+
+    report = buildAuditReport({
+        finishedAtIso: new Date().toISOString(),
+        durationMsTotal: finalDurationMs,
+        remainingStepKeys: finalRemainingStepKeys,
+        progressSnapshot: finalProgressSnapshot,
+        eta: finalEta,
+    });
+
+    const validation = validateAuditRun(report);
+    if (!validation.ok) {
+        errors.push({ source: 'schema', message: validation.errors.join('; ') });
+        report = buildAuditReport({
+            finishedAtIso: new Date().toISOString(),
+            durationMsTotal: Date.now() - startedAtDate.getTime(),
+            remainingStepKeys: getRemainingStepKeys(),
+            progressSnapshot: progress.snapshot(0),
+            eta: {
+                eta_ms: 0,
+                eta_confidence: 0.98,
+                model: 'history+online',
+                eta_error_ms: Math.abs(Number(plannedStartEta.eta_ms || 0) - (Date.now() - startedAtDate.getTime())),
+                confidence_reason: plannedStartEta.confidence_reason || null,
+            },
+        });
+    }
+
+    const refreshedJson = publishJson(report, { outputDir: outputRoot, runDir });
+    outputs.json = refreshedJson.path;
+    outputs.run_json = refreshedJson.runReportPath;
+    if (outputs.master) {
+        publishMasterMarkdown(report, { masterPath: MASTER_PATH });
+    }
+    if (outputs.snapshot && fs.existsSync(MASTER_PATH)) {
+        const masterContent = fs.readFileSync(MASTER_PATH, 'utf8');
+        const nowIso = new Date().toISOString();
+        const snapshotHeader = [
+            '<!-- SNAPSHOT_METADATA_START -->',
+            `- schema_version: ${report.schema_version}`,
+            `- run_id: ${report.run_id}`,
+            `- focus_mode: ${report.focus_mode}`,
+            `- partial: ${report.summary.partial}`,
+            `- eta_final_ms: ${report.eta.eta_ms}`,
+            `- generated_at: ${nowIso}`,
+            '<!-- SNAPSHOT_METADATA_END -->',
+            '',
+        ].join('\n');
+        fs.writeFileSync(outputs.snapshot, `${snapshotHeader}${masterContent}`, 'utf8');
+    }
+
+    stateStore.writeSummary(
+        [
+            `# Audit v3.2 Summary`,
+            ``,
+            `- run_id: ${report.run_id}`,
+            `- profile: ${report.profile}`,
+            `- focus_mode: ${report.focus_mode}`,
+            `- contracts_mode: ${report.contracts_mode}`,
+            `- enforce_level: ${report.enforce_level}`,
+            `- proposal_depth: ${report.proposal_depth}`,
+            `- run_outcome: ${report.run_outcome}`,
+            `- abort_reason: ${report.abort_reason}`,
+            `- partial: ${report.summary.partial}`,
+            `- duration_ms_total: ${report.duration_ms_total}`,
+            `- total_findings: ${report.summary.total_findings}`,
+            `- total_primary: ${report.summary.total_primary}`,
+            `- total_backlog: ${report.summary.total_backlog}`,
+            `- progress_pct: ${report.progress.progress_pct}`,
+            `- eta_ms: ${report.eta.eta_ms}`,
+            `- eta_error_ms: ${report.eta.eta_error_ms ?? 'n/a'}`,
+            `- mcp_ok: ${report.telemetry.mcp.ok}`,
+            `- rag_ok: ${report.telemetry.rag.ok}`,
+            `- lsp_ok: ${report.telemetry.lsp.ok}`,
+            `- semantic_preflight_ok: ${report.semantic_preflight.ok}`,
+            `- shadow_would_block: ${report.shadow_gate.would_block}`,
+            `- telemetry_noise_ignored: ${report.telemetry_noise.ignored_warning_lines}`,
+            `- remaining_step_keys: ${(report.remaining_step_keys || []).slice(0, 8).join(', ') || 'none'}`,
+            `- log_overflow_steps: ${report.log_stats.steps_with_overflow}`,
+            `- gate_blocking: ${report.gate_decision.blocking}`,
+            `- chaos_enabled: ${report.chaos_summary.enabled}`,
+            `- chaos_violations: ${report.chaos_summary.violations}`,
+            ``,
+            contractCoverageReport ? renderContractCoverage(contractCoverage, contractDrift) : null,
+            ``,
+            `## Artifacts`,
+            `- report_json: ${outputs.json}`,
+            `- run_report_json: ${outputs.run_json}`,
+            `- semantic_preflight_json: ${report.artifacts.semantic_preflight_json}`,
+            `- log_stats_json: ${report.artifacts.log_stats_json}`,
+            `- contract_parity_json: ${report.artifacts.contract_parity_json}`,
+            outputs.master ? `- master_md: ${outputs.master}` : null,
+            outputs.snapshot ? `- snapshot_md: ${outputs.snapshot}` : null,
+        ]
+            .filter(Boolean)
+            .join('\n') + '\n'
+    );
 
     etaEstimator.persist();
     const retentionResult = pruneAuditRuns({

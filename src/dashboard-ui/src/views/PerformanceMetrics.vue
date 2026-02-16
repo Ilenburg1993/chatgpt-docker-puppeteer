@@ -26,7 +26,7 @@
                 <GaugeChart
                     :value="telemetry.cpuLoad"
                     :max="100"
-                    label="CPU Load"
+                    label="CPU Usage"
                     unit="%"
                     :warningThreshold="70"
                     :criticalThreshold="90"
@@ -68,8 +68,8 @@
         <div class="charts-grid">
             <div class="chart-card">
                 <div class="chart-header">
-                    <h3>CPU Load</h3>
-                    <span class="chart-stat">Avg: {{ telemetry.averages.cpu }}% | Max: {{ telemetry.averages.cpu }}%</span>
+                    <h3>CPU Usage</h3>
+                    <span class="chart-stat">Avg: {{ telemetry.averages.cpu }}% | Max: {{ telemetry.maxValues.cpu }}%</span>
                 </div>
                 <LineChart
                     :data="cpuChartData"
@@ -170,6 +170,10 @@
                         <tr>
                             <td class="info-label">Last Update</td>
                             <td class="info-value">{{ lastUpdateLabel }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Load Avg (1m)</td>
+                            <td class="info-value">{{ telemetry.current.cpu.load_1min ?? '-' }}</td>
                         </tr>
                         <tr>
                             <td class="info-label">CPU Cores</td>

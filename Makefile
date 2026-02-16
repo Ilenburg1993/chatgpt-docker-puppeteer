@@ -9,15 +9,14 @@
 # • Compatível com Docker / DevContainer do zero
 # • Alinhado com package.json scripts (95% coverage)
 #
-# Versão: 4.0.0
-# Data:   2026-02-02
-# Changelog v4.0:
-#   - Adicionados 40+ novos targets (70+ total)
-#   - Adicionadas declarações .PHONY (segurança)
-#   - Novos targets: análise, queue, testes, manutenção, VS Code, dev
-#   - Melhoradas mensagens de feedback (✅/❌)
-#   - Novos aliases (q, m, d, a)
-#   - Help menu reorganizado com BOLD
+# Versão: 4.1.0
+# Data:   2026-02-15
+# Changelog v4.1:
+#   - Expansão abrangente dos comandos de RAG e Audit (execução + operação)
+#   - Novos targets para rebuild/index sem docs, docs-only e modo estrito
+#   - Novos targets de inspeção de artifacts (último run, progress, tail de eventos)
+#   - Novos atalhos para nightly sem refresh e execução code-only
+#   - Help reorganizado com foco operacional (pré-run, run, pós-run)
 # =============================================================================
 
 .DEFAULT_GOAL := help
@@ -61,11 +60,12 @@ RAG_EXCLUDE_GLOBS ?=
 
 RAG_INCLUDE_GLOBS_LIST = $(strip $(subst $(COMMA),$(SPACE),$(RAG_INCLUDE_GLOBS)))
 RAG_EXCLUDE_GLOBS_LIST = $(strip $(subst $(COMMA),$(SPACE),$(RAG_EXCLUDE_GLOBS)))
-RAG_SCOPE_ARGS = $(if $(RAG_PROFILE),--profile "$(RAG_PROFILE)",) \
-	$(if $(RAG_DOCS_MODE),--docs-mode "$(RAG_DOCS_MODE)",) \
-	$(if $(RAG_MAX_FILE_BYTES),--max-file-bytes "$(RAG_MAX_FILE_BYTES)",) \
+RAG_FILTER_ARGS = $(if $(RAG_MAX_FILE_BYTES),--max-file-bytes "$(RAG_MAX_FILE_BYTES)",) \
 	$(foreach glob,$(RAG_INCLUDE_GLOBS_LIST),--include-glob "$(glob)") \
 	$(foreach glob,$(RAG_EXCLUDE_GLOBS_LIST),--exclude-glob "$(glob)")
+RAG_SCOPE_ARGS = $(if $(RAG_PROFILE),--profile "$(RAG_PROFILE)",) \
+	$(if $(RAG_DOCS_MODE),--docs-mode "$(RAG_DOCS_MODE)",) \
+	$(RAG_FILTER_ARGS)
 
 # =============================================================================
 # DETECÇÃO DE PLATAFORMA
@@ -91,7 +91,7 @@ endif
 help:
 	@echo ""
 	@echo "$(CYAN)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.0 (DEV)            ║$(NC)"
+	@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.1 (DEV)            ║$(NC)"
 	@echo "$(CYAN)║  PM2-First • Bootstrap-Ready • Production-Ready             ║$(NC)"
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
@@ -150,21 +150,34 @@ help:
 	@echo "  $(CYAN)make test-coverage$(NC)     Com coverage"
 	@echo ""
 	@echo "$(BLUE)$(BOLD)🧠 RAG & MCP:$(NC)"
-	@echo "  $(CYAN)make rag-health$(NC)        Health do RAG"
-	@echo "  $(CYAN)make rag-index$(NC)         Reindexação RAG"
+	@echo "  $(CYAN)make rag-help$(NC)          Guia detalhado de operações RAG"
+	@echo "  $(CYAN)make rag-health$(NC)        Health do RAG (estado do índice)"
+	@echo "  $(CYAN)make rag-index$(NC)         Reindexação com argumentos dinâmicos"
+	@echo "  $(CYAN)make rag-index-code-config$(NC)  Indexar só código/config (sem docs)"
+	@echo "  $(CYAN)make rag-index-docs$(NC)    Indexar somente documentação"
 	@echo "  $(CYAN)make rag-ask QUERY='...'$(NC)    Pergunta via RAG"
 	@echo "  $(CYAN)make rag-hybrid QUERY='...'$(NC) Busca híbrida RAG"
 	@echo "  $(CYAN)make rag-expand CHUNK_ID='...'$(NC) Expandir chunk por linhas/símbolo"
 	@echo "  $(CYAN)make rag-reset$(NC)         Reset de índices RAG"
 	@echo "  $(CYAN)make rag-watch$(NC)         Watch incremental contínuo do RAG"
-	@echo "  $(CYAN)make rag-full-rebuild$(NC)  Reset + reindex completo"
+	@echo "  $(CYAN)make rag-full-rebuild$(NC)  Reset + reindex (escopo configurável)"
 	@echo "  $(CYAN)make rag-rebuild-zero$(NC)  Pipeline canônico completo (PM2/MCP/RAG)"
+	@echo "  $(CYAN)make rag-rebuild-code-config$(NC) Rebuild zero focado em código/config"
+	@echo "  $(CYAN)make rag-rebuild-code-config-strict$(NC) Rebuild estrito por extensões"
+	@echo "  $(CYAN)make rag-preflight$(NC)     MCP + LSP + preflight semântico + health"
 	@echo "  $(CYAN)make audit-preflight$(NC)   Preflight semântico estruturado (JSON)"
+	@echo "  $(CYAN)make audit-help$(NC)        Guia detalhado de operações de auditoria"
 	@echo "  $(CYAN)make audit-ready$(NC)       Checklist de prontidão antes da auditoria"
 	@echo "  $(CYAN)make audit-shadow$(NC)      Auditoria rápida em modo shadow gate"
 	@echo "  $(CYAN)make audit-quick$(NC)       Auditoria bug-first rápida (delta + ETA/progresso)"
+	@echo "  $(CYAN)make audit-quick-skip-refresh$(NC) Quick sem refresh de contexto"
 	@echo "  $(CYAN)make audit-deep$(NC)        Auditoria bug-first completa local (com proposals)"
-	@echo "  $(CYAN)make audit-nightly$(NC)     Auditoria noturna v3.2 (contracts + chaos + shadow gate)"
+	@echo "  $(CYAN)make audit-nightly$(NC)     Auditoria noturna completa (com refresh/docs)"
+	@echo "  $(MAGENTA)$(BOLD)make audit-nightly-max-no-docs$(NC) Nightly máxima sem refresh (deep + diffs + chaos + all)"
+	@echo "  $(CYAN)make audit-nightly-no-docs$(NC)   Nightly sem refresh/docs (mais rápido)"
+	@echo "  $(CYAN)make audit-run-last$(NC)    Mostra o diretório do último run"
+	@echo "  $(CYAN)make audit-progress RUN_ID=<run_id>$(NC)  Lê progress.json de um run"
+	@echo "  $(CYAN)make audit-events-tail RUN_ID=<run_id>$(NC) Tail de events.jsonl"
 	@echo "  $(CYAN)make rag-index RAG_DOCS_MODE=exclude$(NC)  Indexar sem MD/MDX"
 	@echo "  $(CYAN)make rag-index RAG_DOCS_MODE=only$(NC)     Indexar somente MD/MDX"
 	@echo "  $(CYAN)make rag-watch RAG_INCLUDE_GLOBS='src/**,config/**'$(NC)  Escopo custom"
@@ -205,18 +218,18 @@ info:
 	@echo "  npm:  $(GREEN)$$($(NPM) --version 2>/dev/null || echo 'não instalado')$(NC)"
 	@echo "  PM2:  $(GREEN)$$($(PM2) --version 2>/dev/null || echo 'não disponível')$(NC)"
 	@echo "  Diretório: $(BOLD)$$(pwd)$(NC)"
-	@echo "  Makefile: $(BOLD)v4.0.0$(NC)"
+	@echo "  Makefile: $(BOLD)v4.1.0$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Novos pacotes (v4.0):$(NC)"
+	@echo "$(YELLOW)Pacotes base instalados no projeto:$(NC)"
 	@echo "  • $(GREEN)chalk$(NC) (^4.1.2) - Terminal colors"
 	@echo "  • $(GREEN)dotenv$(NC) (^16.6.1) - ENV loader"
 	@echo "  • $(GREEN)winston$(NC) (^3.19.0) - Logger estruturado"
 	@echo ""
 
 version:
-	@echo "Makefile v4.0.0 — DEV / Bootstrap-Ready / Production-Ready"
-	@echo "Data: 2026-02-02"
-	@echo "Targets: 70+ | Aliases: 13 | Coverage: 95%"
+	@echo "Makefile v4.1.0 — DEV / Bootstrap-Ready / Production-Ready"
+	@echo "Data: 2026-02-15"
+	@echo "Targets: 80+ | Aliases: 13 | Coverage: 97%"
 
 # =============================================================================
 # 1️⃣ DESCOBERTA DE AMBIENTE (somente leitura)
@@ -540,7 +553,44 @@ test-all: test test-unit test-integration test-e2e
 # 9️⃣.1 RAG & MCP
 # =============================================================================
 
-.PHONY: mcp-diagnose lsp-health semantic-preflight rag-health rag-index rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero
+.PHONY: mcp-diagnose lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
+
+rag-help:
+	@echo ""
+	@echo "$(BLUE)$(BOLD)🧠 RAG — Guia Operacional$(NC)"
+	@echo "  1) Pré-check:      make rag-preflight"
+	@echo "  2) Build code:     make rag-rebuild-code-config"
+	@echo "  3) Build docs:     make rag-index-docs"
+	@echo "  4) Saúde final:    make rag-health"
+	@echo ""
+	@echo "$(CYAN)Escopo dinâmico$(NC): RAG_PROFILE, RAG_DOCS_MODE, RAG_MAX_FILE_BYTES,"
+	@echo "                  RAG_INCLUDE_GLOBS='src/**,scripts/**', RAG_EXCLUDE_GLOBS='docs/**'"
+	@echo ""
+	@echo "$(CYAN)Exemplo$(NC): make rag-index RAG_PROFILE=full RAG_DOCS_MODE=exclude RAG_INCLUDE_GLOBS='src/**,scripts/**'"
+	@echo ""
+
+audit-help:
+	@echo ""
+	@echo "$(BLUE)$(BOLD)🛡️ Audit — Guia Operacional$(NC)"
+	@echo "  1) Pré-check:      make audit-ready"
+	@echo "  2) Delta rápido:   make audit-quick"
+	@echo "  3) Profundo local: make audit-deep"
+	@echo "  4) Noturno:        make audit-nightly"
+	@echo "  5) $(BOLD)Máximo sem rebuild de contexto$(NC): make audit-nightly-max-no-docs"
+	@echo ""
+	@echo "$(CYAN)Observabilidade$(NC): make audit-run-last | make audit-progress RUN_ID='<id>' | make audit-events-tail RUN_ID='<id>'"
+	@echo ""
+	@echo "$(CYAN)Modo rápido sem docs/refresh$(NC): make audit-nightly-no-docs"
+	@echo "$(CYAN)Modo máximo sem docs/refresh$(NC): make audit-nightly-max-no-docs"
+	@echo "$(CYAN)Comando executado$(NC): npm run audit:nightly -- --refresh-context skip --proposal-depth deep --propose-diffs true --focus all --contracts-mode hybrid --chaos-profile full --cloud-fallback on --contract-coverage-report true --log-format jsonl --heartbeat-ms 5000 --shadow-gate true"
+	@echo ""
+
+rag-preflight:
+	@echo "$(CYAN)🧭 RAG preflight (MCP + LSP + preflight semântico + health)$(NC)"
+	@$(NPM) run mcp:diagnose
+	@$(NPM) run lsp:health -- --json
+	@$(NPM) run audit:preflight
+	@$(NPM) run rag:health -- --json || true
 
 mcp-diagnose:
 	@echo "$(CYAN)🔍 Diagnóstico MCP$(NC)"
@@ -561,6 +611,14 @@ rag-health:
 rag-index:
 	@echo "$(CYAN)📚 RAG Index$(NC)"
 	@$(NPM) run rag:index -- $(RAG_SCOPE_ARGS)
+
+rag-index-code-config:
+	@echo "$(CYAN)📚 RAG Index (code/config only, sem docs)$(NC)"
+	@$(NPM) run rag:index -- --profile full --docs-mode exclude $(RAG_FILTER_ARGS)
+
+rag-index-docs:
+	@echo "$(CYAN)📚 RAG Index (docs only)$(NC)"
+	@$(NPM) run rag:index -- --profile full --docs-mode only $(RAG_FILTER_ARGS)
 
 rag-ask:
 	@if [ -z "$(QUERY)" ]; then \
@@ -599,6 +657,19 @@ rag-full-rebuild:
 rag-rebuild-zero:
 	@echo "$(YELLOW)♻️  RAG Rebuild Zero (PM2/MCP/RAG pipeline)$(NC)"
 	@$(NPM) run rag:rebuild:zero -- $(RAG_SCOPE_ARGS)
+
+rag-rebuild-code-config:
+	@echo "$(YELLOW)♻️  RAG Rebuild Zero (code/config, sem docs)$(NC)"
+	@$(NPM) run rag:rebuild:code-config
+
+rag-rebuild-code-config-strict:
+	@echo "$(YELLOW)♻️  RAG Rebuild Zero estrito (extensões de código/config)$(NC)"
+	@$(NPM) run rag:rebuild:zero -- --profile full --docs-mode exclude \
+		--include-glob "**/*.js" --include-glob "**/*.mjs" --include-glob "**/*.cjs" \
+		--include-glob "**/*.ts" --include-glob "**/*.json" \
+		--include-glob "**/*.yml" --include-glob "**/*.yaml" \
+		--include-glob "**/*.sh" --include-glob "**/*.ps1" \
+		--include-glob "**/Dockerfile" --include-glob "**/Makefile"
 
 # =============================================================================
 # 🔟 FORMATAÇÃO & LINT
@@ -774,7 +845,7 @@ check-bindings:
 # 1️⃣3️⃣ DEVELOPMENT SHORTCUTS
 # =============================================================================
 
-.PHONY: dev dev-debug quick-test quick-check check-forbidden audit-preflight audit-ready audit-shadow audit-quick audit-deep audit-nightly
+.PHONY: dev dev-debug quick-test quick-check check-forbidden audit-preflight audit-ready audit-shadow audit-quick audit-quick-skip-refresh audit-deep audit-nightly audit-nightly-no-docs audit-nightly-max-no-docs audit-run-last audit-progress audit-events-tail
 
 dev:
 	@echo "$(GREEN)🚀 Iniciando modo desenvolvimento$(NC)"
@@ -809,13 +880,45 @@ audit-quick:
 	@echo "$(CYAN)🧪 Auditoria bug-first rápida (delta)$(NC)"
 	@$(NPM) run audit:quick
 
+audit-quick-skip-refresh:
+	@echo "$(CYAN)🧪 Auditoria rápida (sem refresh de contexto)$(NC)"
+	@$(NPM) run audit:quick -- --refresh-context skip
+
 audit-deep:
 	@echo "$(CYAN)🧪 Auditoria bug-first completa local$(NC)"
 	@$(NPM) run audit:deep
 
 audit-nightly:
-	@echo "$(CYAN)🌙 Auditoria noturna v3.2 (contracts + chaos + shadow gate + logs)$(NC)"
+	@echo "$(CYAN)🌙 Auditoria noturna completa (refresh + docs + chaos + logs)$(NC)"
 	@$(NPM) run audit:nightly
+
+audit-nightly-no-docs:
+	@echo "$(CYAN)🌙 Auditoria noturna sem refresh/docs (mais rápida)$(NC)"
+	@$(NPM) run audit:nightly -- --refresh-context skip
+
+audit-nightly-max-no-docs:
+	@echo "$(MAGENTA)$(BOLD)🌙 Auditoria noturna máxima (sem refresh/rebuild de contexto)$(NC)"
+	@echo "$(CYAN)Escopo$(NC): análise completa + triagem deep + diffs sugeridos + chaos + contract coverage + shadow gate"
+	@echo "$(CYAN)Quando usar$(NC): varredura profunda de bugs/gaps/falhas com máximo detalhe, sem custo de reindexação RAG/docs nesta execução"
+	@$(NPM) run audit:nightly -- --refresh-context skip --proposal-depth deep --propose-diffs true --focus all --contracts-mode hybrid --chaos-profile full --cloud-fallback on --contract-coverage-report true --log-format jsonl --heartbeat-ms 5000 --shadow-gate true
+
+audit-run-last:
+	@echo "$(CYAN)📁 Último run de auditoria$(NC)"
+	@ls -1dt artifacts/audit/runs/* 2>/dev/null | head -n 1 || echo "$(YELLOW)Sem runs em artifacts/audit/runs$(NC)"
+
+audit-progress:
+	@if [ -z "$(RUN_ID)" ]; then \
+		echo "$(RED)❌ Informe RUN_ID. Ex: make audit-progress RUN_ID='WAVE_AUDIT_NIGHTLY_2026-02-15T13-27-53-018Z'$(NC)"; \
+		exit 1; \
+	fi
+	@cat "artifacts/audit/runs/$(RUN_ID)/progress.json"
+
+audit-events-tail:
+	@if [ -z "$(RUN_ID)" ]; then \
+		echo "$(RED)❌ Informe RUN_ID. Ex: make audit-events-tail RUN_ID='WAVE_AUDIT_NIGHTLY_2026-02-15T13-27-53-018Z'$(NC)"; \
+		exit 1; \
+	fi
+	@tail -f "artifacts/audit/runs/$(RUN_ID)/events.jsonl"
 
 # =============================================================================
 # 1️⃣4️⃣ GIT & QUALIDADE
@@ -885,5 +988,5 @@ docs-list:
 	@ls -1 docs/integration/*.md 2>/dev/null || echo "$(YELLOW)Sem arquivos .md em docs/integration/$(NC)"
 
 # =============================================================================
-# FIM DO MAKEFILE v4.0.0
+# FIM DO MAKEFILE v4.1.0
 # =============================================================================

@@ -41,8 +41,13 @@ async function callMcp(method, params, id) {
 
 /**
  * @param {AuditFindingV3} finding
+ * @param {{
+ *   proposeDiffs: boolean,
+ *   proposalDepth: 'basic'|'standard'|'deep',
+ *   masterPath?: string,
+ * }} options
  */
-function deterministicFallback(finding) {
+function deterministicFallback(finding, options) {
     if (!finding.proposal || typeof finding.proposal !== 'object') {
         finding.proposal = {
             summary: null,
@@ -98,29 +103,60 @@ function deterministicFallback(finding) {
         finding.enforcement_state = 'warn';
     }
 
-    if (!finding.proposal?.summary) {
-        finding.proposal.summary = 'Correção local orientada por evidência automatizada.';
-    }
+    const contextPack = buildContextPack(finding, {
+        rag: null,
+        lsp: null,
+        masterPath: options.masterPath,
+    });
+    const ranked = rankRootCauses(contextPack);
+    const enriched = buildProposalV3(finding, {
+        rankedCauses: ranked,
+        proposeDiffs: options.proposeDiffs,
+        depth: options.proposalDepth,
+        contextPack,
+    });
 
-    if (!Array.isArray(finding.proposal?.test_plan) || finding.proposal.test_plan.length === 0) {
-        finding.proposal.test_plan = buildTestPlan(finding);
-    }
-    if (!Array.isArray(finding.proposal?.validation_commands)) {
-        finding.proposal.validation_commands = ['npm run audit:quick -- --focus bug-first'];
-    }
-
-    if (!finding.proposal_context || typeof finding.proposal_context !== 'object') {
-        finding.proposal_context = {
-            code_context_used: false,
-            rag_scope: null,
-            lsp_signal_quality: finding.source_tool.includes('lsp') ? 'medium' : 'low',
-        };
-    }
+    finding.root_cause = finding.root_cause || enriched.root_cause;
+    finding.root_cause_candidates = enriched.root_cause_candidates;
+    finding.confidence_score = Math.max(Number(finding.confidence_score || 0), Number(enriched.confidence_score || 0));
+    finding.proposal.depth = enriched.proposal.depth;
+    finding.proposal.summary = enriched.proposal.summary || finding.proposal.summary || 'Correção local orientada por evidência automatizada.';
+    finding.proposal.suggested_diff = enriched.proposal.suggested_diff || finding.proposal.suggested_diff;
+    finding.proposal.files_touched = enriched.proposal.files_touched || finding.proposal.files_touched;
+    finding.proposal.test_plan = Array.isArray(enriched.proposal.test_plan) && enriched.proposal.test_plan.length > 0
+        ? enriched.proposal.test_plan
+        : buildTestPlan(finding);
+    finding.proposal.rollback_hint = enriched.proposal.rollback_hint || finding.proposal.rollback_hint;
+    finding.proposal.validation_commands = Array.isArray(enriched.proposal.validation_commands) && enriched.proposal.validation_commands.length > 0
+        ? enriched.proposal.validation_commands
+        : ['npm run audit:quick -- --focus bug-first'];
+    finding.proposal_context = enriched.proposal_context || {
+        code_context_used: false,
+        rag_scope: null,
+        lsp_signal_quality: finding.source_tool.includes('lsp') ? 'medium' : 'low',
+    };
 }
 
 /**
  * @param {AuditFindingV3[]} findings
- * @param {{ enabled?: boolean, maxMcpFindings?: number, proposeDiffs?: boolean, focusMode?: 'bug-first'|'all', proposalDepth?: 'basic'|'standard'|'deep', cloudFallback?: 'off'|'on', masterPath?: string }} [options]
+ * @param {{
+ *   enabled?: boolean,
+ *   maxMcpFindings?: number,
+ *   proposeDiffs?: boolean,
+ *   focusMode?: 'bug-first'|'all',
+ *   proposalDepth?: 'basic'|'standard'|'deep',
+ *   cloudFallback?: 'off'|'on',
+ *   masterPath?: string,
+ *   maxDurationMs?: number,
+ *   onProgress?: (payload: {
+ *     phase: 'triage-intelligence',
+ *     processed: number,
+ *     total: number,
+ *     percent: number,
+ *     mode: 'mcp'|'fallback'|'disabled'|'timeout',
+ *     findingId: string|null
+ *   }) => void,
+ * }} [options]
  * @returns {Promise<{ findings: AuditFindingV3[], usedMcp: boolean, degraded: boolean, warnings: string[] }>}
  */
 export async function triageFindings(findings, options = {}) {
@@ -130,6 +166,9 @@ export async function triageFindings(findings, options = {}) {
     const focusMode = options.focusMode === 'all' ? 'all' : 'bug-first';
     const proposalDepth = ['basic', 'standard', 'deep'].includes(options.proposalDepth || '') ? options.proposalDepth : 'standard';
     const cloudFallback = options.cloudFallback === 'on' ? 'on' : 'off';
+    const maxDurationMs = Number.isFinite(options.maxDurationMs) ? Number(options.maxDurationMs) : 0;
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+    const startedAt = Date.now();
 
     /** @type {string[]} */
     const warnings = [];
@@ -137,9 +176,23 @@ export async function triageFindings(findings, options = {}) {
     if (!enabled || findings.length === 0) {
         const enriched = findings.map(finding => {
             const working = { ...finding };
-            deterministicFallback(working);
+            deterministicFallback(working, {
+                proposeDiffs,
+                proposalDepth,
+                masterPath: options.masterPath,
+            });
             return working;
         });
+        if (onProgress) {
+            onProgress({
+                phase: 'triage-intelligence',
+                processed: enriched.length,
+                total: findings.length,
+                percent: findings.length > 0 ? 100 : 0,
+                mode: 'disabled',
+                findingId: null,
+            });
+        }
         return { findings: enriched, usedMcp: false, degraded: true, warnings };
     }
 
@@ -153,17 +206,67 @@ export async function triageFindings(findings, options = {}) {
         }
         const enriched = findings.map(finding => {
             const working = { ...finding };
-            deterministicFallback(working);
+            deterministicFallback(working, {
+                proposeDiffs,
+                proposalDepth,
+                masterPath: options.masterPath,
+            });
             return working;
         });
+        if (onProgress) {
+            onProgress({
+                phase: 'triage-intelligence',
+                processed: enriched.length,
+                total: findings.length,
+                percent: findings.length > 0 ? 100 : 0,
+                mode: 'fallback',
+                findingId: null,
+            });
+        }
         return { findings: enriched, usedMcp: false, degraded: true, warnings };
     }
 
     let requestId = 10;
     /** @type {AuditFindingV3[]} */
     const enriched = [];
+    let timedOut = false;
 
     for (let index = 0; index < findings.length; index += 1) {
+        if (maxDurationMs > 0 && Date.now() - startedAt >= maxDurationMs) {
+            timedOut = true;
+            warnings.push(`Triage timeout atingido (${maxDurationMs}ms); fallback determinístico aplicado no restante.`);
+            for (let rest = index; rest < findings.length; rest += 1) {
+                const pending = { ...findings[rest] };
+                deterministicFallback(pending, {
+                    proposeDiffs,
+                    proposalDepth,
+                    masterPath: options.masterPath,
+                });
+                const criticalType = pending.type === 'bug' || pending.type === 'gap' || pending.type === 'falha de contrato';
+                const criticalSeverity = pending.severity === 'P0' || pending.severity === 'P1';
+                pending.finding_channel = focusMode === 'bug-first'
+                    ? criticalType && criticalSeverity
+                        ? 'primary'
+                        : 'backlog'
+                    : pending.finding_channel || 'primary';
+                enriched.push(pending);
+                if (onProgress) {
+                    const processed = enriched.length;
+                    const total = findings.length;
+                    const percent = total > 0 ? Number(((processed / total) * 100).toFixed(2)) : 100;
+                    onProgress({
+                        phase: 'triage-intelligence',
+                        processed,
+                        total,
+                        percent,
+                        mode: 'timeout',
+                        findingId: pending.id || null,
+                    });
+                }
+            }
+            break;
+        }
+
         const finding = findings[index];
         const working = {
             ...finding,
@@ -261,11 +364,29 @@ export async function triageFindings(findings, options = {}) {
                 : 'backlog'
             : working.finding_channel || 'primary';
 
-        deterministicFallback(working);
+        deterministicFallback(working, {
+            proposeDiffs,
+            proposalDepth,
+            masterPath: options.masterPath,
+        });
         enriched.push(working);
+
+        if (onProgress) {
+            const processed = enriched.length;
+            const total = findings.length;
+            const percent = total > 0 ? Number(((processed / total) * 100).toFixed(2)) : 100;
+            onProgress({
+                phase: 'triage-intelligence',
+                processed,
+                total,
+                percent,
+                mode: index < maxMcpFindings ? 'mcp' : 'fallback',
+                findingId: working.id || null,
+            });
+        }
 
         await sleep(20);
     }
 
-    return { findings: enriched, usedMcp: true, degraded: false, warnings };
+    return { findings: enriched, usedMcp: true, degraded: timedOut, warnings };
 }

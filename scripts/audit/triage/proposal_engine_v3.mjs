@@ -22,6 +22,9 @@ export function buildProposalV3(finding, options = {}) {
         hasRuntimeEvidence: /runtime|test|smoke|chaos/i.test(String(finding.source_tool || '')),
         sourceConvergence: ranked.length,
     });
+    const historyHint = Array.isArray(options.contextPack?.history) && options.contextPack.history.length > 0
+        ? String(options.contextPack.history[0]).slice(0, 180)
+        : null;
     const testPlan = buildTestPlan(finding);
     const validationCommands = [];
     if (finding.source_tool?.includes('check:forbidden') || finding.contract_id?.startsWith('CONTRACT-STATIC-')) {
@@ -33,11 +36,18 @@ export function buildProposalV3(finding, options = {}) {
     if (finding.source_tool?.includes('test') || finding.source_tool?.includes('runtime') || finding.source_tool?.includes('chaos')) {
         validationCommands.push('npm run test:regression');
     }
+    if (finding.contract_id === 'CONTRACT-STATIC-PROCESS-EXIT') {
+        validationCommands.push('npm run test:regression -- tests/regression/test_wave11_main_server_bootstrap_unification.spec.js');
+    }
+    if (finding.contract_id === 'CONTRACT-STATIC-HARDCODED-PORTS') {
+        validationCommands.push('npm run test:integration -- tests/integration/server/test_server_engine_tls.spec.js');
+    }
     validationCommands.push('npm run audit:quick -- --focus bug-first');
 
     const summary = [
         `Restaurar contrato ${finding.contract_id || finding.source_tool}.`,
         `Causa principal: ${topCause}`,
+        historyHint ? `Histórico relacionado: ${historyHint}` : null,
         codeContextUsed
             ? 'Contexto local de código foi utilizado para orientar patch e validação.'
             : 'Aplicar correção localizada e validar regressão.',

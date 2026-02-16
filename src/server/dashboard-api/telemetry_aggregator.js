@@ -216,6 +216,7 @@ class TelemetryAggregator {
             sample_number: this.totalSamples,
 
             cpu: {
+                usage_percent: Number(hwMetrics.cpu.usage_percent) || 0,
                 load_1min: parseFloat(hwMetrics.cpu.load_1min) || 0,
                 load_5min: parseFloat(hwMetrics.cpu.load_5min) || 0,
                 load_15min: parseFloat(hwMetrics.cpu.load_15min) || 0,
@@ -266,7 +267,7 @@ class TelemetryAggregator {
      * Adiciona métricas aos ring buffers.
      */
     _addToBuffers(metrics) {
-        this.cpuHistory.push(metrics.cpu.load_1min);
+        this.cpuHistory.push(metrics.cpu.usage_percent);
         this.memoryHistory.push(metrics.memory.usage_percent);
         this.heapHistory.push(metrics.heap.usage_percent);
         this.eventLoopLagHistory.push(metrics.event_loop.lag_ms);
@@ -280,6 +281,12 @@ class TelemetryAggregator {
      */
     _checkThresholds(metrics) {
         const checks = [
+            {
+                name: 'high_cpu',
+                condition: metrics.cpu.usage_percent > this.alertThresholds.cpu_percent,
+                message: `CPU usage at ${metrics.cpu.usage_percent}%`,
+                severity: 'warning'
+            },
             {
                 name: 'high_memory',
                 condition: metrics.memory.usage_percent > this.alertThresholds.memory_percent,

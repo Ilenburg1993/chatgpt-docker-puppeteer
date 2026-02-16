@@ -820,5 +820,9 @@
   // ============================================================================
   "cSpell.enabled": false,
   "diffEditor.codeLens": true,
-  "geminicodeassist.outlines.automaticOutlineGeneration": true
+  "geminicodeassist.outlines.automaticOutlineGeneration": true,
+  "chat.agentSkillsLocations": {
+    ".codex/skills": true,
+    "~/.codex/skills": true
+  }
 }
