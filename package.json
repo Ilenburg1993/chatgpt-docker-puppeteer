@@ -199,7 +199,7 @@
     "eslint-plugin-complexity": "^1.0.2",
     "eslint-plugin-i18next": "^6.1.3",
     "eslint-plugin-jsonc": "^2.21.1",
-    "eslint-plugin-n": "^17.23.2",
+    "eslint-plugin-n": "^17.24.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.3.0",
     "graphviz-cli": "^2.0.0",
