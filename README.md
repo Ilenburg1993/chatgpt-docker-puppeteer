@@ -106,6 +106,62 @@ make up
 make logs
 ```
 
+## 🏗️ Build e Distribuição
+
+### Build de Desenvolvimento
+```bash
+# Build completo com dependências de desenvolvimento
+npm run build
+
+# Resultado: diretório `dist/` (~850MB) pronto para execução
+```
+
+### Build de Produção
+```bash
+# Build otimizado para produção (NODE_ENV=production)
+npm run build:prod
+
+# Resultado: diretório `dist/` com bundle minificado
+```
+
+### Executando o Build
+```bash
+# Desenvolvimento
+cd dist && node index.js
+
+# Produção (recomendado)
+cd dist && node start.js
+
+# Com PM2
+cd dist && npx pm2 start ecosystem.config.cjs
+```
+
+### Build Executável (Standalone)
+```bash
+# Criar executáveis nativos para Linux e Windows
+npm run build:exe
+
+# Resultado: diretório `release/` com binários executáveis
+# - release/chatgpt-docker-puppeteer-linux
+# - release/chatgpt-docker-puppeteer-win.exe
+```
+
+> **Nota**: O build executável usa Node.js 18 (via pkg) devido a limitações de compatibilidade com recursos modernos do Node.js 24+ (como top-level await). Os executáveis são totalmente funcionais mas usam uma versão ligeiramente mais antiga do runtime.
+
+### Estratégia de Build
+- **Copy-first**: Copia todos os arquivos fonte para `dist/`
+- **Bundle inteligente**: Usa ESBuild para otimizar módulos compatíveis
+- **External dependencies**: Mantém dependências nativas externas (@pm2/blessed, term.js, pty.js, @lancedb/lancedb-*)
+- **Node.js 24+**: Requer Node.js 24 ou superior
+- **ESM obrigatório**: Mantém compatibilidade com módulos ES
+- **✅ Validado**: Build de produção testado e funcional
+- **⚠️ Executável**: Usa Node.js 18 (limitações do pkg com recursos modernos)
+
+### Distribuição Recomendada
+1. **Docker** (recomendado para produção)
+2. **Bundle otimizado** (`npm run build:prod`) - ✅ Totalmente funcional
+3. **Executável standalone** (`npm run build:exe`) - ⚠️ Funcional mas limitado
+
 ## ⚙️ Configuração
 
 ### Variáveis de Ambiente

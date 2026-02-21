@@ -1,7 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { log } from '#core/logger';
 import denyIfDelegated from '../../middleware/deny_if_delegated.js';
+import { authenticate, optionalAuthenticate } from '../../middleware/auth.js';
 import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
 import dashboardTasksRouter from './dashboard_tasks.js';
 import dashboardMissionsRouter from './dashboard_missions.js';
@@ -20,6 +22,102 @@ function getBridgeMetrics() {
 }
 
 /* --------------------------------------------------------------------------
+   AUTHENTICATION - Sistema de Autenticação JWT
+-------------------------------------------------------------------------- */
+
+/**
+ * POST /api/dashboard/auth/login
+ * Faz login e retorna token JWT
+ */
+router.post('/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        // Validação básica (em produção, verificar contra banco de dados)
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username e password são obrigatórios',
+                request_id: req.id
+            });
+        }
+
+        // Autenticação simples (em produção, implementar verificação real)
+        const validUsers = {
+            'admin': { password: 'admin123', role: 'admin' },
+            'user': { password: 'user123', role: 'user' }
+        };
+
+        const userConfig = validUsers[username];
+        if (!userConfig || userConfig.password !== password) {
+            log('WARN', `[AUTH] Login failed for user: ${username}`, req.id);
+            return res.status(401).json({
+                success: false,
+                error: 'Credenciais inválidas',
+                request_id: req.id
+            });
+        }
+
+        // Gerar token JWT
+        const token = jwt.sign(
+            {
+                id: username,
+                username: username,
+                role: userConfig.role
+            },
+            process.env.JWT_SECRET || 'default-secret-change-in-production',
+            { expiresIn: '24h' }
+        );
+
+        log('INFO', `[AUTH] User logged in: ${username}`, req.id);
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: username,
+                username: username,
+                role: userConfig.role
+            },
+            expires_in: 24 * 60 * 60, // 24 horas em segundos
+            request_id: req.id
+        });
+    } catch (err) {
+        log('ERROR', `[AUTH] Login error: ${err.message}`, req.id);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno no login',
+            request_id: req.id
+        });
+    }
+});
+
+/**
+ * POST /api/dashboard/auth/logout
+ * Invalida token (cliente deve remover do localStorage)
+ */
+router.post('/auth/logout', optionalAuthenticate, (req, res) => {
+    const username = req.user?.username || 'unknown';
+    log('INFO', `[AUTH] User logged out: ${username}`, req.id);
+    res.json({
+        success: true,
+        message: 'Logout realizado com sucesso',
+        request_id: req.id
+    });
+});
+
+/**
+ * GET /api/dashboard/auth/me
+ * Retorna informações do usuário autenticado
+ */
+router.get('/auth/me', authenticate, (req, res) => {
+    res.json({
+        success: true,
+        user: req.user,
+        request_id: req.id
+    });
+});
+
+/* --------------------------------------------------------------------------
    TASKS + MISSIONS (SSOT-first)
 -------------------------------------------------------------------------- */
 
@@ -31,7 +129,7 @@ router.use(dashboardEventsRouter);
    TELEMETRY - Métricas em Tempo Real (compat)
 -------------------------------------------------------------------------- */
 
-router.get('/telemetry/current', async (req, res) => {
+router.get('/telemetry/current', authenticate, async (req, res) => {
     try {
         const metrics = await telemetryAggregator.getCurrent();
         res.json({ success: true, metrics, request_id: req.id });
@@ -82,7 +180,7 @@ router.get('/alerts', async (req, res) => {
     }
 });
 
-router.put('/alerts/thresholds', denyIfDelegated, async (req, res) => {
+router.put('/alerts/thresholds', authenticate, denyIfDelegated, async (req, res) => {
     try {
         const thresholds = req.body;
         telemetryAggregator.setAlertThresholds(thresholds);

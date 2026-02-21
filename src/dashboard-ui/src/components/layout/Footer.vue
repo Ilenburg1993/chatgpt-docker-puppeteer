@@ -1,13 +1,14 @@
 <script setup>
 import { useSocket } from '@/composables/useSocket';
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 const { isConnected } = useSocket();
 const version = ref('2.0.0');
 const uptime = ref('--');
+let uptimeTimer = null;
 
 onMounted(() => {
-    setInterval(() => {
+    uptimeTimer = setInterval(() => {
         const now = Date.now();
         const start = now - 3600000;
         const diff = Math.floor((now - start) / 1000);
@@ -15,6 +16,13 @@ onMounted(() => {
         const minutes = Math.floor((diff % 3600) / 60);
         uptime.value = `${hours}h ${minutes}m`;
     }, 60000);
+});
+
+onUnmounted(() => {
+    if (uptimeTimer) {
+        clearInterval(uptimeTimer);
+        uptimeTimer = null;
+    }
 });
 </script>
 

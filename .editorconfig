@@ -55,7 +55,7 @@ end_of_line = crlf
 # JavaScript / TypeScript — 4 espaços
 [*.{js,mjs,cjs,jsx,ts,tsx}]
 indent_size = 4
-quote_type = single
+#quote_type = single
 
 # Python — PEP 8
 [*.py]

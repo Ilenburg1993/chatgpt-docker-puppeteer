@@ -26,7 +26,7 @@ export async function collectArchitectureFindings(rootDir) {
     } catch (error) {
         errors.push({
             source: 'architecture-collector',
-            message: `Failed to analyze coupling: ${error.message}`
+            message: `Failed to analyze coupling: ${error.message}`,
         });
     }
 
@@ -39,7 +39,7 @@ export async function collectArchitectureFindings(rootDir) {
     } catch (error) {
         errors.push({
             source: 'architecture-collector',
-            message: `Failed to analyze circular dependencies: ${error.message}`
+            message: `Failed to analyze circular dependencies: ${error.message}`,
         });
     }
 
@@ -105,10 +105,10 @@ async function analyzeCircularDependencies(rootDir) {
         // Tentar usar madge se disponível
         const { execSync } = await import('node:child_process');
 
-        const madgeOutput = execSync('npx madge --circular --format json src/', {
+        const madgeOutput = execSync('npx madge --circular --format json src/ --exclude "^dashboard-ui/dist/"', {
             cwd: rootDir,
             encoding: 'utf8',
-            stdio: ['pipe', 'pipe', 'pipe']
+            stdio: ['pipe', 'pipe', 'pipe'],
         });
 
         const circularDeps = JSON.parse(madgeOutput);
@@ -135,7 +135,7 @@ async function analyzeCircularDependencies(rootDir) {
         // madge não disponível, skip
         warnings.push({
             source: 'architecture-circular-deps',
-            message: 'Madge não disponível para análise de dependências circulares (opcional)'
+            message: 'Madge não disponível para análise de dependências circulares (opcional)',
         });
     }
 
@@ -156,7 +156,8 @@ async function findJsFiles(dir) {
             const fullPath = path.join(currentDir, item);
             const stat = fs.statSync(fullPath);
 
-            if (stat.isDirectory() && !item.startsWith('.') && item !== 'node_modules') {
+            // skip build artifacts (dist) when scanning source files
+            if (stat.isDirectory() && !item.startsWith('.') && item !== 'node_modules' && item !== 'dist') {
                 scan(fullPath);
             } else if (stat.isFile() && (item.endsWith('.js') || item.endsWith('.mjs'))) {
                 files.push(fullPath);

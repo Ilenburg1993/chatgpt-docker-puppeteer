@@ -16,26 +16,43 @@ description: "Use for day-to-day operation of the audit pipeline: semantic prefl
 - `npm run audit:preflight`
 - Confirmar `components.pm2/mcp/rag/lsp.ok`.
 
-2. Execução por objetivo.
+2. Baseline operacional obrigatório (início da rodada).
+- `npm run daemon:status`
+- `npm run mcp:diagnose`
+- `npm run rag:health -- --json`
+- Registrar baseline no tracker:
+  - `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
+
+3. Execução por objetivo.
 - Rápida: `npm run audit:quick`
 - Shadow explícito: `npm run audit:quick:shadow`
 - Profunda: `npm run audit:deep`
 - Noturna: `npm run audit:nightly`
 
-3. Leitura de artefatos.
+4. Leitura de artefatos.
 - Pasta: `artifacts/audit/runs/<run_id>/`
 - Arquivos mínimos: `events.jsonl`, `progress.json`, `audit_report_*.json`, `summary.md`.
 
-4. Troubleshooting.
+5. Troubleshooting.
 - MCP: `npm run mcp:diagnose`
 - LSP funcional: `npm run lsp:health -- --json`
 - RAG: `npm run rag:health -- --json`
 
+6. Baseline final obrigatório (fim da rodada).
+- Reexecutar:
+  - `npm run daemon:status`
+  - `npm run mcp:diagnose`
+  - `npm run rag:health -- --json`
+- Atualizar tracker com delta início/fim e risco residual.
+
 ## Guardrails
 - Pipeline nesta fase é não-bloqueante, mas `shadow_gate.would_block=true` exige ação.
 - Não confiar em log solto; usar sempre JSON/artefatos como fonte primária.
+- Se `rag:health.ok=false`, seguir em modo lexical/fallback e marcar risco explicitamente no tracker.
+- Toda rodada deve gerar ou atualizar snapshot em `DOCUMENTAÇÃO/BUGS/rodadas/`.
 
 ## Done Criteria
 - Run finalizada com `report` válido.
 - `semantic_preflight` registrado.
 - `shadow_gate` e `gate_decision` presentes e coerentes.
+- Baseline de início/fim registrado em `CODEX_AUDIT_TRACKER.md`.

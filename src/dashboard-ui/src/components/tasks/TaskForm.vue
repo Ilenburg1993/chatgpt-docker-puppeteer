@@ -2,6 +2,7 @@
 import { reactive, ref, watch } from 'vue';
 import Button from '../ui/Button.vue';
 import Modal from '../ui/Modal.vue';
+import { useNotifications } from '../../composables/useNotifications.js';
 
 const props = defineProps({
     open: {
@@ -36,6 +37,8 @@ const errors = reactive({
 });
 
 const loading = ref(false);
+
+const { showError } = useNotifications();
 
 const agentOptions = [
     { value: 'chatgpt', label: 'ChatGPT' },
@@ -139,7 +142,10 @@ const handleSubmit = async () => {
         emit('submit', taskData);
         handleClose();
     } catch (error) {
-        console.error('Error submitting form:', error);
+        const errorMessage = error?.response?.data?.message ||
+                           error?.message ||
+                           'Erro ao enviar formulário. Tente novamente.';
+        showError(errorMessage);
     } finally {
         loading.value = false;
     }

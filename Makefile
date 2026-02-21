@@ -794,7 +794,7 @@ validate-env:
 validate-powershell-bom:
 	@echo "$(CYAN)🔍 Validando BOM em scripts PowerShell$(NC)"
 	@ERRORS=0; \
-	for file in $$(find . -name '*.ps1' -not -path './node_modules/*' -not -path './backups/*'); do \
+	for file in $$(find . -name '*.ps1' -not -path './node_modules/*' -not -path './backups/*' -not -path './dist/*' -not -path './dashboard-ui/dist/*'); do \
 		if ! file "$$file" 2>/dev/null | grep -qE 'UTF-8.*(with BOM)|UTF-8 Unicode text'; then \
 			echo "$(RED)❌ Missing/Invalid BOM: $$file$(NC)"; \
 			ERRORS=$$((ERRORS+1)); \

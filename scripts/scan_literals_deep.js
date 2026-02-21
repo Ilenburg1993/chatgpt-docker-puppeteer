@@ -19,7 +19,13 @@ function getAllJsFiles(dir) {
         const entries = fs.readdirSync(d, { withFileTypes: true });
         entries.forEach(entry => {
             const fullPath = path.join(d, entry.name);
-            if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+            // Skip dist/build artifacts when recursing
+            if (
+                entry.isDirectory() &&
+                !entry.name.startsWith('.') &&
+                entry.name !== 'node_modules' &&
+                entry.name !== 'dist'
+            ) {
                 walk(fullPath);
             } else if (entry.isFile() && entry.name.endsWith('.js')) {
                 files.push(fullPath);
@@ -70,7 +76,7 @@ const analysis = {
     equalityComparisons: { values: new Map(), contexts: [] },
 
     // Switch cases
-    switchCases: { values: new Map(), contexts: [] }
+    switchCases: { values: new Map(), contexts: [] },
 };
 
 // ============================================
@@ -115,7 +121,7 @@ const patterns = {
     switchCase: /case\s+['"]([A-Z_]+)['"]/g,
 
     // Object property values (type, kind, action, etc.)
-    objectProp: /(\w+)\s*:\s*['"]([A-Z_]+|[a-z_]+)['"]/g
+    objectProp: /(\w+)\s*:\s*['"]([A-Z_]+|[a-z_]+)['"]/g,
 };
 
 // ============================================
@@ -313,7 +319,7 @@ if (analysis.taskStates.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/tasks.js',
         exports: ['TASK_STATES'],
-        values: Array.from(analysis.taskStates.values.keys())
+        values: Array.from(analysis.taskStates.values.keys()),
     });
 }
 
@@ -322,7 +328,7 @@ if (allNervEvents.size > 0) {
     recommendations.push({
         file: 'src/core/constants/nerv.js',
         exports: ['NERV_EVENTS'],
-        values: Array.from(allNervEvents)
+        values: Array.from(allNervEvents),
     });
 }
 
@@ -330,7 +336,7 @@ if (analysis.connectionModes.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/browser.js',
         exports: ['CONNECTION_MODES'],
-        values: Array.from(analysis.connectionModes.values.keys())
+        values: Array.from(analysis.connectionModes.values.keys()),
     });
 }
 
@@ -338,7 +344,7 @@ if (analysis.stateAssignments.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/browser.js',
         exports: ['BROWSER_STATES'],
-        values: Array.from(analysis.stateAssignments.values.keys())
+        values: Array.from(analysis.stateAssignments.values.keys()),
     });
 }
 
@@ -346,7 +352,7 @@ if (analysis.logLevels.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/logging.js',
         exports: ['LOG_LEVELS'],
-        values: Array.from(analysis.logLevels.values.keys())
+        values: Array.from(analysis.logLevels.values.keys()),
     });
 }
 
@@ -354,7 +360,7 @@ if (analysis.logCategories.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/logging.js',
         exports: ['LOG_CATEGORIES'],
-        values: Array.from(analysis.logCategories.values.keys())
+        values: Array.from(analysis.logCategories.values.keys()),
     });
 }
 
@@ -362,7 +368,7 @@ if (analysis.errorTypes.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/errors.js',
         exports: ['ERROR_TYPES'],
-        values: Array.from(analysis.errorTypes.values.keys())
+        values: Array.from(analysis.errorTypes.values.keys()),
     });
 }
 
@@ -370,7 +376,7 @@ if (analysis.driverTypes.values.size > 0) {
     recommendations.push({
         file: 'src/core/constants/drivers.js',
         exports: ['DRIVER_TYPES'],
-        values: Array.from(analysis.driverTypes.values.keys())
+        values: Array.from(analysis.driverTypes.values.keys()),
     });
 }
 

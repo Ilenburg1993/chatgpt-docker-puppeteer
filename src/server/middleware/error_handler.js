@@ -53,11 +53,13 @@ function errorHandler(err, req, res, next) {
     }
 
     // 5. Resposta Padronizada ao Dashboard
+    const isProduction = process.env.NODE_ENV === 'production';
     res.status(statusCode).json({
         success: false,
         error: statusCode === 404 ? 'Recurso não encontrado' : 'Erro interno do servidor',
         request_id: requestId,
-        details: errorDetails
+        // Só incluir detalhes em desenvolvimento
+        ...(isProduction ? {} : { details: errorDetails }),
     });
 }
 

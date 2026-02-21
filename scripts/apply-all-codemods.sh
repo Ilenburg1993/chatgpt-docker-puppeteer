@@ -16,7 +16,7 @@ TARGET_PATTERN="src/**/*.js"
 EXCLUDE_PATTERN="src/core/constants"
 
 echo "📁 Listando arquivos alvo..."
-FILES=$(find src -name "*.js" -not -path "src/core/constants/*" -not -path "*/node_modules/*")
+FILES=$(find src -name "*.js" -not -path "src/core/constants/*" -not -path "*/node_modules/*" -not -path "*/dist/*")
 FILE_COUNT=$(echo "$FILES" | wc -l)
 echo "✓ $FILE_COUNT arquivos encontrados"
 echo ""
@@ -76,9 +76,9 @@ echo "📊 Estatísticas de transformação:"
 echo "================================="
 
 # Contar imports adicionados
-STATUS_IMPORTS=$(grep -r "require.*constants/tasks" src --exclude-dir=constants | wc -l)
-LOG_IMPORTS=$(grep -r "require.*constants/logging" src --exclude-dir=constants | wc -l)
-BROWSER_IMPORTS=$(grep -r "require.*constants/browser" src --exclude-dir=constants | wc -l)
+STATUS_IMPORTS=$(grep -r --exclude-dir=dist --exclude-dir=constants "require.*constants/tasks" src | wc -l)
+LOG_IMPORTS=$(grep -r --exclude-dir=dist --exclude-dir=constants "require.*constants/logging" src | wc -l)
+BROWSER_IMPORTS=$(grep -r --exclude-dir=dist --exclude-dir=constants "require.*constants/browser" src | wc -l)
 
 echo "STATUS_VALUES imports: $STATUS_IMPORTS arquivos"
 echo "LOG_CATEGORIES imports: $LOG_IMPORTS arquivos"
@@ -86,9 +86,9 @@ echo "CONNECTION_MODES imports: $BROWSER_IMPORTS arquivos"
 echo ""
 
 # Contar usos de constantes
-STATUS_USES=$(grep -r "STATUS_VALUES\." src --exclude-dir=constants | wc -l)
-LOG_USES=$(grep -r "LOG_CATEGORIES\." src --exclude-dir=constants | wc -l)
-BROWSER_USES=$(grep -r "CONNECTION_MODES\." src --exclude-dir=constants | wc -l)
+STATUS_USES=$(grep -r --exclude-dir=dist --exclude-dir=constants "STATUS_VALUES\." src | wc -l)
+LOG_USES=$(grep -r --exclude-dir=dist --exclude-dir=constants "LOG_CATEGORIES\." src | wc -l)
+BROWSER_USES=$(grep -r --exclude-dir=dist --exclude-dir=constants "CONNECTION_MODES\." src | wc -l)
 
 echo "STATUS_VALUES usos: $STATUS_USES"
 echo "LOG_CATEGORIES usos: $LOG_USES"
@@ -98,9 +98,9 @@ echo ""
 
 # Verificar se há magic strings restantes
 echo "🔎 Verificando magic strings restantes..."
-REMAINING_PENDING=$(grep -r "'PENDING'" src --exclude-dir=constants 2>/dev/null | wc -l)
-REMAINING_BOOT=$(grep -r "'BOOT'" src --exclude-dir=constants 2>/dev/null | wc -l)
-REMAINING_HYBRID=$(grep -r "'hybrid'" src --exclude-dir=constants 2>/dev/null | wc -l)
+REMAINING_PENDING=$(grep -r --exclude-dir=dist --exclude-dir=constants "'PENDING'" src 2>/dev/null | wc -l)
+REMAINING_BOOT=$(grep -r --exclude-dir=dist --exclude-dir=constants "'BOOT'" src 2>/dev/null | wc -l)
+REMAINING_HYBRID=$(grep -r --exclude-dir=dist --exclude-dir=constants "'hybrid'" src 2>/dev/null | wc -l)
 
 if [ "$REMAINING_PENDING" -gt 0 ]; then
     echo "⚠️  'PENDING' restante: $REMAINING_PENDING ocorrências"

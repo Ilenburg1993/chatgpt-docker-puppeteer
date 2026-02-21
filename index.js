@@ -8,6 +8,8 @@
  * - Docker CMD
  * - PM2 ecosystem.config.cjs
  * - Scripts legados
+ *
+ * @requires Node.js 24+ (ESM obrigatório)
  */
 
 import { main } from '#main';

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const IGNORED_DIRS = new Set(['node_modules', '.git', 'backups', 'tests', 'artifacts', 'coverage']);
+const IGNORED_DIRS = new Set(['node_modules', '.git', 'backups', 'tests', 'artifacts', 'coverage', 'dist']);
 
 /**
  * @typedef {import('./load_registry.mjs').ContractDefinitionV1} ContractDefinitionV1
@@ -136,7 +136,7 @@ function buildIgnoredRanges(content) {
     /** @type {Array<{ braceDepth: number }>} */
     const templateExprStack = [];
 
-    for (let idx = 0; idx < content.length;) {
+    for (let idx = 0; idx < content.length; ) {
         const ch = content[idx];
         const next = idx + 1 < content.length ? content[idx + 1] : '';
 
@@ -236,7 +236,7 @@ function buildIgnoredRanges(content) {
             idx += 2;
             continue;
         }
-        if (ch === '\'' || ch === '"') {
+        if (ch === "'" || ch === '"') {
             mode = 'string';
             quote = ch;
             rangeStart = idx;
@@ -374,7 +374,8 @@ export function evaluateStaticContracts(options) {
                     root_cause: `Violação de contrato estático ${contract.id}.`,
                     suggested_patch: `Ajustar trecho para atender ${contract.title}.`,
                     test_strategy: contract.test_recipe.join(' ; '),
-                    regression_risk: contract.severity_default === 'P0' || contract.severity_default === 'P1' ? 'Alto' : 'Médio',
+                    regression_risk:
+                        contract.severity_default === 'P0' || contract.severity_default === 'P1' ? 'Alto' : 'Médio',
                     owner: contract.owner,
                     enforcement_state: contract.enforcement?.level || 'warn',
                 });
@@ -386,7 +387,9 @@ export function evaluateStaticContracts(options) {
     return {
         findings,
         files_scanned: fileMetas.length,
-        contracts_scanned: options.contracts.filter(contract => contract.kind === 'static' && contract.status === 'active').length,
+        contracts_scanned: options.contracts.filter(
+            contract => contract.kind === 'static' && contract.status === 'active'
+        ).length,
         hits_by_contract: hitsByContract,
     };
 }

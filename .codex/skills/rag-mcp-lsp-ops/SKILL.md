@@ -38,7 +38,10 @@ For contract governance, runbook observability and deep proposal generation, com
   - Docs later: `npm run rag:index -- --profile full --docs-mode only`
 4. Validate usable retrieval.
 - Execute one `rag_search` smoke call over MCP (`tools/call`) and confirm non-error response.
-5. Continue coding flow.
+5. Validate index freshness policy.
+- Prefer index freshness within 24h for high-signal triage.
+- If `index_freshness_ms` is stale, mark reduced confidence and recommend refresh/rebuild.
+6. Continue coding flow.
 - For normal coding queries use `profile=core`.
 - Reserve `profile=full` for rebuild/reindex and wide investigation.
 
@@ -60,6 +63,10 @@ For contract governance, runbook observability and deep proposal generation, com
 - RAG health failing:
   - Confirm `OLLAMA_LOCAL_BASE_URL`
   - Run `npm run rag:rebuild:zero`
+- If Ollama/model remains unavailable:
+  - Continue in lexical mode (non-blocking fallback).
+  - Mark risk explicitly in tracker/snapshot (`rag degraded`, confidence reduced).
+  - Keep MCP/LSP diagnostics active.
 - Long rebuild:
   - Keep process running; full profile can take minutes.
   - If markdown volume is delaying index, run with `--docs-mode exclude` and process docs in a second pass.
@@ -77,4 +84,4 @@ For contract governance, runbook observability and deep proposal generation, com
 - PM2 shows `agente-gpt`, `dashboard-web`, `chrome-proxy` online.
 - `http://localhost:3008/api/mcp` responds.
 - `mcp:diagnose` passes.
-- RAG rebuild completes with exit code `0`.
+- RAG rebuild completes with exit code `0`, or fallback lexical explicitly registrado com risco.

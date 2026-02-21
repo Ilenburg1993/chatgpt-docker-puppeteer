@@ -1,4 +1,4 @@
 interface:
   display_name: "RAG MCP LSP Ops"
-  short_description: "Operate RAG/MCP/LSP rebuild and diagnostics"
-  default_prompt: "Use $rag-mcp-lsp-ops to run the canonical PM2/MCP/RAG operation workflow for this repository."
+  short_description: "RAG/MCP/LSP com política de frescor e fallback lexical"
+  default_prompt: "Use $rag-mcp-lsp-ops para operar PM2/MCP/RAG com checagem de frescor do índice e fallback formal quando Ollama/model estiver indisponível."

@@ -29,7 +29,7 @@
         "command": "bash",
         "args": [
             "-c",
-            "echo '=== 🔍 WORKSPACE SCAN ===' && npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=stylish --max-warnings=999999 && echo '' && echo '=== 📊 STATS ===' && echo \"Files: $(find . -name '*.js' -not -path './node_modules/*' -not -path './backups/*' -not -path './tmp/*' | wc -l)\" && echo \"Total Issues: $(npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --format=json 2>/dev/null | grep -o '\"severity\":' | wc -l)\""
+            "echo '=== 🔍 WORKSPACE SCAN ===' && npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=stylish --max-warnings=999999 && echo '' && echo '=== 📊 STATS ===' && echo \"Files: $(find . -name '*.js' -not -path './node_modules/*' -not -path './backups/*' -not -path './tmp/*' -not -path './dist/*' -not -path './dashboard-ui/dist/*' | wc -l)\" && echo \"Total Issues: $(npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --format=json 2>/dev/null | grep -o '\"severity\":' | wc -l)\""
         ],
         "problemMatcher": [
             "$eslint-stylish"

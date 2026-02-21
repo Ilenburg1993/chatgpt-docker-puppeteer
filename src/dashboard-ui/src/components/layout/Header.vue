@@ -1,14 +1,31 @@
 <script setup>
-import { Bell, Menu, Search, User } from 'lucide-vue-next';
+import { Bell, Menu, Search, User, LogIn, LogOut } from 'lucide-vue-next';
 import { ref } from 'vue';
+import { useAuth } from '../../composables/useAuth.js';
+import LoginModal from '../auth/LoginModal.vue';
 
 const emit = defineEmits(['toggleSidebar']);
 
 const searchQuery = ref('');
 const notifications = ref(3);
+const showLoginModal = ref(false);
+
+const { user, isAuthenticated, logout } = useAuth();
 
 const handleMenuClick = () => {
   emit('toggleSidebar');
+};
+
+const handleLoginClick = () => {
+  showLoginModal.value = true;
+};
+
+const handleLogoutClick = async () => {
+  await logout();
+};
+
+const handleLoginSuccess = () => {
+  showLoginModal.value = false;
 };
 </script>
 
@@ -53,12 +70,32 @@ const handleMenuClick = () => {
 
       <div class="h-8 w-px bg-slate-700/50 mx-2"></div>
 
-      <button class="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-800/50 transition-all duration-300 group">
+      <button
+        v-if="!isAuthenticated"
+        @click="handleLoginClick"
+        class="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-800/50 transition-all duration-300 group text-gray-400 hover:text-white"
+      >
+        <LogIn :size="16" class="group-hover:scale-110 transition-transform duration-300" />
+        <span class="hidden sm:block text-sm font-semibold">Login</span>
+      </button>
+
+      <button
+        v-else
+        @click="handleLogoutClick"
+        class="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-800/50 transition-all duration-300 group"
+      >
         <div class="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center shadow-lg shadow-violet-600/30 group-hover:scale-110 transition-transform duration-300">
           <User :size="16" class="text-white" />
         </div>
-        <span class="hidden sm:block text-sm font-semibold text-white">Admin</span>
+        <span class="hidden sm:block text-sm font-semibold text-white">{{ user?.username }}</span>
+        <LogOut :size="14" class="text-gray-400 group-hover:text-red-400 ml-1" />
       </button>
     </div>
+
+    <!-- Modal de Login -->
+    <LoginModal
+      v-model:open="showLoginModal"
+      @login-success="handleLoginSuccess"
+    />
   </header>
 </template>

@@ -1,5 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as hardware from '#core/hardware';
+import CONFIG from '#core/config';
+import { log } from '#core/logger';
 import { LOG_DIR, ROOT } from '#infra/fs/fs_utils';
 import compression from 'compression';
 import cors from 'cors';
@@ -104,44 +106,50 @@ if (process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === 'true')
 }
 
 /* --------------------------------------------------------------------------
-   3. CORS DINÂMICO COM FALHA EXPLÍCITA
+   3. CORS DINÂMICO (CONFIGURATION DRIVEN)
 -------------------------------------------------------------------------- */
 
-const allowedOrigins = new Set(
-    [
+const corsOrigins = new Set();
+
+function updateCorsOrigins() {
+    corsOrigins.clear();
+    
+    // Add default/local origins
+    const defaults = [
         'http://localhost:3008',
-        'https://localhost:3008',
-        'http://127.0.0.1:3008',
-        'https://127.0.0.1:3008',
-        'http://localhost:5173', // Vite dev server (porta padrão)
-        'https://localhost:5173',
-        'http://localhost:5174', // Vite dev server (porta alternativa)
-        'https://localhost:5174',
-        'http://localhost:5175', // Vite dev server (porta alternativa 2)
-        'https://localhost:5175',
-        'http://localhost:5176', // Vite dev server (porta alternativa 3)
-        'https://localhost:5176',
-        'http://172.17.0.2:5173', // Vite network access
-        'https://172.17.0.2:5173',
-        'http://172.17.0.2:5174', // Vite network access (alt)
-        'https://172.17.0.2:5174',
-        'http://172.17.0.2:5175', // Vite network access (alt 2)
-        'https://172.17.0.2:5175',
-        'http://172.17.0.2:5176', // Vite network access (alt 3)
-        'https://172.17.0.2:5176',
-        process.env.DASHBOARD_ORIGIN,
-    ].filter(Boolean)
-);
+        'http://127.0.0.1:3008', 
+        process.env.DASHBOARD_ORIGIN
+    ];
+    
+    defaults.filter(Boolean).forEach(o => corsOrigins.add(o));
+
+    // Add from CONFIG
+    const configOrigins = CONFIG.ALLOWED_ORIGINS;
+    if (Array.isArray(configOrigins)) {
+        configOrigins.forEach(o => corsOrigins.add(o));
+    } else if (typeof configOrigins === 'string') {
+        configOrigins.split(',').map(s => s.trim()).filter(Boolean).forEach(o => corsOrigins.add(o));
+    }
+    
+    log('INFO', `[SERVER] CORS origins updated: ${corsOrigins.size} allowed origins`);
+}
+
+// Inicializa e escuta mudanças
+updateCorsOrigins();
+CONFIG.on('updated', updateCorsOrigins);
 
 app.use(
     cors({
         origin(origin, callback) {
+            // Allow requests with no origin (like mobile apps or curl requests)
             if (!origin) return callback(null, true);
 
-            if (allowedOrigins.has(origin)) {
+            if (corsOrigins.has(origin)) {
                 return callback(null, true);
             }
 
+            // Optional: Regex support or CIDR logic could be added here
+            
             const err = new Error(`CORS blocked for origin: ${origin}`);
             err.status = 403;
             callback(err);
@@ -235,10 +243,24 @@ app.use('/dashboard/assets', express.static(dashboardAssetsPath, {
 
         if (filePath.endsWith('.br')) {
             res.setHeader('Content-Encoding', 'br');
-            res.type(filePath.slice(0, -3));
+            // Determine extension of the original file (drop the .br suffix)
+            const _base = filePath.slice(0, -3);
+            const _ext = path.extname(_base);
+            if (_ext) {
+                // res.type expects an extension name without the leading dot (eg 'js', 'css')
+                res.type(_ext.slice(1));
+            } else {
+                res.type('application/octet-stream');
+            }
         } else if (filePath.endsWith('.gz')) {
             res.setHeader('Content-Encoding', 'gzip');
-            res.type(filePath.slice(0, -3));
+                const _base = filePath.slice(0, -3);
+                const _ext = path.extname(_base);
+                if (_ext) {
+                    res.type(_ext.slice(1));
+                } else {
+                    res.type('application/octet-stream');
+                }
         }
     }
 }));

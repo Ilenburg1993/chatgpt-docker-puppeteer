@@ -69,7 +69,7 @@ All components communicate via **NERV** (event bus):
 ## Technology Stack
 
 ### Core Technologies
-- **Runtime**: Node.js 20.19.2+ (CommonJS modules)
+- **Runtime**: Node.js 24+ (ESM modules)
 - **Browser Automation**: Puppeteer 24.35+, puppeteer-extra with stealth
 - **Process Manager**: PM2 6.0+
 - **Web Framework**: Express 4.22+
@@ -420,7 +420,7 @@ git push -u origin claude/feature-name
 
 - **Current Version**: 1.1.0 (In Development)
 - **Latest Stable**: 1.0.0 (2026-01-19)
-- **Node.js**: 20.19.2+ LTS
+- **Node.js**: 24+ LTS
 - **npm**: 10.8.2+
 - **PM2**: 6.0+
 

@@ -8,7 +8,7 @@ const INCLUDE_TESTS = args.includes('--include-tests');
 const CUSTOM_DIR = args.find(arg => arg.startsWith('--directory='))?.split('=')[1];
 
 const ROOT = CUSTOM_DIR || '/workspaces/chatgpt-docker-puppeteer';
-const DEFAULT_EXCLUDES = ['node_modules', 'backups', '.git', 'logs', 'coverage', 'profile'];
+const DEFAULT_EXCLUDES = ['node_modules', 'backups', '.git', 'logs', 'coverage', 'profile', 'dist'];
 
 // Comprehensive pattern definitions
 const PATTERNS = [
@@ -17,25 +17,25 @@ const PATTERNS = [
         name: "actor: 'STRING'",
         regex: /actor:\s*['"](?!ActorRole\.|this\.)(KERNEL|SERVER|INFRA|OBSERVER|MAESTRO|DRIVER)['"]/gi,
         severity: 'HIGH',
-        fix: 'Use ActorRole.CONSTANT'
+        fix: 'Use ActorRole.CONSTANT',
     },
     {
         name: "messageType: 'STRING'",
         regex: /messageType:\s*['"](?!MessageType\.)(COMMAND|EVENT|ACK)['"]/gi,
         severity: 'HIGH',
-        fix: 'Use MessageType.CONSTANT'
+        fix: 'Use MessageType.CONSTANT',
     },
     {
         name: "actionCode: 'STRING'",
         regex: /actionCode:\s*['"](?!ActionCode\.)([A-Z_]{3,})['"]/g,
         severity: 'HIGH',
-        fix: 'Use ActionCode.CONSTANT'
+        fix: 'Use ActionCode.CONSTANT',
     },
     {
         name: "kind: 'STRING'",
         regex: /kind:\s*['"](?!MessageType\.)(COMMAND|EVENT|ACK)['"]/gi,
         severity: 'HIGH',
-        fix: 'Use MessageType.CONSTANT (kind is alias for messageType)'
+        fix: 'Use MessageType.CONSTANT (kind is alias for messageType)',
     },
 
     // NERV Protocol - Comparisons
@@ -43,25 +43,25 @@ const PATTERNS = [
         name: "envelope.actor === 'STRING'",
         regex: /\.actor\s*===?\s*['"](?!ActorRole\.)(KERNEL|SERVER|INFRA|DRIVER)['"]/gi,
         severity: 'MEDIUM',
-        fix: 'Use ActorRole.CONSTANT in comparison'
+        fix: 'Use ActorRole.CONSTANT in comparison',
     },
     {
         name: "envelope.messageType === 'STRING'",
         regex: /\.messageType\s*===?\s*['"](?!MessageType\.)(COMMAND|EVENT|ACK)['"]/gi,
         severity: 'MEDIUM',
-        fix: 'Use MessageType.CONSTANT in comparison'
+        fix: 'Use MessageType.CONSTANT in comparison',
     },
     {
         name: "envelope.kind === 'STRING'",
         regex: /\.kind\s*===?\s*['"](?!MessageType\.)(COMMAND|EVENT|ACK)['"]/gi,
         severity: 'MEDIUM',
-        fix: 'Use MessageType.CONSTANT in comparison'
+        fix: 'Use MessageType.CONSTANT in comparison',
     },
     {
         name: "actionCode === 'STRING'",
         regex: /actionCode\s*===?\s*['"](?!ActionCode\.)([A-Z_]{3,})['"]/g,
         severity: 'MEDIUM',
-        fix: 'Use ActionCode.CONSTANT in comparison'
+        fix: 'Use ActionCode.CONSTANT in comparison',
     },
 
     // Switch statements
@@ -69,7 +69,7 @@ const PATTERNS = [
         name: "case 'ACTIONCODE':",
         regex: /case\s+['"](?!ActionCode\.)([A-Z_]{3,})['"]\s*:/g,
         severity: 'MEDIUM',
-        fix: 'Use case ActionCode.CONSTANT:'
+        fix: 'Use case ActionCode.CONSTANT:',
     },
 
     // Object literals (envelope creation)
@@ -77,7 +77,7 @@ const PATTERNS = [
         name: "{ actor: 'STRING' }",
         regex: /{\s*actor:\s*['"](?!ActorRole\.)(KERNEL|SERVER|INFRA)['"]/gi,
         severity: 'HIGH',
-        fix: 'Use ActorRole.CONSTANT in object creation'
+        fix: 'Use ActorRole.CONSTANT in object creation',
     },
 
     // Headers (source/target)
@@ -85,8 +85,8 @@ const PATTERNS = [
         name: "source/target: 'role'",
         regex: /(source|target):\s*['"](?!ActorRole\.|this\.)(kernel|server|driver|infra)['"]/gi,
         severity: 'LOW',
-        fix: 'Consider using ActorRole.CONSTANT.toLowerCase() if cross-subsystem'
-    }
+        fix: 'Consider using ActorRole.CONSTANT.toLowerCase() if cross-subsystem',
+    },
 ];
 
 /**
@@ -111,7 +111,7 @@ function scanFile(filePath) {
                     match: match[0],
                     line: lineNum,
                     lineContent: lineContent,
-                    file: filePath
+                    file: filePath,
                 });
             });
         }
@@ -183,7 +183,7 @@ function printResults(results, label) {
             const severityIcon = {
                 HIGH: '🔴',
                 MEDIUM: '🟡',
-                LOW: '🔵'
+                LOW: '🔵',
             };
 
             console.log(`\n📄 ${file} (${issues.length} issue${issues.length > 1 ? 's' : ''}):`);

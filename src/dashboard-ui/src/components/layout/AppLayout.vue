@@ -16,6 +16,9 @@
       </div>
       <Footer />
     </div>
+
+    <!-- Container global de notificações -->
+    <NotificationContainer />
   </div>
 </template>
 
@@ -24,6 +27,7 @@ import { ref } from 'vue';
 import Footer from './Footer.vue';
 import Header from './Header.vue';
 import Sidebar from './Sidebar.vue';
+import NotificationContainer from '../ui/NotificationContainer.vue';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
 
 const sidebarCollapsed = ref(false);

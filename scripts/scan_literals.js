@@ -33,7 +33,7 @@ const GREP_PATTERNS = [
     { pattern: 'level:\\s*[\'"]([A-Z]+)[\'"]', category: 'LOG_LEVELS' },
 
     // Browser states
-    { pattern: 'this\\.state\\s*=\\s*[\'"]([A-Z_]+)[\'"]', category: 'BROWSER_STATES' }
+    { pattern: 'this\\.state\\s*=\\s*[\'"]([A-Z_]+)[\'"]', category: 'BROWSER_STATES' },
 ];
 
 function grepScan() {
@@ -42,7 +42,7 @@ function grepScan() {
 
     GREP_PATTERNS.forEach(({ pattern, category }) => {
         try {
-            const cmd = `grep -rn -E "${pattern}" ${SRC} ${TESTS} --include="*.js" 2>/dev/null || true`;
+            const cmd = `grep -rn --exclude-dir='dist' --exclude-dir='dashboard-ui/dist' -E "${pattern}" ${SRC} ${TESTS} --include="*.js" 2>/dev/null || true`;
             const output = execSync(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
 
             if (output.trim()) {
@@ -85,7 +85,8 @@ function astScan() {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
         entries.forEach(entry => {
             const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            // Skip build artifacts (dist) and hidden dirs
+            if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'dist') {
                 walk(fullPath);
             } else if (entry.isFile() && entry.name.endsWith('.js')) {
                 files.push(fullPath);
@@ -98,7 +99,7 @@ function astScan() {
         objectProperties: new Map(), // { mode: 'launcher' }
         comparisons: new Map(), // state === 'RUNNING'
         emitCalls: new Map(), // emit('EVENT')
-        logCalls: new Map() // logger.log('INFO')
+        logCalls: new Map(), // logger.log('INFO')
     };
 
     console.log(`Analisando ${files.length} arquivos...\n`);
@@ -217,7 +218,7 @@ function generateReport(grepResults, astResults) {
         recommendations.push({
             file: 'src/core/constants/tasks.js',
             enum: 'TASK_STATES',
-            values: grepResults.TASK_STATES
+            values: grepResults.TASK_STATES,
         });
     }
 
@@ -225,7 +226,7 @@ function generateReport(grepResults, astResults) {
         recommendations.push({
             file: 'src/core/constants/nerv.js',
             enum: 'NERV_EVENTS',
-            values: Array.from(astResults.emitCalls.keys())
+            values: Array.from(astResults.emitCalls.keys()),
         });
     }
 
@@ -233,7 +234,7 @@ function generateReport(grepResults, astResults) {
         recommendations.push({
             file: 'src/core/constants/logging.js',
             enum: 'LOG_LEVELS',
-            values: Array.from(astResults.logCalls.keys())
+            values: Array.from(astResults.logCalls.keys()),
         });
     }
 
@@ -243,7 +244,7 @@ function generateReport(grepResults, astResults) {
         recommendations.push({
             file: 'src/core/constants/browser.js',
             enum: 'CONNECTION_MODES',
-            values: modes
+            values: modes,
         });
     }
 

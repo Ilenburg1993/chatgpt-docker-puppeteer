@@ -175,7 +175,7 @@ import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
 import { useTaskStore } from '@/stores/tasks';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 export default {
@@ -363,6 +363,14 @@ export default {
         // Load tasks on mount
         onMounted(async () => {
             await taskStore.fetchTasks();
+        });
+
+        // Cleanup timers on unmount
+        onUnmounted(() => {
+            if (noticeTimer) {
+                clearTimeout(noticeTimer);
+                noticeTimer = null;
+            }
         });
 
         return {
