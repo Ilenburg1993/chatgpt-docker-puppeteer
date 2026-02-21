@@ -15,7 +15,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lodash-es": "^4.17.23",
-    "lucide-vue-next": "^0.563.0",
+    "lucide-vue-next": "^0.575.0",
     "pinia": "^3.0.4",
     "radix-vue": "^1.9.17",
     "socket.io-client": "^4.8.3",
