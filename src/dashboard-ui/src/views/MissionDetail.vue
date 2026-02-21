@@ -1,15 +1,16 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Button from '@/components/ui/Button.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
-import VisGraph from '@/components/graphs/VisGraph.vue';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { http } from '@/lib/http';
+import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
+
+const VisGraph = defineAsyncComponent(() => import('@/components/graphs/VisGraph.vue'));
 
 const route = useRoute();
 const router = useRouter();
@@ -21,6 +22,7 @@ const missionId = computed(() => String(route.params.id || ''));
 const loading = ref(false);
 const error = ref(null);
 const tab = ref('resumo'); // resumo|tasks|propostas|grafo|eventos|policy
+const commandReason = ref('');
 
 const showCreateTask = ref(false);
 const creatingTask = ref(false);
@@ -44,6 +46,23 @@ const proposals = computed(() => missions.selectedProposals || []);
 const missionTasks = computed(() => missions.selectedTasks || []);
 const graph = computed(() => missions.selectedGraph);
 const missionEvents = computed(() => missions.selectedEvents || []);
+const canEditMission = computed(() => {
+    const status = String(mission.value?.status || '').toUpperCase();
+    return status === 'PAUSED' || status === 'READY';
+});
+
+function resolveReason(defaultReason, errorMessage) {
+    const typed = String(commandReason.value || '').trim();
+    if (typed) return typed;
+    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        const prompted = String(window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '').trim();
+        if (prompted) {
+            commandReason.value = prompted;
+            return prompted;
+        }
+    }
+    return requireReason('', errorMessage);
+}
 
 function statusVariant(status) {
     const s = String(status || '').toUpperCase();
@@ -82,30 +101,64 @@ async function loadAll() {
 }
 
 async function executeMission() {
-    await missions.executeMission(missionId.value);
+    const reason = resolveReason(
+        'Execução da missão a partir do dashboard',
+        'Motivo obrigatório para executar missão.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `MISSION_EXECUTE (${missionId.value})`, reason })) return;
+    await missions.executeMission(missionId.value, {
+        reason,
+    });
     await loadAll();
 }
 async function pauseMission() {
-    await missions.pauseMission(missionId.value);
+    const reason = resolveReason(
+        'Pausa da missão para intervenção humana',
+        'Motivo obrigatório para pausar missão.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `MISSION_PAUSE (${missionId.value})`, reason })) return;
+    await missions.pauseMission(missionId.value, {
+        reason,
+    });
     await loadAll();
 }
 async function resumeMission() {
-    await missions.resumeMission(missionId.value);
+    const reason = resolveReason(
+        'Retomada da missão após intervenção humana',
+        'Motivo obrigatório para retomar missão.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `MISSION_RESUME (${missionId.value})`, reason })) return;
+    await missions.resumeMission(missionId.value, {
+        reason,
+    });
     await loadAll();
 }
 async function cancelMission() {
-    if (!confirm('Cancelar missão?')) return;
-    await missions.cancelMission(missionId.value);
+    const reason = resolveReason(
+        'Cancelamento manual da missão por operador',
+        'Motivo obrigatório para cancelar missão.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `MISSION_CANCEL (${missionId.value})`, reason })) return;
+    await missions.cancelMission(missionId.value, {
+        reason,
+    });
     router.push('/missions');
 }
 
 async function saveMissionBasics() {
+    if (!canEditMission.value) {
+        alert('Pause a missão antes de editar. Edição livre é permitida apenas em READY/PAUSED.');
+        return;
+    }
     editingMission.value = true;
     try {
+        const reason = resolveReason('Edição de metadados da missão', 'Motivo obrigatório para editar missão.');
+        if (!confirmTwoStepAction({ actionLabel: `MISSION_PATCH (${missionId.value})`, reason })) return;
         await missions.patchMission(missionId.value, {
             title: editForm.value.title,
             description: editForm.value.description,
             autonomy_mode: editForm.value.autonomy_mode,
+            reason,
         });
         await loadAll();
     } finally {
@@ -114,6 +167,10 @@ async function saveMissionBasics() {
 }
 
 async function savePolicy() {
+    if (!canEditMission.value) {
+        alert('Pause a missão antes de alterar policy/autonomia.');
+        return;
+    }
     let policy = null;
     try {
         policy = policyText.value ? JSON.parse(policyText.value) : {};
@@ -121,7 +178,16 @@ async function savePolicy() {
         alert('Policy JSON inválido');
         return;
     }
-    await missions.updatePolicy(missionId.value, { autonomy_mode: policyAutonomy.value, policy });
+    const reason = resolveReason(
+        'Atualização de policy/autonomia da missão',
+        'Motivo obrigatório para atualizar policy.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `MISSION_SET_POLICY (${missionId.value})`, reason })) return;
+    await missions.updatePolicy(missionId.value, {
+        autonomy_mode: policyAutonomy.value,
+        policy,
+        reason,
+    });
     await loadAll();
 }
 
@@ -135,7 +201,12 @@ function toggleProposal(id) {
 async function bulkApproveProposals() {
     const ids = Array.from(selectedProposalIds.value);
     if (ids.length === 0) return;
-    await tasks.bulkAction({ ids, action: 'approve' });
+    const reason = resolveReason(
+        'Aprovação em lote de propostas da missão',
+        'Motivo obrigatório para aprovar proposals.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `TASK_BULK_ACTION.approve (${ids.length})`, reason })) return;
+    await tasks.bulkAction({ ids, action: 'approve', reason });
     selectedProposalIds.value = new Set();
     await loadAll();
 }
@@ -143,7 +214,12 @@ async function bulkApproveProposals() {
 async function bulkRejectProposals() {
     const ids = Array.from(selectedProposalIds.value);
     if (ids.length === 0) return;
-    await tasks.bulkAction({ ids, action: 'reject' });
+    const reason = resolveReason(
+        'Rejeição em lote de propostas da missão',
+        'Motivo obrigatório para rejeitar proposals.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `TASK_BULK_ACTION.reject (${ids.length})`, reason })) return;
+    await tasks.bulkAction({ ids, action: 'reject', reason });
     selectedProposalIds.value = new Set();
     await loadAll();
 }
@@ -177,13 +253,35 @@ async function createTaskInMission() {
                 },
             },
         };
-        await http.post('/api/tasks', payload);
+        const reason = resolveReason(
+            'Criação de task dentro da missão',
+            'Motivo obrigatório para criar task na missão.'
+        );
+        if (!confirmTwoStepAction({ actionLabel: `TASK_CREATE (mission:${missionId.value})`, reason })) return;
+        await tasks.createTask(payload, reason);
         showCreateTask.value = false;
         createTaskForm.value = { user_message: '', system_message: '', target: 'auto', model: '', priority: 5, stage: 'READY' };
         await loadAll();
     } finally {
         creatingTask.value = false;
     }
+}
+
+async function quickTaskAction(taskId, action) {
+    const reason = resolveReason(
+        `Ação ${String(action).toUpperCase()} na task ${taskId}`,
+        'Motivo obrigatório para comando de task.'
+    );
+    if (
+        !confirmTwoStepAction({
+            actionLabel: `TASK_${String(action).toUpperCase()} (${taskId})`,
+            reason,
+        })
+    ) {
+        return;
+    }
+    await tasks.taskAction(taskId, action, reason);
+    await loadAll();
 }
 
 onMounted(loadAll);
@@ -236,6 +334,10 @@ watch(missionId, () => void loadAll());
                     <Button variant="danger" size="sm" @click="cancelMission">Cancelar</Button>
                     <Button variant="ghost" size="sm" @click="showCreateTask = true">Adicionar tarefa</Button>
                 </div>
+                <div class="mt-3">
+                    <label class="text-xs text-slate-400">Motivo operacional (audit trail)</label>
+                    <Input v-model="commandReason" placeholder="Ex: ajuste de prioridade do cliente X" />
+                </div>
             </Card>
 
             <div class="flex items-center gap-2 flex-wrap">
@@ -253,15 +355,15 @@ watch(missionId, () => void loadAll());
                     <div class="space-y-4">
                         <div>
                             <label class="text-sm text-slate-300">Título</label>
-                            <Input v-model="editForm.title" />
+                            <Input v-model="editForm.title" :disabled="!canEditMission" />
                         </div>
                         <div>
                             <label class="text-sm text-slate-300">Descrição</label>
-                            <textarea v-model="editForm.description" rows="3" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                            <textarea v-model="editForm.description" rows="3" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" :disabled="!canEditMission" />
                         </div>
                         <div>
                             <label class="text-sm text-slate-300">Autonomia</label>
-                            <select v-model="editForm.autonomy_mode" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                            <select v-model="editForm.autonomy_mode" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" :disabled="!canEditMission">
                                 <option value="USER_ONLY">USER_ONLY</option>
                                 <option value="LLM_SUGGEST">LLM_SUGGEST</option>
                                 <option value="LLM_CREATE_DRAFTS">LLM_CREATE_DRAFTS</option>
@@ -269,7 +371,7 @@ watch(missionId, () => void loadAll());
                             </select>
                         </div>
                         <div class="flex justify-end">
-                            <Button variant="primary" size="sm" @click="saveMissionBasics" :disabled="editingMission">Salvar</Button>
+                            <Button variant="primary" size="sm" @click="saveMissionBasics" :disabled="editingMission || !canEditMission">Salvar</Button>
                         </div>
                     </div>
                 </Card>
@@ -285,17 +387,22 @@ watch(missionId, () => void loadAll());
 
             <div v-else-if="tab === 'tasks'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
                 <div class="divide-y divide-slate-800">
-                    <div v-for="t in missionTasks" :key="t.id" class="px-4 py-3 hover:bg-slate-900/40 cursor-pointer" @click="router.push(`/tasks/${t.id}`)">
+                    <div v-for="t in missionTasks" :key="t.id" class="px-4 py-3 hover:bg-slate-900/40">
                         <div class="flex items-start justify-between gap-4">
-                            <div class="min-w-0">
+                            <div class="min-w-0 cursor-pointer" @click="router.push(`/tasks/${t.id}`)">
                                 <div class="text-sm font-mono text-slate-200 truncate">{{ t.id }}</div>
                                 <div class="text-xs text-slate-400 truncate">{{ t.spec_user_message_preview }}</div>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap justify-end">
                                 <Badge size="sm">{{ t.stage }}</Badge>
                                 <Badge size="sm" :variant="t.unified_status === 'DONE' ? 'success' : t.unified_status === 'FAILED' ? 'error' : 'default'">
                                     {{ t.unified_status }}
                                 </Badge>
+                                <Button v-if="t.command_caps?.can_pause" size="sm" variant="secondary" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'pause')">Pausar</Button>
+                                <Button v-if="t.command_caps?.can_resume" size="sm" variant="secondary" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'resume')">Retomar</Button>
+                                <Button v-if="t.command_caps?.can_unblock" size="sm" variant="secondary" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'unblock')">Desbloquear</Button>
+                                <Button v-if="t.command_caps?.can_retry" size="sm" variant="ghost" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'retry')">Reexecutar</Button>
+                                <Button v-if="t.command_caps?.can_cancel" size="sm" variant="danger" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'cancel')">Cancelar</Button>
                             </div>
                         </div>
                     </div>
@@ -354,7 +461,7 @@ watch(missionId, () => void loadAll());
             <div v-else-if="tab === 'policy'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                     <template #header><div class="text-sm font-semibold text-slate-200">Autonomia</div></template>
-                    <select v-model="policyAutonomy" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                    <select v-model="policyAutonomy" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" :disabled="!canEditMission">
                         <option value="USER_ONLY">USER_ONLY</option>
                         <option value="LLM_SUGGEST">LLM_SUGGEST</option>
                         <option value="LLM_CREATE_DRAFTS">LLM_CREATE_DRAFTS</option>
@@ -363,9 +470,9 @@ watch(missionId, () => void loadAll());
                 </Card>
                 <Card>
                     <template #header><div class="text-sm font-semibold text-slate-200">Policy (JSON)</div></template>
-                    <textarea v-model="policyText" rows="14" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs" />
+                    <textarea v-model="policyText" rows="14" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs" :disabled="!canEditMission" />
                     <div class="flex justify-end mt-3">
-                        <Button size="sm" variant="primary" @click="savePolicy">Salvar policy</Button>
+                        <Button size="sm" variant="primary" @click="savePolicy" :disabled="!canEditMission">Salvar policy</Button>
                     </div>
                 </Card>
             </div>
@@ -425,4 +532,3 @@ watch(missionId, () => void loadAll());
         </Modal>
     </div>
 </template>
-

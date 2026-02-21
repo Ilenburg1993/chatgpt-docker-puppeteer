@@ -34,6 +34,17 @@ export function useAuth() {
      * Computed para verificar se usuário é admin
      */
     const isAdmin = computed(() => authUser.value?.role === 'admin');
+    const isOwner = computed(() => authUser.value?.role === 'owner');
+    const isOperator = computed(() => authUser.value?.role === 'operator');
+    const permissions = computed(() => (Array.isArray(authUser.value?.permissions) ? authUser.value.permissions : []));
+
+    const can = permission => {
+        if (!permission) return false;
+        const role = String(authUser.value?.role || '');
+        if (role === 'owner') return true;
+        if (role === 'admin' && permission !== 'rbac.manage') return true;
+        return permissions.value.includes(String(permission));
+    };
 
     /**
      * Obtém token do localStorage
@@ -193,6 +204,10 @@ export function useAuth() {
         loading: authLoading,
         isAuthenticated,
         isAdmin,
+        isOwner,
+        isOperator,
+        permissions,
+        can,
         login,
         logout,
         verifyToken,

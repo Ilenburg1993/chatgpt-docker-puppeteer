@@ -10,7 +10,7 @@
       <Header />
       <div class="flex flex-1 overflow-hidden">
         <Sidebar :collapsed="sidebarCollapsed" @toggle="toggleSidebar" />
-        <main class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+        <main :class="['flex-1 overflow-y-auto custom-scrollbar', mainPresetClass]">
           <router-view />
         </main>
       </div>
@@ -23,18 +23,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import Footer from './Footer.vue';
 import Header from './Header.vue';
 import Sidebar from './Sidebar.vue';
 import NotificationContainer from '../ui/NotificationContainer.vue';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
+import { useUiPreferences } from '@/composables/useUiPreferences';
 
 const sidebarCollapsed = ref(false);
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value;
 };
+
+const { preset, init: initUiPreferences } = useUiPreferences();
+const mainPresetClass = computed(() => {
+  if (preset.value === 'dense') return 'p-4 md:p-5';
+  if (preset.value === 'focus') return 'p-8 md:p-10';
+  return 'p-6 md:p-8';
+});
+
+onMounted(() => {
+  void initUiPreferences();
+});
 
 useSsotRealtime();
 </script>

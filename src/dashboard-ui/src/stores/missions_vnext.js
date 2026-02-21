@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { http, formatHttpError } from '@/lib/http';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
 
 function _normalizeUpper(value) {
     return value ? String(value).toUpperCase().trim() : null;
@@ -30,6 +31,43 @@ function _upsertById(list, byId, item) {
     const merged = { ...existing, ...item };
     byId.set(id, merged);
     if (idx >= 0) list[idx] = merged;
+}
+
+async function _dispatchControlCommand(command, payload) {
+    const idempotencyKey = payload?.idempotency_key || `ui:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+    const response = await http.post('/api/control/commands', {
+        command,
+        payload: {
+            ...payload,
+            idempotency_key: idempotencyKey,
+        },
+    });
+    return response.data;
+}
+
+async function _refreshTasksSliceForMission(missionId) {
+    try {
+        const tasks = useTasksVNextStore();
+        const selectedMissionFilter = tasks.filters?.mission_id ? String(tasks.filters.mission_id) : null;
+        if (!selectedMissionFilter || selectedMissionFilter === String(missionId)) {
+            await tasks.fetchFirstPage({ limit: 200 });
+        }
+    } catch (_) {
+        // best effort para manter stores sincronizadas sem travar fluxo principal
+    }
+}
+
+async function _refreshMissionSlice() {
+    try {
+        const missions = useMissionsVNextStore();
+        await missions.fetchFirstPage({ limit: 100 });
+    } catch (_) {
+        // best effort
+    }
+}
+
+async function _syncMissionAndTasksContext(missionId) {
+    await Promise.allSettled([_refreshTasksSliceForMission(missionId), _refreshMissionSlice()]);
 }
 
 export const useMissionsVNextStore = defineStore('missions_vnext', {
@@ -162,46 +200,93 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         },
 
         // Mutations (mission domain)
-        async createMission(payload) {
-            const res = await http.post('/api/missions', payload);
-            return res.data;
+        async createMission(payload, reason = 'Criação de missão via control plane') {
+            const result = await _dispatchControlCommand('MISSION_CREATE', {
+                mission: payload || {},
+                reason,
+            });
+            await _refreshMissionSlice();
+            return result;
         },
         async patchMission(missionId, payload) {
-            const res = await http.patch(`/api/missions/${missionId}`, payload);
-            return res.data;
+            const mission = this.getById(missionId) || this.selected || null;
+            const ifVersion = mission?.updated_at_ms || null;
+            const result = await _dispatchControlCommand('MISSION_PATCH', {
+                mission_id: missionId,
+                if_version: ifVersion,
+                reason: payload?.reason || 'Atualização manual da missão no dashboard',
+                patch: payload,
+            });
+            await _syncMissionAndTasksContext(missionId);
+            return result;
         },
-        async executeMission(missionId) {
-            const res = await http.post(`/api/missions/${missionId}/execute`);
-            return res.data;
+        async executeMission(missionId, { reason = 'Execução manual da missão' } = {}) {
+            const result = await _dispatchControlCommand('MISSION_EXECUTE', {
+                mission_id: missionId,
+                reason,
+            });
+            await _syncMissionAndTasksContext(missionId);
+            return result;
         },
-        async pauseMission(missionId) {
-            const res = await http.post(`/api/missions/${missionId}/pause`);
-            return res.data;
+        async pauseMission(missionId, { reason = 'Pausa manual da missão' } = {}) {
+            const result = await _dispatchControlCommand('MISSION_PAUSE', {
+                mission_id: missionId,
+                reason,
+            });
+            await _syncMissionAndTasksContext(missionId);
+            return result;
         },
-        async resumeMission(missionId) {
-            const res = await http.post(`/api/missions/${missionId}/resume`);
-            return res.data;
+        async resumeMission(missionId, { reason = 'Retomada manual da missão' } = {}) {
+            const result = await _dispatchControlCommand('MISSION_RESUME', {
+                mission_id: missionId,
+                reason,
+            });
+            await _syncMissionAndTasksContext(missionId);
+            return result;
         },
-        async cancelMission(missionId) {
-            const res = await http.delete(`/api/missions/${missionId}`);
-            return res.data;
+        async cancelMission(missionId, { reason = 'Cancelamento manual da missão' } = {}) {
+            const result = await _dispatchControlCommand('MISSION_CANCEL', {
+                mission_id: missionId,
+                reason,
+            });
+            await _syncMissionAndTasksContext(missionId);
+            return result;
         },
-        async updatePolicy(missionId, { autonomy_mode, policy }) {
-            const res = await http.post(`/api/missions/${missionId}/policy`, { autonomy_mode, policy });
-            return res.data;
+        async updatePolicy(missionId, { autonomy_mode, policy, reason = 'Atualização de policy/autonomia da missão' }) {
+            const mission = this.getById(missionId) || this.selected || null;
+            const ifVersion = mission?.updated_at_ms || null;
+            const result = await _dispatchControlCommand('MISSION_SET_POLICY', {
+                mission_id: missionId,
+                if_version: ifVersion,
+                autonomy_mode,
+                policy,
+                reason,
+            });
+            await _syncMissionAndTasksContext(missionId);
+            return result;
+        },
+        async ensureMissionContext(missionId) {
+            await this.fetchDetail(missionId);
+            await this.fetchMissionTasks(missionId, { limit: 100 });
+            return {
+                mission: this.selected,
+                tasks: this.selectedTasks,
+            };
         },
         async addFeedback(missionId, feedback) {
-            const res = await http.post(`/api/missions/${missionId}/feedback`, { feedback });
-            return res.data;
+            throw new Error(
+                `Operação desativada no hard cutover vNext: addFeedback(${missionId}). Use command flow/control plane.`
+            );
         },
         async suggestTasks(missionId, payload = {}) {
-            const res = await http.post(`/api/missions/${missionId}/suggest-tasks`, payload);
-            return res.data;
+            throw new Error(
+                `Operação desativada no hard cutover vNext: suggestTasks(${missionId}). Use command flow/control plane.`
+            );
         },
         async rejectProposals(missionId, payload) {
-            const res = await http.post(`/api/missions/${missionId}/proposals/reject`, payload);
-            return res.data;
+            throw new Error(
+                `Operação desativada no hard cutover vNext: rejectProposals(${missionId}). Use command flow/control plane.`
+            );
         },
     },
 });
-

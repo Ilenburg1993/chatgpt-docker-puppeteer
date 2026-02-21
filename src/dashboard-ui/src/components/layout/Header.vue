@@ -1,7 +1,8 @@
 <script setup>
 import { Bell, Menu, Search, User, LogIn, LogOut } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useAuth } from '../../composables/useAuth.js';
+import { useUiPreferences } from '@/composables/useUiPreferences';
 import LoginModal from '../auth/LoginModal.vue';
 
 const emit = defineEmits(['toggleSidebar']);
@@ -9,6 +10,7 @@ const emit = defineEmits(['toggleSidebar']);
 const searchQuery = ref('');
 const notifications = ref(3);
 const showLoginModal = ref(false);
+const { preset, setPreset, init: initUiPreferences } = useUiPreferences();
 
 const { user, isAuthenticated, logout } = useAuth();
 
@@ -27,6 +29,10 @@ const handleLogoutClick = async () => {
 const handleLoginSuccess = () => {
   showLoginModal.value = false;
 };
+
+onMounted(() => {
+  void initUiPreferences();
+});
 </script>
 
 <template>
@@ -63,6 +69,18 @@ const handleLoginSuccess = () => {
     </div>
 
     <div class="flex items-center gap-3">
+      <div class="hidden lg:flex items-center gap-2 mr-2">
+        <span class="text-xs text-slate-400">Preset</span>
+        <select
+          :value="preset"
+          @change="setPreset($event.target.value)"
+          class="px-2 py-1.5 text-xs rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-200"
+        >
+          <option value="dense">dense</option>
+          <option value="balanced">balanced</option>
+          <option value="focus">focus</option>
+        </select>
+      </div>
       <button class="relative p-2.5 rounded-xl hover:bg-slate-800/50 text-gray-400 hover:text-white transition-all duration-300 group">
         <Bell :size="20" class="group-hover:scale-110 transition-transform duration-300" />
         <span v-if="notifications > 0" class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50"></span>

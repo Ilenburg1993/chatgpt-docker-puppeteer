@@ -7,10 +7,12 @@ import Badge from '@/components/ui/Badge.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { http } from '@/lib/http';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
 
 const router = useRouter();
 const store = useTasksVNextStore();
+const missions = useMissionsVNextStore();
 
 const selectedIds = ref(new Set());
 const bulkAction = ref('pause');
@@ -18,6 +20,8 @@ const bulkStage = ref('READY');
 const bulkTarget = ref('auto');
 const bulkPriority = ref(5);
 const bulkExecuteAfterMs = ref(null);
+const bulkMissionId = ref('');
+const bulkReason = ref('');
 
 const showCreate = ref(false);
 const creating = ref(false);
@@ -32,6 +36,18 @@ const createForm = ref({
 });
 
 const items = computed(() => store.items || []);
+const missionOptions = computed(() => missions.items || []);
+const bulkEligibilityPreview = computed(() => {
+    if (bulkAction.value !== 'reassign_mission') return null;
+    const selected = items.value.filter(t => selectedIds.value.has(t.id));
+    const eligible = selected.filter(t => Boolean(t?.command_caps?.can_reassign_mission));
+    const blocked = selected.length - eligible.length;
+    return {
+        total: selected.length,
+        eligible: eligible.length,
+        blocked,
+    };
+});
 
 function statusVariant(status) {
     const s = String(status || '').toUpperCase();
@@ -41,6 +57,19 @@ function statusVariant(status) {
     if (s === 'PAUSED' || s === 'CANCELLED') return 'warning';
     if (s === 'BLOCKED') return 'warning';
     return 'default';
+}
+
+function resolveReason(defaultReason, errorMessage) {
+    const typed = String(bulkReason.value || '').trim();
+    if (typed) return typed;
+    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        const prompted = String(window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '').trim();
+        if (prompted) {
+            bulkReason.value = prompted;
+            return prompted;
+        }
+    }
+    return requireReason('', errorMessage);
 }
 
 function toggle(id) {
@@ -71,19 +100,54 @@ async function runBulk() {
     if (ids.length === 0) return;
 
     const action = bulkAction.value;
+    const reason = resolveReason(
+        `Ação em lote ${String(action).toUpperCase()} no dashboard`,
+        'Informe motivo para executar ação em lote.'
+    );
     const params = {};
     if (action === 'set_stage') params.stage = bulkStage.value;
     if (action === 'set_target') params.target = bulkTarget.value;
     if (action === 'set_priority') params.priority = bulkPriority.value;
     if (action === 'set_execute_after') params.execute_after_ms = bulkExecuteAfterMs.value;
+    if (action === 'reassign_mission') params.mission_id = bulkMissionId.value || null;
+    if (action === 'reassign_mission' && !params.mission_id) {
+        alert('Selecione a missão destino para reatribuição.');
+        return;
+    }
 
-    await store.bulkAction({ ids, action, params });
+    if (
+        !confirmTwoStepAction({
+            actionLabel: `bulk:${String(action).toUpperCase()} (${ids.length} tasks)`,
+            reason,
+        })
+    ) {
+        return;
+    }
+
+    await store.bulkAction({
+        ids,
+        action,
+        params,
+        reason,
+    });
     selectedIds.value = new Set();
     await refresh();
 }
 
 async function quickAction(taskId, action) {
-    await store.bulkAction({ ids: [taskId], action });
+    const reason = resolveReason(
+        `Ação ${String(action).toUpperCase()} na task ${taskId}`,
+        'Informe motivo para executar comando na task.'
+    );
+    if (
+        !confirmTwoStepAction({
+            actionLabel: `task:${String(action).toUpperCase()} (${taskId})`,
+            reason,
+        })
+    ) {
+        return;
+    }
+    await store.taskAction(taskId, action, reason);
     await refresh();
 }
 
@@ -91,7 +155,7 @@ async function createTask() {
     if (!createForm.value.user_message.trim()) return;
     creating.value = true;
     try {
-        const payload = {
+        const taskPayload = {
             stage: createForm.value.stage,
             meta: {
                 priority: Number(createForm.value.priority) || 5,
@@ -106,7 +170,11 @@ async function createTask() {
                 },
             },
         };
-        await http.post('/api/tasks', payload);
+        const reason = resolveReason('Criação de task na tela Tasks', 'Informe motivo para criar task.');
+        if (!confirmTwoStepAction({ actionLabel: 'TASK_CREATE', reason })) {
+            return;
+        }
+        await store.createTask(taskPayload, reason);
         showCreate.value = false;
         createForm.value = { stage: 'READY', mission_id: '', target: 'auto', model: '', priority: 5, system_message: '', user_message: '' };
         await refresh();
@@ -115,7 +183,9 @@ async function createTask() {
     }
 }
 
-onMounted(refresh);
+onMounted(async () => {
+    await Promise.all([missions.fetchFirstPage({ limit: 200 }), refresh()]);
+});
 </script>
 
 <template>
@@ -134,8 +204,9 @@ onMounted(refresh);
             </div>
         </div>
 
-        <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+        <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-7 gap-3">
             <Input v-model="store.filters.search" placeholder="Buscar (id/prompt)..." @keyup.enter="refresh" class="md:col-span-2" />
+            <Input v-model="store.filters.mission_id" placeholder="Filtrar por mission_id..." @keyup.enter="refresh" />
             <select v-model="store.filters.status" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
                 <option :value="null">Status (todos)</option>
                 <option value="PENDING">PENDING</option>
@@ -190,10 +261,11 @@ onMounted(refresh);
                     <option value="approve">Aprovar (PROPOSED→READY)</option>
                     <option value="reject">Rejeitar (PROPOSED→REJECTED)</option>
                     <option value="set_stage">Definir stage</option>
-                    <option value="set_target">Definir target</option>
-                    <option value="set_priority">Definir prioridade</option>
-                    <option value="set_execute_after">Agendar (execute_after_ms)</option>
-                </select>
+                <option value="set_target">Definir target</option>
+                <option value="set_priority">Definir prioridade</option>
+                <option value="set_execute_after">Agendar (execute_after_ms)</option>
+                <option value="reassign_mission">Reatribuir missão</option>
+            </select>
 
                 <template v-if="bulkAction === 'set_stage'">
                     <select v-model="bulkStage" class="w-full md:w-48 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
@@ -222,9 +294,23 @@ onMounted(refresh);
                 <template v-else-if="bulkAction === 'set_execute_after'">
                     <input v-model="bulkExecuteAfterMs" type="number" placeholder="ms (null=agora)" class="w-full md:w-56 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
                 </template>
+                <template v-else-if="bulkAction === 'reassign_mission'">
+                    <select v-model="bulkMissionId" class="w-full md:w-72 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                        <option value="">Selecione missão destino...</option>
+                        <option v-for="m in missionOptions" :key="m.id" :value="m.id">
+                            {{ m.title || m.id }} ({{ m.status }})
+                        </option>
+                    </select>
+                </template>
+            </div>
+            <div class="w-full md:w-72">
+                <input v-model="bulkReason" type="text" placeholder="Motivo obrigatório (audit trail)" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
             </div>
             <div class="flex justify-end">
                 <Button variant="primary" size="sm" @click="runBulk">Aplicar</Button>
+            </div>
+            <div v-if="bulkEligibilityPreview" class="w-full text-xs text-slate-300 md:col-span-6">
+                Preview reassign: elegíveis {{ bulkEligibilityPreview.eligible }}/{{ bulkEligibilityPreview.total }} · bloqueadas {{ bulkEligibilityPreview.blocked }}.
             </div>
         </div>
 
@@ -261,15 +347,24 @@ onMounted(refresh);
                         <td class="p-3"><Badge size="sm" :variant="statusVariant(t.unified_status)">{{ t.unified_status }}</Badge></td>
                         <td class="p-3 font-mono text-slate-300">{{ t.target }}</td>
                         <td class="p-3 font-mono text-slate-300">{{ t.priority }}</td>
-                        <td class="p-3 font-mono text-slate-400">{{ t.mission_id || '-' }}</td>
+                        <td class="p-3">
+                            <div v-if="t.mission_ref?.id" class="text-xs">
+                                <button class="font-mono text-sky-300 hover:underline" @click.stop="router.push(`/missions/${t.mission_ref.id}`)">
+                                    {{ t.mission_ref.title || t.mission_ref.id }}
+                                </button>
+                                <div class="text-slate-400 font-mono">{{ t.mission_ref.id }}</div>
+                                <Badge v-if="t.mission_ref.status" size="sm">{{ t.mission_ref.status }}</Badge>
+                            </div>
+                            <span v-else class="font-mono text-slate-400">-</span>
+                        </td>
                         <td class="p-3 text-right">
                             <div class="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/tasks/${t.id}`)">Abrir</Button>
-                                <Button v-if="t.unified_status === 'PENDING'" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'pause')">Pausar</Button>
-                                <Button v-if="t.unified_status === 'PAUSED'" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'resume')">Retomar</Button>
-                                <Button v-if="t.unified_status === 'BLOCKED'" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'unblock')">Desbloquear</Button>
-                                <Button v-if="['FAILED', 'DONE', 'CANCELLED', 'PAUSED', 'BLOCKED'].includes(t.unified_status)" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'retry')">Reexecutar</Button>
-                                <Button v-if="['PENDING', 'PAUSED'].includes(t.unified_status)" variant="danger" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'cancel')">Cancelar</Button>
+                                <Button v-if="t.command_caps?.can_pause" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'pause')">Pausar</Button>
+                                <Button v-if="t.command_caps?.can_resume" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'resume')">Retomar</Button>
+                                <Button v-if="t.command_caps?.can_unblock" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'unblock')">Desbloquear</Button>
+                                <Button v-if="t.command_caps?.can_retry" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'retry')">Reexecutar</Button>
+                                <Button v-if="t.command_caps?.can_cancel" variant="danger" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'cancel')">Cancelar</Button>
                             </div>
                         </td>
                     </tr>

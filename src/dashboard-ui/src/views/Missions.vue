@@ -7,12 +7,14 @@ import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Modal from '@/components/ui/Modal.vue';
+import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
 
 const router = useRouter();
 const store = useMissionsVNextStore();
 
 const creating = ref(false);
 const showCreate = ref(false);
+const commandReason = ref('');
 const createForm = ref({
     title: '',
     description: '',
@@ -39,12 +41,21 @@ async function createMission() {
     if (!createForm.value.title.trim()) return;
     creating.value = true;
     try {
+        const reason = String(commandReason.value || '').trim();
+        const promptedReason =
+            typeof window !== 'undefined' && typeof window.prompt === 'function'
+                ? String(window.prompt('Informe o motivo operacional para criar a missão:') || '').trim()
+                : '';
+        const normalizedReason = reason || promptedReason;
+        requireReason(normalizedReason, 'Motivo obrigatório para criar missão.');
+        if (!confirmTwoStepAction({ actionLabel: 'MISSION_CREATE', reason: normalizedReason })) return;
         await store.createMission({
             title: createForm.value.title,
             description: createForm.value.description,
             autonomy_mode: createForm.value.autonomy_mode,
-        });
+        }, normalizedReason);
         showCreate.value = false;
+        commandReason.value = '';
         createForm.value = { title: '', description: '', autonomy_mode: 'USER_ONLY' };
         await refresh();
     } finally {
@@ -147,6 +158,10 @@ onMounted(refresh);
                         <option value="LLM_AUTO_APPROVE_WITH_BUDGET">LLM_AUTO_APPROVE_WITH_BUDGET</option>
                     </select>
                 </div>
+                <div>
+                    <label class="text-sm text-slate-300">Motivo operacional (obrigatório)</label>
+                    <Input v-model="commandReason" placeholder="Ex: iniciar nova frente para cliente X" />
+                </div>
             </div>
 
             <template #footer>
@@ -160,4 +175,3 @@ onMounted(refresh);
         </Modal>
     </div>
 </template>
-

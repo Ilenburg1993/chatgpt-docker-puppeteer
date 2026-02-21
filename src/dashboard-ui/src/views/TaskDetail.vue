@@ -1,16 +1,22 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Button from '@/components/ui/Button.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
-import VisGraph from '@/components/graphs/VisGraph.vue';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { http } from '@/lib/http';
 import { formatHttpError } from '@/lib/http';
+import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
+
+const VisGraph = defineAsyncComponent(() => import('@/components/graphs/VisGraph.vue'));
 
 const route = useRoute();
 const router = useRouter();
+const tasksStore = useTasksVNextStore();
+const missionsStore = useMissionsVNextStore();
 
 const taskId = computed(() => String(route.params.id || ''));
 
@@ -23,8 +29,12 @@ const task = computed(() => detail.value?.task || null);
 const attempts = computed(() => detail.value?.attempts || []);
 const events = computed(() => detail.value?.events || []);
 const dependencies = computed(() => detail.value?.dependencies || []);
-const workflow = computed(() => detail.value?.workflow || []);
+const workflow = computed(() => detail.value?.workflow?.tasks || []);
 const artifacts = computed(() => detail.value?.artifacts || []);
+const missionContext = computed(() => detail.value?.mission_context || null);
+const siblingTasks = computed(() => detail.value?.siblings || []);
+const commandReason = ref('');
+const reassignMissionId = ref('');
 
 const edit = ref({
     stage: 'READY',
@@ -41,6 +51,10 @@ const edit = ref({
 const depsText = ref('');
 const jsonText = ref('');
 
+function currentTaskVersion() {
+    return task.value?.timestamps?.updated_at_ms || task.value?.updated_at_ms || null;
+}
+
 function statusVariant(status) {
     const s = String(status || '').toUpperCase();
     if (s === 'RUNNING') return 'info';
@@ -51,13 +65,26 @@ function statusVariant(status) {
     return 'default';
 }
 
+function resolveReason(defaultReason, errorMessage) {
+    const typed = String(commandReason.value || '').trim();
+    if (typed) return typed;
+    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        const prompted = String(window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '').trim();
+        if (prompted) {
+            commandReason.value = prompted;
+            return prompted;
+        }
+    }
+    return requireReason('', errorMessage);
+}
+
 async function fetchDetail() {
     if (!taskId.value) return;
     loading.value = true;
     error.value = null;
     try {
         const res = await http.get(`/api/dashboard/tasks/${taskId.value}`, {
-            params: { include: 'attempts,events,dependencies,workflow,artifacts' },
+            params: { include: 'attempts,events,dependencies,workflow,artifacts,mission_context,siblings' },
         });
         detail.value = res.data?.data || null;
 
@@ -76,6 +103,7 @@ async function fetchDetail() {
 
         depsText.value = JSON.stringify((t.policy?.dependencies || []).map(String), null, 2);
         jsonText.value = JSON.stringify(t, null, 2);
+        reassignMissionId.value = t.mission_ref?.id || t.meta?.mission_id || '';
     } catch (err) {
         error.value = formatHttpError(err).message;
     } finally {
@@ -84,12 +112,15 @@ async function fetchDetail() {
 }
 
 async function saveBasics() {
+    const reason = resolveReason('Edição manual da task no dashboard', 'Motivo obrigatório para salvar alterações.');
+    if (!confirmTwoStepAction({ actionLabel: `TASK_PATCH (${taskId.value})`, reason })) {
+        return;
+    }
     const payload = {
         stage: edit.value.stage,
-        unified_status: edit.value.status,
+        status: edit.value.status,
         meta: {
             priority: Number(edit.value.priority) || 0,
-            mission_id: edit.value.mission_id || undefined,
         },
         spec: {
             target: edit.value.target,
@@ -100,11 +131,23 @@ async function saveBasics() {
             },
         },
     };
-    await http.patch(`/api/tasks/${taskId.value}`, payload);
+    await tasksStore.patchTask(
+        taskId.value,
+        payload,
+        reason,
+        currentTaskVersion()
+    );
     await fetchDetail();
 }
 
 async function saveDependencies() {
+    const reason = resolveReason(
+        'Atualização de dependências da task',
+        'Motivo obrigatório para atualizar dependências.'
+    );
+    if (!confirmTwoStepAction({ actionLabel: `TASK_PATCH.dependencies (${taskId.value})`, reason })) {
+        return;
+    }
     let deps = [];
     try {
         deps = JSON.parse(depsText.value || '[]');
@@ -112,11 +155,20 @@ async function saveDependencies() {
         alert('JSON de dependências inválido (use ["task-..."]).');
         return;
     }
-    await http.put(`/api/tasks/${taskId.value}/dependencies`, { dependencies: deps });
+    await tasksStore.setDependencies(
+        taskId.value,
+        deps,
+        reason,
+        currentTaskVersion()
+    );
     await fetchDetail();
 }
 
 async function saveJsonAdvanced() {
+    const reason = resolveReason('Edição avançada (JSON) da task', 'Motivo obrigatório para edição avançada.');
+    if (!confirmTwoStepAction({ actionLabel: `TASK_PATCH.advanced_json (${taskId.value})`, reason })) {
+        return;
+    }
     let obj = null;
     try {
         obj = JSON.parse(jsonText.value);
@@ -124,12 +176,55 @@ async function saveJsonAdvanced() {
         alert('JSON inválido');
         return;
     }
-    await http.patch(`/api/tasks/${taskId.value}`, obj);
+    await tasksStore.patchTask(
+        taskId.value,
+        obj,
+        reason,
+        currentTaskVersion()
+    );
     await fetchDetail();
 }
 
 async function action(actionName) {
-    await http.post(`/api/tasks/${taskId.value}/${actionName}`);
+    const reason = resolveReason(
+        `Ação ${String(actionName).toUpperCase()} na task`,
+        'Motivo obrigatório para comando de task.'
+    );
+    if (
+        !confirmTwoStepAction({
+            actionLabel: `TASK_${String(actionName).toUpperCase()} (${taskId.value})`,
+            reason,
+        })
+    ) {
+        return;
+    }
+    await tasksStore.taskAction(taskId.value, actionName, reason);
+    await fetchDetail();
+}
+
+async function reassignMission() {
+    if (!reassignMissionId.value) {
+        alert('Selecione a missão destino.');
+        return;
+    }
+    const reason = resolveReason(
+        'Reatribuição manual da task para outra missão',
+        'Motivo obrigatório para reatribuição de missão.'
+    );
+    if (
+        !confirmTwoStepAction({
+            actionLabel: `TASK_REASSIGN_MISSION (${taskId.value} -> ${reassignMissionId.value})`,
+            reason,
+        })
+    ) {
+        return;
+    }
+    await tasksStore.reassignTaskMission(
+        taskId.value,
+        reassignMissionId.value,
+        reason,
+        currentTaskVersion()
+    );
     await fetchDetail();
 }
 
@@ -150,7 +245,9 @@ const depsGraphEdges = computed(() => {
     return dependencies.value.map(d => ({ from: d.id, to: t.meta.id }));
 });
 
-onMounted(fetchDetail);
+onMounted(async () => {
+    await Promise.all([missionsStore.fetchFirstPage({ limit: 200 }), fetchDetail()]);
+});
 watch(taskId, () => void fetchDetail());
 </script>
 
@@ -184,21 +281,30 @@ watch(taskId, () => void fetchDetail());
                                 <Badge size="sm" :variant="statusVariant(task.unified_status)">{{ task.unified_status }}</Badge>
                                 <Badge size="sm">{{ task.spec?.target }}</Badge>
                                 <Badge size="sm">pri: {{ task.meta?.priority ?? 0 }}</Badge>
-                                <Badge size="sm" v-if="task.meta?.mission_id">mission: {{ task.meta.mission_id }}</Badge>
+                                <Badge size="sm" v-if="task.mission_ref?.id">
+                                    mission:
+                                    <button class="font-mono underline-offset-2 hover:underline" @click.stop="router.push(`/missions/${task.mission_ref.id}`)">
+                                        {{ task.mission_ref.title || task.mission_ref.id }}
+                                    </button>
+                                </Badge>
                             </div>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap justify-end">
-                            <Button v-if="task.unified_status === 'PENDING'" variant="secondary" size="sm" @click="action('pause')">Pausar</Button>
-                            <Button v-if="task.unified_status === 'PAUSED'" variant="secondary" size="sm" @click="action('resume')">Retomar</Button>
-                            <Button v-if="task.unified_status === 'BLOCKED'" variant="secondary" size="sm" @click="action('unblock')">Desbloquear</Button>
-                            <Button v-if="['DONE','FAILED','CANCELLED','PAUSED','BLOCKED'].includes(task.unified_status)" variant="ghost" size="sm" @click="action('retry')">Reexecutar</Button>
-                            <Button v-if="['PENDING','PAUSED'].includes(task.unified_status)" variant="danger" size="sm" @click="action('cancel')">Cancelar</Button>
+                            <Button v-if="task.command_caps?.can_pause" variant="secondary" size="sm" @click="action('pause')">Pausar</Button>
+                            <Button v-if="task.command_caps?.can_resume" variant="secondary" size="sm" @click="action('resume')">Retomar</Button>
+                            <Button v-if="task.command_caps?.can_unblock" variant="secondary" size="sm" @click="action('unblock')">Desbloquear</Button>
+                            <Button v-if="task.command_caps?.can_retry" variant="ghost" size="sm" @click="action('retry')">Reexecutar</Button>
+                            <Button v-if="task.command_caps?.can_cancel" variant="danger" size="sm" @click="action('cancel')">Cancelar</Button>
                         </div>
                     </div>
                 </template>
 
                 <div class="text-sm text-slate-300 whitespace-pre-wrap bg-slate-950/40 border border-slate-800 rounded-lg p-3 font-mono">
                     {{ task.spec?.payload?.user_message || '' }}
+                </div>
+                <div class="mt-3">
+                    <label class="text-xs text-slate-400">Motivo operacional (audit trail)</label>
+                    <Input v-model="commandReason" placeholder="Ex: consolidar escopo para missão do cliente A" />
                 </div>
             </Card>
 
@@ -256,9 +362,8 @@ watch(taskId, () => void fetchDetail());
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="text-sm text-slate-300">Mission ID</label>
-                                <Input v-model="edit.mission_id" placeholder="mission-..." />
+                            <div class="text-xs text-slate-400 md:col-span-2">
+                                Reatribuição de missão é comando dedicado (`TASK_REASSIGN_MISSION`) e não faz parte do patch genérico.
                             </div>
                         </div>
                         <div>
@@ -270,9 +375,54 @@ watch(taskId, () => void fetchDetail());
                             <textarea v-model="edit.user_message" rows="6" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
                         </div>
                         <div class="flex justify-end">
-                            <Button variant="primary" size="sm" @click="saveBasics">Salvar</Button>
+                            <Button variant="primary" size="sm" @click="saveBasics" :disabled="!task.command_caps?.can_patch">Salvar Task</Button>
                         </div>
                     </div>
+                </Card>
+
+                <Card>
+                    <template #header><div class="text-sm font-semibold text-slate-200">Contexto da Missão</div></template>
+                    <div v-if="missionContext?.mission" class="space-y-3">
+                        <div class="text-sm text-slate-200">
+                            <button class="font-semibold text-sky-300 hover:underline" @click="router.push(`/missions/${missionContext.mission.id}`)">
+                                {{ missionContext.mission.title || missionContext.mission.id }}
+                            </button>
+                            <div class="text-xs text-slate-400 font-mono">{{ missionContext.mission.id }} · {{ missionContext.mission.status }} · {{ missionContext.mission.autonomy_mode }}</div>
+                        </div>
+                        <div class="text-xs text-slate-300">
+                            Tasks na missão: {{ missionContext.counts?.tasks_total ?? 0 }}
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs text-slate-400">Reatribuir para missão</label>
+                            <select
+                                v-model="reassignMissionId"
+                                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                :disabled="!task.command_caps?.can_reassign_mission"
+                            >
+                                <option value="">Selecione missão destino...</option>
+                                <option v-for="m in missionsStore.items" :key="m.id" :value="m.id">
+                                    {{ m.title || m.id }} ({{ m.status }})
+                                </option>
+                            </select>
+                            <Button variant="secondary" size="sm" @click="reassignMission" :disabled="!task.command_caps?.can_reassign_mission">
+                                Reatribuir Missão
+                            </Button>
+                        </div>
+                        <div v-if="siblingTasks.length" class="pt-2">
+                            <div class="text-xs text-slate-400 mb-2">Tasks irmãs na mesma missão</div>
+                            <div class="space-y-1 max-h-44 overflow-auto">
+                                <button
+                                    v-for="s in siblingTasks"
+                                    :key="s.id"
+                                    class="w-full text-left text-xs font-mono text-slate-300 hover:text-sky-300"
+                                    @click="router.push(`/tasks/${s.id}`)"
+                                >
+                                    {{ s.id }} · {{ s.unified_status }} · {{ s.stage }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="text-sm text-slate-400">Task sem missão vinculada.</div>
                 </Card>
 
                 <Card>
