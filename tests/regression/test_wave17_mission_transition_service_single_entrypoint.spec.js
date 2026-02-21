@@ -30,6 +30,6 @@ test('wave17: mission transitions usam serviço único (sem updateMission(status
     assert.equal(hasStatusMutation(missionController), false);
     assert.equal(hasStatusMutation(missionRunner), false);
 
-    assert.match(missionController, /executeMissionTransition|pauseMissionTransition|resumeMissionTransition|cancelMissionTransition/);
+    assert.match(missionController, /executeCommand|_runMissionControlCommand/);
     assert.match(missionRunner, /updateMissionProgressState|failMissionTransition|completeMissionTransition/);
 });

@@ -360,6 +360,258 @@
       "enforcement": {
         "level": "warn"
       }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-CONTROL-SINGLE-ENTRYPOINT",
+      "title": "Mutação via Control Command Service",
+      "domain": "runtime",
+      "description": "Mutações de missão/task no dashboard server devem passar pelo control_command_service.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.control.single_entrypoint.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18_control_commands_single_entrypoint.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-control-plane",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-CONTROL-PAUSE-TO-EDIT",
+      "title": "Pause-to-Edit Obrigatório",
+      "domain": "runtime",
+      "description": "Edição livre de missão/task deve exigir status PAUSED (ou READY inicial).",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.control.pause_to_edit.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18_pause_to_edit_enforced.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-control-plane",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-CONTROL-REASON-IDEMPOTENCY",
+      "title": "Comando Crítico Requer reason + idempotency_key",
+      "domain": "runtime",
+      "description": "Comandos do control plane devem exigir motivo e chave de idempotência.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.control.reason_idempotency.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18_command_idempotency_and_reason_required.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-control-plane",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-CONTROL-RBAC-DENY-BY-DEFAULT",
+      "title": "RBAC deny-by-default em Mutações",
+      "domain": "runtime",
+      "description": "Mutação sem permissão explícita deve ser negada no control plane.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.control.rbac_deny_default.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18_rbac_matrix_permissions.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-rbac",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-TASK-REASSIGN-STATE-GUARD",
+      "title": "Task Reassign Respeita Estado Elegível",
+      "domain": "runtime",
+      "description": "Reassign de missão deve ser permitido somente em PAUSED ou READY não iniciada.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.task_reassign.state_guard.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18t_task_reassign_requires_paused_or_ready.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-task-control",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-DASHBOARD-VNEXT-NO-DIRECT-TASKS-MUTATION",
+      "title": "Dashboard vNext sem mutação direta /api/tasks",
+      "domain": "runtime",
+      "description": "Views ativas do dashboard devem usar somente command flow para mutações de tasks.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.dashboard_vnext.direct_tasks_mutation.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18t_dashboard_views_no_direct_tasks_mutation_calls.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-dashboard-ssot-cutover",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-TASK-MISSION-CONTEXT-DRIFT",
+      "title": "Dashboard Tasks sem Drift de Contexto de Missão",
+      "domain": "runtime",
+      "description": "API dashboard de tasks deve manter enriquecimento mission_ref/context para evitar drift de vínculo task↔mission.",
+      "kind": "runtime",
+      "severity_default": "P2",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.task_mission_drift.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/integration/server/test_wave18t_dashboard_tasks_enriched_mission_context.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-dashboard-task-mission-context",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-DASHBOARD-VNEXT-NO-DIRECT-MISSIONS-MUTATION",
+      "title": "Dashboard vNext sem mutação direta /api/missions",
+      "domain": "runtime",
+      "description": "Views ativas do dashboard devem usar command flow para mutações de missão.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.dashboard_vnext.direct_missions_mutation.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave19_frontend_hard_cutover_no_legacy_mutations.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-dashboard-ssot-cutover",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-REALTIME-CURSOR-DEDUP-RECONCILIATION",
+      "title": "Realtime com deduplicação e reconciliação por cursor/event_id",
+      "domain": "runtime",
+      "description": "Fluxo SSOT no frontend deve aplicar dedupe por event_id e evitar regressão de cursor.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.realtime.cursor_dedup.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave19_realtime_cursor_dedup_reconciliation.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-dashboard-realtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
     }
   ]
 }

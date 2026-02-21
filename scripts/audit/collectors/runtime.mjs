@@ -139,6 +139,10 @@ export async function collectRuntimeFindings(options) {
     for (const missionSignal of missionTransitionSignals) {
         signals.push(missionSignal);
     }
+    const controlPlaneSignals = detectControlPlaneSignals(process.cwd());
+    for (const controlSignal of controlPlaneSignals) {
+        signals.push(controlSignal);
+    }
 
     if (options.profile !== 'quick') {
         const smoke = await exec(
@@ -341,6 +345,198 @@ function detectMissionTransitionBypass(rootDir) {
             });
         }
     }
+
+    return results;
+}
+
+function detectControlPlaneSignals(rootDir) {
+    const results = [];
+    const controlServicePath = path.join(rootDir, 'src/server/domain/control_command_service.js');
+    const missionControllerPath = path.join(rootDir, 'src/server/api/controllers/missions.js');
+    const taskControllerPath = path.join(rootDir, 'src/server/api/controllers/tasks.js');
+    const missionControlPath = path.join(rootDir, 'src/server/domain/mission_control_service.js');
+    const taskControlPath = path.join(rootDir, 'src/server/domain/task_control_service.js');
+    const authPath = path.join(rootDir, 'src/server/middleware/authorize.js');
+    const dashboardTasksControllerPath = path.join(rootDir, 'src/server/api/controllers/dashboard_tasks.js');
+    const taskViewsPath = path.join(rootDir, 'src/server/api/utils/task_views.js');
+    const ssotRealtimePath = path.join(rootDir, 'src/dashboard-ui/src/composables/useSsotRealtime.js');
+    const dashboardVnextTargets = [
+        'src/dashboard-ui/src/views/TasksView.vue',
+        'src/dashboard-ui/src/views/TaskDetail.vue',
+        'src/dashboard-ui/src/views/MissionDetail.vue',
+        'src/dashboard-ui/src/views/Missions.vue',
+        'src/dashboard-ui/src/stores/tasks_vnext.js',
+        'src/dashboard-ui/src/stores/missions_vnext.js',
+    ];
+
+    try {
+        if (!fs.existsSync(controlServicePath)) {
+            results.push({
+                signal: 'runtime.control.single_entrypoint.failed',
+                evidence: 'control_command_service ausente.',
+                source_tool: 'runtime-control-plane',
+                file: 'src/server/domain/control_command_service.js',
+                line: null,
+            });
+        } else {
+            const controlContent = fs.readFileSync(controlServicePath, 'utf8');
+            if (!/COMMANDS/.test(controlContent) || !/executeCommand/.test(controlContent)) {
+                results.push({
+                    signal: 'runtime.control.single_entrypoint.failed',
+                    evidence: 'control_command_service sem contrato mínimo (COMMANDS/executeCommand).',
+                    source_tool: 'runtime-control-plane',
+                    file: 'src/server/domain/control_command_service.js',
+                    line: null,
+                });
+            }
+            if (!/CONTROL_REQUIRE_REASON/.test(controlContent) || !/CONTROL_REQUIRE_IDEMPOTENCY_KEY/.test(controlContent)) {
+                results.push({
+                    signal: 'runtime.control.reason_idempotency.failed',
+                    evidence: 'Guarda de reason/idempotency não detectada no control_command_service.',
+                    source_tool: 'runtime-control-plane',
+                    file: 'src/server/domain/control_command_service.js',
+                    line: null,
+                });
+            }
+        }
+    } catch {}
+
+    try {
+        const missionControllerContent = fs.existsSync(missionControllerPath)
+            ? fs.readFileSync(missionControllerPath, 'utf8')
+            : '';
+        const taskControllerContent = fs.existsSync(taskControllerPath) ? fs.readFileSync(taskControllerPath, 'utf8') : '';
+        const missionUsesControl = /executeCommand/.test(missionControllerContent);
+        const taskUsesControl = /executeCommand/.test(taskControllerContent);
+        if (!missionUsesControl || !taskUsesControl) {
+            results.push({
+                signal: 'runtime.control.single_entrypoint.failed',
+                evidence: 'Controllers de missão/task não delegam integralmente ao control_command_service.',
+                source_tool: 'runtime-control-plane',
+                file: !missionUsesControl ? 'src/server/api/controllers/missions.js' : 'src/server/api/controllers/tasks.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const missionControlContent = fs.existsSync(missionControlPath) ? fs.readFileSync(missionControlPath, 'utf8') : '';
+        const taskControlContent = fs.existsSync(taskControlPath) ? fs.readFileSync(taskControlPath, 'utf8') : '';
+        const hasMissionPauseGuard = /MISSION_EDIT_REQUIRES_PAUSED|EDITABLE_MISSION/.test(missionControlContent);
+        const hasTaskPauseGuard = /TASK_EDIT_REQUIRES_PAUSED|_assertPauseToEditTask/.test(taskControlContent);
+        if (!hasMissionPauseGuard || !hasTaskPauseGuard) {
+            results.push({
+                signal: 'runtime.control.pause_to_edit.failed',
+                evidence: 'Guardas pause-to-edit não detectadas em mission/task control service.',
+                source_tool: 'runtime-control-plane',
+                file: !hasMissionPauseGuard
+                    ? 'src/server/domain/mission_control_service.js'
+                    : 'src/server/domain/task_control_service.js',
+                line: null,
+            });
+        }
+
+        const hasTaskReassignStateGuard =
+            /TASK_REASSIGN_REQUIRES_PAUSED_OR_READY_NOT_STARTED/.test(taskControlContent) &&
+            /reassignTaskMissionCommand/.test(taskControlContent);
+        const hasTaskReassignPatchGuard = /TASK_MISSION_REASSIGN_USE_COMMAND/.test(taskControlContent);
+        if (!hasTaskReassignStateGuard || !hasTaskReassignPatchGuard) {
+            results.push({
+                signal: 'runtime.task_reassign.state_guard.failed',
+                evidence: 'Guardas de reassign mission (estado elegível + patch guard) não detectadas.',
+                source_tool: 'runtime-task-control',
+                file: 'src/server/domain/task_control_service.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const authContent = fs.existsSync(authPath) ? fs.readFileSync(authPath, 'utf8') : '';
+        if (!/hasPermission/.test(authContent) && !/Permissão insuficiente/.test(authContent)) {
+            results.push({
+                signal: 'runtime.control.rbac_deny_default.failed',
+                evidence: 'Middleware de autorização sem deny-by-default detectado.',
+                source_tool: 'runtime-rbac',
+                file: 'src/server/middleware/authorize.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const directMutationPattern = /http\.(post|patch|put)\(\s*['"`]\/api\/tasks/g;
+        const directMissionMutationPattern = /http\.(post|patch|put|delete)\(\s*['"`]\/api\/missions/g;
+        for (const relPath of dashboardVnextTargets) {
+            const absPath = path.join(rootDir, relPath);
+            if (!fs.existsSync(absPath)) continue;
+            const content = fs.readFileSync(absPath, 'utf8');
+            const match = directMutationPattern.exec(content);
+            directMutationPattern.lastIndex = 0;
+            if (match) {
+                const line = content.slice(0, Number(match.index || 0)).split('\n').length;
+                results.push({
+                    signal: 'runtime.dashboard_vnext.direct_tasks_mutation.failed',
+                    evidence: `${relPath}:${line} mutação direta /api/tasks detectada em rota ativa vNext.`,
+                    source_tool: 'runtime-dashboard-vnext-cutover',
+                    file: relPath,
+                    line,
+                });
+                break;
+            }
+
+            const missionMatch = directMissionMutationPattern.exec(content);
+            directMissionMutationPattern.lastIndex = 0;
+            if (missionMatch) {
+                const line = content.slice(0, Number(missionMatch.index || 0)).split('\n').length;
+                results.push({
+                    signal: 'runtime.dashboard_vnext.direct_missions_mutation.failed',
+                    evidence: `${relPath}:${line} mutação direta /api/missions detectada em rota ativa vNext.`,
+                    source_tool: 'runtime-dashboard-vnext-cutover',
+                    file: relPath,
+                    line,
+                });
+                break;
+            }
+        }
+    } catch {}
+
+    try {
+        const dashboardTasksContent = fs.existsSync(dashboardTasksControllerPath)
+            ? fs.readFileSync(dashboardTasksControllerPath, 'utf8')
+            : '';
+        const taskViewsContent = fs.existsSync(taskViewsPath) ? fs.readFileSync(taskViewsPath, 'utf8') : '';
+        const hasMissionJoin = /LEFT JOIN missions/.test(dashboardTasksContent);
+        const hasMissionContext = /include\.has\('mission_context'\)/.test(dashboardTasksContent);
+        const hasMissionRefAndCaps = /mission_ref/.test(taskViewsContent) && /command_caps/.test(taskViewsContent);
+        if (!hasMissionJoin || !hasMissionContext || !hasMissionRefAndCaps) {
+            results.push({
+                signal: 'runtime.task_mission_drift.failed',
+                evidence: 'Contrato de contexto enriquecido task↔mission não detectado por completo.',
+                source_tool: 'runtime-dashboard-task-mission-context',
+                file: !hasMissionJoin || !hasMissionContext
+                    ? 'src/server/api/controllers/dashboard_tasks.js'
+                    : 'src/server/api/utils/task_views.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const ssotRealtimeContent = fs.existsSync(ssotRealtimePath) ? fs.readFileSync(ssotRealtimePath, 'utf8') : '';
+        const hasBatchBuffer = /pendingTaskBatches|scheduleFlush|REALTIME_FLUSH_MS/.test(ssotRealtimeContent);
+        const hasCursorGuard = /_coerceEventCursor|incomingCursor\s*<\s*lastCursor/.test(ssotRealtimeContent);
+        const hasEventDedup = /seenEventIds|_compactEvents/.test(ssotRealtimeContent);
+        if (!hasBatchBuffer || !hasCursorGuard || !hasEventDedup) {
+            results.push({
+                signal: 'runtime.realtime.cursor_dedup.failed',
+                evidence: 'useSsotRealtime sem dedupe/reconciliação por cursor/event_id completo.',
+                source_tool: 'runtime-dashboard-realtime',
+                file: 'src/dashboard-ui/src/composables/useSsotRealtime.js',
+                line: null,
+            });
+        }
+    } catch {}
 
     return results;
 }

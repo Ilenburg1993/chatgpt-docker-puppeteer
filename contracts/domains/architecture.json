@@ -201,6 +201,93 @@
       "enforcement": {
         "level": "warn"
       }
+    },
+    {
+      "id": "CONTRACT-ARCH-CONTROL-COMMAND-SINGLE-ENTRYPOINT",
+      "title": "Mutações via Control Command Service",
+      "domain": "architecture",
+      "description": "Controllers de missão/tarefa devem delegar mutações ao control_command_service.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "updateTask\\(|updateMission\\(|insertTask\\(",
+        "flags": "gm",
+        "scope": "src/server/api/controllers/missions.js|src/server/api/controllers/tasks.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18_control_commands_single_entrypoint.spec.js"
+      ],
+      "owner": "architecture-control-plane",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-DASHBOARD-VNEXT-NO-DIRECT-TASKS-MUTATION",
+      "title": "Dashboard vNext sem mutação direta em /api/tasks",
+      "domain": "architecture",
+      "description": "Views/stores vNext ativos devem mutar tasks exclusivamente via /api/control/commands.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "http\\.(post|patch|put)\\(\\s*['\"`]\\/api\\/tasks",
+        "flags": "gm",
+        "scope": "src/dashboard-ui/src/views/TasksView.vue|src/dashboard-ui/src/views/TaskDetail.vue|src/dashboard-ui/src/views/MissionDetail.vue|src/dashboard-ui/src/stores/tasks_vnext.js|src/dashboard-ui/src/stores/missions_vnext.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave18t_dashboard_views_no_direct_tasks_mutation_calls.spec.js"
+      ],
+      "owner": "architecture-dashboard-ssot-cutover",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-DASHBOARD-VNEXT-NO-DIRECT-MISSIONS-MUTATION",
+      "title": "Dashboard vNext sem mutação direta em /api/missions",
+      "domain": "architecture",
+      "description": "Views/stores vNext ativos devem mutar missões exclusivamente via /api/control/commands.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "http\\.(post|patch|put|delete)\\(\\s*['\"`]\\/api\\/missions",
+        "flags": "gm",
+        "scope": "src/dashboard-ui/src/views/TasksView.vue|src/dashboard-ui/src/views/TaskDetail.vue|src/dashboard-ui/src/views/MissionDetail.vue|src/dashboard-ui/src/views/Missions.vue|src/dashboard-ui/src/stores/tasks_vnext.js|src/dashboard-ui/src/stores/missions_vnext.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave19_frontend_hard_cutover_no_legacy_mutations.spec.js"
+      ],
+      "owner": "architecture-dashboard-ssot-cutover",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
     }
   ]
 }

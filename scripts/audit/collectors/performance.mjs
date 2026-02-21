@@ -135,6 +135,58 @@ export async function collectPerformanceFindings(rootDir) {
         });
     }
 
+    try {
+        // Control Plane: mutação única via command service
+        const controlSingleEntrypointResult = await analyzeControlSingleEntrypoint(rootDir);
+        findings.push(...controlSingleEntrypointResult.findings);
+        errors.push(...controlSingleEntrypointResult.errors);
+        warnings.push(...controlSingleEntrypointResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze control single entrypoint: ${error.message}`,
+        });
+    }
+
+    try {
+        // Pause-to-edit guard obrigatório em serviços de controle
+        const pauseToEditResult = await analyzeControlPauseToEdit(rootDir);
+        findings.push(...pauseToEditResult.findings);
+        errors.push(...pauseToEditResult.errors);
+        warnings.push(...pauseToEditResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze control pause-to-edit guards: ${error.message}`,
+        });
+    }
+
+    try {
+        // Cutover vNext: sem mutações diretas /api/tasks nas rotas ativas
+        const vnextCutoverResult = await analyzeDashboardVNextTaskMutationCutover(rootDir);
+        findings.push(...vnextCutoverResult.findings);
+        errors.push(...vnextCutoverResult.errors);
+        warnings.push(...vnextCutoverResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze dashboard vNext task mutation cutover: ${error.message}`,
+        });
+    }
+
+    try {
+        // Contrato de reassign mission e contexto task↔mission
+        const reassignResult = await analyzeTaskMissionReassignAndContext(rootDir);
+        findings.push(...reassignResult.findings);
+        errors.push(...reassignResult.errors);
+        warnings.push(...reassignResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze task mission reassign/context contracts: ${error.message}`,
+        });
+    }
+
     return { findings, errors, warnings };
 }
 
@@ -581,6 +633,298 @@ async function analyzeDashboardImportSideEffects(rootDir) {
         errors.push({
             source: 'performance-dashboard-import',
             message: `Failed to analyze dashboard import side effects: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta mutações diretas em controllers sem delegação via control_command_service.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeControlSingleEntrypoint(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    const targets = [
+        'src/server/api/controllers/missions.js',
+        'src/server/api/controllers/tasks.js',
+    ];
+    const directMutationPattern = /updateTask\s*\(|updateMission\s*\(|insertTask\s*\(/g;
+
+    try {
+        for (const relPath of targets) {
+            const absolutePath = path.join(rootDir, relPath);
+            if (!fs.existsSync(absolutePath)) continue;
+
+            const content = fs.readFileSync(absolutePath, 'utf8');
+            const usesCommandService = /executeCommand/.test(content);
+            if (!usesCommandService) {
+                findings.push({
+                    source_tool: 'performance-control-plane',
+                    contract_id: 'CONTRACT-ARCH-CONTROL-COMMAND-SINGLE-ENTRYPOINT',
+                    domain: 'architecture',
+                    file: relPath,
+                    line: null,
+                    evidence: 'Controller sem executeCommand detectado.',
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Mutações fora do command service aumentam drift de regra de negócio.',
+                    root_cause: 'Controller ainda muta estado sem control plane.',
+                    suggested_patch: 'Delegar mutações para /api/control/commands.',
+                    test_strategy: 'Executar regressões wave18 + audit:quick.',
+                    regression_risk: 'Alto',
+                });
+            }
+
+            for (const match of findRegexMatchesWithLine(content, directMutationPattern)) {
+                findings.push({
+                    source_tool: 'performance-control-plane',
+                    contract_id: 'CONTRACT-ARCH-CONTROL-COMMAND-SINGLE-ENTRYPOINT',
+                    domain: 'architecture',
+                    file: relPath,
+                    line: match.line,
+                    evidence: match.evidence,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Mutação direta no controller pode burlar invariantes do control plane.',
+                    root_cause: 'Uso direto de updateTask/updateMission/insertTask em camada de API.',
+                    suggested_patch: 'Encapsular mutação em comando do control_command_service.',
+                    test_strategy: 'Executar testes de comando único e auditoria quick.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-control-plane',
+            message: `Failed to analyze control single entrypoint: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta ausência de guardas pause-to-edit nos serviços de controle.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeControlPauseToEdit(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    const missionControlPath = path.join(rootDir, 'src/server/domain/mission_control_service.js');
+    const taskControlPath = path.join(rootDir, 'src/server/domain/task_control_service.js');
+
+    try {
+        if (fs.existsSync(missionControlPath)) {
+            const content = fs.readFileSync(missionControlPath, 'utf8');
+            if (!/MISSION_EDIT_REQUIRES_PAUSED|EDITABLE_MISSION/.test(content)) {
+                findings.push({
+                    source_tool: 'performance-control-pause-edit',
+                    contract_id: 'CONTRACT-RUNTIME-CONTROL-PAUSE-TO-EDIT',
+                    domain: 'runtime',
+                    file: 'src/server/domain/mission_control_service.js',
+                    line: null,
+                    evidence: 'Guard pause-to-edit de missão não detectado.',
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Missões podem ser editadas em execução.',
+                    root_cause: 'Ausência de guarda READY/PAUSED em edição.',
+                    suggested_patch: 'Exigir READY/PAUSED para mutações de missão.',
+                    test_strategy: 'Executar testes wave18 de pause-to-edit.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+
+        if (fs.existsSync(taskControlPath)) {
+            const content = fs.readFileSync(taskControlPath, 'utf8');
+            if (!/TASK_EDIT_REQUIRES_PAUSED|_assertPauseToEditTask/.test(content)) {
+                findings.push({
+                    source_tool: 'performance-control-pause-edit',
+                    contract_id: 'CONTRACT-RUNTIME-CONTROL-PAUSE-TO-EDIT',
+                    domain: 'runtime',
+                    file: 'src/server/domain/task_control_service.js',
+                    line: null,
+                    evidence: 'Guard pause-to-edit de task não detectado.',
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Tasks podem sofrer edição livre sem pausa.',
+                    root_cause: 'Ausência de guarda de edição para task.',
+                    suggested_patch: 'Validar status PAUSED/READY antes de patch.',
+                    test_strategy: 'Executar testes wave18 de pause-to-edit.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-control-pause-edit',
+            message: `Failed to analyze control pause-to-edit guards: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta chamadas diretas de mutação /api/tasks e /api/missions em views/stores vNext.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+    const targets = [
+        'src/dashboard-ui/src/views/TasksView.vue',
+        'src/dashboard-ui/src/views/TaskDetail.vue',
+        'src/dashboard-ui/src/views/MissionDetail.vue',
+        'src/dashboard-ui/src/stores/tasks_vnext.js',
+        'src/dashboard-ui/src/stores/missions_vnext.js',
+    ];
+    const directTasksMutationPattern = /http\.(post|patch|put)\(\s*['"`]\/api\/tasks/g;
+    const directMissionsMutationPattern = /http\.(post|patch|put|delete)\(\s*['"`]\/api\/missions/g;
+
+    try {
+        for (const relPath of targets) {
+            const absolutePath = path.join(rootDir, relPath);
+            if (!fs.existsSync(absolutePath)) continue;
+            const content = fs.readFileSync(absolutePath, 'utf8');
+            for (const match of findRegexMatchesWithLine(content, directTasksMutationPattern)) {
+                findings.push({
+                    source_tool: 'performance-dashboard-vnext-cutover',
+                    contract_id: 'CONTRACT-ARCH-DASHBOARD-VNEXT-NO-DIRECT-TASKS-MUTATION',
+                    domain: 'architecture',
+                    file: relPath,
+                    line: match.line,
+                    evidence: match.evidence,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Bypass do command flow em rota ativa pode causar drift de regra de domínio.',
+                    root_cause: 'Mutação direta de task fora do control plane.',
+                    suggested_patch: 'Substituir por actions em stores vNext que chamam /api/control/commands.',
+                    test_strategy: 'Executar testes wave18t de cutover + audit:quick.',
+                    regression_risk: 'Alto',
+                });
+            }
+
+            for (const match of findRegexMatchesWithLine(content, directMissionsMutationPattern)) {
+                findings.push({
+                    source_tool: 'performance-dashboard-vnext-cutover',
+                    contract_id: 'CONTRACT-ARCH-DASHBOARD-VNEXT-NO-DIRECT-MISSIONS-MUTATION',
+                    domain: 'architecture',
+                    file: relPath,
+                    line: match.line,
+                    evidence: match.evidence,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Bypass do command flow em rota ativa pode causar drift de regra de domínio de missão.',
+                    root_cause: 'Mutação direta de missão fora do control plane.',
+                    suggested_patch: 'Substituir por actions vNext com /api/control/commands.',
+                    test_strategy: 'Executar testes wave19 de hard cutover + audit:quick.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-dashboard-vnext-cutover',
+            message: `Failed to detect direct /api/tasks or /api/missions mutation in vNext: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta ausência de contratos mínimos para reassign mission e contexto task↔mission.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeTaskMissionReassignAndContext(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    const taskControlPath = path.join(rootDir, 'src/server/domain/task_control_service.js');
+    const controlServicePath = path.join(rootDir, 'src/server/domain/control_command_service.js');
+    const dashboardTasksPath = path.join(rootDir, 'src/server/api/controllers/dashboard_tasks.js');
+    const taskViewsPath = path.join(rootDir, 'src/server/api/utils/task_views.js');
+
+    try {
+        const taskControlContent = fs.existsSync(taskControlPath) ? fs.readFileSync(taskControlPath, 'utf8') : '';
+        const controlServiceContent = fs.existsSync(controlServicePath) ? fs.readFileSync(controlServicePath, 'utf8') : '';
+
+        const hasStateGuard = /TASK_REASSIGN_REQUIRES_PAUSED_OR_READY_NOT_STARTED/.test(taskControlContent);
+        const hasPatchGuard = /TASK_MISSION_REASSIGN_USE_COMMAND/.test(taskControlContent);
+        const hasCommand = /TASK_REASSIGN_MISSION/.test(controlServiceContent);
+
+        if (!hasStateGuard || !hasPatchGuard || !hasCommand) {
+            findings.push({
+                source_tool: 'performance-task-reassign',
+                contract_id: 'CONTRACT-RUNTIME-TASK-REASSIGN-STATE-GUARD',
+                domain: 'runtime',
+                file: !hasCommand ? 'src/server/domain/control_command_service.js' : 'src/server/domain/task_control_service.js',
+                line: null,
+                evidence: 'Guardas/command de TASK_REASSIGN_MISSION incompletos.',
+                severity_hint: 'P1',
+                type: 'bug',
+                impact: 'Reassign de missão pode ocorrer fora das invariantes de estado da task.',
+                root_cause: 'Contrato de reassign incompleto no domínio/control plane.',
+                suggested_patch: 'Exigir comando dedicado + guardas de estado e patch guard.',
+                test_strategy: 'Executar testes wave18t de reassign.',
+                regression_risk: 'Alto',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-task-reassign',
+            message: `Failed to analyze TASK_REASSIGN_MISSION contract: ${error.message}`,
+        });
+    }
+
+    try {
+        const dashboardTasksContent = fs.existsSync(dashboardTasksPath) ? fs.readFileSync(dashboardTasksPath, 'utf8') : '';
+        const taskViewsContent = fs.existsSync(taskViewsPath) ? fs.readFileSync(taskViewsPath, 'utf8') : '';
+        const hasJoin = /LEFT JOIN missions/.test(dashboardTasksContent);
+        const hasMissionContext = /include\.has\('mission_context'\)/.test(dashboardTasksContent);
+        const hasMissionRef = /mission_ref/.test(taskViewsContent);
+        const hasCommandCaps = /command_caps/.test(taskViewsContent);
+
+        if (!hasJoin || !hasMissionContext || !hasMissionRef || !hasCommandCaps) {
+            findings.push({
+                source_tool: 'performance-task-mission-context',
+                contract_id: 'CONTRACT-RUNTIME-TASK-MISSION-CONTEXT-DRIFT',
+                domain: 'runtime',
+                file: !hasJoin || !hasMissionContext
+                    ? 'src/server/api/controllers/dashboard_tasks.js'
+                    : 'src/server/api/utils/task_views.js',
+                line: null,
+                evidence: 'Enriquecimento de contexto task↔mission incompleto.',
+                severity_hint: 'P2',
+                type: 'gap',
+                impact: 'Dashboard pode exibir vínculo task/missão inconsistente e exigir chamadas paralelas.',
+                root_cause: 'Ausência de mission_ref/command_caps/mission_context no contrato da API.',
+                suggested_patch: 'Unificar shape enriquecido em dashboard_tasks/dashboard_missions + task_views.',
+                test_strategy: 'Executar integração wave18t de mission context.',
+                regression_risk: 'Médio',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-task-mission-context',
+            message: `Failed to analyze task mission context contract: ${error.message}`,
         });
     }
 

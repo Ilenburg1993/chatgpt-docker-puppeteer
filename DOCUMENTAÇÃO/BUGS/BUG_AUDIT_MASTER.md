@@ -1,8 +1,8 @@
 # BUG_AUDIT_MASTER
 
-- Ultima atualizacao: 2026-02-21T08:50:09Z
-- Rodada: WAVE_AUDIT_QUICK_2026-02-21T08-49-38-471Z
-- Escopo: Wave 17 (`missao/tarefa SSOT`, `server/dashboard realtime`, `config/env`, `contracts/*`, `scripts/audit/*`) + governanca continua
+- Ultima atualizacao: 2026-02-21T10:21:35Z
+- Rodada: WAVE_AUDIT_QUICK_2026-02-21T10-20-30-099Z
+- Escopo: Wave 19 (`frontend hard cutover`, `MISSION_CREATE no control plane`, `realtime dedupe/cursor`, `presets operacionais`, `contracts/*`, `scripts/audit/*`) + governanca continua
 - Modo de entrega: implementacao completa das correcoes + validacao automatizada
 
 ## Trilha Contínua CODEX (Wave 12+)
@@ -11,7 +11,7 @@
 - Playbook operacional: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_PLAYBOOK.md`
 - Delta local de instruções: `DOCUMENTAÇÃO/BUGS/CODEX_DEFAULT_INSTRUCTIONS_DELTA.md`
 - Snapshot inicial da trilha: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_01-41.md`
-- Snapshot mais recente: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_05-50.md`
+- Snapshot mais recente: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_10-20.md`
 
 ## Automação Audit v2
 - Plano canônico: `DOCUMENTAÇÃO/BUGS/PLANO_MESTRE_UPGRADE_AUDITORIA_V2.md`
