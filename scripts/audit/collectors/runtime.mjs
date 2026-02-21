@@ -1,5 +1,7 @@
 import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 import { evaluateRuntimeSignals } from '../contracts/evaluate_runtime.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding
@@ -114,6 +116,30 @@ export async function collectRuntimeFindings(options) {
         });
     }
 
+    const lockCausalityIssues = detectLockReleaseCausalityIssues(process.cwd());
+    if (lockCausalityIssues.length > 0) {
+        const evidence = lockCausalityIssues
+            .map(item => `${item.file}:${item.line} ${item.evidence}`)
+            .slice(0, 10)
+            .join('\n');
+        signals.push({
+            signal: 'runtime.lock_release_causality.failed',
+            evidence,
+            source_tool: 'runtime-lock-causality',
+            file: lockCausalityIssues[0]?.file || null,
+            line: lockCausalityIssues[0]?.line || null,
+        });
+    }
+
+    const dashboardSignals = detectDashboardRuntimePolicySignals(process.cwd());
+    for (const dashboardSignal of dashboardSignals) {
+        signals.push(dashboardSignal);
+    }
+    const missionTransitionSignals = detectMissionTransitionBypass(process.cwd());
+    for (const missionSignal of missionTransitionSignals) {
+        signals.push(missionSignal);
+    }
+
     if (options.profile !== 'quick') {
         const smoke = await exec(
             'runtime.smoke',
@@ -186,4 +212,135 @@ export async function collectRuntimeFindings(options) {
     }
 
     return { findings, errors, warnings, telemetry };
+}
+
+function detectLockReleaseCausalityIssues(rootDir) {
+    const targets = [
+        'src/agent/queue_worker.js',
+        'src/agent/task_state_projector.js',
+    ];
+    const pattern = /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/g;
+    const issues = [];
+
+    for (const rel of targets) {
+        const fullPath = path.join(rootDir, rel);
+        if (!fs.existsSync(fullPath)) continue;
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const regex = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+        let match;
+        while ((match = regex.exec(content)) !== null) {
+            const line = content.slice(0, Number(match.index || 0)).split('\n').length;
+            const evidence = content.split('\n')[Math.max(0, line - 1)]?.trim() || String(match[0] || pattern.source);
+            issues.push({ file: rel, line, evidence });
+        }
+    }
+
+    return issues;
+}
+
+function detectDashboardRuntimePolicySignals(rootDir) {
+    const results = [];
+    const dashboardControllerPath = path.join(rootDir, 'src/server/api/controllers/dashboard.js');
+    const socketPath = path.join(rootDir, 'src/server/engine/socket.js');
+    const serverMainPath = path.join(rootDir, 'src/server/main.js');
+
+    try {
+        if (fs.existsSync(dashboardControllerPath)) {
+            const content = fs.readFileSync(dashboardControllerPath, 'utf8');
+            if (/admin123|user123|const\s+validUsers\s*=\s*\{/g.test(content)) {
+                results.push({
+                    signal: 'dashboard_auth_insecure',
+                    evidence: 'Credenciais hardcoded detectadas em dashboard auth controller.',
+                    source_tool: 'runtime-dashboard-auth',
+                    file: 'src/server/api/controllers/dashboard.js',
+                    line: null,
+                });
+            }
+        }
+    } catch {}
+
+    try {
+        if (fs.existsSync(socketPath)) {
+            const content = fs.readFileSync(socketPath, 'utf8');
+            const hasCommandEmit = /internalEmitter\.emit\(\s*['"]dashboard:command['"]/.test(content);
+            const hasCommandGate = /DASHBOARD_COMMANDS_ENABLED|COMMAND_CHANNEL_DISABLED/.test(content);
+            const hasRoleGate = /DASHBOARD_COMMAND_ROLE|COMMAND_FORBIDDEN/.test(content);
+            const hasSocketAuthGate = /DASHBOARD_SOCKET_AUTH_REQUIRED|dashboard:auth:error/.test(content);
+
+            if (hasCommandEmit && (!hasCommandGate || !hasRoleGate || !hasSocketAuthGate)) {
+                results.push({
+                    signal: 'dashboard_socket_command_unsafe',
+                    evidence: 'Canal dashboard:command detectado sem gate completo de auth/authz.',
+                    source_tool: 'runtime-dashboard-socket',
+                    file: 'src/server/engine/socket.js',
+                    line: null,
+                });
+            }
+        }
+    } catch {}
+
+    try {
+        if (fs.existsSync(serverMainPath)) {
+            const content = fs.readFileSync(serverMainPath, 'utf8');
+            const startsSsotFeed = /ssotEventFeed\.start\s*\(/.test(content);
+            const hasLegacyBridgeInit = /taskSyncBridge\s*&&\s*typeof\s+taskSyncBridge\.initialize/.test(content);
+            const hasLegacyModeGate = /dashboardTaskSyncMode\s*===\s*['"]legacy_bridge['"]/.test(content);
+            const hasContingencyGate = /DASHBOARD_LEGACY_BRIDGE_CONTINGENCY/.test(content);
+            const startsLegacyBridgeWithoutContingency = hasLegacyBridgeInit && hasLegacyModeGate && !hasContingencyGate;
+
+            if (startsSsotFeed && startsLegacyBridgeWithoutContingency) {
+                results.push({
+                    signal: 'dashboard_dual_feed',
+                    evidence: 'Inicialização potencial de feed SSOT e bridge legacy sem gate de modo.',
+                    source_tool: 'runtime-dashboard-realtime',
+                    file: 'src/server/main.js',
+                    line: null,
+                });
+            }
+        }
+    } catch {}
+
+    return results;
+}
+
+function detectMissionTransitionBypass(rootDir) {
+    const results = [];
+    const targets = [
+        'src/server/api/controllers/missions.js',
+        'src/agent/mission_runner.js',
+    ];
+    const statusMutationPattern = /updateMission\s*\([^)]*$/gm;
+
+    for (const relPath of targets) {
+        const fullPath = path.join(rootDir, relPath);
+        if (!fs.existsSync(fullPath)) {
+            continue;
+        }
+
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+            const line = lines[i];
+            if (!statusMutationPattern.test(line)) {
+                statusMutationPattern.lastIndex = 0;
+                continue;
+            }
+            statusMutationPattern.lastIndex = 0;
+
+            const window = lines.slice(i, Math.min(lines.length, i + 12)).join('\n');
+            if (!/status\s*:/.test(window)) {
+                continue;
+            }
+
+            results.push({
+                signal: 'runtime.mission_transition_bypass.detected',
+                evidence: `${relPath}:${i + 1} updateMission com status detectado fora de mission_execution_service`,
+                source_tool: 'runtime-mission-transition',
+                file: relPath,
+                line: i + 1,
+            });
+        }
+    }
+
+    return results;
 }

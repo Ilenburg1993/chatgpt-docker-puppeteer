@@ -70,6 +70,71 @@ export async function collectPerformanceFindings(rootDir) {
         });
     }
 
+    try {
+        // Análise de ownership de dispatch (Kernel SSOT via QueueWorker)
+        const ownershipResult = await analyzeKernelDispatchOwnership(rootDir);
+        findings.push(...ownershipResult.findings);
+        errors.push(...ownershipResult.errors);
+        warnings.push(...ownershipResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze kernel dispatch ownership: ${error.message}`,
+        });
+    }
+
+    try {
+        // Análise de bypass no serviço de transição de missão
+        const missionTransitionResult = await analyzeMissionTransitionBypass(rootDir);
+        findings.push(...missionTransitionResult.findings);
+        errors.push(...missionTransitionResult.errors);
+        warnings.push(...missionTransitionResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze mission transition bypass: ${error.message}`,
+        });
+    }
+
+    try {
+        // Análise de causalidade lock->attempt no unlock de task
+        const lockCausalityResult = await analyzeLockReleaseCausality(rootDir);
+        findings.push(...lockCausalityResult.findings);
+        errors.push(...lockCausalityResult.errors);
+        warnings.push(...lockCausalityResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze lock release causality: ${error.message}`,
+        });
+    }
+
+    try {
+        // Hardening dashboard auth: credenciais hardcoded
+        const dashboardAuthResult = await analyzeDashboardAuthInsecure(rootDir);
+        findings.push(...dashboardAuthResult.findings);
+        errors.push(...dashboardAuthResult.errors);
+        warnings.push(...dashboardAuthResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze dashboard auth hardcoding: ${error.message}`,
+        });
+    }
+
+    try {
+        // Import-safety: evitar timer em top-level de controller
+        const dashboardImportResult = await analyzeDashboardImportSideEffects(rootDir);
+        findings.push(...dashboardImportResult.findings);
+        errors.push(...dashboardImportResult.errors);
+        warnings.push(...dashboardImportResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze dashboard import side effects: ${error.message}`,
+        });
+    }
+
     return { findings, errors, warnings };
 }
 
@@ -259,6 +324,284 @@ async function analyzePromiseRaceTimeoutLeaks(rootDir) {
     }
 
     return { findings, errors, warnings };
+}
+
+/**
+ * Detecta dispatch direto de task no Kernel fora do QueueWorker (SSOT owner).
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeKernelDispatchOwnership(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    try {
+        const srcDir = path.join(rootDir, 'src');
+        const files = await findJsFiles(srcDir);
+        const allowDirectDispatch = new Set([
+            'src/agent/queue_worker.js',
+            'src/missions/mission_manager.js',
+        ]);
+        const pattern = /\b(?:this\.)?kernel\.executeTask\s*\(/g;
+
+        for (const file of files) {
+            const relativePath = path.relative(rootDir, file).split(path.sep).join('/');
+            if (allowDirectDispatch.has(relativePath)) {
+                continue;
+            }
+
+            const content = fs.readFileSync(file, 'utf8');
+            for (const match of findRegexMatchesWithLine(content, pattern)) {
+                findings.push({
+                    source_tool: 'performance-kernel-ownership',
+                    contract_id: 'CONTRACT-ARCH-SSOT-EXECUTION-OWNER',
+                    domain: 'architecture',
+                    file: relativePath,
+                    line: match.line,
+                    evidence: match.evidence,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Dispatch direto fora do QueueWorker viola ownership SSOT e aumenta risco de execução paralela.',
+                    root_cause: 'Chamada direta para kernel.executeTask em caminho não autorizado.',
+                    suggested_patch: 'Enfileirar via insertTask + QueueWorker, mantendo Kernel como executor único por fila.',
+                    test_strategy: 'Executar lint de ownership + testes de integração de missão/fila.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-kernel-ownership',
+            message: `Failed to detect kernel dispatch ownership violations: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta unlock sem causalidade de attempt em pontos críticos (queue/projector).
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeLockReleaseCausality(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    const targets = [
+        'src/agent/queue_worker.js',
+        'src/agent/task_state_projector.js',
+    ];
+
+    const pattern = /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/g;
+
+    try {
+        for (const relPath of targets) {
+            const absolutePath = path.join(rootDir, relPath);
+            if (!fs.existsSync(absolutePath)) {
+                continue;
+            }
+            const content = fs.readFileSync(absolutePath, 'utf8');
+            for (const match of findRegexMatchesWithLine(content, pattern)) {
+                findings.push({
+                    source_tool: 'performance-lock-causality',
+                    contract_id: 'CONTRACT-RUNTIME-LOCK-RELEASE-ATTEMPT-CAUSALITY',
+                    domain: 'runtime',
+                    file: relPath,
+                    line: match.line,
+                    evidence: match.evidence,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Unlock sem vínculo de attempt pode liberar lease de execução ativa por corrida.',
+                    root_cause: 'releaseTaskLock chamado sem expectedAttemptId no caminho crítico.',
+                    suggested_patch: 'Usar helper de unlock causal (releaseTaskLockForAttempt).',
+                    test_strategy: 'Executar testes de stale-attempt/lock-causality e auditoria quick.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-lock-causality',
+            message: `Failed to detect lock release causality violations: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta mutação de status de missão fora do serviço de domínio único.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeMissionTransitionBypass(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+    const targets = [
+        'src/server/api/controllers/missions.js',
+        'src/agent/mission_runner.js',
+    ];
+
+    try {
+        for (const relPath of targets) {
+            const absolutePath = path.join(rootDir, relPath);
+            if (!fs.existsSync(absolutePath)) continue;
+
+            const content = fs.readFileSync(absolutePath, 'utf8');
+            const lines = content.split('\n');
+            for (let i = 0; i < lines.length; i += 1) {
+                if (!/updateMission\s*\(/.test(lines[i])) {
+                    continue;
+                }
+                const window = lines.slice(i, Math.min(i + 12, lines.length)).join('\n');
+                if (!/status\s*:/.test(window)) {
+                    continue;
+                }
+                findings.push({
+                    source_tool: 'performance-mission-transition',
+                    contract_id: 'CONTRACT-RUNTIME-MISSION-TRANSITION-SERVICE',
+                    domain: 'runtime',
+                    file: relPath,
+                    line: i + 1,
+                    evidence: lines[i].trim(),
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Mutação de status fora do serviço único pode causar drift de regras entre controller/runner.',
+                    root_cause: 'updateMission(status=...) chamado diretamente sem mission_execution_service.',
+                    suggested_patch: 'Encaminhar transição para mission_execution_service com precondições e evento padronizado.',
+                    test_strategy: 'Executar regressão wave17 de serviço único de transição.',
+                    regression_risk: 'Alto',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-mission-transition',
+            message: `Failed to detect mission transition bypass: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta credenciais hardcoded na autenticação do dashboard.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeDashboardAuthInsecure(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    const relPath = 'src/server/api/controllers/dashboard.js';
+    const absolutePath = path.join(rootDir, relPath);
+
+    try {
+        if (!fs.existsSync(absolutePath)) {
+            return { findings, errors, warnings };
+        }
+
+        const content = fs.readFileSync(absolutePath, 'utf8');
+        const pattern = /admin123|user123|const\s+validUsers\s*=\s*\{/g;
+        for (const match of findRegexMatchesWithLine(content, pattern)) {
+            findings.push({
+                source_tool: 'performance-dashboard-auth',
+                contract_id: 'CONTRACT-ARCH-DASHBOARD-AUTH-NO-HARDCODED',
+                domain: 'architecture',
+                file: relPath,
+                line: match.line,
+                evidence: match.evidence,
+                severity_hint: 'P1',
+                type: 'bug',
+                impact: 'Credenciais hardcoded expõem autenticação do dashboard.',
+                root_cause: 'Auth com usuários/senhas embutidos em código.',
+                suggested_patch: 'Mover autenticação para env obrigatória + validação de boot.',
+                test_strategy: 'Executar regressão de auth hardcoded da wave16r.',
+                regression_risk: 'Alto',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-dashboard-auth',
+            message: `Failed to analyze dashboard auth hardcoding: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * Detecta side-effect de timer em import de controller dashboard.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeDashboardImportSideEffects(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    const relPath = 'src/server/api/controllers/dashboard.js';
+    const absolutePath = path.join(rootDir, relPath);
+
+    try {
+        if (!fs.existsSync(absolutePath)) {
+            return { findings, errors, warnings };
+        }
+
+        const content = fs.readFileSync(absolutePath, 'utf8');
+        const pattern = /^\s*startPeriodicCleanup\s*\(/gm;
+        for (const match of findRegexMatchesWithLine(content, pattern)) {
+            findings.push({
+                source_tool: 'performance-dashboard-import',
+                contract_id: 'CONTRACT-ARCH-DASHBOARD-CONTROLLER-NO-TOPLEVEL-TIMER',
+                domain: 'architecture',
+                file: relPath,
+                line: match.line,
+                evidence: match.evidence,
+                severity_hint: 'P1',
+                type: 'bug',
+                impact: 'Import do controller cria timer e quebra import-safety.',
+                root_cause: 'startPeriodicCleanup executado no top-level do módulo.',
+                suggested_patch: 'Iniciar cleanup no bootstrap e parar no lifecycle.',
+                test_strategy: 'Executar regressão de import sem timer side-effect.',
+                regression_risk: 'Médio',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-dashboard-import',
+            message: `Failed to analyze dashboard import side effects: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * @param {string} content
+ * @param {RegExp} pattern
+ */
+function findRegexMatchesWithLine(content, pattern) {
+    const matches = [];
+    const regex = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    let m;
+    while ((m = regex.exec(content)) !== null) {
+        const index = Number(m.index || 0);
+        const line = content.slice(0, index).split('\n').length;
+        const evidence = content.split('\n')[Math.max(0, line - 1)]?.trim() || String(m[0] || pattern.source);
+        matches.push({ line, evidence });
+    }
+    return matches;
 }
 
 /**

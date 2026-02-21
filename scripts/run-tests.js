@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
-import os from 'node:os';
 
-const platform = os.platform();
-let cmd;
-if (platform === 'win32') {
-    cmd = 'powershell -ExecutionPolicy Bypass -File scripts/run_all_tests.ps1';
-} else {
-    cmd = 'bash scripts/run_all_tests.sh';
-}
+/**
+ * @fileoverview Proxy de compatibilidade para run-tests.js
+ * @deprecated Este script foi movido para scripts/build/run-tests.js
+ * Este arquivo é um proxy temporário para manter compatibilidade.
+ */
 
-const res = spawnSync(cmd, { shell: true, stdio: 'inherit' });
-process.exit(res.status || 0);
+console.warn('⚠️  DEPRECATED: Este script foi movido para scripts/build/run-tests.js');
+console.warn('   Por favor, atualize suas referências.');
+console.warn('   Este proxy será removido em breve.');
+
+// Importa o script real
+import('./build/run-tests.js');

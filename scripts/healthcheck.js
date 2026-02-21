@@ -1,29 +1,14 @@
 #!/usr/bin/env node
-import http from 'node:http';
 
-const options = {
-    hostname: 'localhost',
-    port: 3008,
-    path: '/api/health',
-    method: 'GET',
-    timeout: 5000
-};
+/**
+ * @fileoverview Proxy de compatibilidade para healthcheck.js
+ * @deprecated Este script foi movido para scripts/health/healthcheck.js
+ * Este arquivo é um proxy temporário para manter compatibilidade.
+ */
 
-const req = http.request(options, res => {
-    if (res.statusCode === 200) {
-        process.exit(0);
-    } else {
-        process.exit(1);
-    }
-});
+console.warn('⚠️  DEPRECATED: Este script foi movido para scripts/health/healthcheck.js');
+console.warn('   Por favor, atualize suas referências.');
+console.warn('   Este proxy será removido em breve.');
 
-req.on('error', () => {
-    process.exit(1);
-});
-
-req.on('timeout', () => {
-    req.destroy();
-    process.exit(1);
-});
-
-req.end();
+// Importa o script real
+import('./health/healthcheck.js');

@@ -368,15 +368,15 @@ monit:
 
 dashboard-check:
 	@echo "$(CYAN)🔍 Dashboard Access Diagnostics$(NC)"
-	@bash scripts/check-dashboard-access.sh
+	@bash scripts/ops/check-dashboard-access.sh
 
 dashboard-guide:
 	@echo "$(CYAN)📖 Port Forwarding Setup Guide$(NC)"
-	@bash scripts/guide-port-forwarding.sh
+	@bash scripts/ops/guide-port-forwarding.sh
 
 dashboard-open:
 	@echo "$(CYAN)🌐 Opening Dashboard in Browser$(NC)"
-	@bash scripts/open-dashboard-browser.sh
+	@bash scripts/ops/open-dashboard-browser.sh
 
 dashboard-test-windows:
 	@echo "$(CYAN)🪟 Test Dashboard Access from Windows$(NC)"
@@ -391,7 +391,7 @@ dashboard-test-windows:
 
 dashboard-sync:
 	@echo "$(CYAN)🔄 DevContainer Config Sync Check$(NC)"
-	@bash scripts/check-devcontainer-sync.sh
+	@bash scripts/ops/check-devcontainer-sync.sh
 
 # =============================================================================
 # 5️⃣ HEALTH (PM2 SOVEREIGN MODE)
@@ -401,7 +401,7 @@ dashboard-sync:
 
 health:
 	@echo "$(CYAN)🏥 PM2 Health Check (Sovereign Mode)$(NC)"
-	@bash scripts/pm2-check.sh || true
+	@bash scripts/ops/pm2-check.sh || true
 
 health-core: health
 
@@ -409,10 +409,10 @@ pm2-check:
 	@bash scripts/pm2-check.sh
 
 pm2-check-fix:
-	@bash scripts/pm2-check.sh --fix
+	@bash scripts/ops/pm2-check.sh --fix
 
 pm2-startup:
-	@bash scripts/pm2-startup.sh
+	@bash scripts/setup/pm2-startup.sh
 
 pm2-validate:
 	@echo "$(CYAN)🔍 Validando configuração PM2 Sovereign...$(NC)"
@@ -780,15 +780,15 @@ validate-git:
 
 validate-env:
 	@echo "$(CYAN)🔍 Validando arquivos .env contra .env.schema.json$(NC)"
-	@if [ ! -f scripts/validate-env.js ]; then \
-		echo "$(RED)❌ scripts/validate-env.js não encontrado$(NC)"; \
+	@if [ ! -f scripts/env/validate-env.js ]; then \
+		echo "$(RED)❌ scripts/env/validate-env.js não encontrado$(NC)"; \
 		exit 1; \
 	fi
 	@if [ ! -f .env.schema.json ]; then \
 		echo "$(RED)❌ .env.schema.json não encontrado$(NC)"; \
 		exit 1; \
 	fi
-	@$(NODE) scripts/validate-env.js --all || (echo "$(RED)❌ Validação ENV falhou$(NC)" && exit 1)
+	@$(NODE) scripts/env/validate-env.js --all || (echo "$(RED)❌ Validação ENV falhou$(NC)" && exit 1)
 	@echo "$(GREEN)✅ Validação ENV concluída$(NC)"
 
 validate-powershell-bom:
@@ -839,7 +839,7 @@ check-chrome:
 
 check-bindings:
 	@echo "$(CYAN)🔍 Verificando bindings 0.0.0.0$(NC)"
-	@bash scripts/check-all-bindings.sh
+	@bash scripts/env/check-all-bindings.sh
 
 # =============================================================================
 # 1️⃣3️⃣ DEVELOPMENT SHORTCUTS

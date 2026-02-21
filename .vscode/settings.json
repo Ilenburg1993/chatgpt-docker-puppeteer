@@ -164,7 +164,7 @@
   "diffEditor.diffAlgorithm": "advanced",
   "diffEditor.experimental.showMoves": true,
   "diffEditor.ignoreTrimWhitespace": true,
-  "diffEditor.maxComputationTime": 5000,
+  "diffEditor.maxComputationTime": 0,
   "diffEditor.maxFileSize": 100,
   "diffEditor.renderIndicators": true,
   "diffEditor.renderMarginRevertIcon": true,
