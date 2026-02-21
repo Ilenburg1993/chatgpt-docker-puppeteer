@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { log } from '#core/logger';
 import { getJwtSecret, JWT_SIGN_OPTIONS } from '#core/jwt_config';
+import { getRbacUserByUsername, verifyRbacCredentials } from '#infra/db/rbac_repo';
 import { revokeToken } from '#infra/db/token_blocklist';
 import denyIfDelegated from '../../middleware/deny_if_delegated.js';
 import { authenticate } from '../../middleware/auth.js';
@@ -86,35 +87,49 @@ router.post('/auth/login', async (req, res) => {
             });
         }
 
-        let authUser = { username, role: 'admin' };
+        let authUser = { username, role: 'viewer', roles: ['viewer'], permissions: [] };
 
         if (isDashboardAuthRequired()) {
-            let credentials;
-            try {
-                credentials = getDashboardAuthCredentials();
-            } catch (configErr) {
-                log('ERROR', `[AUTH] Configuração de autenticação inválida: ${configErr.message}`, req.id);
-                return res.status(503).json({
-                    success: false,
-                    error: 'Autenticação do dashboard indisponível por configuração inválida',
-                    request_id: req.id,
-                });
-            }
+            let rbacUser = verifyRbacCredentials(username, password);
+            if (!rbacUser) {
+                let credentials;
+                try {
+                    credentials = getDashboardAuthCredentials();
+                } catch (configErr) {
+                    log('ERROR', `[AUTH] Configuração de autenticação inválida: ${configErr.message}`, req.id);
+                    return res.status(503).json({
+                        success: false,
+                        error: 'Autenticação do dashboard indisponível por configuração inválida',
+                        request_id: req.id,
+                    });
+                }
 
-            const isValidUsername = safeCredentialMatch(username, credentials.username);
-            const isValidPassword = safeCredentialMatch(password, credentials.password);
-            if (!isValidUsername || !isValidPassword) {
-                log('WARN', `[AUTH] Login failed for user: ${username}`, req.id);
-                return res.status(401).json({
-                    success: false,
-                    error: 'Credenciais inválidas',
-                    request_id: req.id,
-                });
+                const isValidUsername = safeCredentialMatch(username, credentials.username);
+                const isValidPassword = safeCredentialMatch(password, credentials.password);
+                if (!isValidUsername || !isValidPassword) {
+                    log('WARN', `[AUTH] Login failed for user: ${username}`, req.id);
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Credenciais inválidas',
+                        request_id: req.id,
+                    });
+                }
+
+                // fallback de compatibilidade: credencial de env pode não existir em RBAC ainda.
+                rbacUser = getRbacUserByUsername(credentials.username) || {
+                    id: credentials.username,
+                    username: credentials.username,
+                    role: credentials.role,
+                    roles: [credentials.role],
+                    permissions: [],
+                };
             }
 
             authUser = {
-                username: credentials.username,
-                role: credentials.role,
+                username: rbacUser.username,
+                role: rbacUser.role || 'viewer',
+                roles: Array.isArray(rbacUser.roles) && rbacUser.roles.length > 0 ? rbacUser.roles : [rbacUser.role || 'viewer'],
+                permissions: Array.isArray(rbacUser.permissions) ? rbacUser.permissions : [],
             };
         }
 
@@ -125,6 +140,8 @@ router.post('/auth/login', async (req, res) => {
                 id: authUser.username,
                 username: authUser.username,
                 role: authUser.role,
+                roles: authUser.roles,
+                permissions: authUser.permissions,
                 jti,
             },
             getJwtSecret(),
@@ -139,6 +156,8 @@ router.post('/auth/login', async (req, res) => {
                 id: authUser.username,
                 username: authUser.username,
                 role: authUser.role,
+                roles: authUser.roles,
+                permissions: authUser.permissions,
             },
             expires_in: 24 * 60 * 60, // 24 horas em segundos
             request_id: req.id,

@@ -287,6 +287,115 @@ const MIGRATIONS = [
             }
         },
     },
+    {
+        version: 6,
+        name: 'control_plane_and_rbac',
+        up: `
+            CREATE TABLE IF NOT EXISTS mission_steps (
+                id TEXT PRIMARY KEY,
+                mission_id TEXT NOT NULL,
+                step_id TEXT NOT NULL,
+                step_index INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                current_task_id TEXT NULL,
+                last_task_id TEXT NULL,
+                attempt_seq INTEGER NOT NULL DEFAULT 0,
+                version INTEGER NOT NULL DEFAULT 1,
+                updated_at_ms INTEGER NOT NULL,
+                UNIQUE (mission_id, step_id, attempt_seq),
+                FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE CASCADE,
+                FOREIGN KEY (current_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+                FOREIGN KEY (last_task_id) REFERENCES tasks(id) ON DELETE SET NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_mission_steps_mission ON mission_steps(mission_id, step_index);
+            CREATE INDEX IF NOT EXISTS idx_mission_steps_status ON mission_steps(status, updated_at_ms);
+
+            CREATE TABLE IF NOT EXISTS control_operations (
+                id TEXT PRIMARY KEY,
+                command TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                actor_id TEXT NULL,
+                actor_role TEXT NULL,
+                reason TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                result_json TEXT NULL,
+                error_code TEXT NULL,
+                error_message TEXT NULL,
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_control_ops_entity ON control_operations(entity_type, entity_id, updated_at_ms);
+            CREATE INDEX IF NOT EXISTS idx_control_ops_status ON control_operations(status, updated_at_ms);
+
+            CREATE TABLE IF NOT EXISTS audit_diffs (
+                id TEXT PRIMARY KEY,
+                operation_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                before_json TEXT NOT NULL,
+                after_json TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL,
+                FOREIGN KEY (operation_id) REFERENCES control_operations(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_diffs_operation ON audit_diffs(operation_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_diffs_entity ON audit_diffs(entity_type, entity_id, created_at_ms);
+
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                user_id TEXT PRIMARY KEY,
+                layout_json TEXT NOT NULL DEFAULT '{}',
+                columns_json TEXT NOT NULL DEFAULT '{}',
+                filters_json TEXT NOT NULL DEFAULT '{}',
+                density TEXT NOT NULL DEFAULT 'comfortable',
+                shortcuts_json TEXT NOT NULL DEFAULT '{}',
+                alerts_json TEXT NOT NULL DEFAULT '{}',
+                updated_at_ms INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS rbac_users (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS rbac_roles (
+                id TEXT PRIMARY KEY,
+                role_name TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS rbac_permissions (
+                id TEXT PRIMARY KEY,
+                permission TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS rbac_user_role (
+                user_id TEXT NOT NULL,
+                role_id TEXT NOT NULL,
+                PRIMARY KEY (user_id, role_id),
+                FOREIGN KEY (user_id) REFERENCES rbac_users(id) ON DELETE CASCADE,
+                FOREIGN KEY (role_id) REFERENCES rbac_roles(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS rbac_role_permission (
+                role_id TEXT NOT NULL,
+                permission_id TEXT NOT NULL,
+                PRIMARY KEY (role_id, permission_id),
+                FOREIGN KEY (role_id) REFERENCES rbac_roles(id) ON DELETE CASCADE,
+                FOREIGN KEY (permission_id) REFERENCES rbac_permissions(id) ON DELETE CASCADE
+            );
+        `,
+    },
 ];
 
 export { MIGRATIONS };

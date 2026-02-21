@@ -6,6 +6,7 @@ const router = express.Router();
 
 import { audit, log } from '#core/logger';
 import * as schemas from '#core/schemas';
+import { executeCommand } from '#server/domain/control_command_service';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
@@ -14,12 +15,12 @@ import {
     clearQueuePreserveRunning,
     countTasks,
     getTaskById,
-    insertTask,
+    insertTask as persistTaskInsert,
     listTasks,
     purgeTask,
     releaseTaskLock,
     retryFailedTasks,
-    updateTask,
+    updateTask as persistTaskUpdate,
 } from '#infra/db/task_repo';
 import { putJson, readText as readArtifactText } from '#infra/storage/artifact_store';
 import schemaGuard from '../../middleware/schema_guard.js';
@@ -53,7 +54,7 @@ function _safeId(raw) {
  */
 function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {
     try {
-        return updateTask(taskId, updates);
+        return persistTaskUpdate(taskId, updates);
     } catch (err) {
         if (err && err.name === 'OptimisticLockError') {
             log('WARN', `[TasksAPI] Task ${taskId} update conflict after retries`);
@@ -140,6 +141,33 @@ function _uniqStrings(list) {
         out.push(s);
     }
     return out;
+}
+
+async function _runTaskControlCommand(req, res, command, payload = {}) {
+    try {
+        const result = await executeCommand({
+            command,
+            payload: {
+                ...payload,
+                reason: payload.reason || req.body?.reason || `${command.toLowerCase()} via /api/tasks`,
+                idempotency_key:
+                    payload.idempotency_key ||
+                    `${req.id}:${command}:${payload.task_id || (Array.isArray(payload.ids) ? payload.ids.join(',') : 'n/a')}`,
+            },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+        });
+
+        return result;
+    } catch (err) {
+        res.status(Number(err?.statusCode || 500)).json({
+            success: false,
+            code: err?.code || 'TASK_CONTROL_FAILED',
+            error: err?.message || 'Falha no comando de task',
+            details: err?.details || null,
+            request_id: req.id,
+        });
+        return null;
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -312,7 +340,7 @@ router.post('/', async (req, res) => {
             // Return existing task
         } else {
             // Create new task
-            insertTask(taskV5, { stage: desiredStage, status: 'PENDING', actor: 'gui', promptTemplateArtifactId });
+            persistTaskInsert(taskV5, { stage: desiredStage, status: 'PENDING', actor: 'gui', promptTemplateArtifactId });
             created = true;
 
             await audit('CREATE_TASK', {
@@ -845,28 +873,10 @@ router.post('/:id/reject', async (req, res) => {
 router.post('/:id/pause', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const now = Date.now();
-        const updated = _safeUpdateTask(safeId, { status: 'PAUSED', paused_at_ms: now });
-        if (!updated) {
-            return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
-        }
-        try {
-            releaseTaskLock({ taskId: safeId });
-        } catch (_) {
-            /* ignore */
-        }
-
+        const control = await _runTaskControlCommand(req, res, 'TASK_PAUSE', { task_id: safeId });
+        if (!control) return;
         await audit('PAUSE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_PAUSED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:task:${safeId}:pause`,
-        });
-        res.json({ success: true, task: updated, request_id: req.id });
+        res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao pausar task: ${e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao pausar task.', request_id: req.id });
@@ -876,33 +886,10 @@ router.post('/:id/pause', async (req, res) => {
 router.post('/:id/resume', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const updated = _safeUpdateTask(safeId, {
-            status: 'PENDING',
-            paused_at_ms: null,
-            blocked_reason: null,
-            blocked_at_ms: null,
-            blocked_details_json: null,
-            execute_after_ms: null,
-        });
-        if (!updated) {
-            return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
-        }
-        try {
-            releaseTaskLock({ taskId: safeId });
-        } catch (_) {
-            /* ignore */
-        }
+        const control = await _runTaskControlCommand(req, res, 'TASK_RESUME', { task_id: safeId });
+        if (!control) return;
         await audit('RESUME_TASK', { id: safeId, user: 'GUI', request_id: req.id });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_RESUMED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:task:${safeId}:resume`,
-        });
-        res.json({ success: true, task: updated, request_id: req.id });
+        res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao resumir task: ${e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao resumir task.', request_id: req.id });
@@ -913,33 +900,10 @@ router.post('/:id/resume', async (req, res) => {
 router.post('/:id/unblock', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const updated = _safeUpdateTask(safeId, {
-            status: 'PENDING',
-            paused_at_ms: null,
-            blocked_reason: null,
-            blocked_at_ms: null,
-            blocked_details_json: null,
-            execute_after_ms: null,
-        });
-        if (!updated) {
-            return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
-        }
-        try {
-            releaseTaskLock({ taskId: safeId });
-        } catch (_) {
-            /* ignore */
-        }
+        const control = await _runTaskControlCommand(req, res, 'TASK_UNBLOCK', { task_id: safeId });
+        if (!control) return;
         await audit('UNBLOCK_TASK', { id: safeId, user: 'GUI', request_id: req.id });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_UNBLOCKED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:task:${safeId}:unblock`,
-        });
-        res.json({ success: true, task: updated, request_id: req.id });
+        res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao desbloquear task: ${e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao desbloquear task.', request_id: req.id });
@@ -949,60 +913,11 @@ router.post('/:id/unblock', async (req, res) => {
 router.post('/:id/retry', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const existing = getTaskById(safeId);
-        if (!existing) {
-            return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
-        }
-        const currentStatus = String(existing.unified_status || existing.state?.status || '')
-            .toUpperCase()
-            .trim();
-        if (currentStatus === 'RUNNING') {
-            return res
-                .status(409)
-                .json({ success: false, error: 'Task em execução: pause/cancel antes de retry', request_id: req.id });
-        }
-        if (!ALLOWED_TASK_STATUSES.has(currentStatus)) {
-            return res
-                .status(409)
-                .json({ success: false, error: 'Status atual inválido para retry', request_id: req.id });
-        }
-        const updated = _safeUpdateTask(safeId, {
-            stage: 'READY',
-            status: 'PENDING',
-            attempts: 0,
-            blocked_reason: null,
-            blocked_at_ms: null,
-            blocked_details_json: null,
-            failed_at_ms: null,
-            completed_at_ms: null,
-            cancelled_at_ms: null,
-            paused_at_ms: null,
-            execute_after_ms: null,
-            last_error: null,
-        });
-        if (!updated) {
-            return res.status(500).json({ success: false, error: 'Falha ao rearmar task', request_id: req.id });
-        }
-
-        // Hygiene: clear any stale lock so SSOT can re-claim.
-        try {
-            releaseTaskLock({ taskId: safeId });
-        } catch (_) {
-            /* ignore */
-        }
+        const control = await _runTaskControlCommand(req, res, 'TASK_RETRY', { task_id: safeId });
+        if (!control) return;
 
         await audit('RETRY_TASK', { id: safeId, user: 'GUI', request_id: req.id });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_RETRIED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:task:${safeId}:retry`,
-        });
-
-        res.json({ success: true, task: updated, request_id: req.id });
+        res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao retry task: ${e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao retry task.', request_id: req.id });
@@ -1016,21 +931,10 @@ router.post('/:id/retry', async (req, res) => {
 router.delete('/:id/purge', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const deleted = purgeTask(safeId);
-        if (!deleted) {
-            return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
-        }
+        const control = await _runTaskControlCommand(req, res, 'TASK_PURGE', { task_id: safeId });
+        if (!control) return;
         await audit('PURGE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_PURGED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:task:${safeId}:purge`,
-        });
-        res.json({ success: true, request_id: req.id });
+        res.json({ success: true, operation: control.operation, request_id: req.id });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao purgar tarefa: ${e.message}`, req.id);
         res.status(500).json({ success: false, error: 'Falha ao purgar task.', request_id: req.id });
@@ -1044,34 +948,13 @@ router.delete('/:id/purge', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
-        const now = Date.now();
-        const updated = _safeUpdateTask(safeId, {
-            status: 'CANCELLED',
-            cancelled_at_ms: now,
-            last_error: 'USER_CANCELLED',
-        });
-
-        if (!updated) {
-            return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
-        }
-        try {
-            releaseTaskLock({ taskId: safeId });
-        } catch (_) {
-            /* ignore */
-        }
+        const control = await _runTaskControlCommand(req, res, 'TASK_CANCEL', { task_id: safeId });
+        if (!control) return;
 
         await audit('DELETE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
-        recordEvent({
-            entityType: 'task',
-            entityId: safeId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'TASK_CANCELLED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:task:${safeId}:cancel`,
-        });
         res.json({
             success: true,
+            task: control?.result?.after || null,
             request_id: req.id,
         });
     } catch (e) {
@@ -1114,6 +997,24 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
         const ids = _uniqStrings(req.body.ids).map(_safeId).filter(Boolean).slice(0, 500);
         if (ids.length === 0) {
             return res.status(400).json({ success: false, error: 'ids vazio', request_id: req.id });
+        }
+
+        const ssotActions = new Set(['pause', 'resume', 'unblock', 'retry', 'cancel']);
+        if (ssotActions.has(action)) {
+            const control = await _runTaskControlCommand(req, res, 'TASK_BULK_ACTION', {
+                ids,
+                action,
+                params,
+            });
+            if (!control) return;
+
+            return res.json({
+                success: true,
+                updated: control?.result?.metadata?.ok || 0,
+                failed: control?.result?.metadata?.failed || [],
+                metadata: control?.result?.metadata || {},
+                request_id: req.id,
+            });
         }
 
         const stageParam = params.stage !== undefined ? String(params.stage).toUpperCase().trim() : null;

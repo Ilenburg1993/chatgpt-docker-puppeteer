@@ -162,6 +162,13 @@ const ConfigSchema = z
             .boolean()
             .default(process.env.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY === 'true'),
         DASHBOARD_EMIT_TASK_UPDATED_COMPAT: z.boolean().default(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT === 'true'),
+        CONTROL_REQUIRE_REASON: z.boolean().default(process.env.CONTROL_REQUIRE_REASON !== 'false'),
+        CONTROL_REQUIRE_IDEMPOTENCY_KEY: z.boolean().default(process.env.CONTROL_REQUIRE_IDEMPOTENCY_KEY !== 'false'),
+        CONTROL_STRICT_PAUSE_TO_EDIT: z.boolean().default(process.env.CONTROL_STRICT_PAUSE_TO_EDIT !== 'false'),
+        RBAC_BOOTSTRAP_OWNER_USERNAME: z.string().default(process.env.RBAC_BOOTSTRAP_OWNER_USERNAME || ''),
+        RBAC_BOOTSTRAP_OWNER_PASSWORD: z.string().default(process.env.RBAC_BOOTSTRAP_OWNER_PASSWORD || ''),
+        UI_PREFS_PERSISTENCE: z.enum(['sqlite']).default('sqlite'),
+        LEGACY_PATHS_CONTINGENCY: z.boolean().default(process.env.LEGACY_PATHS_CONTINGENCY === 'true'),
 
         // --- Driver Factory / Pool Configuration (Centralized) ---
         DRIVER_POOL_MAX_SIZE: z.number().int().min(1).max(20).default(5),
@@ -432,6 +439,27 @@ class ConfigurationManager extends EventEmitter {
     }
     get DASHBOARD_EMIT_TASK_UPDATED_COMPAT() {
         return this.currentConfig.DASHBOARD_EMIT_TASK_UPDATED_COMPAT;
+    }
+    get CONTROL_REQUIRE_REASON() {
+        return this.currentConfig.CONTROL_REQUIRE_REASON;
+    }
+    get CONTROL_REQUIRE_IDEMPOTENCY_KEY() {
+        return this.currentConfig.CONTROL_REQUIRE_IDEMPOTENCY_KEY;
+    }
+    get CONTROL_STRICT_PAUSE_TO_EDIT() {
+        return this.currentConfig.CONTROL_STRICT_PAUSE_TO_EDIT;
+    }
+    get RBAC_BOOTSTRAP_OWNER_USERNAME() {
+        return this.currentConfig.RBAC_BOOTSTRAP_OWNER_USERNAME;
+    }
+    get RBAC_BOOTSTRAP_OWNER_PASSWORD() {
+        return this.currentConfig.RBAC_BOOTSTRAP_OWNER_PASSWORD;
+    }
+    get UI_PREFS_PERSISTENCE() {
+        return this.currentConfig.UI_PREFS_PERSISTENCE;
+    }
+    get LEGACY_PATHS_CONTINGENCY() {
+        return this.currentConfig.LEGACY_PATHS_CONTINGENCY;
     }
 
     // --- Chrome & Proxy Connection Getters ---

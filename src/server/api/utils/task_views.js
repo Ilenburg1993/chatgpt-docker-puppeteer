@@ -29,13 +29,48 @@ function getOrchestrationSummary(taskJson, row) {
     };
 }
 
+function _isEditable(row) {
+    const status = String(row?.status || '').toUpperCase();
+    const stage = String(row?.stage || '').toUpperCase();
+    const attempts = Number(row?.attempts || 0);
+    const startedAt = row?.started_at_ms ?? null;
+    return status === 'PAUSED' || (status === 'PENDING' && stage === 'READY' && attempts === 0 && !startedAt);
+}
+
+function buildTaskCommandCaps(row) {
+    const status = String(row?.status || '').toUpperCase();
+    const editable = _isEditable(row);
+    return {
+        can_pause: ['PENDING', 'RUNNING'].includes(status),
+        can_resume: ['PAUSED', 'BLOCKED'].includes(status),
+        can_unblock: status === 'BLOCKED',
+        can_retry: ['FAILED', 'DONE', 'CANCELLED', 'PAUSED', 'BLOCKED'].includes(status),
+        can_cancel: ['PENDING', 'PAUSED', 'RUNNING', 'BLOCKED'].includes(status),
+        can_patch: editable,
+        can_set_dependencies: editable,
+        can_reassign_mission: editable,
+    };
+}
+
+function buildMissionRef(row) {
+    if (!row?.mission_id) return null;
+    return {
+        id: row.mission_id,
+        title: row.mission_title || null,
+        status: row.mission_status || null,
+        autonomy_mode: row.mission_autonomy_mode || null,
+    };
+}
+
 function taskRowToListItem(row) {
     const taskJson = parseTaskJson(row.task_json);
     const orchestration = getOrchestrationSummary(taskJson, row);
+    const missionRef = buildMissionRef(row);
 
     return {
         id: row.id,
         mission_id: row.mission_id ?? null,
+        mission_ref: missionRef,
         stage: row.stage,
         status: row.status,
         unified_status: row.status,
@@ -54,6 +89,7 @@ function taskRowToListItem(row) {
         spec_user_message_preview: _preview(row.spec_user_message, 300),
         spec_system_message_preview: _preview(row.spec_system_message, 120),
         orchestration_summary: orchestration,
+        command_caps: buildTaskCommandCaps(row),
         timestamps: {
             created_at_ms: row.created_at_ms,
             updated_at_ms: row.updated_at_ms,
@@ -79,9 +115,10 @@ function taskRowToDetailTask(row) {
 
     task.state = task.state || {};
     task.state.status = row.status;
+    task.command_caps = buildTaskCommandCaps(row);
+    task.mission_ref = buildMissionRef(row);
 
     return task;
 }
 
-export { parseTaskJson, taskRowToListItem, taskRowToDetailTask };
-
+export { buildTaskCommandCaps, parseTaskJson, taskRowToListItem, taskRowToDetailTask };

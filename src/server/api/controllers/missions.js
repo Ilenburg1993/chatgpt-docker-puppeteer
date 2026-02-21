@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
+import { executeCommand } from '#server/domain/control_command_service';
 import { recordEvent } from '#infra/db/events_repo';
 import {
     AUTONOMY_MODES,
@@ -9,16 +10,10 @@ import {
     getMissionById,
     listMissions,
     MISSION_STATUS,
-    updateMission,
+    updateMission as persistMissionUpdate,
 } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
-import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
-import {
-    cancelMissionTransition,
-    executeMissionTransition,
-    pauseMissionTransition,
-    resumeMissionTransition,
-} from '#agent/mission_execution_service';
+import { insertTask as persistTaskInsert, TASK_STAGES } from '#infra/db/task_repo';
 import { WorkflowGenerator } from '#missions/workflow_generator';
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -165,6 +160,40 @@ function _sendTransitionFailure(res, req, result) {
     });
 }
 
+function _resolveIfVersion(mission, requestedIfVersion) {
+    if (requestedIfVersion !== undefined && requestedIfVersion !== null) {
+        return requestedIfVersion;
+    }
+
+    const parsed = Date.parse(String(mission?.updated_at || ''));
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+async function _runMissionControlCommand(req, res, command, payload = {}) {
+    try {
+        const result = await executeCommand({
+            command,
+            payload: {
+                ...payload,
+                reason: payload.reason || req.body?.reason || `${command.toLowerCase()} via /api/missions`,
+                idempotency_key: payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
+            },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+        });
+
+        return result;
+    } catch (err) {
+        res.status(Number(err?.statusCode || 500)).json({
+            success: false,
+            code: err?.code || 'MISSION_CONTROL_FAILED',
+            error: err?.message || 'Falha no comando de missão',
+            details: err?.details || null,
+            request_id: req.id,
+        });
+        return null;
+    }
+}
+
 /* --------------------------------------------------------------------------
    0. TEMPLATES
 -------------------------------------------------------------------------- */
@@ -290,24 +319,17 @@ router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
             req.body?.description !== undefined ? _asTrimmedString(req.body.description, '') : undefined;
         const autonomyModeRaw = req.body?.autonomy_mode ?? req.body?.autonomyMode;
         const autonomy_mode = autonomyModeRaw !== undefined ? _coerceAutonomyMode(autonomyModeRaw) : undefined;
-
-        const updated = updateMission(missionId, {
-            ...(title !== undefined ? { title } : {}),
-            ...(description !== undefined ? { description } : {}),
-            ...(autonomy_mode !== undefined ? { autonomy_mode } : {}),
+        const control = await _runMissionControlCommand(req, res, 'MISSION_PATCH', {
+            mission_id: missionId,
+            if_version: _resolveIfVersion(mission, req.body?.if_version),
+            patch: {
+                ...(title !== undefined ? { title } : {}),
+                ...(description !== undefined ? { description } : {}),
+                ...(autonomy_mode !== undefined ? { autonomy_mode } : {}),
+            },
         });
-
-        recordEvent({
-            entityType: 'mission',
-            entityId: missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'MISSION_UPDATED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${missionId}:updated`,
-        });
-
-        res.json({ success: true, mission: updated, request_id: req.id });
+        if (!control) return;
+        res.json({ success: true, mission: control?.result?.after || mission, request_id: req.id });
     } catch (err) {
         log('ERROR', `[MISSIONS_API] Erro ao atualizar missão: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
@@ -417,21 +439,15 @@ router.get('/:id/progress', async (req, res) => {
 router.post('/:id/execute', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const result = executeMissionTransition({
-            missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            dedupKey: `req:${req.id}:mission:${missionId}:execute`,
-            payload: { request_id: req.id },
+        const control = await _runMissionControlCommand(req, res, 'MISSION_EXECUTE', {
+            mission_id: missionId,
         });
-        if (!result.ok) {
-            return _sendTransitionFailure(res, req, result);
-        }
+        if (!control) return;
 
         res.json({
             success: true,
             message: 'Missão iniciada',
-            mission: result.mission,
+            mission: control?.result?.after || null,
             request_id: req.id,
         });
     } catch (err) {
@@ -451,21 +467,13 @@ router.post('/:id/execute', async (req, res) => {
 router.post('/:id/pause', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const result = pauseMissionTransition({
-            missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            dedupKey: `req:${req.id}:mission:${missionId}:pause`,
-            payload: { request_id: req.id },
-        });
-        if (!result.ok) {
-            return _sendTransitionFailure(res, req, result);
-        }
+        const control = await _runMissionControlCommand(req, res, 'MISSION_PAUSE', { mission_id: missionId });
+        if (!control) return;
 
         res.json({
             success: true,
             message: 'Missão pausada',
-            mission: result.mission,
+            mission: control?.result?.after || null,
             request_id: req.id,
         });
     } catch (err) {
@@ -485,21 +493,13 @@ router.post('/:id/pause', async (req, res) => {
 router.post('/:id/resume', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const result = resumeMissionTransition({
-            missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            dedupKey: `req:${req.id}:mission:${missionId}:resume`,
-            payload: { request_id: req.id },
-        });
-        if (!result.ok) {
-            return _sendTransitionFailure(res, req, result);
-        }
+        const control = await _runMissionControlCommand(req, res, 'MISSION_RESUME', { mission_id: missionId });
+        if (!control) return;
 
         res.json({
             success: true,
             message: 'Missão resumida',
-            mission: result.mission,
+            mission: control?.result?.after || null,
             request_id: req.id,
         });
     } catch (err) {
@@ -533,25 +533,17 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
             req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode
         );
         const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : null;
-
-        const updated = updateMission(missionId, {
+        const control = await _runMissionControlCommand(req, res, 'MISSION_SET_POLICY', {
+            mission_id: missionId,
+            if_version: _resolveIfVersion(mission, req.body?.if_version),
             autonomy_mode,
-            ...(policy ? { policy } : {}),
+            policy,
         });
-
-        recordEvent({
-            entityType: 'mission',
-            entityId: missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'MISSION_POLICY_UPDATED',
-            payload: { request_id: req.id, autonomy_mode, has_policy: Boolean(policy) },
-            dedupKey: `req:${req.id}:mission:${missionId}:policy`,
-        });
+        if (!control) return;
 
         res.json({
             success: true,
-            mission: updated,
+            mission: control?.result?.after || null,
             request_id: req.id,
         });
     } catch (err) {
@@ -592,7 +584,7 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
 
         const current = mission.context || {};
         const feedbackList = Array.isArray(current.feedback) ? current.feedback : [];
-        const updated = updateMission(missionId, {
+        const updated = persistMissionUpdate(missionId, {
             context: {
                 ...current,
                 feedback: [...feedbackList, { ts_ms: Date.now(), text: feedback }],
@@ -772,7 +764,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
             result: {},
         });
 
-        insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'user' });
+        persistTaskInsert(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'user' });
 
         recordEvent({
             entityType: 'mission',
@@ -880,7 +872,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                 result: {},
             });
 
-            insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'user' });
+            persistTaskInsert(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'user' });
             createdTaskIds.push(taskId);
         }
 
@@ -1034,21 +1026,13 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
 router.delete('/:id', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const result = cancelMissionTransition({
-            missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            dedupKey: `req:${req.id}:mission:${missionId}:cancel`,
-            payload: { request_id: req.id },
-        });
-        if (!result.ok) {
-            return _sendTransitionFailure(res, req, result);
-        }
+        const control = await _runMissionControlCommand(req, res, 'MISSION_CANCEL', { mission_id: missionId });
+        if (!control) return;
 
         res.json({
             success: true,
             message: 'Missão cancelada',
-            mission: result.mission,
+            mission: control?.result?.after || null,
             request_id: req.id,
         });
     } catch (err) {

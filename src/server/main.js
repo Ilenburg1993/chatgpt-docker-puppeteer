@@ -172,6 +172,13 @@ async function bootstrap(options = {}) {
         ]);
         const applyRoutes = routerModule?.applyRoutes;
         validateDashboardAuthConfig(CONFIG);
+        try {
+            const { bootstrapRbacFromEnv } = await import('#infra/db/rbac_repo');
+            bootstrapRbacFromEnv();
+            log('DEBUG', '[BOOT] RBAC bootstrap aplicado');
+        } catch (err) {
+            log('WARN', `[BOOT] Falha no bootstrap RBAC: ${err?.message || String(err)}`);
+        }
 
         log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
         const requestedSyncMode = CONFIG.DASHBOARD_TASK_SYNC_MODE || 'ssot_feed';

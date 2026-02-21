@@ -13,6 +13,68 @@ function _asInt(raw, fallback) {
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+function _parseJson(raw, fallback = null) {
+    try {
+        return raw ? JSON.parse(String(raw)) : fallback;
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function _buildMissionContext(db, missionId) {
+    if (!missionId) return null;
+    const mission = db
+        .prepare(
+            `
+            SELECT id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms, started_at_ms, completed_at_ms
+            FROM missions
+            WHERE id = ?
+        `
+        )
+        .get(missionId);
+    if (!mission) return null;
+
+    const countsRows = db
+        .prepare(
+            `
+            SELECT stage, status, COUNT(*) AS c
+            FROM tasks
+            WHERE mission_id = ?
+            GROUP BY stage, status
+        `
+        )
+        .all(missionId);
+
+    const counts = {
+        tasks_total: 0,
+        by_stage: {},
+        by_status: {},
+    };
+    for (const row of countsRows) {
+        const count = Number(row.c) || 0;
+        counts.tasks_total += count;
+        counts.by_stage[String(row.stage)] = (counts.by_stage[String(row.stage)] || 0) + count;
+        counts.by_status[String(row.status)] = (counts.by_status[String(row.status)] || 0) + count;
+    }
+
+    return {
+        mission: {
+            id: mission.id,
+            title: mission.title,
+            description: mission.description,
+            status: mission.status,
+            autonomy_mode: mission.autonomy_mode,
+            policy: _parseJson(mission.policy_json, {}),
+            context: _parseJson(mission.context_json, {}),
+            created_at_ms: mission.created_at_ms,
+            updated_at_ms: mission.updated_at_ms,
+            started_at_ms: mission.started_at_ms ?? null,
+            completed_at_ms: mission.completed_at_ms ?? null,
+        },
+        counts,
+    };
+}
+
 /**
  * @param {{
  *   status?: string | null,
@@ -125,8 +187,12 @@ router.get('/tasks', async (req, res) => {
                 t.spec_user_message, t.spec_system_message,
                 t.task_json,
                 t.created_at_ms, t.updated_at_ms,
-                t.started_at_ms, t.completed_at_ms, t.failed_at_ms, t.paused_at_ms, t.cancelled_at_ms
+                t.started_at_ms, t.completed_at_ms, t.failed_at_ms, t.paused_at_ms, t.cancelled_at_ms,
+                m.title AS mission_title,
+                m.status AS mission_status,
+                m.autonomy_mode AS mission_autonomy_mode
             FROM tasks t
+            LEFT JOIN missions m ON m.id = t.mission_id
             ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY t.updated_at_ms DESC, t.id DESC
             LIMIT @limit
@@ -157,7 +223,21 @@ router.get('/tasks/:id', async (req, res) => {
         const taskId = String(req.params.id);
         const include = parseIncludeParam(req.query.include);
 
-        const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+        const row = db
+            .prepare(
+                `
+                SELECT
+                    t.*,
+                    m.title AS mission_title,
+                    m.status AS mission_status,
+                    m.autonomy_mode AS mission_autonomy_mode
+                FROM tasks t
+                LEFT JOIN missions m ON m.id = t.mission_id
+                WHERE t.id = ?
+                LIMIT 1
+            `
+            )
+            .get(taskId);
         if (!row) {
             return fail(res, req, 404, { code: 'TASK_NOT_FOUND', error: 'Task não encontrada', details: { task_id: taskId } });
         }
@@ -166,6 +246,7 @@ router.get('/tasks/:id', async (req, res) => {
 
         /** @type {any} */
         const data = { task };
+        data.mission_ref = task.mission_ref || null;
 
         if (include.has('attempts')) {
             data.attempts = listAttemptsByTask(taskId, { limit: 200 });
@@ -200,9 +281,14 @@ router.get('/tasks/:id', async (req, res) => {
             const deps = db
                 .prepare(
                     `
-                    SELECT t.*
+                    SELECT
+                        t.*,
+                        m.title AS mission_title,
+                        m.status AS mission_status,
+                        m.autonomy_mode AS mission_autonomy_mode
                     FROM task_dependencies d
                     JOIN tasks t ON t.id = d.depends_on_task_id
+                    LEFT JOIN missions m ON m.id = t.mission_id
                     WHERE d.task_id = ?
                     ORDER BY t.created_at_ms ASC
                 `
@@ -216,7 +302,15 @@ router.get('/tasks/:id', async (req, res) => {
                 .prepare(
                     `
                     SELECT *
-                    FROM tasks
+                    FROM (
+                        SELECT
+                            t.*,
+                            m.title AS mission_title,
+                            m.status AS mission_status,
+                            m.autonomy_mode AS mission_autonomy_mode
+                        FROM tasks t
+                        LEFT JOIN missions m ON m.id = t.mission_id
+                    ) x
                     WHERE parent_id = ?
                     ORDER BY created_at_ms ASC
                     LIMIT 500
@@ -233,7 +327,15 @@ router.get('/tasks/:id', async (req, res) => {
                     .prepare(
                         `
                         SELECT *
-                        FROM tasks
+                        FROM (
+                            SELECT
+                                t.*,
+                                m.title AS mission_title,
+                                m.status AS mission_status,
+                                m.autonomy_mode AS mission_autonomy_mode
+                            FROM tasks t
+                            LEFT JOIN missions m ON m.id = t.mission_id
+                        ) x
                         WHERE workflow_id = ?
                         ORDER BY created_at_ms ASC
                         LIMIT 2000
@@ -246,6 +348,38 @@ router.get('/tasks/:id', async (req, res) => {
                 };
             } else {
                 data.workflow = null;
+            }
+        }
+
+        if (include.has('mission_context')) {
+            data.mission_context = _buildMissionContext(db, row.mission_id);
+        }
+
+        if (include.has('siblings')) {
+            if (!row.mission_id) {
+                data.siblings = [];
+            } else {
+                const siblings = db
+                    .prepare(
+                        `
+                        SELECT
+                            t.*,
+                            m.title AS mission_title,
+                            m.status AS mission_status,
+                            m.autonomy_mode AS mission_autonomy_mode
+                        FROM tasks t
+                        LEFT JOIN missions m ON m.id = t.mission_id
+                        WHERE t.mission_id = @mission_id AND t.id <> @task_id
+                        ORDER BY t.updated_at_ms DESC, t.id DESC
+                        LIMIT @limit
+                    `
+                    )
+                    .all({
+                        mission_id: row.mission_id,
+                        task_id: taskId,
+                        limit: Math.max(1, Math.min(_asInt(req.query.siblings_limit, 25), 100)),
+                    });
+                data.siblings = siblings.map(taskRowToListItem);
             }
         }
 

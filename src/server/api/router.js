@@ -5,6 +5,7 @@ import { apiLimiter } from '#server/engine/app';
 import denyIfDelegated from '../middleware/deny_if_delegated.js';
 import { errorHandler, notFound } from '../middleware/error_handler.js';
 import artifactsController from './controllers/artifacts.js';
+import controlController from './controllers/control.js';
 import dashboardController from './controllers/dashboard.js';
 import dnaController from './controllers/dna.js';
 import * as healthController from './controllers/health.js';
@@ -126,6 +127,13 @@ async function applyRoutes(app) {
      * Inclui: MissionManager, WorkflowGenerator, templates, execution control.
      */
     app.use('/api/missions', apiLimiter, missionsController);
+
+    /**
+     * DOMÍNIO CONTROL PLANE (SSOT mutações)
+     * Namespace: /api/control
+     * Responsável por comando único de mutações auditáveis de missão/task.
+     */
+    app.use('/api/control', apiLimiter, controlController);
 
     /**
      * DOMÍNIO DO DASHBOARD V2 (Mission Control Enterprise)

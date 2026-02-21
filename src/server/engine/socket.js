@@ -2,7 +2,9 @@
 import CONFIG from '#core/config';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
+import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
 import { isTokenRevoked } from '#infra/db/token_blocklist';
+import { hasPermission } from '#server/domain/rbac_policy';
 import { ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
 import { validateIPCEnvelope, validateRobotIdentity } from '#shared/nerv/schemas';
 import EventEmitter from 'node:events';
@@ -111,7 +113,9 @@ function verifyDashboardToken(token) {
             user: {
                 id: decoded.id,
                 username: decoded.username,
-                role: decoded.role || 'user',
+                role: decoded.role || 'viewer',
+                roles: Array.isArray(decoded.roles) ? decoded.roles.map(r => String(r)) : [],
+                permissions: Array.isArray(decoded.permissions) ? decoded.permissions.map(p => String(p)) : [],
                 jti: decoded.jti || null,
                 exp: decoded.exp || null,
             },
@@ -252,17 +256,31 @@ function init(httpServer) {
 
                 if (policy.authRequired) {
                     const userRole = socket.dashboardUser?.role || null;
-                    if (userRole !== policy.commandRole) {
+                    const roleAllowed = userRole === policy.commandRole || userRole === 'owner';
+                    const permAllowed = hasPermission(socket.dashboardUser, RBAC_PERMISSIONS.DASHBOARD_COMMAND);
+                    if (!roleAllowed || !permAllowed) {
                         socket.emit('dashboard:command:error', {
                             code: 'COMMAND_FORBIDDEN',
-                            error: `Role insuficiente. Necessário: ${policy.commandRole}`,
+                            error: `Permissão insuficiente. Necessário role=${policy.commandRole} e ${RBAC_PERMISSIONS.DASHBOARD_COMMAND}`,
                         });
                         return;
                     }
                 }
 
+                const reason = String(data?.reason || '').trim();
+                if (parseBooleanEnv('CONTROL_REQUIRE_REASON', true) && !reason) {
+                    socket.emit('dashboard:command:error', {
+                        code: 'COMMAND_REASON_REQUIRED',
+                        error: 'Campo reason é obrigatório para comandos dashboard',
+                    });
+                    return;
+                }
+
                 log('DEBUG', `[HUB] Dashboard command received: ${JSON.stringify(data)}`);
-                internalEmitter.emit('dashboard:command', data);
+                internalEmitter.emit('dashboard:command', {
+                    ...data,
+                    actor: socket.dashboardUser || null,
+                });
             });
 
             socket.on('dashboard:status_request', data => {

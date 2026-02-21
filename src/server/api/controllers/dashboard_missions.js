@@ -194,10 +194,15 @@ router.get('/missions/:id', async (req, res) => {
             const tasks = db
                 .prepare(
                     `
-                    SELECT *
-                    FROM tasks
-                    WHERE mission_id = ?
-                    ORDER BY updated_at_ms DESC, id DESC
+                    SELECT
+                        t.*,
+                        m.title AS mission_title,
+                        m.status AS mission_status,
+                        m.autonomy_mode AS mission_autonomy_mode
+                    FROM tasks t
+                    LEFT JOIN missions m ON m.id = t.mission_id
+                    WHERE t.mission_id = ?
+                    ORDER BY t.updated_at_ms DESC, t.id DESC
                     LIMIT 2000
                 `
                 )
@@ -250,23 +255,23 @@ router.get('/missions/:id/tasks', async (req, res) => {
         const stage = req.query.stage ? String(req.query.stage).toUpperCase().trim() : null;
         const status = req.query.status ? String(req.query.status).toUpperCase().trim() : null;
 
-        const where = ['mission_id = @mission_id'];
+        const where = ['t.mission_id = @mission_id'];
         /** @type {Record<string, any>} */
         const params = { mission_id: missionId, limit: limit + 1 };
 
         if (stage) {
-            where.push('stage = @stage');
+            where.push('t.stage = @stage');
             params.stage = stage;
         }
         if (status) {
-            where.push('status = @status');
+            where.push('t.status = @status');
             params.status = status;
         }
 
         const cUpdated = cursor && Number(cursor.updated_at_ms);
         const cId = cursor && cursor.id ? String(cursor.id) : null;
         if (Number.isFinite(cUpdated) && cId) {
-            where.push('(updated_at_ms < @cursor_updated OR (updated_at_ms = @cursor_updated AND id < @cursor_id))');
+            where.push('(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))');
             params.cursor_updated = cUpdated;
             params.cursor_id = cId;
         }
@@ -274,10 +279,15 @@ router.get('/missions/:id/tasks', async (req, res) => {
         const rows = db
             .prepare(
                 `
-                SELECT *
-                FROM tasks
+                SELECT
+                    t.*,
+                    m.title AS mission_title,
+                    m.status AS mission_status,
+                    m.autonomy_mode AS mission_autonomy_mode
+                FROM tasks t
+                LEFT JOIN missions m ON m.id = t.mission_id
                 WHERE ${where.join(' AND ')}
-                ORDER BY updated_at_ms DESC, id DESC
+                ORDER BY t.updated_at_ms DESC, t.id DESC
                 LIMIT @limit
             `
             )
@@ -305,14 +315,14 @@ router.get('/missions/:id/proposals', async (req, res) => {
         const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
         const cursor = decodeCursor(req.query.cursor);
 
-        const where = ["mission_id = @mission_id", "stage = 'PROPOSED'"];
+        const where = ["t.mission_id = @mission_id", "t.stage = 'PROPOSED'"];
         /** @type {Record<string, any>} */
         const params = { mission_id: missionId, limit: limit + 1 };
 
         const cUpdated = cursor && Number(cursor.updated_at_ms);
         const cId = cursor && cursor.id ? String(cursor.id) : null;
         if (Number.isFinite(cUpdated) && cId) {
-            where.push('(updated_at_ms < @cursor_updated OR (updated_at_ms = @cursor_updated AND id < @cursor_id))');
+            where.push('(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))');
             params.cursor_updated = cUpdated;
             params.cursor_id = cId;
         }
@@ -320,10 +330,15 @@ router.get('/missions/:id/proposals', async (req, res) => {
         const rows = db
             .prepare(
                 `
-                SELECT *
-                FROM tasks
+                SELECT
+                    t.*,
+                    m.title AS mission_title,
+                    m.status AS mission_status,
+                    m.autonomy_mode AS mission_autonomy_mode
+                FROM tasks t
+                LEFT JOIN missions m ON m.id = t.mission_id
                 WHERE ${where.join(' AND ')}
-                ORDER BY updated_at_ms DESC, id DESC
+                ORDER BY t.updated_at_ms DESC, t.id DESC
                 LIMIT @limit
             `
             )
@@ -452,4 +467,3 @@ router.get('/missions/:id/graph', async (req, res) => {
 });
 
 export default router;
-

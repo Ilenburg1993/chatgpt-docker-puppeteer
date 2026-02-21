@@ -2,6 +2,7 @@
 import jwt from 'jsonwebtoken';
 import { log } from '#core/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
+import { getRbacUserByUsername } from '#infra/db/rbac_repo';
 import { isTokenRevoked } from '#infra/db/token_blocklist';
 
 /**
@@ -43,11 +44,26 @@ export function authenticate(req, res, next) {
             });
         }
 
+        const tokenUsername = decoded.username ? String(decoded.username) : '';
+        const rbacUser = tokenUsername ? getRbacUserByUsername(tokenUsername) : null;
+        const permissions = Array.isArray(decoded.permissions)
+            ? decoded.permissions.map(p => String(p))
+            : Array.isArray(rbacUser?.permissions)
+              ? rbacUser.permissions
+              : [];
+        const role = decoded.role || rbacUser?.role || 'viewer';
+
         // Adicionar informações do usuário à requisição
         req.user = {
             id: decoded.id,
-            username: decoded.username,
-            role: decoded.role || 'user',
+            username: tokenUsername || decoded.id,
+            role,
+            roles: Array.isArray(decoded.roles)
+                ? decoded.roles
+                : Array.isArray(rbacUser?.roles)
+                  ? rbacUser.roles
+                  : [role],
+            permissions,
             jti: decoded.jti || null,
             iat: decoded.iat,
             exp: decoded.exp,
@@ -97,10 +113,25 @@ export function optionalAuthenticate(req, res, next) {
                 log('DEBUG', '[AUTH] Optional auth ignored due to revoked token', req.id);
                 return next();
             }
+            const tokenUsername = decoded.username ? String(decoded.username) : '';
+            const rbacUser = tokenUsername ? getRbacUserByUsername(tokenUsername) : null;
+            const permissions = Array.isArray(decoded.permissions)
+                ? decoded.permissions.map(p => String(p))
+                : Array.isArray(rbacUser?.permissions)
+                  ? rbacUser.permissions
+                  : [];
+            const role = decoded.role || rbacUser?.role || 'viewer';
+
             req.user = {
                 id: decoded.id,
-                username: decoded.username,
-                role: decoded.role || 'user',
+                username: tokenUsername || decoded.id,
+                role,
+                roles: Array.isArray(decoded.roles)
+                    ? decoded.roles
+                    : Array.isArray(rbacUser?.roles)
+                      ? rbacUser.roles
+                      : [role],
+                permissions,
                 jti: decoded.jti || null,
                 iat: decoded.iat,
                 exp: decoded.exp,
