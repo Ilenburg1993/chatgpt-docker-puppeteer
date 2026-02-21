@@ -19,7 +19,7 @@
     "pinia": "^3.0.4",
     "radix-vue": "^1.9.17",
     "socket.io-client": "^4.8.3",
-    "tailwind-merge": "^3.4.0",
+    "tailwind-merge": "^3.5.0",
     "uuid": "^11.0.0",
     "vis-data": "^8.0.3",
     "vis-network": "^10.0.2",
