@@ -44,11 +44,6 @@
             </div>
         </form>
 
-        <template #footer>
-            <div class="text-xs text-foreground-muted text-center">
-                Usuários de teste: admin/admin123 ou user/user123
-            </div>
-        </template>
     </Modal>
 </template>
 
@@ -59,6 +54,7 @@ import Modal from '../ui/Modal.vue';
 import Button from '../ui/Button.vue';
 import Input from '../ui/Input.vue';
 import { useNotifications } from '../../composables/useNotifications.js';
+import { useAuth } from '../../composables/useAuth.js';
 
 /**
  * Props do componente LoginModal
@@ -104,7 +100,8 @@ const error = ref('');
 /**
  * Instância das notificações
  */
-const { showSuccess, showError } = useNotifications();
+const { showError } = useNotifications();
+const { login } = useAuth();
 
 /**
  * Fecha o modal
@@ -157,28 +154,12 @@ const handleLogin = async () => {
     error.value = '';
 
     try {
-        const response = await fetch('/api/dashboard/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                username: form.username.trim(),
-                password: form.password.trim(),
-            }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            // Salvar token no localStorage
-            localStorage.setItem('auth_token', data.token);
-
-            showSuccess(`Bem-vindo, ${data.user.username}!`);
-            emit('login-success', data.user);
+        const success = await login(form.username.trim(), form.password.trim());
+        if (success) {
+            emit('login-success');
             handleClose();
         } else {
-            error.value = data.error || 'Erro no login';
+            error.value = 'Credenciais inválidas';
             showError(error.value);
         }
     } catch (err) {

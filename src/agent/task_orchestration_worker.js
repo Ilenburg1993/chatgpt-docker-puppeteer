@@ -8,7 +8,7 @@ import { extendTaskLock, insertTask, releaseTaskLock, TASK_STAGES, updateTask } 
 import { resilientLock } from '#infra/locks/resilient_lock';
 import { putText, readText } from '#infra/storage/artifact_store';
 import { ValidationService } from '#orchestrator/validation/validation_service';
-import crypto from 'node:crypto';
+import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
 import fs from 'node:fs/promises';
 
 /**
@@ -134,10 +134,6 @@ function _computeBackoffMs({ iteration = 1, minMs = 2000, maxMs = 120000 } = {})
     const base = Math.min(maxMs, minMs * Math.pow(2, Math.max(0, it - 1)));
     const jitter = Math.floor(base * (0.1 + Math.random() * 0.1)); // 10–20%
     return Math.min(maxMs, base + jitter);
-}
-
-function _hashId(input) {
-    return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
 /**
@@ -1054,77 +1050,18 @@ class TaskOrchestrationWorker {
             return;
         }
 
-        const childId = `task-${_hashId(`${taskId}|${attemptId}|${nextStepId}`)}`;
-        const rootWorkflowId = task?.meta?.workflow_id || task?.meta?.id || taskId;
-        const missionId = task?.meta?.mission_id || task?.mission?.mission_id || null;
-
-        const sys = typeof task?.spec?.payload?.system_message === 'string' ? task.spec.payload.system_message : '';
-        const prompt =
-            (nextStep?.config && typeof nextStep.config === 'object' && typeof nextStep.config.prompt === 'string'
-                ? nextStep.config.prompt
-                : null) ||
-            (typeof nextStep?.description === 'string' ? nextStep.description : null) ||
-            (typeof nextStep?.name === 'string' ? nextStep.name : null) ||
-            `Execute workflow step ${nextIndex + 1}`;
-
-        const inputs = Array.from(completed).map(stepId => ({
-            type: 'task_result',
-            task_id: acc?.[stepId]?.task_id || taskId,
-            attempt: 'latest',
-            format: 'text',
-            label: `workflow_step_output:${String(stepId)}`,
-        }));
-
-        const childTask = {
-            ...task,
-            meta: {
-                ...(task.meta || {}),
-                id: childId,
-                parent_id: taskId,
-                workflow_id: rootWorkflowId,
-                mission_id: missionId || undefined,
-                created_at: new Date(now).toISOString(),
-                source: 'self_generated',
-                tags: Array.from(new Set([...(task?.meta?.tags || []), 'workflow_step'])),
-            },
-            spec: {
-                ...(task.spec || {}),
-                payload: {
-                    system_message: sys,
-                    user_message: String(prompt),
-                    context: {
-                        ...(task?.spec?.payload?.context && typeof task.spec.payload.context === 'object'
-                            ? task.spec.payload.context
-                            : {}),
-                        inputs,
-                        workflow_step_id: nextStepId,
-                        workflow_step_index: nextIndex,
-                    },
-                },
-                execution: {
-                    ...(task?.spec?.execution || {}),
-                    strategy: 'MULTI_STEP',
-                    workflow_config: wf,
-                },
-            },
-            policy: {
-                ...(task.policy || {}),
-                dependencies: [taskId],
-                execute_after: null,
-            },
-            mission: {
-                ...(task.mission || {}),
-                mission_id: missionId,
-                step_id: nextStepId,
-                step_index: nextIndex,
-            },
-            state: {
-                ...(task.state || {}),
-                status: 'PENDING',
-                workflow_state: task.state.workflow_state,
-            },
-            result: {},
-        };
+        const { childTask, childId, workflowId: rootWorkflowId } = buildWorkflowNextStepTask({
+            parentTask: task,
+            parentTaskId: String(taskId),
+            attemptId: attemptId ? String(attemptId) : null,
+            nextStep,
+            nextStepIndex: nextIndex,
+            workflowConfig: wf,
+            completedStepIds: Array.from(completed).map(stepId => String(stepId)),
+            accumulatedContext: acc,
+            nowMs: now,
+            source: 'self_generated',
+        });
 
         // Atomic creation + audit. insertTask also registers TASK_CREATED.
         insertTask(childTask, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'system', ifNotExists: true });

@@ -13,6 +13,12 @@ import {
 } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
+import {
+    cancelMissionTransition,
+    executeMissionTransition,
+    pauseMissionTransition,
+    resumeMissionTransition,
+} from '#agent/mission_execution_service';
 import { WorkflowGenerator } from '#missions/workflow_generator';
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -147,6 +153,16 @@ function _pickAllowedTarget(options = /** @type {{requested?: any, allowedTarget
         return allowed[0];
     }
     return 'auto';
+}
+
+function _sendTransitionFailure(res, req, result) {
+    return res.status(Number(result?.statusCode || 500)).json({
+        success: false,
+        error: result?.error || 'Falha na transição da missão',
+        code: result?.code || 'MISSION_TRANSITION_FAILED',
+        details: result?.details || null,
+        request_id: req.id,
+    });
 }
 
 /* --------------------------------------------------------------------------
@@ -401,31 +417,21 @@ router.get('/:id/progress', async (req, res) => {
 router.post('/:id/execute', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const mission = getMissionById(missionId);
-        if (!mission) {
-            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
-        }
-
-        const now = Date.now();
-        const updated = updateMission(missionId, {
-            status: MISSION_STATUS.RUNNING,
-            started_at_ms: mission.started_at ? Date.parse(mission.started_at) : now,
-        });
-
-        recordEvent({
-            entityType: 'mission',
-            entityId: missionId,
+        const result = executeMissionTransition({
+            missionId,
             actorType: 'user',
             actorId: req.ip || null,
-            eventType: 'MISSION_EXECUTED',
-            payload: { request_id: req.id },
             dedupKey: `req:${req.id}:mission:${missionId}:execute`,
+            payload: { request_id: req.id },
         });
+        if (!result.ok) {
+            return _sendTransitionFailure(res, req, result);
+        }
 
         res.json({
             success: true,
             message: 'Missão iniciada',
-            mission: updated,
+            mission: result.mission,
             request_id: req.id,
         });
     } catch (err) {
@@ -445,49 +451,22 @@ router.post('/:id/execute', async (req, res) => {
 router.post('/:id/pause', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const mission = getMissionById(missionId);
-        if (!mission) {
-            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
-        }
-
-        const now = Date.now();
-
-        // Pausa missão (gating de elegibilidade no claimNextEligibleTask)
-        const updated = updateMission(missionId, { status: MISSION_STATUS.PAUSED });
-
-        // Pausa tasks já elegíveis/rodando (TaskControlWatcher emitirá abort para locked tasks)
-        try {
-            const db = getDb();
-            db.prepare(
-                `
-                UPDATE tasks
-                SET status = 'PAUSED',
-                    paused_at_ms = @now,
-                    updated_at_ms = @now
-                WHERE mission_id = @mission_id
-                  AND stage = 'READY'
-                  AND status IN ('PENDING', 'RUNNING')
-            `
-            ).run({ now, mission_id: missionId });
-        } catch (_) {
-            /* best-effort */
+        const result = pauseMissionTransition({
+            missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            dedupKey: `req:${req.id}:mission:${missionId}:pause`,
+            payload: { request_id: req.id },
+        });
+        if (!result.ok) {
+            return _sendTransitionFailure(res, req, result);
         }
 
         res.json({
             success: true,
             message: 'Missão pausada',
-            mission: updated,
+            mission: result.mission,
             request_id: req.id,
-        });
-
-        recordEvent({
-            entityType: 'mission',
-            entityId: missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'MISSION_PAUSED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${missionId}:pause`,
         });
     } catch (err) {
         log('ERROR', `[MISSIONS_API] Erro ao pausar missão: ${err?.message || String(err)}`, req.id);
@@ -506,51 +485,22 @@ router.post('/:id/pause', async (req, res) => {
 router.post('/:id/resume', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const mission = getMissionById(missionId);
-        if (!mission) {
-            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
-        }
-
-        const now = Date.now();
-
-        const updated = updateMission(missionId, {
-            status: MISSION_STATUS.RUNNING,
-            started_at_ms: mission.started_at ? Date.parse(mission.started_at) : now,
+        const result = resumeMissionTransition({
+            missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            dedupKey: `req:${req.id}:mission:${missionId}:resume`,
+            payload: { request_id: req.id },
         });
-
-        // Retoma tasks pausadas
-        try {
-            const db = getDb();
-            db.prepare(
-                `
-                UPDATE tasks
-                SET status = 'PENDING',
-                    paused_at_ms = NULL,
-                    updated_at_ms = @now
-                WHERE mission_id = @mission_id
-                  AND stage = 'READY'
-                  AND status = 'PAUSED'
-            `
-            ).run({ now, mission_id: missionId });
-        } catch (_) {
-            /* best-effort */
+        if (!result.ok) {
+            return _sendTransitionFailure(res, req, result);
         }
 
         res.json({
             success: true,
             message: 'Missão resumida',
-            mission: updated,
+            mission: result.mission,
             request_id: req.id,
-        });
-
-        recordEvent({
-            entityType: 'mission',
-            entityId: missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'MISSION_RESUMED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${missionId}:resume`,
         });
     } catch (err) {
         log('ERROR', `[MISSIONS_API] Erro ao resumir missão: ${err?.message || String(err)}`, req.id);
@@ -783,6 +733,8 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
 
         const taskId = `task-${uuidv4()}`;
         const nowIso = new Date().toISOString();
+        const parentTaskId = progress.current_task_id ? String(progress.current_task_id) : null;
+        const correlationId = `req-${req.id}-mission-${missionId}-planner`.replace(/[^a-zA-Z0-9._-]/g, '-');
 
         const taskV5 = schemas.core.TaskSchemaV5.parse({
             meta: {
@@ -793,6 +745,8 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
                 source: 'gui',
                 mission_id: missionId,
                 workflow_id: workflow?.id || undefined,
+                parent_id: parentTaskId || undefined,
+                correlation_id: correlationId,
                 tags: ['mission_planner'],
             },
             spec: {
@@ -894,6 +848,13 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                     source: 'gui',
                     mission_id: missionId,
                     workflow_id: workflow?.id || undefined,
+                    parent_id: mission.context?.progress?.current_task_id
+                        ? String(mission.context.progress.current_task_id)
+                        : undefined,
+                    correlation_id: `req-${req.id}-mission-${missionId}-proposal-${taskId}`.replace(
+                        /[^a-zA-Z0-9._-]/g,
+                        '-'
+                    ),
                     tags: Array.isArray(proposal?.tags) ? proposal.tags.map(t => String(t)) : [],
                 },
                 spec: {
@@ -1073,50 +1034,22 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
 router.delete('/:id', async (req, res) => {
     try {
         const missionId = req.params.id;
-        const mission = getMissionById(missionId);
-        if (!mission) {
-            return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
-        }
-
-        const now = Date.now();
-        const updated = updateMission(missionId, {
-            status: MISSION_STATUS.CANCELLED,
-            completed_at_ms: now,
+        const result = cancelMissionTransition({
+            missionId,
+            actorType: 'user',
+            actorId: req.ip || null,
+            dedupKey: `req:${req.id}:mission:${missionId}:cancel`,
+            payload: { request_id: req.id },
         });
-
-        // Cancel tasks that could still execute.
-        try {
-            const db = getDb();
-            db.prepare(
-                `
-                UPDATE tasks
-                SET status = 'CANCELLED',
-                    cancelled_at_ms = @now,
-                    updated_at_ms = @now,
-                    last_error = COALESCE(last_error, 'MISSION_CANCELLED')
-                WHERE mission_id = @mission_id
-                  AND status IN ('PENDING', 'RUNNING', 'PAUSED', 'FAILED')
-            `
-            ).run({ now, mission_id: missionId });
-        } catch (_) {
-            /* best-effort */
+        if (!result.ok) {
+            return _sendTransitionFailure(res, req, result);
         }
 
         res.json({
             success: true,
             message: 'Missão cancelada',
-            mission: updated,
+            mission: result.mission,
             request_id: req.id,
-        });
-
-        recordEvent({
-            entityType: 'mission',
-            entityId: missionId,
-            actorType: 'user',
-            actorId: req.ip || null,
-            eventType: 'MISSION_CANCELLED',
-            payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${missionId}:cancel`,
         });
     } catch (err) {
         log('ERROR', `[MISSIONS_API] Erro ao cancelar missão: ${err?.message || String(err)}`, req.id);

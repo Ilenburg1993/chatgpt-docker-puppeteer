@@ -1,8 +1,12 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import CONFIG from '#core/config';
+import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
+import { isTokenRevoked } from '#infra/db/token_blocklist';
 import { ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
 import { validateIPCEnvelope, validateRobotIdentity } from '#shared/nerv/schemas';
 import EventEmitter from 'node:events';
+import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,35 +19,110 @@ let ioInstance = null;
    CORS (Dashboard) — Política conservadora
 ========================================================================== */
 
-const DASHBOARD_ALLOWED_ORIGINS = new Set(
-    [
-        // Production-like (served from the same server)
-        'http://localhost:3008',
-        'http://127.0.0.1:3008',
+let dashboardAllowedOrigins = new Set();
+let configUpdatedHandler = null;
 
-        // Vite dev server
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:5174',
-        'http://127.0.0.1:5174',
-        'http://localhost:5175',
-        'http://127.0.0.1:5175',
-        'http://localhost:5176',
-        'http://127.0.0.1:5176',
+function parseBooleanEnv(name, defaultValue) {
+    const raw = process.env[name];
+    if (raw === undefined) {
+        return defaultValue;
+    }
+    const value = String(raw).trim().toLowerCase();
+    if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
+    if (value === '0' || value === 'false' || value === 'no' || value === 'off') return false;
+    return defaultValue;
+}
 
-        // Docker network access (best-effort; origin varies by setup)
-        'http://172.17.0.2:5173',
-        'http://172.17.0.2:5174',
-        'http://172.17.0.2:5175',
-        'http://172.17.0.2:5176',
+function getDashboardSocketPolicy() {
+    return {
+        authRequired: parseBooleanEnv('DASHBOARD_SOCKET_AUTH_REQUIRED', true),
+        commandsEnabled: parseBooleanEnv('DASHBOARD_COMMANDS_ENABLED', false),
+        commandRole: String(process.env.DASHBOARD_COMMAND_ROLE || 'admin').trim() || 'admin',
+        emitTaskUpdatedCompat: parseBooleanEnv('DASHBOARD_EMIT_TASK_UPDATED_COMPAT', false),
+    };
+}
 
-        process.env.DASHBOARD_ORIGIN,
-    ].filter(Boolean)
-);
+function normalizeOrigins(originsLike) {
+    if (Array.isArray(originsLike)) {
+        return originsLike.map(origin => String(origin).trim()).filter(Boolean);
+    }
+
+    if (typeof originsLike === 'string') {
+        return originsLike
+            .split(',')
+            .map(origin => origin.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+}
+
+function refreshAllowedOrigins() {
+    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env.DASHBOARD_ORIGIN].filter(Boolean);
+    const merged = new Set([...defaults, ...normalizeOrigins(CONFIG.ALLOWED_ORIGINS)]);
+    dashboardAllowedOrigins = merged;
+}
+
+function ensureConfigUpdatedListener() {
+    if (configUpdatedHandler) {
+        return;
+    }
+
+    configUpdatedHandler = () => {
+        refreshAllowedOrigins();
+        log('INFO', `[HUB] Socket CORS allowlist atualizada (${dashboardAllowedOrigins.size} origens)`);
+    };
+
+    CONFIG.on('updated', configUpdatedHandler);
+}
+
+function removeConfigUpdatedListener() {
+    if (!configUpdatedHandler) {
+        return;
+    }
+    CONFIG.off('updated', configUpdatedHandler);
+    configUpdatedHandler = null;
+}
 
 function isDashboardOriginAllowed(origin) {
     if (!origin) return true;
-    return DASHBOARD_ALLOWED_ORIGINS.has(origin);
+    if (dashboardAllowedOrigins.has(origin)) {
+        return true;
+    }
+    log('WARN', `[CORS] Blocked origin: ${origin}`);
+    return false;
+}
+
+function verifyDashboardToken(token) {
+    if (!token || typeof token !== 'string') {
+        return { ok: false, code: 'AUTH_TOKEN_MISSING', message: 'Token JWT ausente no handshake' };
+    }
+
+    try {
+        const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+        const jti = decoded?.jti;
+
+        if (jti && isTokenRevoked(jti)) {
+            return { ok: false, code: 'TOKEN_REVOKED', message: 'Token revogado' };
+        }
+
+        return {
+            ok: true,
+            user: {
+                id: decoded.id,
+                username: decoded.username,
+                role: decoded.role || 'user',
+                jti: decoded.jti || null,
+                exp: decoded.exp || null,
+            },
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            code: err?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+            message: err?.message || 'Token inválido',
+        };
+    }
 }
 
 /**
@@ -75,15 +154,16 @@ function flushTaskUpdates() {
 
     const updates = Array.from(taskUpdateBuffer.values()).map(entry => ({
         taskId: entry.taskId,
-        state: entry.state
+        state: entry.state,
     }));
 
     if (ioInstance) {
         ioInstance.to('dashboards').emit('task:updates_batch', { updates, count: updates.length });
-        // Compat/ergonomia: também emite evento individual para consumers legados.
-        // O dashboard V2 prefere o batch, mas algumas views ainda escutam 'task:updated'.
-        for (const update of updates) {
-            ioInstance.to('dashboards').emit('task:updated', update);
+        // Compatibilidade opt-in para consumers legados.
+        if (getDashboardSocketPolicy().emitTaskUpdatedCompat) {
+            for (const update of updates) {
+                ioInstance.to('dashboards').emit('task:updated', update);
+            }
         }
         log('DEBUG', `[HUB] Flushed ${updates.length} batched task updates`);
     }
@@ -106,6 +186,9 @@ function init(httpServer) {
         ioInstance = null;
     }
 
+    refreshAllowedOrigins();
+    ensureConfigUpdatedListener();
+
     log('INFO', '[HUB] Mission Control Hub V600 Online (IPC 2.0 Native).');
 
     ioInstance = new Server(httpServer, {
@@ -117,22 +200,38 @@ function init(httpServer) {
                 return callback(new Error(`Socket CORS blocked for origin: ${origin}`), false);
             },
             methods: ['GET', 'POST'],
-            credentials: true
+            credentials: true,
         },
         transports: ['websocket'],
         pingTimeout: 10000,
-        pingInterval: 5000
+        pingInterval: 5000,
     });
 
     ioInstance.on('connection', socket => {
         // 1. FILTRO DE INFRAESTRUTURA (Token de Acesso)
         const token = socket.handshake.auth?.token;
         const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
+        const dashboardPolicy = getDashboardSocketPolicy();
 
         if (isAgentAttempt) {
             log('DEBUG', `[HUB] Tentativa de acoplamento de agente (ID: ${socket.id}).`);
             _setupMaestroProtocol(socket);
         } else {
+            if (dashboardPolicy.authRequired) {
+                const authResult = verifyDashboardToken(token);
+                if (!authResult.ok) {
+                    socket.emit('dashboard:auth:error', {
+                        code: authResult.code || 'TOKEN_INVALID',
+                        error: authResult.message || 'Falha de autenticação',
+                    });
+                    socket.disconnect(true);
+                    return;
+                }
+                socket.dashboardUser = authResult.user || null;
+            } else {
+                socket.dashboardUser = null;
+            }
+
             // Terminais de visualização (Dashboard) entram na sala de broadcast de telemetria
             socket.join('dashboards');
             log('DEBUG', `[HUB] Terminal Dashboard conectado: ${socket.id}`);
@@ -142,6 +241,26 @@ function init(httpServer) {
 
             // Setup dashboard command listeners
             socket.on('dashboard:command', data => {
+                const policy = getDashboardSocketPolicy();
+                if (!policy.commandsEnabled) {
+                    socket.emit('dashboard:command:error', {
+                        code: 'COMMAND_CHANNEL_DISABLED',
+                        error: 'Canal de comando desabilitado por política',
+                    });
+                    return;
+                }
+
+                if (policy.authRequired) {
+                    const userRole = socket.dashboardUser?.role || null;
+                    if (userRole !== policy.commandRole) {
+                        socket.emit('dashboard:command:error', {
+                            code: 'COMMAND_FORBIDDEN',
+                            error: `Role insuficiente. Necessário: ${policy.commandRole}`,
+                        });
+                        return;
+                    }
+                }
+
                 log('DEBUG', `[HUB] Dashboard command received: ${JSON.stringify(data)}`);
                 internalEmitter.emit('dashboard:command', data);
             });
@@ -207,7 +326,7 @@ function _setupMaestroProtocol(socket) {
             agentRegistry.set(identity.robot_id, {
                 socket_id: socket.id,
                 identity,
-                last_seen: Date.now()
+                last_seen: Date.now(),
             });
 
             // O Maestro entra em salas privadas para comandos direcionados (Unicast)
@@ -219,7 +338,7 @@ function _setupMaestroProtocol(socket) {
             // Resposta de Autorização (Handshake ACK)
             socket.emit('handshake:authorized', {
                 session_id: socket.id,
-                server_ts: Date.now()
+                server_ts: Date.now(),
             });
 
             // Notifica Dashboards sobre o novo agente pronto para missões
@@ -284,14 +403,14 @@ function sendCommand(command, payload, robotId = null) {
             timestamp: Date.now(),
             // ActorRole.MISSION_CONTROL is not part of the canonical vocabulary.
             // This command is emitted by the SERVER hub.
-            source: ActorRole.SERVER
+            source: ActorRole.SERVER,
         },
         ids: {
             msg_id: msgId,
-            correlation_id: correlationId
+            correlation_id: correlationId,
         },
         kind: command,
-        payload
+        payload,
     };
 
     const target = robotId ? `agent:${robotId}` : 'system_agents';
@@ -307,6 +426,13 @@ function sendCommand(command, payload, robotId = null) {
  * Essencial para o ciclo de vida NASA Standard.
  */
 async function stop() {
+    if (taskUpdateTimer) {
+        clearTimeout(taskUpdateTimer);
+        taskUpdateTimer = null;
+    }
+    taskUpdateBuffer.clear();
+    removeConfigUpdatedListener();
+
     if (ioInstance) {
         log('INFO', '[HUB] Encerrando barramento e limpando conexões...');
 
@@ -381,7 +507,7 @@ function broadcastTaskUpdate(taskId, data) {
     taskUpdateBuffer.set(normalizedTaskId, {
         taskId: normalizedTaskId,
         state: normalizedState || {},
-        timestamp: Date.now()
+        timestamp: Date.now(),
     });
 
     // Cancela timer anterior e agenda novo flush
@@ -397,7 +523,7 @@ function broadcastTaskUpdate(taskId, data) {
 export const getRegistry = () =>
     Array.from(agentRegistry.entries()).map(([robot_id, entry]) => ({
         robot_id,
-        ...entry
+        ...entry,
     }));
 export const getIO = () => ioInstance;
 export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
@@ -431,7 +557,7 @@ export const connectExternal = async (port = 3008) => {
         transports: ['websocket'],
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 5
+        reconnectionAttempts: 5,
     });
 
     const handshakeIdentity = {
@@ -439,7 +565,7 @@ export const connectExternal = async (port = 3008) => {
         instance_id: process.env.NODE_APP_INSTANCE || String(process.pid),
         role: ActorRole.MAESTRO,
         version: PROTOCOL_VERSION,
-        capabilities: ['split-mode', 'external-socket']
+        capabilities: ['split-mode', 'external-socket'],
     };
 
     const performHandshake = async () =>
@@ -569,7 +695,7 @@ export const connectExternal = async (port = 3008) => {
         // Best-effort in split mode: preserve API shape even without direct server-side socket lookup.
         sendToClient: (clientId, event, data) => clientSocket.emit(event, { clientId, payload: data }),
         connected: () => clientSocket.connected,
-        disconnect: () => clientSocket.disconnect()
+        disconnect: () => clientSocket.disconnect(),
     };
 };
 
@@ -585,7 +711,7 @@ function notifyShutdown(timeoutMs) {
     notify('system:shutdown', {
         message: 'Servidor será encerrado em breve',
         timeoutMs,
-        timestamp: Date.now()
+        timestamp: Date.now(),
     });
 }
 

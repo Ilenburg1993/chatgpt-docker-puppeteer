@@ -57,7 +57,7 @@ export const safeReadJSON = fsCore.safeReadJSON;
  *
  * @returns {Promise<number>} Número total de arquivos removidos
  */
-export const cleanupOrphans = async function() {
+export const cleanupOrphans = async function () {
     let totalCleaned = 0;
     const targetDirs = [PATHS.QUEUE, PATHS.RESPONSE, path.dirname(PATHS.IDENTITY)];
 
@@ -87,14 +87,14 @@ export const cleanupOrphans = async function() {
  * @returns {Promise<object>} Resultado da operação de salvamento
  * @throws {Error} Quando o limite de profundidade da fila é atingido
  */
-export const saveTask = async function(task) {
-    // ✅ DoS Prevention: Queue depth limit
-    const MAX_QUEUE_DEPTH = 10000; // TODO: mover para config.json
+export const saveTask = async function (task) {
+    // ✅ DoS Prevention: Queue depth limit - configurable via environment variable
+    const MAX_QUEUE_DEPTH = parseInt(process.env.MAX_QUEUE_DEPTH) || 10000;
     const currentQueue = await getQueue();
 
     if (currentQueue.length >= MAX_QUEUE_DEPTH) {
         throw new Error(
-            `Queue depth limit reached (${MAX_QUEUE_DEPTH}). Clear queue or increase limit in config.json`
+            `Queue depth limit reached (${MAX_QUEUE_DEPTH}). Clear queue or increase limit via MAX_QUEUE_DEPTH env var`
         );
     }
 
@@ -111,7 +111,7 @@ export const saveTask = async function(task) {
  * @param {string} id - ID da tarefa a ser removida
  * @returns {Promise<void>}
  */
-export const deleteTask = async function(id) {
+export const deleteTask = async function (id) {
     queueCache.markDirty(); // Invalida primeiro (defensivo)
     await taskStore.deleteTask(id);
 };

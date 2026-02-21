@@ -155,16 +155,12 @@
 <script>
 import { computed, onMounted } from 'vue';
 import { useSystemStore } from '@/stores/system';
-import { useRealtime } from '@/composables/useRealtime';
 
 export default {
     name: 'SystemHealth',
 
     setup() {
         const system = useSystemStore();
-
-        // Activate real-time updates
-        useRealtime();
 
         // Overall status label
         const overallLabel = computed(() => {

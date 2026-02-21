@@ -1,6 +1,16 @@
 // @ts-check
 import { ref, computed, onMounted } from 'vue';
 import { useNotifications } from './useNotifications.js';
+import { http } from '@/lib/http';
+
+const authUser = ref(null);
+const authLoading = ref(false);
+let verifyInFlight = null;
+let authInitialized = false;
+
+const getTokenFromStorage = () => localStorage.getItem('auth_token');
+const setTokenInStorage = token => localStorage.setItem('auth_token', token);
+const clearTokenInStorage = () => localStorage.removeItem('auth_token');
 
 /**
  * Composable para gerenciamento de autenticação JWT
@@ -11,16 +21,6 @@ import { useNotifications } from './useNotifications.js';
  */
 export function useAuth() {
     /**
-     * Estado do usuário autenticado
-     */
-    const user = ref(null);
-
-    /**
-     * Estado de loading
-     */
-    const loading = ref(false);
-
-    /**
      * Instância das notificações
      */
     const { showSuccess, showError } = useNotifications();
@@ -28,19 +28,19 @@ export function useAuth() {
     /**
      * Computed para verificar se usuário está autenticado
      */
-    const isAuthenticated = computed(() => !!user.value);
+    const isAuthenticated = computed(() => !!authUser.value);
 
     /**
      * Computed para verificar se usuário é admin
      */
-    const isAdmin = computed(() => user.value?.role === 'admin');
+    const isAdmin = computed(() => authUser.value?.role === 'admin');
 
     /**
      * Obtém token do localStorage
      * @returns {string|null} Token JWT ou null
      */
     const getToken = () => {
-        return localStorage.getItem('auth_token');
+        return getTokenFromStorage();
     };
 
     /**
@@ -48,14 +48,14 @@ export function useAuth() {
      * @param {string} token - Token JWT
      */
     const setToken = token => {
-        localStorage.setItem('auth_token', token);
+        setTokenInStorage(token);
     };
 
     /**
      * Remove token do localStorage
      */
     const removeToken = () => {
-        localStorage.removeItem('auth_token');
+        clearTokenInStorage();
     };
 
     /**
@@ -64,31 +64,31 @@ export function useAuth() {
      */
     const verifyToken = async () => {
         const token = getToken();
-        if (!token) return false;
-
-        try {
-            const response = await fetch('/api/dashboard/auth/me', {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                user.value = data.user;
-                return true;
-            } else {
-                // Token inválido, remover
-                removeToken();
-                user.value = null;
-                return false;
-            }
-        } catch (error) {
-            console.error('Token verification error:', error);
-            removeToken();
-            user.value = null;
+        if (!token) {
+            authUser.value = null;
             return false;
         }
+
+        if (verifyInFlight) {
+            return verifyInFlight;
+        }
+
+        verifyInFlight = (async () => {
+            try {
+                const response = await http.get('/api/dashboard/auth/me');
+                const payload = response?.data || {};
+                authUser.value = payload.user || null;
+                return Boolean(payload.user);
+            } catch (_error) {
+                removeToken();
+                authUser.value = null;
+                return false;
+            } finally {
+                verifyInFlight = null;
+            }
+        })();
+
+        return verifyInFlight;
     };
 
     /**
@@ -98,34 +98,27 @@ export function useAuth() {
      * @returns {Promise<boolean>} True se login bem-sucedido
      */
     const login = async (username, password) => {
-        loading.value = true;
+        authLoading.value = true;
 
         try {
-            const response = await fetch('/api/dashboard/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
-            });
-
-            const data = await response.json();
+            const response = await http.post('/api/dashboard/auth/login', { username, password });
+            const data = response?.data || {};
 
             if (data.success) {
                 setToken(data.token);
-                user.value = data.user;
+                authUser.value = data.user;
                 showSuccess(`Bem-vindo, ${data.user.username}!`);
                 return true;
-            } else {
-                showError(data.error || 'Erro no login');
-                return false;
             }
+
+            showError(data.error || 'Erro no login');
+            return false;
         } catch (error) {
-            showError('Erro de conexão');
-            console.error('Login error:', error);
+            const apiError = error?.response?.data?.error || 'Erro de conexão';
+            showError(apiError);
             return false;
         } finally {
-            loading.value = false;
+            authLoading.value = false;
         }
     };
 
@@ -139,12 +132,7 @@ export function useAuth() {
         try {
             // Tentar fazer logout no servidor (opcional)
             if (token) {
-                await fetch('/api/dashboard/auth/logout', {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                await http.post('/api/dashboard/auth/logout');
             }
         } catch (error) {
             console.error('Logout error:', error);
@@ -152,7 +140,7 @@ export function useAuth() {
 
         // Sempre limpar estado local
         removeToken();
-        user.value = null;
+        authUser.value = null;
         showSuccess('Logout realizado com sucesso');
     };
 
@@ -193,12 +181,16 @@ export function useAuth() {
 
     // Verificar token automaticamente ao inicializar
     onMounted(async () => {
+        if (authInitialized) {
+            return;
+        }
+        authInitialized = true;
         await verifyToken();
     });
 
     return {
-        user,
-        loading,
+        user: authUser,
+        loading: authLoading,
         isAuthenticated,
         isAdmin,
         login,

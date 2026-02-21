@@ -1,11 +1,16 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import CONFIG from '#core/config';
+import {
+    emitStaleAttemptIgnoredEvent,
+    evaluateAttemptInvariants,
+    releaseTaskLockForAttempt,
+} from '#agent/task_attempt_invariants';
 import { log } from '#core/logger';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
 import { updateAttempt, upsertAttempt } from '#infra/db/task_attempt_repo';
-import { extendTaskLock, incrementTaskAttempts, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import { extendTaskLock, incrementTaskAttempts, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import * as PATHS from '#infra/fs/paths';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
 import {
@@ -160,16 +165,6 @@ function _getMissionIdForTask(taskId) {
     }
 }
 
-function _getCurrentAttemptIdForTask(taskId) {
-    try {
-        const db = getDb();
-        const row = db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId);
-        return row?.latest_attempt_id ?? row?.last_correlation_id ?? null;
-    } catch (_) {
-        return null;
-    }
-}
-
 /**
  * Opções do construtor do TaskStateProjector.
  * @typedef {Object} TaskStateProjectorOptions
@@ -311,11 +306,9 @@ class TaskStateProjector {
         const msgId = getMsgId(envelope) || null;
         const now = Date.now();
 
-        // P0-5 FIX: Stale attempt check now relies on optimistic locking in updateTask
-        // instead of separate DB read. updateTask() will return null if concurrent modification
-        // detected (including attempt ID changes), preventing stale event application.
-        const currentAttemptId = attemptId ? _getCurrentAttemptIdForTask(taskId) : null;
-        const isStaleAttempt = Boolean(attemptId && currentAttemptId && attemptId !== currentAttemptId);
+        const attemptInvariant = evaluateAttemptInvariants({ taskId, attemptId });
+        const currentAttemptId = attemptInvariant.currentAttemptId;
+        const isStaleAttempt = !attemptInvariant.apply;
 
         // Persistent idempotency: prefer msg_id (stable per envelope) over correlation_id (stable per attempt).
         // This ensures redelivery doesn't double-apply, while allowing retries that reuse correlation ids.
@@ -332,6 +325,17 @@ class TaskStateProjector {
         if (!inserted) {
             return;
         }
+
+        const markStaleAttemptIgnored = (context = 'stale_attempt') =>
+            emitStaleAttemptIgnoredEvent({
+                taskId,
+                attemptId,
+                currentAttemptId,
+                actionCode,
+                correlationId,
+                msgId,
+                context,
+            });
 
         if (actionCode === ActionCode.DRIVER_TASK_ACCEPTED || actionCode === ActionCode.DRIVER_TASK_HEARTBEAT) {
             const lockTtlMs =
@@ -357,6 +361,7 @@ class TaskStateProjector {
             }
 
             if (isStaleAttempt) {
+                markStaleAttemptIgnored('accepted_or_heartbeat');
                 return;
             }
 
@@ -402,6 +407,7 @@ class TaskStateProjector {
             }
 
             if (isStaleAttempt) {
+                markStaleAttemptIgnored('task_started');
                 return;
             }
 
@@ -429,6 +435,7 @@ class TaskStateProjector {
 
         if (actionCode === ActionCode.DRIVER_TASK_QUEUED) {
             if (isStaleAttempt) {
+                markStaleAttemptIgnored('task_queued');
                 return;
             }
             // Legacy driver-side backpressure (in-memory queue). In SSOT mode, we reschedule in DB and unlock.
@@ -497,7 +504,7 @@ class TaskStateProjector {
                 }
             }
 
-            releaseTaskLock({ taskId });
+            releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
             return;
         }
 
@@ -564,6 +571,7 @@ class TaskStateProjector {
             }
 
             if (isStaleAttempt) {
+                markStaleAttemptIgnored('task_completed');
                 return;
             }
 
@@ -584,7 +592,7 @@ class TaskStateProjector {
             });
 
             // Task is terminal; unlock for hygiene.
-            releaseTaskLock({ taskId });
+            releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
             return;
         }
 
@@ -654,6 +662,7 @@ class TaskStateProjector {
             }
 
             if (isStaleAttempt) {
+                markStaleAttemptIgnored('task_aborted');
                 return;
             }
 
@@ -664,7 +673,7 @@ class TaskStateProjector {
                 last_correlation_id: correlationId,
                 latest_attempt_id: attemptId,
             });
-            releaseTaskLock({ taskId });
+            releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
             return;
         }
 
@@ -730,6 +739,7 @@ class TaskStateProjector {
             }
 
             if (isStaleAttempt) {
+                markStaleAttemptIgnored('task_failed_or_error');
                 try {
                     if (attemptId) {
                         const reasonCode = payload?.reason_code || payload?.reasonCode || payload?.reason || null;
@@ -878,7 +888,7 @@ class TaskStateProjector {
                     }
                 }
 
-                releaseTaskLock({ taskId });
+                releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
                 return;
             }
 
@@ -956,7 +966,7 @@ class TaskStateProjector {
                     }
                 }
 
-                releaseTaskLock({ taskId });
+                releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
                 return;
             }
 
@@ -1062,7 +1072,7 @@ class TaskStateProjector {
                         blocked_at_ms: null,
                         blocked_details_json: null,
                     });
-                    releaseTaskLock({ taskId });
+                    releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
                     return;
                 }
 
@@ -1079,7 +1089,7 @@ class TaskStateProjector {
                         blocked_at_ms: null,
                         blocked_details_json: null,
                     });
-                    releaseTaskLock({ taskId });
+                    releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
                     return;
                 }
 
@@ -1100,7 +1110,7 @@ class TaskStateProjector {
                     blocked_at_ms: null,
                     blocked_details_json: null,
                 });
-                releaseTaskLock({ taskId });
+                releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
                 return;
             }
 
@@ -1155,7 +1165,7 @@ class TaskStateProjector {
                     /* ignore */
                 }
 
-                releaseTaskLock({ taskId });
+                releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
                 return;
             }
 
@@ -1202,7 +1212,7 @@ class TaskStateProjector {
             } catch (_) {
                 /* ignore */
             }
-            releaseTaskLock({ taskId });
+            releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
         }
     }
 }

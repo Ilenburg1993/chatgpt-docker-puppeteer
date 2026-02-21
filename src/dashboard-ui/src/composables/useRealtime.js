@@ -30,11 +30,6 @@ export function useRealtime(options = {}) {
             telemetryStore.handleTelemetryMetrics(data);
         },
 
-        // Update individual de task
-        'task:updated': (data) => {
-            taskStore.handleTaskUpdate(data);
-        },
-
         // Batch de updates de tasks (debounced)
         'task:updates_batch': (data) => {
             taskStore.handleTaskUpdatesBatch(data);

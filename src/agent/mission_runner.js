@@ -1,10 +1,16 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { getMissionById, listMissions, MISSION_STATUS, updateMission } from '#infra/db/mission_repo';
+import { getMissionById, listMissions, MISSION_STATUS } from '#infra/db/mission_repo';
+import {
+    completeMissionTransition,
+    failMissionTransition,
+    updateMissionProgressState,
+} from '#agent/mission_execution_service';
+import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'node:crypto';
 
 /**
  * @typedef {Object} MissionRunnerOptions
@@ -46,6 +52,10 @@ function _safeJson(obj, fallback) {
     } catch (_) {
         return fallback;
     }
+}
+
+function _hashId(input) {
+    return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
 /**
@@ -156,11 +166,17 @@ class MissionRunner {
         const maxTasks = Number(policy.max_tasks_total || 200) || 200;
         const createdCount = Number(progress.created_count || 0) || 0;
         if (createdCount >= maxTasks) {
-            updateMission(missionId, {
-                status: MISSION_STATUS.FAILED,
-                completed_at_ms: Date.now(),
-                context: { ...context, progress, failure_reason: 'Mission task budget exceeded' },
+            const failResult = failMissionTransition({
+                missionId,
+                failureReason: 'Mission task budget exceeded',
+                contextPatch: { progress },
+                actorType: 'system',
+                dedupKey: `mission:${missionId}:budget_exceeded`,
+                payload: { max_tasks_total: maxTasks, created_count: createdCount },
             });
+            if (!failResult.ok) {
+                log('WARN', `[MissionRunner] failMissionTransition rejected: ${failResult.code || failResult.error}`);
+            }
             return;
         }
 
@@ -185,9 +201,20 @@ class MissionRunner {
                     current_step_index: Number(progress.current_step_index || 0) + 1,
                 };
 
-                updateMission(missionId, {
-                    context: { ...context, progress: nextProgress },
+                const progressResult = updateMissionProgressState({
+                    missionId,
+                    progress: nextProgress,
+                    expectedProgress: { currentTaskId: progress.current_task_id },
+                    actorType: 'system',
+                    dedupKey: `mission:${missionId}:task_done:${progress.current_task_id}`,
+                    payload: {
+                        task_id: progress.current_task_id,
+                        task_status: status,
+                    },
                 });
+                if (!progressResult.ok) {
+                    log('WARN', `[MissionRunner] progress update rejected: ${progressResult.code || progressResult.error}`);
+                }
                 return;
             }
 
@@ -200,32 +227,49 @@ class MissionRunner {
                 current_task_id: null,
             };
 
-            updateMission(missionId, {
-                status: MISSION_STATUS.FAILED,
-                completed_at_ms: Date.now(),
-                context: {
-                    ...context,
-                    progress: nextProgress,
-                    failure_reason: `Task ${progress.current_task_id} ended with ${status}`,
-                },
+            const failResult = failMissionTransition({
+                missionId,
+                failureReason: `Task ${progress.current_task_id} ended with ${status}`,
+                contextPatch: { progress: nextProgress },
+                expectedProgress: { currentTaskId: progress.current_task_id },
+                actorType: 'system',
+                dedupKey: `mission:${missionId}:task_terminal_failure:${progress.current_task_id}`,
+                payload: { task_id: progress.current_task_id, task_status: status },
             });
+            if (!failResult.ok) {
+                log('WARN', `[MissionRunner] fail transition rejected: ${failResult.code || failResult.error}`);
+            }
             return;
         }
 
         const currentStepIndex = Number(progress.current_step_index || 0) || 0;
         if (currentStepIndex >= workflow.steps.length) {
-            updateMission(missionId, {
-                status: MISSION_STATUS.DONE,
-                completed_at_ms: Date.now(),
-                context: { ...context, progress: { ...progress, current_task_id: null } },
+            const doneResult = completeMissionTransition({
+                missionId,
+                contextPatch: { progress: { ...progress, current_task_id: null } },
+                actorType: 'system',
+                dedupKey: `mission:${missionId}:completed`,
+                payload: { total_steps: workflow.steps.length },
             });
+            if (!doneResult.ok) {
+                log('WARN', `[MissionRunner] complete transition rejected: ${doneResult.code || doneResult.error}`);
+            }
             return;
         }
 
         const step = workflow.steps[currentStepIndex];
         const stepId = step?.id || `step-${currentStepIndex}`;
+        const parentTaskId = Array.isArray(progress.completed) && progress.completed.length > 0
+            ? String(progress.completed[progress.completed.length - 1])
+            : null;
 
-        const taskId = `task-${uuidv4()}`;
+        const attemptSeqByStep =
+            progress?.step_attempt_seq && typeof progress.step_attempt_seq === 'object' ? progress.step_attempt_seq : {};
+        const currentAttemptSeq = Number(attemptSeqByStep[stepId] || 0) || 0;
+        const nextAttemptSeq = Math.max(1, currentAttemptSeq + 1);
+        const deterministicSeed = `${missionId}|${stepId}|${nextAttemptSeq}`;
+        const taskId = `task-${_hashId(deterministicSeed)}`;
+        const correlationId = `corr-${_hashId(`mission|${missionId}|${stepId}|${nextAttemptSeq}`)}`;
         const nowIso = new Date().toISOString();
 
         const userMessage =
@@ -242,6 +286,8 @@ class MissionRunner {
                 source: 'flow_manager',
                 mission_id: missionId,
                 workflow_id: workflow.id,
+                parent_id: parentTaskId || undefined,
+                correlation_id: correlationId,
                 tags: ['mission_step'],
             },
             spec: {
@@ -272,17 +318,54 @@ class MissionRunner {
             result: {},
         });
 
-        insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'system' });
+        const db = getDb();
+        const existingTask = db.prepare('SELECT id FROM tasks WHERE id = ?').get(taskId);
+        insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'system', ifNotExists: true });
+
+        recordEvent({
+            entityType: 'mission',
+            entityId: missionId,
+            actorType: 'system',
+            eventType: 'MISSION_STEP_TASK_ENQUEUED',
+            payload: {
+                task_id: taskId,
+                step_id: stepId,
+                step_index: currentStepIndex,
+                workflow_id: workflow.id || null,
+                attempt_seq: nextAttemptSeq,
+                if_not_exists: true,
+                reused_existing_task: Boolean(existingTask?.id),
+            },
+            dedupKey: `mission:${missionId}:step_task:${stepId}:${nextAttemptSeq}`,
+        });
 
         const nextProgress = {
             ...progress,
             current_task_id: taskId,
-            created_count: createdCount + 1,
+            created_count: existingTask?.id ? createdCount : createdCount + 1,
             last_step_id: stepId,
             last_step_index: currentStepIndex,
+            step_attempt_seq: {
+                ...attemptSeqByStep,
+                [stepId]: nextAttemptSeq,
+            },
         };
 
-        updateMission(missionId, { context: { ...context, progress: nextProgress } });
+        const progressResult = updateMissionProgressState({
+            missionId,
+            progress: nextProgress,
+            expectedProgress: { currentTaskId: progress.current_task_id, currentStepIndex },
+            actorType: 'system',
+            dedupKey: `mission:${missionId}:step_progress:${stepId}:${nextAttemptSeq}`,
+            payload: {
+                task_id: taskId,
+                step_id: stepId,
+                step_index: currentStepIndex,
+            },
+        });
+        if (!progressResult.ok) {
+            log('WARN', `[MissionRunner] step progress rejected: ${progressResult.code || progressResult.error}`);
+        }
     }
 }
 

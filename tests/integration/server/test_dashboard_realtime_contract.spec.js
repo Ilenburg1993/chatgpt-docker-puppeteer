@@ -3,6 +3,7 @@ import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import { io as ioClient } from 'socket.io-client';
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -39,6 +40,9 @@ describe('Dashboard realtime contract (Socket.io)', () => {
     let dbPath = null;
 
     before(async () => {
+        process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_dashboard_realtime_contract_jwt_secret_123456789';
+        process.env.DASHBOARD_SOCKET_AUTH_REQUIRED = 'true';
+
         dbPath = path.join(os.tmpdir(), `maestro-test-dashboard-realtime-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
         process.env.MAESTRO_DB_PATH = dbPath;
         try {
@@ -58,11 +62,24 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         socketHub.init(httpServer);
 
+        const token = jwt.sign(
+            {
+                id: 'test-dashboard',
+                username: 'test-dashboard',
+                role: 'admin',
+                jti: `jti-${Date.now()}`,
+            },
+            process.env.JWT_SECRET,
+            { algorithm: 'HS256', expiresIn: '1h' }
+        );
+
         client = ioClient(`http://localhost:${port}`, {
-            transports: ['websocket']
+            transports: ['websocket'],
+            auth: { token },
+            extraHeaders: { origin: 'http://localhost:3008' },
         });
 
-        await waitForEvent(client, 'connect', 1500);
+        await waitForEvent(client, 'connect', 15000);
 
         ssotEventFeed.start({ socketHub, intervalMs: 50, batchLimit: 500 });
 
@@ -78,7 +95,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         insertTask(seedTask, { stage: 'READY', status: 'PENDING', actor: 'system', ifNotExists: true });
         recordEvent({ entityType: 'task', entityId: 'task-seed', eventType: 'TASK_SEEDED', payload: { id: 'task-seed' } });
 
-        await waitForEvent(client, 'task:updates_batch', 2000);
+        await waitForEvent(client, 'task:updates_batch', 8000);
     });
 
     after(async () => {

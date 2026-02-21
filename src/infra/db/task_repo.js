@@ -151,7 +151,14 @@ function getTaskById(taskId) {
     return row ? _rowToTask(/** @type {TaskRow} */ (row)) : null;
 }
 
-function listTasks({ status = null, stage = null, missionId = null, limit = 2000 } = {}) {
+/**
+ * Lista tasks com suporte a filtros, paginação e limite seguro.
+ * PERF-01 FIX: Adicionado parâmetro `offset` para paginação e limitado
+ * o máximo retornável a 500 por chamada (vs 20.000 anterior).
+ *
+ * @param {{ status?: string|null, stage?: string|null, missionId?: string|null, limit?: number, offset?: number }} [opts]
+ */
+function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = {}) {
     const db = getDb();
     const where = [];
     /** @type {Record<string, unknown>} */
@@ -173,13 +180,43 @@ function listTasks({ status = null, stage = null, missionId = null, limit = 2000
     const sql = `
         SELECT * FROM tasks
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-        ORDER BY created_at_ms DESC
-        LIMIT @limit
+        ORDER BY priority DESC, created_at_ms DESC
+        LIMIT @limit OFFSET @offset
     `;
 
-    params.limit = Math.max(1, Math.min(Number(limit) || 2000, 20000));
+    params.limit = Math.max(1, Math.min(Number(limit) || 100, 500));
+    params.offset = Math.max(0, Number(offset) || 0);
     const rows = db.prepare(sql).all(params);
     return rows.map(r => _rowToTask(/** @type {TaskRow} */ (r)));
+}
+
+/**
+ * Conta o total de tasks com filtros (para paginação).
+ * @param {{ status?: string|null, stage?: string|null, missionId?: string|null }} [opts]
+ * @returns {number}
+ */
+function countTasks({ status = null, stage = null, missionId = null } = {}) {
+    const db = getDb();
+    const where = [];
+    /** @type {Record<string, unknown>} */
+    const params = {};
+
+    if (status) {
+        where.push('status = @status');
+        params.status = status;
+    }
+    if (stage) {
+        where.push('stage = @stage');
+        params.stage = stage;
+    }
+    if (missionId) {
+        where.push('mission_id = @mission_id');
+        params.mission_id = missionId;
+    }
+
+    const sql = `SELECT COUNT(*) as n FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`;
+    const row = db.prepare(sql).get(params);
+    return /** @type {any} */ (row)?.n || 0;
 }
 
 function getTaskDependencies(taskId) {
@@ -210,7 +247,13 @@ function getTaskDependencies(taskId) {
  */
 function insertTask(
     rawTask,
-    { stage = TASK_STAGES.READY, status = 'PENDING', actor = 'system', ifNotExists = false, promptTemplateArtifactId = null } = {}
+    {
+        stage = TASK_STAGES.READY,
+        status = 'PENDING',
+        actor = 'system',
+        ifNotExists = false,
+        promptTemplateArtifactId = null,
+    } = {}
 ) {
     const db = getDb();
     const now = _now();
@@ -459,61 +502,79 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
         }
     }
 
-    const lastError = updates.last_error !== undefined ? (updates.last_error ? String(updates.last_error) : null) : row.last_error;
-    const lastCorrelationId = updates.last_correlation_id !== undefined ? (updates.last_correlation_id ? String(updates.last_correlation_id) : null) : row.last_correlation_id;
+    const lastError =
+        updates.last_error !== undefined ? (updates.last_error ? String(updates.last_error) : null) : row.last_error;
+    const lastCorrelationId =
+        updates.last_correlation_id !== undefined
+            ? updates.last_correlation_id
+                ? String(updates.last_correlation_id)
+                : null
+            : row.last_correlation_id;
 
     const attempts = updates.attempts !== undefined ? Number(updates.attempts) || 0 : row.attempts;
 
-    const startedAtMs = updates.started_at_ms !== undefined ? (Number(updates.started_at_ms) || null) : row.started_at_ms;
-    const completedAtMs = updates.completed_at_ms !== undefined ? (Number(updates.completed_at_ms) || null) : row.completed_at_ms;
-    const pausedAtMs = updates.paused_at_ms !== undefined ? (Number(updates.paused_at_ms) || null) : row.paused_at_ms;
-    const cancelledAtMs = updates.cancelled_at_ms !== undefined ? (Number(updates.cancelled_at_ms) || null) : row.cancelled_at_ms;
-    const failedAtMs = updates.failed_at_ms !== undefined ? (Number(updates.failed_at_ms) || null) : row.failed_at_ms;
+    const startedAtMs = updates.started_at_ms !== undefined ? Number(updates.started_at_ms) || null : row.started_at_ms;
+    const completedAtMs =
+        updates.completed_at_ms !== undefined ? Number(updates.completed_at_ms) || null : row.completed_at_ms;
+    const pausedAtMs = updates.paused_at_ms !== undefined ? Number(updates.paused_at_ms) || null : row.paused_at_ms;
+    const cancelledAtMs =
+        updates.cancelled_at_ms !== undefined ? Number(updates.cancelled_at_ms) || null : row.cancelled_at_ms;
+    const failedAtMs = updates.failed_at_ms !== undefined ? Number(updates.failed_at_ms) || null : row.failed_at_ms;
 
     const blockedReason =
-        updates.blocked_reason !== undefined ? (updates.blocked_reason ? String(updates.blocked_reason) : null) : row.blocked_reason ?? null;
+        updates.blocked_reason !== undefined
+            ? updates.blocked_reason
+                ? String(updates.blocked_reason)
+                : null
+            : (row.blocked_reason ?? null);
     const blockedAtMs =
-        updates.blocked_at_ms !== undefined ? (Number(updates.blocked_at_ms) || null) : row.blocked_at_ms ?? null;
+        updates.blocked_at_ms !== undefined ? Number(updates.blocked_at_ms) || null : (row.blocked_at_ms ?? null);
     const blockedDetailsJson =
         updates.blocked_details_json !== undefined
             ? updates.blocked_details_json
                 ? String(updates.blocked_details_json)
                 : null
-            : row.blocked_details_json ?? null;
+            : (row.blocked_details_json ?? null);
 
-    const resultJson = updates.result_json !== undefined ? (updates.result_json ? JSON.stringify(updates.result_json) : null) : row.result_json;
+    const resultJson =
+        updates.result_json !== undefined
+            ? updates.result_json
+                ? JSON.stringify(updates.result_json)
+                : null
+            : row.result_json;
 
     const promptTemplateArtifactId =
         updates.prompt_template_artifact_id !== undefined
             ? updates.prompt_template_artifact_id
                 ? String(updates.prompt_template_artifact_id)
                 : null
-            : row.prompt_template_artifact_id ?? null;
+            : (row.prompt_template_artifact_id ?? null);
 
     const latestAttemptId =
         updates.latest_attempt_id !== undefined
             ? updates.latest_attempt_id
                 ? String(updates.latest_attempt_id)
                 : null
-            : row.latest_attempt_id ?? null;
+            : (row.latest_attempt_id ?? null);
 
     const latestRenderedPromptArtifactId =
         updates.latest_rendered_prompt_artifact_id !== undefined
             ? updates.latest_rendered_prompt_artifact_id
                 ? String(updates.latest_rendered_prompt_artifact_id)
                 : null
-            : row.latest_rendered_prompt_artifact_id ?? null;
+            : (row.latest_rendered_prompt_artifact_id ?? null);
 
     const latestResponseV2JsonArtifactId =
         updates.latest_response_v2_json_artifact_id !== undefined
             ? updates.latest_response_v2_json_artifact_id
                 ? String(updates.latest_response_v2_json_artifact_id)
                 : null
-            : row.latest_response_v2_json_artifact_id ?? null;
+            : (row.latest_response_v2_json_artifact_id ?? null);
 
     const tx = db.transaction(() => {
-        const result = db.prepare(
-            `
+        const result = db
+            .prepare(
+                `
             UPDATE tasks SET
                 mission_id = @mission_id,
                 parent_id = @parent_id,
@@ -546,39 +607,40 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
                 blocked_details_json = @blocked_details_json
             WHERE id = @id AND updated_at_ms = @expected_version
         `
-        ).run({
-            id: taskId,
-            expected_version: expectedVersion,
-            mission_id: nextMissionId,
-            parent_id: nextParentId ? String(nextParentId) : null,
-            workflow_id: nextWorkflowId ? String(nextWorkflowId) : null,
-            stage: nextStage,
-            status: nextStatus,
-            priority: nextPriority,
-            target: nextTarget,
-            model: nextModel,
-            execute_after_ms: nextExecuteAfterMs,
-            attempts,
-            last_error: lastError,
-            last_correlation_id: lastCorrelationId,
-            spec_user_message: nextSpecUser,
-            spec_system_message: nextSpecSystem,
-            task_json: nextTaskJson,
-            result_json: resultJson,
-            prompt_template_artifact_id: promptTemplateArtifactId,
-            latest_attempt_id: latestAttemptId,
-            latest_rendered_prompt_artifact_id: latestRenderedPromptArtifactId,
-            latest_response_v2_json_artifact_id: latestResponseV2JsonArtifactId,
-            updated_at_ms: now,
-            started_at_ms: startedAtMs,
-            completed_at_ms: completedAtMs,
-            paused_at_ms: pausedAtMs,
-            cancelled_at_ms: cancelledAtMs,
-            failed_at_ms: failedAtMs,
-            blocked_reason: blockedReason,
-            blocked_at_ms: blockedAtMs,
-            blocked_details_json: blockedDetailsJson,
-        });
+            )
+            .run({
+                id: taskId,
+                expected_version: expectedVersion,
+                mission_id: nextMissionId,
+                parent_id: nextParentId ? String(nextParentId) : null,
+                workflow_id: nextWorkflowId ? String(nextWorkflowId) : null,
+                stage: nextStage,
+                status: nextStatus,
+                priority: nextPriority,
+                target: nextTarget,
+                model: nextModel,
+                execute_after_ms: nextExecuteAfterMs,
+                attempts,
+                last_error: lastError,
+                last_correlation_id: lastCorrelationId,
+                spec_user_message: nextSpecUser,
+                spec_system_message: nextSpecSystem,
+                task_json: nextTaskJson,
+                result_json: resultJson,
+                prompt_template_artifact_id: promptTemplateArtifactId,
+                latest_attempt_id: latestAttemptId,
+                latest_rendered_prompt_artifact_id: latestRenderedPromptArtifactId,
+                latest_response_v2_json_artifact_id: latestResponseV2JsonArtifactId,
+                updated_at_ms: now,
+                started_at_ms: startedAtMs,
+                completed_at_ms: completedAtMs,
+                paused_at_ms: pausedAtMs,
+                cancelled_at_ms: cancelledAtMs,
+                failed_at_ms: failedAtMs,
+                blocked_reason: blockedReason,
+                blocked_at_ms: blockedAtMs,
+                blocked_details_json: blockedDetailsJson,
+            });
 
         // Optimistic locking: check if update actually happened
         if (result.changes === 0) {
@@ -589,7 +651,9 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
         if (nextDeps !== null) {
             db.prepare('DELETE FROM task_dependencies WHERE task_id = ?').run(taskId);
             if (nextDeps.length > 0) {
-                const stmt = db.prepare('INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?)');
+                const stmt = db.prepare(
+                    'INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?)'
+                );
                 for (const depId of nextDeps) {
                     stmt.run(taskId, depId);
                 }
@@ -722,8 +786,15 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
  * @param {object} params - Parameters
  * @param {string} params.taskId - The task ID
  * @param {string} [params.workerId] - The worker ID (optional, for safety)
+ * @param {string} [params.expectedAttemptId] - Expected latest attempt/correlation for lock-causality guard
  */
-function releaseTaskLock(/** @type {{ taskId: string, workerId?: string }} */ { taskId, workerId }) {
+function releaseTaskLock(
+    /** @type {{ taskId: string, workerId?: string, expectedAttemptId?: string }} */ {
+        taskId,
+        workerId,
+        expectedAttemptId,
+    }
+) {
     const db = getDb();
     const now = _now();
     const res = db
@@ -736,9 +807,14 @@ function releaseTaskLock(/** @type {{ taskId: string, workerId?: string }} */ { 
                 updated_at_ms = @now
             WHERE id = @id
               AND (@workerId IS NULL OR locked_by = @workerId)
+              AND (
+                @expectedAttemptId IS NULL OR
+                latest_attempt_id = @expectedAttemptId OR
+                last_correlation_id = @expectedAttemptId
+              )
         `
         )
-        .run({ id: taskId, workerId: workerId || null, now });
+        .run({ id: taskId, workerId: workerId || null, expectedAttemptId: expectedAttemptId || null, now });
     return res.changes || 0;
 }
 
@@ -750,7 +826,14 @@ function releaseTaskLock(/** @type {{ taskId: string, workerId?: string }} */ { 
  * @param {number} [params.nowMs] - Current timestamp in ms
  * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
  */
-function extendTaskLock(/** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ { taskId, workerId, nowMs = _now(), lockTtlMs = 60000 }) {
+function extendTaskLock(
+    /** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ {
+        taskId,
+        workerId,
+        nowMs = _now(),
+        lockTtlMs = 60000,
+    }
+) {
     const db = getDb();
     const res = db
         .prepare(
@@ -821,6 +904,20 @@ function purgeTask(taskId) {
 }
 
 export {
-    claimNextEligibleTask, clearQueuePreserveRunning, extendTaskLock, getTaskById, getTaskDependencies, incrementTaskAttempts, insertTask, listTasks, purgeTask, releaseTaskLock, retryFailedTasks, setTaskStage,
-    setTaskStatus, TASK_STAGES, updateTask
+    claimNextEligibleTask,
+    clearQueuePreserveRunning,
+    countTasks,
+    extendTaskLock,
+    getTaskById,
+    getTaskDependencies,
+    incrementTaskAttempts,
+    insertTask,
+    listTasks,
+    purgeTask,
+    releaseTaskLock,
+    retryFailedTasks,
+    setTaskStage,
+    setTaskStatus,
+    TASK_STAGES,
+    updateTask,
 };

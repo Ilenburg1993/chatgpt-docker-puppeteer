@@ -34,7 +34,7 @@ class ValidationService {
             return {
                 passed,
                 score: passed ? 100 : 0,
-                feedback: passed ? 'Pattern matched' : `Pattern did not match: ${config.pattern}`
+                feedback: passed ? 'Pattern matched' : `Pattern did not match: ${config.pattern}`,
             };
         });
 
@@ -48,9 +48,7 @@ class ValidationService {
             return {
                 passed,
                 score,
-                feedback: passed
-                    ? `Length OK (${length} chars)`
-                    : `Length ${length} not in range [${min}, ${max}]`
+                feedback: passed ? `Length OK (${length} chars)` : `Length ${length} not in range [${min}, ${max}]`,
             };
         });
 
@@ -64,20 +62,20 @@ class ValidationService {
                     return {
                         passed: result.success,
                         score: result.success ? 100 : 0,
-                        feedback: result.success ? 'Schema validation passed' : JSON.stringify(result.error.issues)
+                        feedback: result.success ? 'Schema validation passed' : JSON.stringify(result.error.issues),
                     };
                 }
                 // Se não tem schema, só verifica se é JSON válido
                 return {
                     passed: true,
                     score: 100,
-                    feedback: 'Valid JSON'
+                    feedback: 'Valid JSON',
                 };
             } catch (error) {
                 return {
                     passed: false,
                     score: 0,
-                    feedback: `Invalid JSON: ${error.message}`
+                    feedback: `Invalid JSON: ${error.message}`,
                 };
             }
         });
@@ -104,26 +102,31 @@ class ValidationService {
             return {
                 passed,
                 score: passed ? 100 : 0,
-                feedback
+                feedback,
             };
         });
 
-        // LLM-as-Judge validator (stub - será implementado completamente depois)
-        this.validators.set('llm_judge', async (output, config) => {
-            // STUB: Por enquanto retorna score aleatório simulado
-            // TODO: Implementar LLM-as-judge real chamando driver
+        // LLM-as-Judge validator (FUNC-01 FIX: bypass explícito e documentado)
+        // Anteriormente retornava score aleatório (Math.random()), invalidando toda
+        // lógica de qualidade que dependia deste validador.
+        this.validators.set('llm_judge', async (_output, config) => {
+            // BYPASS EXPLÍCITO: LLM-as-judge ainda não implementado.
+            // Retorna resultado determinístico que indica "não validado" (score: null)
+            // diferente de "falha" (score: 0) ou "aprovado" (score: 100).
             logger.warn(
-                '[ValidationService] llm_judge validator ainda é stub - retornando score simulado'
+                '[ValidationService] llm_judge não implementado — validação em modo bypass. ' +
+                    'Retornando passed=true com score=null. ' +
+                    'Para habilitar validação real, implemente o driver LLM neste validador.'
             );
-
-            const simulatedScore = 75 + Math.random() * 20; // 75-95
             return {
-                passed: simulatedScore >= (config.min_quality_score || 70),
-                score: simulatedScore,
-                feedback: `Simulated LLM judge score: ${simulatedScore.toFixed(1)}/100`,
-                strengths: ['coherence', 'accuracy'],
-                weaknesses: ['depth'],
-                suggestions: ['Add more examples']
+                passed: true, // Não bloqueia o fluxo
+                score: null, // null = não validado (vs 0 = falhou)
+                validation_mode: 'bypassed',
+                feedback: 'LLM-as-judge não configurado. Validação em modo bypass.',
+                strengths: [],
+                weaknesses: [],
+                suggestions: [],
+                _bypass_reason: 'LLM_JUDGE_NOT_IMPLEMENTED',
             };
         });
 
@@ -153,7 +156,7 @@ class ValidationService {
                 overall_score: 100,
                 validation_results: [],
                 feedback: 'No validators configured',
-                issues: []
+                issues: [],
             };
         }
 
@@ -182,7 +185,7 @@ class ValidationService {
                     feedback: result.feedback,
                     strengths: result.strengths,
                     weaknesses: result.weaknesses,
-                    suggestions: result.suggestions
+                    suggestions: result.suggestions,
                 });
 
                 totalScore += result.score;
@@ -197,7 +200,7 @@ class ValidationService {
                     validator_type: type,
                     passed: false,
                     score: 0,
-                    feedback: `Error: ${error.message}`
+                    feedback: `Error: ${error.message}`,
                 });
             }
         }
@@ -221,7 +224,7 @@ class ValidationService {
                     passed,
                     overall_score,
                     num_validators: validators.length,
-                    num_issues: issues.length
+                    num_issues: issues.length,
                 });
             } catch (e) {
                 logger.error('[ValidationService] Falha ao emitir VALIDATION_COMPLETED via NERV:', e.message);
@@ -233,7 +236,7 @@ class ValidationService {
             overall_score,
             validation_results,
             feedback,
-            issues
+            issues,
         };
     }
 

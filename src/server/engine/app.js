@@ -6,7 +6,7 @@ import { LOG_DIR, ROOT } from '#infra/fs/fs_utils';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import helmet from 'helmet';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +36,7 @@ function readRagReadiness() {
             index_mode: manifest?.last_index_mode || 'full',
             index_updated_at: hasIndexTimestamp ? updatedAt : null,
             index_updated_at_iso: hasIndexTimestamp ? formatIsoSecond(updatedAt) : null,
-            index_freshness_ms: hasIndexTimestamp ? Math.max(0, now - updatedAt) : null
+            index_freshness_ms: hasIndexTimestamp ? Math.max(0, now - updatedAt) : null,
         };
     } catch {
         return {
@@ -44,7 +44,7 @@ function readRagReadiness() {
             index_mode: null,
             index_updated_at: null,
             index_updated_at_iso: null,
-            index_freshness_ms: null
+            index_freshness_ms: null,
         };
     }
 }
@@ -85,12 +85,36 @@ app.use((req, res, next) => {
 /* --------------------------------------------------------------------------
    2. HARDENING DE HEADERS HTTP
 -------------------------------------------------------------------------- */
+// SEC-03 FIX: CSP configurada adequadamente para o dashboard React/Vite.
+// Anteriormente desabilitada com contentSecurityPolicy: false.
 app.use(
     helmet({
-        contentSecurityPolicy: false,
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"], // Necessário para Vite/React em prod
+                styleSrc: ["'self'", "'unsafe-inline'"], // Necessário para Tailwind/inline styles
+                imgSrc: ["'self'", 'data:', 'blob:'],
+                connectSrc: [
+                    "'self'",
+                    'ws://localhost:*',
+                    'wss://localhost:*',
+                    ...(process.env.DASHBOARD_ORIGIN ? [process.env.DASHBOARD_ORIGIN] : []),
+                ],
+                fontSrc: ["'self'", 'data:'],
+                objectSrc: ["'none'"],
+                frameAncestors: ["'none'"],
+                baseUri: ["'self'"],
+                formAction: ["'self'"],
+            },
+        },
         crossOriginEmbedderPolicy: false,
         frameguard: { action: 'deny' },
-        referrerPolicy: { policy: 'no-referrer' }
+        referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+        hsts:
+            process.env.NODE_ENV === 'production'
+                ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+                : false,
     })
 );
 
@@ -99,8 +123,11 @@ app.use(
 -------------------------------------------------------------------------- */
 if (process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === 'true') {
     app.use((req, res, next) => {
-        // HSTS: força HTTPS por 1 ano, inclui subdomínios, permite preload
-        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+        // HSTS já configurado via helmet acima; este middleware é mantido para compatibilidade
+        // com ambientes que não usam helmet (ex: proxies reversos customizados)
+        if (!res.getHeader('Strict-Transport-Security')) {
+            res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+        }
         next();
     });
 }
@@ -113,14 +140,10 @@ const corsOrigins = new Set();
 
 function updateCorsOrigins() {
     corsOrigins.clear();
-    
+
     // Add default/local origins
-    const defaults = [
-        'http://localhost:3008',
-        'http://127.0.0.1:3008', 
-        process.env.DASHBOARD_ORIGIN
-    ];
-    
+    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env.DASHBOARD_ORIGIN];
+
     defaults.filter(Boolean).forEach(o => corsOrigins.add(o));
 
     // Add from CONFIG
@@ -128,9 +151,13 @@ function updateCorsOrigins() {
     if (Array.isArray(configOrigins)) {
         configOrigins.forEach(o => corsOrigins.add(o));
     } else if (typeof configOrigins === 'string') {
-        configOrigins.split(',').map(s => s.trim()).filter(Boolean).forEach(o => corsOrigins.add(o));
+        configOrigins
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .forEach(o => corsOrigins.add(o));
     }
-    
+
     log('INFO', `[SERVER] CORS origins updated: ${corsOrigins.size} allowed origins`);
 }
 
@@ -149,7 +176,7 @@ app.use(
             }
 
             // Optional: Regex support or CIDR logic could be added here
-            
+
             const err = new Error(`CORS blocked for origin: ${origin}`);
             err.status = 403;
             callback(err);
@@ -157,7 +184,7 @@ app.use(
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-        maxAge: 600
+        maxAge: 600,
     })
 );
 
@@ -167,20 +194,28 @@ app.use(
 
 /**
  * Rate limiter para endpoints da API.
- * 100 requests por minuto por IP, com skip para desenvolvimento local.
+ * SEC-04 FIX: Removido skip total em desenvolvimento. Usa limite maior em não-produção
+ * para facilitar testes sem desabilitar completamente a proteção.
+ *
+ * Limites:
+ * - produção: 100 req/min por IP
+ * - desenvolvimento/staging: 2000 req/min por IP (mais permissivo para dev workflow)
  *
  * @type {ReturnType<typeof rateLimit>}
  */
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 100,
+    max:
+        process.env.NODE_ENV === 'production'
+            ? parseInt(process.env.RATE_LIMIT_MAX || '100', 10)
+            : parseInt(process.env.RATE_LIMIT_MAX_DEV || '2000', 10),
     standardHeaders: true,
     legacyHeaders: false,
-    skip: req => {
-        // Skip rate limit para dev mode (requests locais)
-        const isDev = process.env.NODE_ENV !== 'production';
-        const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-        return isDev && isLocal;
+    keyGenerator: req => ipKeyGenerator(req.ip || ''),
+    message: {
+        success: false,
+        error: 'Muitas requisições. Tente novamente em breve.',
+        code: 'RATE_LIMIT_EXCEEDED',
     },
 });
 
@@ -198,7 +233,7 @@ app.use((req, res, next) => {
     ) {
         return res.status(415).json({
             error: 'Unsupported Media Type',
-            request_id: req.id
+            request_id: req.id,
         });
     }
     next();
@@ -234,26 +269,28 @@ app.use('/dashboard/assets', (req, res, next) => {
     next();
 });
 
-app.use('/dashboard/assets', express.static(dashboardAssetsPath, {
-    immutable: true,
-    maxAge: '365d',
-    setHeaders(res, filePath) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        res.setHeader('Vary', 'Accept-Encoding');
+app.use(
+    '/dashboard/assets',
+    express.static(dashboardAssetsPath, {
+        immutable: true,
+        maxAge: '365d',
+        setHeaders(res, filePath) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.setHeader('Vary', 'Accept-Encoding');
 
-        if (filePath.endsWith('.br')) {
-            res.setHeader('Content-Encoding', 'br');
-            // Determine extension of the original file (drop the .br suffix)
-            const _base = filePath.slice(0, -3);
-            const _ext = path.extname(_base);
-            if (_ext) {
-                // res.type expects an extension name without the leading dot (eg 'js', 'css')
-                res.type(_ext.slice(1));
-            } else {
-                res.type('application/octet-stream');
-            }
-        } else if (filePath.endsWith('.gz')) {
-            res.setHeader('Content-Encoding', 'gzip');
+            if (filePath.endsWith('.br')) {
+                res.setHeader('Content-Encoding', 'br');
+                // Determine extension of the original file (drop the .br suffix)
+                const _base = filePath.slice(0, -3);
+                const _ext = path.extname(_base);
+                if (_ext) {
+                    // res.type expects an extension name without the leading dot (eg 'js', 'css')
+                    res.type(_ext.slice(1));
+                } else {
+                    res.type('application/octet-stream');
+                }
+            } else if (filePath.endsWith('.gz')) {
+                res.setHeader('Content-Encoding', 'gzip');
                 const _base = filePath.slice(0, -3);
                 const _ext = path.extname(_base);
                 if (_ext) {
@@ -261,22 +298,26 @@ app.use('/dashboard/assets', express.static(dashboardAssetsPath, {
                 } else {
                     res.type('application/octet-stream');
                 }
-        }
-    }
-}));
+            }
+        },
+    })
+);
 
 // Serve non-asset dashboard files (index.html, icons, etc.) without aggressive caching.
-app.use('/dashboard', express.static(dashboardV2Path, {
-    etag: true,
-    maxAge: 0,
-    setHeaders(res, filePath) {
-        if (filePath.endsWith('index.html')) {
-            res.setHeader('Cache-Control', 'no-store');
-        } else {
-            res.setHeader('Cache-Control', 'no-cache');
-        }
-    }
-}));
+app.use(
+    '/dashboard',
+    express.static(dashboardV2Path, {
+        etag: true,
+        maxAge: 0,
+        setHeaders(res, filePath) {
+            if (filePath.endsWith('index.html')) {
+                res.setHeader('Cache-Control', 'no-store');
+            } else {
+                res.setHeader('Cache-Control', 'no-cache');
+            }
+        },
+    })
+);
 
 app.get(/^\/dashboard($|\/.*)/, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -307,9 +348,10 @@ app.get('/ready', (req, res) => {
         // MCP upstreams (dynamic) - avoid stale snapshots.
         let mcp = mcpBase;
         try {
-            const getter = app.locals && typeof app.locals.getMcpUpstreamsStatus === 'function'
-                ? app.locals.getMcpUpstreamsStatus
-                : null;
+            const getter =
+                app.locals && typeof app.locals.getMcpUpstreamsStatus === 'function'
+                    ? app.locals.getMcpUpstreamsStatus
+                    : null;
             const upstreams = getter ? getter() : null;
             if (upstreams && Array.isArray(upstreams)) {
                 mcp = Object.assign({}, mcpBase || {}, { upstreams });
@@ -319,17 +361,17 @@ app.get('/ready', (req, res) => {
         }
 
         if (runtime) {
-            const requiredKeys = app.locals && Array.isArray(app.locals.requiredReadiness)
-                ? app.locals.requiredReadiness
-                : Object.keys(runtime);
+            const requiredKeys =
+                app.locals && Array.isArray(app.locals.requiredReadiness)
+                    ? app.locals.requiredReadiness
+                    : Object.keys(runtime);
 
             // Non-required readiness hints
             try {
                 if (mcp && Array.isArray(mcp.upstreams)) {
                     const requiredUpstreams = mcp.upstreams.filter(u => u?.required);
-                    runtime.mcp_upstreams = requiredUpstreams.length === 0
-                        ? true
-                        : requiredUpstreams.every(u => !u?.enabled || u?.ready);
+                    runtime.mcp_upstreams =
+                        requiredUpstreams.length === 0 ? true : requiredUpstreams.every(u => !u?.enabled || u?.ready);
                 }
             } catch (e) {
                 // ignore
@@ -340,7 +382,10 @@ app.get('/ready', (req, res) => {
             status = allReady ? 'ready' : 'not-ready';
         }
 
-        const payload = Object.assign({ status, ts: Date.now(), runtime, mcp, rag: readRagReadiness() }, hardwareMetrics || {});
+        const payload = Object.assign(
+            { status, ts: Date.now(), runtime, mcp, rag: readRagReadiness() },
+            hardwareMetrics || {}
+        );
         res.json(payload);
     } catch (err) {
         res.status(500).json({ status: 'unknown', error: err && err.message ? err.message : String(err) });
@@ -364,7 +409,7 @@ app.use((err, req, res, next) => {
 
     res.status(status).json({
         error: err.message || 'Internal server error',
-        request_id: req.id || null
+        request_id: req.id || null,
     });
 });
 

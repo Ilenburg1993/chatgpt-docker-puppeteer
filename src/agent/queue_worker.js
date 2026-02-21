@@ -1,10 +1,11 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
+import { releaseTaskLockForAttempt } from '#agent/task_attempt_invariants';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
 import { updateAttempt, upsertAttempt } from '#infra/db/task_attempt_repo';
-import { claimNextEligibleTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import { claimNextEligibleTask, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { putJson, putText, readText } from '#infra/storage/artifact_store';
 import { promises as fs } from 'node:fs';
 
@@ -292,7 +293,7 @@ class QueueWorker {
                         last_error: 'TASK_INVALID: spec.payload.user_message missing',
                         failed_at_ms: Date.now(),
                     });
-                    releaseTaskLock({ taskId });
+                    releaseTaskLockForAttempt({ taskId, context: 'queue_invalid_task' });
                     continue;
                 }
 
@@ -315,7 +316,7 @@ class QueueWorker {
                         payload: { currentAttempts, maxAttempts },
                         dedupKey: `task:${taskId}:max_attempts:${currentAttempts}:${maxAttempts}`,
                     });
-                    releaseTaskLock({ taskId });
+                    releaseTaskLockForAttempt({ taskId, context: 'queue_max_attempts' });
                     continue;
                 }
 
@@ -488,7 +489,13 @@ class QueueWorker {
                         });
                     }
 
-                    releaseTaskLock({ taskId });
+                    releaseTaskLockForAttempt({
+                        taskId,
+                        attemptId: correlationId,
+                        actionCode: 'QUEUE_DISPATCH_FAILED',
+                        correlationId,
+                        context: 'queue_dispatch_failed',
+                    });
                 }
 
                 // Small yield to avoid monopolizing event loop when draining many slots.

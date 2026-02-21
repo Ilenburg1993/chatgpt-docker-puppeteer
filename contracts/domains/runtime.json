@@ -223,6 +223,143 @@
       "enforcement": {
         "level": "p1"
       }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-LOCK-RELEASE-ATTEMPT-CAUSALITY",
+      "title": "Unlock Deve Respeitar Attempt Corrente",
+      "domain": "runtime",
+      "description": "Unlock de task em queue/projector deve ser condicionado ao attempt corrente para evitar corrida de lease.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.lock_release_causality.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave15_task_attempt_lock_causality.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-lock-causality",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-DASHBOARD-AUTH-INSECURE",
+      "title": "Dashboard Auth Insegura",
+      "domain": "runtime",
+      "description": "Runtime não deve operar com autenticação dashboard insegura (credenciais hardcoded ou bypass).",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "dashboard_auth_insecure"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave16r_dashboard_auth_no_hardcoded.spec.js"
+      ],
+      "owner": "runtime-dashboard-security",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-DASHBOARD-SOCKET-COMMAND-AUTHZ",
+      "title": "Dashboard Socket Command com AuthZ",
+      "domain": "runtime",
+      "description": "Canal dashboard:command deve estar desabilitado por padrão ou protegido por autenticação/autorização.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "dashboard_socket_command_unsafe"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/integration/server/test_wave16r_dashboard_command_disabled_by_default.spec.js"
+      ],
+      "owner": "runtime-dashboard-socket",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-DASHBOARD-DUAL-FEED",
+      "title": "Dashboard sem Dual Feed Indevido",
+      "domain": "runtime",
+      "description": "No modo default SSOT, não deve haver inicialização simultânea de feed SSOT e bridge legacy.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "dashboard_dual_feed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave16r_ssot_feed_single_source.spec.js"
+      ],
+      "owner": "runtime-dashboard-realtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-MISSION-TRANSITION-SERVICE",
+      "title": "Missão Usa Serviço de Transição Único",
+      "domain": "runtime",
+      "description": "Rotas/runner não devem mutar status de missão fora do mission_execution_service.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "runtime.mission_transition_bypass.detected"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave17_mission_transition_service_single_entrypoint.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-mission-domain",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
     }
   ]
 }

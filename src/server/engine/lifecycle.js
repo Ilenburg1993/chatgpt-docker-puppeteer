@@ -39,14 +39,16 @@ const signalHandlers = {
 };
 
 async function loadDashboardShutdownModules() {
-    const [taskSyncBridgeModule, telemetryAggregatorModule] = await Promise.all([
+    const [taskSyncBridgeModule, telemetryAggregatorModule, tokenBlocklistModule] = await Promise.all([
         import('#server/dashboard-api/task_sync_bridge'),
         import('#server/dashboard-api/telemetry_aggregator'),
+        import('#infra/db/token_blocklist'),
     ]);
 
     return {
         taskSyncBridge: taskSyncBridgeModule?.default ?? null,
         telemetryAggregator: telemetryAggregatorModule?.default ?? null,
+        stopTokenCleanup: tokenBlocklistModule?.stopPeriodicCleanup ?? null,
     };
 }
 
@@ -161,7 +163,7 @@ async function gracefulShutdown(signal) {
         // Lazy-load apenas no shutdown para evitar side effects no import do entrypoint.
         // Para timers internos antes de desconectar o Hub.
         try {
-            const { taskSyncBridge, telemetryAggregator } = await loadDashboardShutdownModules();
+            const { taskSyncBridge, telemetryAggregator, stopTokenCleanup } = await loadDashboardShutdownModules();
 
             try {
                 if (telemetryAggregator && typeof telemetryAggregator.stop === 'function') {
@@ -177,6 +179,14 @@ async function gracefulShutdown(signal) {
                 }
             } catch (e) {
                 log('DEBUG', `[LIFECYCLE] TaskSyncBridge.clearAll() skipped: ${e && e.message ? e.message : String(e)}`);
+            }
+
+            try {
+                if (typeof stopTokenCleanup === 'function') {
+                    stopTokenCleanup();
+                }
+            } catch (e) {
+                log('DEBUG', `[LIFECYCLE] stopPeriodicCleanup() skipped: ${e && e.message ? e.message : String(e)}`);
             }
         } catch (e) {
             log('DEBUG', `[LIFECYCLE] Dashboard shutdown modules skipped: ${e && e.message ? e.message : String(e)}`);

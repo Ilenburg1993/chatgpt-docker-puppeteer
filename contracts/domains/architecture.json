@@ -82,6 +82,125 @@
       "enforcement": {
         "level": "warn"
       }
+    },
+    {
+      "id": "CONTRACT-ARCH-SSOT-EXECUTION-OWNER",
+      "title": "Ownership SSOT de Dispatch",
+      "domain": "architecture",
+      "description": "Dispatch direto via kernel.executeTask deve ficar restrito a pontos autorizados do fluxo SSOT.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "\\b(?:this\\.)?kernel\\.executeTask\\s*\\(",
+        "flags": "gm",
+        "scope": "src",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": [
+          "src/agent/queue_worker.js",
+          "src/missions/mission_manager.js"
+        ]
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave15_arch_contract_ssot_execution_owner.spec.js"
+      ],
+      "owner": "architecture-kernel-ssot",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-DASHBOARD-AUTH-NO-HARDCODED",
+      "title": "Dashboard Auth sem Credenciais Hardcoded",
+      "domain": "architecture",
+      "description": "Controllers de dashboard não podem conter credenciais hardcoded (ex.: admin123/user123).",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "admin123|user123|const\\s+validUsers\\s*=\\s*\\{",
+        "flags": "gm",
+        "scope": "src/server/api/controllers/dashboard.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave16r_dashboard_auth_no_hardcoded.spec.js"
+      ],
+      "owner": "architecture-dashboard-security",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-DASHBOARD-CONTROLLER-NO-TOPLEVEL-TIMER",
+      "title": "Controller sem Timer em Top-level",
+      "domain": "architecture",
+      "description": "Controllers não devem iniciar timers em import puro (ex.: startPeriodicCleanup no top-level).",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "^\\s*startPeriodicCleanup\\s*\\(",
+        "flags": "gm",
+        "scope": "src/server/api/controllers/dashboard.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave16r_dashboard_import_no_timer_side_effect.spec.js"
+      ],
+      "owner": "architecture-dashboard-runtime",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-MISSION-TRANSITION-SERVICE-ENTRYPOINT",
+      "title": "Transição de Missão via Serviço Único",
+      "domain": "architecture",
+      "description": "Atualizações de status de missão devem ocorrer via mission_execution_service, não por updateMission ad-hoc em controller/runner.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "updateMission\\s*\\([^\\)]*\\{[\\s\\S]{0,260}?status\\s*:",
+        "flags": "gm",
+        "scope": "src/server/api/controllers/missions.js|src/agent/mission_runner.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave17_mission_transition_service_single_entrypoint.spec.js"
+      ],
+      "owner": "architecture-mission-domain",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
     }
   ]
 }

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as Authority from '#core/authority';
+import { getJwtSecret } from '#core/jwt_config';
 import { log } from '#core/logger';
 
 
@@ -50,6 +51,41 @@ async function persistServerState(deps, nerv, port, authority = Authority.SERVER
     } catch (err) {
         log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);
     }
+}
+
+function envFlag(name, defaultValue) {
+    const raw = process.env[name];
+    if (raw === undefined) {
+        return defaultValue;
+    }
+    const value = String(raw).trim().toLowerCase();
+    if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
+    if (value === '0' || value === 'false' || value === 'no' || value === 'off') return false;
+    return defaultValue;
+}
+
+function validateDashboardAuthConfig(config) {
+    const authRequired = config?.DASHBOARD_AUTH_REQUIRED ?? envFlag('DASHBOARD_AUTH_REQUIRED', true);
+    const socketAuthRequired = config?.DASHBOARD_SOCKET_AUTH_REQUIRED ?? envFlag('DASHBOARD_SOCKET_AUTH_REQUIRED', true);
+    if (!authRequired) {
+        if (!socketAuthRequired) {
+            return;
+        }
+    }
+
+    const username = String(config?.DASHBOARD_AUTH_USERNAME || process.env.DASHBOARD_AUTH_USERNAME || '').trim();
+    const password = String(config?.DASHBOARD_AUTH_PASSWORD || process.env.DASHBOARD_AUTH_PASSWORD || '');
+
+    if (authRequired && !username) {
+        throw new Error('[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_USERNAME está ausente');
+    }
+
+    if (authRequired && password.length < 12) {
+        throw new Error('[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_PASSWORD deve ter ao menos 12 caracteres');
+    }
+
+    // Garante contrato de segurança do JWT antes do runtime aceitar conexões dashboard.
+    getJwtSecret();
 }
 
 
@@ -110,7 +146,6 @@ async function bootstrap(options = {}) {
             logWatcher,
             { default: appInstance },
             routerModule,
-            { default: taskSyncBridge },
             { default: telemetryAggregator },
         ] = await Promise.all([
             import('#core/config'),
@@ -133,12 +168,24 @@ async function bootstrap(options = {}) {
             import('./watchers/log_watcher.js'),
             import('./engine/app.js'),
             import('./api/router.js'),
-            import('#server/dashboard-api/task_sync_bridge'),
             import('#server/dashboard-api/telemetry_aggregator'),
         ]);
         const applyRoutes = routerModule?.applyRoutes;
+        validateDashboardAuthConfig(CONFIG);
 
         log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
+        const requestedSyncMode = CONFIG.DASHBOARD_TASK_SYNC_MODE || 'ssot_feed';
+        const legacyBridgeContingency = Boolean(
+            CONFIG.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY || envFlag('DASHBOARD_LEGACY_BRIDGE_CONTINGENCY', false)
+        );
+        const dashboardTaskSyncMode =
+            requestedSyncMode === 'legacy_bridge' && legacyBridgeContingency ? 'legacy_bridge' : 'ssot_feed';
+        if (requestedSyncMode === 'legacy_bridge' && !legacyBridgeContingency) {
+            log(
+                'WARN',
+                '[BOOT] DASHBOARD_TASK_SYNC_MODE=legacy_bridge ignorado; habilite DASHBOARD_LEGACY_BRIDGE_CONTINGENCY=true apenas em contingência'
+            );
+        }
 
         /* --------------------------------------------------------------
          FASE 1 — Lifecycle / Signal Handling
@@ -183,12 +230,16 @@ async function bootstrap(options = {}) {
         log('DEBUG', '[BOOT] Socket hub acoplado');
 
         // Dashboard vNext: SSOT DB Event Feed (realtime via SQLite events table)
-        try {
-            const intervalMs = Number(process.env.SSOT_EVENT_FEED_INTERVAL_MS || 250) || 250;
-            const batchLimit = Number(process.env.SSOT_EVENT_FEED_BATCH_LIMIT || 500) || 500;
-            ssotEventFeed.start({ socketHub, intervalMs, batchLimit });
-        } catch (err) {
-            log('WARN', `[BOOT] Falha ao iniciar SSOTEventFeed: ${err.message}`);
+        if (dashboardTaskSyncMode === 'ssot_feed') {
+            try {
+                const intervalMs = Number(process.env.SSOT_EVENT_FEED_INTERVAL_MS || 250) || 250;
+                const batchLimit = Number(process.env.SSOT_EVENT_FEED_BATCH_LIMIT || 500) || 500;
+                ssotEventFeed.start({ socketHub, intervalMs, batchLimit });
+            } catch (err) {
+                log('WARN', `[BOOT] Falha ao iniciar SSOTEventFeed: ${err.message}`);
+            }
+        } else {
+            log('INFO', `[BOOT] SSOTEventFeed desativado (DASHBOARD_TASK_SYNC_MODE=${dashboardTaskSyncMode})`);
         }
 
         // Dashboard V2: TelemetryAggregator (realtime metrics)
@@ -218,6 +269,14 @@ async function bootstrap(options = {}) {
         }
         await applyRoutes(appInstance);
         log('DEBUG', '[BOOT] Rotas HTTP consolidadas');
+
+        try {
+            const { startPeriodicCleanup } = await import('#infra/db/token_blocklist');
+            startPeriodicCleanup();
+            log('DEBUG', '[BOOT] Token blocklist cleanup periódico iniciado');
+        } catch (err) {
+            log('WARN', `[BOOT] Falha ao iniciar token blocklist cleanup: ${err.message}`);
+        }
 
         /* --------------------------------------------------------------
            FASE 6 — Telemetria
@@ -297,16 +356,23 @@ async function bootstrap(options = {}) {
             log('DEBUG', '[BOOT] NERV injetado (delegated)');
         }
 
-        // Dashboard V2: TaskSyncBridge (realtime task updates via NERV)
-        if (CONFIG.ENABLE_TASK_SYNC_BRIDGE) {
+        // Dashboard legacy bridge: habilitado apenas em contingência explícita.
+        if (dashboardTaskSyncMode === 'legacy_bridge') {
             try {
-                taskSyncBridge.initialize({ socketHub, nervClient: nerv });
-                log('INFO', '[BOOT] TaskSyncBridge inicializado (NERV → Dashboard)');
+                const taskSyncBridge = await import('#server/dashboard-api/task_sync_bridge').then(
+                    module => module.default ?? null
+                );
+                if (taskSyncBridge && typeof taskSyncBridge.initialize === 'function') {
+                    taskSyncBridge.initialize({ socketHub, nervClient: nerv });
+                    log('WARN', '[BOOT] TaskSyncBridge inicializado (contingência legacy_bridge)');
+                } else {
+                    log('WARN', '[BOOT] TaskSyncBridge indisponível para modo legacy_bridge');
+                }
             } catch (err) {
                 log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
             }
         } else {
-            log('INFO', '[BOOT] TaskSyncBridge desativado (ENABLE_TASK_SYNC_BRIDGE=false)');
+            log('INFO', `[BOOT] TaskSyncBridge desativado (modo efetivo=${dashboardTaskSyncMode})`);
         }
 
         // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)

@@ -1,7 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import fs from 'node:fs';
 import path from 'node:path';
-import { initDirectory } from '#infra/async_init';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
@@ -18,11 +17,16 @@ const AUDIT_FILE = path.join(LOG_DIR, 'audit.log');
 // --- POLÍTICAS DE RETENÇÃO ---
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB para logs comuns
 const MAX_AUDIT_SIZE = 2 * 1024 * 1024; // 2MB para auditoria (conforme requisito server.js)
-const MAX_ARCHIVES = 5; // Mantém 5 arquivos de histórico por tipo
+const MAX_ARCHIVES = process.env.LOG_MAX_ARCHIVES ? parseInt(process.env.LOG_MAX_ARCHIVES, 10) : 5;
 
-// FIXED (P0-2.1): Usa async initialization para prevenir race condition
-// Garante thread-safe directory creation em ambientes multi-processo (PM2)
-const logDirReady = initDirectory(LOG_DIR, { recursive: true });
+// BUG-02 FIX: Inicialização síncrona do diretório de logs na carga do módulo.
+// Isso elimina a necessidade de `async/await` na função `log()`, que era chamada
+// em todo o codebase sem `await`, resultando em Promises não tratadas.
+try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+} catch (_) {
+    // Ignorar: pode já existir ou não ter permissão (fallback para console.log)
+}
 
 /* ==========================================================================
    SISTEMA DE GESTÃO DE ARQUIVOS (ROTAÇÃO E LIMPEZA)
@@ -57,12 +61,6 @@ function cleanOldFiles(prefix) {
 
 /**
  * Rotaciona um arquivo se ele exceder o limite definido.
- * Side-effects: Renomeia arquivo e limpa arquivos antigos.
- * @param {string} filePath - Caminho do arquivo a rotacionar.
- * @param {string} prefix - Prefixo para o arquivo arquivado.
- * @param {number} maxSize - Tamanho máximo em bytes.
- */
-/**
  * Rotaciona arquivo de log quando excede tamanho máximo.
  * Side-effects: Renomeia arquivo atual para .bak e limpa arquivos antigos.
  * @param {string} filePath - Caminho do arquivo a rotacionar.
@@ -100,7 +98,7 @@ const LOG_LEVELS = {
     INFO: 1,
     WARN: 2,
     ERROR: 3,
-    FATAL: 4
+    FATAL: 4,
 };
 
 // Read LOG_LEVEL from environment (default: INFO)
@@ -109,17 +107,14 @@ let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS.INFO;
 
 /**
  * Log Operacional: Registra eventos do fluxo de trabalho com filtragem por nível.
- * FIXED (P0-2.1): Agora async para aguardar inicialização thread-safe do diretório.
+ * BUG-02 FIX: Refatorado para função síncrona. O diretório de logs é criado na carga do módulo.
  * Side-effects: Escreve no console e arquivo de log, rotaciona arquivos se necessário.
  * @param {LogLevel} level - Nível do log.
  * @param {string|Error|Record<string, unknown>} msg - Mensagem ou objeto a logar.
  * @param {string} [taskId='-'] - ID da tarefa associada.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  */
-async function log(level, msg, taskId = '-') {
-    // Aguarda inicialização do diretório de logs (race-free)
-    await logDirReady;
-
+function log(level, msg, taskId = '-') {
     // Filter: Only log if level >= configured threshold
     const levelValue = LOG_LEVELS[level.toUpperCase()] ?? LOG_LEVELS.INFO;
     if (levelValue < minLevel) {
@@ -161,7 +156,7 @@ log.getLevel = () => configuredLevel;
  * @param {LogLevel} newLevel - Novo nível de log.
  * @throws {Error} Nunca lança erro - valida entrada e loga avisos.
  */
-log.setLevel = (newLevel) => {
+log.setLevel = newLevel => {
     const upperLevel = newLevel.toUpperCase();
     if (LOG_LEVELS[upperLevel] !== undefined) {
         minLevel = LOG_LEVELS[upperLevel];
@@ -207,12 +202,12 @@ function metric(name, payload) {
             Object.assign(
                 {
                     ts: new Date().toISOString(),
-                    metric: name
+                    metric: name,
                 },
                 payload || {}
             )
         );
-        fs.appendFileSync(METRICS_FILE, `${entry}\\n`, 'utf-8');
+        fs.appendFileSync(METRICS_FILE, `${entry}\n`, 'utf-8');
     } catch (_) {
         // Silent failure - metrics are non-critical
     }
@@ -288,21 +283,21 @@ export { log };
  * Função de auditoria.
  * Side-effects: Escreve auditoria em arquivo.
  */
-    export { audit };
+export { audit };
 
 /**
  * Função de métricas.
  * Side-effects: Escreve métricas em arquivo.
  */
-    export { metric };
+export { metric };
 
 /**
  * Alias para metric.
  * Side-effects: Escreve métricas em arquivo.
  */
-    export { metric as logMetric };
+export { metric as logMetric };
 
 /**
  * Diretório de logs.
  */
-    export { LOG_DIR };
+export { LOG_DIR };

@@ -1,6 +1,8 @@
 // @ts-check
 import jwt from 'jsonwebtoken';
 import { log } from '#core/logger';
+import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
+import { isTokenRevoked } from '#infra/db/token_blocklist';
 
 /**
  * Middleware de autenticação JWT para proteger rotas do dashboard
@@ -27,14 +29,26 @@ export function authenticate(req, res, next) {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     try {
-        // Verificar token JWT
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret-change-in-production');
+        // Verificar token JWT usando secret centralizado e validado
+        const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+
+        // SEC-02 FIX: Verificar se o token foi revogado (logout explícito)
+        const jti = decoded.jti;
+        if (jti && isTokenRevoked(jti)) {
+            log('WARN', `[AUTH] Token revogado apresentado pelo usuário: ${decoded.username}`, req.id);
+            return res.status(401).json({
+                success: false,
+                error: 'Token revogado. Por favor, faça login novamente.',
+                request_id: req.id,
+            });
+        }
 
         // Adicionar informações do usuário à requisição
         req.user = {
             id: decoded.id,
             username: decoded.username,
             role: decoded.role || 'user',
+            jti: decoded.jti || null,
             iat: decoded.iat,
             exp: decoded.exp,
         };
@@ -77,11 +91,17 @@ export function optionalAuthenticate(req, res, next) {
         const token = authHeader.substring(7);
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret-change-in-production');
+            const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+            const jti = decoded.jti;
+            if (jti && isTokenRevoked(jti)) {
+                log('DEBUG', '[AUTH] Optional auth ignored due to revoked token', req.id);
+                return next();
+            }
             req.user = {
                 id: decoded.id,
                 username: decoded.username,
                 role: decoded.role || 'user',
+                jti: decoded.jti || null,
                 iat: decoded.iat,
                 exp: decoded.exp,
             };

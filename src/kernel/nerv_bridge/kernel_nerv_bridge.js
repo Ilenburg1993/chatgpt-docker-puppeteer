@@ -2,6 +2,9 @@
 import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { getCorrelationId, getMessageType, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
+import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
+import { recordEvent } from '#infra/db/events_repo';
+import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 
 /* ===========================
    Utilitários internos
@@ -482,33 +485,109 @@ class KernelNERVBridge {
      * Handler interno: NEXT_STEP action
      */
     async _handleNextStepAction(task, nextStep, feedback, correlationId) {
+        const now = Date.now();
+        const taskId = task?.meta?.id ? String(task.meta.id) : null;
+        if (!taskId) {
+            this.telemetry.warning('nerv_bridge_orchestration_next_step_missing_task_id', {
+                correlationId,
+                at: now,
+            });
+            return;
+        }
+
+        const nextAction = nextStep?.action ? String(nextStep.action) : 'execute_prompt';
+        if (nextAction !== 'execute_prompt') {
+            this.telemetry.warning('nerv_bridge_orchestration_next_step_unsupported_action', {
+                taskId,
+                action: nextAction,
+                correlationId,
+                at: now,
+            });
+            return;
+        }
+
+        const workflowState =
+            task?.state?.workflow_state && typeof task.state.workflow_state === 'object' ? task.state.workflow_state : {};
+        const completedStepIds = Array.isArray(workflowState.completed_steps) ? workflowState.completed_steps : [];
+        const accumulatedContext =
+            workflowState.accumulated_context && typeof workflowState.accumulated_context === 'object'
+                ? workflowState.accumulated_context
+                : {};
+        const inferredIndex = Number(
+            nextStep?.step_index ??
+                nextStep?.stepIndex ??
+                nextStep?.index ??
+                workflowState.current_step_index ??
+                completedStepIds.length
+        );
+        const nextStepIndex = Number.isFinite(inferredIndex) ? Math.max(0, inferredIndex) : Math.max(0, completedStepIds.length);
+        const attemptId = correlationId ? String(correlationId) : null;
+
         this.telemetry.info('nerv_bridge_orchestration_next_step', {
-            taskId: task.meta.id,
+            taskId,
             nextStepId: nextStep?.id,
-            workflowId: task.meta.workflow_id,
+            workflowId: task?.meta?.workflow_id,
             correlationId,
-            at: Date.now()
+            at: now,
         });
 
-        // Cria nova task para próximo step
-        // NOTA: Isso será implementado completamente quando integrarmos com MissionManager
-        // Por ora, apenas logamos e emitimos evento
+        const { childTask, childId, nextStepId, workflowId } = buildWorkflowNextStepTask({
+            parentTask: task,
+            parentTaskId: taskId,
+            attemptId,
+            nextStep,
+            nextStepIndex,
+            workflowConfig: task?.spec?.execution?.workflow_config || null,
+            completedStepIds: completedStepIds.map(stepId => String(stepId)),
+            accumulatedContext,
+            nowMs: now,
+            source: 'self_generated',
+        });
+
+        insertTask(childTask, {
+            stage: TASK_STAGES.READY,
+            status: 'PENDING',
+            actor: 'system',
+            ifNotExists: true,
+        });
+
+        recordEvent({
+            entityType: 'task',
+            entityId: taskId,
+            tsMs: now,
+            actorType: 'system',
+            eventType: 'TASK_ORCHESTRATION_NEXT_STEP_CREATED',
+            payload: {
+                from_task_id: taskId,
+                from_attempt_id: attemptId,
+                to_task_id: childId,
+                workflow_id: workflowId,
+                step_id: nextStepId,
+                step_index: nextStepIndex,
+            },
+            dedupKey: `task:${taskId}:next_step:${attemptId || 'none'}:${nextStepId}`,
+        });
+
         await this.emitEvent({
             target: 'server',
-            correlationId: task.meta.workflow_id || correlationId,
+            correlationId: task?.meta?.workflow_id || correlationId,
             payload: {
                 actionCode: ActionCode.WORKFLOW_STEP_STARTED,
-                workflow_id: task.meta.workflow_id,
-                step_id: nextStep?.id,
-                previous_task_id: task.meta.id
+                workflow_id: task?.meta?.workflow_id || workflowId,
+                step_id: nextStepId,
+                previous_task_id: taskId,
+                child_task_id: childId,
             }
         });
 
-        // TODO: Integrar com MissionManager para criar próxima task
-        this.telemetry.warning('nerv_bridge_next_step_not_fully_implemented', {
-            taskId: task.meta.id,
-            nextStepId: nextStep?.id,
-            at: Date.now()
+        this.telemetry.info('nerv_bridge_next_step_task_created', {
+            taskId,
+            childTaskId: childId,
+            nextStepId,
+            workflowId,
+            correlationId,
+            feedbackLength: typeof feedback === 'string' ? feedback.length : 0,
+            at: now,
         });
     }
 

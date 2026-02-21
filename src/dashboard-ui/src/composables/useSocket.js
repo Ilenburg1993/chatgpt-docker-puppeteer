@@ -14,6 +14,17 @@ import { onMounted, onUnmounted, ref } from 'vue';
 let socketInstance = null;
 let connectionCount = 0;
 let handlersInitialized = false;
+const isConnected = ref(false);
+const error = ref(null);
+const reconnectAttempts = ref(0);
+
+function getDashboardToken() {
+    try {
+        return localStorage.getItem('auth_token');
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Cria ou retorna instância existente do Socket.io
@@ -27,6 +38,7 @@ function getSocketInstance(url = '', options = {}) {
             reconnectionAttempts: 10,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
+            auth: cb => cb({ token: getDashboardToken() }),
             ...options
         });
     }
@@ -38,9 +50,6 @@ function getSocketInstance(url = '', options = {}) {
  */
 export function useSocket(options = {}) {
     const socket = getSocketInstance(options.url || '', options);
-    const isConnected = ref(false);
-    const error = ref(null);
-    const reconnectAttempts = ref(0);
 
     /**
      * Conecta ao servidor
@@ -108,6 +117,7 @@ export function useSocket(options = {}) {
 
         socket.on('connect_error', (err) => {
             error.value = err.message;
+            isConnected.value = false;
             if (import.meta.env.DEV) {
                 console.error('[Socket.io] Connection error:', err);
             }

@@ -1,6 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { v4 as uuidv4 } from 'uuid';
 import * as logger from '#core/logger';
+import CONFIG from '#core/config';
+import { getDb } from '#infra/db/sqlite';
+import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 import { MissionStateManager, MISSION_STATUS } from './mission_state_manager.js';
 import { WorkflowGenerator } from './workflow_generator.js';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
@@ -8,6 +11,11 @@ import { ContextManager } from '#orchestrator/context_manager';
 import { FeedbackProcessor } from './feedback_processor.js';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import { getActionCode, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
+import crypto from 'node:crypto';
+
+function _hashId(input) {
+    return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
+}
 
 /**
  * MissionManager - Gerencia ciclo de vida de missões.
@@ -23,15 +31,16 @@ class MissionManager {
      * @param {Object} [deps.feedbackProcessor] - FeedbackProcessor (opcional)
      * @param {Object} [deps.checkpointManager] - CheckpointManager (opcional)
      */
-    constructor({ kernel, nerv, stateManager = null, workflowGenerator = null, contextManager = null, feedbackProcessor = null, checkpointManager = null }) {
-        if (!kernel) {
-            throw new Error('MissionManager requer Kernel');
-        }
+    constructor({ kernel = null, nerv, stateManager = null, workflowGenerator = null, contextManager = null, feedbackProcessor = null, checkpointManager = null }) {
         if (!nerv) {
             throw new Error('MissionManager requer NERV');
         }
 
-        this.kernel = kernel;
+        this.kernel = kernel || {
+            executeTask: async () => {
+                throw new Error('MissionManager legacy dispatch indisponível: kernel não injetado');
+            },
+        };
         this.nerv = nerv;
         this.stateManager = stateManager || new MissionStateManager();
         this.workflowGenerator = workflowGenerator || new WorkflowGenerator();
@@ -56,7 +65,7 @@ class MissionManager {
         // Setup listeners NERV
         this._setupListeners();
 
-        logger.log('INFO', '[MissionManager] Inicializado com ContextManager, FeedbackProcessor e CheckpointManager');
+        logger.log('INFO', '[MissionManager] Inicializado (modo SSOT-first; dispatch direto legado desaconselhado)');
     }
 
     /**
@@ -195,6 +204,7 @@ class MissionManager {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.RUNNING
         });
+        this._syncMissionStatusToDb({ ...state, status: MISSION_STATUS.RUNNING }, MISSION_STATUS.RUNNING);
 
         logger.log('INFO', `[MissionManager] Iniciando execução: ${missionId}`);
 
@@ -229,6 +239,7 @@ class MissionManager {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.PAUSED
         });
+        this._syncMissionStatusToDb({ ...state, status: MISSION_STATUS.PAUSED }, MISSION_STATUS.PAUSED);
 
         // Remove do cache (tasks em andamento continuarão, mas próximos steps não serão iniciados)
         this.activeMissions.delete(missionId);
@@ -256,6 +267,7 @@ class MissionManager {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.RUNNING
         });
+        this._syncMissionStatusToDb({ ...state, status: MISSION_STATUS.RUNNING }, MISSION_STATUS.RUNNING);
 
         this.activeMissions.set(missionId, {
             currentStepIndex: state.progress.current_step,
@@ -358,34 +370,134 @@ class MissionManager {
 
         logger.log('INFO', `[MissionManager] Executando step ${currentStepIndex + 1}/${workflow.steps.length}: ${step.id}`);
 
-        // Gera Task V5 baseado no step
-        const taskV5 = this._generateTaskV5FromStep(step, state);
-
-        // Gera correlationId
+        // Gera correlationId estável por missão+step
         const correlationId = `mission-${missionId}-step-${currentStepIndex}`;
-
-        // Cacheia taskId para tracking
         const missionCache = this.activeMissions.get(missionId);
-        if (missionCache) {
-            missionCache.currentStepIndex = currentStepIndex;
-            missionCache.taskIds.push(taskV5.meta.id);
+        const parentTaskId = missionCache?.taskIds?.length
+            ? String(missionCache.taskIds[missionCache.taskIds.length - 1])
+            : null;
+
+        // Gera Task V5 baseado no step com vínculo explícito de causalidade.
+        const taskV5 = this._generateTaskV5FromStep(step, state, {
+            stepIndex: currentStepIndex,
+            parentTaskId,
+            correlationId,
+        });
+
+        const dispatchMode = this._resolveDispatchMode();
+
+        try {
+            if (dispatchMode === 'legacy_direct') {
+                await this.kernel.executeTask(taskV5, correlationId);
+                logger.log('WARN', `[MissionManager] Dispatch legado direto ativo (contingência): ${taskV5.meta.id}`);
+            } else {
+                this._syncMissionStatusToDb(state, MISSION_STATUS.RUNNING);
+                insertTask(taskV5, {
+                    stage: TASK_STAGES.READY,
+                    status: 'PENDING',
+                    actor: 'mission_manager',
+                    ifNotExists: true,
+                });
+                logger.log('DEBUG', `[MissionManager] Task enfileirada (SSOT): ${taskV5.meta.id}`);
+            }
+
+            if (missionCache) {
+                missionCache.currentStepIndex = currentStepIndex;
+                if (!missionCache.taskIds.includes(taskV5.meta.id)) {
+                    missionCache.taskIds.push(taskV5.meta.id);
+                }
+            }
+        } catch (error) {
+            logger.log('ERROR', `[MissionManager] Erro ao despachar task (${dispatchMode}): ${error.message}`);
+            await this._failMission(missionId, error.message);
+        }
+    }
+
+    _resolveDispatchMode() {
+        const raw =
+            process.env.MISSION_STEP_DISPATCH_MODE ||
+            CONFIG.get('MISSION_STEP_DISPATCH_MODE', CONFIG?.all?.MISSION_STEP_DISPATCH_MODE || 'ssot_queue');
+        const contingencyEnabled = String(process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED || '').trim() === 'true';
+
+        const normalized = String(raw || 'ssot_queue').trim().toLowerCase();
+        if (normalized === 'legacy_direct' && contingencyEnabled) {
+            return 'legacy_direct';
         }
 
-        // Envia task para Kernel
+        if (normalized === 'legacy_direct' && !contingencyEnabled) {
+            logger.log(
+                'WARN',
+                '[MissionManager] MISSION_STEP_DISPATCH_MODE=legacy_direct ignorado; habilite MISSION_MANAGER_LEGACY_DISPATCH_ENABLED=true apenas para contingência'
+            );
+        }
+        return 'ssot_queue';
+    }
+
+    _mapMissionStatusToDb(status) {
+        const normalized = String(status || '').trim().toLowerCase();
+        if (normalized === 'running') return 'RUNNING';
+        if (normalized === 'paused') return 'PAUSED';
+        if (normalized === 'completed') return 'DONE';
+        if (normalized === 'failed') return 'FAILED';
+        if (normalized === 'cancelled') return 'CANCELLED';
+        if (normalized === 'pending') return 'READY';
+        return 'READY';
+    }
+
+    _syncMissionStatusToDb(missionState, statusOverride = null) {
+        const missionId = missionState?.id;
+        if (!missionId) return;
+
         try {
-            await this.kernel.executeTask(taskV5, correlationId);
-            logger.log('DEBUG', `[MissionManager] Task enviada: ${taskV5.meta.id}`);
+            const db = getDb();
+            const now = Date.now();
+            const status = this._mapMissionStatusToDb(statusOverride || missionState?.status || MISSION_STATUS.PENDING);
+            const title = String(missionState?.title || missionId);
+            const description = String(missionState?.description || '');
+            const startedAtMs = status === 'RUNNING' ? now : null;
+            const completedAtMs = status === 'DONE' ? now : null;
+
+            db.prepare(
+                `
+                INSERT INTO missions (
+                    id, title, description, status, autonomy_mode, policy_json, context_json,
+                    created_at_ms, updated_at_ms, started_at_ms, completed_at_ms
+                ) VALUES (
+                    @id, @title, @description, @status, @autonomy_mode, @policy_json, @context_json,
+                    @created_at_ms, @updated_at_ms, @started_at_ms, @completed_at_ms
+                )
+                ON CONFLICT(id) DO UPDATE SET
+                    title = COALESCE(@title, missions.title),
+                    description = COALESCE(@description, missions.description),
+                    status = @status,
+                    updated_at_ms = @updated_at_ms,
+                    started_at_ms = COALESCE(missions.started_at_ms, @started_at_ms),
+                    completed_at_ms = COALESCE(@completed_at_ms, missions.completed_at_ms)
+            `
+            ).run({
+                id: missionId,
+                title,
+                description,
+                status,
+                autonomy_mode: 'USER_ONLY',
+                policy_json: JSON.stringify(missionState?.config || {}),
+                context_json: JSON.stringify({ template: missionState?.config?.template || null }),
+                created_at_ms: now,
+                updated_at_ms: now,
+                started_at_ms: startedAtMs,
+                completed_at_ms: completedAtMs,
+            });
         } catch (error) {
-            logger.log('ERROR', `[MissionManager] Erro ao enviar task: ${error.message}`);
-            await this._failMission(missionId, error.message);
+            logger.log('WARN', `[MissionManager] Falha ao sincronizar missão no SQLite: ${error.message}`);
         }
     }
 
     /**
      * Gera Task V5 a partir de um step do workflow.
      */
-    _generateTaskV5FromStep(step, missionState) {
-        const taskId = `task-${uuidv4()}`;
+    _generateTaskV5FromStep(step, missionState, { stepIndex = null, parentTaskId = null, correlationId = null } = {}) {
+        const stableSeed = `${missionState?.id || 'mission'}|${step?.id || 'step'}|${stepIndex ?? 'na'}`;
+        const taskId = `task-${_hashId(stableSeed)}`;
 
         // Extrai prompt do step (pode estar em prompt_template ou payload)
         const userMessage = step.prompt_template || step.description || 'Execute this step';
@@ -448,10 +560,12 @@ class MissionManager {
                 version: '5.0',
                 created_at: new Date().toISOString(),
                 priority: 8,
-                source: 'mission',
+                source: 'flow_manager',
                 mission_id: missionState.id,
                 workflow_id: missionState.workflow.id,
-                step_id: step.id
+                step_id: step.id,
+                parent_id: parentTaskId || undefined,
+                correlation_id: correlationId || undefined,
             },
             spec: {
                 target: 'chatgpt', // Default, pode ser configurável
@@ -462,14 +576,15 @@ class MissionManager {
                 validation: step.validation || { validators: [] }
             },
             state: {
-                status: 'pending',
+                status: 'PENDING',
                 created_at: new Date().toISOString(),
-                history: []
+                history: {}
             },
             policy: {
                 max_cost_cents: 500, // TODO: calcular baseado em estimate
                 dependencies: []
-            }
+            },
+            result: {},
         };
 
         return taskV5;
@@ -589,6 +704,7 @@ class MissionManager {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.COMPLETED
         });
+        this._syncMissionStatusToDb({ id: missionId, status: MISSION_STATUS.COMPLETED }, MISSION_STATUS.COMPLETED);
 
         this.activeMissions.delete(missionId);
         this.processedMissionTasks.delete(missionId);
@@ -610,6 +726,7 @@ class MissionManager {
             status: MISSION_STATUS.FAILED,
             failure_reason: reason
         });
+        this._syncMissionStatusToDb({ id: missionId, status: MISSION_STATUS.FAILED }, MISSION_STATUS.FAILED);
 
         this.activeMissions.delete(missionId);
         this.processedMissionTasks.delete(missionId);

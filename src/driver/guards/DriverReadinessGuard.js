@@ -1,4 +1,5 @@
 import { log } from '#core/logger';
+import { isDomainMatch } from '#core/domain_matcher';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { Triage } from '../modules/triage.js';
 
@@ -242,27 +243,34 @@ class DriverReadinessGuard {
             // CHECK 4: Domain Validation
             // ============================================
             if (this.driver.config.expectedDomain) {
-                const currentUrl = this.driver.page.url ? this.driver.page.url() : '';
+                const currentUrlRaw = this.driver.page.url ? this.driver.page.url() : '';
+                const currentUrl = typeof currentUrlRaw === 'string' ? currentUrlRaw.trim() : '';
 
-                // Skip validation for about:blank (not navigated yet)
-                if (currentUrl !== 'about:blank' && currentUrl !== '') {
-                    if (!currentUrl.includes(this.driver.config.expectedDomain)) {
-                        issues.push({
-                            check: CHECK_TYPES.DOMAIN_VALID,
-                            severity: SEVERITY.FATAL,
-                            message: `Domain mismatch: expected ${this.driver.config.expectedDomain}`,
-                            expected: this.driver.config.expectedDomain,
-                            actual: currentUrl,
-                        });
-
-                        throw new Error(
-                            `Domain mismatch: expected ${this.driver.config.expectedDomain}, got ${currentUrl}`
-                        );
-                    }
-
+                // about:blank antes de navegação não é mismatch.
+                if (currentUrl === 'about:blank') {
                     checks[CHECK_TYPES.DOMAIN_VALID] = true;
+                } else if (!currentUrl) {
+                    issues.push({
+                        check: CHECK_TYPES.DOMAIN_VALID,
+                        severity: SEVERITY.FATAL,
+                        message: 'Domain validation failed: current URL is empty',
+                        expected: this.driver.config.expectedDomain,
+                        actual: currentUrl,
+                    });
+
+                    throw new Error(`Domain validation failed: empty URL (expected ${this.driver.config.expectedDomain})`);
+                } else if (!isDomainMatch(currentUrl, this.driver.config.expectedDomain)) {
+                    issues.push({
+                        check: CHECK_TYPES.DOMAIN_VALID,
+                        severity: SEVERITY.FATAL,
+                        message: `Domain mismatch: expected ${this.driver.config.expectedDomain}`,
+                        expected: this.driver.config.expectedDomain,
+                        actual: currentUrl,
+                    });
+
+                    throw new Error(`Domain mismatch: expected ${this.driver.config.expectedDomain}, got ${currentUrl}`);
                 } else {
-                    checks[CHECK_TYPES.DOMAIN_VALID] = true; // about:blank = skip
+                    checks[CHECK_TYPES.DOMAIN_VALID] = true;
                 }
             } else {
                 checks[CHECK_TYPES.DOMAIN_VALID] = true; // No expected domain = skip

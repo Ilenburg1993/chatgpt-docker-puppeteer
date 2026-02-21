@@ -28,6 +28,11 @@ function _asInt(raw, fallback) {
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+function _isCompatEmitEnabled() {
+    const raw = String(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT || '').trim().toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
 function _fetchMissionCounts(db, missionIds) {
     if (!missionIds || missionIds.length === 0) return {};
 
@@ -225,8 +230,10 @@ async function _tick(options) {
                     count: updates.length,
                     last_event_id: lastId,
                 });
-                for (const u of updates) {
-                    io.to('dashboards').emit('task:updated', u);
+                if (_isCompatEmitEnabled()) {
+                    for (const u of updates) {
+                        io.to('dashboards').emit('task:updated', u);
+                    }
                 }
             }
         }
@@ -268,8 +275,10 @@ async function _tick(options) {
                     count: updates.length,
                     last_event_id: lastId,
                 });
-                for (const u of updates) {
-                    io.to('dashboards').emit('mission:updated', u);
+                if (_isCompatEmitEnabled()) {
+                    for (const u of updates) {
+                        io.to('dashboards').emit('mission:updated', u);
+                    }
                 }
             }
         }

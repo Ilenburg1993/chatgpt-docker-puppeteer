@@ -12,6 +12,7 @@ import { getDb } from '#infra/db/sqlite';
 import { getAttemptById, listAttemptsByTask } from '#infra/db/task_attempt_repo';
 import {
     clearQueuePreserveRunning,
+    countTasks,
     getTaskById,
     insertTask,
     listTasks,
@@ -25,7 +26,16 @@ import schemaGuard from '../../middleware/schema_guard.js';
 import { fail, ok } from '../utils/api_envelope.js';
 
 const ALLOWED_TASK_STAGES = new Set(['DRAFT', 'PROPOSED', 'READY', 'REJECTED', 'ARCHIVED']);
-const ALLOWED_TASK_STATUSES = new Set(['PENDING', 'RUNNING', 'DONE', 'FAILED', 'PAUSED', 'SKIPPED', 'CANCELLED', 'BLOCKED']);
+const ALLOWED_TASK_STATUSES = new Set([
+    'PENDING',
+    'RUNNING',
+    'DONE',
+    'FAILED',
+    'PAUSED',
+    'SKIPPED',
+    'CANCELLED',
+    'BLOCKED',
+]);
 const ALLOWED_TARGETS = new Set(['auto', 'chatgpt', 'gemini', 'claude', 'ollama']);
 
 function _safeId(raw) {
@@ -98,13 +108,14 @@ function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
 
 function _getLockSnapshot(taskId) {
     const db = getDb();
-    const row = db
-        .prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?')
-        .get(taskId);
+    const row = db.prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?').get(taskId);
     if (!row) return null;
     return {
         locked_by: row.locked_by ? String(row.locked_by) : null,
-        lock_expires_at_ms: row.lock_expires_at_ms !== null && row.lock_expires_at_ms !== undefined ? Number(row.lock_expires_at_ms) : null,
+        lock_expires_at_ms:
+            row.lock_expires_at_ms !== null && row.lock_expires_at_ms !== undefined
+                ? Number(row.lock_expires_at_ms)
+                : null,
         status: row.status ? String(row.status) : null,
         stage: row.stage ? String(row.stage) : null,
     };
@@ -137,15 +148,48 @@ function _uniqStrings(list) {
 
 /**
  * GET /
- * Lista o snapshot estável da fila (Otimizado via Cache RAM).
+ * Lista tarefas com paginação.
+ * Query params: page (default 1), limit (default 100, max 1000)
  */
 router.get('/', async (req, res) => {
     try {
-        const tasks = listTasks({ limit: 20000 });
-        ok(res, req, { items: tasks }, { limit: 20000 });
+        // Parse pagination parameters
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 100));
+        const offset = (page - 1) * limit;
+
+        // Get optional filters
+        const status = req.query.status || null;
+        const stage = req.query.stage || null;
+        const missionId = req.query.missionId || null;
+
+        // Fetch paginated tasks and total count in parallel
+        const [tasks, total] = await Promise.all([
+            Promise.resolve(listTasks({ limit, offset, status, stage, missionId })),
+            Promise.resolve(countTasks({ status, stage, missionId })),
+        ]);
+
+        const totalPages = Math.ceil(total / limit);
+
+        // Return paginated response with metadata
+        ok(
+            res,
+            req,
+            { items: tasks },
+            {
+                limit,
+                total,
+                page,
+                totalPages,
+            }
+        );
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao ler fila: ${e.message}`, req.id);
-        fail(res, req, 500, { code: 'TASKS_LIST_FAILED', error: 'Erro interno ao acessar a fila de tarefas.', details: e.message });
+        fail(res, req, 500, {
+            code: 'TASKS_LIST_FAILED',
+            error: 'Erro interno ao acessar a fila de tarefas.',
+            details: e.message,
+        });
     }
 });
 
@@ -160,11 +204,7 @@ router.post('/', async (req, res) => {
         const incomingId = req.body?.meta?.id ? String(req.body.meta.id) : null;
         const safeId = (incomingId || `task-${uuidv4()}`).replace(/[^a-zA-Z0-9._-]/g, '');
 
-        const target =
-            req.body?.spec?.target ||
-            req.body?.meta?.agent ||
-            req.body?.meta?.target ||
-            'chatgpt';
+        const target = req.body?.spec?.target || req.body?.meta?.agent || req.body?.meta?.target || 'chatgpt';
         const normalizedTarget = String(target).toLowerCase().trim();
         if (!ALLOWED_TARGETS.has(normalizedTarget)) {
             return res.status(400).json({
@@ -176,17 +216,11 @@ router.post('/', async (req, res) => {
         }
 
         const userMessage =
-            req.body?.spec?.payload?.user_message ||
-            req.body?.spec?.payload?.prompt ||
-            req.body?.prompt ||
-            '';
+            req.body?.spec?.payload?.user_message || req.body?.spec?.payload?.prompt || req.body?.prompt || '';
 
         const systemMessage = req.body?.spec?.payload?.system_message || '';
 
-        const model =
-            req.body?.spec?.model ||
-            req.body?.spec?.payload?.model ||
-            null;
+        const model = req.body?.spec?.model || req.body?.spec?.payload?.model || null;
 
         const priorityRaw = req.body?.meta?.priority;
         const priority = Number.isFinite(Number(priorityRaw)) ? Number(priorityRaw) : 5;
@@ -269,7 +303,11 @@ router.post('/', async (req, res) => {
             const clientRequestId = req.body?.client_request_id ? String(req.body.client_request_id) : null;
             if (clientRequestId) {
                 // If client provided a request ID, treat as idempotent retry
-                log('INFO', `[API_TASKS] Idempotent retry detected for task ${safeId} with client_request_id ${clientRequestId}`, req.id);
+                log(
+                    'INFO',
+                    `[API_TASKS] Idempotent retry detected for task ${safeId} with client_request_id ${clientRequestId}`,
+                    req.id
+                );
             }
             // Return existing task
         } else {
@@ -305,7 +343,7 @@ router.post('/', async (req, res) => {
         res.status(400).json({
             success: false,
             error: `Dados da tarefa inválidos: ${e.message}`,
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -329,13 +367,16 @@ async function handleTaskUpdate(req, res) {
             return res.status(409).json({
                 success: false,
                 error: 'Task em processamento (claim)',
-                message: 'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
+                message:
+                    'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
                 details: { locked_by: lockSnapshot.locked_by, lock_expires_at_ms: lockSnapshot.lock_expires_at_ms },
                 request_id: req.id,
             });
         }
 
-        const currentStatus = String(existing.unified_status || existing.state?.status || '').toUpperCase().trim();
+        const currentStatus = String(existing.unified_status || existing.state?.status || '')
+            .toUpperCase()
+            .trim();
         if (currentStatus === 'RUNNING') {
             return res.status(409).json({
                 success: false,
@@ -400,7 +441,9 @@ async function handleTaskUpdate(req, res) {
         }
 
         const validated = schemas.core.TaskSchemaV5.parse(merged);
-        const validatedTarget = String(validated?.spec?.target || '').toLowerCase().trim();
+        const validatedTarget = String(validated?.spec?.target || '')
+            .toLowerCase()
+            .trim();
         if (!ALLOWED_TARGETS.has(validatedTarget)) {
             return res.status(400).json({
                 success: false,
@@ -459,7 +502,8 @@ async function handleTaskUpdate(req, res) {
             return res.status(409).json({
                 success: false,
                 error: 'Concurrent modification detected',
-                message: 'A task foi modificada por outro processo durante esta operação. Recarregue e tente novamente.',
+                message:
+                    'A task foi modificada por outro processo durante esta operação. Recarregue e tente novamente.',
                 request_id: req.id,
             });
         }
@@ -486,14 +530,14 @@ async function handleTaskUpdate(req, res) {
         res.json({
             success: true,
             task: updated,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha na atualização: ${e.message}`, req.id);
         res.status(400).json({
             success: false,
             error: e.message,
-            request_id: req.id
+            request_id: req.id,
         });
     }
 }
@@ -526,7 +570,7 @@ router.get('/:id/prompt', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
 
-        const attemptId = req.query?.attempt ? String(req.query.attempt) : (task.latest_attempt_id || null);
+        const attemptId = req.query?.attempt ? String(req.query.attempt) : task.latest_attempt_id || null;
         if (!attemptId) {
             return res.status(404).json({ success: false, error: 'Attempt não especificado', request_id: req.id });
         }
@@ -538,7 +582,9 @@ router.get('/:id/prompt', async (req, res) => {
 
         const artId = attempt.rendered_prompt_artifact_id || null;
         if (!artId) {
-            return res.status(404).json({ success: false, error: 'Prompt renderizado não disponível', request_id: req.id });
+            return res
+                .status(404)
+                .json({ success: false, error: 'Prompt renderizado não disponível', request_id: req.id });
         }
 
         const text = await readArtifactText(artId);
@@ -569,7 +615,9 @@ router.get('/:id/dependencies', async (req, res) => {
 
         const db = getDb();
         const rows = db
-            .prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id ASC')
+            .prepare(
+                'SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id ASC'
+            )
             .all(taskId);
         const deps = rows.map(r => String(r.depends_on_task_id));
         res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
@@ -590,9 +638,15 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
-        const status = String(existing.unified_status || existing.state?.status || '').toUpperCase().trim();
+        const status = String(existing.unified_status || existing.state?.status || '')
+            .toUpperCase()
+            .trim();
         if (status === 'RUNNING') {
-            return res.status(409).json({ success: false, error: 'Task em execução: não é permitido editar dependências', request_id: req.id });
+            return res.status(409).json({
+                success: false,
+                error: 'Task em execução: não é permitido editar dependências',
+                request_id: req.id,
+            });
         }
 
         const lockSnapshot = _getLockSnapshot(taskId);
@@ -602,7 +656,8 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
             return res.status(409).json({
                 success: false,
                 error: 'Task em processamento (claim)',
-                message: 'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
+                message:
+                    'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
                 details: { locked_by: lockSnapshot.locked_by, lock_expires_at_ms: lockSnapshot.lock_expires_at_ms },
                 request_id: req.id,
             });
@@ -614,7 +669,10 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
         const db = getDb();
         if (deps.length > 0) {
             const placeholders = deps.map(() => '?').join(',');
-            const found = db.prepare(`SELECT id FROM tasks WHERE id IN (${placeholders})`).all(...deps).map(r => String(r.id));
+            const found = db
+                .prepare(`SELECT id FROM tasks WHERE id IN (${placeholders})`)
+                .all(...deps)
+                .map(r => String(r.id));
             const foundSet = new Set(found);
             const missing = deps.filter(d => !foundSet.has(d));
             if (missing.length > 0) {
@@ -671,11 +729,12 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
                 return res.status(400).json({
                     success: false,
                     error: 'Dependência circular detectada',
-                    message: 'As dependências fornecidas criariam um ciclo no grafo de dependências, o que causaria deadlock.',
+                    message:
+                        'As dependências fornecidas criariam um ciclo no grafo de dependências, o que causaria deadlock.',
                     request_id: req.id,
                 });
             }
-            throw txErr;  // Re-throw unexpected errors
+            throw txErr; // Re-throw unexpected errors
         }
 
         res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
@@ -696,8 +755,14 @@ router.post('/:id/approve', async (req, res) => {
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
-        if (String(existing.stage || '').toUpperCase().trim() !== 'PROPOSED') {
-            return res.status(409).json({ success: false, error: 'Ação inválida: task não está em PROPOSED', request_id: req.id });
+        if (
+            String(existing.stage || '')
+                .toUpperCase()
+                .trim() !== 'PROPOSED'
+        ) {
+            return res
+                .status(409)
+                .json({ success: false, error: 'Ação inválida: task não está em PROPOSED', request_id: req.id });
         }
 
         const updated = _safeUpdateTask(safeId, {
@@ -738,8 +803,14 @@ router.post('/:id/reject', async (req, res) => {
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
-        if (String(existing.stage || '').toUpperCase().trim() !== 'PROPOSED') {
-            return res.status(409).json({ success: false, error: 'Ação inválida: task não está em PROPOSED', request_id: req.id });
+        if (
+            String(existing.stage || '')
+                .toUpperCase()
+                .trim() !== 'PROPOSED'
+        ) {
+            return res
+                .status(409)
+                .json({ success: false, error: 'Ação inválida: task não está em PROPOSED', request_id: req.id });
         }
 
         const updated = _safeUpdateTask(safeId, {
@@ -882,12 +953,18 @@ router.post('/:id/retry', async (req, res) => {
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
-        const currentStatus = String(existing.unified_status || existing.state?.status || '').toUpperCase().trim();
+        const currentStatus = String(existing.unified_status || existing.state?.status || '')
+            .toUpperCase()
+            .trim();
         if (currentStatus === 'RUNNING') {
-            return res.status(409).json({ success: false, error: 'Task em execução: pause/cancel antes de retry', request_id: req.id });
+            return res
+                .status(409)
+                .json({ success: false, error: 'Task em execução: pause/cancel antes de retry', request_id: req.id });
         }
         if (!ALLOWED_TASK_STATUSES.has(currentStatus)) {
-            return res.status(409).json({ success: false, error: 'Status atual inválido para retry', request_id: req.id });
+            return res
+                .status(409)
+                .json({ success: false, error: 'Status atual inválido para retry', request_id: req.id });
         }
         const updated = _safeUpdateTask(safeId, {
             stage: 'READY',
@@ -995,14 +1072,14 @@ router.delete('/:id', async (req, res) => {
         });
         res.json({
             success: true,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao remover tarefa: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao remover tarefa do disco.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -1048,20 +1125,39 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
             return res.status(400).json({ success: false, error: 'params.stage é obrigatório', request_id: req.id });
         }
         if (action === 'set_stage' && stageParam && !ALLOWED_TASK_STAGES.has(stageParam)) {
-            return res.status(400).json({ success: false, error: 'params.stage inválido', details: { allowed: Array.from(ALLOWED_TASK_STAGES) }, request_id: req.id });
+            return res.status(400).json({
+                success: false,
+                error: 'params.stage inválido',
+                details: { allowed: Array.from(ALLOWED_TASK_STAGES) },
+                request_id: req.id,
+            });
         }
         if (action === 'set_target' && !targetParam) {
             return res.status(400).json({ success: false, error: 'params.target é obrigatório', request_id: req.id });
         }
         if (action === 'set_target' && targetParam && !ALLOWED_TARGETS.has(targetParam)) {
-            return res.status(400).json({ success: false, error: 'params.target inválido', details: { allowed: Array.from(ALLOWED_TARGETS) }, request_id: req.id });
+            return res.status(400).json({
+                success: false,
+                error: 'params.target inválido',
+                details: { allowed: Array.from(ALLOWED_TARGETS) },
+                request_id: req.id,
+            });
         }
         if (action === 'set_priority' && !Number.isFinite(priorityParam)) {
             return res.status(400).json({ success: false, error: 'params.priority inválido', request_id: req.id });
         }
         if (action === 'set_execute_after') {
-            if (!(executeAfterParam === null || executeAfterParam === undefined || Number.isFinite(Number(executeAfterParam)) || typeof executeAfterParam === 'string')) {
-                return res.status(400).json({ success: false, error: 'params.execute_after_ms inválido', request_id: req.id });
+            if (
+                !(
+                    executeAfterParam === null ||
+                    executeAfterParam === undefined ||
+                    Number.isFinite(Number(executeAfterParam)) ||
+                    typeof executeAfterParam === 'string'
+                )
+            ) {
+                return res
+                    .status(400)
+                    .json({ success: false, error: 'params.execute_after_ms inválido', request_id: req.id });
             }
         }
 
@@ -1084,22 +1180,49 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
 
                 const now = Date.now();
 
-                if (isRunning && ['set_stage', 'set_target', 'set_priority', 'set_execute_after', 'approve', 'reject', 'retry', 'resume', 'unblock'].includes(action)) {
+                if (
+                    isRunning &&
+                    [
+                        'set_stage',
+                        'set_target',
+                        'set_priority',
+                        'set_execute_after',
+                        'approve',
+                        'reject',
+                        'retry',
+                        'resume',
+                        'unblock',
+                    ].includes(action)
+                ) {
                     failed.push({ id, error: 'Task RUNNING: ação não permitida' });
                     continue;
                 }
 
                 // If task is actively claimed (lock lease), block edits that would race with imminent execution.
                 const lockSnapshot = _getLockSnapshot(id);
-                if (status === 'PENDING' && _isTaskActivelyClaimed(lockSnapshot, now) && ['set_stage', 'set_target', 'set_priority', 'set_execute_after'].includes(action)) {
+                if (
+                    status === 'PENDING' &&
+                    _isTaskActivelyClaimed(lockSnapshot, now) &&
+                    ['set_stage', 'set_target', 'set_priority', 'set_execute_after'].includes(action)
+                ) {
                     failed.push({ id, error: 'Task em processamento (claim): pause/cancel antes de editar' });
                     continue;
                 }
-                if (action === 'approve' && String(existing.stage || '').toUpperCase().trim() !== 'PROPOSED') {
+                if (
+                    action === 'approve' &&
+                    String(existing.stage || '')
+                        .toUpperCase()
+                        .trim() !== 'PROPOSED'
+                ) {
                     failed.push({ id, error: 'Task não está em PROPOSED' });
                     continue;
                 }
-                if (action === 'reject' && String(existing.stage || '').toUpperCase().trim() !== 'PROPOSED') {
+                if (
+                    action === 'reject' &&
+                    String(existing.stage || '')
+                        .toUpperCase()
+                        .trim() !== 'PROPOSED'
+                ) {
                     failed.push({ id, error: 'Task não está em PROPOSED' });
                     continue;
                 }
@@ -1140,7 +1263,13 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
                     updatePayload = { status: 'CANCELLED', cancelled_at_ms: now, last_error: 'USER_CANCELLED' };
                     shouldReleaseLock = true;
                 } else if (action === 'approve') {
-                    updatePayload = { stage: 'READY', status: 'PENDING', paused_at_ms: null, cancelled_at_ms: null, failed_at_ms: null };
+                    updatePayload = {
+                        stage: 'READY',
+                        status: 'PENDING',
+                        paused_at_ms: null,
+                        cancelled_at_ms: null,
+                        failed_at_ms: null,
+                    };
                     shouldReleaseLock = true;
                 } else if (action === 'reject') {
                     updatePayload = { stage: 'REJECTED', status: 'SKIPPED', last_error: 'USER_REJECTED' };
@@ -1263,14 +1392,14 @@ router.post('/retry-failed', async (req, res) => {
         res.json({
             success: true,
             count,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha na reinicialização em lote: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha na reinicialização em lote.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -1295,14 +1424,14 @@ router.post('/clear', async (req, res) => {
         res.json({
             success: true,
             ...report,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_TASKS] Falha ao limpar a fila: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao limpar a fila.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -1337,16 +1466,28 @@ router.get('/:id', async (req, res) => {
     try {
         const taskId = _safeId(req.params.id);
         if (['retry-failed', 'clear', 'bulk', 'results'].includes(taskId)) {
-            return fail(res, req, 404, { code: 'TASK_NOT_FOUND', error: 'Task não encontrada', details: { task_id: taskId } });
+            return fail(res, req, 404, {
+                code: 'TASK_NOT_FOUND',
+                error: 'Task não encontrada',
+                details: { task_id: taskId },
+            });
         }
         const task = getTaskById(taskId);
         if (!task) {
-            return fail(res, req, 404, { code: 'TASK_NOT_FOUND', error: 'Task não encontrada', details: { task_id: taskId } });
+            return fail(res, req, 404, {
+                code: 'TASK_NOT_FOUND',
+                error: 'Task não encontrada',
+                details: { task_id: taskId },
+            });
         }
         ok(res, req, { task }, {});
     } catch (err) {
         log('ERROR', `[API_TASKS] Falha ao buscar task: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'TASK_GET_FAILED', error: 'Falha ao buscar task', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'TASK_GET_FAILED',
+            error: 'Falha ao buscar task',
+            details: err?.message || String(err),
+        });
     }
 });
 

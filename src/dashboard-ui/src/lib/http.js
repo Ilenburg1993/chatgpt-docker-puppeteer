@@ -7,6 +7,18 @@ export const http = axios.create({
     withCredentials: true
 });
 
+http.interceptors.request.use(
+    config => {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    error => Promise.reject(error)
+);
+
 http.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -37,4 +49,3 @@ export function formatHttpError(error) {
         request_id: requestId
     };
 }
-

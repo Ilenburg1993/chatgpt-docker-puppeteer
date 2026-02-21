@@ -149,6 +149,19 @@ const ConfigSchema = z
                 z.array(z.string()), // ["http://foo.com"]
             ])
             .default(['http://localhost:3008']),
+        DASHBOARD_AUTH_REQUIRED: z.boolean().default(process.env.DASHBOARD_AUTH_REQUIRED !== 'false'),
+        DASHBOARD_AUTH_USERNAME: z.string().default(process.env.DASHBOARD_AUTH_USERNAME || ''),
+        DASHBOARD_AUTH_PASSWORD: z.string().default(process.env.DASHBOARD_AUTH_PASSWORD || ''),
+        DASHBOARD_SOCKET_AUTH_REQUIRED: z.boolean().default(process.env.DASHBOARD_SOCKET_AUTH_REQUIRED !== 'false'),
+        DASHBOARD_COMMANDS_ENABLED: z.boolean().default(process.env.DASHBOARD_COMMANDS_ENABLED === 'true'),
+        DASHBOARD_COMMAND_ROLE: z.string().default(process.env.DASHBOARD_COMMAND_ROLE || 'admin'),
+        DASHBOARD_TASK_SYNC_MODE: z
+            .enum(['ssot_feed', 'legacy_bridge'])
+            .default(process.env.DASHBOARD_TASK_SYNC_MODE === 'legacy_bridge' ? 'legacy_bridge' : 'ssot_feed'),
+        DASHBOARD_LEGACY_BRIDGE_CONTINGENCY: z
+            .boolean()
+            .default(process.env.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY === 'true'),
+        DASHBOARD_EMIT_TASK_UPDATED_COMPAT: z.boolean().default(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT === 'true'),
 
         // --- Driver Factory / Pool Configuration (Centralized) ---
         DRIVER_POOL_MAX_SIZE: z.number().int().min(1).max(20).default(5),
@@ -160,6 +173,12 @@ const ConfigSchema = z
         DRIVER_BACKPRESSURE_TEMP: z.boolean().default(true),
         TASK_CONTROL_ABORT_TIMEOUT_MS: z.number().int().min(100).default(1500),
         TASK_CONTROL_ABORT_MAX_RETRIES: z.number().int().min(0).max(10).default(2),
+        MISSION_STEP_DISPATCH_MODE: z
+            .enum(['ssot_queue', 'legacy_direct'])
+            .default(process.env.MISSION_STEP_DISPATCH_MODE === 'legacy_direct' ? 'legacy_direct' : 'ssot_queue'),
+        MISSION_MANAGER_LEGACY_DISPATCH_ENABLED: z
+            .boolean()
+            .default(process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED === 'true'),
 
         // --- BrowserPool Configuration (formalized schema) ---
         BROWSER_POOL_SIZE: z.number().int().min(1).max(20).default(3),
@@ -387,6 +406,33 @@ class ConfigurationManager extends EventEmitter {
     get ALLOWED_ORIGINS() {
         return this.currentConfig.ALLOWED_ORIGINS;
     }
+    get DASHBOARD_AUTH_REQUIRED() {
+        return this.currentConfig.DASHBOARD_AUTH_REQUIRED;
+    }
+    get DASHBOARD_AUTH_USERNAME() {
+        return this.currentConfig.DASHBOARD_AUTH_USERNAME;
+    }
+    get DASHBOARD_AUTH_PASSWORD() {
+        return this.currentConfig.DASHBOARD_AUTH_PASSWORD;
+    }
+    get DASHBOARD_SOCKET_AUTH_REQUIRED() {
+        return this.currentConfig.DASHBOARD_SOCKET_AUTH_REQUIRED;
+    }
+    get DASHBOARD_COMMANDS_ENABLED() {
+        return this.currentConfig.DASHBOARD_COMMANDS_ENABLED;
+    }
+    get DASHBOARD_COMMAND_ROLE() {
+        return this.currentConfig.DASHBOARD_COMMAND_ROLE || 'admin';
+    }
+    get DASHBOARD_TASK_SYNC_MODE() {
+        return this.currentConfig.DASHBOARD_TASK_SYNC_MODE;
+    }
+    get DASHBOARD_LEGACY_BRIDGE_CONTINGENCY() {
+        return this.currentConfig.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY;
+    }
+    get DASHBOARD_EMIT_TASK_UPDATED_COMPAT() {
+        return this.currentConfig.DASHBOARD_EMIT_TASK_UPDATED_COMPAT;
+    }
 
     // --- Chrome & Proxy Connection Getters ---
     get CHROME_HOST() {
@@ -449,6 +495,12 @@ class ConfigurationManager extends EventEmitter {
     }
     get TASK_CONTROL_ABORT_MAX_RETRIES() {
         return this.currentConfig.TASK_CONTROL_ABORT_MAX_RETRIES;
+    }
+    get MISSION_STEP_DISPATCH_MODE() {
+        return this.currentConfig.MISSION_STEP_DISPATCH_MODE;
+    }
+    get MISSION_MANAGER_LEGACY_DISPATCH_ENABLED() {
+        return this.currentConfig.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
     }
     get BROWSER_POOL_SIZE() {
         return this.currentConfig.BROWSER_POOL_SIZE;

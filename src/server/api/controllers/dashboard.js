@@ -1,15 +1,59 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import { timingSafeEqual } from 'node:crypto';
+import { v4 as uuidv4 } from 'uuid';
 import { log } from '#core/logger';
+import { getJwtSecret, JWT_SIGN_OPTIONS } from '#core/jwt_config';
+import { revokeToken } from '#infra/db/token_blocklist';
 import denyIfDelegated from '../../middleware/deny_if_delegated.js';
-import { authenticate, optionalAuthenticate } from '../../middleware/auth.js';
-import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
+import { authenticate } from '../../middleware/auth.js';
 import dashboardTasksRouter from './dashboard_tasks.js';
 import dashboardMissionsRouter from './dashboard_missions.js';
 import dashboardEventsRouter from './dashboard_events.js';
 
 const router = express.Router();
+const DASHBOARD_AUTH_PASSWORD_MIN_LENGTH = 12;
+let telemetryAggregatorPromise = null;
+
+async function getTelemetryAggregator() {
+    if (!telemetryAggregatorPromise) {
+        telemetryAggregatorPromise = import('#server/dashboard-api/telemetry_aggregator').then(
+            module => module.default ?? module
+        );
+    }
+    return telemetryAggregatorPromise;
+}
+
+function isDashboardAuthRequired() {
+    return process.env.DASHBOARD_AUTH_REQUIRED !== 'false';
+}
+
+function getDashboardAuthCredentials() {
+    const username = String(process.env.DASHBOARD_AUTH_USERNAME || '').trim();
+    const password = String(process.env.DASHBOARD_AUTH_PASSWORD || '');
+
+    if (!username) {
+        throw new Error('DASHBOARD_AUTH_USERNAME ausente');
+    }
+
+    if (password.length < DASHBOARD_AUTH_PASSWORD_MIN_LENGTH) {
+        throw new Error(
+            `DASHBOARD_AUTH_PASSWORD invalida (minimo ${DASHBOARD_AUTH_PASSWORD_MIN_LENGTH} caracteres requerido)`
+        );
+    }
+
+    return { username, password, role: 'admin' };
+}
+
+function safeCredentialMatch(input, expected) {
+    const left = Buffer.from(String(input || ''), 'utf8');
+    const right = Buffer.from(String(expected || ''), 'utf8');
+    if (left.length !== right.length) {
+        return false;
+    }
+    return timingSafeEqual(left, right);
+}
 
 function getBridgeMetrics() {
     // TaskSyncBridge is being deprecated in favor of a DB Event Feed.
@@ -38,70 +82,100 @@ router.post('/auth/login', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: 'Username e password são obrigatórios',
-                request_id: req.id
+                request_id: req.id,
             });
         }
 
-        // Autenticação simples (em produção, implementar verificação real)
-        const validUsers = {
-            'admin': { password: 'admin123', role: 'admin' },
-            'user': { password: 'user123', role: 'user' }
-        };
+        let authUser = { username, role: 'admin' };
 
-        const userConfig = validUsers[username];
-        if (!userConfig || userConfig.password !== password) {
-            log('WARN', `[AUTH] Login failed for user: ${username}`, req.id);
-            return res.status(401).json({
-                success: false,
-                error: 'Credenciais inválidas',
-                request_id: req.id
-            });
+        if (isDashboardAuthRequired()) {
+            let credentials;
+            try {
+                credentials = getDashboardAuthCredentials();
+            } catch (configErr) {
+                log('ERROR', `[AUTH] Configuração de autenticação inválida: ${configErr.message}`, req.id);
+                return res.status(503).json({
+                    success: false,
+                    error: 'Autenticação do dashboard indisponível por configuração inválida',
+                    request_id: req.id,
+                });
+            }
+
+            const isValidUsername = safeCredentialMatch(username, credentials.username);
+            const isValidPassword = safeCredentialMatch(password, credentials.password);
+            if (!isValidUsername || !isValidPassword) {
+                log('WARN', `[AUTH] Login failed for user: ${username}`, req.id);
+                return res.status(401).json({
+                    success: false,
+                    error: 'Credenciais inválidas',
+                    request_id: req.id,
+                });
+            }
+
+            authUser = {
+                username: credentials.username,
+                role: credentials.role,
+            };
         }
 
-        // Gerar token JWT
+        // Gerar token JWT com jti (JWT ID) para suportar revogação no logout
+        const jti = uuidv4();
         const token = jwt.sign(
             {
-                id: username,
-                username: username,
-                role: userConfig.role
+                id: authUser.username,
+                username: authUser.username,
+                role: authUser.role,
+                jti,
             },
-            process.env.JWT_SECRET || 'default-secret-change-in-production',
-            { expiresIn: '24h' }
+            getJwtSecret(),
+            JWT_SIGN_OPTIONS
         );
 
-        log('INFO', `[AUTH] User logged in: ${username}`, req.id);
+        log('INFO', `[AUTH] User logged in: ${authUser.username}`, req.id);
         res.json({
             success: true,
             token,
             user: {
-                id: username,
-                username: username,
-                role: userConfig.role
+                id: authUser.username,
+                username: authUser.username,
+                role: authUser.role,
             },
             expires_in: 24 * 60 * 60, // 24 horas em segundos
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (err) {
         log('ERROR', `[AUTH] Login error: ${err.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro interno no login',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
 
 /**
  * POST /api/dashboard/auth/logout
- * Invalida token (cliente deve remover do localStorage)
+ * SEC-02 FIX: Revoga o token JWT na blocklist para invalidação imediata.
+ * O cliente também deve remover o token do localStorage.
  */
-router.post('/auth/logout', optionalAuthenticate, (req, res) => {
+router.post('/auth/logout', authenticate, (req, res) => {
     const username = req.user?.username || 'unknown';
-    log('INFO', `[AUTH] User logged out: ${username}`, req.id);
+    const jti = req.user?.jti;
+    const exp = req.user?.exp;
+
+    // Revogar token na blocklist se tiver jti
+    if (jti) {
+        const expiresAtMs = exp ? Number(exp) * 1000 : Date.now() + 86400000;
+        const revoked = revokeToken(jti, expiresAtMs);
+        log('INFO', `[AUTH] User logged out: ${username} (token revogado: ${revoked})`, req.id);
+    } else {
+        log('INFO', `[AUTH] User logged out: ${username} (sem jti — token legado não revogado)`, req.id);
+    }
+
     res.json({
         success: true,
-        message: 'Logout realizado com sucesso',
-        request_id: req.id
+        message: 'Logout realizado com sucesso. Token invalidado.',
+        request_id: req.id,
     });
 });
 
@@ -113,7 +187,7 @@ router.get('/auth/me', authenticate, (req, res) => {
     res.json({
         success: true,
         user: req.user,
-        request_id: req.id
+        request_id: req.id,
     });
 });
 
@@ -131,6 +205,7 @@ router.use(dashboardEventsRouter);
 
 router.get('/telemetry/current', authenticate, async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const metrics = await telemetryAggregator.getCurrent();
         res.json({ success: true, metrics, request_id: req.id });
     } catch (err) {
@@ -141,6 +216,7 @@ router.get('/telemetry/current', authenticate, async (req, res) => {
 
 router.get('/telemetry/history', async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const history = telemetryAggregator.getFullHistory();
         res.json({ success: true, ...history, request_id: req.id });
     } catch (err) {
@@ -151,6 +227,7 @@ router.get('/telemetry/history', async (req, res) => {
 
 router.get('/telemetry/history/:metric', async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const metric = req.params.metric;
         const samples = parseInt(req.query.samples, 10) || 60;
         const history = telemetryAggregator.getHistory(metric, samples);
@@ -172,6 +249,7 @@ router.get('/telemetry/history/:metric', async (req, res) => {
 
 router.get('/alerts', async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const alerts = telemetryAggregator.getActiveAlerts();
         res.json({ success: true, count: alerts.length, alerts, request_id: req.id });
     } catch (err) {
@@ -182,6 +260,7 @@ router.get('/alerts', async (req, res) => {
 
 router.put('/alerts/thresholds', authenticate, denyIfDelegated, async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const thresholds = req.body;
         telemetryAggregator.setAlertThresholds(thresholds);
         res.json({ success: true, message: 'Thresholds atualizados', request_id: req.id });
@@ -197,6 +276,7 @@ router.put('/alerts/thresholds', authenticate, denyIfDelegated, async (req, res)
 
 router.get('/system/health', async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const metrics = await telemetryAggregator.getCurrent();
         const alerts = telemetryAggregator.getActiveAlerts();
         const bridgeMetrics = getBridgeMetrics();
@@ -212,21 +292,21 @@ router.get('/system/health', async (req, res) => {
             api: { status: 'healthy', message: 'API responding' },
             queue: {
                 status: metrics?.queue?.size > 500 ? 'warning' : 'healthy',
-                message: `Queue size: ${metrics?.queue?.size || 0}`
+                message: `Queue size: ${metrics?.queue?.size || 0}`,
             },
             memory: {
                 status:
                     metrics?.heap?.usage_percent > 90
                         ? 'critical'
                         : metrics?.heap?.usage_percent > 70
-                            ? 'warning'
-                            : 'healthy',
-                message: `Heap: ${metrics?.heap?.usage_percent || 0}%`
+                          ? 'warning'
+                          : 'healthy',
+                message: `Heap: ${metrics?.heap?.usage_percent || 0}%`,
             },
             kernel: {
                 status: bridgeMetrics.initialized ? 'healthy' : 'degraded',
-                message: bridgeMetrics.initialized ? 'SSOT mode' : 'Not initialized'
-            }
+                message: bridgeMetrics.initialized ? 'SSOT mode' : 'Not initialized',
+            },
         };
 
         res.json({
@@ -235,7 +315,7 @@ router.get('/system/health', async (req, res) => {
             components,
             alerts_count: alerts.length,
             uptime_seconds: metrics?.uptime_seconds || 0,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] Erro ao verificar health: ${err.message}`, req.id);
@@ -243,20 +323,21 @@ router.get('/system/health', async (req, res) => {
             success: false,
             status: 'error',
             error: 'Erro ao verificar status do sistema',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
 
 router.get('/system/info', async (req, res) => {
     try {
+        const telemetryAggregator = await getTelemetryAggregator();
         const metrics = await telemetryAggregator.getCurrent();
 
         res.json({
             success: true,
             system: metrics?.system || {},
             versions: { node: process.version, platform: process.platform, arch: process.arch },
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] Erro ao buscar info: ${err.message}`, req.id);
