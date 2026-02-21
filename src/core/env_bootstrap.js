@@ -9,12 +9,20 @@ import fs from 'node:fs';
  */
 const BOOTSTRAP_FLAG = '__MAESTRO_ENV_BOOTSTRAPPED__';
 
-if (!globalThis[BOOTSTRAP_FLAG]) {
-    if (fs.existsSync('.env.local')) {
-        dotenv.config({ path: '.env.local', override: true });
+function ensureEnvBootstrap() {
+    if (globalThis[BOOTSTRAP_FLAG]) {
+        return false;
     }
 
-    dotenv.config();
+    if (fs.existsSync('.env.local')) {
+        dotenv.config({ path: '.env.local', override: true, quiet: true });
+    }
+
+    dotenv.config({ quiet: true });
     globalThis[BOOTSTRAP_FLAG] = true;
+    return true;
 }
 
+ensureEnvBootstrap();
+
+export { ensureEnvBootstrap, BOOTSTRAP_FLAG };

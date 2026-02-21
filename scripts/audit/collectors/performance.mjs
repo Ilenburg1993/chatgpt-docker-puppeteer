@@ -27,7 +27,7 @@ export async function collectPerformanceFindings(rootDir) {
     } catch (error) {
         errors.push({
             source: 'performance-collector',
-            message: `Failed to analyze complexity: ${error.message}`
+            message: `Failed to analyze complexity: ${error.message}`,
         });
     }
 
@@ -40,7 +40,7 @@ export async function collectPerformanceFindings(rootDir) {
     } catch (error) {
         errors.push({
             source: 'performance-collector',
-            message: `Failed to analyze memory leaks: ${error.message}`
+            message: `Failed to analyze memory leaks: ${error.message}`,
         });
     }
 
@@ -53,7 +53,20 @@ export async function collectPerformanceFindings(rootDir) {
     } catch (error) {
         errors.push({
             source: 'performance-collector',
-            message: `Failed to analyze query performance: ${error.message}`
+            message: `Failed to analyze query performance: ${error.message}`,
+        });
+    }
+
+    try {
+        // Análise de vazamento por Promise.race com timeout sem cancelamento
+        const timeoutRaceResult = await analyzePromiseRaceTimeoutLeaks(rootDir);
+        findings.push(...timeoutRaceResult.findings);
+        errors.push(...timeoutRaceResult.errors);
+        warnings.push(...timeoutRaceResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze Promise.race timeout leaks: ${error.message}`,
         });
     }
 
@@ -71,7 +84,11 @@ async function analyzeComplexity(rootDir) {
 
     try {
         // Usar eslint complexity plugin se disponível
-        const eslintResult = await runCommand('npx', ['eslint', '--format', 'json', '--rule', 'complexity: [2, 10]', 'src/'], { cwd: rootDir });
+        const eslintResult = await runCommand(
+            'npx',
+            ['eslint', '--format', 'json', '--rule', 'complexity: [2, 10]', 'src/'],
+            { cwd: rootDir }
+        );
 
         if (eslintResult.ok && eslintResult.stdout) {
             const eslintData = JSON.parse(eslintResult.stdout);
@@ -101,7 +118,7 @@ async function analyzeComplexity(rootDir) {
         // eslint não disponível ou erro
         warnings.push({
             source: 'performance-complexity',
-            message: 'ESLint complexity analysis not available (optional)'
+            message: 'ESLint complexity analysis not available (optional)',
         });
     }
 
@@ -131,26 +148,26 @@ async function analyzeMemoryLeaks(rootDir) {
             const removeListeners = (content.match(/removeEventListener\s*\(/g) || []).length;
 
             if (addListeners > removeListeners && addListeners > 0) {
-            findings.push({
-                source_tool: 'performance-memory',
-                contract_id: 'CONTRACT-PERFORMANCE-MEMORY-LEAK',
-                domain: 'performance',
-                file: relativePath,
-                evidence: `${addListeners} addEventListener vs ${removeListeners} removeEventListener`,
-                severity_hint: 'P1',
-                type: 'bug',
-                impact: 'Possível vazamento de memória por listeners não removidos.',
-                root_cause: 'Event listeners adicionados sem cleanup correspondente.',
-                suggested_patch: 'Implementar removeEventListener no cleanup apropriado.',
-                test_strategy: 'Análise estática de balanceamento de listeners.',
-                regression_risk: 'Médio',
-            });
+                findings.push({
+                    source_tool: 'performance-memory',
+                    contract_id: 'CONTRACT-PERFORMANCE-MEMORY-LEAK',
+                    domain: 'performance',
+                    file: relativePath,
+                    evidence: `${addListeners} addEventListener vs ${removeListeners} removeEventListener`,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Possível vazamento de memória por listeners não removidos.',
+                    root_cause: 'Event listeners adicionados sem cleanup correspondente.',
+                    suggested_patch: 'Implementar removeEventListener no cleanup apropriado.',
+                    test_strategy: 'Análise estática de balanceamento de listeners.',
+                    regression_risk: 'Médio',
+                });
+            }
         }
-    }
     } catch (error) {
         errors.push({
             source: 'performance-memory',
-            message: `Failed to analyze memory leaks: ${error.message}`
+            message: `Failed to analyze memory leaks: ${error.message}`,
         });
     }
 
@@ -173,8 +190,8 @@ async function analyzeQueryPerformance(rootDir) {
         const content = fs.readFileSync(file, 'utf8');
         const relativePath = path.relative(rootDir, file);
 
-        // Detectar queries N+1 potenciais
-        const loops = content.match(/for\s*\([^}]*\)\s*{\s*[^}]*query|forEach\s*\([^}]*query/gi) || [];
+        // Detectar N+1 de dados/rede em loops (evita falso-positivo de DOM querySelector)
+        const loops = findPotentialNPlusOneLoops(content);
         if (loops.length > 0) {
             findings.push({
                 source_tool: 'performance-query',
@@ -197,6 +214,132 @@ async function analyzeQueryPerformance(rootDir) {
 }
 
 /**
+ * Detecta Promise.race com timeout baseado em setTimeout sem clearTimeout.
+ *
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzePromiseRaceTimeoutLeaks(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    try {
+        const srcDir = path.join(rootDir, 'src');
+        const files = await findJsFiles(srcDir);
+
+        for (const file of files) {
+            const content = fs.readFileSync(file, 'utf8');
+            const relativePath = path.relative(rootDir, file);
+            const races = findPromiseRaceTimeoutWithoutCleanup(content);
+
+            for (const race of races) {
+                findings.push({
+                    source_tool: 'performance-timeout-race',
+                    contract_id: 'CONTRACT-RUNTIME-PROMISE-RACE-TIMEOUT-CLEANUP',
+                    domain: 'runtime',
+                    file: relativePath,
+                    line: race.line,
+                    evidence: race.evidence,
+                    severity_hint: 'P1',
+                    type: 'bug',
+                    impact: 'Timer pode permanecer pendente após Promise.race, gerando ruído e degradação sob carga.',
+                    root_cause: 'Timeout criado sem clearTimeout no caminho de sucesso/falha.',
+                    suggested_patch: 'Substituir por helper cancelável (_withTimeout) ou limpar timer explicitamente.',
+                    test_strategy: 'Executar testes de burst e validar ausência de timers residuais.',
+                    regression_risk: 'Médio',
+                });
+            }
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-timeout-race',
+            message: `Failed to detect Promise.race timeout leaks: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * @param {string} content
+ * @returns {Array<{line:number,evidence:string}>}
+ */
+function findPromiseRaceTimeoutWithoutCleanup(content) {
+    const findings = [];
+    const racePattern = /Promise\.race\s*\(\s*\[([\s\S]{0,3000}?)\]\s*\)/g;
+
+    let match;
+    while ((match = racePattern.exec(content)) !== null) {
+        const block = match[1] || '';
+        const hasTimeoutPromise =
+            /new\s+Promise\s*\(\s*\(\s*_,\s*reject\s*\)\s*=>[\s\S]{0,600}?setTimeout\s*\(/.test(block) ||
+            /setTimeout\s*\(\s*\(\)\s*=>[\s\S]{0,400}?reject\s*\(/.test(block);
+
+        if (!hasTimeoutPromise) {
+            continue;
+        }
+
+        if (/clearTimeout\s*\(/.test(block)) {
+            continue;
+        }
+
+        const before = content.slice(0, match.index);
+        const line = before.split('\n').length;
+        const compactEvidence = block.replace(/\s+/g, ' ').trim().slice(0, 220);
+        findings.push({
+            line,
+            evidence: `Promise.race com timeout sem clearTimeout: ${compactEvidence}`,
+        });
+    }
+
+    return findings;
+}
+
+/**
+ * Retorna blocos de loop que parecem executar queries de dados/rede.
+ * Ignora explicitamente padrões de DOM (`querySelector`, `document.*`, `window.*`).
+ *
+ * @param {string} content
+ * @returns {string[]}
+ */
+function findPotentialNPlusOneLoops(content) {
+    const loopBlocks = [];
+    const loopPattern =
+        /\bfor\s*\([^)]*\)\s*{[\s\S]{0,1200}?}|\bforEach\s*\([^)]*\)\s*=>\s*{[\s\S]{0,1200}?}/g;
+
+    const dataQueryPatterns = [
+        /\b(?:db|repo|repository|model|collection|client|prisma|sequelize|mongoose|knex)\b[\w$.[\]'"]{0,120}\.\s*(?:query|find(?:One|Many|All)?|select|aggregate|count|execute|get)\s*\(/i,
+        /\b(?:fetch|request|axios\.(?:get|post|put|patch|delete|request)|http(?:Client)?\.(?:get|post|put|patch|delete|request))\s*\(/i,
+    ];
+
+    const domQueryPatterns = [
+        /\bquerySelector(All)?\s*\(/i,
+        /\bdocument\./i,
+        /\bwindow\./i,
+        /\belementFromPoint\s*\(/i,
+        /\bcreateTreeWalker\s*\(/i,
+    ];
+
+    const matches = content.match(loopPattern) || [];
+    for (const loopBlock of matches) {
+        const hasDataQuery = dataQueryPatterns.some(re => re.test(loopBlock));
+        if (!hasDataQuery) {
+            continue;
+        }
+
+        const hasOnlyDomSignals = domQueryPatterns.some(re => re.test(loopBlock));
+        if (hasOnlyDomSignals && !/\b(?:db|repo|repository|model|collection|client|prisma|sequelize|mongoose|knex)\b/i.test(loopBlock)) {
+            continue;
+        }
+
+        loopBlocks.push(loopBlock);
+    }
+
+    return loopBlocks;
+}
+
+/**
  * @param {string} dir
  * @returns {Promise<string[]>}
  */
@@ -210,7 +353,8 @@ async function findJsFiles(dir) {
             const fullPath = path.join(currentDir, item);
             const stat = fs.statSync(fullPath);
 
-            if (stat.isDirectory() && !item.startsWith('.') && item !== 'node_modules') {
+            // Skip build artifacts
+            if (stat.isDirectory() && !item.startsWith('.') && item !== 'node_modules' && item !== 'dist') {
                 scan(fullPath);
             } else if (stat.isFile() && (item.endsWith('.js') || item.endsWith('.mjs'))) {
                 files.push(fullPath);

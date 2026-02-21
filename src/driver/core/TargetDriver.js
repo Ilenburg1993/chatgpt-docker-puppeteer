@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { isDomainMatch } from '#core/domain_matcher';
 import { log } from '#core/logger';
 
 /* ==========================================================================
@@ -9,11 +10,11 @@ import { log } from '#core/logger';
 
 const TARGETDRIVER_CONFIG = Object.freeze({
     // State Timeouts (ms)
-    STATE_TIMEOUT_WARNING_MS: 30000,     // 30s
-    STATE_TIMEOUT_ERROR_MS: 120000,      // 2min
+    STATE_TIMEOUT_WARNING_MS: 30000, // 30s
+    STATE_TIMEOUT_ERROR_MS: 120000, // 2min
 
     // Health Check
-    HEALTH_CHECK_INTERVAL_MS: 5000,      // 5s
+    HEALTH_CHECK_INTERVAL_MS: 5000, // 5s
 
     // State History
     MAX_STATE_HISTORY_SIZE: 20,
@@ -24,11 +25,11 @@ const TARGETDRIVER_CONFIG = Object.freeze({
         image_generation: false,
         file_upload: false,
         context_reset: true,
-        streaming_events: false
+        streaming_events: false,
     }),
 
     // Memory
-    MAX_EVENT_LISTENERS: 50
+    MAX_EVENT_LISTENERS: 50,
 });
 
 /* ==========================================================================
@@ -48,6 +49,7 @@ const EVENTS = Object.freeze({
     ABORT_SIGNAL_RECEIVED: 'abort_received', // ✅ v2.0: AbortSignal disparado
     CONTEXT_ATTACHED: 'context_attached', // ✅ v3.0: Context attached (page + signal)
     CONTEXT_DETACHED: 'context_detached', // ✅ v3.0: Context detached
+    CONTEXT_HOT_SWAP: 'context_hot_swap', // ✅ v3.1: Context re-attached (Hot Pool)
 });
 
 /* ==========================================================================
@@ -91,7 +93,7 @@ const CAPABILITIES_SCHEMA = Object.freeze([
     'code_interpreter',
     'web_browsing',
     'dalle',
-    'function_calling'
+    'function_calling',
 ]);
 
 /**
@@ -260,7 +262,7 @@ class TargetDriver extends EventEmitter {
                     type: 'PAGE_CLOSED',
                     correlationId: this.correlationId,
                     state: this._state,
-                    ts: Date.now()
+                    ts: Date.now(),
                 });
 
                 // Reset to IDLE if not already UNATTACHED
@@ -278,20 +280,20 @@ class TargetDriver extends EventEmitter {
             this._pageEventListeners.push({ event: 'close', handler: closeHandler });
 
             // 2. Page error event
-            const errorHandler = (err) => {
+            const errorHandler = err => {
                 log('ERROR', `[${this.name}] Page error: ${err.message}`, this.correlationId);
                 this.emit(EVENTS.WARNING, {
                     type: 'PAGE_ERROR',
                     error: err.message,
                     correlationId: this.correlationId,
-                    ts: Date.now()
+                    ts: Date.now(),
                 });
 
                 this._errorCount++;
                 this._lastError = {
                     type: 'PAGE_ERROR',
                     message: err.message,
-                    ts: Date.now()
+                    ts: Date.now(),
                 };
             };
             this.page.on('error', errorHandler);
@@ -304,7 +306,7 @@ class TargetDriver extends EventEmitter {
                     type: 'PAGE_DISCONNECTED',
                     correlationId: this.correlationId,
                     state: this._state,
-                    ts: Date.now()
+                    ts: Date.now(),
                 });
 
                 // Reset to IDLE if not already UNATTACHED
@@ -321,8 +323,11 @@ class TargetDriver extends EventEmitter {
             this.page.on('disconnected', disconnectHandler);
             this._pageEventListeners.push({ event: 'disconnected', handler: disconnectHandler });
 
-            log('DEBUG', `[${this.name}] Page lifecycle handlers attached (${this._pageEventListeners.length})`, this.correlationId);
-
+            log(
+                'DEBUG',
+                `[${this.name}] Page lifecycle handlers attached (${this._pageEventListeners.length})`,
+                this.correlationId
+            );
         } catch (err) {
             log('ERROR', `[${this.name}] Failed to attach page handlers: ${err.message}`, this.correlationId);
         }
@@ -429,9 +434,10 @@ class TargetDriver extends EventEmitter {
      * Attach context (page + signal) ao driver ANTES de executar task.
      *
      * ✅ v3.0: Pool-ready - Driver pode ser reutilizado entre tasks
+     * ✅ v3.1: Hot-Swap - Permite reanexar signal se página for a mesma (Hot Pool)
      *
      * PRÉ-CONDIÇÕES:
-     * - Driver em estado UNATTACHED
+     * - Driver em estado UNATTACHED OU (IDLE e mesma página)
      * - Driver não destruído
      * - Page válida (não null, não closed)
      * - Signal válido (AbortSignal instance)
@@ -460,7 +466,10 @@ class TargetDriver extends EventEmitter {
             throw new Error(`[${this.name}] Cannot attach context: driver destroyed`);
         }
 
-        if (this._state !== STATES.UNATTACHED) {
+        // ✅ v3.1: Hot-Swap support
+        const isHotSwap = this._state === STATES.IDLE && this.page === page;
+
+        if (this._state !== STATES.UNATTACHED && !isHotSwap) {
             throw new Error(
                 `[${this.name}] Cannot attach context: driver not UNATTACHED (current: ${this._state}). ` +
                     `Call detachContext() first.`
@@ -484,11 +493,16 @@ class TargetDriver extends EventEmitter {
             const currentUrl = page.url ? page.url() : '';
 
             // Skip validation for about:blank (not navigated yet)
-            if (currentUrl !== 'about:blank' && currentUrl !== '' && !currentUrl.includes(this.config.expectedDomain)) {
+            if (currentUrl !== 'about:blank' && currentUrl !== '' && !isDomainMatch(currentUrl, this.config.expectedDomain)) {
                 throw new Error(
                     `[${this.name}] Domain mismatch: expected ${this.config.expectedDomain}, got ${currentUrl}`
                 );
             }
+        }
+
+        // Se for Hot Swap, remove listeners antigos antes de reconfigurar
+        if (isHotSwap) {
+            this._teardownAbortListener();
         }
 
         // Attach page + signal
@@ -503,16 +517,26 @@ class TargetDriver extends EventEmitter {
         this._setupPageLifecycleHandlers();
 
         // Transição: UNATTACHED → IDLE
-        this.setState(STATES.IDLE);
+        if (this._state !== STATES.IDLE) {
+            this.setState(STATES.IDLE);
+        }
+
+        // ✅ v3.1: Hot Pool - Se for Hot Swap (mesma página), emite evento diferenciado
+        const eventType = isHotSwap ? EVENTS.CONTEXT_HOT_SWAP : EVENTS.CONTEXT_ATTACHED;
 
         // Telemetria
-        this.emit(EVENTS.CONTEXT_ATTACHED, {
+        this.emit(eventType, {
             pageUrl: page.url ? page.url() : 'unknown',
             correlationId,
+            isHotSwap,
             ts: Date.now(),
         });
 
-        log('DEBUG', `[${this.name}] Context attached: ${correlationId || 'no-correlation'}`, this.correlationId);
+        log(
+            'DEBUG',
+            `[${this.name}] Context attached (${isHotSwap ? 'HOT' : 'COLD'}): ${correlationId || 'no-correlation'}`,
+            this.correlationId
+        );
     }
 
     /**
@@ -1067,6 +1091,29 @@ class TargetDriver extends EventEmitter {
         } catch (_e) {
             // Ignore logging errors during cleanup
         }
+    }
+
+    /**
+     * ✅ v3.1: Hot/Cold State Management
+     *
+     * @returns {boolean} True se o driver está ATTACHED mas IDLE (Cold state)
+     */
+    get isCold() {
+        return this._state === STATES.IDLE && this.page !== null && !this.page.isClosed();
+    }
+
+    /**
+     * ✅ v3.1: Hot/Cold State Management
+     *
+     * @returns {boolean} True se o driver está ATTACHED e EXECUTING (Hot state)
+     */
+    get isHot() {
+        return (
+            this._state !== STATES.IDLE &&
+            this._state !== STATES.UNATTACHED &&
+            this.page !== null &&
+            !this.page.isClosed()
+        );
     }
 }
 

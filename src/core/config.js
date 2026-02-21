@@ -1,9 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as PATHS from '#infra/fs/paths';
 import { safeReadJSON } from '#infra/fs/safe_read';
-import './env_bootstrap.js';
 import EventEmitter from 'node:events';
 import { z } from 'zod';
+import './env_bootstrap.js';
 import { log } from './logger.js';
 
 /**
@@ -25,7 +25,7 @@ import { log } from './logger.js';
 -------------------------------------------------------------------------- */
 
 /**
- * Valida variáveis de ambiente obrigatórias e recomendadas no carregamento do módulo.
+ * Valida variáveis de ambiente obrigatórias e recomendadas.
  * Side-effects: Registra logs de erro/aviso se faltarem variáveis.
  */
 function validateEnvFile() {
@@ -47,19 +47,15 @@ function validateEnvFile() {
     }
 }
 
-// Run validation on module load
-validateEnvFile();
+function emitDeprecatedPortWarning() {
+    if (!process.env.PORT || process.env.SERVER_PORT) {
+        return;
+    }
 
-/* --------------------------------------------------------------------------
-   DEPRECATION WARNING: PORT → SERVER_PORT
--------------------------------------------------------------------------- */
-if (process.env.PORT && !process.env.SERVER_PORT) {
-    console.warn('');
-    console.warn('\x1b[33m[DEPRECATED]\x1b[0m PORT environment variable is deprecated.');
-    console.warn('\x1b[33m[DEPRECATED]\x1b[0m Please use SERVER_PORT instead to avoid conflicts.');
-    console.warn('\x1b[33m[DEPRECATED]\x1b[0m PORT will be removed in v6.0');
-    console.warn('\x1b[33m[DEPRECATED]\x1b[0m Falling back to PORT value for now...');
-    console.warn('');
+    log('WARN', '[DEPRECATED] PORT environment variable is deprecated.');
+    log('WARN', '[DEPRECATED] Please use SERVER_PORT instead to avoid conflicts.');
+    log('WARN', '[DEPRECATED] PORT will be removed in v6.0');
+    log('WARN', '[DEPRECATED] Falling back to PORT value for now...');
 }
 
 /**
@@ -142,7 +138,35 @@ const ConfigSchema = z
         ADAPTIVE_COOLDOWN_MS: z.number().min(1000).default(5000),
 
         // --- Concurrency & Workers (P9.9) ---
-        MAX_WORKERS: z.number().int().min(1).max(10).default(3)
+        MAX_WORKERS: z.number().int().min(1).max(10).default(3),
+
+        // --- Segurança & API ---
+        SERVER_PORT: z.number().int().min(1024).max(65535).default(3008),
+        // ✅ P0 FIX: Validate allowed origins to prevent hardcoded IP issues
+        ALLOWED_ORIGINS: z
+            .union([
+                z.string(), // "http://foo.com,https://bar.com"
+                z.array(z.string()), // ["http://foo.com"]
+            ])
+            .default(['http://localhost:3008']),
+
+        // --- Driver Factory / Pool Configuration (Centralized) ---
+        DRIVER_POOL_MAX_SIZE: z.number().int().min(1).max(20).default(5),
+        DRIVER_POOL_MIN_SIZE: z.number().int().min(0).max(5).default(2),
+        DRIVER_IDLE_TIMEOUT_MS: z.number().min(5000).default(300000), // 5 min
+        DRIVER_WARMUP_TARGETS: z.union([z.string(), z.array(z.string())]).default('chatgpt,gemini'),
+        DRIVER_POOL_ENABLED: z.boolean().default(true),
+        DRIVER_BACKPRESSURE_TIMEOUT_MS: z.number().default(5000),
+        DRIVER_BACKPRESSURE_TEMP: z.boolean().default(true),
+        TASK_CONTROL_ABORT_TIMEOUT_MS: z.number().int().min(100).default(1500),
+        TASK_CONTROL_ABORT_MAX_RETRIES: z.number().int().min(0).max(10).default(2),
+
+        // --- BrowserPool Configuration (formalized schema) ---
+        BROWSER_POOL_SIZE: z.number().int().min(1).max(20).default(3),
+        ALLOCATION_STRATEGY: z.enum(['round-robin', 'least-loaded', 'target-affinity']).default('round-robin'),
+        HEALTH_CHECK_INTERVAL: z.number().int().min(1000).default(30000),
+        BROWSER_PAGE_TTL_MS: z.number().int().min(1000).default(3600000),
+        BROWSER_ALLOCATE_MAX_ATTEMPTS: z.number().int().min(1).optional(),
     })
     .passthrough(); // Preserva chaves de comentário "//"
 
@@ -161,6 +185,8 @@ class ConfigurationManager extends EventEmitter {
         // Inicializa o estado em RAM com os valores padrão (Baseline)
         this.currentConfig = ConfigSchema.parse({});
         this.isInitialized = false;
+        this._envValidationDone = false;
+        this._deprecationWarningShown = false;
     }
 
     /**
@@ -172,6 +198,16 @@ class ConfigurationManager extends EventEmitter {
      */
     async reload(correlationId = 'sys-boot') {
         try {
+            if (!this._envValidationDone) {
+                validateEnvFile();
+                this._envValidationDone = true;
+            }
+
+            if (!this._deprecationWarningShown) {
+                emitDeprecatedPortWarning();
+                this._deprecationWarningShown = true;
+            }
+
             log('DEBUG', '[CONFIG] Sincronizando definições com o disco...', correlationId);
 
             // Leitura segura e assíncrona
@@ -348,6 +384,10 @@ class ConfigurationManager extends EventEmitter {
         return this.currentConfig.ADAPTIVE_COOLDOWN_MS;
     }
 
+    get ALLOWED_ORIGINS() {
+        return this.currentConfig.ALLOWED_ORIGINS;
+    }
+
     // --- Chrome & Proxy Connection Getters ---
     get CHROME_HOST() {
         return this.currentConfig.CHROME_HOST;
@@ -374,6 +414,100 @@ class ConfigurationManager extends EventEmitter {
     }
     get ENABLE_TASK_SYNC_BRIDGE() {
         return this.currentConfig.ENABLE_TASK_SYNC_BRIDGE || false;
+    }
+
+    // --- Driver Factory Getters ---
+    get DRIVER_POOL_MAX_SIZE() {
+        return this.currentConfig.DRIVER_POOL_MAX_SIZE;
+    }
+    get DRIVER_POOL_MIN_SIZE() {
+        return this.currentConfig.DRIVER_POOL_MIN_SIZE;
+    }
+    get DRIVER_IDLE_TIMEOUT_MS() {
+        return this.currentConfig.DRIVER_IDLE_TIMEOUT_MS;
+    }
+    get DRIVER_WARMUP_TARGETS() {
+        const val = this.currentConfig.DRIVER_WARMUP_TARGETS;
+        return Array.isArray(val)
+            ? val
+            : val
+                  .split(',')
+                  .map(s => s.trim())
+                  .filter(Boolean);
+    }
+    get DRIVER_POOL_ENABLED() {
+        return this.currentConfig.DRIVER_POOL_ENABLED;
+    }
+    get DRIVER_BACKPRESSURE_TIMEOUT_MS() {
+        return this.currentConfig.DRIVER_BACKPRESSURE_TIMEOUT_MS;
+    }
+    get DRIVER_BACKPRESSURE_TEMP() {
+        return this.currentConfig.DRIVER_BACKPRESSURE_TEMP;
+    }
+    get TASK_CONTROL_ABORT_TIMEOUT_MS() {
+        return this.currentConfig.TASK_CONTROL_ABORT_TIMEOUT_MS;
+    }
+    get TASK_CONTROL_ABORT_MAX_RETRIES() {
+        return this.currentConfig.TASK_CONTROL_ABORT_MAX_RETRIES;
+    }
+    get BROWSER_POOL_SIZE() {
+        return this.currentConfig.BROWSER_POOL_SIZE;
+    }
+    get ALLOCATION_STRATEGY() {
+        return this.currentConfig.ALLOCATION_STRATEGY;
+    }
+    get HEALTH_CHECK_INTERVAL() {
+        return this.currentConfig.HEALTH_CHECK_INTERVAL;
+    }
+    get BROWSER_PAGE_TTL_MS() {
+        return this.currentConfig.BROWSER_PAGE_TTL_MS;
+    }
+    get BROWSER_ALLOCATE_MAX_ATTEMPTS() {
+        return this.currentConfig.BROWSER_ALLOCATE_MAX_ATTEMPTS;
+    }
+
+    /**
+     * Backwards-compatible getter used by legacy callers.
+     * Supports dot-separated paths (e.g. "a.b.c") and a fallback value when the key is absent.
+     * Also falls back to process.env when the requested key exists there.
+     *
+     * @param {string} key - The key or dot-path to retrieve from the current configuration.
+     * @param {any} [fallback] - Value to return when the key is not present.
+     * @returns {any} The value from configuration, environment, or the provided fallback.
+     */
+    get(key, fallback) {
+        try {
+            if (typeof key !== 'string' || key.length === 0) return fallback;
+
+            // Fast-path: top-level direct property
+            if (Object.prototype.hasOwnProperty.call(this.currentConfig, key)) {
+                const v = this.currentConfig[key];
+                return v === undefined ? fallback : v;
+            }
+
+            // Dot-path traversal (e.g. 'a.b.c')
+            const parts = key.split('.');
+            let val = this.currentConfig;
+            for (const p of parts) {
+                if (val && Object.prototype.hasOwnProperty.call(val, p)) {
+                    val = val[p];
+                } else {
+                    val = undefined;
+                    break;
+                }
+            }
+
+            if (val === undefined) {
+                // As a last resort, check environment variables (string values)
+                if (process.env[key] !== undefined) return process.env[key];
+                return fallback;
+            }
+
+            return val;
+        } catch (e) {
+            // Fail-safe: never throw from config getter
+            return fallback;
+        }
     }
 }
 

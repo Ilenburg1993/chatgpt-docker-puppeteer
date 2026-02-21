@@ -545,19 +545,50 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 await page.evaluate(config => {
                     return new Promise(resolve => {
                         const controller = new AbortController();
-                        const timeout = setTimeout(() => {
-                            controller.abort();
+                        let done = false;
+
+                        const finish = () => {
+                            if (done) {
+                                return;
+                            }
+                            done = true;
+                            clearTimeout(timeout);
+                            try {
+                                document.removeEventListener('mousemove', onMouseMove);
+                            } catch (_err) {
+                                // Ignore remove listener errors
+                            }
+                            try {
+                                controller.abort();
+                            } catch (_err) {
+                                // Ignore abort errors
+                            }
                             resolve();
+                        };
+
+                        const onMouseMove = () => {
+                            finish();
+                        };
+                        const addMouseMoveListener = options => {
+                            document.addEventListener('mousemove', onMouseMove, options);
+                        };
+
+                        const timeout = setTimeout(() => {
+                            finish();
                         }, config.HYDRATION_TIMEOUT);
-                        document.addEventListener(
-                            'mousemove',
-                            () => {
-                                clearTimeout(timeout);
-                                resolve();
-                            },
-                            { once: true, signal: controller.signal }
-                        );
-                        window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+
+                        try {
+                            addMouseMoveListener({
+                                once: true,
+                                signal: controller.signal,
+                            });
+                        } catch (_err) {
+                            // Fallback for contexts that do not support AbortSignal in addEventListener options
+                            addMouseMoveListener({ once: true });
+                        }
+
+                        // Trigger one synthetic interaction tick to unblock hydration listeners when possible.
+                        document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
                     });
                 }, STABILIZER_CONFIG);
 

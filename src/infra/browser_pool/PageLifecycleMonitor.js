@@ -60,6 +60,7 @@ class PageLifecycleMonitor {
         // Metadata
         this.createdAt = Date.now();
         this.eventsReceived = 0;
+        this.rebindCount = 0;
 
         // Attach listeners imediatamente
         this._attachListeners();
@@ -125,7 +126,7 @@ class PageLifecycleMonitor {
     handlePageClose() {
         try {
             // 1. Remove from pool
-            this.poolManager.removePageFromPool(this.taskId);
+            this.poolManager.removePageFromPool(this.taskId, this.page);
 
             // 2. Emit NERV event (se disponível)
             if (this.nerv) {
@@ -194,7 +195,7 @@ class PageLifecycleMonitor {
     handlePageDisconnect() {
         try {
             // 1. Remove from pool
-            this.poolManager.removePageFromPool(this.taskId);
+            this.poolManager.removePageFromPool(this.taskId, this.page);
 
             // 2. Update stats
             if (this.poolManager.stats) {
@@ -245,6 +246,43 @@ class PageLifecycleMonitor {
         } catch (err) {
             log('ERROR', `[PageLifecycleMonitor] Cleanup failed: ${err.message}`);
         }
+    }
+
+    /**
+     * Reassocia monitor para novo taskId (hot-reuse).
+     *
+     * @param {string} newTaskId - Novo taskId real
+     * @returns {void}
+     */
+    rebindTaskId(newTaskId) {
+        const previousTaskId = this.taskId;
+        const normalizedTaskId = typeof newTaskId === 'string' ? newTaskId.trim() : '';
+
+        if (!normalizedTaskId) {
+            log('WARN', '[PageLifecycleMonitor] Ignoring rebind with empty taskId');
+            return;
+        }
+
+        if (normalizedTaskId === previousTaskId) {
+            return;
+        }
+
+        this.taskId = normalizedTaskId;
+        this.rebindCount++;
+
+        if (this.nerv) {
+            this.nerv.emit({
+                type: 'BROWSER_PAGE_TASK_REBIND',
+                payload: {
+                    oldTaskId: previousTaskId,
+                    newTaskId: normalizedTaskId,
+                    timestamp: Date.now(),
+                    rebindCount: this.rebindCount,
+                },
+            });
+        }
+
+        log('DEBUG', `[PageLifecycleMonitor] TaskId rebind: ${previousTaskId} -> ${normalizedTaskId}`);
     }
 
     /**

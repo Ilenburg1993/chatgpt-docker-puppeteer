@@ -1,9 +1,17 @@
 # BUG_AUDIT_MASTER
 
-- Ultima atualizacao: 2026-02-15T14:33:03.825Z
-- Rodada: WAVE_AUDIT_NIGHTLY_2026-02-15T14-29-27-279Z
-- Escopo: `src/main.js`, `src/server/main.js` e dependencias criticas de boot/shutdown/rede + backlog Wave 11
+- Ultima atualizacao: 2026-02-21T03:33:04Z
+- Rodada: WAVE_AUDIT_QUICK_2026-02-21T03-32-36-214Z
+- Escopo: Wave 14 (`src/main.js`, `src/server/main.js`, `src/agent/task_control_watcher.js`, `src/driver/*`, `src/infra/browser_pool/*`) + governanca continua
 - Modo de entrega: implementacao completa das correcoes + validacao automatizada
+
+## Trilha Contínua CODEX (Wave 12+)
+- Tracker vivo canônico: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
+- Alias compatível: `DOCUMENTAÇÃO/bugs/CODEX_AUDIT_TRACKER.md`
+- Playbook operacional: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_PLAYBOOK.md`
+- Delta local de instruções: `DOCUMENTAÇÃO/BUGS/CODEX_DEFAULT_INSTRUCTIONS_DELTA.md`
+- Snapshot inicial da trilha: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_01-41.md`
+- Snapshot mais recente: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_03-33.md`
 
 ## Automação Audit v2
 - Plano canônico: `DOCUMENTAÇÃO/BUGS/PLANO_MESTRE_UPGRADE_AUDITORIA_V2.md`

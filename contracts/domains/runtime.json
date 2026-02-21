@@ -135,6 +135,94 @@
       "enforcement": {
         "level": "p1"
       }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-ABORT-COMMAND-AWAIT",
+      "title": "Abort Command Deve Ser Aguardado",
+      "domain": "runtime",
+      "description": "Emissão de DRIVER_ABORT no TaskControlWatcher deve usar await para evitar falha silenciosa.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "(?<!await\\s)sendCommand\\s*\\(",
+        "flags": "gm",
+        "scope": "src/agent/task_control_watcher.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave14_task_control_watcher_abort_await.spec.js"
+      ],
+      "owner": "runtime-task-control",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-IMPORT-SIDE-EFFECT",
+      "title": "Entrypoints sem Side-Effect em Import",
+      "domain": "runtime",
+      "description": "Import puro de entrypoints não deve disparar bootstrap de env/config com logs operacionais.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "import\\s+['\\\"]\\.\\/core\\/env_bootstrap\\.js['\\\"]|validateEnvFile\\s*\\(\\s*\\)\\s*;|\\[DEPRECATED\\]\\x1b\\[0m PORT environment variable is deprecated",
+        "flags": "gm",
+        "scope": "src/main.js|src/core/config.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --input-type=module -e \"import './src/main.js'; console.log('OK')\"",
+        "node --input-type=module -e \"import './src/server/main.js'; console.log('OK')\""
+      ],
+      "owner": "runtime-bootstrap",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-HOT-POOL-MONITOR-CONSISTENCY",
+      "title": "Hot Pool Deve Rebindar Monitor por TaskId",
+      "domain": "runtime",
+      "description": "Lifecycle monitor não pode remover página apenas por taskId stale após hot-reuse.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "removePageFromPool\\(this\\.taskId\\s*\\)",
+        "flags": "gm",
+        "scope": "src/infra/browser_pool/PageLifecycleMonitor.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave14_hot_pool_monitor_taskid_rebind.spec.js"
+      ],
+      "owner": "runtime-browserpool",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
     }
   ]
 }

@@ -32,6 +32,81 @@ class TaskControlWatcher {
         this._timer = null;
         this._running = false;
         this._stopped = false;
+        this.abortTimeoutMs = Math.max(100, Number(process.env.TASK_CONTROL_ABORT_TIMEOUT_MS || 1500) || 1500);
+        this.abortMaxRetries = Math.max(0, Number.parseInt(process.env.TASK_CONTROL_ABORT_MAX_RETRIES || '2', 10) || 2);
+    }
+
+    _sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    _withTimeout(promise, timeoutMs, operation) {
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                const timeoutError = new Error(`${operation} timed out after ${timeoutMs}ms`);
+                timeoutError.name = 'TimeoutError';
+                reject(timeoutError);
+            }, timeoutMs);
+
+            Promise.resolve(promise).then(
+                value => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(value);
+                },
+                error => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(error);
+                }
+            );
+        });
+    }
+
+    async _emitAbortCommand(taskId, reason, correlationId) {
+        const totalAttempts = this.abortMaxRetries + 1;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+            try {
+                await this._withTimeout(
+                    sendCommand(
+                        this.nerv,
+                        ActorRole.KERNEL,
+                        ActionCode.DRIVER_ABORT,
+                        { taskId, reason },
+                        correlationId,
+                        ActorRole.DRIVER
+                    ),
+                    this.abortTimeoutMs,
+                    `sendCommand(DRIVER_ABORT:${taskId})`
+                );
+
+                return { ok: true, attempt };
+            } catch (error) {
+                lastError = error;
+                log(
+                    'WARN',
+                    `[TaskControlWatcher] Abort emit attempt ${attempt}/${totalAttempts} falhou para ${taskId}: ${error?.message || String(error)}`,
+                    correlationId
+                );
+
+                if (attempt < totalAttempts) {
+                    await this._sleep(Math.min(250 * attempt, 750));
+                }
+            }
+        }
+
+        return {
+            ok: false,
+            attempts: totalAttempts,
+            error: lastError?.message || String(lastError),
+        };
     }
 
     /**
@@ -118,37 +193,69 @@ class TaskControlWatcher {
                     entityId: taskId,
                     tsMs: now,
                     actorType: 'system',
-                    eventType: 'CONTROL_ABORT_SENT',
-                    payload: { reason, correlationId },
-                    dedupKey,
+                    eventType: 'CONTROL_ABORT_INTENT',
+                    payload: { reason, correlationId, status, intentAt },
+                    dedupKey: `${dedupKey}:intent`,
                 });
 
                 if (!firstTime) {
                     continue;
                 }
 
-                try {
-                    sendCommand(
-                        this.nerv,
-                        ActorRole.KERNEL,
-                        ActionCode.DRIVER_ABORT,
-                        { taskId, reason },
-                        correlationId,
-                        ActorRole.DRIVER
-                    );
-                } catch (err) {
-                    log(
-                        'WARN',
-                        `[TaskControlWatcher] Failed to emit DRIVER_ABORT for ${taskId}: ${err?.message || String(err)}`,
-                        correlationId
-                    );
-                }
+                const emitResult = await this._emitAbortCommand(taskId, reason, correlationId);
+                const lockReason = emitResult.ok ? 'ABORT_EMITTED' : 'ABORT_EMIT_FAILED';
+                let lockReleased = false;
+                let lockReleaseError = null;
 
                 // Hygiene: clear lock so the queue doesn't consider this task in-flight forever.
                 try {
                     releaseTaskLock({ taskId });
+                    lockReleased = true;
                 } catch (_) {
-                    /* ignore */
+                    lockReleaseError = _?.message || String(_);
+                }
+
+                if (emitResult.ok) {
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: Date.now(),
+                        actorType: 'system',
+                        eventType: 'CONTROL_ABORT_SENT',
+                        payload: {
+                            reason,
+                            correlationId,
+                            attempt: emitResult.attempt,
+                            lockReleased,
+                            lockReason,
+                            lockReleaseError,
+                        },
+                        dedupKey: `${dedupKey}:sent`,
+                    });
+                } else {
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: Date.now(),
+                        actorType: 'system',
+                        eventType: 'CONTROL_ABORT_FAILED',
+                        payload: {
+                            reason,
+                            correlationId,
+                            attempts: emitResult.attempts,
+                            error: emitResult.error,
+                            lockReleased,
+                            lockReason,
+                            lockReleaseError,
+                        },
+                        dedupKey: `${dedupKey}:failed`,
+                    });
+
+                    log(
+                        'WARN',
+                        `[TaskControlWatcher] CONTROL_ABORT_FAILED para ${taskId} (lockReleased=${lockReleased}, reason=${lockReason})`,
+                        correlationId
+                    );
                 }
             }
         } finally {

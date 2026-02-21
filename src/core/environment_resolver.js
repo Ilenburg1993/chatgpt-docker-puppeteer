@@ -29,7 +29,10 @@ class EnvironmentResolver {
 
             // 3. DESCOBERTA POR SEGMENTAÇÃO (Target Matching)
             // Buscamos o melhor match entre os alvos suportados pela Factory
-            const availableTargets = driverFactory.availableTargets;
+            const availableTargets =
+                typeof driverFactory.getAvailableTargets === 'function'
+                    ? driverFactory.getAvailableTargets()
+                    : driverFactory.availableTargets || [];
             let identifiedTarget = null;
             let matchQuality = 0;
 

@@ -1,4 +1,5 @@
 import { log } from '#core/logger';
+import { isDomainMatch } from '#core/domain_matcher';
 
 /**
  * Severity levels para validation issues.
@@ -118,7 +119,7 @@ class PageValidator {
 
                 if (expectedDomain) {
                     // Skip validation for about:blank (not navigated yet)
-                    if (currentUrl !== 'about:blank' && !currentUrl.includes(expectedDomain)) {
+                    if (currentUrl !== 'about:blank' && !isDomainMatch(currentUrl, expectedDomain)) {
                         issues.push({
                             type: ISSUE_TYPES.DOMAIN_MISMATCH,
                             severity: SEVERITY.WARNING,

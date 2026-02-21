@@ -246,6 +246,28 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 // Mesmo com erro, cleanup deve ter sido chamado
                 assert.ok(observerCleanupCalled || result !== null, 'Cleanup deve ser executado');
             });
+
+            it('deve remover listener de hydration explicitamente para evitar leak', async () => {
+                const { waitForStability } = stabilizerModule;
+                let hydrationSource = '';
+
+                mockPage.evaluate = mock.fn(async fn => {
+                    const source = fn?.toString?.() || '';
+                    if (source.includes("addEventListener('mousemove'")) {
+                        hydrationSource = source;
+                        return;
+                    }
+                    return false;
+                });
+                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+
+                await waitForStability(mockDriver, 5000);
+
+                assert.ok(
+                    hydrationSource.includes("removeEventListener('mousemove'"),
+                    'Hydration guard deve remover listener de mousemove explicitamente'
+                );
+            });
         });
 
         describe('Bug #7: CPU Lag Loop com Abort Signal', () => {

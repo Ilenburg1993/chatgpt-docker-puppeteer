@@ -107,6 +107,8 @@ const MONITOR_EVENTS = {
     CRITICAL_ISSUE: 'health:critical',
     CONNECTION_LOST: 'health:connection_lost',
     RECOVERY_NEEDED: 'health:recovery_needed',
+    MONITOR_STARTED: 'health:monitor_started',
+    MONITOR_STOPPED: 'health:monitor_stopped',
 };
 
 /* ==========================================================================
@@ -144,6 +146,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
         // Health history (last 10 checks)
         this.healthHistory = [];
+        this._checkInFlight = null;
 
         log('DEBUG', '[PeriodicHealthMonitor] Initialized (CDP-only mode)');
     }
@@ -240,6 +243,18 @@ class PeriodicHealthMonitor extends EventEmitter {
      * @returns {Promise<object>} Health check result
      */
     async runHealthCheck() {
+        if (this._checkInFlight) {
+            return this._checkInFlight;
+        }
+
+        this._checkInFlight = this._runHealthCheckUnsafe().finally(() => {
+            this._checkInFlight = null;
+        });
+
+        return this._checkInFlight;
+    }
+
+    async _runHealthCheckUnsafe() {
         const startTime = Date.now();
         this.stats.totalChecks++;
         this.stats.lastCheckTime = startTime;

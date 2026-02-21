@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
+import CONFIG from '#core/config';
 import EventEmitter from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,27 +8,15 @@ import { pathToFileURL } from 'node:url';
 import TargetDriver from './core/TargetDriver.js';
 
 /* ==========================================================================
-   FACTORY_CONFIG v3.0 - Pool Management
+   FACTORY CONSTANTS
 ========================================================================== */
-const FACTORY_CONFIG = {
+const CONSTANTS = {
     // Discovery
     TARGETS_DIR: path.join(import.meta.dirname, 'targets'),
-    DEFAULT_TARGET: process.env.FACTORY_DEFAULT_TARGET || 'chatgpt',
-    VALIDATE_ON_BOOT: process.env.FACTORY_VALIDATE_BOOT === 'true',
+    DEFAULT_TARGET: 'chatgpt', // Fallback se CONFIG falhar
     DISCOVERY_RETRY_COUNT: 3,
     LAZY_LOAD_TIMEOUT_MS: 10000,
-
-    // ✅ v3.0: Pool Management
-    MAX_POOL_SIZE: parseInt(process.env.DRIVER_POOL_MAX_SIZE) || 5,
-    MIN_POOL_SIZE: parseInt(process.env.DRIVER_POOL_MIN_SIZE) || 2,
-    IDLE_TIMEOUT_MS: parseInt(process.env.DRIVER_IDLE_TIMEOUT_MS) || 300000, // 5min
-    WARMUP_TARGETS: (process.env.DRIVER_WARMUP_TARGETS || 'chatgpt,gemini').split(','),
-    HEALTH_CHECK_INTERVAL_MS: parseInt(process.env.DRIVER_HEALTH_INTERVAL_MS) || 30000, // 30s
-    POOL_ENABLED: process.env.DRIVER_POOL_ENABLED !== 'false', // Default true
-
-    // ✅ C1: Backpressure Strategy
-    BACKPRESSURE_TIMEOUT_MS: parseInt(process.env.DRIVER_BACKPRESSURE_TIMEOUT_MS) || 5000, // 5s
-    BACKPRESSURE_ALLOW_TEMPORARY: process.env.DRIVER_BACKPRESSURE_TEMP !== 'false', // Default true
+    HEALTH_CHECK_INTERVAL_MS: 30000,
 };
 
 /* ==========================================================================
@@ -44,6 +33,13 @@ const FACTORY_EVENTS = {
     POOL_INITIALIZED: 'factory:pool_initialized', // ✅ v3.0: Warmup complete
     ERROR: 'factory:error',
 };
+
+/**
+ * Lista exportada com referência estável para targets disponíveis.
+ * É atualizada internamente após discovery.
+ * @type {string[]}
+ */
+const AVAILABLE_TARGETS_EXPORT = [];
 
 /* ==========================================================================
    DriverFactory v3.0 - Pool-Ready Architecture
@@ -74,7 +70,8 @@ class DriverFactory extends EventEmitter {
     /**
      * Construtor do DriverFactory v3.0
      *
-     * Inicializa registry, pool, métricas e executa discovery + warmup.
+     * Inicializa registry, pool e métricas sem side-effects de runtime.
+     * Discovery/warmup só ocorre via start()/ensureReady().
      */
     constructor() {
         super();
@@ -135,6 +132,15 @@ class DriverFactory extends EventEmitter {
             errors: 0,
             poolBackpressureRecovered: 0, // ✅ C1: Backpressure recoveries
             temporaryDriversCreated: 0, // ✅ C1: Temporary drivers created
+
+            // ✅ v3.1: Hot Pool Telemetry
+            hotPoolSize: 0,
+            coldPoolSize: 0,
+            pressureEvents: 0,
+            waitersQueued: 0,
+            waitersWoken: 0,
+            waitersTimedOut: 0,
+            createSerializationPasses: 0,
         };
 
         /**
@@ -151,11 +157,187 @@ class DriverFactory extends EventEmitter {
          */
         this.config = {};
 
+        /**
+         * ✅ v3.1: Browser Pool reference (Hot Pool support)
+         * @type {Object | null}
+         * @private
+         */
+        this.browserPool = null;
+
+        /**
+         * Target padrão efetivo resolvido internamente.
+         * Evita mutar CONFIG quando ele expõe getters somente leitura.
+         * @type {string}
+         * @private
+         */
+        this.defaultTargetKey = String(CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET).toLowerCase();
+
+        /**
+         * Controle de lifecycle explícito (import-safe).
+         * @type {boolean}
+         * @private
+         */
+        this._ready = false;
+
+        /**
+         * Discovery já executado.
+         * @type {boolean}
+         * @private
+         */
+        this._discovered = false;
+
+        /**
+         * Warmup já executado.
+         * @type {boolean}
+         * @private
+         */
+        this._poolInitialized = false;
+
+        /**
+         * Promise única de start (memoization).
+         * @type {Promise<void> | null}
+         * @private
+         */
+        this._startPromise = null;
+
+        /**
+         * Fila por target para serializar operações críticas.
+         * @type {Map<string, Promise<void>>}
+         * @private
+         */
+        this._targetSerializers = new Map();
+
+        /**
+         * Fila FIFO de espera por target (backpressure sem recursão).
+         * @type {Map<string, Array<{resolve: () => void, reject: (err: Error) => void, timer: NodeJS.Timeout, done: boolean}>>}
+         * @private
+         */
+        this._waiters = new Map();
+
         // Configurar max listeners
         this.setMaxListeners(50);
+    }
 
-        // Executar discovery + warmup automático
-        this._discover();
+    /* ==========================================================================
+       LIFECYCLE (IMPORT-SAFE)
+    ========================================================================== */
+
+    /**
+     * Inicializa factory explicitamente (discovery + warmup opcional + health checks).
+     *
+     * @param {{
+     *   browserPool?: object | null,
+     *   warmup?: boolean,
+     *   startHealthChecks?: boolean
+     * }} [options]
+     * @returns {Promise<void>}
+     */
+    async start(options = {}) {
+        if (this._ready) {
+            this._applyStartOptions(options);
+            return;
+        }
+
+        if (this._startPromise) {
+            await this._startPromise;
+            this._applyStartOptions(options);
+            return;
+        }
+
+        this._startPromise = (async () => {
+            this._applyStartOptions(options);
+
+            this._discover();
+
+            const shouldWarmup = options.warmup ?? CONFIG.DRIVER_POOL_ENABLED;
+            if (shouldWarmup) {
+                await this.initializePool({ skipEnsureReady: true });
+            }
+
+            const shouldStartHealthChecks = options.startHealthChecks ?? true;
+            if (shouldStartHealthChecks) {
+                this._startHealthChecks();
+            }
+
+            this._ready = true;
+        })();
+
+        try {
+            await this._startPromise;
+        } catch (err) {
+            this._ready = false;
+            this._startPromise = null;
+            throw err;
+        }
+    }
+
+    /**
+     * Garante factory pronta com lazy-start controlado.
+     *
+     * @param {{
+     *   browserPool?: object | null,
+     *   warmup?: boolean,
+     *   startHealthChecks?: boolean
+     * }} [options]
+     * @returns {Promise<void>}
+     */
+    async ensureReady(options = {}) {
+        if (this._ready) {
+            this._applyStartOptions(options);
+            return;
+        }
+        await this.start(options);
+    }
+
+    /**
+     * Aplica opções de runtime não destrutivas.
+     * @param {{ browserPool?: object | null }} options
+     * @private
+     */
+    _applyStartOptions(options = {}) {
+        if (Object.prototype.hasOwnProperty.call(options, 'browserPool')) {
+            if (options.browserPool == null) {
+                this.clearBrowserPool();
+            } else {
+                this.setBrowserPool(options.browserPool);
+            }
+        }
+    }
+
+    /**
+     * Atualiza array exportado de targets disponíveis (referência estável).
+     * @private
+     */
+    _refreshAvailableTargetsExport() {
+        AVAILABLE_TARGETS_EXPORT.length = 0;
+        AVAILABLE_TARGETS_EXPORT.push(...Object.keys(this.registry));
+    }
+
+    /**
+     * Serializa uma operação por target.
+     * @template T
+     * @param {string} target
+     * @param {() => Promise<T>} operation
+     * @returns {Promise<T>}
+     * @private
+     */
+    async _serializeByTarget(target, operation) {
+        const previous = this._targetSerializers.get(target) || Promise.resolve();
+        let release = null;
+        const barrier = new Promise(resolve => {
+            release = resolve;
+        });
+        this._targetSerializers.set(target, previous.then(() => barrier));
+
+        await previous;
+        try {
+            this.metrics.createSerializationPasses++;
+            return await operation();
+        } finally {
+            if (typeof release === 'function') {
+                release();
+            }
+        }
     }
 
     /* ==========================================================================
@@ -173,13 +355,20 @@ class DriverFactory extends EventEmitter {
      * @emits factory:error - Se erro fatal em discovery
      */
     _discover() {
+        if (this._discovered) {
+            return;
+        }
+
         const startTime = Date.now();
         let discovered = 0;
 
         try {
+            this.registry = Object.create(null);
+            this.pool.clear();
+
             // Validar que diretório existe
-            if (!fs.existsSync(FACTORY_CONFIG.TARGETS_DIR)) {
-                const error = `Diretório de targets não existe: ${FACTORY_CONFIG.TARGETS_DIR}`;
+            if (!fs.existsSync(CONSTANTS.TARGETS_DIR)) {
+                const error = `Diretório de targets não existe: ${CONSTANTS.TARGETS_DIR}`;
                 log('FATAL', `[FACTORY] ${error}`);
                 throw new Error(error);
             }
@@ -187,7 +376,7 @@ class DriverFactory extends EventEmitter {
             // Ler diretório com try-catch robusto
             let files;
             try {
-                files = fs.readdirSync(FACTORY_CONFIG.TARGETS_DIR);
+                files = fs.readdirSync(CONSTANTS.TARGETS_DIR);
             } catch (readdirError) {
                 const error = `Erro ao ler diretório de targets: ${readdirError.message}`;
                 log('FATAL', `[FACTORY] ${error}`);
@@ -202,7 +391,7 @@ class DriverFactory extends EventEmitter {
 
                 try {
                     const targetKey = file.replace('Driver.js', '').toLowerCase();
-                    const driverPath = path.join(FACTORY_CONFIG.TARGETS_DIR, file);
+                    const driverPath = path.join(CONSTANTS.TARGETS_DIR, file);
 
                     // Validar que arquivo é acessível
                     if (!fs.existsSync(driverPath)) {
@@ -227,48 +416,37 @@ class DriverFactory extends EventEmitter {
 
             // Validar que pelo menos 1 driver foi descoberto
             if (discovered === 0) {
-                const error = `Nenhum driver descoberto em ${FACTORY_CONFIG.TARGETS_DIR}. Sistema não pode operar.`;
+                const error = `Nenhum driver descoberto em ${CONSTANTS.TARGETS_DIR}. Sistema não pode operar.`;
                 log('FATAL', `[FACTORY] ${error}`);
                 throw new Error(error);
             }
 
             // Validar DEFAULT_TARGET ou usar primeiro descoberto
-            const defaultKey = FACTORY_CONFIG.DEFAULT_TARGET.toLowerCase();
-            if (!this.registry[defaultKey]) {
+            const configuredDefault = String(CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET).toLowerCase();
+            this.defaultTargetKey = configuredDefault;
+            if (!this.registry[this.defaultTargetKey]) {
                 const availableTargets = Object.keys(this.registry);
-                const originalDefault = FACTORY_CONFIG.DEFAULT_TARGET;
-                FACTORY_CONFIG.DEFAULT_TARGET = availableTargets[0];
+                const originalDefault = CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET;
+                this.defaultTargetKey = availableTargets[0];
                 log(
                     'WARN',
-                    `[FACTORY] Default target '${originalDefault}' não encontrado. Usando '${FACTORY_CONFIG.DEFAULT_TARGET}'`
+                    `[FACTORY] Default target '${originalDefault}' não encontrado. Usando '${this.defaultTargetKey}'`
                 );
             }
 
             // Métricas e telemetria
             this.metrics.discoveryTime = Date.now() - startTime;
+            this._discovered = true;
+            this._refreshAvailableTargetsExport();
 
             log('INFO', `[FACTORY] ${discovered} targets mapeados em ${this.metrics.discoveryTime}ms`);
 
             this.emit(FACTORY_EVENTS.DISCOVERY_COMPLETE, {
                 targetCount: discovered,
                 targets: Object.keys(this.registry),
-                defaultTarget: FACTORY_CONFIG.DEFAULT_TARGET,
+                defaultTarget: this.getDefaultTarget(),
                 discoveryTime: this.metrics.discoveryTime,
             });
-
-            // ✅ v3.0: Inicializar pool (warmup) após discovery
-            if (FACTORY_CONFIG.POOL_ENABLED) {
-                this.initializePool().catch(err => {
-                    log('ERROR', `[FACTORY] Pool initialization failed: ${err.message}`);
-                    this.emit(FACTORY_EVENTS.ERROR, {
-                        operation: 'pool_init',
-                        error: err.message,
-                    });
-                });
-
-                // ✅ v3.0: Start health checks timer
-                this._startHealthChecks();
-            }
         } catch (e) {
             this.metrics.errors++;
             log('FATAL', `[FACTORY] Erro catastrófico no mapeamento de drivers: ${e.message}`);
@@ -296,12 +474,22 @@ class DriverFactory extends EventEmitter {
      * @returns {Promise<void>}
      * @emits factory:pool_initialized - Quando warmup completa
      */
-    async initializePool() {
+    async initializePool(options = {}) {
+        const { skipEnsureReady = false } = options;
+
+        if (!skipEnsureReady) {
+            await this.ensureReady({ warmup: false });
+        }
+
+        if (this._poolInitialized) {
+            return;
+        }
+
         log('INFO', '[FACTORY] Initializing driver pool (warmup)...');
 
         const warmupPromises = [];
 
-        for (const target of FACTORY_CONFIG.WARMUP_TARGETS) {
+        for (const target of CONFIG.DRIVER_WARMUP_TARGETS) {
             const targetKey = target.trim().toLowerCase();
 
             if (!this.registry[targetKey]) {
@@ -310,7 +498,7 @@ class DriverFactory extends EventEmitter {
             }
 
             // Criar MIN_POOL_SIZE drivers para este target
-            for (let i = 0; i < FACTORY_CONFIG.MIN_POOL_SIZE; i++) {
+            for (let i = 0; i < CONFIG.DRIVER_POOL_MIN_SIZE; i++) {
                 const promise = this._createWarmDriver(targetKey).catch(err => {
                     log('WARN', `[FACTORY] Failed to create warm driver ${targetKey}[${i}]: ${err.message}`);
                     return null;
@@ -323,13 +511,14 @@ class DriverFactory extends EventEmitter {
         await Promise.allSettled(warmupPromises);
 
         const totalWarm = this._getTotalPoolSize();
+        this._poolInitialized = true;
 
         log('INFO', `[FACTORY] Pool initialized: ${totalWarm} warm drivers created`);
 
         this.emit(FACTORY_EVENTS.POOL_INITIALIZED, {
-            targets: FACTORY_CONFIG.WARMUP_TARGETS,
+            targets: CONFIG.DRIVER_WARMUP_TARGETS,
             poolSize: totalWarm,
-            minPoolSize: FACTORY_CONFIG.MIN_POOL_SIZE,
+            minPoolSize: CONFIG.DRIVER_POOL_MIN_SIZE,
         });
     }
 
@@ -343,7 +532,7 @@ class DriverFactory extends EventEmitter {
     async _createWarmDriver(target) {
         try {
             // Criar driver sem context (UNATTACHED)
-            const driver = await this.createDriver(target, this.config);
+            const driver = await this.createDriver(target, this.config, { skipEnsureReady: true });
 
             // Adicionar ao pool
             const pool = this.pool.get(target);
@@ -393,8 +582,14 @@ class DriverFactory extends EventEmitter {
      * // driver.page === null
      * // driver.signal === null
      */
-    async createDriver(targetName, config = {}) {
-        const key = (targetName || FACTORY_CONFIG.DEFAULT_TARGET).toLowerCase();
+    async createDriver(targetName, config = {}, options = {}) {
+        const { skipEnsureReady = false } = options;
+
+        if (!skipEnsureReady) {
+            await this.ensureReady();
+        }
+
+        const key = (targetName || this.getDefaultTarget() || CONSTANTS.DEFAULT_TARGET).toLowerCase();
 
         // Validar config
         if (!config || typeof config !== 'object') {
@@ -433,8 +628,8 @@ class DriverFactory extends EventEmitter {
             try {
                 const timeoutPromise = new Promise((_, reject) => {
                     setTimeout(() => {
-                        reject(new Error(`Lazy-load timeout após ${FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS}ms`));
-                    }, FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS);
+                        reject(new Error(`Lazy-load timeout após ${CONSTANTS.LAZY_LOAD_TIMEOUT_MS}ms`));
+                    }, CONSTANTS.LAZY_LOAD_TIMEOUT_MS);
                 });
 
                 const importPromise = import(pathToFileURL(meta.path).href).then(mod => mod.default ?? mod);
@@ -539,156 +734,160 @@ class DriverFactory extends EventEmitter {
      * factory.releaseToPool(driver);
      */
     async acquireFromPool(targetName) {
-        const key = (targetName || FACTORY_CONFIG.DEFAULT_TARGET).toLowerCase();
+        await this.ensureReady();
 
-        const pool = this.pool.get(key);
+        const key = (targetName || this.getDefaultTarget() || CONSTANTS.DEFAULT_TARGET).toLowerCase();
+        const hotPoolEnabled = this._isHotPoolEnabled() && Boolean(this.browserPool);
+        const desiredState = hotPoolEnabled ? 'IDLE' : 'UNATTACHED';
 
-        if (!pool) {
-            const err = new Error(`[FACTORY] Invalid target: ${key}`);
-            err.code = 'INVALID_TARGET';
-            err.details = { target: key };
-            throw err;
-        }
+        while (true) {
+            const acquisition = await this._serializeByTarget(key, async () => {
+                const pool = this.pool.get(key);
 
-        // 1. Busca driver disponível (não busy, estado UNATTACHED)
-        let entry = pool.find(e => !e.busy && e.driver.state === 'UNATTACHED' && !e.driver.destroyed);
-
-        if (entry) {
-            // POOL HIT - reusa driver IDLE
-            this.metrics.poolHits++;
-
-            log('DEBUG', `[FACTORY] POOL HIT: Reusing driver for ${key} (uses: ${entry.totalUses})`);
-
-            this.emit(FACTORY_EVENTS.POOL_HIT, {
-                target: key,
-                poolSize: pool.length,
-                totalUses: entry.totalUses,
-                poolHits: this.metrics.poolHits,
-            });
-        } else {
-            // POOL MISS - cria novo ou aguarda
-            this.metrics.poolMisses++;
-
-            if (pool.length < FACTORY_CONFIG.MAX_POOL_SIZE) {
-                log('DEBUG', `[FACTORY] POOL MISS: Creating new driver for ${key}`);
-
-                const driver = this.createDriver(key, this.config);
-
-                entry = {
-                    driver,
-                    target: key,
-                    busy: false,
-                    createdAt: Date.now(),
-                    lastUsedAt: null,
-                    totalUses: 0,
-                };
-
-                pool.push(entry);
-
-                this.emit(FACTORY_EVENTS.POOL_MISS, {
-                    target: key,
-                    poolSize: pool.length,
-                    poolMisses: this.metrics.poolMisses,
-                });
-            } else {
-                // ✅ C1: POOL EXHAUSTED - BACKPRESSURE STRATEGY
-                this.metrics.poolExhausted++;
-
-                log(
-                    'WARN',
-                    `[FACTORY] POOL EXHAUSTED: All ${FACTORY_CONFIG.MAX_POOL_SIZE} drivers for ${key} are busy. ` +
-                        `Attempting backpressure recovery (timeout: ${FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS}ms)`
-                );
-
-                this.emit(FACTORY_EVENTS.POOL_EXHAUSTED, {
-                    target: key,
-                    poolSize: pool.length,
-                    maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
-                    poolExhausted: this.metrics.poolExhausted,
-                });
-
-                // ✅ C1: ESTRATÉGIA 1 - Aguardar release (backpressure)
-                try {
-                    const driver = await this._waitForDriverRelease(key, FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS);
-
-                    this.metrics.poolBackpressureRecovered++;
-
-                    log('INFO', `[FACTORY] Backpressure recovered: driver released for ${key}`);
-
-                    return driver; // Retry acquire (recursivo)
-                } catch (_timeoutError) {
-                    // ✅ C1: ESTRATÉGIA 2 (Fallback) - Driver temporário
-                    if (FACTORY_CONFIG.BACKPRESSURE_ALLOW_TEMPORARY) {
-                        log(
-                            'WARN',
-                            `[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)`
-                        );
-
-                        const tempDriver = await this.createDriver(key, this.config);
-                        /** @type {any} */ (tempDriver)._isTemporary = true; // Flag para não adicionar ao pool
-
-                        this.metrics.temporaryDriversCreated++;
-
-                        // NÃO adiciona ao pool, retorna direto
-                        return tempDriver;
-                    }
-
-                    // ✅ C1: REJECT como último recurso
-                    const err = new Error(
-                        `[FACTORY] POOL_EXHAUSTED: All ${FACTORY_CONFIG.MAX_POOL_SIZE} drivers for ${key} are busy ` +
-                            `(timeout waiting for release: ${FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS}ms)`
-                    );
-                    err.code = 'DRIVER_POOL_EXHAUSTED';
-                    err.details = {
-                        target: key,
-                        poolSize: pool.length,
-                        maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
-                        timeoutMs: FACTORY_CONFIG.BACKPRESSURE_TIMEOUT_MS,
-                    };
+                if (!pool) {
+                    const err = new Error(`[FACTORY] Invalid target: ${key}`);
+                    err.code = 'INVALID_TARGET';
+                    err.details = { target: key };
                     throw err;
                 }
+
+                let entry = pool.find(
+                    e =>
+                        !e.busy &&
+                        e.driver.state === desiredState &&
+                        !e.driver.destroyed &&
+                        (!this.browserPool || (e.driver.page && !e.driver.page.isClosed()))
+                );
+
+                let acquisitionType = 'hit';
+
+                if (!entry) {
+                    if (pool.length < CONFIG.DRIVER_POOL_MAX_SIZE) {
+                        acquisitionType = 'miss';
+                        let driver;
+                        if (hotPoolEnabled) {
+                            driver = await this._createHotDriver(key);
+                        } else {
+                            driver = await this.createDriver(key, this.config, { skipEnsureReady: true });
+                        }
+
+                        entry = {
+                            driver,
+                            target: key,
+                            busy: false,
+                            createdAt: Date.now(),
+                            lastUsedAt: null,
+                            totalUses: 0,
+                        };
+
+                        pool.push(entry);
+                    } else {
+                        return { status: 'exhausted', poolSize: pool.length };
+                    }
+                }
+
+                entry.busy = true;
+                entry.lastUsedAt = Date.now();
+                entry.totalUses++;
+
+                if (entry.driver.destroyed) {
+                    throw new Error(`[FACTORY] Driver was destroyed (should not happen)`);
+                }
+
+                return {
+                    status: 'acquired',
+                    entry,
+                    poolSize: pool.length,
+                    acquisitionType,
+                };
+            });
+
+            if (acquisition.status === 'acquired') {
+                const { entry, poolSize, acquisitionType } = acquisition;
+
+                if (acquisitionType === 'hit') {
+                    this.metrics.poolHits++;
+                    log(
+                        'DEBUG',
+                        `[FACTORY] POOL HIT: Reusing driver for ${key} (state: ${desiredState}, uses: ${entry.totalUses})`
+                    );
+                    this.emit(FACTORY_EVENTS.POOL_HIT, {
+                        target: key,
+                        poolSize,
+                        totalUses: entry.totalUses,
+                        poolHits: this.metrics.poolHits,
+                    });
+                } else {
+                    this.metrics.poolMisses++;
+                    log(
+                        'DEBUG',
+                        `[FACTORY] POOL MISS: Creating new driver for ${key} (${hotPoolEnabled ? 'HOT' : 'COLD'})`
+                    );
+                    this.emit(FACTORY_EVENTS.POOL_MISS, {
+                        target: key,
+                        poolSize,
+                        poolMisses: this.metrics.poolMisses,
+                    });
+                }
+
+                log('DEBUG', `[FACTORY] Acquired driver: ${key} (uses: ${entry.totalUses})`);
+                return entry.driver;
+            }
+
+            this.metrics.poolExhausted++;
+            this.metrics.pressureEvents++;
+
+            log(
+                'WARN',
+                `[FACTORY] POOL EXHAUSTED: All ${CONFIG.DRIVER_POOL_MAX_SIZE} drivers for ${key} are busy. ` +
+                    `Attempting backpressure recovery (timeout: ${CONFIG.DRIVER_BACKPRESSURE_TIMEOUT_MS}ms)`
+            );
+
+            this.emit(FACTORY_EVENTS.POOL_EXHAUSTED, {
+                target: key,
+                poolSize: acquisition.poolSize,
+                maxPoolSize: CONFIG.DRIVER_POOL_MAX_SIZE,
+                poolExhausted: this.metrics.poolExhausted,
+            });
+
+            try {
+                await this._waitForDriverRelease(key, CONFIG.DRIVER_BACKPRESSURE_TIMEOUT_MS);
+                this.metrics.poolBackpressureRecovered++;
+                log('INFO', `[FACTORY] Backpressure recovered: driver released for ${key}`);
+                continue;
+            } catch (_timeoutError) {
+                if (CONFIG.DRIVER_BACKPRESSURE_TEMP) {
+                    log('WARN', '[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)');
+                    const tempDriver = await this.createDriver(key, this.config, { skipEnsureReady: true });
+                    /** @type {any} */ (tempDriver)._isTemporary = true;
+                    this.metrics.temporaryDriversCreated++;
+                    return tempDriver;
+                }
+
+                const err = new Error(
+                    `[FACTORY] POOL_EXHAUSTED: All ${CONFIG.DRIVER_POOL_MAX_SIZE} drivers for ${key} are busy ` +
+                        `(timeout waiting for release: ${CONFIG.DRIVER_BACKPRESSURE_TIMEOUT_MS}ms)`
+                );
+                err.code = 'DRIVER_POOL_EXHAUSTED';
+                err.details = {
+                    target: key,
+                    poolSize: acquisition.poolSize,
+                    maxPoolSize: CONFIG.DRIVER_POOL_MAX_SIZE,
+                    timeoutMs: CONFIG.DRIVER_BACKPRESSURE_TIMEOUT_MS,
+                };
+                throw err;
             }
         }
-
-        // 2. Marca como busy
-        entry.busy = true;
-        entry.lastUsedAt = Date.now();
-        entry.totalUses++;
-
-        // 3. Validar que driver é válido
-        if (entry.driver.destroyed) {
-            throw new Error(`[FACTORY] Driver was destroyed (should not happen)`);
-        }
-
-        log('DEBUG', `[FACTORY] Acquired driver: ${key} (uses: ${entry.totalUses})`);
-
-        return entry.driver;
     }
 
     /**
      * ✅ v3.0 (C3): Libera driver de volta ao pool (estado UNATTACHED).
-     * ✅ C3: Strict validation - Garante que driver está em estado correto.
-     *
-     * PRÉ-CONDIÇÕES:
-     * - Driver deve estar UNATTACHED (detachContext() já foi chamado)
-     * - Driver não pode estar destruído
-     *
-     * PÓS-CONDIÇÕES:
-     * - Driver volta para pool (busy=false) SE validação OK
-     * - Driver removido do pool SE validação falhar
-     * - Evento DRIVER_RELEASED emitido
+     * ✅ v3.1: Suporta Hot Pool Recycling (estado IDLE + resetSession).
      *
      * @param {TargetDriver} driver - Driver para liberar
-     * @returns {void}
-     *
-     * @emits factory:driver_released - Quando driver volta ao pool
-     *
-     * @example
-     * const response = await driver.execute(prompt);
-     * driver.detachContext();
-     * factory.releaseToPool(driver);  // Driver volta IDLE
+     * @returns {Promise<void>}
      */
-    releaseToPool(driver) {
+    async releaseToPool(driver) {
         if (!driver) {
             log('WARN', '[FACTORY] releaseToPool called with null driver');
             return;
@@ -714,6 +913,58 @@ class DriverFactory extends EventEmitter {
             return;
         }
 
+        // --- MODO HOT POOL (BrowserPool conectado) ---
+        if (this.browserPool && this._isHotPoolEnabled()) {
+            // Valida integridade da página
+            if (driver.destroyed || !driver.page || driver.page.isClosed()) {
+                log('WARN', `[FACTORY] Hot Driver released broken (destroyed/closed). Evicting.`);
+                if (driver.page && !driver.page.isClosed()) {
+                    await driver.page.close().catch(() => {});
+                }
+                this._evictDriver(pool, entry);
+                driver.destroy().catch(() => {});
+                return;
+            }
+
+            try {
+                // Soft Reset (Assíncrono) - Mantém driver busy durante limpeza
+                log('DEBUG', `[FACTORY] Recycling Hot Driver (${entry.target})...`);
+
+                // @ts-ignore - resetSession method
+                if (typeof driver.resetSession === 'function') {
+                    // @ts-ignore
+                    await driver.resetSession();
+                } else if (driver.page) {
+                    await driver.page.goto('about:blank').catch(() => {});
+                }
+
+                // Força estado IDLE se necessário
+                if (driver.state !== 'IDLE') {
+                    // @ts-ignore - Force state reset
+                    driver._state = 'IDLE';
+                }
+
+                // Driver limpo e pronto para reuso
+                entry.busy = false;
+
+                log('DEBUG', `[FACTORY] Recycled driver: ${entry.target} (uses: ${entry.totalUses})`);
+
+                this.metrics.driversReleased++;
+                this.emit(FACTORY_EVENTS.DRIVER_RELEASED, { target: entry.target });
+                this._notifyWaiters(entry.target);
+            } catch (err) {
+                log('ERROR', `[FACTORY] Failed to recycle driver: ${err.message}. Evicting.`);
+                if (driver.page && !driver.page.isClosed()) {
+                    await driver.page.close().catch(() => {});
+                }
+                this._evictDriver(pool, entry);
+                driver.destroy().catch(() => {});
+            }
+            return;
+        }
+
+        // --- MODO COLD POOL (Legado) ---
+
         // ✅ C3: STRICT VALIDATION - Driver DEVE estar UNATTACHED
         if (driver.state !== 'UNATTACHED') {
             log(
@@ -723,6 +974,7 @@ class DriverFactory extends EventEmitter {
             );
 
             // ✅ C3: Tenta force detach (C2 idempotência)
+            // @ts-ignore
             if (driver.isContextAttached && driver.isContextAttached()) {
                 try {
                     driver.detachContext({ force: true });
@@ -739,36 +991,18 @@ class DriverFactory extends EventEmitter {
                             `Driver compromised - removing from pool (will be destroyed on next GC).`
                     );
 
-                    // ✅ C3: Remove driver do pool (corrupted state)
-                    const index = pool.indexOf(entry);
-                    if (index !== -1) {
-                        pool.splice(index, 1);
-                    }
-
-                    // Tentar destruir imediatamente
-                    driver.destroy().catch(destroyErr => {
-                        log('ERROR', `[FACTORY] C3: Error destroying compromised driver: ${destroyErr.message}`);
-                    });
-
+                    this._evictDriver(pool, entry);
+                    driver.destroy().catch(() => {});
                     this.metrics.errors++;
-                    return; // NÃO marca como disponível
+                    return;
                 }
             }
         }
 
         // ✅ C3: Verificação final (paranoia check)
         if (driver.state !== 'UNATTACHED') {
-            log(
-                'ERROR',
-                `[FACTORY] C3 PARANOIA CHECK FAILED: Driver still not UNATTACHED after force detach ` +
-                    `(state: ${driver.state}). Removing from pool.`
-            );
-
-            const index = pool.indexOf(entry);
-            if (index !== -1) {
-                pool.splice(index, 1);
-            }
-
+            log('ERROR', `[FACTORY] C3 PARANOIA CHECK FAILED. Removing from pool.`);
+            this._evictDriver(pool, entry);
             driver.destroy().catch(() => {});
             this.metrics.errors++;
             return;
@@ -787,6 +1021,20 @@ class DriverFactory extends EventEmitter {
             poolSize: pool.length,
             driversReleased: this.metrics.driversReleased,
         });
+
+        this._notifyWaiters(entry.target);
+    }
+
+    /**
+     * Helper para remover driver do pool.
+     * @private
+     */
+    _evictDriver(pool, entry) {
+        const index = pool.indexOf(entry);
+        if (index !== -1) {
+            pool.splice(index, 1);
+        }
+        this.metrics.driversEvicted++;
     }
 
     /**
@@ -797,6 +1045,10 @@ class DriverFactory extends EventEmitter {
      * @private
      */
     _startHealthChecks() {
+        if (this.healthTimer) {
+            return;
+        }
+
         this.healthTimer = setInterval(() => {
             try {
                 const now = Date.now();
@@ -812,7 +1064,7 @@ class DriverFactory extends EventEmitter {
 
                         const idleTime = now - (entry.lastUsedAt || entry.createdAt);
                         const shouldRemove =
-                            idleTime > FACTORY_CONFIG.IDLE_TIMEOUT_MS && pool.length > FACTORY_CONFIG.MIN_POOL_SIZE;
+                            idleTime > CONFIG.DRIVER_IDLE_TIMEOUT_MS && pool.length > CONFIG.DRIVER_POOL_MIN_SIZE;
 
                         if (shouldRemove) {
                             log('DEBUG', `[FACTORY] GC: Removing idle driver: ${target} (idle: ${idleTime}ms)`);
@@ -837,10 +1089,36 @@ class DriverFactory extends EventEmitter {
                         }
                     }
                 }
+
+                // ✅ v3.1: Hot Pool Health Check
+                if (this.browserPool && this._isHotPoolEnabled()) {
+                    for (const pool of this.pool.values()) {
+                        for (const entry of pool) {
+                            // Check COLD (attached) drivers for closed pages
+                            // @ts-ignore
+                            if (
+                                !entry.busy &&
+                                entry.driver.isCold &&
+                                entry.driver.page &&
+                                entry.driver.page.isClosed()
+                            ) {
+                                log(
+                                    'WARN',
+                                    `[FACTORY] Health Check: Found dead page in COLD driver (${entry.target}). Evicting.`
+                                );
+                                this._evictDriver(pool, entry);
+                                entry.driver.destroy().catch(() => {});
+
+                                // Replenish pool (async)
+                                this._createHotDriver(entry.target).catch(() => {});
+                            }
+                        }
+                    }
+                }
             } catch (err) {
                 log('ERROR', `[FACTORY] Health check error: ${err.message}`);
             }
-        }, FACTORY_CONFIG.HEALTH_CHECK_INTERVAL_MS);
+        }, CONSTANTS.HEALTH_CHECK_INTERVAL_MS);
     }
 
     /**
@@ -856,23 +1134,69 @@ class DriverFactory extends EventEmitter {
      */
     _waitForDriverRelease(target, timeout) {
         return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                this.off(FACTORY_EVENTS.DRIVER_RELEASED, listener);
-                reject(new Error('TIMEOUT'));
-            }, timeout);
-
-            const listener = event => {
-                if (event.target === target) {
-                    clearTimeout(timer);
-                    this.off(FACTORY_EVENTS.DRIVER_RELEASED, listener);
-
-                    // Tenta acquire novamente (recursivo)
-                    this.acquireFromPool(target).then(resolve).catch(reject);
-                }
+            const queue = this._waiters.get(target) || [];
+            const waiter = {
+                resolve: () => {
+                    if (waiter.done) return;
+                    waiter.done = true;
+                    clearTimeout(waiter.timer);
+                    this.metrics.waitersWoken++;
+                    resolve();
+                },
+                reject: err => {
+                    if (waiter.done) return;
+                    waiter.done = true;
+                    clearTimeout(waiter.timer);
+                    reject(err);
+                },
+                timer: /** @type {NodeJS.Timeout} */ (null),
+                done: false,
             };
 
-            this.on(FACTORY_EVENTS.DRIVER_RELEASED, listener);
+            waiter.timer = setTimeout(() => {
+                const currentQueue = this._waiters.get(target) || [];
+                const index = currentQueue.indexOf(waiter);
+                if (index !== -1) {
+                    currentQueue.splice(index, 1);
+                }
+                if (currentQueue.length === 0) {
+                    this._waiters.delete(target);
+                }
+                this.metrics.waitersTimedOut++;
+                waiter.reject(new Error('TIMEOUT'));
+            }, timeout);
+
+            queue.push(waiter);
+            this._waiters.set(target, queue);
+            this.metrics.waitersQueued++;
         });
+    }
+
+    /**
+     * Acorda próximo waiter FIFO para um target.
+     * @param {string} target
+     * @private
+     */
+    _notifyWaiters(target) {
+        const queue = this._waiters.get(target);
+        if (!queue || queue.length === 0) {
+            return;
+        }
+
+        while (queue.length > 0) {
+            const waiter = queue.shift();
+            if (!waiter || waiter.done) {
+                continue;
+            }
+            waiter.resolve();
+            break;
+        }
+
+        if (queue.length === 0) {
+            this._waiters.delete(target);
+        } else {
+            this._waiters.set(target, queue);
+        }
     }
 
     /**
@@ -924,6 +1248,15 @@ class DriverFactory extends EventEmitter {
     }
 
     /**
+     * Lista targets atualmente descobertos.
+     *
+     * @returns {string[]}
+     */
+    getAvailableTargets() {
+        return Object.keys(this.registry);
+    }
+
+    /**
      * Verifica se target existe no registry.
      *
      * @param {string} targetName - Nome do target
@@ -940,7 +1273,7 @@ class DriverFactory extends EventEmitter {
      * @returns {string} Nome do target padrão
      */
     getDefaultTarget() {
-        return FACTORY_CONFIG.DEFAULT_TARGET;
+        return this.defaultTargetKey || String(CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET).toLowerCase();
     }
 
     /**
@@ -948,7 +1281,9 @@ class DriverFactory extends EventEmitter {
      *
      * @returns {Object} Health status completo
      */
-    getHealth() {
+    async getHealth() {
+        await this.ensureReady({ warmup: false });
+
         const poolStats = [];
         for (const [target, pool] of this.pool.entries()) {
             const busy = pool.filter(e => e.busy).length;
@@ -966,17 +1301,18 @@ class DriverFactory extends EventEmitter {
         return {
             discovered: Object.keys(this.registry).length,
             targets: Object.keys(this.registry),
-            defaultTarget: FACTORY_CONFIG.DEFAULT_TARGET,
+            defaultTarget: this.getDefaultTarget(),
             failedDrivers: Array.from(this.failedDrivers),
 
             // ✅ v3.0: Pool stats
             pool: {
-                enabled: FACTORY_CONFIG.POOL_ENABLED,
+                enabled: CONFIG.DRIVER_POOL_ENABLED,
+                hotPoolEnabled: this._isHotPoolEnabled() && Boolean(this.browserPool),
                 totalSize: this._getTotalPoolSize(),
-                maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
-                minPoolSize: FACTORY_CONFIG.MIN_POOL_SIZE,
-                idleTimeout: FACTORY_CONFIG.IDLE_TIMEOUT_MS,
-                warmupTargets: FACTORY_CONFIG.WARMUP_TARGETS,
+                maxPoolSize: CONFIG.DRIVER_POOL_MAX_SIZE,
+                minPoolSize: CONFIG.DRIVER_POOL_MIN_SIZE,
+                idleTimeout: CONFIG.DRIVER_IDLE_TIMEOUT_MS,
+                warmupTargets: CONFIG.DRIVER_WARMUP_TARGETS,
                 byTarget: poolStats,
             },
 
@@ -996,15 +1332,20 @@ class DriverFactory extends EventEmitter {
                 driversEvicted: this.metrics.driversEvicted,
                 errors: this.metrics.errors,
                 discoveryTime: this.metrics.discoveryTime,
+                pressureEvents: this.metrics.pressureEvents,
+                waitersQueued: this.metrics.waitersQueued,
+                waitersWoken: this.metrics.waitersWoken,
+                waitersTimedOut: this.metrics.waitersTimedOut,
+                createSerializationPasses: this.metrics.createSerializationPasses,
             },
 
             config: {
-                targetsDir: FACTORY_CONFIG.TARGETS_DIR,
-                defaultTarget: FACTORY_CONFIG.DEFAULT_TARGET,
-                validateOnBoot: FACTORY_CONFIG.VALIDATE_ON_BOOT,
-                maxPoolSize: FACTORY_CONFIG.MAX_POOL_SIZE,
-                minPoolSize: FACTORY_CONFIG.MIN_POOL_SIZE,
-                idleTimeout: FACTORY_CONFIG.IDLE_TIMEOUT_MS,
+                targetsDir: CONSTANTS.TARGETS_DIR,
+                defaultTarget: this.getDefaultTarget(),
+                validateOnBoot: true,
+                maxPoolSize: CONFIG.DRIVER_POOL_MAX_SIZE,
+                minPoolSize: CONFIG.DRIVER_POOL_MIN_SIZE,
+                idleTimeout: CONFIG.DRIVER_IDLE_TIMEOUT_MS,
             },
         };
     }
@@ -1034,6 +1375,15 @@ class DriverFactory extends EventEmitter {
             driversEvicted: 0,
             discoveryTime: 0,
             errors: 0,
+            poolBackpressureRecovered: 0,
+            temporaryDriversCreated: 0,
+            hotPoolSize: 0,
+            coldPoolSize: 0,
+            pressureEvents: 0,
+            waitersQueued: 0,
+            waitersWoken: 0,
+            waitersTimedOut: 0,
+            createSerializationPasses: 0,
         };
     }
 
@@ -1076,6 +1426,14 @@ class DriverFactory extends EventEmitter {
 
         await Promise.allSettled(destroyPromises);
 
+        this._ready = false;
+        this._poolInitialized = false;
+        this._discovered = false;
+        this._startPromise = null;
+        this.registry = Object.create(null);
+        this._waiters.clear();
+        this._refreshAvailableTargetsExport();
+
         log('INFO', '[FACTORY] Pool shutdown complete');
     }
 
@@ -1097,6 +1455,92 @@ class DriverFactory extends EventEmitter {
         };
         return domains[target] || null;
     }
+
+    /**
+     * ✅ v3.1: Define o pool de browsers para uso em Hot Pool.
+     * Deve ser chamado durante o bootstrap (main.js).
+     *
+     * @param {Object} pool - Instância de BrowserPoolManager
+     */
+    setBrowserPool(pool) {
+        if (!pool) {
+            throw new Error('[FACTORY] browserPool cannot be null');
+        }
+        if (!this._isHotPoolEnabled()) {
+            this.browserPool = null;
+            log('WARN', '[FACTORY] DRIVER_HOT_POOL_ENABLED=false — BrowserPool attachment skipped.');
+            return;
+        }
+        this.browserPool = pool;
+        log('INFO', '[FACTORY] BrowserPool attached. Hot Pool strategies enabled.');
+    }
+
+    /**
+     * Remove referência do BrowserPool (detach explícito).
+     * Útil para testes/reconfiguração e fallback operacional.
+     */
+    clearBrowserPool() {
+        this.browserPool = null;
+        log('INFO', '[FACTORY] BrowserPool detached.');
+    }
+
+    /**
+     * Indica se modo hot pool está habilitado.
+     * @returns {boolean}
+     * @private
+     */
+    _isHotPoolEnabled() {
+        return String(process.env.DRIVER_HOT_POOL_ENABLED ?? 'true').toLowerCase() !== 'false';
+    }
+
+    /**
+     * ✅ v3.1: Cria um driver "quente" (com página já alocada).
+     * Orquestra a criação do driver E a alocação de página do BrowserPool.
+     *
+     * @param {string} target - Target do driver (ex: 'chatgpt')
+     * @returns {Promise<any>} Driver em estado IDLE (com página anexa)
+     * @private
+     */
+    async _createHotDriver(target) {
+        if (!this.browserPool || !this._isHotPoolEnabled()) {
+            throw new Error(
+                '[FACTORY] Cannot create Hot Driver: BrowserPool not attached. Call setBrowserPool() first.'
+            );
+        }
+
+        // 1. Cria driver (Estado: UNATTACHED)
+        const driver = await this.createDriver(target, this.config, { skipEnsureReady: true });
+
+        try {
+            // 2. Aloca página do BrowserPool
+            log('DEBUG', `[FACTORY] Allocating page for Hot Driver (${target})...`);
+            const page = await this.browserPool.allocate(target);
+
+            // 3. Attach context (Warmup)
+            // Cria um controller temporário para manter o driver em estado válido (IDLE)
+            // Este signal será substituído quando a task real assumir o driver (Hot Swap)
+            const warmupController = new AbortController();
+
+            // @ts-ignore - TargetDriver method
+            driver.attachContext(page, warmupController.signal, 'pool-warmup');
+
+            // Marca driver como 'Hot' para métricas
+            // @ts-ignore
+            driver._isHot = true;
+
+            log('DEBUG', `[FACTORY] Hot Driver created: ${target} (IDLE)`);
+            return driver;
+        } catch (err) {
+            // Rollback: Destrói driver se falhar alocação de página
+            log('ERROR', `[FACTORY] Failed to create Hot Driver for ${target}: ${err.message}`);
+
+            if (driver && typeof driver.destroy === 'function') {
+                // @ts-ignore
+                driver.destroy().catch(() => {});
+            }
+            throw err;
+        }
+    }
 }
 
 /* ==========================================================================
@@ -1115,6 +1559,18 @@ const factory = new DriverFactory();
  * @type {function(string, object): Promise<object>}
  */
 export const createDriver = factory.createDriver.bind(factory);
+
+/**
+ * Inicializa lifecycle explícito da factory.
+ * @type {function(Object=): Promise<void>}
+ */
+export const start = factory.start.bind(factory);
+
+/**
+ * Garante factory pronta de forma lazy.
+ * @type {function(Object=): Promise<void>}
+ */
+export const ensureReady = factory.ensureReady.bind(factory);
 
 /**
  * Adquire driver do pool.
@@ -1177,6 +1633,12 @@ export const getDriverMetadata = factory.getDriverMetadata.bind(factory);
 export const getAllDriversMetadata = factory.getAllDriversMetadata.bind(factory);
 
 /**
+ * Lista targets atualmente disponíveis.
+ * @type {function(): string[]}
+ */
+export const getAvailableTargets = factory.getAvailableTargets.bind(factory);
+
+/**
  * Verifica se target está disponível.
  * @type {function(string): boolean}
  */
@@ -1204,7 +1666,7 @@ export const getMetrics = factory.getMetrics.bind(factory);
  * Lista de targets disponíveis.
  * @type {string[]}
  */
-export const availableTargets = Object.keys(factory.getAllDriversMetadata());
+export const availableTargets = AVAILABLE_TARGETS_EXPORT;
 
 /**
  * Configuração da factory.
@@ -1218,4 +1680,4 @@ export const availableTargets = Object.keys(factory.getAllDriversMetadata());
  * Instância da factory.
  * @type {object}
  */
-export { factory, FACTORY_CONFIG, FACTORY_EVENTS };
+export { factory, CONSTANTS as FACTORY_CONFIG, FACTORY_EVENTS };

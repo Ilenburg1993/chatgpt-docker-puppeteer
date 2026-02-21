@@ -9,8 +9,6 @@ import * as logWatcher from '../watchers/log_watcher.js';
 import { log } from '#core/logger';
 import CONFIG from '#core/config';
 import * as Discovery from '#nerv/discovery';
-import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
-import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
 import * as ssotEventFeed from '../realtime/ssot_event_feed.js';
 
 /**
@@ -39,6 +37,18 @@ const signalHandlers = {
     uncaughtException: null,
     unhandledRejection: null,
 };
+
+async function loadDashboardShutdownModules() {
+    const [taskSyncBridgeModule, telemetryAggregatorModule] = await Promise.all([
+        import('#server/dashboard-api/task_sync_bridge'),
+        import('#server/dashboard-api/telemetry_aggregator'),
+    ]);
+
+    return {
+        taskSyncBridge: taskSyncBridgeModule?.default ?? null,
+        telemetryAggregator: telemetryAggregatorModule?.default ?? null,
+    };
+}
 
 function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
@@ -148,21 +158,28 @@ async function gracefulShutdown(signal) {
         }
 
         // 2.5. DASHBOARD AGGREGATORS (realtime)
+        // Lazy-load apenas no shutdown para evitar side effects no import do entrypoint.
         // Para timers internos antes de desconectar o Hub.
         try {
-            if (telemetryAggregator && typeof telemetryAggregator.stop === 'function') {
-                telemetryAggregator.stop();
-            }
-        } catch (e) {
-            log('DEBUG', `[LIFECYCLE] TelemetryAggregator.stop() skipped: ${e && e.message ? e.message : String(e)}`);
-        }
+            const { taskSyncBridge, telemetryAggregator } = await loadDashboardShutdownModules();
 
-        try {
-            if (taskSyncBridge && typeof taskSyncBridge.clearAll === 'function') {
-                taskSyncBridge.clearAll();
+            try {
+                if (telemetryAggregator && typeof telemetryAggregator.stop === 'function') {
+                    telemetryAggregator.stop();
+                }
+            } catch (e) {
+                log('DEBUG', `[LIFECYCLE] TelemetryAggregator.stop() skipped: ${e && e.message ? e.message : String(e)}`);
+            }
+
+            try {
+                if (taskSyncBridge && typeof taskSyncBridge.clearAll === 'function') {
+                    taskSyncBridge.clearAll();
+                }
+            } catch (e) {
+                log('DEBUG', `[LIFECYCLE] TaskSyncBridge.clearAll() skipped: ${e && e.message ? e.message : String(e)}`);
             }
         } catch (e) {
-            log('DEBUG', `[LIFECYCLE] TaskSyncBridge.clearAll() skipped: ${e && e.message ? e.message : String(e)}`);
+            log('DEBUG', `[LIFECYCLE] Dashboard shutdown modules skipped: ${e && e.message ? e.message : String(e)}`);
         }
 
         try {

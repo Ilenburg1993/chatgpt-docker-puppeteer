@@ -20,6 +20,8 @@ class BrowserPoolManager {
             poolSize: config.poolSize || 3,
             allocationStrategy: config.allocationStrategy || 'round-robin',
             healthCheckInterval: config.healthCheckInterval || 30000,
+            pageTtlMs: config.pageTtlMs || 3600000,
+            allocateMaxAttempts: config.allocateMaxAttempts || null,
             // Force uso explícito de `browserEndpoint` — não há fallback para 'chromium'
             browserEndpoint: config.browserEndpoint || {},
         };
@@ -67,6 +69,7 @@ class BrowserPoolManager {
         this.reconnectionInProgress = false;
         this.browser = null;
         this.nerv = null;
+        this._healthCheckInFlight = null;
     }
 
     /**
@@ -169,8 +172,8 @@ class BrowserPoolManager {
 
         // ✅ Phase 3: Inicializa e inicia PeriodicHealthMonitor
         this.healthMonitor = new PeriodicHealthMonitor(this);
-        this._attachHealthMonitorEvents();
-        this._bridgeCircuitBreakerAndMonitor(); // ✅ Bridge CB ↔ Monitor
+        await this._attachHealthMonitorEvents();
+        await this._bridgeCircuitBreakerAndMonitor(); // ✅ Bridge CB ↔ Monitor
         this.healthMonitor.start(this.config.healthCheckInterval);
 
         log('INFO', `[BrowserPool] Inicializado com ${this.pool.length}/${this.config.poolSize} instâncias`);
@@ -194,94 +197,113 @@ class BrowserPoolManager {
             throw new Error('[BrowserPool] Pool em shutdown, não é possível alocar novas páginas.');
         }
 
-        // Seleciona instância baseado na estratégia
-        const poolEntry = this._selectInstance(target);
+        const configuredAttempts = Number.parseInt(
+            String(
+                process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ??
+                    this.config.allocateMaxAttempts ??
+                    ''
+            ),
+            10
+        );
+        const defaultMaxAttempts = Math.max(1, Number(this.config.poolSize || this.pool.length || 1) * 3);
+        const maxAttempts =
+            Number.isInteger(configuredAttempts) && configuredAttempts > 0 ? configuredAttempts : defaultMaxAttempts;
 
-        if (!poolEntry) {
-            throw new Error('[BrowserPool] Nenhuma instância saudável disponível no pool.');
-        }
+        let lastError = null;
 
-        try {
-            // Cria nova página na instância selecionada
-            const page = await poolEntry.browser.newPage();
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const poolEntry = this._selectInstance(target);
+            if (!poolEntry) {
+                throw new Error('[BrowserPool] Nenhuma instância saudável disponível no pool.');
+            }
 
-            // ✅ P0-U1: Valida página ANTES de alocar (BUG-01 FIX)
-            const validation = await PageValidator.validate(page, target);
+            let page = null;
 
-            if (!validation.valid) {
-                // Página inválida (fatal issues), fecha e tenta novamente
-                log('ERROR', `[BrowserPool] Page validation failed: ${JSON.stringify(validation.issues)}`);
+            try {
+                page = await poolEntry.browser.newPage();
 
-                try {
-                    await page.close();
-                } catch (closeErr) {
-                    log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr.message}`);
+                // ✅ P0-U1: Valida página ANTES de alocar (BUG-01 FIX)
+                const validation = await PageValidator.validate(page, target);
+
+                if (!validation.valid) {
+                    log('ERROR', `[BrowserPool] Page validation failed: ${JSON.stringify(validation.issues)}`);
+
+                    try {
+                        await page.close();
+                    } catch (closeErr) {
+                        log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr.message}`);
+                    }
+
+                    const validationError = new Error('PAGE_VALIDATION_FAILED');
+                    validationError.details = validation.issues;
+                    this._registerAllocationFailure(poolEntry, validationError, {
+                        cause: FailureCause.TECHNICAL_CRASH,
+                    });
+                    lastError = validationError;
+                    continue;
                 }
 
-                // Marca como falha no circuit breaker
-                const validationError = new Error('PAGE_VALIDATION_FAILED');
-                this.circuitBreaker.registerFailure(poolEntry.id, validationError, {
-                    cause: FailureCause.TECHNICAL_CRASH,
-                });
-
-                // Retry allocation (recursivo)
-                if (poolEntry.health.consecutiveFailures < 3) {
-                    return this.allocate(target);
+                // Log warnings (non-fatal issues)
+                if (validation.issues.length > 0) {
+                    log('WARN', `[BrowserPool] Page validation warnings: ${JSON.stringify(validation.issues)}`);
                 }
 
-                throw new Error(`Page validation failed: ${JSON.stringify(validation.issues)}`);
+                // Gera taskId único temporário (será substituído pelo real via updatePageTaskId)
+                const taskId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                // Registra página no pool entry
+                poolEntry.pages.set(taskId, page);
+                poolEntry.stats.allocations++;
+                poolEntry.stats.activeTasks++;
+
+                this.stats.totalAllocations++;
+
+                log(
+                    'DEBUG',
+                    `[BrowserPool] Página alocada de ${poolEntry.id} (${poolEntry.stats.activeTasks} ativas; attempt ${attempt}/${maxAttempts})`
+                );
+
+                // Anexa metadata à página para rastreamento
+                page._poolMetadata = {
+                    poolEntryId: poolEntry.id,
+                    taskId,
+                    allocatedAt: Date.now(),
+                    validation, // ✅ Salva resultado de validação para debugging
+                };
+
+                // ✅ P0-U5: Store temp ID for later update
+                page._tempTaskId = taskId;
+                page._poolEntry = poolEntry;
+
+                // ✅ P0-U2: Attach lifecycle monitor (BUG-02 FIX)
+                const monitor = new PageLifecycleMonitor(page, this, taskId, this.nerv || null);
+                this.lifecycleMonitors.set(taskId, monitor);
+
+                log('DEBUG', `[BrowserPool] Lifecycle monitor attached for ${taskId}`);
+
+                return page;
+            } catch (error) {
+                lastError = error;
+
+                if (page && !page.isClosed()) {
+                    try {
+                        await page.close();
+                    } catch (closeErr) {
+                        log('WARN', `[BrowserPool] Error closing failed page: ${closeErr.message}`);
+                    }
+                }
+
+                this._registerAllocationFailure(poolEntry, error);
+
+                log(
+                    'ERROR',
+                    `[BrowserPool] Erro ao alocar página de ${poolEntry.id} (attempt ${attempt}/${maxAttempts}): ${error.message}`
+                );
             }
-
-            // Log warnings (non-fatal issues)
-            if (validation.issues.length > 0) {
-                log('WARN', `[BrowserPool] Page validation warnings: ${JSON.stringify(validation.issues)}`);
-            }
-
-            // Gera taskId único temporário (será substituído pelo real via updatePageTaskId)
-            const taskId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-            // Registra página no pool entry
-            poolEntry.pages.set(taskId, page);
-            poolEntry.stats.allocations++;
-            poolEntry.stats.activeTasks++;
-
-            this.stats.totalAllocations++;
-
-            log('DEBUG', `[BrowserPool] Página alocada de ${poolEntry.id} (${poolEntry.stats.activeTasks} ativas)`);
-
-            // Anexa metadata à página para rastreamento
-            page._poolMetadata = {
-                poolEntryId: poolEntry.id,
-                taskId,
-                allocatedAt: Date.now(),
-                validation, // ✅ Salva resultado de validação para debugging
-            };
-
-            // ✅ P0-U5: Store temp ID for later update
-            page._tempTaskId = taskId;
-            page._poolEntry = poolEntry;
-
-            // ✅ P0-U2: Attach lifecycle monitor (BUG-02 FIX)
-            const monitor = new PageLifecycleMonitor(page, this, taskId, this.nerv || null);
-            this.lifecycleMonitors.set(taskId, monitor);
-
-            log('DEBUG', `[BrowserPool] Lifecycle monitor attached for ${taskId}`);
-
-            return page;
-        } catch (error) {
-            log('ERROR', `[BrowserPool] Erro ao alocar página de ${poolEntry.id}: ${error.message}`);
-
-            // Marca instância como unhealthy
-            poolEntry.health.status = STATUS_VALUES.UNHEALTHY;
-            poolEntry.health.consecutiveFailures++;
-
-            // Tenta alocar de outra instância
-            if (poolEntry.health.consecutiveFailures < 3) {
-                return this.allocate(target); // Recursão com outra instância
-            }
-
-            throw error;
         }
+
+        const finalError = lastError || new Error('Allocation failed without specific error');
+        throw new Error(`[BrowserPool] Falha ao alocar página após ${maxAttempts} tentativas: ${finalError.message}`);
     }
 
     /**
@@ -295,25 +317,69 @@ class BrowserPoolManager {
      * @returns {void}
      */
     updatePageTaskId(page, realTaskId) {
-        if (!page._tempTaskId || !page._poolEntry) {
-            log('WARN', '[BrowserPool] Cannot update taskId: missing metadata');
+        if (!page || !realTaskId) {
+            log('WARN', '[BrowserPool] Cannot update taskId: invalid args');
             return;
         }
 
-        const poolEntry = page._poolEntry;
-        const tempTaskId = page._tempTaskId;
+        const poolEntry =
+            page._poolEntry ||
+            this.pool.find(entry => {
+                for (const pooledPage of entry.pages.values()) {
+                    if (pooledPage === page) return true;
+                }
+                return false;
+            });
 
-        // Remove temp ID
-        poolEntry.pages.delete(tempTaskId);
+        if (!poolEntry) {
+            log('WARN', '[BrowserPool] Cannot update taskId: pool entry not found');
+            return;
+        }
 
-        // Add real ID
+        let currentTaskId = page._tempTaskId || page._poolMetadata?.taskId || null;
+        if (!currentTaskId) {
+            for (const [knownTaskId, pooledPage] of poolEntry.pages.entries()) {
+                if (pooledPage === page) {
+                    currentTaskId = knownTaskId;
+                    break;
+                }
+            }
+        }
+
+        if (currentTaskId && currentTaskId !== realTaskId) {
+            poolEntry.pages.delete(currentTaskId);
+        }
+
         poolEntry.pages.set(realTaskId, page);
 
-        // Update metadata
-        page._poolMetadata.taskId = realTaskId;
+        if (!page._poolMetadata) {
+            page._poolMetadata = {
+                poolEntryId: poolEntry.id,
+                taskId: realTaskId,
+                allocatedAt: Date.now(),
+            };
+        } else {
+            page._poolMetadata.taskId = realTaskId;
+            page._poolMetadata.poolEntryId = poolEntry.id;
+        }
+
+        page._poolEntry = poolEntry;
         delete page._tempTaskId;
 
-        log('DEBUG', `[BrowserPool] Updated taskId: ${tempTaskId} → ${realTaskId}`);
+        if (currentTaskId && currentTaskId !== realTaskId) {
+            const monitor = this.lifecycleMonitors.get(currentTaskId);
+            if (monitor) {
+                this.lifecycleMonitors.delete(currentTaskId);
+                if (typeof monitor.rebindTaskId === 'function') {
+                    monitor.rebindTaskId(realTaskId);
+                } else {
+                    monitor.taskId = realTaskId;
+                }
+                this.lifecycleMonitors.set(realTaskId, monitor);
+            }
+        }
+
+        log('DEBUG', `[BrowserPool] Updated taskId: ${currentTaskId || 'unknown'} → ${realTaskId}`);
     }
 
     /**
@@ -367,32 +433,61 @@ class BrowserPoolManager {
      * Previne pool corruption (páginas closed no registro).
      *
      * @param {string} taskId - Task ID da página
+     * @param {Page|null} [pageRef=null] - Referência da página (fallback)
      * @returns {void}
      */
-    removePageFromPool(taskId) {
+    removePageFromPool(taskId, pageRef = null) {
         try {
             // Find pool entry que contém esta página
-            const poolEntry = this.pool.find(entry => entry.pages.has(taskId));
+            let resolvedTaskId = taskId;
+            let poolEntry = this.pool.find(entry => entry.pages.has(taskId));
+
+            if (!poolEntry && pageRef) {
+                for (const entry of this.pool) {
+                    for (const [knownTaskId, pooledPage] of entry.pages.entries()) {
+                        if (pooledPage === pageRef) {
+                            poolEntry = entry;
+                            resolvedTaskId = knownTaskId;
+                            break;
+                        }
+                    }
+
+                    if (poolEntry) {
+                        break;
+                    }
+                }
+            }
 
             if (!poolEntry) {
-                log('WARN', `[BrowserPool] TaskId ${taskId} not found in pool (already removed?)`);
+                log(
+                    'WARN',
+                    `[BrowserPool] TaskId ${taskId} not found in pool (already removed? pageRef=${Boolean(pageRef)})`
+                );
                 return;
             }
 
             // Remove from pages Map
-            poolEntry.pages.delete(taskId);
+            const page = poolEntry.pages.get(resolvedTaskId);
+            poolEntry.pages.delete(resolvedTaskId);
 
             // Update stats
             poolEntry.stats.activeTasks = Math.max(0, poolEntry.stats.activeTasks - 1);
 
             // Cleanup monitor
-            const monitor = this.lifecycleMonitors.get(taskId);
+            const monitor = this.lifecycleMonitors.get(resolvedTaskId);
             if (monitor) {
                 monitor.cleanup();
-                this.lifecycleMonitors.delete(taskId);
+                this.lifecycleMonitors.delete(resolvedTaskId);
             }
 
-            log('INFO', `[BrowserPool] Page removed from pool: ${taskId} (${poolEntry.stats.activeTasks} active)`);
+            if (page && page._poolMetadata) {
+                page._poolMetadata.taskId = null;
+            }
+
+            log(
+                'INFO',
+                `[BrowserPool] Page removed from pool: ${resolvedTaskId} (${poolEntry.stats.activeTasks} active)`
+            );
         } catch (err) {
             log('ERROR', `[BrowserPool] Error removing page from pool: ${err.message}`);
         }
@@ -459,10 +554,14 @@ class BrowserPoolManager {
      */
     _startHealthChecks() {
         this.healthCheckTimer = setInterval(async () => {
-            await this._performHealthCheck();
+            await this.runHealthCheck();
         }, this.config.healthCheckInterval);
 
         log('DEBUG', `[BrowserPool] Health checks iniciados (intervalo: ${this.config.healthCheckInterval}ms)`);
+    }
+
+    async runHealthCheck() {
+        return this._performHealthCheck();
     }
 
     /**
@@ -471,6 +570,18 @@ class BrowserPoolManager {
      * V1.0: Integrado com Circuit Breaker para detecção inteligente de falhas
      */
     async _performHealthCheck() {
+        if (this._healthCheckInFlight) {
+            return this._healthCheckInFlight;
+        }
+
+        this._healthCheckInFlight = this._performHealthCheckUnsafe().finally(() => {
+            this._healthCheckInFlight = null;
+        });
+
+        return this._healthCheckInFlight;
+    }
+
+    async _performHealthCheckUnsafe() {
         this.stats.healthChecks++;
 
         for (const poolEntry of this.pool) {
@@ -562,6 +673,17 @@ class BrowserPoolManager {
         await this._cleanupZombiePages();
     }
 
+    _registerAllocationFailure(poolEntry, error, context = {}) {
+        poolEntry.health.status = STATUS_VALUES.UNHEALTHY;
+        poolEntry.health.consecutiveFailures++;
+
+        this.circuitBreaker.registerFailure(poolEntry.id, error, {
+            cause: FailureCause.TECHNICAL_CRASH,
+            ...context,
+            consecutiveFailures: poolEntry.health.consecutiveFailures,
+        });
+    }
+
     /**
      * ✅ Phase 2 Fix #19: Cleanup zombie browser contexts (TTL expiration)
      *
@@ -574,7 +696,7 @@ class BrowserPoolManager {
      */
     async _cleanupZombiePages() {
         const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
-        const ttlMs = Number(CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000);
+        const ttlMs = Number(this.config.pageTtlMs || CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000);
         const now = Date.now();
         let zombieCount = 0;
 
@@ -992,13 +1114,14 @@ class BrowserPoolManager {
                     if (newBrowser && newBrowser.isConnected()) {
                         log('INFO', `[BrowserPool] ✅ Reconnection successful on attempt ${attempt}`);
 
-                        // Update pool entry
-                        if (this.pool.length > 0) {
-                            const poolEntry = this.pool[0];
+                        // Update manager reference + all pool entries
+                        this.browser = newBrowser;
+                        const now = Date.now();
+                        for (const poolEntry of this.pool) {
                             poolEntry.browser = newBrowser;
                             poolEntry.health.status = STATUS_VALUES.HEALTHY;
                             poolEntry.health.consecutiveFailures = 0;
-                            poolEntry.health.lastCheck = Date.now();
+                            poolEntry.health.lastCheck = now;
                         }
 
                         reconnected = true;
@@ -1020,9 +1143,10 @@ class BrowserPoolManager {
 
                 // ✅ FIX (Bug #1): Notificar CircuitBreaker do recovery
                 if (this.circuitBreaker && this.pool.length > 0) {
-                    const poolEntry = this.pool[0];
-                    this.circuitBreaker.registerRecovery(poolEntry.id);
-                    log('INFO', `[BrowserPool] ✅ CircuitBreaker recovery registered: ${poolEntry.id}`);
+                    for (const poolEntry of this.pool) {
+                        this.circuitBreaker.registerRecovery(poolEntry.id);
+                        log('INFO', `[BrowserPool] ✅ CircuitBreaker recovery registered: ${poolEntry.id}`);
+                    }
                 }
 
                 // Emit via NERV

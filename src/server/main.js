@@ -2,32 +2,9 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import '#core/env_bootstrap';
 
 import * as Authority from '#core/authority';
-import CONFIG from '#core/config';
-import { CONNECTION_MODES } from '#core/constants/browser';
 import { log } from '#core/logger';
-import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import * as Discovery from '#nerv/discovery';
-import * as NERV from '#nerv/nerv';
-import taskSyncBridge from '#server/dashboard-api/task_sync_bridge';
-import telemetryAggregator from '#server/dashboard-api/telemetry_aggregator';
-import { ActionCode, ActorRole, PROTOCOL_VERSION } from '#shared/nerv/constants';
-import * as snapshot from '#shared/telemetry/snapshot';
-import * as router from './api/router.js';
-import app from './engine/app.js';
-import * as lifecycle from './engine/lifecycle.js';
-import * as serverEngine from './engine/server.js';
-import * as socketHub from './engine/socket.js';
-import ServerNERVAdapter from './nerv_adapter/server_nerv_adapter.js';
-import * as pm2Bridge from './realtime/bus/pm2_bridge.js';
-import * as ssotEventFeed from './realtime/ssot_event_feed.js';
-import * as logTail from './realtime/streams/log_tail.js';
-import * as hardwareTelemetry from './realtime/telemetry/hardware.js';
-import reconciler from './supervisor/reconcilier.js';
-import * as fsWatcher from './watchers/fs_watcher.js';
-import * as logWatcher from './watchers/log_watcher.js';
 
 
 /* ==========================================================================
@@ -43,13 +20,16 @@ import * as logWatcher from './watchers/log_watcher.js';
  *   ✔ Commit atômico via arquivo temporário (fallback)
  *   ✔ Nunca retorna estado parcialmente gravado
  *
+ * @param {{discovery: typeof import('#nerv/discovery'), protocolVersion: string, singularityMode: string}} deps
  * @param {object} nerv - Instância NERV para publicação de eventos
  * @param {number} port - Porta efetivamente bound pelo HTTP engine
  * @param {'standalone'|'delegated'} [authority='standalone'] - Modo de autoridade do servidor
  * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)
  * @returns {Promise<void>}
  */
-async function persistServerState(nerv, port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
+async function persistServerState(deps, nerv, port, authority = Authority.SERVER_AUTHORITIES.STANDALONE) {
+    const { discovery, protocolVersion, singularityMode } = deps;
+
     // Legacy compatibility hook: discovery is now canonical via NERV (SERVER_READY).
     // We delegate to the discovery helper which prefers NERV and only falls back
     // to file-based persistence if explicitly enabled via `ENABLE_STATE_FILE=true`.
@@ -58,14 +38,14 @@ async function persistServerState(nerv, port, authority = Authority.SERVER_AUTHO
         server_port: port,
         pid: process.pid,
         server_started_at: new Date().toISOString(),
-        protocol: PROTOCOL_VERSION || '2.0.0',
-        mode: CONNECTION_MODES.SINGULARITY,
+        protocol: protocolVersion,
+        mode: singularityMode,
         role: 'server',
         authority,
     };
 
     try {
-        await Discovery.publishServerReady(nerv, payload);
+        await discovery.publishServerReady(nerv, payload);
         log('DEBUG', '[BOOT] persistServerState delegated to Discovery (NERV-first, file fallback opt-in)');
     } catch (err) {
         log('WARN', `[BOOT] persistServerState delegation failed: ${err.message}`);
@@ -109,6 +89,55 @@ async function bootstrap(options = {}) {
     const authority = Authority.resolveAuthority(options.authority);
 
     try {
+        const [
+            { default: CONFIG },
+            { CONNECTION_MODES },
+            HighLevelNERV,
+            Discovery,
+            NERV,
+            { ActionCode, ActorRole, PROTOCOL_VERSION },
+            snapshot,
+            lifecycle,
+            serverEngine,
+            socketHub,
+            { default: ServerNERVAdapter },
+            pm2Bridge,
+            ssotEventFeed,
+            logTail,
+            hardwareTelemetry,
+            { default: reconciler },
+            fsWatcher,
+            logWatcher,
+            { default: appInstance },
+            routerModule,
+            { default: taskSyncBridge },
+            { default: telemetryAggregator },
+        ] = await Promise.all([
+            import('#core/config'),
+            import('#core/constants/browser'),
+            import('#nerv/adapters/high_level_adapter'),
+            import('#nerv/discovery'),
+            import('#nerv/nerv'),
+            import('#shared/nerv/constants'),
+            import('#shared/telemetry/snapshot'),
+            import('./engine/lifecycle.js'),
+            import('./engine/server.js'),
+            import('./engine/socket.js'),
+            import('./nerv_adapter/server_nerv_adapter.js'),
+            import('./realtime/bus/pm2_bridge.js'),
+            import('./realtime/ssot_event_feed.js'),
+            import('./realtime/streams/log_tail.js'),
+            import('./realtime/telemetry/hardware.js'),
+            import('./supervisor/reconcilier.js'),
+            import('./watchers/fs_watcher.js'),
+            import('./watchers/log_watcher.js'),
+            import('./engine/app.js'),
+            import('./api/router.js'),
+            import('#server/dashboard-api/task_sync_bridge'),
+            import('#server/dashboard-api/telemetry_aggregator'),
+        ]);
+        const applyRoutes = routerModule?.applyRoutes;
+
         log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
 
         /* --------------------------------------------------------------
@@ -178,13 +207,16 @@ async function bootstrap(options = {}) {
         // Expõe autoridade no app para que controllers possam atuar de forma
         // conservadora (ex.: negar operações de lifecycle quando delegated)
         try {
-            app.locals = app.locals || {};
-            app.locals.authority = authority;
+            appInstance.locals = appInstance.locals || {};
+            appInstance.locals.authority = authority;
         } catch (e) {
             /* noop */
         }
 
-        await router.applyRoutes(app);
+        if (typeof applyRoutes !== 'function') {
+            throw new Error('router.applyRoutes indisponível');
+        }
+        await applyRoutes(appInstance);
         log('DEBUG', '[BOOT] Rotas HTTP consolidadas');
 
         /* --------------------------------------------------------------
@@ -318,7 +350,16 @@ async function bootstrap(options = {}) {
 
                 // Fallback: persistServerState (file-based discovery)
                 try {
-                    await persistServerState(nerv, port, authority);
+                    await persistServerState(
+                        {
+                            discovery: Discovery,
+                            protocolVersion: PROTOCOL_VERSION || '2.0.0',
+                            singularityMode: CONNECTION_MODES.SINGULARITY,
+                        },
+                        nerv,
+                        port,
+                        authority
+                    );
                 } catch (persistErr) {
                     log('ERROR', `[BOOT] persistServerState falhou: ${persistErr.message}`);
                     if (!nervPublished && Authority.isStandalone(authority)) {
@@ -376,24 +417,19 @@ async function bootstrap(options = {}) {
 
         // Atualiza readiness do app HTTP para consumo do endpoint /ready
         try {
-            try {
-                const app = await import('./engine/app.js').then(m => m.default ?? m);
-                app.locals = app.locals || {};
-                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, {
-                    nerv: Boolean(nerv),
-                    serverAdapter: Boolean(serverAdapter),
-                    httpServer: Boolean(httpServer),
-                });
-                app.locals.requiredReadiness = app.locals.requiredReadiness || ['nerv'];
-                log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
-            } catch (err) {
-                log(
-                    'WARN',
-                    `[BOOT] Não foi possível definir runtimeReadiness no app: ${err && err.message ? err.message : String(err)}`
-                );
-            }
+            appInstance.locals = appInstance.locals || {};
+            appInstance.locals.runtimeReadiness = Object.assign({}, appInstance.locals.runtimeReadiness || null, {
+                nerv: Boolean(nerv),
+                serverAdapter: Boolean(serverAdapter),
+                httpServer: Boolean(httpServer),
+            });
+            appInstance.locals.requiredReadiness = appInstance.locals.requiredReadiness || ['nerv'];
+            log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
         } catch (err) {
-            /* noop */
+            log(
+                'WARN',
+                `[BOOT] Não foi possível definir runtimeReadiness no app: ${err && err.message ? err.message : String(err)}`
+            );
         }
 
         return {
@@ -432,7 +468,9 @@ const __isPm2Managed =
     typeof process.env.NODE_APP_INSTANCE !== 'undefined' ||
     (process.env.PM2_JSON_PROCESSING === 'true' && Boolean(process.env.PM2_HOME));
 
-const __shouldBootstrap = __isDirectRun || __isPm2Managed || process.env.DAEMON_MODE === 'true';
+// Evita side effects de runtime em import puro do entrypoint.
+// Bootstrap automatico fica restrito a execucao direta ou processo gerenciado pelo PM2.
+const __shouldBootstrap = __isDirectRun || __isPm2Managed;
 
 if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
     globalThis.__MISSION_CONTROL_BOOTSTRAPPED__ = true;

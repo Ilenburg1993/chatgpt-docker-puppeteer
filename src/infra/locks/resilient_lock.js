@@ -43,7 +43,7 @@ class ResilientLockManager {
             sigint: null,
             sigterm: null,
             uncaughtException: null,
-            unhandledRejection: null
+            unhandledRejection: null,
         };
 
         /**
@@ -55,13 +55,17 @@ class ResilientLockManager {
             totalReleased: 0,
             totalFailedAcquire: 0,
             totalFailedRelease: 0,
-            peakConcurrentLocks: 0
+            peakConcurrentLocks: 0,
         };
     }
 
     /**
      * Registers process termination handlers for automatic cleanup.
      * Only registers once, subsequent calls are no-op.
+     *
+     * ✅ P0 FIX (2026-02-16): Removed intrusive process.exit calls.
+     * This library should clean up resources but NOT control process lifecycle.
+     *
      * @private
      */
     _registerCleanupHandlers() {
@@ -69,35 +73,27 @@ class ResilientLockManager {
             return;
         }
 
-        const cleanup = async () => {
+        const cleanup = async signal => {
             const lockCount = this.activeLocks.size;
             if (lockCount > 0) {
-                console.log(`[ResilientLock] Process terminating with ${lockCount} active locks, releasing...`);
-                await this.releaseAll();
+                console.log(`[ResilientLock] ${signal} received. Releasing ${lockCount} active locks...`);
+                await this.releaseAll().catch(err => console.error(`[ResilientLock] Cleanup error: ${err.message}`));
             }
         };
 
-        this._cleanupHandlers.beforeExit = cleanup;
-        this._cleanupHandlers.sigint = cleanup;
-        this._cleanupHandlers.sigterm = cleanup;
-        this._cleanupHandlers.uncaughtException = async (err) => {
-            console.error('[ResilientLock] Uncaught exception, cleaning up locks before exit:', err.message);
-            await this.releaseAll();
-            // Re-throw to maintain normal crash behavior
-            process.exit(1);
-        };
-        this._cleanupHandlers.unhandledRejection = async (reason) => {
-            console.error('[ResilientLock] Unhandled rejection, cleaning up locks:', reason);
-            await this.releaseAll();
-            process.exit(1);
-        };
+        // Standard termination signals (graceful shutdown)
+        // We do NOT exit the process here; we let the main event loop finish or be terminated by the orchestrator.
+        this._cleanupHandlers.sigint = () => cleanup('SIGINT');
+        this._cleanupHandlers.sigterm = () => cleanup('SIGTERM');
+        this._cleanupHandlers.beforeExit = () => cleanup('beforeExit');
 
-        // Register handlers for graceful shutdown
-        process.once('beforeExit', this._cleanupHandlers.beforeExit);
+        // ❌ REMOVED: uncaughtException / unhandledRejection handlers.
+        // A library should never hijack global error handling or force process.exit(1).
+        // The main application (main.js/server.js) is responsible for crashing safely.
+
         process.once('SIGINT', this._cleanupHandlers.sigint);
         process.once('SIGTERM', this._cleanupHandlers.sigterm);
-        process.once('uncaughtException', this._cleanupHandlers.uncaughtException);
-        process.once('unhandledRejection', this._cleanupHandlers.unhandledRejection);
+        process.once('beforeExit', this._cleanupHandlers.beforeExit);
 
         this._cleanupHandlersRegistered = true;
         log('DEBUG', '[ResilientLock] Cleanup handlers registered');
@@ -120,14 +116,8 @@ class ResilientLockManager {
             process.removeListener('SIGTERM', this._cleanupHandlers.sigterm);
             this._cleanupHandlers.sigterm = null;
         }
-        if (this._cleanupHandlers.uncaughtException) {
-            process.removeListener('uncaughtException', this._cleanupHandlers.uncaughtException);
-            this._cleanupHandlers.uncaughtException = null;
-        }
-        if (this._cleanupHandlers.unhandledRejection) {
-            process.removeListener('unhandledRejection', this._cleanupHandlers.unhandledRejection);
-            this._cleanupHandlers.unhandledRejection = null;
-        }
+
+        // uncaughtException/unhandledRejection were removed in P0 fix
 
         this._cleanupHandlersRegistered = false;
         log('DEBUG', '[ResilientLock] Cleanup handlers removed');
@@ -176,8 +166,8 @@ class ResilientLockManager {
                 metadata: {
                     ...metadata,
                     acquiredAt: Date.now(),
-                    lockKey
-                }
+                    lockKey,
+                },
             });
 
             // Update stats
@@ -188,7 +178,6 @@ class ResilientLockManager {
 
             log('DEBUG', `[ResilientLock] Acquired ${lockKey} (${this.activeLocks.size} active)`, metadata);
             return true;
-
         } catch (err) {
             this._stats.totalFailedAcquire++;
             log('ERROR', `[ResilientLock] Error acquiring ${lockKey}: ${err.message}`, metadata);
@@ -224,7 +213,6 @@ class ResilientLockManager {
 
             log('DEBUG', `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`, lock.metadata);
             return true;
-
         } catch (err) {
             this._stats.totalFailedRelease++;
             log('WARN', `[ResilientLock] Failed to release ${lockKey}: ${err.message}`, lock.metadata);
@@ -242,13 +230,14 @@ class ResilientLockManager {
      * Releases all active locks.
      * Called automatically on process exit.
      *
+     * @param {number} [timeoutMs=5000] - Timeout per release attempt (not total) to prevent indefinite hang.
      * @returns {Promise<{total: number, released: number, failed: number}>} Release statistics
      *
      * @example
      * const stats = await resilientLock.releaseAll();
      * console.log(`Released ${stats.released}/${stats.total} locks`);
      */
-    async releaseAll() {
+    async releaseAll(timeoutMs = 5000) {
         const lockKeys = Array.from(this.activeLocks.keys());
         const total = lockKeys.length;
         let released = 0;
@@ -259,19 +248,31 @@ class ResilientLockManager {
             return { total: 0, released: 0, failed: 0 };
         }
 
-        log('INFO', `[ResilientLock] Releasing ${total} active locks...`);
+        log('INFO', `[ResilientLock] Releasing ${total} active locks (timeout: ${timeoutMs}ms)...`);
 
-        for (const lockKey of lockKeys) {
-            const success = await this.release(lockKey);
-            if (success) {
-                released++;
-            } else {
+        const promises = lockKeys.map(async lockKey => {
+            try {
+                // Wrap release in timeout
+                const releasePromise = this.release(lockKey);
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+                );
+
+                const success = await Promise.race([releasePromise, timeoutPromise]);
+                if (success) released++;
+                else failed++;
+            } catch (err) {
                 failed++;
+                log('WARN', `[ResilientLock] Failed to release lock ${lockKey}: ${err.message}`);
             }
-        }
+        });
+
+        await Promise.allSettled(promises);
 
         log('INFO', `[ResilientLock] Released ${released}/${total} locks (${failed} failed)`);
-        if (this.activeLocks.size === 0) {
+
+        // Force cleanup even if some failed
+        if (this.activeLocks.size === 0 || failed > 0) {
             this._unregisterCleanupHandlers();
         }
 
@@ -302,7 +303,7 @@ class ResilientLockManager {
         return Array.from(this.activeLocks.entries()).map(([key, lock]) => ({
             key,
             ...lock.metadata,
-            heldForMs: Date.now() - lock.metadata.acquiredAt
+            heldForMs: Date.now() - lock.metadata.acquiredAt,
         }));
     }
 
@@ -318,7 +319,7 @@ class ResilientLockManager {
     getStats() {
         return {
             ...this._stats,
-            currentActive: this.activeLocks.size
+            currentActive: this.activeLocks.size,
         };
     }
 
@@ -386,7 +387,6 @@ class ResilientLockManager {
             }
 
             return extended;
-
         } catch (err) {
             log('ERROR', `[ResilientLock] Failed to extend ${lockKey}: ${err.message}`, lock.metadata);
             return false;

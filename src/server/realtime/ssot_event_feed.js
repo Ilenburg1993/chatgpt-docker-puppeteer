@@ -19,7 +19,7 @@ let _errorCount = 0;
 /**
  * @typedef {object} StartOptions
  * @property {object} socketHub - Instância do SocketHub para emissão de eventos
- * @property {number} [intervalMs=250] - Intervalo em ms entre verificações
+ * @property {number} [intervalMs=1000] - Intervalo em ms entre verificações (aumentado de 250ms para reduzir sobrecarga)
  * @property {number} [batchLimit=500] - Número máximo de eventos por lote
  */
 
@@ -30,34 +30,67 @@ function _asInt(raw, fallback) {
 
 function _fetchMissionCounts(db, missionIds) {
     if (!missionIds || missionIds.length === 0) return {};
-    const placeholders = missionIds.map(() => '?').join(',');
 
+    // Otimização: Uma única query para buscar counts de todas as missões ativas
+    // ao invés de queries separadas por lote de missionIds
     const rows = db
         .prepare(
             `
-            SELECT mission_id, stage, status, COUNT(*) AS c
-            FROM tasks
-            WHERE mission_id IN (${placeholders})
-            GROUP BY mission_id, stage, status
+            SELECT
+                m.id as mission_id,
+                t.stage,
+                t.status,
+                COUNT(t.id) AS c
+            FROM missions m
+            LEFT JOIN tasks t ON t.mission_id = m.id
+            WHERE m.id IN (${missionIds.map(() => '?').join(',')})
+            GROUP BY m.id, t.stage, t.status
+            UNION ALL
+            SELECT
+                m.id as mission_id,
+                NULL as stage,
+                NULL as status,
+                0 AS c
+            FROM missions m
+            WHERE m.id IN (${missionIds.map(() => '?').join(',')})
+            AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.mission_id = m.id)
+            GROUP BY m.id
         `
         )
-        .all(...missionIds);
+        .all(...missionIds, ...missionIds);
 
     /** @type {Record<string, any>} */
     const out = {};
     for (const r of rows) {
         const mid = String(r.mission_id);
-        out[mid] = out[mid] || { tasks_total: 0, by_stage: {}, by_status: {}, proposed: 0, blocked: 0, running: 0, pending: 0, done: 0, failed: 0 };
-        const c = Number(r.c) || 0;
-        out[mid].tasks_total += c;
-        out[mid].by_stage[String(r.stage)] = (out[mid].by_stage[String(r.stage)] || 0) + c;
-        out[mid].by_status[String(r.status)] = (out[mid].by_status[String(r.status)] || 0) + c;
-        if (String(r.stage) === 'PROPOSED') out[mid].proposed += c;
-        if (String(r.status) === 'BLOCKED') out[mid].blocked += c;
-        if (String(r.status) === 'RUNNING') out[mid].running += c;
-        if (String(r.status) === 'PENDING') out[mid].pending += c;
-        if (String(r.status) === 'DONE') out[mid].done += c;
-        if (String(r.status) === 'FAILED') out[mid].failed += c;
+        if (!out[mid]) {
+            out[mid] = {
+                tasks_total: 0,
+                by_stage: {},
+                by_status: {},
+                proposed: 0,
+                blocked: 0,
+                running: 0,
+                pending: 0,
+                done: 0,
+                failed: 0,
+            };
+        }
+
+        if (r.stage !== null && r.status !== null) {
+            const c = Number(r.c) || 0;
+            out[mid].tasks_total += c;
+            out[mid].by_stage[String(r.stage)] = (out[mid].by_stage[String(r.stage)] || 0) + c;
+            out[mid].by_status[String(r.status)] = (out[mid].by_status[String(r.status)] || 0) + c;
+
+            // Contadores específicos
+            if (String(r.stage) === 'PROPOSED') out[mid].proposed += c;
+            if (String(r.status) === 'BLOCKED') out[mid].blocked += c;
+            if (String(r.status) === 'RUNNING') out[mid].running += c;
+            if (String(r.status) === 'PENDING') out[mid].pending += c;
+            if (String(r.status) === 'DONE') out[mid].done += c;
+            if (String(r.status) === 'FAILED') out[mid].failed += c;
+        }
     }
     return out;
 }
@@ -263,7 +296,7 @@ async function _tick(options) {
  * @returns {void}
  */
 function start(options) {
-    const { socketHub, intervalMs = 250, batchLimit = 500 } = options || {};
+    const { socketHub, intervalMs = 1000, batchLimit = 500 } = options || {};
     if (_timer) return;
     if (!socketHub) throw new Error('SSOTEventFeed.start requires socketHub');
 
