@@ -415,6 +415,187 @@ const MIGRATIONS = [
             );
         `,
     },
+    {
+        version: 7,
+        name: 'audit_agent_and_inference_config',
+        up: `
+            CREATE TABLE IF NOT EXISTS audit_jobs (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                priority INTEGER NOT NULL DEFAULT 50,
+                trigger_type TEXT NOT NULL,
+                trigger_ref TEXT NULL,
+                scope_json TEXT NOT NULL DEFAULT '{}',
+                policy_json TEXT NOT NULL DEFAULT '{}',
+                mission_id TEXT NULL,
+                current_step TEXT NULL,
+                created_by TEXT NULL,
+                assigned_to TEXT NULL,
+                attempt_seq INTEGER NOT NULL DEFAULT 0,
+                result_json TEXT NULL,
+                error_json TEXT NULL,
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL,
+                started_at_ms INTEGER NULL,
+                completed_at_ms INTEGER NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_jobs_status_updated ON audit_jobs(status, updated_at_ms);
+            CREATE INDEX IF NOT EXISTS idx_audit_jobs_kind_updated ON audit_jobs(kind, updated_at_ms);
+            CREATE INDEX IF NOT EXISTS idx_audit_jobs_trigger_updated ON audit_jobs(trigger_type, updated_at_ms);
+
+            CREATE TABLE IF NOT EXISTS audit_job_runs (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                attempt_seq INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                executor TEXT NOT NULL DEFAULT 'audit-agent',
+                llm_model TEXT NULL,
+                llm_provider TEXT NULL,
+                token_usage_json TEXT NULL,
+                metrics_json TEXT NULL,
+                error_json TEXT NULL,
+                started_at_ms INTEGER NOT NULL,
+                completed_at_ms INTEGER NULL,
+                FOREIGN KEY (job_id) REFERENCES audit_jobs(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_job_runs_job_attempt ON audit_job_runs(job_id, attempt_seq);
+            CREATE INDEX IF NOT EXISTS idx_audit_job_runs_status_started ON audit_job_runs(status, started_at_ms);
+
+            CREATE TABLE IF NOT EXISTS inference_backends (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                kind TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                base_url TEXT NULL,
+                auth_ref TEXT NULL,
+                health_policy_json TEXT NOT NULL DEFAULT '{}',
+                transport_policy_json TEXT NOT NULL DEFAULT '{}',
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS inference_models (
+                id TEXT PRIMARY KEY,
+                backend_id TEXT NOT NULL,
+                model_name TEXT NOT NULL,
+                alias TEXT NOT NULL UNIQUE,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                capabilities_json TEXT NOT NULL DEFAULT '{}',
+                resource_profile_json TEXT NOT NULL DEFAULT '{}',
+                safety_profile_json TEXT NOT NULL DEFAULT '{}',
+                default_params_json TEXT NOT NULL DEFAULT '{}',
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL,
+                FOREIGN KEY (backend_id) REFERENCES inference_backends(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_inference_models_backend_enabled ON inference_models(backend_id, enabled);
+
+            CREATE TABLE IF NOT EXISTS inference_profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                purpose TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                preferred_backend_id TEXT NULL,
+                preferred_model_id TEXT NULL,
+                fallback_chain_json TEXT NOT NULL DEFAULT '[]',
+                generation_params_json TEXT NOT NULL DEFAULT '{}',
+                budget_policy_json TEXT NOT NULL DEFAULT '{}',
+                validation_policy_json TEXT NOT NULL DEFAULT '{}',
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL,
+                FOREIGN KEY (preferred_backend_id) REFERENCES inference_backends(id) ON DELETE SET NULL,
+                FOREIGN KEY (preferred_model_id) REFERENCES inference_models(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS inference_client_policies (
+                id TEXT PRIMARY KEY,
+                client_tag TEXT NOT NULL UNIQUE,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                profile_id TEXT NULL,
+                allowed_backends_json TEXT NOT NULL DEFAULT '[]',
+                allowed_models_json TEXT NOT NULL DEFAULT '[]',
+                max_parallel INTEGER NOT NULL DEFAULT 1,
+                rate_limit_json TEXT NOT NULL DEFAULT '{}',
+                timeout_ms INTEGER NULL,
+                token_budget_json TEXT NOT NULL DEFAULT '{}',
+                priority INTEGER NOT NULL DEFAULT 50,
+                degraded_behavior_json TEXT NOT NULL DEFAULT '{}',
+                approval_policy_json TEXT NOT NULL DEFAULT '{}',
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL,
+                FOREIGN KEY (profile_id) REFERENCES inference_profiles(id) ON DELETE SET NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_inference_client_policies_enabled ON inference_client_policies(enabled, priority);
+        `,
+    },
+    {
+        version: 8,
+        name: 'audit_agent_findings_patches_watch_rules',
+        up: `
+            CREATE TABLE IF NOT EXISTS audit_job_findings (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                source TEXT NOT NULL,
+                contract_id TEXT NULL,
+                dedup_key TEXT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                evidence_json TEXT NOT NULL DEFAULT '{}',
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL,
+                FOREIGN KEY (job_id) REFERENCES audit_jobs(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_findings_job ON audit_job_findings(job_id, created_at_ms DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_findings_status ON audit_job_findings(status, updated_at_ms DESC);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_findings_dedup ON audit_job_findings(job_id, dedup_key);
+
+            CREATE TABLE IF NOT EXISTS audit_patch_proposals (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                patch_unified_diff TEXT NOT NULL DEFAULT '',
+                patch_summary_json TEXT NOT NULL DEFAULT '{}',
+                risk_score REAL NULL,
+                dry_run_result_json TEXT NULL,
+                approval_required INTEGER NOT NULL DEFAULT 1,
+                approved_by TEXT NULL,
+                approved_at_ms INTEGER NULL,
+                applied_by TEXT NULL,
+                applied_at_ms INTEGER NULL,
+                rollback_patch TEXT NULL,
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL,
+                FOREIGN KEY (job_id) REFERENCES audit_jobs(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_patches_job ON audit_patch_proposals(job_id, created_at_ms DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_patches_status ON audit_patch_proposals(status, updated_at_ms DESC);
+
+            CREATE TABLE IF NOT EXISTS audit_watch_rules (
+                id TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                name TEXT NOT NULL,
+                trigger_type TEXT NOT NULL,
+                scope_json TEXT NOT NULL DEFAULT '{}',
+                schedule_cron TEXT NULL,
+                debounce_ms INTEGER NOT NULL DEFAULT 5000,
+                cooldown_ms INTEGER NOT NULL DEFAULT 30000,
+                action_policy_json TEXT NOT NULL DEFAULT '{}',
+                created_at_ms INTEGER NOT NULL,
+                updated_at_ms INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_watch_rules_enabled ON audit_watch_rules(enabled, updated_at_ms DESC);
+        `,
+    },
 ];
 
 export { MIGRATIONS };

@@ -746,6 +746,28 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
+            upsertRuntimeResource({
+                id: 'ollama_host',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'unknown',
+                stop: async () => {
+                    // Placeholder de ciclo de vida para futura integração do sidecar supervisor.
+                    // Nesta fase, o server só faz probe pontual e não mantém poller local.
+                },
+            });
+            upsertRuntimeResource({
+                id: 'inference_gateway',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'unknown',
+            });
+            upsertRuntimeResource({
+                id: 'audit_agent',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'unknown',
+            });
 
             appInstance.locals = appInstance.locals || {};
             appInstance.locals.runtimeReadiness = Object.assign({}, appInstance.locals.runtimeReadiness || null, {
@@ -789,6 +811,89 @@ async function bootstrap(options = {}) {
                 reasonCode: hasLspTools ? null : 'LSP_TOOLS_NOT_EXPOSED',
                 message: hasLspTools ? null : 'MCP não expôs ferramentas LSP neste ciclo',
             });
+
+            try {
+                const { createOllamaHostSupervisor } = await import('../inference_gateway/ollama_host_supervisor.js');
+                const probeSupervisor = createOllamaHostSupervisor({
+                    retryEnabled: false,
+                    setIntervalFn: () => /** @type {any} */ (null),
+                    clearIntervalFn: () => {},
+                });
+                const ollamaState = await probeSupervisor.pollOnce();
+                setRuntimeResourceState('ollama_host', ollamaState.state === 'ready' ? 'ready' : 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: ollamaState.reasonCode,
+                    message: ollamaState.message,
+                    health: () => probeSupervisor.getState(),
+                });
+            } catch (err) {
+                setRuntimeResourceState('ollama_host', 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: 'OLLAMA_PROBE_FAILED',
+                    message: err?.message || String(err),
+                });
+            }
+
+            const safeProbeJson = async (url, timeoutMs = 1500) => {
+                try {
+                    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+                    const text = await response.text().catch(() => '');
+                    let json = null;
+                    try {
+                        json = text ? JSON.parse(text) : null;
+                    } catch {
+                        json = null;
+                    }
+                    return { ok: response.ok, status: response.status, json };
+                } catch (error) {
+                    return { ok: false, status: null, error: error?.message || String(error), json: null };
+                }
+            };
+
+            try {
+                const inferenceGatewayHost = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
+                const inferenceGatewayPort = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+                const inferenceProbe = await safeProbeJson(
+                    `http://${inferenceGatewayHost}:${inferenceGatewayPort}/health`,
+                    1200
+                );
+                setRuntimeResourceState('inference_gateway', inferenceProbe.ok ? 'ready' : 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: inferenceProbe.ok ? null : 'INFERENCE_GATEWAY_UNREACHABLE',
+                    message: inferenceProbe.ok ? null : inferenceProbe.error || `HTTP ${inferenceProbe.status || 'n/a'}`,
+                    health: () => inferenceProbe,
+                });
+            } catch (err) {
+                setRuntimeResourceState('inference_gateway', 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: 'INFERENCE_GATEWAY_PROBE_FAILED',
+                    message: err?.message || String(err),
+                });
+            }
+
+            try {
+                const auditAgentHost = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
+                const auditAgentPort = Number(process.env.AUDIT_AGENT_PORT || 3098);
+                const auditAgentProbe = await safeProbeJson(`http://${auditAgentHost}:${auditAgentPort}/health`, 1200);
+                setRuntimeResourceState('audit_agent', auditAgentProbe.ok ? 'ready' : 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: auditAgentProbe.ok ? null : 'AUDIT_AGENT_UNREACHABLE',
+                    message: auditAgentProbe.ok ? null : auditAgentProbe.error || `HTTP ${auditAgentProbe.status || 'n/a'}`,
+                    health: () => auditAgentProbe,
+                });
+            } catch (err) {
+                setRuntimeResourceState('audit_agent', 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: 'AUDIT_AGENT_PROBE_FAILED',
+                    message: err?.message || String(err),
+                });
+            }
 
             log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
         } catch (err) {

@@ -31,6 +31,7 @@
 const isProduction = __dirname.endsWith('/dist') || __dirname.endsWith('\\dist');
 const projectRoot = isProduction ? require('path').resolve(__dirname, '..') : __dirname;
 const scriptPath = isProduction ? './start.js' : './index.js';
+const enableAuditAgentPm2Processes = String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true';
 
 console.log(`🔍 PM2 Environment: ${isProduction ? 'PRODUCTION (dist)' : 'DEVELOPMENT (root)'}`);
 console.log(`📁 Project root: ${projectRoot}`);
@@ -262,5 +263,114 @@ module.exports = {
             listen_timeout: 8000, // Startup timeout
             min_uptime: '10s', // Minimum uptime before considering stable
         },
+        ...(enableAuditAgentPm2Processes
+            ? [
+                  {
+                      name: 'inference-gateway',
+                      cwd: projectRoot,
+                      script: './src/inference_gateway/main.js',
+                      wait_ready: true,
+                      exec_mode: 'fork',
+                      instances: 1,
+                      watch: false,
+                      autorestart: true,
+                      kill_timeout: 8000,
+                      listen_timeout: 8000,
+                      max_memory_restart: '512M',
+                      merge_logs: false,
+                      time: true,
+                      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                      error_file: './logs/inference-gateway-error.log',
+                      out_file: './logs/inference-gateway-out.log',
+                      filter_env: ['NO_COLOR'],
+                      env: {
+                          NODE_ENV: 'development',
+                          FORCE_COLOR: '1',
+                          INFERENCE_GATEWAY_ENABLED: 'true',
+                          INFERENCE_GATEWAY_HOST: '127.0.0.1',
+                          INFERENCE_GATEWAY_PORT: '3099',
+                      },
+                      env_production: {
+                          NODE_ENV: 'production',
+                          FORCE_COLOR: '1',
+                          INFERENCE_GATEWAY_ENABLED: 'true',
+                          INFERENCE_GATEWAY_HOST: '127.0.0.1',
+                          INFERENCE_GATEWAY_PORT: '3099',
+                      },
+                  },
+                  {
+                      name: 'ollama-host-supervisor',
+                      cwd: projectRoot,
+                      script: './scripts/ollama-host-supervisor.js',
+                      exec_mode: 'fork',
+                      instances: 1,
+                      watch: false,
+                      autorestart: true,
+                      kill_timeout: 8000,
+                      max_memory_restart: '256M',
+                      merge_logs: false,
+                      time: true,
+                      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                      error_file: './logs/ollama-supervisor-error.log',
+                      out_file: './logs/ollama-supervisor-out.log',
+                      filter_env: ['NO_COLOR'],
+                      env: {
+                          NODE_ENV: 'development',
+                          FORCE_COLOR: '1',
+                          OLLAMA_SUPERVISOR_ENABLED: 'true',
+                          OLLAMA_HEALTH_POLL_MS: '5000',
+                      },
+                      env_production: {
+                          NODE_ENV: 'production',
+                          FORCE_COLOR: '1',
+                          OLLAMA_SUPERVISOR_ENABLED: 'true',
+                          OLLAMA_HEALTH_POLL_MS: '5000',
+                      },
+                  },
+                  {
+                      name: 'audit-agent',
+                      cwd: projectRoot,
+                      script: './src/audit_agent/main.js',
+                      wait_ready: true,
+                      exec_mode: 'fork',
+                      instances: 1,
+                      watch: false,
+                      autorestart: true,
+                      kill_timeout: 8000,
+                      listen_timeout: 8000,
+                      max_memory_restart: '512M',
+                      merge_logs: false,
+                      time: true,
+                      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                      error_file: './logs/audit-agent-error.log',
+                      out_file: './logs/audit-agent-out.log',
+                      filter_env: ['NO_COLOR'],
+                      env: {
+                          NODE_ENV: 'development',
+                          FORCE_COLOR: '1',
+                          AUDIT_AGENT_ENABLED: 'true',
+                          AUDIT_AGENT_MODE: 'semi_auto',
+                          AUDIT_AGENT_HOST: '127.0.0.1',
+                          AUDIT_AGENT_PORT: '3098',
+                          AUDIT_AGENT_MAX_CONCURRENT_JOBS: '1',
+                          AUDIT_AGENT_MAX_PARALLEL_LLM_CALLS: '1',
+                          AUDIT_AGENT_TRIGGER_DEBOUNCE_MS: '5000',
+                          AUDIT_AGENT_JOB_COOLDOWN_MS: '30000',
+                      },
+                      env_production: {
+                          NODE_ENV: 'production',
+                          FORCE_COLOR: '1',
+                          AUDIT_AGENT_ENABLED: 'true',
+                          AUDIT_AGENT_MODE: 'semi_auto',
+                          AUDIT_AGENT_HOST: '127.0.0.1',
+                          AUDIT_AGENT_PORT: '3098',
+                          AUDIT_AGENT_MAX_CONCURRENT_JOBS: '1',
+                          AUDIT_AGENT_MAX_PARALLEL_LLM_CALLS: '1',
+                          AUDIT_AGENT_TRIGGER_DEBOUNCE_MS: '5000',
+                          AUDIT_AGENT_JOB_COOLDOWN_MS: '30000',
+                      },
+                  },
+              ]
+            : []),
     ],
 };
