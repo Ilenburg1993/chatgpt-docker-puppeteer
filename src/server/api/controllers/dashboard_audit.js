@@ -1,0 +1,627 @@
+// @ts-check
+import express from 'express';
+import { log } from '#core/logger';
+import { ok, fail } from '../utils/api_envelope.js';
+import { authenticate } from '../../middleware/auth.js';
+import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
+import { getAuditJobById, listAuditJobs } from '#infra/db/audit_job_repo';
+import { listAuditFindingsByJobId } from '#infra/db/audit_finding_repo';
+import { getAuditPatchProposalById, listAuditPatchProposalsByJobId } from '#infra/db/audit_patch_repo';
+import { listAuditWatchRules } from '#infra/db/audit_watch_rule_repo';
+
+/** @type {ReturnType<typeof express.Router>} */
+const router = express.Router();
+
+function _actorFromReq(req) {
+    return req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] };
+}
+
+async function _runControl(req, res, command, payload = {}) {
+    try {
+        const result = await executeCommand({
+            command,
+            payload: {
+                ...payload,
+                reason: payload.reason || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/audit`,
+                idempotency_key:
+                    payload.idempotency_key ||
+                    req.body?.idempotency_key ||
+                    `${req.id}:${command}:${payload.id || payload.audit_job_id || payload.patch_id || payload.watch_rule_id || 'n/a'}`,
+            },
+            actor: _actorFromReq(req),
+        });
+        return result;
+    } catch (err) {
+        fail(res, req, Number(err?.statusCode || 500), {
+            code: err?.code || 'AUDIT_CONTROL_COMMAND_FAILED',
+            error: err?.message || 'Falha em comando de auditoria',
+            details: err?.details || null,
+        });
+        return null;
+    }
+}
+
+function _positiveIntEnv(name, fallback) {
+    const n = Number(process.env[name]);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+function _computeDryRunState(patch) {
+    const dryRun = patch?.dry_run_result_json;
+    if (!dryRun || typeof dryRun !== 'object') {
+        return { state: 'missing', reason: 'no_dry_run_result' };
+    }
+    if (dryRun.pending === true) {
+        return { state: 'pending', reason: String(dryRun.reason || 'pending') };
+    }
+    const validatedAtMs = Number(dryRun.validated_at_ms ?? dryRun.ts ?? 0);
+    const ttlMs = Number(dryRun.ttl_ms ?? _positiveIntEnv('AUDIT_PATCH_DRY_RUN_MAX_AGE_MS', 10 * 60 * 1000));
+    if (!Number.isFinite(validatedAtMs) || validatedAtMs <= 0) {
+        return { state: 'invalid', reason: 'missing_timestamp' };
+    }
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+        return { state: 'invalid', reason: 'invalid_ttl' };
+    }
+    const ageMs = Math.max(0, Date.now() - validatedAtMs);
+    const expiresAtMs = validatedAtMs + ttlMs;
+    return {
+        state: ageMs <= ttlMs && dryRun.ok === true ? 'fresh' : ageMs <= ttlMs ? 'failed' : 'stale',
+        ok: dryRun.ok === true,
+        age_ms: ageMs,
+        ttl_ms: ttlMs,
+        validated_at_ms: validatedAtMs,
+        expires_at_ms: expiresAtMs,
+        reason: dryRun.reason || null,
+    };
+}
+
+function _enrichPatch(patch) {
+    const summary = _safeObject(patch?.patch_summary_json);
+    const proposedChanges = Array.isArray(summary?.proposed_changes)
+        ? summary.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
+        : [];
+    const candidateFiles = Array.isArray(summary?.candidate_files)
+        ? summary.candidate_files.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
+        : [];
+    const llmMeta = {
+        source: summary?.source ? String(summary.source) : null,
+        llm_provider: summary?.llm_provider ? String(summary.llm_provider) : null,
+        llm_model: summary?.llm_model ? String(summary.llm_model) : null,
+        profile_name: summary?.profile_name ? String(summary.profile_name) : null,
+        risk_level: summary?.risk_level ? String(summary.risk_level) : null,
+        summary: summary?.summary ? String(summary.summary) : null,
+        candidate_files: candidateFiles,
+        proposed_changes: proposedChanges,
+        mode: summary?.mode ? String(summary.mode) : null,
+    };
+    return {
+        ...patch,
+        dry_run_state: _computeDryRunState(patch),
+        llm_patch_summary: llmMeta,
+    };
+}
+
+function _safeObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function _deriveLlmTriageSummary(job) {
+    const result = _safeObject(job?.result_json);
+    const triage = _safeObject(result?.llm_triage);
+    if (!triage) return null;
+    const parsed = _safeObject(triage.parsed);
+    const nextActions = Array.isArray(parsed?.next_actions)
+        ? parsed.next_actions.map(v => String(v || '').trim()).filter(Boolean).slice(0, 5)
+        : [];
+    return {
+        present: true,
+        ok: triage.ok === true,
+        skipped: triage.skipped === true,
+        model: triage.model ? String(triage.model) : null,
+        profile_name: triage.profile_name ? String(triage.profile_name) : null,
+        risk_level: parsed?.risk_level ? String(parsed.risk_level) : null,
+        summary: parsed?.summary ? String(parsed.summary) : null,
+        next_actions: nextActions,
+        error: triage.error ? String(triage.error) : null,
+        ts: Number(triage.ts || 0) || null,
+    };
+}
+
+function _deriveLlmPatchAuthorSummary(job) {
+    const result = _safeObject(job?.result_json);
+    const patchAuthor = _safeObject(result?.llm_patch_author);
+    if (!patchAuthor) return null;
+    const parsed = _safeObject(patchAuthor.parsed);
+    const validation = _safeObject(patchAuthor.validation);
+    const candidateFiles = Array.isArray(parsed?.candidate_files)
+        ? parsed.candidate_files.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+        : [];
+    const proposedChanges = Array.isArray(parsed?.proposed_changes)
+        ? parsed.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+        : [];
+    return {
+        present: true,
+        ok: patchAuthor.ok === true,
+        skipped: patchAuthor.skipped === true,
+        model: patchAuthor.model ? String(patchAuthor.model) : null,
+        profile_name: patchAuthor.profile_name ? String(patchAuthor.profile_name) : null,
+        risk_level: parsed?.risk_level ? String(parsed.risk_level) : null,
+        summary: parsed?.summary ? String(parsed.summary) : null,
+        candidate_files: candidateFiles,
+        proposed_changes: proposedChanges,
+        validation: validation || null,
+        error: patchAuthor.error ? String(patchAuthor.error) : null,
+        ts: Number(patchAuthor.ts || 0) || null,
+    };
+}
+
+function _enrichAuditJob(job) {
+    if (!job || typeof job !== 'object') return job;
+    return {
+        ...job,
+        llm_triage_summary: _deriveLlmTriageSummary(job),
+        llm_patch_author_summary: _deriveLlmPatchAuthorSummary(job),
+    };
+}
+
+function getAuditAgentBaseUrl() {
+    const host = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
+    const port = Number(process.env.AUDIT_AGENT_PORT || 3098);
+    return `http://${host}:${port}`;
+}
+
+async function safeFetchJson(url, timeoutMs = 2000, init = undefined) {
+    try {
+        const res = await fetch(url, {
+            ...init,
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+        const text = await res.text();
+        let json = null;
+        try {
+            json = text ? JSON.parse(text) : null;
+        } catch {
+            json = null;
+        }
+        return { ok: res.ok, status: res.status, json, text };
+    } catch (error) {
+        return { ok: false, status: null, json: null, text: null, error: error?.message || String(error) };
+    }
+}
+
+async function _fetchAuditJobWithFallback(id) {
+    const baseUrl = getAuditAgentBaseUrl();
+    const upstream = await safeFetchJson(`${baseUrl}/jobs/${encodeURIComponent(String(id || ''))}`, 2500);
+    if (upstream.ok) {
+        return { ok: true, status: 200, source: 'audit-agent', job: upstream.json?.job || null, upstream };
+    }
+    const fromDb = getAuditJobById(id);
+    if (fromDb) {
+        return {
+            ok: true,
+            status: 200,
+            source: 'audit-job-repo-fallback',
+            job: fromDb,
+            upstream,
+        };
+    }
+    return {
+        ok: false,
+        status: Number(upstream.status || 503),
+        source: null,
+        job: null,
+        upstream,
+    };
+}
+
+router.get('/audit/runtime', authenticate, async (req, res) => {
+    try {
+        const appLocals = req.app?.locals || {};
+        const runtimeSummary = typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
+        const baseUrl = getAuditAgentBaseUrl();
+        const [health, metrics] = await Promise.all([
+            safeFetchJson(`${baseUrl}/health`, 1500),
+            safeFetchJson(`${baseUrl}/metrics`, 1500),
+        ]);
+
+        const resources = Array.isArray(runtimeSummary?.resources)
+            ? runtimeSummary.resources.filter(item => ['audit_agent'].includes(String(item.id)))
+            : [];
+
+        ok(
+            res,
+            req,
+            {
+                resources,
+                probes: { audit_agent: health },
+                metrics,
+                endpoints: { auditAgent: baseUrl },
+            },
+            { readiness_status: runtimeSummary?.status || 'unknown' }
+        );
+    } catch (err) {
+        log('ERROR', `[DASHBOARD_API] audit runtime failed: ${err?.message || String(err)}`, req.id);
+        fail(res, req, 500, {
+            code: 'AUDIT_RUNTIME_FAILED',
+            error: 'Erro ao recuperar runtime do audit agent',
+            details: err?.message || String(err),
+        });
+    }
+});
+
+router.get('/audit/jobs', authenticate, async (req, res) => {
+    try {
+        const baseUrl = getAuditAgentBaseUrl();
+        const url = new URL(`${baseUrl}/jobs`);
+        if (req.query.status) url.searchParams.set('status', String(req.query.status));
+        if (req.query.limit) url.searchParams.set('limit', String(req.query.limit));
+
+        const upstream = await safeFetchJson(url.toString(), 2500);
+        if (!upstream.ok) {
+            // Fallback to DB snapshots when local runtime is unavailable.
+            const items = listAuditJobs({
+                status: req.query.status ? String(req.query.status) : null,
+                limit: req.query.limit ? Number(req.query.limit) : 100,
+            });
+            return ok(res, req, items.map(_enrichAuditJob), {
+                source: 'audit-job-repo-fallback',
+                upstream_available: false,
+                upstream_error: upstream.error || upstream.json || upstream.text || null,
+            });
+        }
+
+        return ok(res, req, (upstream.json?.items || []).map(_enrichAuditJob), { source: 'audit-agent' });
+    } catch (err) {
+        return fail(res, req, 500, {
+            code: 'AUDIT_JOBS_LIST_FAILED',
+            error: 'Erro ao listar jobs do audit agent',
+            details: err?.message || String(err),
+        });
+    }
+});
+
+router.get('/audit/jobs/:id', authenticate, async (req, res) => {
+    const result = await _fetchAuditJobWithFallback(req.params.id);
+    if (!result.ok) {
+        return fail(res, req, result.status, {
+            code: result.upstream?.status === 404 ? 'AUDIT_JOB_NOT_FOUND' : 'AUDIT_AGENT_UNAVAILABLE',
+            error: result.upstream?.status === 404 ? 'Audit job não encontrado' : 'Audit Agent indisponível',
+            details: result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+        });
+    }
+    return ok(res, req, _enrichAuditJob(result.job), {
+        source: result.source,
+        upstream_available: result.source === 'audit-agent',
+        upstream_error: result.source === 'audit-agent' ? null : result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+    });
+});
+
+router.get('/audit/jobs/:id/llm-triage', authenticate, async (req, res) => {
+    const result = await _fetchAuditJobWithFallback(req.params.id);
+    if (!result.ok) {
+        return fail(res, req, result.status, {
+            code: result.upstream?.status === 404 ? 'AUDIT_JOB_NOT_FOUND' : 'AUDIT_AGENT_UNAVAILABLE',
+            error: result.upstream?.status === 404 ? 'Audit job não encontrado' : 'Audit Agent indisponível',
+            details: result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+        });
+    }
+    const job = result.job || null;
+    const llmTriage = _safeObject(_safeObject(job?.result_json)?.llm_triage);
+    if (!llmTriage) {
+        return ok(res, req, null, {
+            source: result.source,
+            audit_job_id: String(req.params.id || ''),
+            present: false,
+        });
+    }
+    return ok(
+        res,
+        req,
+        {
+            summary: _deriveLlmTriageSummary(job),
+            parsed: _safeObject(llmTriage.parsed) || null,
+            raw_response: typeof llmTriage.raw_response === 'string' ? llmTriage.raw_response : null,
+            preflight: _safeObject(llmTriage.preflight) || null,
+            policy: _safeObject(llmTriage.policy) || null,
+            provider: llmTriage.provider ? String(llmTriage.provider) : null,
+            client_tag: llmTriage.client_tag ? String(llmTriage.client_tag) : null,
+            error: llmTriage.error ? String(llmTriage.error) : null,
+            skipped: llmTriage.skipped === true,
+            ok: llmTriage.ok === true,
+            ts: Number(llmTriage.ts || 0) || null,
+        },
+        {
+            source: result.source,
+            audit_job_id: String(req.params.id || ''),
+            present: true,
+        }
+    );
+});
+
+router.get('/audit/jobs/:id/llm-patch-author', authenticate, async (req, res) => {
+    const result = await _fetchAuditJobWithFallback(req.params.id);
+    if (!result.ok) {
+        return fail(res, req, result.status, {
+            code: result.upstream?.status === 404 ? 'AUDIT_JOB_NOT_FOUND' : 'AUDIT_AGENT_UNAVAILABLE',
+            error: result.upstream?.status === 404 ? 'Audit job não encontrado' : 'Audit Agent indisponível',
+            details: result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+        });
+    }
+    const job = result.job || null;
+    const llmPatch = _safeObject(_safeObject(job?.result_json)?.llm_patch_author);
+    if (!llmPatch) {
+        return ok(res, req, null, {
+            source: result.source,
+            audit_job_id: String(req.params.id || ''),
+            present: false,
+        });
+    }
+    return ok(
+        res,
+        req,
+        {
+            summary: _deriveLlmPatchAuthorSummary(job),
+            parsed: _safeObject(llmPatch.parsed) || null,
+            raw_response: typeof llmPatch.raw_response === 'string' ? llmPatch.raw_response : null,
+            preflight: _safeObject(llmPatch.preflight) || null,
+            policy: _safeObject(llmPatch.policy) || null,
+            validation: _safeObject(llmPatch.validation) || null,
+            patch_proposal: _safeObject(llmPatch.patch_proposal) || null,
+            provider: llmPatch.provider ? String(llmPatch.provider) : null,
+            client_tag: llmPatch.client_tag ? String(llmPatch.client_tag) : null,
+            error: llmPatch.error ? String(llmPatch.error) : null,
+            skipped: llmPatch.skipped === true,
+            ok: llmPatch.ok === true,
+            ts: Number(llmPatch.ts || 0) || null,
+        },
+        {
+            source: result.source,
+            audit_job_id: String(req.params.id || ''),
+            present: true,
+        }
+    );
+});
+
+router.get('/audit/jobs/:id/findings', authenticate, (req, res) => {
+    const items = listAuditFindingsByJobId(String(req.params.id || ''), {
+        limit: req.query.limit ? Number(req.query.limit) : 200,
+    });
+    return ok(res, req, items, {
+        source: 'audit-finding-repo',
+        audit_job_id: String(req.params.id || ''),
+    });
+});
+
+router.get('/audit/jobs/:id/patches', authenticate, (req, res) => {
+    const items = listAuditPatchProposalsByJobId(String(req.params.id || ''), {
+        limit: req.query.limit ? Number(req.query.limit) : 50,
+    });
+    const enriched = items.map(_enrichPatch);
+    const counts = enriched.reduce(
+        (acc, item) => {
+            const state = String(item?.dry_run_state?.state || 'unknown');
+            acc.total += 1;
+            acc.by_status[String(item.status || 'unknown')] = (acc.by_status[String(item.status || 'unknown')] || 0) + 1;
+            acc.dry_run[state] = (acc.dry_run[state] || 0) + 1;
+            return acc;
+        },
+        { total: 0, by_status: {}, dry_run: {} }
+    );
+    return ok(res, req, enriched, {
+        source: 'audit-patch-repo',
+        audit_job_id: String(req.params.id || ''),
+        summary: counts,
+    });
+});
+
+router.get('/audit/patches/:id', authenticate, (req, res) => {
+    const patch = getAuditPatchProposalById(String(req.params.id || ''));
+    if (!patch) {
+        return fail(res, req, 404, {
+            code: 'AUDIT_PATCH_NOT_FOUND',
+            error: 'Audit patch proposal não encontrado',
+        });
+    }
+    return ok(res, req, _enrichPatch(patch), {
+        source: 'audit-patch-repo',
+        audit_patch_id: String(req.params.id || ''),
+    });
+});
+
+router.get('/audit/patches/:id/apply-readiness', authenticate, async (req, res) => {
+    try {
+        const result = await executeCommand({
+            command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
+            payload: {
+                patch_id: req.params.id,
+                reason: String(req.query.reason || 'read apply readiness via /api/dashboard/audit'),
+                idempotency_key: `${req.id}:${COMMANDS.AUDIT_PATCH_APPLY_VALIDATE}:${String(req.params.id || '')}`,
+            },
+            actor: _actorFromReq(req),
+        });
+        return ok(
+            res,
+            req,
+            {
+                patch: result.result?.after ? _enrichPatch(result.result.after) : null,
+                validation: result.result?.metadata?.validation || null,
+            },
+            {
+                source: 'control-plane',
+                command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
+                operation_id: result.operation?.id || null,
+            }
+        );
+    } catch (err) {
+        return fail(res, req, Number(err?.statusCode || 500), {
+            code: err?.code || 'AUDIT_PATCH_APPLY_VALIDATE_FAILED',
+            error: err?.message || 'Falha ao validar readiness de apply',
+            details: err?.details || null,
+        });
+    }
+});
+
+router.get('/audit/jobs/:id/patches/:patchId', authenticate, (req, res) => {
+    const patch = getAuditPatchProposalById(String(req.params.patchId || ''));
+    if (!patch || String(patch.job_id) !== String(req.params.id || '')) {
+        return fail(res, req, 404, {
+            code: 'AUDIT_PATCH_NOT_FOUND',
+            error: 'Audit patch proposal não encontrado para este job',
+        });
+    }
+    return ok(res, req, _enrichPatch(patch), {
+        source: 'audit-patch-repo',
+        audit_patch_id: String(req.params.patchId || ''),
+        audit_job_id: String(req.params.id || ''),
+    });
+});
+
+router.post('/audit/jobs', authenticate, async (req, res) => {
+    const body = req.body || {};
+    const createResult = await _runControl(req, res, COMMANDS.AUDIT_JOB_CREATE, body);
+    if (!createResult) return;
+    const createdJob = createResult.result?.after || createResult.result || null;
+    const runNow = body.run_now === true || body.runNow === true;
+    if (!runNow || !createdJob?.id) {
+        return ok(res, req, { job: createdJob, run: null }, {
+            source: 'control-plane',
+            command: COMMANDS.AUDIT_JOB_CREATE,
+            operation_id: createResult.operation?.id || null,
+        });
+    }
+
+    const runResult = await _runControl(req, res, COMMANDS.AUDIT_JOB_RUN, {
+        audit_job_id: createdJob.id,
+        reason: body.reason || 'run newly created audit job',
+    });
+    if (!runResult) return;
+    return ok(
+        res,
+        req,
+        { job: runResult.result?.after || createdJob, create: createResult.result || null, run: runResult.result || null },
+        {
+            source: 'control-plane',
+            command: `${COMMANDS.AUDIT_JOB_CREATE}+${COMMANDS.AUDIT_JOB_RUN}`,
+            operation_id: runResult.operation?.id || createResult.operation?.id || null,
+        }
+    );
+});
+
+router.post('/audit/jobs/:id/run', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_JOB_RUN, {
+        ...(req.body || {}),
+        audit_job_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_JOB_RUN,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.post('/audit/jobs/:id/cancel', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_JOB_CANCEL, {
+        ...(req.body || {}),
+        audit_job_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_JOB_CANCEL,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.post('/audit/patches/:id/approve', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_APPROVE, {
+        ...(req.body || {}),
+        patch_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_PATCH_APPROVE,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.post('/audit/patches/:id/reject', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_REJECT, {
+        ...(req.body || {}),
+        patch_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_PATCH_REJECT,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.post('/audit/patches/:id/apply', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_APPLY, {
+        ...(req.body || {}),
+        patch_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_PATCH_APPLY,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.post('/audit/patches/:id/apply/validate', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_APPLY_VALIDATE, {
+        ...(req.body || {}),
+        patch_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(
+        res,
+        req,
+        {
+            patch: result.result?.after ? _enrichPatch(result.result.after) : null,
+            validation: result.result?.metadata?.validation || null,
+        },
+        {
+            source: 'control-plane',
+            command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
+            operation_id: result.operation?.id || null,
+        }
+    );
+});
+
+router.post('/audit/watch-rules', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_WATCH_RULE_UPSERT, req.body || {});
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_WATCH_RULE_UPSERT,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.post('/audit/watch-rules/:id/toggle', authenticate, async (req, res) => {
+    const result = await _runControl(req, res, COMMANDS.AUDIT_WATCH_RULE_TOGGLE, {
+        ...(req.body || {}),
+        watch_rule_id: req.params.id,
+    });
+    if (!result) return;
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.AUDIT_WATCH_RULE_TOGGLE,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+router.get('/audit/watch-rules', authenticate, (_req, res) => {
+    const items = listAuditWatchRules({
+        enabledOnly: String(_req.query.enabled_only || 'false').toLowerCase() === 'true',
+        limit: _req.query.limit ? Number(_req.query.limit) : 100,
+    });
+    return ok(res, _req, items, { source: 'audit-watch-rule-repo' });
+});
+
+export default router;

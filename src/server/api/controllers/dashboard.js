@@ -12,6 +12,8 @@ import { authenticate } from '../../middleware/auth.js';
 import dashboardTasksRouter from './dashboard_tasks.js';
 import dashboardMissionsRouter from './dashboard_missions.js';
 import dashboardEventsRouter from './dashboard_events.js';
+import dashboardInferenceRouter from './dashboard_inference.js';
+import dashboardAuditRouter from './dashboard_audit.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -224,6 +226,8 @@ router.get('/auth/me', authenticate, (req, res) => {
 router.use(dashboardTasksRouter);
 router.use(dashboardMissionsRouter);
 router.use(dashboardEventsRouter);
+router.use(dashboardInferenceRouter);
+router.use(dashboardAuditRouter);
 
 /* --------------------------------------------------------------------------
    TELEMETRY - Métricas em Tempo Real (compat)
