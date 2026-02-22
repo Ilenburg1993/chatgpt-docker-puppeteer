@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log as _log } from '#core/logger';
 import { createCursor } from 'ghost-cursor';
 
@@ -800,7 +801,7 @@ async function humanClick(...args) {
     if (_isLegacyHumanClickArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */
-        const legacyArgs = /** @type {any} */ (args);
+        const legacyArgs = /** @type {unknown} */ (args);
         await humanClickCore(...legacyArgs);
         return true;
     }
@@ -884,7 +885,7 @@ async function humanType(...args) {
     if (_isLegacyHumanTypeArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */
-        const legacyArgs = /** @type {any} */ (args);
+        const legacyArgs = /** @type {unknown} */ (args);
         await humanTypeCore(...legacyArgs);
         return true;
     }

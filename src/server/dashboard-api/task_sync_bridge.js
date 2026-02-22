@@ -300,8 +300,8 @@ class TaskSyncBridge extends EventEmitter {
                     : err &&
                         typeof err === 'object' &&
                         err !== null &&
-                        typeof (/** @type {any} */ (err).message) === 'string'
-                      ? /** @type {any} */ (err).message
+                        typeof (/** @type {unknown} */ (err).message) === 'string'
+                      ? /** @type {unknown} */ (err).message
                       : err
                         ? JSON.stringify(err)
                         : 'Unknown error';
@@ -346,8 +346,8 @@ class TaskSyncBridge extends EventEmitter {
                     : err &&
                         typeof err === 'object' &&
                         err !== null &&
-                        typeof (/** @type {any} */ (err).message) === 'string'
-                      ? /** @type {any} */ (err).message
+                        typeof (/** @type {unknown} */ (err).message) === 'string'
+                      ? /** @type {unknown} */ (err).message
                       : err
                         ? JSON.stringify(err)
                         : 'Task failed';
@@ -459,8 +459,8 @@ class TaskSyncBridge extends EventEmitter {
             }
 
             const queue = await io.getQueue();
-            const task = /** @type {any} */ (
-                queue.find(t => /** @type {any} */ (t)?.meta?.id === taskId || /** @type {any} */ (t)?.id === taskId)
+            const task = /** @type {unknown} */ (
+                queue.find(t => /** @type {unknown} */ (t)?.meta?.id === taskId || /** @type {unknown} */ (t)?.id === taskId)
             );
             if (!task) {
                 return;
@@ -469,15 +469,15 @@ class TaskSyncBridge extends EventEmitter {
             const persistedTask = {
                 ...task,
                 runtime_state: {
-                    .../** @type {any} */ ((task).runtime_state || {}),
+                    .../** @type {unknown} */ ((task).runtime_state || {}),
                     ...runtimeState,
                 },
                 state: {
-                    .../** @type {any} */ ((task).state || {}),
+                    .../** @type {unknown} */ ((task).state || {}),
                     status:
                         runtimeState.status ||
-                        /** @type {any} */ (task).state?.status ||
-                        /** @type {any} */ (task).status ||
+                        /** @type {unknown} */ (task).state?.status ||
+                        /** @type {unknown} */ (task).status ||
                         UnifiedStatus.PENDING,
                     updated_at: Date.now(),
                 },

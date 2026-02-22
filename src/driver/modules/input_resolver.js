@@ -15,7 +15,7 @@ const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
     CACHE_TTL_MS: parseInt(
         process.env.RESOLVER_CACHE_TTL ||
-            /** @type {any} */ (CONFIG).all?.INPUT_CACHE_TTL ||
+            /** @type {unknown} */ (CONFIG).all?.INPUT_CACHE_TTL ||
             '60000'
     ),
     

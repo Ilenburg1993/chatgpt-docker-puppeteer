@@ -859,7 +859,7 @@ class DriverFactory extends EventEmitter {
                 if (CONFIG.DRIVER_BACKPRESSURE_TEMP) {
                     log('WARN', '[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)');
                     const tempDriver = await this.createDriver(key, this.config, { skipEnsureReady: true });
-                    /** @type {any} */ (tempDriver)._isTemporary = true;
+                    /** @type {import('#types/driver/contracts').IDriver} */ (tempDriver)._isTemporary = true;
                     this.metrics.temporaryDriversCreated++;
                     return tempDriver;
                 }

@@ -115,7 +115,7 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
                 continue;
             }
 
-            const tt = /** @type {any} */ (targetTask);
+            const tt = /** @type {Record<string, unknown>} */ (targetTask);
 
             // Proteção contra auto-referência (Prevenção de paradoxo recursivo)
             if (currentTask && tt.meta?.id === currentTask.meta?.id) {

@@ -26,7 +26,7 @@ export const types = {
  * @throws {Error} Se a validação falhar após tentativas de migração.
  */
 export const parseTask = raw => {
-    /** @type {any} */
+    /** @type {Record<string, unknown>} */
     const r = raw;
     // V5-safe: never "heal" a declared V5 task back into V4.
     if (r?.meta?.version === '5.0') {

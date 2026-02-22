@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
 /**
@@ -207,7 +208,7 @@ function validateBrowserConnection(browser) {
         });
     }
 
-    if (!/** @type {any} */ (browser).isConnected()) {
+    if (!/** @type {import('puppeteer').Browser} */ (browser).isConnected()) {
         return ValidationResult.fail('BROWSER_DISCONNECTED', {
             message: 'Browser não está conectado',
             suggestion: 'Verifique se Chrome está rodando e acessível'

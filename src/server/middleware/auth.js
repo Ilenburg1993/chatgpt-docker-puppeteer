@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-check - Type checking rigoroso habilitado
 import jwt from 'jsonwebtoken';
 import { log } from '#core/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';

@@ -1,3 +1,5 @@
+// @ts-check - Type checking rigoroso habilitado
+
 /**
  * @fileoverview Async initialization utilities for race-free module loading.
  * Provides patterns for safe async initialization in ESM modules.

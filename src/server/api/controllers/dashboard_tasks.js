@@ -244,7 +244,7 @@ router.get('/tasks/:id', async (req, res) => {
 
         const task = taskRowToDetailTask(row);
 
-        /** @type {any} */
+        /** @type {unknown} */
         const data = { task };
         data.mission_ref = task.mission_ref || null;
 

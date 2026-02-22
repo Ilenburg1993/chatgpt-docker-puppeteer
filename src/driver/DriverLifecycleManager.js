@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-check - Type checking rigoroso habilitado
 
 import * as driverFactory from './factory.js';
 
@@ -31,7 +31,7 @@ export class DriverLifecycleManager {
         // Soberania de interrupcao: o chamador pode abortar execucao a qualquer momento.
         this.abortController = new AbortController();
 
-        /** @type {any} */
+        /** @type {import('#types/driver/contracts').IDriver | null} */
         this.driver = null;
         this._released = false;
     }

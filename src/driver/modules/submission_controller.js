@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import * as adaptive from '#logic/adaptive';
 import { log } from '#core/logger';

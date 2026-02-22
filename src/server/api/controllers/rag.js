@@ -190,7 +190,7 @@ export async function handleRagHealth(req, res) {
  */
 export async function handleRagIndex(req, res) {
   try {
-    const body = /** @type {any} */ (req.body || {});
+    const body = /** @type {unknown} */ (req.body || {});
     const {
       root,
       profile,

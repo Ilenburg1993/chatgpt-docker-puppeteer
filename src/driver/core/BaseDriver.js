@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
+import { DRIVER_DOMAINS, DRIVER_NAMES } from '#core/constants';
 import { DriverReadinessGuard } from '../guards/DriverReadinessGuard.js';
 import PageSessionTracker from '../trackers/PageSessionTracker.js';
 import TargetDriver from './TargetDriver.js';
@@ -70,7 +71,7 @@ class BaseDriver extends TargetDriver {
         super(config);
 
         // Driver identification (writable so target drivers can override)
-        this.name = 'BaseUniversalDriver';
+        this.name = DRIVER_NAMES.BASE_UNIVERSAL;
 
         // ✅ v3.0: currentDomain será atualizado quando page for attached
         this.currentDomain = null;
@@ -162,7 +163,7 @@ class BaseDriver extends TargetDriver {
 
         modules.forEach(module => {
             if (module) {
-                /** @type {any} */ (module).driver = this;
+                /** @type {import('puppeteer-core').Page | import('#types/driver/contracts').IDriver} */ (module).driver = this;
             }
         });
     }
@@ -304,12 +305,12 @@ class BaseDriver extends TargetDriver {
         try {
             const url = this.page.url();
             if (!url || url === 'about:blank' || !url.startsWith('http')) {
-                this.currentDomain = 'initialization';
+                this.currentDomain = DRIVER_DOMAINS.INITIALIZATION;
                 return this.currentDomain;
             }
             this.currentDomain = new URL(url).hostname.replace(/^www\./, '');
         } catch (_e) {
-            this.currentDomain = 'unknown_context';
+            this.currentDomain = DRIVER_DOMAINS.UNKNOWN_CONTEXT;
         }
 
         // ✅ v2.0: Emit domain change

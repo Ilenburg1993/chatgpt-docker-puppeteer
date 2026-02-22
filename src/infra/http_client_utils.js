@@ -1,3 +1,5 @@
+// @ts-check - Type checking rigoroso habilitado
+
 /**
  * @fileoverview Safe HTTP client utilities with guaranteed resource cleanup.
  * Prevents request handle leaks by ensuring proper destruction on timeout/error.

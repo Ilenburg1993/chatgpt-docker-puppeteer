@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { DRIVER_NAMES } from '#core/constants';
 import { isDomainMatch } from '#core/domain_matcher';
 import { log } from '#core/logger';
 
@@ -181,7 +182,7 @@ class TargetDriver extends EventEmitter {
             enumerable: false,
         });
 
-        this.name = 'Generic';
+        this.name = DRIVER_NAMES.GENERIC;
         this.destroyed = false;
         // Always initialize with a string so typed code doesn't need null-guards.
         // BaseDriver may overwrite with its own correlationId generator.

@@ -1,5 +1,7 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import BaseDriver from '#driver/core/BaseDriver';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { DRIVER_NAMES } from '#core/constants';
 import * as triage from '../modules/triage.js';
 import * as adaptive from '#logic/adaptive';
 import * as analyzer from '#shared/sadi/analyzer';
@@ -73,7 +75,7 @@ class ChatGPTDriver extends BaseDriver {
     constructor(config) {
         super(config);
 
-        this.name = 'ChatGPT';
+        this.name = DRIVER_NAMES.CHATGPT;
         this.currentDomain = 'chatgpt.com';
 
         // ✅ v2.0: Use CHATGPT_CONFIG
@@ -166,7 +168,7 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         // Valida interface carregada
-        const interfaceValidation = await validateLLMInterface(/** @type {any} */ (this.page));
+        const interfaceValidation = await validateLLMInterface(/** @type {import('puppeteer').Page} */ (this.page));
         if (!interfaceValidation.valid) {
             const err = new Error(`PREREQUISITE_FAILED: ${interfaceValidation.reason}`);
             err.details = interfaceValidation.details;
@@ -247,7 +249,7 @@ class ChatGPTDriver extends BaseDriver {
 
             try {
                 // ✅ BUG #4: Validar navegação
-                const response = /** @type {any} */ (await this.page.goto(targetUrl, {
+                const response = /** @type {import('puppeteer').HTTPResponse} */ (await this.page.goto(targetUrl, {
                     waitUntil: 'networkidle2',
                     timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
                 }));
@@ -307,7 +309,7 @@ class ChatGPTDriver extends BaseDriver {
             throw new Error('Textarea not found');
         }
 
-        const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {any} */ (inputProtocol.protocol), this.signal);
+        const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {Protocol} */ (inputProtocol.protocol), this.signal);
 
         // 2. Limpar textarea
         await ctx.evaluate(proto => {
@@ -337,7 +339,7 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         const { ctx: sendCtx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
-            /** @type {any} */ (sendProtocol.protocol),
+            /** @type {Protocol} */ (sendProtocol.protocol),
             this.signal
         );
         const rect = await this.biomechanics.getStableRect(sendCtx, sendProtocol.protocol.selector);
@@ -428,7 +430,7 @@ class ChatGPTDriver extends BaseDriver {
                 let currentText = '';
 
                 if (responseArea && responseArea.protocol) {
-                    const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {any} */ (responseArea.protocol), this.signal);
+                    const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {Protocol} */ (responseArea.protocol), this.signal);
 
                     // Extração com Poda de Pensamento (NASA Standard Pruning)
                     const extractionResult = await ctx.evaluate(proto => {
@@ -715,7 +717,7 @@ class ChatGPTDriver extends BaseDriver {
 
         if (stopProtocol && stopProtocol.protocol) {
             const { ctx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
-                /** @type {any} */ (stopProtocol.protocol),
+                /** @type {Protocol} */ (stopProtocol.protocol),
                 this.signal
             );
             const rect = await this.biomechanics.getStableRect(ctx, stopProtocol.protocol.selector);

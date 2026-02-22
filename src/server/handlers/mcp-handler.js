@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * MCP (Model Context Protocol) Handler for Express
  *

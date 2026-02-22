@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
 import { ConnectionOrchestrator } from '../ConnectionOrchestrator.js';
@@ -117,7 +118,7 @@ class BrowserPoolManager {
         }
 
         // ✅ Bug #3: Validar proxy ANTES de tentar conectar
-        const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
+        const CONFIG = /** @type {import('#core/config').default} */ (await import('#core/config').then(m => m.default ?? m));
         if (CONFIG.CHROME_PROXY_ENABLED !== false) {
             await this._validateProxyAvailability();
         }
@@ -695,7 +696,7 @@ class BrowserPoolManager {
      * TTL: 1 hour (3600000ms) - configurable via BROWSER_PAGE_TTL_MS
      */
     async _cleanupZombiePages() {
-        const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
+        const CONFIG = /** @type {import('#core/config').default} */ (await import('#core/config').then(m => m.default ?? m));
         const ttlMs = Number(this.config.pageTtlMs || CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000);
         const now = Date.now();
         let zombieCount = 0;
@@ -787,7 +788,7 @@ class BrowserPoolManager {
      * @throws {Error} Se proxy não estiver disponível ou unhealthy
      */
     async _validateProxyAvailability() {
-        const CONFIG = /** @type {any} */ (await import('#core/config').then(m => m.default ?? m));
+        const CONFIG = /** @type {import('#core/config').default} */ (await import('#core/config').then(m => m.default ?? m));
 
         /*
          * CONTRATO DE TOPOLOGIA (CANÔNICO):

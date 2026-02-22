@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * @fileoverview Resilient Lock Manager with automatic cleanup on process termination.
  * Guarantees lock release even when process crashes, preventing deadlocks.

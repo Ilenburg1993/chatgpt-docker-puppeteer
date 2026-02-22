@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import * as human from '#shared/biomechanics/human';
 import * as analyzer from '#shared/sadi/analyzer';
@@ -60,6 +61,37 @@ const BIOMECH_CONFIG = {
     /** TTL do cache de modifier (ms) - Default: 1h */
     MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000')
 };
+
+/**
+ * Keyboard modifier keys used for keyboard shortcuts.
+ *
+ * @readonly
+ * @enum {string}
+ */
+const MODIFIER_KEYS = {
+    /** Control key (Windows/Linux primary modifier) */
+    CONTROL: 'Control',
+
+    /** Meta key (Mac primary modifier) */
+    META: 'Meta',
+
+    /** Shift key */
+    SHIFT: 'Shift',
+
+    /** Alt key */
+    ALT: 'Alt'
+};
+
+/**
+ * Array of all known modifier keys
+ * @type {ReadonlyArray<string>}
+ */
+const MODIFIER_KEYS_ARRAY = Object.values(MODIFIER_KEYS);
+
+/**
+ * Frozen modifier keys object (immutable)
+ */
+Object.freeze(MODIFIER_KEYS);
 
 /**
  * Eventos emitidos pelo BiomechanicsEngine.
@@ -245,13 +277,13 @@ class BiomechanicsEngine extends EventEmitter {
                 this.modifier = null;
             } else {
                 // Windows/Linux sempre usa Control
-                this.modifier = 'Control';
+                this.modifier = MODIFIER_KEYS.CONTROL;
             }
 
             this.modifierTimestamp = Date.now();
             this.stats.modifierDetections++;
         } catch (_modErr) {
-            this.modifier = 'Control';
+            this.modifier = MODIFIER_KEYS.CONTROL;
             this.modifierTimestamp = Date.now();
         }
 
@@ -279,7 +311,7 @@ class BiomechanicsEngine extends EventEmitter {
 
         try {
             if (this.driver.page && !this.driver.page.isClosed()) {
-                const knownMods = ['Control', 'Meta', 'Shift', 'Alt'];
+                const knownMods = MODIFIER_KEYS_ARRAY;
                 for (const mod of knownMods) {
                     try {
                         await this.driver.page.keyboard.up(mod);
@@ -818,4 +850,4 @@ function create(driver) {
     return new BiomechanicsEngine(driver);
 }
 
-export { BiomechanicsEngine, BIOMECH_CONFIG, BIOMECH_EVENTS, create };
+export { BiomechanicsEngine, BIOMECH_CONFIG, BIOMECH_EVENTS, MODIFIER_KEYS, MODIFIER_KEYS_ARRAY, create };

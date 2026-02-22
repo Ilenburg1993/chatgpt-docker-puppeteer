@@ -1,6 +1,8 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { ERROR_NAMES } from '#core/constants';
 import * as i18n from '#core/i18n';
 import { log } from '#core/logger';
 
@@ -89,7 +91,7 @@ class TriageError extends Error {
      */
     constructor(type, message, context) {
         super(message);
-        this.name = 'TriageError';
+        this.name = ERROR_NAMES.TRIAGE_ERROR;
         this.type = type;
         this.context = context;
         this.timestamp = Date.now();

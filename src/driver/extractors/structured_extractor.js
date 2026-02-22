@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import TurndownService from 'turndown';
 import { parse as parseHTML } from 'node-html-parser';
 import * as logger from '#core/logger';
@@ -139,7 +140,7 @@ class StructuredExtractor {
      */
     _parseStructured(html) {
         try {
-            const root = /** @type {any} */ (parseHTML(html));
+            const root = /** @type {HTMLElement} */ (parseHTML(html));
 
             return {
                 sections: this._extractSections(root),

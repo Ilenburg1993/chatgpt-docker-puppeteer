@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-check - Type checking rigoroso habilitado
 import crypto from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';

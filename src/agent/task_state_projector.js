@@ -293,11 +293,11 @@ class TaskStateProjector {
             ActionCode.DRIVER_TASK_RETRYING,
             ActionCode.DRIVER_ERROR,
         ]);
-        if (!supported.has(/** @type {any} */ (actionCode))) {
+        if (!supported.has(/** @type {unknown} */ (actionCode))) {
             return;
         }
 
-        const payload = /** @type {any} */ (getPayload(envelope));
+        const payload = /** @type {unknown} */ (getPayload(envelope));
         const taskId = getTaskIdFromPayload(payload);
         if (!taskId) return;
 

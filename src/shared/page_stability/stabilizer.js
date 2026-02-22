@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import * as adaptive from '#logic/adaptive';
 
@@ -123,7 +124,7 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                     const selector =
                         '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
                     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-                    /** @type {any} */
+                    /** @type {unknown} */
                     let node = walker.currentNode;
 
                     while (node) {
@@ -425,7 +426,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                     const curr = queue.shift();
                                     if (!curr) break;
                                     const walker = document.createTreeWalker(curr, NodeFilter.SHOW_ELEMENT);
-                                    /** @type {any} */
+                                    /** @type {unknown} */
                                     let node = walker.nextNode();
                                     while (node) {
                                         if (node.nodeType === 1) {

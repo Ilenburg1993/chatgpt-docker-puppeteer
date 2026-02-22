@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as PATHS from '#infra/fs/paths';
 import * as io from '#infra/io';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
@@ -155,7 +156,7 @@ async function _captureVisualEvidence(page, folder, _correlationId) {
     // B. Snapshot do DOM (Legibilidade Preservada)
     // Removemos scripts e iframes, mas mantemos o CSS para análise visual humana.
     const html = await page.evaluate(() => {
-        const clone = /** @type {any} */ (document.documentElement.cloneNode(true));
+        const clone = /** @type {Element} */ (document.documentElement.cloneNode(true));
         // Limpeza de elementos ativos que podem quebrar o visualizador offline
         const selectorsToRemove = 'script, iframe, noscript, link[rel="prefetch"], link[rel="preload"]';
         clone.querySelectorAll(selectorsToRemove).forEach(e => e.remove());

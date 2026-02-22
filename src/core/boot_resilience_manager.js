@@ -84,7 +84,7 @@ async function createBrowserPool(config, nerv = null) {
 
     // ✅ Injeta NERV no Circuit Breaker
     if (nerv && pool.circuitBreaker) {
-        /** @type {any} */ (pool.circuitBreaker).nerv = nerv;
+        /** @type {import('./circuit_breaker').CircuitBreakerManager} */ (pool.circuitBreaker).nerv = nerv;
         log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
     }
 
@@ -254,7 +254,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                     // Chrome iniciado! Tenta reconectar Browser Pool usando createBrowserPool
                     try {
                         const { default: CONFIG } = await import('./config.js');
-                        const all = /** @type {any} */ (CONFIG).all || {};
+                        const all = /** @type {Record<string, unknown>} */ (CONFIG).all || {};
 
                         const browserPool = await createBrowserPool({
                             poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
@@ -341,7 +341,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                 try {
                     const { default: CONFIG } = await import('./config.js');
-                    const all = /** @type {any} */ (CONFIG).all || {};
+                    const all = /** @type {Record<string, unknown>} */ (CONFIG).all || {};
 
                     const browserPool = await createBrowserPool({
                         poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
@@ -406,7 +406,7 @@ async function initializeBrowserPoolResilient(config, options = {}) {
 
         // ✅ Injeta NERV no Circuit Breaker
         if (nerv && browserPool.circuitBreaker) {
-            /** @type {any} */ (browserPool.circuitBreaker).nerv = nerv;
+            /** @type {import('./circuit_breaker').CircuitBreakerManager} */ (browserPool.circuitBreaker).nerv = nerv;
             log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
         }
 

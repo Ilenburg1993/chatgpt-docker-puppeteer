@@ -1,3 +1,4 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import * as driverFactory from '../factory.js';
 import { STATUS_VALUES } from '#core/constants/tasks';

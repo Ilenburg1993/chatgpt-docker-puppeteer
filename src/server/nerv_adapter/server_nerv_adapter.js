@@ -312,7 +312,7 @@ class ServerNERVAdapter {
     async _broadcastEvent(envelope) {
 
         const actionCode = getActionCode(envelope);
-        if (!actionCode || PRIVATE_EVENTS.has(/** @type {any} */ (actionCode))) return;
+        if (!actionCode || PRIVATE_EVENTS.has(/** @type {string} */ (actionCode))) return;
 
         const socketEvent = this._translateEventName(actionCode);
         const payload = getPayload(envelope);

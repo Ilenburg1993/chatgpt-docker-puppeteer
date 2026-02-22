@@ -547,7 +547,7 @@ export const getIO = () => ioInstance;
 export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
 export const once = (eventName, handler) => internalEmitter.once(eventName, handler);
 export const off = (eventName, handler) => internalEmitter.off(eventName, handler);
-export const emit = (eventName, ...args) => /** @type {any} */ (internalEmitter).emit(eventName, ...args);
+export const emit = (eventName, ...args) => /** @type {import('node:events').EventEmitter} */ (internalEmitter).emit(eventName, ...args);
 
 export const sendToClient = (clientId, eventName, data) => {
     if (!ioInstance) {

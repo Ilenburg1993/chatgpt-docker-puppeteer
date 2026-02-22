@@ -1,5 +1,7 @@
+// @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
+import { ERROR_NAMES } from '#core/constants';
 
 /**
  * Configuração de navegação em frames (timeouts, depth limit, retry).
@@ -71,7 +73,7 @@ class FrameNavError extends Error {
      */
     constructor(type, message, context) {
         super(message);
-        this.name = 'FrameNavError';
+        this.name = ERROR_NAMES.FRAME_NAV_ERROR;
         this.type = type;
         this.context = context;
         this.timestamp = Date.now();

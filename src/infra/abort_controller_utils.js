@@ -1,3 +1,5 @@
+// @ts-check - Type checking rigoroso habilitado
+
 /**
  * @fileoverview Utility functions for managing AbortController with Promise operations.
  * Provides safe patterns for timeout handling and resource cleanup.

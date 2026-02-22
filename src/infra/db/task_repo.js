@@ -216,7 +216,7 @@ function countTasks({ status = null, stage = null, missionId = null } = {}) {
 
     const sql = `SELECT COUNT(*) as n FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`;
     const row = db.prepare(sql).get(params);
-    return /** @type {any} */ (row)?.n || 0;
+    return /** @type {{ n: number }} */ (row)?.n || 0;
 }
 
 function getTaskDependencies(taskId) {
@@ -408,7 +408,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
     }
 
     /** @type {TaskRow} */
-    const row = /** @type {any} */ (existing);
+    const row = /** @type {TaskRow} */ (existing);
     const expectedVersion = row.updated_at_ms;
 
     const nextStage = updates.stage ?? row.stage;

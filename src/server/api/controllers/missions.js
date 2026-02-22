@@ -255,7 +255,7 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             workflow = await workflowGenerator.generateWorkflow(templateId, params);
         }
 
-        const mission = /** @type {any} */ (
+        const mission = /** @type {unknown} */ (
             createMission({
                 title,
                 description,

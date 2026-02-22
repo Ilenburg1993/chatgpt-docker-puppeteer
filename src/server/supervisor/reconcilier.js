@@ -41,7 +41,7 @@ class SupervisorReconciler {
             return;
         }
 
-        const io = /** @type {any} */ (socketHub.getIO());
+        const io = /** @type {unknown} */ (socketHub.getIO());
         if (!io) {
             log('WARN', '[RECONCILER] Barramento indisponível. Re-tentando acoplamento em 5s...');
             setTimeout(() => this._attachSensoryListeners(), 5000);
