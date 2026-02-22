@@ -42,4 +42,3 @@ export function mergeSmallRanges({ ranges, lines, minChunkChars, maxChunkChars }
 
     return merged;
 }
-

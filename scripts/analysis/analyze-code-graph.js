@@ -17,7 +17,7 @@ const options = {
     findOrphans: args.includes('--orphans'),
     showStats: args.includes('--stats') || args.length === 0,
     exportJson: args.includes('--export-json'),
-    exportDot: args.includes('--export-dot')
+    exportDot: args.includes('--export-dot'),
 };
 
 // Resolve config in canonical order: tsconfig first, jsconfig fallback.
@@ -45,7 +45,7 @@ const moduleStats = {
     total: 0,
     byDirectory: {},
     topImporters: [],
-    topImported: []
+    topImported: [],
 };
 
 /**
@@ -376,7 +376,7 @@ if (options.exportJson) {
         reverseDependencies: Object.fromEntries(reverseGraph),
         nervEvents,
         circular: options.findCircular ? findCircularDependencies() : [],
-        orphans: options.findOrphans ? findOrphans() : []
+        orphans: options.findOrphans ? findOrphans() : [],
     };
 
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
@@ -399,7 +399,7 @@ if (options.exportDot) {
             DRIVER: 'lightyellow',
             SERVER: 'lightpink',
             INFRA: 'lightgray',
-            CORE: 'orange'
+            CORE: 'orange',
         };
 
         deps.forEach(dep => {

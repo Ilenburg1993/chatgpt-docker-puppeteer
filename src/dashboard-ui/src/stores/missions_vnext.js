@@ -70,6 +70,7 @@ async function _syncMissionAndTasksContext(missionId) {
     await Promise.allSettled([_refreshTasksSliceForMission(missionId), _refreshMissionSlice()]);
 }
 
+/** Constante/valor exportado: useMissionsVNextStore. */
 export const useMissionsVNextStore = defineStore('missions_vnext', {
     state: () => ({
         items: /** @type {any[]} */ ([]),

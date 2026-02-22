@@ -17,17 +17,14 @@ console.log('-'.repeat(80));
 console.log();
 
 try {
-    const codePrompt = 'Write a JavaScript function named greet that takes a name and returns "Hello, [name]!". Just the code.';
+    const codePrompt =
+        'Write a JavaScript function named greet that takes a name and returns "Hello, [name]!". Just the code.';
     console.log('Prompt:', codePrompt);
     console.log('Model: gpt-oss:20b-cloud (120B parameters, cloud)');
     console.log();
     console.log('Chamando Ollama Cloud...');
 
-    const codeResult = await ollama.generate(
-        codePrompt,
-        'gpt-oss:20b-cloud',
-        { temperature: 0.3, num_predict: 150 }
-    );
+    const codeResult = await ollama.generate(codePrompt, 'gpt-oss:20b-cloud', { temperature: 0.3, num_predict: 150 });
 
     console.log();
     console.log('✅ RESPOSTA LITERAL (Code Generation):');
@@ -52,11 +49,10 @@ try {
     console.log();
     console.log('Chamando Ollama Cloud...');
 
-    const chatResult = await ollama.generate(
-        chatPrompt,
-        'gemini-3-pro-preview:latest',
-        { temperature: 0.7, num_predict: 200 }
-    );
+    const chatResult = await ollama.generate(chatPrompt, 'gemini-3-pro-preview:latest', {
+        temperature: 0.7,
+        num_predict: 200,
+    });
 
     console.log();
     console.log('✅ RESPOSTA LITERAL (Text/Chat Generation):');
@@ -81,11 +77,7 @@ try {
     console.log();
     console.log('Chamando Ollama Local...');
 
-    const codeResult2 = await ollama.generate(
-        codePrompt2,
-        'qwen2.5-coder:3b',
-        { temperature: 0.3, num_predict: 150 }
-    );
+    const codeResult2 = await ollama.generate(codePrompt2, 'qwen2.5-coder:3b', { temperature: 0.3, num_predict: 150 });
 
     console.log();
     console.log('✅ RESPOSTA LITERAL (Code Generation - Local):');

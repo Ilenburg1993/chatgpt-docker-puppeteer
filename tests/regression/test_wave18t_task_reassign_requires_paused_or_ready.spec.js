@@ -17,4 +17,3 @@ test('wave18t: TASK_REASSIGN_MISSION exige estado PAUSED ou READY não iniciada'
     assert.match(taskControl, /function reassignTaskMissionCommand/);
     assert.match(controlCommand, /TASK_REASSIGN_MISSION/);
 });
-

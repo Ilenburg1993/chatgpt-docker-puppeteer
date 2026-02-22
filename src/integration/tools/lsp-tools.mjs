@@ -23,7 +23,7 @@ async function lspDefinitionHandler(params, ctx) {
     return {
         text: formatListResult('LSP Definition', locations),
         json: { operation: 'definition', locations },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -32,7 +32,7 @@ async function lspReferencesHandler(params, ctx) {
     return {
         text: formatListResult('LSP References', references),
         json: { operation: 'references', references },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -41,7 +41,7 @@ async function lspHoverHandler(params, ctx) {
     return {
         text: `# LSP Hover\n\n${hover ? hover.display : 'No hover info available'}`,
         json: { operation: 'hover', hover },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -50,7 +50,7 @@ async function lspDocumentSymbolsHandler(params, ctx) {
     return {
         text: formatListResult('LSP Document Symbols', symbols),
         json: { operation: 'document_symbols', symbols },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -59,7 +59,7 @@ async function lspWorkspaceSymbolsHandler(params, ctx) {
     return {
         text: formatListResult('LSP Workspace Symbols', symbols),
         json: { operation: 'workspace_symbols', symbols },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -68,7 +68,7 @@ async function lspDiagnosticsHandler(params, ctx) {
     return {
         text: formatListResult('LSP Diagnostics', diagnostics),
         json: { operation: 'diagnostics', diagnostics },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -77,7 +77,7 @@ async function lspCodeActionsHandler(params, ctx) {
     return {
         text: formatListResult('LSP Code Actions', actions),
         json: { operation: 'code_actions', actions },
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }
 
@@ -87,10 +87,11 @@ async function lspApplyCodeActionHandler(params, ctx) {
     return {
         text: `# LSP Apply Code Action\n\nMode: ${result.mode}\nFiles: ${result.files.length}\nEdits: ${result.totalEdits}`,
         json: { operation: 'apply_code_action', ...result },
-        flags: { degraded: false, mutating: !previewMode, partial: false }
+        flags: { degraded: false, mutating: !previewMode, partial: false },
     };
 }
 
+/** Função exportada: registerLspTools. */
 export async function registerLspTools(registry) {
     registry.register(
         'lsp_definition',
@@ -101,10 +102,10 @@ export async function registerLspTools(registry) {
                 properties: {
                     filePath: { type: 'string' },
                     line: { type: 'number' },
-                    character: { type: 'number' }
+                    character: { type: 'number' },
                 },
-                required: ['filePath', 'line', 'character']
-            }
+                required: ['filePath', 'line', 'character'],
+            },
         },
         lspDefinitionHandler
     );
@@ -118,10 +119,10 @@ export async function registerLspTools(registry) {
                 properties: {
                     filePath: { type: 'string' },
                     line: { type: 'number' },
-                    character: { type: 'number' }
+                    character: { type: 'number' },
                 },
-                required: ['filePath', 'line', 'character']
-            }
+                required: ['filePath', 'line', 'character'],
+            },
         },
         lspReferencesHandler
     );
@@ -135,10 +136,10 @@ export async function registerLspTools(registry) {
                 properties: {
                     filePath: { type: 'string' },
                     line: { type: 'number' },
-                    character: { type: 'number' }
+                    character: { type: 'number' },
                 },
-                required: ['filePath', 'line', 'character']
-            }
+                required: ['filePath', 'line', 'character'],
+            },
         },
         lspHoverHandler
     );
@@ -150,10 +151,10 @@ export async function registerLspTools(registry) {
             inputSchema: {
                 type: 'object',
                 properties: {
-                    filePath: { type: 'string' }
+                    filePath: { type: 'string' },
                 },
-                required: ['filePath']
-            }
+                required: ['filePath'],
+            },
         },
         lspDocumentSymbolsHandler
     );
@@ -166,10 +167,10 @@ export async function registerLspTools(registry) {
                 type: 'object',
                 properties: {
                     query: { type: 'string' },
-                    maxResults: { type: 'number' }
+                    maxResults: { type: 'number' },
                 },
-                required: ['query']
-            }
+                required: ['query'],
+            },
         },
         lspWorkspaceSymbolsHandler
     );
@@ -181,10 +182,10 @@ export async function registerLspTools(registry) {
             inputSchema: {
                 type: 'object',
                 properties: {
-                    filePath: { type: 'string' }
+                    filePath: { type: 'string' },
                 },
-                required: ['filePath']
-            }
+                required: ['filePath'],
+            },
         },
         lspDiagnosticsHandler
     );
@@ -201,10 +202,10 @@ export async function registerLspTools(registry) {
                     character: { type: 'number' },
                     endLine: { type: 'number' },
                     endCharacter: { type: 'number' },
-                    maxResults: { type: 'number' }
+                    maxResults: { type: 'number' },
                 },
-                required: ['filePath', 'line', 'character']
-            }
+                required: ['filePath', 'line', 'character'],
+            },
         },
         lspCodeActionsHandler
     );
@@ -220,10 +221,10 @@ export async function registerLspTools(registry) {
                 properties: {
                     mode: { type: 'string', enum: ['preview', 'apply'], default: 'preview' },
                     action: { type: 'object' },
-                    confirmationToken: { type: 'string' }
+                    confirmationToken: { type: 'string' },
                 },
-                required: ['mode', 'action']
-            }
+                required: ['mode', 'action'],
+            },
         },
         lspApplyCodeActionHandler
     );

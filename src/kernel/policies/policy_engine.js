@@ -2,6 +2,7 @@
 import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
 
+/** Classe exportada: default. */
 class PolicyEngine {
     constructor(config) {
         this.config = config;
@@ -49,13 +50,13 @@ class PolicyEngine {
             if (state.is_idle) {
                 return {
                     action: 'ACTIVATE_TASK', // Comando interno para o TaskEffector
-                    payload: obs.payload
+                    payload: obs.payload,
                 };
             }
             // Se já estou ocupado, rejeite educadamente.
             return {
                 action: 'EMIT_EVENT',
-                payload: this._createRejectionEnvelope(obs, 'BUSY')
+                payload: this._createRejectionEnvelope(obs, 'BUSY'),
             };
         }
 
@@ -83,7 +84,7 @@ class PolicyEngine {
                 // 2. Avisar o servidor
                 proposals.push({
                     action: 'EMIT_EVENT',
-                    payload: this._createTaskFailedEnvelope(state.task, 'MAX_RETRIES_EXCEEDED')
+                    payload: this._createTaskFailedEnvelope(state.task, 'MAX_RETRIES_EXCEEDED'),
                 });
             } else {
                 // Se ainda tem tentativas, o Driver (via TaskEffector) deve tentar se recuperar sozinho.
@@ -110,7 +111,7 @@ class PolicyEngine {
             messageType: MessageType.EVENT,
             actionCode: ActionCode.TASK_REJECTED,
             correlationId: originalObs.correlation_id,
-            payload: { reason }
+            payload: { reason },
         });
     }
 
@@ -126,8 +127,8 @@ class PolicyEngine {
             correlationId: task?.meta?.correlation_id, // Mantém o fio de Ariadne
             payload: {
                 task_id: task?.meta?.id,
-                reason
-            }
+                reason,
+            },
         });
     }
 }

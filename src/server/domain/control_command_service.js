@@ -33,6 +33,7 @@ import {
 } from './task_control_service.js';
 import { assertPermission, normalizeActor } from './rbac_policy.js';
 
+/** Constante/valor exportado: COMMANDS. */
 const COMMANDS = Object.freeze({
     MISSION_CREATE: 'MISSION_CREATE',
     MISSION_EXECUTE: 'MISSION_EXECUTE',
@@ -293,6 +294,7 @@ function _dispatch(command, payload, actor) {
     }
 }
 
+/** Função exportada: validateCommand. */
 function validateCommand({ command, payload = {}, actor = null }) {
     const normalized = _normalizeCommand(command);
 
@@ -338,6 +340,7 @@ function validateCommand({ command, payload = {}, actor = null }) {
     }
 }
 
+/** Função exportada: executeCommand. */
 async function executeCommand({ command, payload = {}, actor = null, dryRun = false }) {
     const normalized = _normalizeCommand(command);
 

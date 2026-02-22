@@ -1,14 +1,14 @@
 # ✅ Validação de Variáveis — Lifecycle Scripts
 
-**Data**: 3 de Fevereiro de 2026
-**Arquivos Auditados**: post-create.sh, post-attach.sh
-**Status**: ✅ **VALIDADO COM SUCESSO**
+**Data**: 3 de Fevereiro de 2026 **Arquivos Auditados**: post-create.sh, post-attach.sh **Status**:
+✅ **VALIDADO COM SUCESSO**
 
 ---
 
 ## 📋 Resumo Executivo
 
-Auditei **completamente** os scripts de lifecycle (post-create.sh e post-attach.sh) quanto ao uso correto de variáveis.
+Auditei **completamente** os scripts de lifecycle (post-create.sh e post-attach.sh) quanto ao uso
+correto de variáveis.
 
 **Resultado**: ✅ **TODOS OS SCRIPTS ESTÃO CORRETOS**
 
@@ -20,8 +20,8 @@ Auditei **completamente** os scripts de lifecycle (post-create.sh e post-attach.
 
 #### ✅ Variáveis Estruturais Usadas Corretamente
 
-| Variável        | Tipo    | Uso                              | Validação                               |
-| --------------- | ------- | -------------------------------- | --------------------------------------- |
+| Variável        | Tipo    | Uso                              | Validação                                |
+| --------------- | ------- | -------------------------------- | ---------------------------------------- |
 | `HOME_DIR`      | Local   | `${HOME}`                        | ✅ Usa ENV do sistema (dinâmico)         |
 | `USER_HOME`     | Local   | `${HOME:-/home/${CURRENT_USER}}` | ✅ Fallback dinâmico                     |
 | `CURRENT_USER`  | Local   | `$(id -un)`                      | ✅ Runtime detection                     |
@@ -33,6 +33,7 @@ Auditei **completamente** os scripts de lifecycle (post-create.sh e post-attach.
 **Status**: ✅ **CORRETO E JUSTIFICADO**
 
 **Razão**:
+
 ```bash
 # Linha 254: Validação de contrato
 readonly EXPECTED_USER="node"
@@ -46,12 +47,14 @@ fi
 ```
 
 Este é o **ÚNICO lugar legítimo** para hardcode "node" porque:
+
 1. É um **contrato de segurança** (valida identidade do container)
 2. Sincronizado com `remoteUser: "node"` do devcontainer.json
 3. Se remoteUser mudar para "testuser", este script **DEVE** falhar (proteção)
 4. É **read-only validation**, não criação de paths
 
 **Alternativa Considerada e Rejeitada**:
+
 ```bash
 # ❌ PIOR: Ler USER_NAME do ENV (pode ser sobrescrito)
 readonly EXPECTED_USER="${USER_NAME}"
@@ -62,8 +65,8 @@ readonly EXPECTED_USER="${USER_NAME}"
 
 #### ✅ ENVs do Sistema Usadas Corretamente
 
-| Categoria          | ENVs Referenciadas                                       | Validação             |
-| ------------------ | -------------------------------------------------------- | --------------------- |
+| Categoria          | ENVs Referenciadas                                       | Validação              |
+| ------------------ | -------------------------------------------------------- | ---------------------- |
 | **STRUCTURAL**     | NODE_ENV, SERVER_MODE, BROWSER_MODE                      | ✅ Lê, não sobrescreve |
 | **INFRASTRUCTURE** | SERVER_PORT, CHROME_PORT, CHROME_PROXY_PORT, CHROME_HOST | ✅ Validação de portas |
 | **OPERATIONAL**    | LOG_LEVEL, BROWSER_MODE                                  | ✅ Lê valores          |
@@ -130,14 +133,15 @@ set +o pipefail 2>/dev/null || true
 **Status**: ✅ **CORRETO POR DESIGN**
 
 **Justificativa**:
+
 - post-attach é **UX-first** (não pode bloquear VS Code)
 - post-create é **validation-first** (pode falhar com segurança)
 - Estratégia dupla deliberada (resilience vs strictness)
 
 #### ✅ Variáveis Usadas Corretamente
 
-| Variável        | Tipo  | Uso                               | Validação              |
-| --------------- | ----- | --------------------------------- | ---------------------- |
+| Variável        | Tipo  | Uso                               | Validação               |
+| --------------- | ----- | --------------------------------- | ----------------------- |
 | `CURRENT_USER`  | Local | `$(id -un)`                       | ✅ Runtime detection    |
 | `USER_HOME`     | Local | `${HOME:-/home/${CURRENT_USER}}`  | ✅ Fallback dinâmico    |
 | `WORKSPACE_DIR` | Local | `${PWD:-indefinido}`              | ✅ Heurística defensiva |
@@ -240,12 +244,14 @@ Heurísticas:
 **Resposta**: ❌ **NÃO** (e está correto assim)
 
 **Razão**:
+
 - Dockerfile ENVs são **build-time** (imagem)
 - Scripts são **runtime** (container execution)
 - Scripts usam **runtime detection** (`id -un`, `pwd`) para máxima portabilidade
 - Se usassem ENVs do Dockerfile, perderiam flexibilidade
 
 **Exemplo**:
+
 ```bash
 # ❌ ERRADO: Dependeria de Dockerfile ENV
 HOME_DIR="${HOME_DIR}"  # E se ENV não existir? E se for sobrescrito?
@@ -269,6 +275,7 @@ HOME_DIR="${HOME}"  # Sempre disponível, sempre correto
 | **post-create.sh**    | `EXPECTED_USER="node"` | **Validação** (security contract) |
 
 **Fluxo de Segurança**:
+
 ```
 1. devcontainer.json diz: "container DEVE rodar como 'node'"
 2. Dockerfile cria: USER_NAME=node
@@ -279,11 +286,13 @@ HOME_DIR="${HOME}"  # Sempre disponível, sempre correto
 ```
 
 **Se mudássemos remoteUser para "testuser"**:
+
 - devcontainer.json: `remoteUser: "testuser"`
 - Dockerfile: `ARG REMOTE_USER=testuser` → `USER_NAME=testuser`
 - **post-create DEVE SER ATUALIZADO**: `EXPECTED_USER="testuser"`
 
 **Isto é CORRETO** porque:
+
 1. Força revisão manual do contrato de segurança
 2. Previne containers rodando como root sem detecção
 3. Alinha com princípio "fail explicit, not implicit"
@@ -318,16 +327,17 @@ echo "Home detectado: ${USER_HOME}"
 
 ### Superfície de Ataque (Hardcoding)
 
-| Tipo                        | Ocorrências       | Risco                        | Status |
-| --------------------------- | ----------------- | ---------------------------- | ------ |
-| **Paths hardcoded**         | 0                 | 🟢 Nenhum                     | ✅      |
-| **User identity hardcoded** | 1 (EXPECTED_USER) | 🟢 Válido (security contract) | ✅      |
-| **Ports hardcoded**         | 0                 | 🟢 Nenhum                     | ✅      |
-| **Hosts hardcoded**         | 0                 | 🟢 Nenhum                     | ✅      |
+| Tipo                        | Ocorrências       | Risco                         | Status |
+| --------------------------- | ----------------- | ----------------------------- | ------ |
+| **Paths hardcoded**         | 0                 | 🟢 Nenhum                     | ✅     |
+| **User identity hardcoded** | 1 (EXPECTED_USER) | 🟢 Válido (security contract) | ✅     |
+| **Ports hardcoded**         | 0                 | 🟢 Nenhum                     | ✅     |
+| **Hosts hardcoded**         | 0                 | 🟢 Nenhum                     | ✅     |
 
 ### Validações de Segurança Implementadas
 
 1. **Identity Validation** (post-create.sh linha 273)
+
    ```bash
    if [[ "${CURRENT_USER}" != "${EXPECTED_USER}" ]]; then
        error "Security violation: wrong user"
@@ -336,6 +346,7 @@ echo "Home detectado: ${USER_HOME}"
    ```
 
 2. **Port Conflict Detection** (post-create.sh linha 496)
+
    ```bash
    if [[ "${SERVER_PORT}" == "${CHROME_PORT}" ]]; then
        error "Port collision detected"
@@ -359,8 +370,8 @@ echo "Home detectado: ${USER_HOME}"
 
 ### Status dos Scripts
 
-| Script             | Linhas | Variáveis    | Hardcoding | Status             |
-| ------------------ | ------ | ------------ | ---------- | ------------------ |
+| Script             | Linhas | Variáveis    | Hardcoding | Status              |
+| ------------------ | ------ | ------------ | ---------- | ------------------- |
 | **post-create.sh** | 1,642  | 36+ readonly | 1 válido   | ✅ **100% CORRETO** |
 | **post-attach.sh** | 918    | 12           | 0          | ✅ **100% CORRETO** |
 
@@ -376,14 +387,15 @@ echo "Home detectado: ${USER_HOME}"
 
 ### Sincronização com Sistema de Variáveis
 
-| Camada                | Scripts                            | Status    |
-| --------------------- | ---------------------------------- | --------- |
-| **VS Code Variables** | ❌ Não usados (runtime context)     | ✅ Correto |
-| **Dockerfile ARGs**   | ❌ Não usados (runtime detection)   | ✅ Correto |
-| **Dockerfile ENVs**   | ✅ Lidos (NODE_ENV, CHROME_*, etc.) | ✅ Correto |
-| **Runtime Detection** | ✅ Usado (id -un, pwd, etc.)        | ✅ Correto |
+| Camada                | Scripts                              | Status     |
+| --------------------- | ------------------------------------ | ---------- |
+| **VS Code Variables** | ❌ Não usados (runtime context)      | ✅ Correto |
+| **Dockerfile ARGs**   | ❌ Não usados (runtime detection)    | ✅ Correto |
+| **Dockerfile ENVs**   | ✅ Lidos (NODE*ENV, CHROME*\*, etc.) | ✅ Correto |
+| **Runtime Detection** | ✅ Usado (id -un, pwd, etc.)         | ✅ Correto |
 
 **Razão**: Scripts preferem **runtime detection** sobre **build-time ENVs** para:
+
 - Máxima portabilidade
 - Resilience a overrides
 - Independência do Dockerfile
@@ -393,17 +405,18 @@ echo "Home detectado: ${USER_HOME}"
 **Ações Necessárias**: ✅ **NENHUMA** (scripts 100% validados)
 
 **Se remoteUser mudar no futuro**:
+
 1. Atualizar `remoteUser: "node"` → `remoteUser: "newuser"` em devcontainer.json
 2. Atualizar `EXPECTED_USER="node"` → `EXPECTED_USER="newuser"` em post-create.sh linha 254
 3. Rebuild container
 
 **Documentação**:
+
 - ✅ Scripts já têm headers completos (v6.0, v5.2.0)
 - ✅ Comentários explicam EXPECTED_USER hardcode
 - ✅ Referências a ENV_ANALYSIS_V6.md presentes
 
 ---
 
-**Validação Completa**: 3 de Fevereiro de 2026
-**Certificado**: ✅ **SCRIPTS 100% CORRETOS**
+**Validação Completa**: 3 de Fevereiro de 2026 **Certificado**: ✅ **SCRIPTS 100% CORRETOS**
 **Próxima Ação**: ✅ **NENHUMA** (pode prosseguir com confiança)

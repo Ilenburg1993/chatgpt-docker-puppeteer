@@ -10,6 +10,7 @@
 import { defineStore } from 'pinia';
 import { formatHttpError, http } from '@/lib/http';
 
+/** Constante/valor exportado: useSystemStore. */
 export const useSystemStore = defineStore('system', {
     state: () => ({
         // Status geral
@@ -20,7 +21,7 @@ export const useSystemStore = defineStore('system', {
             api: { status: 'unknown', message: '' },
             queue: { status: 'unknown', message: '' },
             memory: { status: 'unknown', message: '' },
-            kernel: { status: 'unknown', message: '' }
+            kernel: { status: 'unknown', message: '' },
         },
 
         // Alertas ativos
@@ -31,7 +32,7 @@ export const useSystemStore = defineStore('system', {
             platform: '',
             node_version: '',
             arch: '',
-            pid: null
+            pid: null,
         },
 
         // Uptime
@@ -44,40 +45,38 @@ export const useSystemStore = defineStore('system', {
         error: null,
 
         // Última atualização
-        lastUpdate: null
+        lastUpdate: null,
     }),
 
     getters: {
         /**
          * Número de alertas ativos
          */
-        alertCount: (state) => state.alerts.length,
+        alertCount: state => state.alerts.length,
 
         /**
          * Alertas críticos
          */
-        criticalAlerts: (state) =>
-            state.alerts.filter(a => a.severity === 'critical'),
+        criticalAlerts: state => state.alerts.filter(a => a.severity === 'critical'),
 
         /**
          * Alertas de warning
          */
-        warningAlerts: (state) =>
-            state.alerts.filter(a => a.severity === 'warning'),
+        warningAlerts: state => state.alerts.filter(a => a.severity === 'warning'),
 
         /**
          * Todos os componentes com status
          */
-        componentsList: (state) =>
+        componentsList: state =>
             Object.entries(state.components).map(([name, data]) => ({
                 name,
-                ...data
+                ...data,
             })),
 
         /**
          * Componentes com problema
          */
-        problemComponents: (state) =>
+        problemComponents: state =>
             Object.entries(state.components)
                 .filter(([, data]) => data.status !== 'healthy')
                 .map(([name, data]) => ({ name, ...data })),
@@ -85,12 +84,12 @@ export const useSystemStore = defineStore('system', {
         /**
          * Sistema está saudável
          */
-        isHealthy: (state) => state.overallStatus === 'healthy',
+        isHealthy: state => state.overallStatus === 'healthy',
 
         /**
          * Uptime formatado
          */
-        uptimeFormatted: (state) => {
+        uptimeFormatted: state => {
             const seconds = state.uptimeSeconds;
             const days = Math.floor(seconds / 86400);
             const hours = Math.floor((seconds % 86400) / 3600);
@@ -103,7 +102,7 @@ export const useSystemStore = defineStore('system', {
                 return `${hours}h ${minutes}m`;
             }
             return `${minutes}m`;
-        }
+        },
     },
 
     actions: {
@@ -156,7 +155,7 @@ export const useSystemStore = defineStore('system', {
                 this.systemInfo = {
                     ...this.systemInfo,
                     ...response.data.system,
-                    ...response.data.versions
+                    ...response.data.versions,
                 };
             } catch (error) {
                 console.error('[SystemStore] Erro ao carregar info:', error);
@@ -198,7 +197,7 @@ export const useSystemStore = defineStore('system', {
             if (this.components[component]) {
                 this.components[component] = {
                     ...this.components[component],
-                    ...data
+                    ...data,
                 };
             }
         },
@@ -222,6 +221,6 @@ export const useSystemStore = defineStore('system', {
          */
         clearError() {
             this.error = null;
-        }
-    }
+        },
+    },
 });

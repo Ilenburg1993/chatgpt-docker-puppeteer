@@ -76,7 +76,7 @@ function createConnection({ telemetry, adapter }) {
     if (typeof adapter.onReceive === 'function') {
         adapter.onReceive(frame => {
             telemetry.emit('nerv:transport:receive', {
-                size: frame ? frame.length || null : null
+                size: frame ? frame.length || null : null,
             });
 
             for (const handler of receiveHandlers) {
@@ -88,7 +88,7 @@ function createConnection({ telemetry, adapter }) {
     if (typeof adapter.onError === 'function') {
         adapter.onError(error => {
             telemetry.emit('nerv:transport:error', {
-                message: error ? error.message : 'erro físico'
+                message: error ? error.message : 'erro físico',
             });
         });
     }
@@ -140,7 +140,7 @@ function createConnection({ telemetry, adapter }) {
      */
     function send(frame) {
         telemetry.emit('nerv:transport:send', {
-            size: frame ? frame.length || null : null
+            size: frame ? frame.length || null : null,
         });
 
         if (typeof adapter.send === 'function') {
@@ -173,7 +173,7 @@ function createConnection({ telemetry, adapter }) {
         start,
         stop,
         send,
-        onReceive
+        onReceive,
     });
 }
 

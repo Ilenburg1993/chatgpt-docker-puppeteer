@@ -19,13 +19,7 @@
       "overlap": 0
     }
   },
-  "features": [
-    "semantic-search",
-    "incremental-indexing",
-    "query-caching",
-    "retry-logic",
-    "progress-reporting"
-  ],
+  "features": ["semantic-search", "incremental-indexing", "query-caching", "retry-logic", "progress-reporting"],
   "dependencies": {
     "@lancedb/lancedb": "^0.18.0",
     "ignore": "^5.3.2",

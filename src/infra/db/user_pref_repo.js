@@ -36,12 +36,14 @@ function _rowToPrefs(row) {
     };
 }
 
+/** Função exportada: getUserPreferences. */
 function getUserPreferences(userId) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM user_preferences WHERE user_id = ?').get(String(userId || '').trim());
     return _rowToPrefs(row);
 }
 
+/** Função exportada: upsertUserPreferences. */
 function upsertUserPreferences(userId, patch = {}) {
     const db = getDb();
     const id = String(userId || '').trim();

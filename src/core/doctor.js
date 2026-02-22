@@ -123,7 +123,7 @@ async function probeChromeConnection() {
                 connected: false,
                 endpoint: httpEndpoint,
                 error: 'Chrome not responding',
-                latency_ms: result.ms
+                latency_ms: result.ms,
             };
         }
 
@@ -143,14 +143,14 @@ async function probeChromeConnection() {
                             protocol: info['Protocol-Version'] || 'Unknown',
                             user_agent: info['User-Agent'] || 'Unknown',
                             ws_endpoint: info['webSocketDebuggerUrl'] || endpoint,
-                            latency_ms: result.ms
+                            latency_ms: result.ms,
                         });
                     } catch {
                         resolve({
                             connected: true,
                             endpoint: httpEndpoint,
                             version: 'Unknown',
-                            latency_ms: result.ms
+                            latency_ms: result.ms,
                         });
                     }
                 });
@@ -160,7 +160,7 @@ async function probeChromeConnection() {
                     connected: false,
                     endpoint: httpEndpoint,
                     error: err.message,
-                    latency_ms: 0
+                    latency_ms: 0,
                 });
             });
             req.setTimeout(5000, () => {
@@ -169,7 +169,7 @@ async function probeChromeConnection() {
                     connected: false,
                     endpoint: httpEndpoint,
                     error: 'Connection timeout',
-                    latency_ms: 5000
+                    latency_ms: 5000,
                 });
             });
         });
@@ -178,7 +178,7 @@ async function probeChromeConnection() {
             connected: false,
             endpoint: httpEndpoint,
             error: err.message,
-            latency_ms: 0
+            latency_ms: 0,
         };
     }
 }
@@ -208,7 +208,7 @@ async function saveTrends(trends) {
             ram: trends.ram.slice(-limit),
             cpu: trends.cpu.slice(-limit),
             io: trends.io.slice(-limit),
-            ts: new Date().toISOString()
+            ts: new Date().toISOString(),
         };
         await fsp.writeFile(TREND_FILE, JSON.stringify(simplified, null, 2));
     } catch (_) {
@@ -243,7 +243,7 @@ function getHardwareMetrics() {
         cpu_cores: cores,
         ram_usage_pct: ((1 - freeMem / totalMem) * 100).toFixed(1),
         ram_free_gb: `${(freeMem / 1024 / 1024 / 1024).toFixed(2)}GB`,
-        ts: Date.now()
+        ts: Date.now(),
     };
 }
 
@@ -296,7 +296,7 @@ async function checkStorageSLA() {
             resolve({
                 latency_ms: ioLatency,
                 write_ok: writeOk,
-                disk_info_raw: stdout ? stdout.split('\n').slice(-2).join(' ').trim() : 'N/A'
+                disk_info_raw: stdout ? stdout.split('\n').slice(-2).join(' ').trim() : 'N/A',
             });
         });
     });
@@ -345,7 +345,7 @@ async function runFullCheck() {
             const s = Date.now();
             setImmediate(() => r(Date.now() - s));
         }),
-        probeChromeConnection()
+        probeChromeConnection(),
     ]);
 
     // Additional probe: check configured proxy/hosts via ConnectionOrchestrator
@@ -363,7 +363,7 @@ async function runFullCheck() {
         queueStats = {
             pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
             running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length,
-            total: tasks.length
+            total: tasks.length,
         };
     } catch {
         /* Fail-safe */
@@ -407,11 +407,11 @@ async function runFullCheck() {
             version: '39.0',
             engine: 'Universal_Physician',
             timestamp: new Date().toISOString(),
-            duration_ms: Date.now() - t0
+            duration_ms: Date.now() - t0,
         },
         health: {
             score: Math.max(0, 100 - issues.length * 20),
-            status: issues.length === 0 ? STATUS_VALUES.HEALTHY : issues.length > 2 ? 'CRITICAL' : 'DEGRADED'
+            status: issues.length === 0 ? STATUS_VALUES.HEALTHY : issues.length > 2 ? 'CRITICAL' : 'DEGRADED',
         },
         telemetry: {
             network: targets.map((url, i) => ({ url, ...networkResults[i] })),
@@ -422,14 +422,14 @@ async function runFullCheck() {
             system: {
                 ...metrics,
                 event_loop_lag_ms: lag,
-                uptime_seconds: Math.floor(process.uptime())
-            }
+                uptime_seconds: Math.floor(process.uptime()),
+            },
         },
         recovery_manifest: {
             detected_issues: issues,
             suggested_steps: manifest,
-            can_auto_fix: issues.length > 0 && dna.ok
-        }
+            can_auto_fix: issues.length > 0 && dna.ok,
+        },
     };
 }
 

@@ -12,7 +12,7 @@ const ALLOWED_PATTERNS = [
     'ecosystem.config.js',
     'analysis/',
     'logs/',
-    'scripts/'
+    'scripts/',
 ];
 
 function walk(dir) {
@@ -58,7 +58,9 @@ if (offending.length > 0) {
     for (const o of offending) {
         console.error(` - ${o.file}`);
     }
-    console.error('\nAções sugeridas: atualizar os arquivos acima para usar NERV SERVER_READY ou mover referências para DOCUMENTAÇÃO/DEPRECATIONS.');
+    console.error(
+        '\nAções sugeridas: atualizar os arquivos acima para usar NERV SERVER_READY ou mover referências para DOCUMENTAÇÃO/DEPRECATIONS.'
+    );
     process.exit(2);
 }
 

@@ -33,7 +33,7 @@ const handlers = {
      *
      * Minimal implementation: advertises tools/resources capabilities.
      */
-    'initialize': async (params, registry) => {
+    initialize: async (params, registry) => {
         const clientProtocolVersion = params?.protocolVersion;
         const protocolVersion =
             typeof clientProtocolVersion === 'string' && clientProtocolVersion.trim()
@@ -44,13 +44,13 @@ const handlers = {
             protocolVersion,
             capabilities: {
                 tools: {},
-                resources: {}
+                resources: {},
             },
             serverInfo: {
                 name: 'chatgpt-docker-unified',
-                version: '4.0.0'
+                version: '4.0.0',
             },
-            instructions: `Tools: ${registry.getToolNames().join(', ')}`
+            instructions: `Tools: ${registry.getToolNames().join(', ')}`,
         };
     },
 
@@ -67,7 +67,7 @@ const handlers = {
      * notifications/cancelled: client notifies that a request was cancelled
      * Notification (no response expected).
      */
-    'notifications/cancelled': async (params) => {
+    'notifications/cancelled': async params => {
         console.error('[MCP Handler] notifications/cancelled (legacy handler):', params);
         return {};
     },
@@ -75,7 +75,7 @@ const handlers = {
     /**
      * ping: liveness check
      */
-    'ping': async () => {
+    ping: async () => {
         return {};
     },
 
@@ -104,7 +104,7 @@ const handlers = {
 
         try {
             const result = await registry.execute(name, args, {
-                signal: controller.signal
+                signal: controller.signal,
             });
 
             clearTimeout(timeoutId);
@@ -116,22 +116,21 @@ const handlers = {
 
             const normalized = normalizeToolResultPayload(result);
             const isRagTool = typeof name === 'string' && name.startsWith('rag_');
-            const normalizedData = normalized.json !== undefined
-                ? normalized.json
-                : (isRagTool ? { fallback: true } : undefined);
+            const normalizedData =
+                normalized.json !== undefined ? normalized.json : isRagTool ? { fallback: true } : undefined;
 
             // MCP-compatible payload + structured content
             return {
                 content: [
                     {
                         type: 'text',
-                        text: normalized.text
-                    }
+                        text: normalized.text,
+                    },
                 ],
                 structuredContent: {
                     ...(normalizedData !== undefined ? { data: normalizedData } : {}),
-                    flags: normalized.flags
-                }
+                    flags: normalized.flags,
+                },
             };
         } catch (error) {
             clearTimeout(timeoutId);
@@ -143,10 +142,10 @@ const handlers = {
                     content: [
                         {
                             type: 'text',
-                            text: `Tool "${name}" timed out after ${timeout}ms and was cancelled.\n\nTip: Reduce max_tokens or use qwen2.5-coder:3b model for faster CPU inference.`
-                        }
+                            text: `Tool "${name}" timed out after ${timeout}ms and was cancelled.\n\nTip: Reduce max_tokens or use qwen2.5-coder:3b model for faster CPU inference.`,
+                        },
                     ],
-                    isError: true
+                    isError: true,
                 };
             }
 
@@ -157,10 +156,10 @@ const handlers = {
                 content: [
                     {
                         type: 'text',
-                        text: `Error executing tool "${name}": ${error.message}`
-                    }
+                        text: `Error executing tool "${name}": ${error.message}`,
+                    },
                 ],
-                isError: true
+                isError: true,
             };
         }
     },
@@ -177,16 +176,16 @@ const handlers = {
                     uri: 'rag://stats',
                     name: 'RAG Runtime Statistics',
                     mimeType: 'application/json',
-                    description: 'RAG cache, index freshness, chunk schema and expand health'
-                }
-            ]
+                    description: 'RAG cache, index freshness, chunk schema and expand health',
+                },
+            ],
         };
     },
 
     /**
      * resources/read: Read resource content
      */
-    'resources/read': async (params) => {
+    'resources/read': async params => {
         const { uri } = params;
 
         console.error(`[MCP Handler] resources/read: ${uri}`);
@@ -194,7 +193,8 @@ const handlers = {
         if (uri === 'rag://stats') {
             try {
                 // Import facade dynamically to get cache stats
-                const { getRagCacheStats, getRagIndexStatus, getRagStorageStats } = await import('../../../tools/rag/lib/facade.mjs');
+                const { getRagCacheStats, getRagIndexStatus, getRagStorageStats } =
+                    await import('../../../tools/rag/lib/facade.mjs');
                 const stats = getRagCacheStats();
                 const index = await getRagIndexStatus();
                 const storage = await getRagStorageStats();
@@ -205,8 +205,8 @@ const handlers = {
                     expand_health: {
                         enabled: true,
                         default_lines: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
-                        max_lines: Number(process.env.RAG_EXPAND_MAX_LINES || 240)
-                    }
+                        max_lines: Number(process.env.RAG_EXPAND_MAX_LINES || 240),
+                    },
                 };
 
                 return {
@@ -214,17 +214,17 @@ const handlers = {
                         {
                             uri,
                             mimeType: 'application/json',
-                            text: JSON.stringify(payload, null, 2)
-                        }
-                    ]
+                            text: JSON.stringify(payload, null, 2),
+                        },
+                    ],
                 };
             } catch (error) {
                 throw new Error(`Failed to read resource ${uri}: ${error.message}`); // eslint-disable-line preserve-caught-error
             }
         }
 
-        throw new Error(`Unknown resource: ${uri}`);  
-    }
+        throw new Error(`Unknown resource: ${uri}`);
+    },
 };
 
 /**
@@ -253,7 +253,7 @@ export function setupMCPHandler(app, registry) {
 
             const payload = req.body;
 
-            const handleOne = async (msg) => {
+            const handleOne = async msg => {
                 const { jsonrpc, id, method, params = {} } = msg || {};
                 const requestKey = id === undefined || id === null ? null : String(id);
 
@@ -266,9 +266,9 @@ export function setupMCPHandler(app, registry) {
                             id,
                             error: {
                                 code: -32600,
-                                message: 'Invalid Request: jsonrpc must be "2.0"'
-                            }
-                        }
+                                message: 'Invalid Request: jsonrpc must be "2.0"',
+                            },
+                        },
                     };
                 }
 
@@ -282,9 +282,9 @@ export function setupMCPHandler(app, registry) {
                             id,
                             error: {
                                 code: -32601,
-                                message: `Method not found: ${method}`
-                            }
-                        }
+                                message: `Method not found: ${method}`,
+                            },
+                        },
                     };
                 }
 
@@ -313,7 +313,7 @@ export function setupMCPHandler(app, registry) {
                     try {
                         const result = await handler(params, registry, {
                             controller,
-                            timeoutMs: Number(process.env.MCP_TOOL_TIMEOUT || 90000)
+                            timeoutMs: Number(process.env.MCP_TOOL_TIMEOUT || 90000),
                         });
                         return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
                     } finally {
@@ -327,9 +327,7 @@ export function setupMCPHandler(app, registry) {
 
             // Batch support
             if (Array.isArray(payload)) {
-                const results = (await Promise.all(payload.map(handleOne)))
-                    .map((r) => r?.json)
-                    .filter(Boolean);
+                const results = (await Promise.all(payload.map(handleOne))).map(r => r?.json).filter(Boolean);
                 if (results.length === 0) {
                     return res.status(202).end();
                 }
@@ -342,7 +340,6 @@ export function setupMCPHandler(app, registry) {
             }
 
             res.status(single.httpStatus || 200).json(single.json);
-
         } catch (error) {
             console.error('[MCP Handler] Error:', error);
 
@@ -352,8 +349,8 @@ export function setupMCPHandler(app, registry) {
                 error: {
                     code: -32603,
                     message: 'Internal error',
-                    data: error.message
-                }
+                    data: error.message,
+                },
             });
         }
     });
@@ -379,7 +376,7 @@ export function setupMCPHandler(app, registry) {
             methods: Object.keys(handlers),
             tools: registry.getToolNames(),
             toolCount: registry.getStats().totalTools,
-            status: 'ready'
+            status: 'ready',
         });
     });
 
@@ -391,7 +388,7 @@ function normalizeToolResultPayload(value) {
         return {
             text: JSON.stringify(value, null, 2),
             json: value.structuredContent,
-            flags: { degraded: false, mutating: false, partial: false }
+            flags: { degraded: false, mutating: false, partial: false },
         };
     }
 
@@ -402,21 +399,21 @@ function normalizeToolResultPayload(value) {
             flags: {
                 degraded: Boolean(value.flags?.degraded),
                 mutating: Boolean(value.flags?.mutating),
-                partial: Boolean(value.flags?.partial)
-            }
+                partial: Boolean(value.flags?.partial),
+            },
         };
     }
 
     if (typeof value === 'string') {
         return {
             text: value,
-            flags: { degraded: false, mutating: false, partial: false }
+            flags: { degraded: false, mutating: false, partial: false },
         };
     }
 
     return {
         text: JSON.stringify(value, null, 2),
         json: value,
-        flags: { degraded: false, mutating: false, partial: false }
+        flags: { degraded: false, mutating: false, partial: false },
     };
 }

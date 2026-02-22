@@ -50,6 +50,7 @@ function insertArtifact(input) {
     return id;
 }
 
+/** Função exportada: getArtifactById. */
 function getArtifactById(artifactId) {
     const db = getDb();
     return db.prepare('SELECT * FROM artifacts WHERE id = ?').get(artifactId) || null;
@@ -67,4 +68,3 @@ function deleteArtifactById(artifactId) {
 }
 
 export { insertArtifact, getArtifactById, deleteArtifactById };
-

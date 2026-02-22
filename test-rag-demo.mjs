@@ -62,8 +62,8 @@ const server = app.listen(3008, async () => {
                 jsonrpc: '2.0',
                 id: 1,
                 method: 'tools/call',
-                params: { name: 'ollama_models', arguments: {} }
-            })
+                params: { name: 'ollama_models', arguments: {} },
+            }),
         });
         const modelsData = await models.json();
         const modelsText = modelsData.result.content[0].text;
@@ -90,10 +90,10 @@ const server = app.listen(3008, async () => {
                     name: 'rag_search',
                     arguments: {
                         query: 'CHROME_PROXY_PORT definition',
-                        topK: 3
-                    }
-                }
-            })
+                        topK: 3,
+                    },
+                },
+            }),
         });
         const searchData = await search.json();
         const searchText = searchData.result.content[0].text;
@@ -117,8 +117,8 @@ const server = app.listen(3008, async () => {
                 jsonrpc: '2.0',
                 id: 3,
                 method: 'tools/call',
-                params: { name: 'rag_health', arguments: {} }
-            })
+                params: { name: 'rag_health', arguments: {} },
+            }),
         });
         const healthData = await health.json();
         const healthText = healthData.result.content[0].text;
@@ -147,10 +147,10 @@ const server = app.listen(3008, async () => {
                         prompt: 'Write a comprehensive JSDoc docstring for a function that calculates the nth fibonacci number',
                         model: 'qwen2.5-coder:3b',
                         temperature: 0.3,
-                        max_tokens: 200
-                    }
-                }
-            })
+                        max_tokens: 200,
+                    },
+                },
+            }),
         });
         const generateData = await generate.json();
         const generateText = generateData.result.content[0].text;
@@ -175,7 +175,6 @@ const server = app.listen(3008, async () => {
         console.log('🎉 Sistema validado e operacional!\n');
 
         process.exit(0);
-
     } catch (error) {
         console.error('\n❌ Erro na demonstração:', error.message);
         console.error(error.stack);

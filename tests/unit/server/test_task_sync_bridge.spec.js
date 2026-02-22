@@ -55,8 +55,8 @@ describe('TaskSyncBridge', () => {
                 queuePosition: 3,
                 queueSize: 10,
                 activeDrivers: 2,
-                next_action: 'RETRY_LATER'
-            }
+                next_action: 'RETRY_LATER',
+            },
         });
 
         const state = bridge.kernelStateCache.get('task-queued-1');
@@ -80,8 +80,8 @@ describe('TaskSyncBridge', () => {
             payload: {
                 taskId: 'task-stale-1',
                 queuePosition: 1,
-                queueSize: 2
-            }
+                queueSize: 2,
+            },
         });
 
         nerv.emitEnvelope({
@@ -91,8 +91,8 @@ describe('TaskSyncBridge', () => {
             payload: {
                 taskId: 'task-stale-1',
                 queuePosition: 99,
-                queueSize: 999
-            }
+                queueSize: 999,
+            },
         });
 
         const state = bridge.kernelStateCache.get('task-stale-1');
@@ -101,5 +101,4 @@ describe('TaskSyncBridge', () => {
         assert.strictEqual(state.last_correlation_id, 'corr-new');
         assert.strictEqual(state.event_timestamp, 2000);
     });
-
 });

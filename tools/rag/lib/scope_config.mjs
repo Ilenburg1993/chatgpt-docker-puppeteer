@@ -10,7 +10,9 @@ function parsePositiveInt(rawValue, fallback) {
 }
 
 function normalizeDocsMode(rawMode) {
-    const normalized = String(rawMode || '').trim().toLowerCase();
+    const normalized = String(rawMode || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'exclude' || normalized === 'only') return normalized;
     return 'include';
 }
@@ -22,15 +24,15 @@ function normalizeProfile(rawProfile) {
 
 function parseGlobList(rawValue) {
     if (Array.isArray(rawValue)) {
-        return rawValue.flatMap((entry) => parseGlobList(entry));
+        return rawValue.flatMap(entry => parseGlobList(entry));
     }
     const raw = String(rawValue ?? '').trim();
     if (!raw) return [];
     return raw
         .split(/[\n,;]/g)
-        .map((glob) => String(glob || '').trim())
+        .map(glob => String(glob || '').trim())
         .filter(Boolean)
-        .map((glob) => glob.replace(/\\/g, '/'));
+        .map(glob => glob.replace(/\\/g, '/'));
 }
 
 function uniqueSorted(list) {
@@ -43,7 +45,7 @@ function toScopeHashPayload(scope) {
         docs_mode: scope.docs_mode,
         include_globs: scope.include_globs,
         exclude_globs: scope.exclude_globs,
-        max_file_bytes: scope.max_file_bytes
+        max_file_bytes: scope.max_file_bytes,
     };
 }
 
@@ -57,9 +59,8 @@ export function resolveRagScopeConfig(input = {}) {
     const docsMode = normalizeDocsMode(input.docsMode ?? process.env.RAG_DOCS_MODE ?? 'include');
     const includeGlobs = uniqueSorted(parseGlobList(input.includeGlobs ?? process.env.RAG_INCLUDE_GLOBS));
     const excludeGlobsBase = parseGlobList(input.excludeGlobs ?? process.env.RAG_EXCLUDE_GLOBS);
-    const excludeGlobs = docsMode === 'exclude'
-        ? uniqueSorted([...excludeGlobsBase, ...DOC_GLOBS])
-        : uniqueSorted(excludeGlobsBase);
+    const excludeGlobs =
+        docsMode === 'exclude' ? uniqueSorted([...excludeGlobsBase, ...DOC_GLOBS]) : uniqueSorted(excludeGlobsBase);
     const maxFileBytes = parsePositiveInt(
         input.maxFileBytes ?? process.env.RAG_INDEX_MAX_FILE_BYTES,
         DEFAULT_MAX_FILE_BYTES
@@ -71,7 +72,7 @@ export function resolveRagScopeConfig(input = {}) {
         include_globs: includeGlobs,
         exclude_globs: excludeGlobs,
         max_file_bytes: maxFileBytes,
-        scope_hash: ''
+        scope_hash: '',
     };
     scope.scope_hash = buildScopeHash(scope);
 
@@ -83,7 +84,6 @@ export function resolveRagScopeConfig(input = {}) {
         maxFileBytes,
         scope,
         scopeHash: scope.scope_hash,
-        docsGlobs: [...DOC_GLOBS]
+        docsGlobs: [...DOC_GLOBS],
     };
 }
-

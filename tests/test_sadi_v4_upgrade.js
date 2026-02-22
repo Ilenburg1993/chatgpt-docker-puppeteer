@@ -79,7 +79,7 @@ console.log('✅ Test 2: Parameter validation (defensive programming)');
         console.log('✅ Test 5: Error handling (graceful fallbacks)');
         const mockPageWithError = {
             url: () => 'https://test.com',
-            evaluate: () => Promise.reject(new Error('Mock error'))
+            evaluate: () => Promise.reject(new Error('Mock error')),
         };
 
         const result = await analyzer.findChatInputSelector(mockPageWithError, 'en');

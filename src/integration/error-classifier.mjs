@@ -23,10 +23,10 @@
  * @enum {string}
  */
 export const ErrorClass = Object.freeze({
-    TRANSIENT: 'TRANSIENT',       // Temporary failures (network blips) - retry immediately
-    DEGRADED: 'DEGRADED',          // Service degraded (timeouts, rate limits) - retry with backoff
-    PERMANENT: 'PERMANENT',        // Permanent failures (auth, invalid input) - don't retry
-    CIRCUIT_OPEN: 'CIRCUIT_OPEN',  // Circuit breaker active - don't retry
+    TRANSIENT: 'TRANSIENT', // Temporary failures (network blips) - retry immediately
+    DEGRADED: 'DEGRADED', // Service degraded (timeouts, rate limits) - retry with backoff
+    PERMANENT: 'PERMANENT', // Permanent failures (auth, invalid input) - don't retry
+    CIRCUIT_OPEN: 'CIRCUIT_OPEN', // Circuit breaker active - don't retry
 });
 
 /**
@@ -34,10 +34,10 @@ export const ErrorClass = Object.freeze({
  * @enum {string}
  */
 export const RetryStrategy = Object.freeze({
-    IMMEDIATE: 'IMMEDIATE',                      // Retry now (for very transient errors)
-    EXPONENTIAL_BACKOFF: 'EXPONENTIAL_BACKOFF',  // Retry with backoff (standard)
-    MODEL_FALLBACK: 'MODEL_FALLBACK',            // Try smaller/faster model
-    NO_RETRY: 'NO_RETRY',                        // Give up (permanent error)
+    IMMEDIATE: 'IMMEDIATE', // Retry now (for very transient errors)
+    EXPONENTIAL_BACKOFF: 'EXPONENTIAL_BACKOFF', // Retry with backoff (standard)
+    MODEL_FALLBACK: 'MODEL_FALLBACK', // Try smaller/faster model
+    NO_RETRY: 'NO_RETRY', // Give up (permanent error)
 });
 
 /**
@@ -88,12 +88,12 @@ export function classifyError(error, context = {}) {
     ) {
         return {
             errorClass: ErrorClass.TRANSIENT,
-            reasonClass: 'ENV_UNAVAILABLE',  // Maps to existing taxonomy
+            reasonClass: 'ENV_UNAVAILABLE', // Maps to existing taxonomy
             reasonCode: 'NETWORK_ERROR',
             strategy: RetryStrategy.EXPONENTIAL_BACKOFF,
             retryable: true,
-            countAttempt: false,  // Don't consume retry budget for infra issues
-            suggestedDelayMs: 1000,  // 1s base backoff for network issues
+            countAttempt: false, // Don't consume retry budget for infra issues
+            suggestedDelayMs: 1000, // 1s base backoff for network issues
             message: 'Network connectivity issue - will retry with backoff',
         };
     }
@@ -119,14 +119,12 @@ export function classifyError(error, context = {}) {
 
         return {
             errorClass: ErrorClass.DEGRADED,
-            reasonClass: 'ENV_UNAVAILABLE',  // Timeout is infrastructure issue
+            reasonClass: 'ENV_UNAVAILABLE', // Timeout is infrastructure issue
             reasonCode: isOllamaTimeout ? 'LLM_TIMEOUT' : 'TIMEOUT',
-            strategy: isOllamaTimeout
-                ? RetryStrategy.MODEL_FALLBACK
-                : RetryStrategy.EXPONENTIAL_BACKOFF,
+            strategy: isOllamaTimeout ? RetryStrategy.MODEL_FALLBACK : RetryStrategy.EXPONENTIAL_BACKOFF,
             retryable: true,
-            countAttempt: false,  // Don't count timeouts as user errors
-            suggestedDelayMs: msg.includes('rate limit') ? 5000 : 0,  // 5s for rate limits, 0 for timeout+fallback
+            countAttempt: false, // Don't count timeouts as user errors
+            suggestedDelayMs: msg.includes('rate limit') ? 5000 : 0, // 5s for rate limits, 0 for timeout+fallback
             modelFallback: isOllamaTimeout ? getSmallerModel(context.model) : null,
             message: isOllamaTimeout
                 ? `Timeout on ${context.model || 'model'} - will try smaller/faster model`
@@ -154,12 +152,15 @@ export function classifyError(error, context = {}) {
         msg.includes('ValidationError') ||
         name === 'ValidationError'
     ) {
-        const isAuthError = msg.includes('401') || msg.includes('403') ||
-                          msg.includes('authentication') || msg.includes('Unauthorized');
+        const isAuthError =
+            msg.includes('401') ||
+            msg.includes('403') ||
+            msg.includes('authentication') ||
+            msg.includes('Unauthorized');
 
         return {
             errorClass: ErrorClass.PERMANENT,
-            reasonClass: 'TASK_ERROR',  // Count these attempts
+            reasonClass: 'TASK_ERROR', // Count these attempts
             reasonCode: isAuthError ? 'AUTH_FAILURE' : 'INVALID_REQUEST',
             strategy: RetryStrategy.NO_RETRY,
             retryable: false,
@@ -172,19 +173,15 @@ export function classifyError(error, context = {}) {
     }
 
     // 4. CIRCUIT_OPEN: Circuit breaker active
-    if (
-        msg.includes('circuit') ||
-        msg.includes('Circuit breaker') ||
-        msg.includes('CIRCUIT_OPEN')
-    ) {
+    if (msg.includes('circuit') || msg.includes('Circuit breaker') || msg.includes('CIRCUIT_OPEN')) {
         return {
             errorClass: ErrorClass.CIRCUIT_OPEN,
             reasonClass: 'ENV_UNAVAILABLE',
             reasonCode: 'CIRCUIT_OPEN',
             strategy: RetryStrategy.NO_RETRY,
-            retryable: false,  // Don't retry while circuit open
+            retryable: false, // Don't retry while circuit open
             countAttempt: false,
-            suggestedDelayMs: 30000,  // 30s before circuit might recover
+            suggestedDelayMs: 30000, // 30s before circuit might recover
             message: 'Service circuit breaker is open - wait before retrying',
         };
     }
@@ -193,12 +190,12 @@ export function classifyError(error, context = {}) {
     // Better to retry unknown errors than fail immediately
     return {
         errorClass: ErrorClass.DEGRADED,
-        reasonClass: 'TASK_ERROR',  // Count attempts by default for safety
+        reasonClass: 'TASK_ERROR', // Count attempts by default for safety
         reasonCode: 'UNKNOWN_ERROR',
         strategy: RetryStrategy.EXPONENTIAL_BACKOFF,
         retryable: true,
         countAttempt: true,
-        suggestedDelayMs: 2000,  // 2s base backoff for unknown errors
+        suggestedDelayMs: 2000, // 2s base backoff for unknown errors
         message: 'Unknown error - will retry conservatively',
     };
 }

@@ -10,13 +10,15 @@ const { values } = parseArgs({
         'before-lines': { type: 'string' },
         'after-lines': { type: 'string' },
         root: { type: 'string' },
-        json: { type: 'boolean', default: false }
-    }
+        json: { type: 'boolean', default: false },
+    },
 });
 
 const chunkId = values['chunk-id'];
 if (!chunkId) {
-    console.error('Usage: npm run rag:expand -- --chunk-id <chunk_id> [--mode lines|symbol] [--before-lines N] [--after-lines N] [--json]');
+    console.error(
+        'Usage: npm run rag:expand -- --chunk-id <chunk_id> [--mode lines|symbol] [--before-lines N] [--after-lines N] [--json]'
+    );
     process.exit(2);
 }
 
@@ -25,7 +27,7 @@ const result = await ragExpand({
     mode: values.mode || 'lines',
     beforeLines: values['before-lines'] ? Number(values['before-lines']) : undefined,
     afterLines: values['after-lines'] ? Number(values['after-lines']) : undefined,
-    root: values.root
+    root: values.root,
 });
 
 if (values.json) {
@@ -39,7 +41,9 @@ if (!result.ok) {
 }
 
 console.log(`[RAG] chunk=${result.chunk_id} mode=${result.mode} path=${result.path}`);
-console.log(`[RAG] range=${result.range.start_line}-${result.range.end_line} base=${result.base_range.start_line}-${result.base_range.end_line}`);
+console.log(
+    `[RAG] range=${result.range.start_line}-${result.range.end_line} base=${result.base_range.start_line}-${result.base_range.end_line}`
+);
 console.log(`\n\`\`\`${result.language || 'text'}`);
 process.stdout.write(result.text || '');
 if (result.text && !result.text.endsWith('\n')) {

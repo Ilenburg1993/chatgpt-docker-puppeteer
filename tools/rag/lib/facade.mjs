@@ -2,7 +2,13 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { getRagPaths, ensureDirs, atomicWriteJson, acquireIndexLock, releaseIndexLock } from './paths.mjs';
 import { createEmptyManifest, loadManifest } from './manifest.mjs';
-import { scanWorkspace, findProjectRoot, RAG_SCAN_PROFILES, loadWorkspaceFile, isRagIndexableRelPath } from './scan.mjs';
+import {
+    scanWorkspace,
+    findProjectRoot,
+    RAG_SCAN_PROFILES,
+    loadWorkspaceFile,
+    isRagIndexableRelPath,
+} from './scan.mjs';
 import { fingerprintBuffer } from './fingerprint.mjs';
 import { buildLineIndex, sliceByLines } from './text.mjs';
 import {
@@ -11,13 +17,18 @@ import {
     sha256HexForString,
     normalizeRelPath,
     CHUNKER_VERSION,
-    RAG_CHUNK_MAX_CHARS
+    RAG_CHUNK_MAX_CHARS,
 } from './contract.mjs';
 import { chunkByType, detectLanguage, buildTags } from './chunking/chunk_dispatcher.mjs';
 import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
 import { EmbeddingCache } from './embeddings/embed_cache.mjs';
 import { createRagAdaptiveThrottler } from './adaptive_throttler.mjs';
-import { classifyContentClass, isPreferredByIntent, normalizeContentClass, normalizeIntentScope } from './content_class.mjs';
+import {
+    classifyContentClass,
+    isPreferredByIntent,
+    normalizeContentClass,
+    normalizeIntentScope,
+} from './content_class.mjs';
 import {
     openDb,
     ensureTable,
@@ -29,7 +40,7 @@ import {
     createFTSIndex,
     getChunkById,
     getChunkStats,
-    TABLE_NAME
+    TABLE_NAME,
 } from './storage/lancedb.mjs';
 import { formatMarkdownResults } from './format.mjs';
 import { normalizeQuery } from './text/query_normalizer.mjs';
@@ -43,12 +54,12 @@ const RAG_REASON_CODES = Object.freeze({
     OLLAMA_UNAVAILABLE: 'OLLAMA_UNAVAILABLE',
     EMBEDDING_TIMEOUT: 'EMBEDDING_TIMEOUT',
     INDEX_LOCKED: 'INDEX_LOCKED',
-    RAG_QUERY_TIMEOUT: 'RAG_QUERY_TIMEOUT'
+    RAG_QUERY_TIMEOUT: 'RAG_QUERY_TIMEOUT',
 });
 
 const RAG_INDEX_MODE = Object.freeze({
     FULL: 'full',
-    INCREMENTAL: 'incremental'
+    INCREMENTAL: 'incremental',
 });
 
 function resolveDefaultProfile(requestedProfile) {
@@ -93,7 +104,7 @@ function toIsoSecond(epochMs) {
 
 function toLocalSecond(epochMs) {
     const d = new Date(epochMs);
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
@@ -103,27 +114,26 @@ function buildTimeFields(epochMs) {
         return {
             indexed_at: null,
             indexed_at_iso: null,
-            indexed_at_local: null
+            indexed_at_local: null,
         };
     }
     return {
         indexed_at: normalized,
         indexed_at_iso: toIsoSecond(normalized),
-        indexed_at_local: toLocalSecond(normalized)
+        indexed_at_local: toLocalSecond(normalized),
     };
 }
 
 function buildIndexStatus(manifest, nowMs = Date.now()) {
     const updatedAtMs = normalizeTimestampMs(manifest?.updated_at);
-    const mode = manifest?.last_index_mode === RAG_INDEX_MODE.INCREMENTAL
-        ? RAG_INDEX_MODE.INCREMENTAL
-        : RAG_INDEX_MODE.FULL;
+    const mode =
+        manifest?.last_index_mode === RAG_INDEX_MODE.INCREMENTAL ? RAG_INDEX_MODE.INCREMENTAL : RAG_INDEX_MODE.FULL;
     return {
         index_mode: mode,
         index_updated_at: updatedAtMs,
         index_updated_at_iso: updatedAtMs ? toIsoSecond(updatedAtMs) : null,
         index_updated_at_local: updatedAtMs ? toLocalSecond(updatedAtMs) : null,
-        index_freshness_ms: updatedAtMs ? Math.max(0, nowMs - updatedAtMs) : null
+        index_freshness_ms: updatedAtMs ? Math.max(0, nowMs - updatedAtMs) : null,
     };
 }
 
@@ -141,7 +151,7 @@ function buildQueryStatus(nowMs = Date.now()) {
     return {
         query_at: nowMs,
         query_at_iso: toIsoSecond(nowMs),
-        query_at_local: toLocalSecond(nowMs)
+        query_at_local: toLocalSecond(nowMs),
     };
 }
 
@@ -166,11 +176,14 @@ function buildProgressSnapshot({ startedAtMs, processedFiles, totalFiles, embedd
     const filesPct = totalFiles > 0 ? clampPercent((processedFiles / totalFiles) * 100) : 100;
     const filesRemainingPct = clampPercent(100 - filesPct);
 
-    const safeEstimatedChunks = Math.max(embeddedChunks, Number.isFinite(estimatedTotalChunks) ? estimatedTotalChunks : embeddedChunks);
+    const safeEstimatedChunks = Math.max(
+        embeddedChunks,
+        Number.isFinite(estimatedTotalChunks) ? estimatedTotalChunks : embeddedChunks
+    );
     const chunksPct = safeEstimatedChunks > 0 ? clampPercent((embeddedChunks / safeEstimatedChunks) * 100) : 0;
     const chunksRemainingPct = clampPercent(100 - chunksPct);
 
-    const filesPerMs = processedFiles > 0 ? (processedFiles / elapsedMs) : 0;
+    const filesPerMs = processedFiles > 0 ? processedFiles / elapsedMs : 0;
     const remainingFiles = Math.max(0, totalFiles - processedFiles);
     const etaMs = filesPerMs > 0 ? Math.ceil(remainingFiles / filesPerMs) : null;
     const throughputFilesPerMin = filesPerMs > 0 ? filesPerMs * 60000 : 0;
@@ -181,7 +194,7 @@ function buildProgressSnapshot({ startedAtMs, processedFiles, totalFiles, embedd
         chunksPct,
         chunksRemainingPct,
         etaMs,
-        throughputFilesPerMin
+        throughputFilesPerMin,
     };
 }
 
@@ -191,7 +204,7 @@ function buildScopeOptionsFromResolved(resolvedScope) {
         docsMode: resolvedScope.docsMode,
         includeGlobs: resolvedScope.includeGlobs,
         excludeGlobs: resolvedScope.excludeGlobs,
-        maxFileBytes: resolvedScope.maxFileBytes
+        maxFileBytes: resolvedScope.maxFileBytes,
     };
 }
 
@@ -203,7 +216,7 @@ function copyScope(scope) {
         include_globs: Array.isArray(scope.include_globs) ? [...scope.include_globs] : [],
         exclude_globs: Array.isArray(scope.exclude_globs) ? [...scope.exclude_globs] : [],
         max_file_bytes: scope.max_file_bytes,
-        scope_hash: scope.scope_hash
+        scope_hash: scope.scope_hash,
     };
 }
 
@@ -239,10 +252,8 @@ function normalizeFileMtimeMs(entry) {
 }
 
 function decorateResultsWithSourceMetadata(results, manifest) {
-    const manifestFiles = manifest?.files && typeof manifest.files === 'object'
-        ? manifest.files
-        : {};
-    return results.map((result) => {
+    const manifestFiles = manifest?.files && typeof manifest.files === 'object' ? manifest.files : {};
+    return results.map(result => {
         const contentClass = normalizeContentClass(result.content_class, result.path, result.ext);
         const pathRootRel = normalizeRelPath(result.path || '');
         const manifestEntry = manifestFiles[pathRootRel] || null;
@@ -252,7 +263,7 @@ function decorateResultsWithSourceMetadata(results, manifest) {
             content_class: contentClass,
             path_root_rel: pathRootRel,
             file_mtime_ms: fileMtimeMs,
-            file_mtime_iso: toIsoSecondOrNull(fileMtimeMs)
+            file_mtime_iso: toIsoSecondOrNull(fileMtimeMs),
         };
     });
 }
@@ -263,9 +274,9 @@ function applyIntentScopePolicy(results, intentScope, topK) {
         return {
             result_policy: {
                 intent_scope: normalizedScope,
-                docs_filtered: false
+                docs_filtered: false,
             },
-            results: results.slice(0, topK)
+            results: results.slice(0, topK),
         };
     }
 
@@ -282,15 +293,15 @@ function applyIntentScopePolicy(results, intentScope, topK) {
 
     const merged = [...preferred, ...secondary];
     const sliced = merged.slice(0, topK);
-    const docsInOutput = sliced.filter((result) => result.content_class === 'docs').length;
+    const docsInOutput = sliced.filter(result => result.content_class === 'docs').length;
     const docsFiltered = normalizedScope === 'code-first' && docsInPool > docsInOutput;
 
     return {
         result_policy: {
             intent_scope: normalizedScope,
-            docs_filtered: docsFiltered
+            docs_filtered: docsFiltered,
         },
-        results: sliced
+        results: sliced,
     };
 }
 
@@ -303,7 +314,7 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
             expanded_results: 0,
             expand_mode: options.expandMode || 'symbol',
             expand_top_n: 0,
-            expand_budget_chars: options.expandBudgetChars || 0
+            expand_budget_chars: options.expandBudgetChars || 0,
         };
     }
 
@@ -324,7 +335,7 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
             expanded_results: 0,
             expand_mode: expandMode,
             expand_top_n: 0,
-            expand_budget_chars: expandBudgetChars
+            expand_budget_chars: expandBudgetChars,
         };
     }
 
@@ -341,14 +352,16 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
         }
 
         try {
-            const expanded = /** @type {any} */ (await ragExpand({
-                chunkId: result.chunk_id,
-                mode: expandMode,
-                beforeLines,
-                afterLines,
-                paths: options.paths,
-                root: options.root
-            }));
+            const expanded = /** @type {any} */ (
+                await ragExpand({
+                    chunkId: result.chunk_id,
+                    mode: expandMode,
+                    beforeLines,
+                    afterLines,
+                    paths: options.paths,
+                    root: options.root,
+                })
+            );
 
             if (!expanded?.ok) {
                 result.expanded_context_error = expanded?.message || 'expand_failed';
@@ -367,7 +380,7 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
                 mode: expanded.mode_used || expanded.mode || expandMode,
                 chars_returned: expanded.chars_returned || text.length,
                 range: expanded.range,
-                text
+                text,
             };
             usedChars += text.length;
             expandedCount += 1;
@@ -384,7 +397,7 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
         expanded_results: expandedCount,
         expand_mode: expandMode,
         expand_top_n: expandTopN,
-        expand_budget_chars: expandBudgetChars
+        expand_budget_chars: expandBudgetChars,
     };
 }
 
@@ -415,10 +428,10 @@ function buildIndexLockError(lock) {
     const lockInfo = lock?.existingLock || {};
     const err = new Error(
         `RAG_INDEX_LOCKED: Another indexing process is running.\n` +
-        `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
-        `If no indexing is running, the lock may be stale.\n` +
-        `It will auto-clear after 6 hours, or you can manually remove:\n` +
-        `  rm /home/node/.local/share/rag-index/index.lock\n`
+            `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
+            `If no indexing is running, the lock may be stale.\n` +
+            `It will auto-clear after 6 hours, or you can manually remove:\n` +
+            `  rm /home/node/.local/share/rag-index/index.lock\n`
     );
     err.details = lock;
     err.reason_code = RAG_REASON_CODES.INDEX_LOCKED;
@@ -452,7 +465,7 @@ function toChunkDescriptor(range, { relPath, lineStarts, fileBuffer, manifestChu
         startByte,
         endByte,
         contentSha256: content_sha256,
-        chunkerVersion: manifestChunkerVersion
+        chunkerVersion: manifestChunkerVersion,
     });
     const header_text = buildHeaderTextForRange(range, { relPath, language, tags });
     const embed_text = buildEmbedText(header_text, text);
@@ -469,7 +482,7 @@ function toChunkDescriptor(range, { relPath, lineStarts, fileBuffer, manifestChu
         text,
         header_text,
         embed_text,
-        content_sha256
+        content_sha256,
     };
 }
 
@@ -477,7 +490,7 @@ function withNeighborIds(descriptors) {
     return descriptors.map((d, idx) => ({
         ...d,
         chunk_prev_id: idx > 0 ? descriptors[idx - 1].chunk_id : null,
-        chunk_next_id: idx + 1 < descriptors.length ? descriptors[idx + 1].chunk_id : null
+        chunk_next_id: idx + 1 < descriptors.length ? descriptors[idx + 1].chunk_id : null,
     }));
 }
 
@@ -507,7 +520,7 @@ function buildStructuredExpandError(reasonCode, message, details = {}) {
         ok: false,
         reason_code: reasonCode,
         message,
-        ...details
+        ...details,
     };
 }
 
@@ -549,14 +562,18 @@ export async function ragHealth(options = {}) {
             const paths = getRagPaths(options.paths);
             await ensureDirs(paths);
 
-            const writable = await canWrite(paths.indexDir) && await canWrite(paths.dbDir);
+            const writable = (await canWrite(paths.indexDir)) && (await canWrite(paths.dbDir));
             const manifest = await loadManifest(paths).catch(err => ({ error: String(err?.message || err) }));
 
-            const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
-                baseURL: options.ollamaBaseUrl,
-                model: options.model
-            });
-            const embHealth = await embeddings.health().catch(err => ({ ok: false, error: String(err?.message || err) }));
+            const embeddings =
+                options.embeddingsProvider ||
+                new OllamaEmbeddingsProvider({
+                    baseURL: options.ollamaBaseUrl,
+                    model: options.model,
+                });
+            const embHealth = await embeddings
+                .health()
+                .catch(err => ({ ok: false, error: String(err?.message || err) }));
 
             const db = await openDb(paths.dbDir).catch(err => ({ error: String(err?.message || err) }));
             let tableNames = null;
@@ -591,7 +608,7 @@ export async function ragHealth(options = {}) {
                 scope_hash: manifest?.last_scope_hash || null,
                 ...buildIndexStatus(manifest),
                 ollama: embHealth,
-                lancedb: { ok: !('error' in db), tableNames }
+                lancedb: { ok: !('error' in db), tableNames },
             };
         },
         30000,
@@ -609,280 +626,297 @@ export async function ragIndex(options = {}) {
             const paths = getRagPaths(options.paths);
             await ensureDirs(paths);
 
-        const lock = await acquireIndexLock(paths);
-        if (!lock.acquired) {
-            throw buildIndexLockError(lock);
-        }
+            const lock = await acquireIndexLock(paths);
+            if (!lock.acquired) {
+                throw buildIndexLockError(lock);
+            }
 
             try {
-        let manifest = await loadManifest(paths);
-        if (!manifest) {
-            manifest = createEmptyManifest();
-            manifest.embedding.model = options.model || manifest.embedding.model;
-            manifest.embedding.base_url_default = options.ollamaBaseUrl || manifest.embedding.base_url_default;
-        }
-
-        if (manifest.chunker_version !== CHUNKER_VERSION) {
-            throw new Error(
-                `CHUNKER_VERSION_MISMATCH: Index uses chunker '${manifest.chunker_version}', ` +
-                `but code expects '${CHUNKER_VERSION}'.\n\n` +
-                `This happens when the RAG chunking logic changes.\n` +
-                `Solution: Reset and rebuild the index:\n` +
-                `  npm run rag:reset -- --yes\n` +
-                `  npm run rag:index\n`
-            );
-        }
-
-        const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
-            baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
-            model: options.model || manifest.embedding.model
-        });
-
-        const resolvedScope = resolveRagScopeConfig({
-            profile: options.profile,
-            includeGlobs: options.includeGlobs,
-            excludeGlobs: options.excludeGlobs,
-            docsMode: options.docsMode,
-            maxFileBytes: options.maxFileBytes
-        });
-        const files = await scanWorkspace(root, buildScopeOptionsFromResolved(resolvedScope));
-
-        // Validate embedding dimension early (fail-fast if model changed)
-        if (manifest.embedding.dim !== null && files.length > 0) {
-            console.log('[RAG] Validating embedding dimension...');
-            const testVector = await embeddings.embed('test');
-            const actualDim = testVector.length;
-
-            if (manifest.embedding.dim !== actualDim) {
-                throw new Error(
-                    `EMBEDDING_DIM_MISMATCH: Manifest expects dim=${manifest.embedding.dim}, ` +
-                    `but model '${embeddings.model}' returned dim=${actualDim}.\n` +
-                    `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`
-                );
-            }
-            console.log(`[RAG] Dimension validated: ${actualDim}`);
-        }
-
-        const db = await openDb(paths.dbDir);
-        const tableNames = await db.tableNames().catch(() => []);
-        let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
-
-        const throttler = createRagAdaptiveThrottler({ mode: 'full' });
-        const throttleStats = throttler.getStats();
-        console.log(
-            `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
-            `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
-            `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
-        );
-
-        const report = {
-            root,
-            profile: resolvedScope.profile,
-            scope: copyScope(resolvedScope.scope),
-            scanned_files: files.length,
-            changed_files: 0,
-            skipped_files: 0,
-            embedded_chunks: 0,
-            inserted_chunks: 0,
-            deleted_chunks: 0,
-            pruned_files: 0,
-            pruned_delete_ops: 0,
-            scope_reconciled: false
-        };
-
-        await reconcileScopeChanges({ manifest, resolvedScope, table, report });
-
-        console.log(`[RAG] Indexing: ${files.length} files scanned, processing changes...`);
-        if (report.scope_reconciled) {
-            console.log(`[RAG] Scope changed, pruned ${report.pruned_files} files outside active scope`);
-        }
-
-        let processedCount = 0;
-        let changedCount = 0;
-        let observedTotalChunksInChangedFiles = 0;
-        const startedAtMs = Date.now();
-
-        const logProgress = ({ force = false } = {}) => {
-            if (!force && processedCount > 0 && processedCount % 25 !== 0) return;
-            const estimatedChangedFiles = processedCount > 0
-                ? Math.max(report.changed_files, Math.round((report.changed_files / processedCount) * files.length))
-                : report.changed_files;
-            const avgChunksPerChangedFile = report.changed_files > 0
-                ? (observedTotalChunksInChangedFiles / report.changed_files)
-                : 0;
-            const estimatedTotalChunks = estimatedChangedFiles > 0
-                ? Math.max(report.embedded_chunks, Math.round(avgChunksPerChangedFile * estimatedChangedFiles))
-                : report.embedded_chunks;
-            const snapshot = buildProgressSnapshot({
-                startedAtMs,
-                processedFiles: processedCount,
-                totalFiles: files.length,
-                embeddedChunks: report.embedded_chunks,
-                estimatedTotalChunks
-            });
-            console.log(
-                `[RAG] progress files=${snapshot.filesPct.toFixed(1)}% remaining=${snapshot.filesRemainingPct.toFixed(1)}%` +
-                ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
-                ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
-                ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
-                ` | scanned=${processedCount}/${files.length} changed=${report.changed_files} skipped=${report.skipped_files}`
-            );
-        };
-
-        for (const f of files) {
-            processedCount++;
-            const relPath = normalizeRelPath(f.relPath);
-            const fp = await fingerprintBuffer(f.buffer);
-            const prev = manifest.files[relPath];
-
-            if (prev && prev.sha256 === fp.sha256 && prev.xxhash64 === fp.xxhash64 && prev.size === f.size) {
-                report.skipped_files++;
-                logProgress();
-                continue;
-            }
-
-            report.changed_files++;
-            changedCount++;
-
-            // Log file being processed (only changed files, to avoid clutter)
-            console.log(`[RAG] Processing [${changedCount}]: ${relPath}`);
-
-            const { lines, lineStarts } = buildLineIndex(f.buffer);
-            const ranges = chunkByType({
-                relPath,
-                lines,
-                maxChunkChars: Math.min(RAG_CHUNK_MAX_CHARS, Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS))
-            });
-            const ext = computeExt(relPath);
-            const language = detectLanguage(relPath);
-            const tags = buildTags(relPath);
-            const file_id = buildFileId(relPath);
-            const indexedAtMs = Date.now();
-
-            const descriptors = withNeighborIds(ranges.map((r) => toChunkDescriptor(r, {
-                relPath,
-                lineStarts,
-                fileBuffer: f.buffer,
-                manifestChunkerVersion: manifest.chunker_version,
-                language,
-                tags
-            })));
-            observedTotalChunksInChangedFiles += descriptors.length;
-
-            const chunkRows = [];
-            for (let fileChunkIndex = 0; fileChunkIndex < descriptors.length; fileChunkIndex++) {
-                const descriptor = descriptors[fileChunkIndex];
-                // Embed with retry logic (handles transient failures)
-                console.log(
-                    `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
-                    `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
-                );
-                const vector = await retryWithBackoff(
-                    () => embeddings.embed(descriptor.embed_text),
-                    {
-                        maxRetries: 3,
-                        initialDelay: 1000,
-                        maxDelay: 10000,
-                        onRetry: (err, attempt, max, delay) => {
-                            console.warn(`[RAG] Embed retry ${attempt}/${max} after ${delay}ms: ${err.message}`);
-                        }
-                    }
-                );
-                report.embedded_chunks++;
-
-                // Adaptive throttling: automatically adjusts delay based on CPU usage
-                // Speeds up when CPU < 30%, slows down when CPU > 50%
-                await throttler.throttle();
-
-                if (!manifest.embedding.dim) {
-                    manifest.embedding.dim = vector.length;
-                } else if (manifest.embedding.dim !== vector.length) {
-                    throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+                let manifest = await loadManifest(paths);
+                if (!manifest) {
+                    manifest = createEmptyManifest();
+                    manifest.embedding.model = options.model || manifest.embedding.model;
+                    manifest.embedding.base_url_default = options.ollamaBaseUrl || manifest.embedding.base_url_default;
                 }
 
-                if (!table) {
-                    table = await ensureTable(db, manifest.embedding.dim);
+                if (manifest.chunker_version !== CHUNKER_VERSION) {
+                    throw new Error(
+                        `CHUNKER_VERSION_MISMATCH: Index uses chunker '${manifest.chunker_version}', ` +
+                            `but code expects '${CHUNKER_VERSION}'.\n\n` +
+                            `This happens when the RAG chunking logic changes.\n` +
+                            `Solution: Reset and rebuild the index:\n` +
+                            `  npm run rag:reset -- --yes\n` +
+                            `  npm run rag:index\n`
+                    );
                 }
 
-                    chunkRows.push({
-                        chunk_id: descriptor.chunk_id,
-                        file_id,
-                        path: relPath,
-                        ext,
-                        content_class: classifyContentClass(relPath, ext),
-                        language: language ?? null,
-                    kind: descriptor.kind,
-                    symbol: descriptor.symbol,
-                    exported: descriptor.exported,
-                    start_line: descriptor.startLine,
-                    end_line: descriptor.endLine,
-                    start_byte: descriptor.startByte,
-                    end_byte: descriptor.endByte,
-                    tags,
-                    header_text: descriptor.header_text,
-                    text: descriptor.text,
-                    embed_text: descriptor.embed_text,
-                    chunk_prev_id: descriptor.chunk_prev_id,
-                    chunk_next_id: descriptor.chunk_next_id,
-                    content_sha256: descriptor.content_sha256,
-                    embedding_model: embeddings.model,
-                    vector,
-                    indexed_at: BigInt(indexedAtMs)
+                const embeddings =
+                    options.embeddingsProvider ||
+                    new OllamaEmbeddingsProvider({
+                        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+                        model: options.model || manifest.embedding.model,
+                    });
+
+                const resolvedScope = resolveRagScopeConfig({
+                    profile: options.profile,
+                    includeGlobs: options.includeGlobs,
+                    excludeGlobs: options.excludeGlobs,
+                    docsMode: options.docsMode,
+                    maxFileBytes: options.maxFileBytes,
                 });
-            }
+                const files = await scanWorkspace(root, buildScopeOptionsFromResolved(resolvedScope));
 
-            if (table) {
-            await deleteByPath(table, relPath);
-            report.deleted_chunks += 1; // logical delete op (not row count)
-            report.inserted_chunks += await addChunks(table, chunkRows);
-            }
+                // Validate embedding dimension early (fail-fast if model changed)
+                if (manifest.embedding.dim !== null && files.length > 0) {
+                    console.log('[RAG] Validating embedding dimension...');
+                    const testVector = await embeddings.embed('test');
+                    const actualDim = testVector.length;
 
-            manifest.files[relPath] = {
-                size: f.size,
-                mtime_ms: f.mtimeMs,
-                xxhash64: fp.xxhash64,
-                sha256: fp.sha256,
-                ...buildTimeFields(indexedAtMs)
-            };
+                    if (manifest.embedding.dim !== actualDim) {
+                        throw new Error(
+                            `EMBEDDING_DIM_MISMATCH: Manifest expects dim=${manifest.embedding.dim}, ` +
+                                `but model '${embeddings.model}' returned dim=${actualDim}.\n` +
+                                `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`
+                        );
+                    }
+                    console.log(`[RAG] Dimension validated: ${actualDim}`);
+                }
 
-            logProgress({ force: true });
-        }
+                const db = await openDb(paths.dbDir);
+                const tableNames = await db.tableNames().catch(() => []);
+                let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
 
-        logProgress({ force: true });
+                const throttler = createRagAdaptiveThrottler({ mode: 'full' });
+                const throttleStats = throttler.getStats();
+                console.log(
+                    `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
+                        `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
+                        `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
+                );
 
-        if (table) {
-            try {
-                await createFTSIndex(table);
-            } catch (ftsError) {
-                console.warn(`[RAG] FTS index not available yet: ${ftsError?.message || ftsError}`);
-            }
-        }
+                const report = {
+                    root,
+                    profile: resolvedScope.profile,
+                    scope: copyScope(resolvedScope.scope),
+                    scanned_files: files.length,
+                    changed_files: 0,
+                    skipped_files: 0,
+                    embedded_chunks: 0,
+                    inserted_chunks: 0,
+                    deleted_chunks: 0,
+                    pruned_files: 0,
+                    pruned_delete_ops: 0,
+                    scope_reconciled: false,
+                };
 
-        console.log(`[RAG] Indexing complete: ${report.inserted_chunks} chunks indexed`);
+                await reconcileScopeChanges({ manifest, resolvedScope, table, report });
 
-        manifest.updated_at = Date.now();
-        manifest.last_index_mode = RAG_INDEX_MODE.FULL;
-        applyScopeToManifest(manifest, resolvedScope);
-        report.scope = copyScope(resolvedScope.scope);
+                console.log(`[RAG] Indexing: ${files.length} files scanned, processing changes...`);
+                if (report.scope_reconciled) {
+                    console.log(`[RAG] Scope changed, pruned ${report.pruned_files} files outside active scope`);
+                }
 
-        // Display indexing summary
-        console.log('\n[RAG] ═══ Indexing Summary ═══');
-        console.log(`  Files scanned:    ${report.scanned_files}`);
-        console.log(`  Files changed:    ${report.changed_files}`);
-        console.log(`  Files skipped:    ${report.skipped_files} (${((report.skipped_files/report.scanned_files)*100).toFixed(1)}%)`);
-        console.log(`  Chunks embedded:  ${report.embedded_chunks}`);
-        console.log(`  Chunks inserted:  ${report.inserted_chunks}`);
-        if (report.changed_files > 0) {
-            console.log(`  Avg chunks/file:  ${(report.embedded_chunks/report.changed_files).toFixed(1)}`);
-        }
-        console.log('═══════════════════════════════\n');
+                let processedCount = 0;
+                let changedCount = 0;
+                let observedTotalChunksInChangedFiles = 0;
+                const startedAtMs = Date.now();
 
-        await atomicWriteJson(paths.manifestPath, manifest);
-        try {
-            await db.close();
-        } catch (_) {
-            // ignore
-        }
+                const logProgress = ({ force = false } = {}) => {
+                    if (!force && processedCount > 0 && processedCount % 25 !== 0) return;
+                    const estimatedChangedFiles =
+                        processedCount > 0
+                            ? Math.max(
+                                  report.changed_files,
+                                  Math.round((report.changed_files / processedCount) * files.length)
+                              )
+                            : report.changed_files;
+                    const avgChunksPerChangedFile =
+                        report.changed_files > 0 ? observedTotalChunksInChangedFiles / report.changed_files : 0;
+                    const estimatedTotalChunks =
+                        estimatedChangedFiles > 0
+                            ? Math.max(
+                                  report.embedded_chunks,
+                                  Math.round(avgChunksPerChangedFile * estimatedChangedFiles)
+                              )
+                            : report.embedded_chunks;
+                    const snapshot = buildProgressSnapshot({
+                        startedAtMs,
+                        processedFiles: processedCount,
+                        totalFiles: files.length,
+                        embeddedChunks: report.embedded_chunks,
+                        estimatedTotalChunks,
+                    });
+                    console.log(
+                        `[RAG] progress files=${snapshot.filesPct.toFixed(1)}% remaining=${snapshot.filesRemainingPct.toFixed(1)}%` +
+                            ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
+                            ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
+                            ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
+                            ` | scanned=${processedCount}/${files.length} changed=${report.changed_files} skipped=${report.skipped_files}`
+                    );
+                };
+
+                for (const f of files) {
+                    processedCount++;
+                    const relPath = normalizeRelPath(f.relPath);
+                    const fp = await fingerprintBuffer(f.buffer);
+                    const prev = manifest.files[relPath];
+
+                    if (prev && prev.sha256 === fp.sha256 && prev.xxhash64 === fp.xxhash64 && prev.size === f.size) {
+                        report.skipped_files++;
+                        logProgress();
+                        continue;
+                    }
+
+                    report.changed_files++;
+                    changedCount++;
+
+                    // Log file being processed (only changed files, to avoid clutter)
+                    console.log(`[RAG] Processing [${changedCount}]: ${relPath}`);
+
+                    const { lines, lineStarts } = buildLineIndex(f.buffer);
+                    const ranges = chunkByType({
+                        relPath,
+                        lines,
+                        maxChunkChars: Math.min(
+                            RAG_CHUNK_MAX_CHARS,
+                            Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS)
+                        ),
+                    });
+                    const ext = computeExt(relPath);
+                    const language = detectLanguage(relPath);
+                    const tags = buildTags(relPath);
+                    const file_id = buildFileId(relPath);
+                    const indexedAtMs = Date.now();
+
+                    const descriptors = withNeighborIds(
+                        ranges.map(r =>
+                            toChunkDescriptor(r, {
+                                relPath,
+                                lineStarts,
+                                fileBuffer: f.buffer,
+                                manifestChunkerVersion: manifest.chunker_version,
+                                language,
+                                tags,
+                            })
+                        )
+                    );
+                    observedTotalChunksInChangedFiles += descriptors.length;
+
+                    const chunkRows = [];
+                    for (let fileChunkIndex = 0; fileChunkIndex < descriptors.length; fileChunkIndex++) {
+                        const descriptor = descriptors[fileChunkIndex];
+                        // Embed with retry logic (handles transient failures)
+                        console.log(
+                            `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
+                                `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
+                        );
+                        const vector = await retryWithBackoff(() => embeddings.embed(descriptor.embed_text), {
+                            maxRetries: 3,
+                            initialDelay: 1000,
+                            maxDelay: 10000,
+                            onRetry: (err, attempt, max, delay) => {
+                                console.warn(`[RAG] Embed retry ${attempt}/${max} after ${delay}ms: ${err.message}`);
+                            },
+                        });
+                        report.embedded_chunks++;
+
+                        // Adaptive throttling: automatically adjusts delay based on CPU usage
+                        // Speeds up when CPU < 30%, slows down when CPU > 50%
+                        await throttler.throttle();
+
+                        if (!manifest.embedding.dim) {
+                            manifest.embedding.dim = vector.length;
+                        } else if (manifest.embedding.dim !== vector.length) {
+                            throw new Error(
+                                `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                            );
+                        }
+
+                        if (!table) {
+                            table = await ensureTable(db, manifest.embedding.dim);
+                        }
+
+                        chunkRows.push({
+                            chunk_id: descriptor.chunk_id,
+                            file_id,
+                            path: relPath,
+                            ext,
+                            content_class: classifyContentClass(relPath, ext),
+                            language: language ?? null,
+                            kind: descriptor.kind,
+                            symbol: descriptor.symbol,
+                            exported: descriptor.exported,
+                            start_line: descriptor.startLine,
+                            end_line: descriptor.endLine,
+                            start_byte: descriptor.startByte,
+                            end_byte: descriptor.endByte,
+                            tags,
+                            header_text: descriptor.header_text,
+                            text: descriptor.text,
+                            embed_text: descriptor.embed_text,
+                            chunk_prev_id: descriptor.chunk_prev_id,
+                            chunk_next_id: descriptor.chunk_next_id,
+                            content_sha256: descriptor.content_sha256,
+                            embedding_model: embeddings.model,
+                            vector,
+                            indexed_at: BigInt(indexedAtMs),
+                        });
+                    }
+
+                    if (table) {
+                        await deleteByPath(table, relPath);
+                        report.deleted_chunks += 1; // logical delete op (not row count)
+                        report.inserted_chunks += await addChunks(table, chunkRows);
+                    }
+
+                    manifest.files[relPath] = {
+                        size: f.size,
+                        mtime_ms: f.mtimeMs,
+                        xxhash64: fp.xxhash64,
+                        sha256: fp.sha256,
+                        ...buildTimeFields(indexedAtMs),
+                    };
+
+                    logProgress({ force: true });
+                }
+
+                logProgress({ force: true });
+
+                if (table) {
+                    try {
+                        await createFTSIndex(table);
+                    } catch (ftsError) {
+                        console.warn(`[RAG] FTS index not available yet: ${ftsError?.message || ftsError}`);
+                    }
+                }
+
+                console.log(`[RAG] Indexing complete: ${report.inserted_chunks} chunks indexed`);
+
+                manifest.updated_at = Date.now();
+                manifest.last_index_mode = RAG_INDEX_MODE.FULL;
+                applyScopeToManifest(manifest, resolvedScope);
+                report.scope = copyScope(resolvedScope.scope);
+
+                // Display indexing summary
+                console.log('\n[RAG] ═══ Indexing Summary ═══');
+                console.log(`  Files scanned:    ${report.scanned_files}`);
+                console.log(`  Files changed:    ${report.changed_files}`);
+                console.log(
+                    `  Files skipped:    ${report.skipped_files} (${((report.skipped_files / report.scanned_files) * 100).toFixed(1)}%)`
+                );
+                console.log(`  Chunks embedded:  ${report.embedded_chunks}`);
+                console.log(`  Chunks inserted:  ${report.inserted_chunks}`);
+                if (report.changed_files > 0) {
+                    console.log(`  Avg chunks/file:  ${(report.embedded_chunks / report.changed_files).toFixed(1)}`);
+                }
+                console.log('═══════════════════════════════\n');
+
+                await atomicWriteJson(paths.manifestPath, manifest);
+                try {
+                    await db.close();
+                } catch (_) {
+                    // ignore
+                }
 
                 return report;
             } finally {
@@ -926,37 +960,40 @@ export async function ragIndexChanged(options = {}) {
                 if (manifest.chunker_version !== CHUNKER_VERSION) {
                     throw new Error(
                         `CHUNKER_VERSION_MISMATCH: Index uses chunker '${manifest.chunker_version}', ` +
-                        `but code expects '${CHUNKER_VERSION}'.\n\n` +
-                        `This happens when the RAG chunking logic changes.\n` +
-                        `Solution: Reset and rebuild the index:\n` +
-                        `  npm run rag:reset -- --yes\n` +
-                        `  npm run rag:index\n`
+                            `but code expects '${CHUNKER_VERSION}'.\n\n` +
+                            `This happens when the RAG chunking logic changes.\n` +
+                            `Solution: Reset and rebuild the index:\n` +
+                            `  npm run rag:reset -- --yes\n` +
+                            `  npm run rag:index\n`
                     );
                 }
 
-                const embeddings = options.embeddingsProvider || new OllamaEmbeddingsProvider({
-                    baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
-                    model: options.model || manifest.embedding.model
-                });
+                const embeddings =
+                    options.embeddingsProvider ||
+                    new OllamaEmbeddingsProvider({
+                        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+                        model: options.model || manifest.embedding.model,
+                    });
 
                 const resolvedScope = resolveRagScopeConfig({
                     profile: options.profile,
                     includeGlobs: options.includeGlobs,
                     excludeGlobs: options.excludeGlobs,
                     docsMode: options.docsMode,
-                    maxFileBytes: options.maxFileBytes
+                    maxFileBytes: options.maxFileBytes,
                 });
-                const changedPaths = [...new Set(
-                    (
-                        Array.isArray(options.changedPaths)
+                const changedPaths = [
+                    ...new Set(
+                        (Array.isArray(options.changedPaths)
                             ? options.changedPaths
                             : Array.isArray(options.paths)
-                                ? options.paths
-                                : []
-                    )
-                        .map((p) => normalizeRelPath(String(p || '').replace(/\\/g, '/')))
-                        .filter(Boolean)
-                )];
+                              ? options.paths
+                              : []
+                        )
+                            .map(p => normalizeRelPath(String(p || '').replace(/\\/g, '/')))
+                            .filter(Boolean)
+                    ),
+                ];
 
                 const report = {
                     root,
@@ -972,7 +1009,7 @@ export async function ragIndexChanged(options = {}) {
                     deleted_chunks: 0,
                     pruned_files: 0,
                     pruned_delete_ops: 0,
-                    scope_reconciled: false
+                    scope_reconciled: false,
                 };
 
                 const db = await openDb(paths.dbDir);
@@ -1001,34 +1038,38 @@ export async function ragIndexChanged(options = {}) {
                 const throttleStats = throttler.getStats();
                 console.log(
                     `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
-                    `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
-                    `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
+                        `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
+                        `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
                 );
                 const startedAtMs = Date.now();
                 let observedTotalChunksInChangedFiles = 0;
 
                 const logChangedProgress = ({ force = false } = {}) => {
                     if (!force && report.processed_paths > 0 && report.processed_paths % 10 !== 0) return;
-                    const estimatedTotalChunks = report.changed_files > 0
-                        ? Math.max(
-                            report.embedded_chunks,
-                            Math.round((observedTotalChunksInChangedFiles / report.changed_files) * Math.max(report.changed_files, changedPaths.length))
-                        )
-                        : report.embedded_chunks;
+                    const estimatedTotalChunks =
+                        report.changed_files > 0
+                            ? Math.max(
+                                  report.embedded_chunks,
+                                  Math.round(
+                                      (observedTotalChunksInChangedFiles / report.changed_files) *
+                                          Math.max(report.changed_files, changedPaths.length)
+                                  )
+                              )
+                            : report.embedded_chunks;
                     const snapshot = buildProgressSnapshot({
                         startedAtMs,
                         processedFiles: report.processed_paths,
                         totalFiles: changedPaths.length,
                         embeddedChunks: report.embedded_chunks,
-                        estimatedTotalChunks
+                        estimatedTotalChunks,
                     });
                     console.log(
                         `[RAG] progress files=${snapshot.filesPct.toFixed(1)}% remaining=${snapshot.filesRemainingPct.toFixed(1)}%` +
-                        ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
-                        ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
-                        ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
-                        ` | processed=${report.processed_paths}/${changedPaths.length} changed=${report.changed_files}` +
-                        ` deleted=${report.deleted_files} skipped=${report.skipped_files}`
+                            ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
+                            ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
+                            ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
+                            ` | processed=${report.processed_paths}/${changedPaths.length} changed=${report.changed_files}` +
+                            ` deleted=${report.deleted_files} skipped=${report.skipped_files}`
                     );
                 };
 
@@ -1037,7 +1078,7 @@ export async function ragIndexChanged(options = {}) {
                     const prev = manifest.files[relPath];
 
                     const file = await loadWorkspaceFile(root, relPath, {
-                        ...buildScopeOptionsFromResolved(resolvedScope)
+                        ...buildScopeOptionsFromResolved(resolvedScope),
                     });
 
                     // Deleted or now excluded file: remove from index + manifest.
@@ -1069,8 +1110,8 @@ export async function ragIndexChanged(options = {}) {
                         if (manifest.embedding.dim !== actualDim) {
                             throw new Error(
                                 `EMBEDDING_DIM_MISMATCH: Manifest expects dim=${manifest.embedding.dim}, ` +
-                                `but model '${embeddings.model}' returned dim=${actualDim}.\n` +
-                                `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`
+                                    `but model '${embeddings.model}' returned dim=${actualDim}.\n` +
+                                    `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`
                             );
                         }
                         dimValidated = true;
@@ -1082,7 +1123,10 @@ export async function ragIndexChanged(options = {}) {
                     const ranges = chunkByType({
                         relPath,
                         lines,
-                        maxChunkChars: Math.min(RAG_CHUNK_MAX_CHARS, Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS))
+                        maxChunkChars: Math.min(
+                            RAG_CHUNK_MAX_CHARS,
+                            Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS)
+                        ),
                     });
                     const ext = computeExt(relPath);
                     const language = detectLanguage(relPath);
@@ -1090,14 +1134,18 @@ export async function ragIndexChanged(options = {}) {
                     const file_id = buildFileId(relPath);
                     const indexedAtMs = Date.now();
 
-                    const descriptors = withNeighborIds(ranges.map((r) => toChunkDescriptor(r, {
-                        relPath,
-                        lineStarts,
-                        fileBuffer: file.buffer,
-                        manifestChunkerVersion: manifest.chunker_version,
-                        language,
-                        tags
-                    })));
+                    const descriptors = withNeighborIds(
+                        ranges.map(r =>
+                            toChunkDescriptor(r, {
+                                relPath,
+                                lineStarts,
+                                fileBuffer: file.buffer,
+                                manifestChunkerVersion: manifest.chunker_version,
+                                language,
+                                tags,
+                            })
+                        )
+                    );
                     observedTotalChunksInChangedFiles += descriptors.length;
 
                     const chunkRows = [];
@@ -1105,23 +1153,22 @@ export async function ragIndexChanged(options = {}) {
                         const descriptor = descriptors[fileChunkIndex];
                         console.log(
                             `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
-                            `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
+                                `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
                         );
-                        const vector = await retryWithBackoff(
-                            () => embeddings.embed(descriptor.embed_text),
-                            {
-                                maxRetries: 3,
-                                initialDelay: 1000,
-                                maxDelay: 10000
-                            }
-                        );
+                        const vector = await retryWithBackoff(() => embeddings.embed(descriptor.embed_text), {
+                            maxRetries: 3,
+                            initialDelay: 1000,
+                            maxDelay: 10000,
+                        });
                         report.embedded_chunks++;
                         await throttler.throttle();
 
                         if (!manifest.embedding.dim) {
                             manifest.embedding.dim = vector.length;
                         } else if (manifest.embedding.dim !== vector.length) {
-                            throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+                            throw new Error(
+                                `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                            );
                         }
 
                         if (!table) {
@@ -1151,7 +1198,7 @@ export async function ragIndexChanged(options = {}) {
                             content_sha256: descriptor.content_sha256,
                             embedding_model: embeddings.model,
                             vector,
-                            indexed_at: BigInt(indexedAtMs)
+                            indexed_at: BigInt(indexedAtMs),
                         });
                     }
 
@@ -1166,7 +1213,7 @@ export async function ragIndexChanged(options = {}) {
                         mtime_ms: file.mtimeMs,
                         xxhash64: fp.xxhash64,
                         sha256: fp.sha256,
-                        ...buildTimeFields(indexedAtMs)
+                        ...buildTimeFields(indexedAtMs),
                     };
                     logChangedProgress({ force: true });
                 }
@@ -1224,13 +1271,16 @@ export async function ragQuery(options = {}) {
             const filters = options.filters || {};
             const query = String(options.query || '');
 
-            const embeddings = /** @type {any} */ (options.embeddingsProvider || new OllamaEmbeddingsProvider({
-                baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
-                model: options.model || manifest.embedding.model
-            }));
+            const embeddings = /** @type {any} */ (
+                options.embeddingsProvider ||
+                    new OllamaEmbeddingsProvider({
+                        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+                        model: options.model || manifest.embedding.model,
+                    })
+            );
 
             /** @param {object} base */
-            const finalizeResult = async (base) => {
+            const finalizeResult = async base => {
                 const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
                 const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
                 const expanded = await maybeAutoExpandResults(scoped.results, {
@@ -1241,7 +1291,7 @@ export async function ragQuery(options = {}) {
                     beforeLines: options.beforeLines || options.before_lines,
                     afterLines: options.afterLines || options.after_lines,
                     paths: options.paths,
-                    root: options.root
+                    root: options.root,
                 });
 
                 return {
@@ -1254,7 +1304,7 @@ export async function ragQuery(options = {}) {
                         index_updated_at: indexStatus.index_updated_at,
                         index_updated_at_iso: indexStatus.index_updated_at_iso,
                         index_freshness_ms: indexStatus.index_freshness_ms,
-                        last_index_scope: lastIndexScope
+                        last_index_scope: lastIndexScope,
                     },
                     result_policy: {
                         ...scoped.result_policy,
@@ -1262,9 +1312,9 @@ export async function ragQuery(options = {}) {
                         expanded_results: expanded.expanded_results,
                         expand_mode: expanded.expand_mode,
                         expand_top_n: expanded.expand_top_n,
-                        expand_budget_chars: expanded.expand_budget_chars
+                        expand_budget_chars: expanded.expand_budget_chars,
                     },
-                    results: expanded.results
+                    results: expanded.results,
                 };
             };
 
@@ -1290,7 +1340,7 @@ export async function ragQuery(options = {}) {
                             degraded: Boolean(reasonCode),
                             ...(reasonCode ? { reason_code: reasonCode } : {}),
                             ...(degradedReason ? { degraded_reason: degradedReason } : {}),
-                            results: []
+                            results: [],
                         });
                     }
 
@@ -1315,7 +1365,7 @@ export async function ragQuery(options = {}) {
                         degraded: Boolean(reasonCode),
                         ...(reasonCode ? { reason_code: reasonCode } : {}),
                         ...(degradedReason ? { degraded_reason: degradedReason } : {}),
-                        results
+                        results,
                     });
                 };
 
@@ -1347,13 +1397,15 @@ export async function ragQuery(options = {}) {
                     }
 
                     if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
-                        throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+                        throw new Error(
+                            `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                        );
                     }
 
                     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
                     const results = await search(table, vector, {
                         topK: fetchTopK,
-                        filters
+                        filters,
                     });
 
                     return finalizeResult({
@@ -1368,7 +1420,7 @@ export async function ragQuery(options = {}) {
                         ...buildQueryStatus(),
                         backend: 'hybrid',
                         degraded: false,
-                        results
+                        results,
                     });
                 } catch (error) {
                     const reasonCode = classifyRagReasonCode(error);
@@ -1451,10 +1503,13 @@ export async function ragHybridSearch(options = {}) {
             const scopeHash = manifest?.last_scope_hash || null;
             const intentScope = normalizeIntentScope(options.intentScope || options.intent_scope || 'code-first');
 
-            const embeddings = /** @type {any} */ (options.embeddingsProvider || new OllamaEmbeddingsProvider({
-                baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
-                model: options.model || manifest.embedding.model
-            }));
+            const embeddings = /** @type {any} */ (
+                options.embeddingsProvider ||
+                    new OllamaEmbeddingsProvider({
+                        baseURL: options.ollamaBaseUrl || manifest.embedding.base_url_default,
+                        model: options.model || manifest.embedding.model,
+                    })
+            );
 
             const {
                 query,
@@ -1463,10 +1518,10 @@ export async function ragHybridSearch(options = {}) {
                 ext,
                 tags,
                 distanceRange,
-                rerank = true,         // Enable reranking by default
-                rerankWeights,         // Custom weights (optional)
-                mmr = true,            // Enable MMR by default
-                mmrLambda = 0.7        // MMR lambda (0.7 = 70% relevance, 30% diversity)
+                rerank = true, // Enable reranking by default
+                rerankWeights, // Custom weights (optional)
+                mmr = true, // Enable MMR by default
+                mmrLambda = 0.7, // MMR lambda (0.7 = 70% relevance, 30% diversity)
             } = options;
             const queryText = String(query || '').trim();
             if (!queryText) {
@@ -1476,7 +1531,7 @@ export async function ragHybridSearch(options = {}) {
             const fetchTopK = intentScope === 'all' ? requestedTopK : Math.min(requestedTopK * 4, 80);
 
             /** @param {object} base */
-            const finalizeResult = async (base) => {
+            const finalizeResult = async base => {
                 const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
                 const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
                 const expanded = await maybeAutoExpandResults(scoped.results, {
@@ -1487,7 +1542,7 @@ export async function ragHybridSearch(options = {}) {
                     beforeLines: options.beforeLines || options.before_lines,
                     afterLines: options.afterLines || options.after_lines,
                     paths: options.paths,
-                    root: options.root
+                    root: options.root,
                 });
 
                 return {
@@ -1500,7 +1555,7 @@ export async function ragHybridSearch(options = {}) {
                         index_updated_at: indexStatus.index_updated_at,
                         index_updated_at_iso: indexStatus.index_updated_at_iso,
                         index_freshness_ms: indexStatus.index_freshness_ms,
-                        last_index_scope: lastIndexScope
+                        last_index_scope: lastIndexScope,
                     },
                     result_policy: {
                         ...scoped.result_policy,
@@ -1508,9 +1563,9 @@ export async function ragHybridSearch(options = {}) {
                         expanded_results: expanded.expanded_results,
                         expand_mode: expanded.expand_mode,
                         expand_top_n: expanded.expand_top_n,
-                        expand_budget_chars: expanded.expand_budget_chars
+                        expand_budget_chars: expanded.expand_budget_chars,
                     },
-                    results: expanded.results
+                    results: expanded.results,
                 };
             };
 
@@ -1541,7 +1596,7 @@ export async function ragHybridSearch(options = {}) {
                             hybridMode: false,
                             rerank,
                             mmr,
-                            mmrLambda
+                            mmrLambda,
                         });
                     }
                     let results = [];
@@ -1569,7 +1624,7 @@ export async function ragHybridSearch(options = {}) {
                         hybridMode: false,
                         rerank,
                         mmr,
-                        mmrLambda
+                        mmrLambda,
                     });
                 };
 
@@ -1598,11 +1653,15 @@ export async function ragHybridSearch(options = {}) {
                     }
 
                     if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
-                        throw new Error(`EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`);
+                        throw new Error(
+                            `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                        );
                     }
 
                     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
-                    console.log(`[RAG] Hybrid search: query="${queryText}", topK=${requestedTopK}, rerank=${rerank}, mmr=${mmr}, intent=${intentScope}`);
+                    console.log(
+                        `[RAG] Hybrid search: query="${queryText}", topK=${requestedTopK}, rerank=${rerank}, mmr=${mmr}, intent=${intentScope}`
+                    );
                     const results = await hybridSearch(table, vector, queryText, {
                         topK: fetchTopK,
                         filters,
@@ -1611,7 +1670,7 @@ export async function ragHybridSearch(options = {}) {
                         rerankWeights,
                         intentScope,
                         mmr,
-                        mmrLambda
+                        mmrLambda,
                     });
 
                     return finalizeResult({
@@ -1630,7 +1689,7 @@ export async function ragHybridSearch(options = {}) {
                         hybridMode: true,
                         rerank,
                         mmr,
-                        mmrLambda
+                        mmrLambda,
                     });
                 } catch (error) {
                     const reasonCode = classifyRagReasonCode(error);
@@ -1668,7 +1727,7 @@ export async function ragReset(options = {}) {
     if (!options.yes) {
         throw new Error(
             'RAG_RESET_REQUIRES_YES: This operation will delete all indexed data.\n' +
-            'To confirm, run: npm run rag:reset -- --yes'
+                'To confirm, run: npm run rag:reset -- --yes'
         );
     }
     await ensureDirs(paths);
@@ -1700,13 +1759,11 @@ export async function ragExpand(options = {}) {
     }
 
     const root = options.root ? path.resolve(options.root) : await findProjectRoot(process.cwd());
-    const mode = String(options.mode || 'lines').trim().toLowerCase();
+    const mode = String(options.mode || 'lines')
+        .trim()
+        .toLowerCase();
     if (mode !== 'lines' && mode !== 'symbol') {
-        return buildStructuredExpandError(
-            'INVALID_EXPAND_MODE',
-            'mode must be one of: lines, symbol',
-            { mode }
-        );
+        return buildStructuredExpandError('INVALID_EXPAND_MODE', 'mode must be one of: lines, symbol', { mode });
     }
 
     const manifest = (await loadManifest(paths)) || createEmptyManifest();
@@ -1724,7 +1781,7 @@ export async function ragExpand(options = {}) {
                 'RAG index table not found. Rebuild index before calling rag_expand.',
                 {
                     chunk_id: chunkId,
-                    ...buildIndexStatus(manifest)
+                    ...buildIndexStatus(manifest),
                 }
             );
         }
@@ -1734,7 +1791,7 @@ export async function ragExpand(options = {}) {
         if (!chunk) {
             return buildStructuredExpandError('CHUNK_NOT_FOUND', 'chunk_id not found in index', {
                 chunk_id: chunkId,
-                ...buildIndexStatus(manifest)
+                ...buildIndexStatus(manifest),
             });
         }
 
@@ -1749,14 +1806,13 @@ export async function ragExpand(options = {}) {
 
         if (mode === 'symbol' && chunk.symbol) {
             const safePath = String(chunk.path).replace(/'/g, "''");
-            const rows = await table
-                .query()
-                .where(`path = '${safePath}'`)
-                .limit(10000)
-                .toArray();
-            const sameSymbol = rows.filter((row) => String(row.symbol || '') === String(chunk.symbol));
+            const rows = await table.query().where(`path = '${safePath}'`).limit(10000).toArray();
+            const sameSymbol = rows.filter(row => String(row.symbol || '') === String(chunk.symbol));
             if (sameSymbol.length > 0) {
-                baseStartLine = sameSymbol.reduce((min, row) => Math.min(min, Number(row.start_line || min)), baseStartLine);
+                baseStartLine = sameSymbol.reduce(
+                    (min, row) => Math.min(min, Number(row.start_line || min)),
+                    baseStartLine
+                );
                 baseEndLine = sameSymbol.reduce((max, row) => Math.max(max, Number(row.end_line || max)), baseEndLine);
                 expansionBasis = 'symbol';
             }
@@ -1784,11 +1840,11 @@ export async function ragExpand(options = {}) {
             chunk_next_id: chunk.chunk_next_id || null,
             base_range: {
                 start_line: baseStartLine,
-                end_line: baseEndLine
+                end_line: baseEndLine,
             },
             range: {
                 start_line: expandedStartLine,
-                end_line: expandedEndLine
+                end_line: expandedEndLine,
             },
             requested_before_lines: beforeLines,
             requested_after_lines: afterLines,
@@ -1800,12 +1856,12 @@ export async function ragExpand(options = {}) {
             query_at_iso: toIsoSecond(nowMs),
             query_at_local: toLocalSecond(nowMs),
             ...buildIndexStatus(manifest, nowMs),
-            text: expandedSlice.text
+            text: expandedSlice.text,
         };
     } catch (error) {
         return buildStructuredExpandError('RAG_EXPAND_FAILED', String(error?.message || error), {
             chunk_id: chunkId,
-            mode
+            mode,
         });
     } finally {
         if (!dbClosed) {
@@ -1835,7 +1891,7 @@ export async function getRagStorageStats(options = {}) {
                 chunker_version: manifest.chunker_version,
                 expected_chunker_version: CHUNKER_VERSION,
                 chunker_mismatch: manifest.chunker_version !== CHUNKER_VERSION,
-                ...buildIndexStatus(manifest)
+                ...buildIndexStatus(manifest),
             };
         }
 
@@ -1848,7 +1904,7 @@ export async function getRagStorageStats(options = {}) {
             expected_chunker_version: CHUNKER_VERSION,
             chunker_mismatch: manifest.chunker_version !== CHUNKER_VERSION,
             ...buildIndexStatus(manifest),
-            ...chunkStats
+            ...chunkStats,
         };
     } finally {
         if (!dbClosed) {

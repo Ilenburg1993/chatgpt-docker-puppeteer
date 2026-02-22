@@ -63,7 +63,7 @@ const MAX_TARGETS = 100; // Limite de targets para GC automático
 const StatsSchema = z.object({
     avg: z.number().nonnegative(),
     var: z.number().nonnegative(),
-    count: z.number().nonnegative()
+    count: z.number().nonnegative(),
 });
 
 const TargetProfileSchema = z.object({
@@ -77,7 +77,7 @@ const TargetProfileSchema = z.object({
 const AdaptiveStateSchema = z.object({
     targets: z.record(z.string(), TargetProfileSchema),
     infra: StatsSchema,
-    last_adjustment_at: z.number()
+    last_adjustment_at: z.number(),
 });
 
 /* --------------------------------------------------------------------------
@@ -88,13 +88,13 @@ const STATE_FILE = path.join(LOG_DIR, 'adaptive_state.json');
 const createEmptyStats = avg => ({
     avg,
     var: Math.pow(avg / 2, 2),
-    count: 0
+    count: 0,
 });
 
 const defaultState = {
     targets: {},
     infra: createEmptyStats(200),
-    last_adjustment_at: 0
+    last_adjustment_at: 0,
 };
 
 let state = defaultState;
@@ -160,7 +160,6 @@ async function persist() {
     } catch (e) {
         log('ERROR', `[ADAPTIVE] Falha de escrita: ${e.message}`);
     } finally {
-
         persistLock = false;
         if (pendingPersist) {
             pendingPersist = false;
@@ -213,7 +212,7 @@ function decayIfNeeded(profile, now) {
         profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
         profile.stream.count = Math.floor(profile.stream.count * decayFactor);
         profile.echo.count = Math.floor(profile.echo.count * decayFactor);
-        log('INFO', `[ADAPTIVE] Decay aplicado: age=${Math.round(age/3600000)}h, factor=${decayFactor.toFixed(2)}`);
+        log('INFO', `[ADAPTIVE] Decay aplicado: age=${Math.round(age / 3600000)}h, factor=${decayFactor.toFixed(2)}`);
     }
 }
 
@@ -468,9 +467,7 @@ async function getToolTimeout(toolName, options = {}) {
     // Context penalty for large inputs (similar to messageCount logic)
     // log2(contextSize+2)*1000 = ~1s per doubling (cap at 10s)
     // Rationale: larger inputs take longer to process
-    const contextPenalty = Math.min(10000, Math.round(
-        Math.log2((options.contextSize || 0) + 2) * 1000
-    ));
+    const contextPenalty = Math.min(10000, Math.round(Math.log2((options.contextSize || 0) + 2) * 1000));
 
     const total = base + margin + contextPenalty;
 
@@ -514,7 +511,7 @@ async function getStabilityMetrics(target = 'generic') {
     return {
         score,
         status: score > 80 ? 'STABLE' : score > 50 ? 'DEGRADED' : 'UNSTABLE',
-        samples: profile.stream.count
+        samples: profile.stream.count,
     };
 }
 
@@ -610,9 +607,15 @@ export const forcePersist = persist;
  * @property {number} PROGRESS_TIMEOUT - Timeout fixo para progresso (60s)
  */
 export const values = {
-    get HEARTBEAT_TIMEOUT() { return Math.round(state.infra.avg * 5); },
-    get ECHO_TIMEOUT() { return Math.round((state.targets.chatgpt?.echo.avg || SEED_ECHO) * 3); },
-    get PROGRESS_TIMEOUT() { return 60000; },
+    get HEARTBEAT_TIMEOUT() {
+        return Math.round(state.infra.avg * 5);
+    },
+    get ECHO_TIMEOUT() {
+        return Math.round((state.targets.chatgpt?.echo.avg || SEED_ECHO) * 3);
+    },
+    get PROGRESS_TIMEOUT() {
+        return 60000;
+    },
 };
 
 /** Exports nomeados do módulo adaptive */

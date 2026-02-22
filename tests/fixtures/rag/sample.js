@@ -5,6 +5,7 @@
 
 export const CONFIG_VALUE = 42;
 
+/** Constante/valor exportado: CHROME_PROXY_PORT. */
 export const CHROME_PROXY_PORT = 9224;
 
 /**
@@ -17,6 +18,7 @@ export function processInput(input) {
     return normalized;
 }
 
+/** Classe exportada: DataProcessor. */
 export class DataProcessor {
     constructor(options = {}) {
         this.maxSize = options.maxSize || 1000;
@@ -35,7 +37,7 @@ export class DataProcessor {
     transform(data) {
         return data.map(item => ({
             ...item,
-            processed: true
+            processed: true,
         }));
     }
 }

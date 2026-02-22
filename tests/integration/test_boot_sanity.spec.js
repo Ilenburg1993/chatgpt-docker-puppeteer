@@ -67,20 +67,20 @@ describe('Boot Sequence Sanity Check (V2.0)', () => {
 
         // Mock simples de Kernel e NERV
         const mockKernel = {
-            executeTask: async () => {}
+            executeTask: async () => {},
         };
 
         const mockNERV = {
             onReceive: () => {},
             emit: () => {},
             emitCommand: () => {},
-            emitEvent: () => {}
+            emitEvent: () => {},
         };
 
         // Cria instância
         const manager = new MissionManager({
             kernel: mockKernel,
-            nerv: mockNERV
+            nerv: mockNERV,
         });
 
         assert.ok(manager, 'MissionManager deveria ser instanciado');

@@ -9,7 +9,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             registry.set('chatgpt', {
                 name: 'ChatGPT',
                 version: '1.0.0',
-                create: () => ({ type: 'chatgpt' })
+                create: () => ({ type: 'chatgpt' }),
             });
 
             assert.ok(registry.has('chatgpt'));
@@ -21,7 +21,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             registry.set('gemini', {
                 name: 'Gemini',
                 version: '1.0.0',
-                create: () => ({ type: 'gemini' })
+                create: () => ({ type: 'gemini' }),
             });
 
             assert.ok(registry.has('gemini'));
@@ -30,7 +30,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve listar drivers disponíveis', () => {
             const registry = new Map([
                 ['chatgpt', { name: 'ChatGPT' }],
-                ['gemini', { name: 'Gemini' }]
+                ['gemini', { name: 'Gemini' }],
             ]);
 
             const available = Array.from(registry.keys());
@@ -46,7 +46,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                     if (type === 'chatgpt') {
                         return { type: 'chatgpt', initialized: true };
                     }
-                }
+                },
             };
 
             const driver = factory.create('chatgpt');
@@ -61,7 +61,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                     if (type === 'gemini') {
                         return { type: 'gemini', initialized: true };
                     }
-                }
+                },
             };
 
             const driver = factory.create('gemini');
@@ -76,7 +76,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                     if (!known.includes(type)) {
                         throw new Error(`Driver desconhecido: ${type}`);
                     }
-                }
+                },
             };
 
             assert.throws(() => factory.create('unknown'), /Driver desconhecido/);
@@ -88,7 +88,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             const selectDriver = target => {
                 const mapping = {
                     chatgpt: 'chatgpt',
-                    gemini: 'gemini'
+                    gemini: 'gemini',
                 };
                 return mapping[target];
             };
@@ -101,7 +101,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             const selectDriver = target => {
                 const mapping = {
                     chatgpt: 'chatgpt',
-                    gemini: 'gemini'
+                    gemini: 'gemini',
                 };
                 return mapping[target] || 'chatgpt'; // default
             };
@@ -115,12 +115,12 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             const config = {
                 chatgpt: {
                     timeout: 30000,
-                    retries: 3
+                    retries: 3,
                 },
                 gemini: {
                     timeout: 60000,
-                    retries: 5
-                }
+                    retries: 5,
+                },
             };
 
             assert.strictEqual(config.chatgpt.timeout, 30000);
@@ -130,11 +130,11 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve mesclar config global com específica', () => {
             const globalConfig = {
                 timeout: 45000,
-                retries: 3
+                retries: 3,
             };
 
             const specificConfig = {
-                timeout: 30000
+                timeout: 30000,
                 // retries herda do global
             };
 
@@ -150,7 +150,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             const pool = [
                 { id: 'driver-1', type: 'chatgpt', busy: false },
                 { id: 'driver-2', type: 'chatgpt', busy: false },
-                { id: 'driver-3', type: 'gemini', busy: false }
+                { id: 'driver-3', type: 'gemini', busy: false },
             ];
 
             assert.strictEqual(pool.length, 3);
@@ -160,7 +160,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             const pool = [
                 { id: 'driver-1', busy: true },
                 { id: 'driver-2', busy: false },
-                { id: 'driver-3', busy: true }
+                { id: 'driver-3', busy: true },
             ];
 
             const available = pool.find(d => !d.busy);
@@ -171,7 +171,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve retornar null se todos ocupados', () => {
             const pool = [
                 { id: 'driver-1', busy: true },
-                { id: 'driver-2', busy: true }
+                { id: 'driver-2', busy: true },
             ];
 
             const available = pool.find(d => !d.busy);
@@ -184,7 +184,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve validar versão do driver', () => {
             const driver = {
                 name: 'ChatGPT',
-                version: '1.2.3'
+                version: '1.2.3',
             };
 
             const versionRegex = /^\d+\.\d+\.\d+$/;
@@ -218,7 +218,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve listar capacidades de ChatGPT', () => {
             const chatgptDriver = {
                 type: 'chatgpt',
-                capabilities: ['text-generation', 'conversation', 'code-analysis']
+                capabilities: ['text-generation', 'conversation', 'code-analysis'],
             };
 
             assert.ok(chatgptDriver.capabilities.includes('text-generation'));
@@ -226,7 +226,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
         it('deve verificar suporte a recurso', () => {
             const driver = {
-                capabilities: ['text-generation', 'conversation']
+                capabilities: ['text-generation', 'conversation'],
             };
 
             const hasCapability = cap => driver.capabilities.includes(cap);
@@ -240,13 +240,13 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve limpar driver após uso', () => {
             let driver = {
                 id: 'driver-1',
-                resources: { page: {}, browser: {} }
+                resources: { page: {}, browser: {} },
             };
 
             // Simular cleanup
             driver = {
                 ...driver,
-                resources: null
+                resources: null,
             };
 
             assert.strictEqual(driver.resources, null);

@@ -12,13 +12,13 @@ const DEFAULT_DNA = {
         version: 1,
         last_updated: new Date().toISOString(),
         updated_by: 'system_init',
-        evolution_count: 0
+        evolution_count: 0,
     },
     targets: {},
     global_selectors: {
         input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
-        send_button: ["button[type='submit']", "[data-testid='send-button']"]
-    }
+        send_button: ["button[type='submit']", "[data-testid='send-button']"],
+    },
 };
 
 /**
@@ -42,7 +42,7 @@ function backupDna(dna) {
         const backup = {
             snapshot: JSON.parse(JSON.stringify(dna)),
             timestamp: new Date().toISOString(),
-            version: dna._meta?.version || 0
+            version: dna._meta?.version || 0,
         };
 
         DNA_HISTORY.unshift(backup);
@@ -182,7 +182,7 @@ async function getTargetRules(domain) {
     return {
         selectors: dna.global_selectors,
         behavior_overrides: {},
-        source: 'global_fallback'
+        source: 'global_fallback',
     };
 }
 
@@ -204,7 +204,9 @@ function invalidateCache() {
  */
 async function rollbackDna(versionIndex = 0) {
     if (versionIndex < 0 || versionIndex >= DNA_HISTORY.length) {
-        throw new Error(`DNA_ROLLBACK_FAILED: Versão ${versionIndex} não existe no histórico (disponíveis: 0-${DNA_HISTORY.length - 1})`);
+        throw new Error(
+            `DNA_ROLLBACK_FAILED: Versão ${versionIndex} não existe no histórico (disponíveis: 0-${DNA_HISTORY.length - 1})`
+        );
     }
 
     const backup = DNA_HISTORY[versionIndex];
@@ -226,7 +228,7 @@ function getDnaHistory() {
         version: backup.version,
         timestamp: backup.timestamp,
         evolution_count: backup.snapshot._meta?.evolution_count || 0,
-        updated_by: backup.snapshot._meta?.updated_by || 'unknown'
+        updated_by: backup.snapshot._meta?.updated_by || 'unknown',
     }));
 }
 

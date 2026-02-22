@@ -14,9 +14,10 @@ const PATTERNS = {
     TEST_UTIL: /^test_|_test\.js$/,
     CONSTANTS: /constant|literal|scan_|magic/i,
     ANALYSIS: /analyze|scan|audit|check|validate/i,
-    DEBUG: /debug|test|fix/i
+    DEBUG: /debug|test|fix/i,
 };
 
+/** Função exportada: classifyScript. */
 function classifyScript(filename, content) {
     // System files - ignore
     if (PATTERNS.SYSTEM.test(filename)) {
@@ -28,7 +29,7 @@ function classifyScript(filename, content) {
         return {
             category: 'DEV_TOOL',
             action: 'EVALUATE',
-            reason: 'Test utility - check if redundant with existing test infrastructure'
+            reason: 'Test utility - check if redundant with existing test infrastructure',
         };
     }
 
@@ -40,13 +41,13 @@ function classifyScript(filename, content) {
                 category: 'REUSABLE',
                 action: 'MOVE',
                 reason: 'General-purpose constant/literal scanning tool',
-                target: 'scripts/scan_constants.js'
+                target: 'scripts/scan_constants.js',
             };
         } else {
             return {
                 category: 'IMMEDIATE',
                 action: 'DELETE',
-                reason: 'One-time validation script, purpose fulfilled'
+                reason: 'One-time validation script, purpose fulfilled',
             };
         }
     }
@@ -59,13 +60,13 @@ function classifyScript(filename, content) {
                 category: 'REUSABLE',
                 action: 'MOVE',
                 reason: 'Reusable analysis tool',
-                target: `scripts/${filename}`
+                target: `scripts/${filename}`,
             };
         } else {
             return {
                 category: 'IMMEDIATE',
                 action: 'DELETE',
-                reason: 'Simple one-off analysis'
+                reason: 'Simple one-off analysis',
             };
         }
     }
@@ -75,7 +76,7 @@ function classifyScript(filename, content) {
         return {
             category: 'IMMEDIATE',
             action: 'DELETE',
-            reason: 'Debug/fix script - specific issue already resolved'
+            reason: 'Debug/fix script - specific issue already resolved',
         };
     }
 
@@ -83,10 +84,11 @@ function classifyScript(filename, content) {
     return {
         category: 'UNKNOWN',
         action: 'REVIEW',
-        reason: 'Requires manual inspection'
+        reason: 'Requires manual inspection',
     };
 }
 
+/** Função exportada: auditTmpScripts. */
 function auditTmpScripts() {
     console.log('🔍 AUDITING /tmp/ JAVASCRIPT FILES\n');
     console.log('='.repeat(80));
@@ -98,7 +100,7 @@ function auditTmpScripts() {
         IMMEDIATE: [],
         REUSABLE: [],
         DEV_TOOL: [],
-        UNKNOWN: []
+        UNKNOWN: [],
     };
 
     files.forEach(filename => {
@@ -111,7 +113,7 @@ function auditTmpScripts() {
                 // Skip very large files (likely system files)
                 results.SYSTEM.push({
                     filename,
-                    classification: { category: 'SYSTEM', action: 'IGNORE', reason: 'File too large (>100KB)' }
+                    classification: { category: 'SYSTEM', action: 'IGNORE', reason: 'File too large (>100KB)' },
                 });
                 return;
             }
@@ -140,7 +142,7 @@ function auditTmpScripts() {
             IMMEDIATE: '🗑️ ',
             REUSABLE: '♻️ ',
             DEV_TOOL: '🛠️ ',
-            UNKNOWN: '❓'
+            UNKNOWN: '❓',
         }[category];
 
         console.log(`\n${icon} ${category} (${items.length} files):`);

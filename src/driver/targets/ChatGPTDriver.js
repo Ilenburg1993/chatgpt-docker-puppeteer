@@ -40,9 +40,7 @@ function toFrameNavProtocol(protocol) {
           ? rawFramePath
           : '';
 
-    const context = typeof protocol?.context === 'string' && protocol.context.length > 0
-        ? protocol.context
-        : 'root';
+    const context = typeof protocol?.context === 'string' && protocol.context.length > 0 ? protocol.context : 'root';
 
     return { context, framePath };
 }
@@ -61,17 +59,17 @@ const CHATGPT_CONFIG = Object.freeze({
     MIN_RESPONSE_LENGTH: 10,
 
     // Timeouts
-    MAX_WAIT_TIME_MS: 600000,        // 10min (previne hang)
-    STALL_WARNING_MS: 30000,         // 30s
-    NAVIGATION_TIMEOUT_MS: 30000,    // 30s
-    CONTINUATION_DELAY_MS: 2000,     // 2s
+    MAX_WAIT_TIME_MS: 600000, // 10min (previne hang)
+    STALL_WARNING_MS: 30000, // 30s
+    NAVIGATION_TIMEOUT_MS: 30000, // 30s
+    CONTINUATION_DELAY_MS: 2000, // 2s
 
     // Model Switching
     DEFAULT_MODEL_ID: 'gpt-5.2',
 
     // Retry
     STOP_GENERATION_MAX_RETRIES: 3,
-    STOP_GENERATION_RETRY_DELAY_MS: 1000
+    STOP_GENERATION_RETRY_DELAY_MS: 1000,
 });
 
 /**
@@ -90,6 +88,7 @@ const SUPPORTED_MODELS = Object.freeze([
 // CHATGPT DRIVER
 // ============================================================================
 
+/** Classe exportada: default. */
 class ChatGPTDriver extends BaseDriver {
     /**
      * ChatGPT Driver - Especialista em interface OpenAI.
@@ -205,7 +204,9 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         // Valida interface carregada
-        const interfaceValidation = await validateLLMInterface(/** @type {import('puppeteer-core').Page} */ (this.page));
+        const interfaceValidation = await validateLLMInterface(
+            /** @type {import('puppeteer-core').Page} */ (this.page)
+        );
         if (!interfaceValidation.valid) {
             const err = new Error(`PREREQUISITE_FAILED: ${interfaceValidation.reason}`);
             err.details = interfaceValidation.details;
@@ -286,10 +287,12 @@ class ChatGPTDriver extends BaseDriver {
 
             try {
                 // ✅ BUG #4: Validar navegação
-                const response = /** @type {HttpResponseLike | null} */ (await this.page.goto(targetUrl, {
-                    waitUntil: 'networkidle2',
-                    timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
-                }));
+                const response = /** @type {HttpResponseLike | null} */ (
+                    await this.page.goto(targetUrl, {
+                        waitUntil: 'networkidle2',
+                        timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
+                    })
+                );
 
                 if (!response || !response.ok()) {
                     throw new Error(`Navigation failed: HTTP ${response ? response.status() : 'NO_RESPONSE'}`);
@@ -332,7 +335,9 @@ class ChatGPTDriver extends BaseDriver {
         this.continuationCount = 0;
         this.thoughtBlocksPruned = 0;
 
-        const { humanTyping = true, delay = 0 } = /** @type {{ humanTyping?: boolean, delay?: number }} */ (options || {});
+        const { humanTyping = true, delay = 0 } = /** @type {{ humanTyping?: boolean, delay?: number }} */ (
+            options || {}
+        );
 
         this._emitVital('PROGRESS_UPDATE', {
             step: 'SENDING_PROMPT',
@@ -378,7 +383,11 @@ class ChatGPTDriver extends BaseDriver {
             throw new Error('Send button not found');
         }
 
-        const { ctx: sendCtx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
+        const {
+            ctx: sendCtx,
+            offsetX,
+            offsetY,
+        } = await this.frameNavigator.getExecutionContext(
             toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (sendProtocol.protocol))),
             this.signal
         );
@@ -471,7 +480,9 @@ class ChatGPTDriver extends BaseDriver {
 
                 if (responseArea && responseArea.protocol) {
                     const { ctx } = await this.frameNavigator.getExecutionContext(
-                        toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (responseArea.protocol))),
+                        toFrameNavProtocol(
+                            /** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (responseArea.protocol))
+                        ),
                         this.signal
                     );
 

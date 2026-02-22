@@ -30,7 +30,7 @@ const CONNECTION_MODES = {
     REMOTE: 'remote',
 
     /** Singularity mode - single shared browser instance */
-    SINGULARITY: 'singularity'
+    SINGULARITY: 'singularity',
 };
 
 /**
@@ -50,7 +50,7 @@ const BROWSER_STATES = {
     CRASHED: 'CRASHED',
 
     /** Browser is idle and available */
-    IDLE: 'IDLE'
+    IDLE: 'IDLE',
 };
 
 /**

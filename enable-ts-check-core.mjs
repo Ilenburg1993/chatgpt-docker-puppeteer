@@ -29,25 +29,17 @@ function findFiles(dir) {
 }
 
 // Arquivos CORE que devem ter type checking rigoroso
-const coreDirs = [
-    'src/core',
-    'src/kernel',
-    'src/orchestrator',
-    'src/logic'
-];
+const coreDirs = ['src/core', 'src/kernel', 'src/orchestrator', 'src/logic'];
 
 const coreFiles = [
     'src/driver/core/BaseDriver.js',
     'src/driver/core/TargetDriver.js',
     'src/driver/factory.js',
     'src/infra/ConnectionOrchestrator.js',
-    'src/main.js'
+    'src/main.js',
 ];
 
-const files = [
-    ...coreDirs.flatMap(dir => findFiles(dir)),
-    ...coreFiles.filter(f => fs.existsSync(f))
-];
+const files = [...coreDirs.flatMap(dir => findFiles(dir)), ...coreFiles.filter(f => fs.existsSync(f))];
 
 console.log(`🔧 Habilitando // @ts-check em ${files.length} arquivos CORE\n`);
 

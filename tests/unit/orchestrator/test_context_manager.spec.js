@@ -13,7 +13,7 @@ describe('ContextManager Unit Tests', () => {
     describe('1. Context Initialization', () => {
         it('should initialize context for a mission', () => {
             const context = contextManager.initializeContext('mission-123', {
-                metadata: { template: 'book_writing' }
+                metadata: { template: 'book_writing' },
             });
 
             assert.ok(context);
@@ -105,7 +105,7 @@ describe('ContextManager Unit Tests', () => {
         it('should apply TOKEN_LIMIT strategy', async () => {
             contextManager = new ContextManager({
                 chunkingStrategy: CHUNKING_STRATEGY.TOKEN_LIMIT,
-                maxTokens: 50 // Muito baixo para forçar truncation
+                maxTokens: 50, // Muito baixo para forçar truncation
             });
 
             contextManager.initializeContext('mission-123');
@@ -127,7 +127,7 @@ describe('ContextManager Unit Tests', () => {
         it('should not summarize if policy is DISABLED', async () => {
             contextManager = new ContextManager({
                 summarizationPolicy: SUMMARIZATION_POLICY.DISABLED,
-                windowSize: 2
+                windowSize: 2,
             });
 
             contextManager.initializeContext('mission-123');
@@ -145,7 +145,7 @@ describe('ContextManager Unit Tests', () => {
             contextManager = new ContextManager({
                 summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
                 maxTokens: 100,
-                windowSize: 2
+                windowSize: 2,
             });
 
             contextManager.initializeContext('mission-123');
@@ -167,7 +167,7 @@ describe('ContextManager Unit Tests', () => {
             const pattern = {
                 type: 'feedback',
                 content: 'Add more code examples',
-                metadata: { mission: 'mission-123' }
+                metadata: { mission: 'mission-123' },
             };
 
             contextManager.addPattern(pattern);
@@ -234,7 +234,7 @@ describe('MemoryStore Unit Tests', () => {
             const result = memoryStore.addPattern({
                 type: 'feedback',
                 content: 'Add more examples',
-                metadata: { source: 'user' }
+                metadata: { source: 'user' },
             });
 
             assert.strictEqual(result, true);
@@ -243,7 +243,7 @@ describe('MemoryStore Unit Tests', () => {
 
         it('should reject invalid pattern (missing type)', () => {
             const result = memoryStore.addPattern({
-                content: 'Some content'
+                content: 'Some content',
             });
 
             assert.strictEqual(result, false);
@@ -252,7 +252,7 @@ describe('MemoryStore Unit Tests', () => {
 
         it('should reject invalid pattern (missing content)', () => {
             const result = memoryStore.addPattern({
-                type: 'feedback'
+                type: 'feedback',
             });
 
             assert.strictEqual(result, false);
@@ -310,7 +310,7 @@ describe('MemoryStore Unit Tests', () => {
             const results = memoryStore.getPatternsByType('feedback', 10);
 
             assert.strictEqual(results.length, 2);
-            assert.ok(results.every((p) => p.type === 'feedback'));
+            assert.ok(results.every(p => p.type === 'feedback'));
         });
 
         it('should return empty array for non-existent type', () => {
@@ -348,7 +348,7 @@ describe('MemoryStore Unit Tests', () => {
             }
 
             // Pattern 1 deveria ter sido preservado por ser muito acessado
-            const remaining = memoryStore.patterns.map((p) => p.content);
+            const remaining = memoryStore.patterns.map(p => p.content);
             // (Nota: LRU simples, não garante que Pattern 1 seja mantido se outros foram acessados recentemente)
         });
     });

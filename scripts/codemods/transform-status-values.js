@@ -27,7 +27,7 @@ module.exports = function (fileInfo, api) {
         'SKIPPED',
         'DONE',
         'PAUSED',
-        'STALLED'
+        'STALLED',
     ];
 
     let hasChanges = false;
@@ -60,8 +60,8 @@ module.exports = function (fileInfo, api) {
                 id: { type: 'ObjectPattern' },
                 init: {
                     callee: { name: 'require' },
-                    arguments: [{ value: importPath }]
-                }
+                    arguments: [{ value: importPath }],
+                },
             })
             .size() > 0;
 
@@ -71,7 +71,7 @@ module.exports = function (fileInfo, api) {
             j.variableDeclarator(
                 j.objectPattern([j.property('init', j.identifier('STATUS_VALUES'), j.identifier('STATUS_VALUES'))]),
                 j.callExpression(j.identifier('require'), [j.literal(importPath)])
-            )
+            ),
         ]);
 
         // Insert at the top after existing requires
@@ -79,9 +79,9 @@ module.exports = function (fileInfo, api) {
             .find(j.VariableDeclaration, {
                 declarations: [
                     {
-                        init: { callee: { name: 'require' } }
-                    }
-                ]
+                        init: { callee: { name: 'require' } },
+                    },
+                ],
             })
             .at(0);
 

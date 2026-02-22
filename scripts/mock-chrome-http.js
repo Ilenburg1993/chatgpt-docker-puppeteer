@@ -9,7 +9,7 @@ const host = process.env.MOCK_CHROME_HOST || process.env.CHROME_HOST || 'host.do
 // ✅ Validação de porta (0-65535)
 const rawPort = process.env.MOCK_CHROME_PORT || process.env.CHROME_PORT || '9225';
 const parsedPort = parseInt(rawPort, 10);
-const port = (Number.isFinite(parsedPort) && parsedPort >= 0 && parsedPort <= 65535) ? parsedPort : 9225;
+const port = Number.isFinite(parsedPort) && parsedPort >= 0 && parsedPort <= 65535 ? parsedPort : 9225;
 
 if (parsedPort !== port) {
     console.warn(`[WARN] Invalid port "${rawPort}", using default: ${port}`);
@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
             'User-Agent': 'MockBrowser/1.0',
             'V8-Version': '9.9.0',
             'WebKit-Version': '537.36',
-            webSocketDebuggerUrl: wsUrl
+            webSocketDebuggerUrl: wsUrl,
         };
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(body));
@@ -39,8 +39,8 @@ const server = http.createServer((req, res) => {
                 title: 'about:blank',
                 type: 'page',
                 url: 'https://example.com',
-                webSocketDebuggerUrl: wsUrl
-            }
+                webSocketDebuggerUrl: wsUrl,
+            },
         ];
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(body));

@@ -2,6 +2,7 @@
 import * as schemas from '#core/schemas';
 import { getDb } from './sqlite.js';
 
+/** Constante/valor exportado: TASK_STAGES. */
 const TASK_STAGES = Object.freeze({
     DRAFT: 'DRAFT',
     PROPOSED: 'PROPOSED',
@@ -145,6 +146,7 @@ function _rowToTask(row) {
     return task;
 }
 
+/** Função exportada: getTaskById. */
 function getTaskById(taskId) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
@@ -219,6 +221,7 @@ function countTasks({ status = null, stage = null, missionId = null } = {}) {
     return /** @type {{ n: number }} */ (row)?.n || 0;
 }
 
+/** Função exportada: getTaskDependencies. */
 function getTaskDependencies(taskId) {
     const db = getDb();
     const rows = db
@@ -685,10 +688,12 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
     return getTaskById(taskId);
 }
 
+/** Função exportada: setTaskStage. */
 function setTaskStage(taskId, stage) {
     return updateTask(taskId, { stage });
 }
 
+/** Função exportada: setTaskStatus. */
 function setTaskStatus(taskId, status, extra = {}) {
     return updateTask(taskId, { status, ...extra });
 }
@@ -855,6 +860,7 @@ function extendTaskLock(
     return res.changes || 0;
 }
 
+/** Função exportada: retryFailedTasks. */
 function retryFailedTasks() {
     const db = getDb();
     const now = _now();
@@ -873,6 +879,7 @@ function retryFailedTasks() {
     return res.changes || 0;
 }
 
+/** Função exportada: incrementTaskAttempts. */
 function incrementTaskAttempts(taskId, delta = 1) {
     const db = getDb();
     const now = _now();
@@ -890,6 +897,7 @@ function incrementTaskAttempts(taskId, delta = 1) {
     return res.changes || 0;
 }
 
+/** Função exportada: clearQueuePreserveRunning. */
 function clearQueuePreserveRunning() {
     const db = getDb();
     const running = db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status = 'RUNNING'").get()?.c || 0;
@@ -897,6 +905,7 @@ function clearQueuePreserveRunning() {
     return { deleted: res.changes || 0, preserved: running };
 }
 
+/** Função exportada: purgeTask. */
 function purgeTask(taskId) {
     const db = getDb();
     const res = db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);

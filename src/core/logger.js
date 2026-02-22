@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
+/** Diretório base persistente de logs operacionais, métricas e auditoria. */
 const LOG_DIR = path.join(ROOT, 'logs');
 
 /**
@@ -299,5 +300,8 @@ export { metric as logMetric };
 
 /**
  * Diretório de logs.
+ */
+/**
+ * Diretório raiz de logs do processo (operacional, métricas e auditoria).
  */
 export { LOG_DIR };

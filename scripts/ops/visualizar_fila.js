@@ -23,7 +23,7 @@ const COLORS = {
     DONE: '#238636', // Verde
     FAILED: '#f85149', // Vermelho
     SKIPPED: '#30363d', // Cinza Escuro
-    SCHEDULED: '#58a6ff' // Azul
+    SCHEDULED: '#58a6ff', // Azul
 };
 
 // --- INICIALIZAÇÃO ---
@@ -69,12 +69,12 @@ if (MODE_HTML) {
             color: {
                 background: COLORS[status] || '#fff',
                 border: '#30363d',
-                highlight: { background: '#58a6ff', border: '#fff' }
+                highlight: { background: '#58a6ff', border: '#fff' },
             },
             font: { color: '#ffffff', face: 'monospace', size: 12 },
             shape: 'box',
             margin: 10,
-            shadow: true
+            shadow: true,
         };
     });
 
@@ -89,7 +89,7 @@ if (MODE_HTML) {
                 dashes: !exists,
                 color: exists ? '#8b949e' : '#f85149',
                 width: exists ? 1 : 3,
-                title: exists ? 'Dependência OK' : 'ERRO: Dependência Inexistente'
+                title: exists ? 'Dependência OK' : 'ERRO: Dependência Inexistente',
             });
         });
     });

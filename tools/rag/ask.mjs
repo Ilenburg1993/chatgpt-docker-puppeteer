@@ -14,8 +14,8 @@ const { positionals, values } = parseArgs({
         diagnostics: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
         'ollama-base-url': { type: 'string' },
-        model: { type: 'string' }
-    }
+        model: { type: 'string' },
+    },
 });
 
 const query = positionals.join(' ').trim();
@@ -33,10 +33,10 @@ const { markdown, result } = await ragAsk({
     filters: {
         pathPrefix: values['path-prefix'],
         ext: values.ext,
-        tags: values.tag || []
+        tags: values.tag || [],
     },
     ollamaBaseUrl: values['ollama-base-url'],
-    model: values.model
+    model: values.model,
 });
 
 if (values.json) {

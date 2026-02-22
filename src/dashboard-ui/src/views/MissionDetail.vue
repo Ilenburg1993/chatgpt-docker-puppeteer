@@ -55,7 +55,9 @@ function resolveReason(defaultReason, errorMessage) {
     const typed = String(commandReason.value || '').trim();
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-        const prompted = String(window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '').trim();
+        const prompted = String(
+            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || ''
+        ).trim();
         if (prompted) {
             commandReason.value = prompted;
             return prompted;
@@ -112,10 +114,7 @@ async function executeMission() {
     await loadAll();
 }
 async function pauseMission() {
-    const reason = resolveReason(
-        'Pausa da missão para intervenção humana',
-        'Motivo obrigatório para pausar missão.'
-    );
+    const reason = resolveReason('Pausa da missão para intervenção humana', 'Motivo obrigatório para pausar missão.');
     if (!confirmTwoStepAction({ actionLabel: `MISSION_PAUSE (${missionId.value})`, reason })) return;
     await missions.pauseMission(missionId.value, {
         reason,
@@ -260,7 +259,14 @@ async function createTaskInMission() {
         if (!confirmTwoStepAction({ actionLabel: `TASK_CREATE (mission:${missionId.value})`, reason })) return;
         await tasks.createTask(payload, reason);
         showCreateTask.value = false;
-        createTaskForm.value = { user_message: '', system_message: '', target: 'auto', model: '', priority: 5, stage: 'READY' };
+        createTaskForm.value = {
+            user_message: '',
+            system_message: '',
+            target: 'auto',
+            model: '',
+            priority: 5,
+            stage: 'READY',
+        };
         await loadAll();
     } finally {
         creatingTask.value = false;
@@ -328,9 +334,15 @@ watch(missionId, () => void loadAll());
                 </template>
 
                 <div class="flex items-center gap-2 flex-wrap">
-                    <Button variant="primary" size="sm" @click="executeMission" :disabled="mission.status === 'RUNNING'">Executar</Button>
-                    <Button variant="secondary" size="sm" @click="pauseMission" :disabled="mission.status !== 'RUNNING'">Pausar</Button>
-                    <Button variant="secondary" size="sm" @click="resumeMission" :disabled="mission.status !== 'PAUSED'">Retomar</Button>
+                    <Button variant="primary" size="sm" @click="executeMission" :disabled="mission.status === 'RUNNING'"
+                        >Executar</Button
+                    >
+                    <Button variant="secondary" size="sm" @click="pauseMission" :disabled="mission.status !== 'RUNNING'"
+                        >Pausar</Button
+                    >
+                    <Button variant="secondary" size="sm" @click="resumeMission" :disabled="mission.status !== 'PAUSED'"
+                        >Retomar</Button
+                    >
                     <Button variant="danger" size="sm" @click="cancelMission">Cancelar</Button>
                     <Button variant="ghost" size="sm" @click="showCreateTask = true">Adicionar tarefa</Button>
                 </div>
@@ -343,9 +355,13 @@ watch(missionId, () => void loadAll());
             <div class="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="ghost" @click="tab = 'resumo'" :disabled="tab === 'resumo'">Resumo</Button>
                 <Button size="sm" variant="ghost" @click="tab = 'tasks'" :disabled="tab === 'tasks'">Tarefas</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'propostas'" :disabled="tab === 'propostas'">Propostas</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'propostas'" :disabled="tab === 'propostas'"
+                    >Propostas</Button
+                >
                 <Button size="sm" variant="ghost" @click="tab = 'grafo'" :disabled="tab === 'grafo'">Grafo</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'eventos'" :disabled="tab === 'eventos'">Eventos</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'eventos'" :disabled="tab === 'eventos'"
+                    >Eventos</Button
+                >
                 <Button size="sm" variant="ghost" @click="tab = 'policy'" :disabled="tab === 'policy'">Policy</Button>
             </div>
 
@@ -359,11 +375,20 @@ watch(missionId, () => void loadAll());
                         </div>
                         <div>
                             <label class="text-sm text-slate-300">Descrição</label>
-                            <textarea v-model="editForm.description" rows="3" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" :disabled="!canEditMission" />
+                            <textarea
+                                v-model="editForm.description"
+                                rows="3"
+                                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                :disabled="!canEditMission"
+                            />
                         </div>
                         <div>
                             <label class="text-sm text-slate-300">Autonomia</label>
-                            <select v-model="editForm.autonomy_mode" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" :disabled="!canEditMission">
+                            <select
+                                v-model="editForm.autonomy_mode"
+                                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                :disabled="!canEditMission"
+                            >
                                 <option value="USER_ONLY">USER_ONLY</option>
                                 <option value="LLM_SUGGEST">LLM_SUGGEST</option>
                                 <option value="LLM_CREATE_DRAFTS">LLM_CREATE_DRAFTS</option>
@@ -371,7 +396,13 @@ watch(missionId, () => void loadAll());
                             </select>
                         </div>
                         <div class="flex justify-end">
-                            <Button variant="primary" size="sm" @click="saveMissionBasics" :disabled="editingMission || !canEditMission">Salvar</Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                @click="saveMissionBasics"
+                                :disabled="editingMission || !canEditMission"
+                                >Salvar</Button
+                            >
                         </div>
                     </div>
                 </Card>
@@ -385,7 +416,10 @@ watch(missionId, () => void loadAll());
                 </Card>
             </div>
 
-            <div v-else-if="tab === 'tasks'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+            <div
+                v-else-if="tab === 'tasks'"
+                class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden"
+            >
                 <div class="divide-y divide-slate-800">
                     <div v-for="t in missionTasks" :key="t.id" class="px-4 py-3 hover:bg-slate-900/40">
                         <div class="flex items-start justify-between gap-4">
@@ -395,14 +429,58 @@ watch(missionId, () => void loadAll());
                             </div>
                             <div class="flex items-center gap-2 flex-wrap justify-end">
                                 <Badge size="sm">{{ t.stage }}</Badge>
-                                <Badge size="sm" :variant="t.unified_status === 'DONE' ? 'success' : t.unified_status === 'FAILED' ? 'error' : 'default'">
+                                <Badge
+                                    size="sm"
+                                    :variant="
+                                        t.unified_status === 'DONE'
+                                            ? 'success'
+                                            : t.unified_status === 'FAILED'
+                                              ? 'error'
+                                              : 'default'
+                                    "
+                                >
                                     {{ t.unified_status }}
                                 </Badge>
-                                <Button v-if="t.command_caps?.can_pause" size="sm" variant="secondary" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'pause')">Pausar</Button>
-                                <Button v-if="t.command_caps?.can_resume" size="sm" variant="secondary" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'resume')">Retomar</Button>
-                                <Button v-if="t.command_caps?.can_unblock" size="sm" variant="secondary" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'unblock')">Desbloquear</Button>
-                                <Button v-if="t.command_caps?.can_retry" size="sm" variant="ghost" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'retry')">Reexecutar</Button>
-                                <Button v-if="t.command_caps?.can_cancel" size="sm" variant="danger" class="h-7 px-2 text-xs" @click="quickTaskAction(t.id, 'cancel')">Cancelar</Button>
+                                <Button
+                                    v-if="t.command_caps?.can_pause"
+                                    size="sm"
+                                    variant="secondary"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickTaskAction(t.id, 'pause')"
+                                    >Pausar</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_resume"
+                                    size="sm"
+                                    variant="secondary"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickTaskAction(t.id, 'resume')"
+                                    >Retomar</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_unblock"
+                                    size="sm"
+                                    variant="secondary"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickTaskAction(t.id, 'unblock')"
+                                    >Desbloquear</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_retry"
+                                    size="sm"
+                                    variant="ghost"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickTaskAction(t.id, 'retry')"
+                                    >Reexecutar</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_cancel"
+                                    size="sm"
+                                    variant="danger"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickTaskAction(t.id, 'cancel')"
+                                    >Cancelar</Button
+                                >
                             </div>
                         </div>
                     </div>
@@ -415,8 +493,20 @@ watch(missionId, () => void loadAll());
                         <div class="flex items-center justify-between">
                             <div class="text-sm font-semibold text-slate-200">Propostas (stage=PROPOSED)</div>
                             <div class="flex items-center gap-2">
-                                <Button size="sm" variant="secondary" @click="bulkApproveProposals" :disabled="selectedProposalIds.size === 0">Aprovar</Button>
-                                <Button size="sm" variant="danger" @click="bulkRejectProposals" :disabled="selectedProposalIds.size === 0">Rejeitar</Button>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    @click="bulkApproveProposals"
+                                    :disabled="selectedProposalIds.size === 0"
+                                    >Aprovar</Button
+                                >
+                                <Button
+                                    size="sm"
+                                    variant="danger"
+                                    @click="bulkRejectProposals"
+                                    :disabled="selectedProposalIds.size === 0"
+                                    >Rejeitar</Button
+                                >
                             </div>
                         </div>
                     </template>
@@ -426,8 +516,17 @@ watch(missionId, () => void loadAll());
                 <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
                     <div v-if="proposals.length === 0" class="px-4 py-6 text-slate-400">Nenhuma proposta pendente.</div>
                     <div v-else class="divide-y divide-slate-800">
-                        <div v-for="t in proposals" :key="t.id" class="px-4 py-3 flex items-start gap-3 hover:bg-slate-900/40">
-                            <input type="checkbox" class="mt-1" :checked="selectedProposalIds.has(t.id)" @change="toggleProposal(t.id)" />
+                        <div
+                            v-for="t in proposals"
+                            :key="t.id"
+                            class="px-4 py-3 flex items-start gap-3 hover:bg-slate-900/40"
+                        >
+                            <input
+                                type="checkbox"
+                                class="mt-1"
+                                :checked="selectedProposalIds.has(t.id)"
+                                @change="toggleProposal(t.id)"
+                            />
                             <div class="min-w-0 flex-1 cursor-pointer" @click="router.push(`/tasks/${t.id}`)">
                                 <div class="text-sm font-mono text-slate-200 truncate">{{ t.id }}</div>
                                 <div class="text-xs text-slate-400 truncate">{{ t.spec_user_message_preview }}</div>
@@ -445,15 +544,23 @@ watch(missionId, () => void loadAll());
                 <VisGraph :nodes="graphNodes" :edges="graphEdges" height="560px" />
             </div>
 
-            <div v-else-if="tab === 'eventos'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+            <div
+                v-else-if="tab === 'eventos'"
+                class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden"
+            >
                 <div class="divide-y divide-slate-800">
                     <div v-for="e in missionEvents" :key="e.id" class="px-4 py-3">
                         <div class="flex items-center justify-between gap-4">
-                            <div class="text-xs text-slate-400 font-mono truncate">#{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}</div>
+                            <div class="text-xs text-slate-400 font-mono truncate">
+                                #{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}
+                            </div>
                             <div class="text-xs text-slate-500">{{ new Date(e.ts_ms).toLocaleString() }}</div>
                         </div>
                         <div class="text-sm text-slate-200 font-semibold">{{ e.event_type }}</div>
-                        <pre class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56">{{ JSON.stringify(e.payload, null, 2) }}</pre>
+                        <pre
+                            class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56"
+                            >{{ JSON.stringify(e.payload, null, 2) }}</pre
+                        >
                     </div>
                 </div>
             </div>
@@ -461,7 +568,11 @@ watch(missionId, () => void loadAll());
             <div v-else-if="tab === 'policy'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                     <template #header><div class="text-sm font-semibold text-slate-200">Autonomia</div></template>
-                    <select v-model="policyAutonomy" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" :disabled="!canEditMission">
+                    <select
+                        v-model="policyAutonomy"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        :disabled="!canEditMission"
+                    >
                         <option value="USER_ONLY">USER_ONLY</option>
                         <option value="LLM_SUGGEST">LLM_SUGGEST</option>
                         <option value="LLM_CREATE_DRAFTS">LLM_CREATE_DRAFTS</option>
@@ -470,9 +581,16 @@ watch(missionId, () => void loadAll());
                 </Card>
                 <Card>
                     <template #header><div class="text-sm font-semibold text-slate-200">Policy (JSON)</div></template>
-                    <textarea v-model="policyText" rows="14" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs" :disabled="!canEditMission" />
+                    <textarea
+                        v-model="policyText"
+                        rows="14"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs"
+                        :disabled="!canEditMission"
+                    />
                     <div class="flex justify-end mt-3">
-                        <Button size="sm" variant="primary" @click="savePolicy" :disabled="!canEditMission">Salvar policy</Button>
+                        <Button size="sm" variant="primary" @click="savePolicy" :disabled="!canEditMission"
+                            >Salvar policy</Button
+                        >
                     </div>
                 </Card>
             </div>
@@ -485,16 +603,27 @@ watch(missionId, () => void loadAll());
             <div class="space-y-4">
                 <div>
                     <label class="text-sm text-slate-300">User message</label>
-                    <textarea v-model="createTaskForm.user_message" rows="4" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <textarea
+                        v-model="createTaskForm.user_message"
+                        rows="4"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </div>
                 <div>
                     <label class="text-sm text-slate-300">System message</label>
-                    <textarea v-model="createTaskForm.system_message" rows="2" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <textarea
+                        v-model="createTaskForm.system_message"
+                        rows="2"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label class="text-sm text-slate-300">Stage</label>
-                        <select v-model="createTaskForm.stage" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                        <select
+                            v-model="createTaskForm.stage"
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        >
                             <option value="READY">READY</option>
                             <option value="DRAFT">DRAFT</option>
                             <option value="PROPOSED">PROPOSED</option>
@@ -502,7 +631,10 @@ watch(missionId, () => void loadAll());
                     </div>
                     <div>
                         <label class="text-sm text-slate-300">Target</label>
-                        <select v-model="createTaskForm.target" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                        <select
+                            v-model="createTaskForm.target"
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        >
                             <option value="auto">auto</option>
                             <option value="chatgpt">chatgpt</option>
                             <option value="gemini">gemini</option>
@@ -512,7 +644,13 @@ watch(missionId, () => void loadAll());
                     </div>
                     <div>
                         <label class="text-sm text-slate-300">Prioridade</label>
-                        <input v-model.number="createTaskForm.priority" type="number" min="0" max="10" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                        <input
+                            v-model.number="createTaskForm.priority"
+                            type="number"
+                            min="0"
+                            max="10"
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        />
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -526,7 +664,9 @@ watch(missionId, () => void loadAll());
             <template #footer>
                 <div class="flex justify-end gap-2 w-full">
                     <Button variant="ghost" size="sm" @click="showCreateTask = false">Cancelar</Button>
-                    <Button variant="primary" size="sm" @click="createTaskInMission" :disabled="creatingTask">Criar</Button>
+                    <Button variant="primary" size="sm" @click="createTaskInMission" :disabled="creatingTask"
+                        >Criar</Button
+                    >
                 </div>
             </template>
         </Modal>

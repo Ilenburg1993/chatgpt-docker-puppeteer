@@ -1,6 +1,7 @@
 # ChatGPT Docker Puppeteer
 
-**Sistema Node.js 24 ESM para orquestrar missões de longa duração com LLMs via automação de browser (Puppeteer), com foco em confiabilidade operacional, observabilidade e evolução contínua.**
+**Sistema Node.js 24 ESM para orquestrar missões de longa duração com LLMs via automação de browser
+(Puppeteer), com foco em confiabilidade operacional, observabilidade e evolução contínua.**
 
 [![Node.js Version](https://img.shields.io/badge/Node.js-24+-green.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -8,11 +9,14 @@
 
 ## 🚀 Visão Geral
 
-Este sistema automatiza interações complexas com Large Language Models (LLMs) como ChatGPT, Gemini e Claude através de automação de navegador usando Puppeteer. Projetado para missões de longa duração com intervenção humana mínima através de um dashboard web.
+Este sistema automatiza interações complexas com Large Language Models (LLMs) como ChatGPT, Gemini e
+Claude através de automação de navegador usando Puppeteer. Projetado para missões de longa duração
+com intervenção humana mínima através de um dashboard web.
 
 ### ✨ Características Principais
 
-- **🧠 Orquestração Inteligente**: Sistema de tarefas com execução paralela e controle de concorrência
+- **🧠 Orquestração Inteligente**: Sistema de tarefas com execução paralela e controle de
+  concorrência
 - **🌐 Dashboard Web**: Interface em tempo real para monitoramento e controle
 - **🔄 Arquitetura Event-Driven**: Comunicação baseada em eventos NERV para alta performance
 - **🛡️ Segurança Enterprise**: HTTPS obrigatório, circuit breakers, validações rigorosas
@@ -55,6 +59,7 @@ Este sistema automatiza interações complexas com Large Language Models (LLMs) 
 ## 🚀 Instalação Rápida
 
 ### Desenvolvimento
+
 ```bash
 # Clone o repositório
 git clone https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
@@ -72,6 +77,7 @@ npm run dev
 ```
 
 ### Produção (PM2)
+
 ```bash
 # Configure produção
 cp .env.production .env
@@ -85,6 +91,7 @@ npm run daemon:status
 ```
 
 ### Pipeline Canônico RAG/MCP
+
 ```bash
 # Sobe PM2 + valida MCP + reconstrói RAG do zero (profile full)
 npm run rag:rebuild:zero
@@ -97,6 +104,7 @@ npm run rag:expand -- --chunk-id <chunk_id> --mode symbol
 ```
 
 ### Docker
+
 ```bash
 # Build e execute
 make build
@@ -109,6 +117,7 @@ make logs
 ## 🏗️ Build e Distribuição
 
 ### Build de Desenvolvimento
+
 ```bash
 # Build completo com dependências de desenvolvimento
 npm run build
@@ -117,6 +126,7 @@ npm run build
 ```
 
 ### Build de Produção
+
 ```bash
 # Build otimizado para produção (NODE_ENV=production)
 npm run build:prod
@@ -125,6 +135,7 @@ npm run build:prod
 ```
 
 ### Executando o Build
+
 ```bash
 # Desenvolvimento
 cd dist && node index.js
@@ -137,6 +148,7 @@ cd dist && npx pm2 start ecosystem.config.cjs
 ```
 
 ### Build Executável (Standalone)
+
 ```bash
 # Criar executáveis nativos para Linux e Windows
 npm run build:exe
@@ -146,18 +158,23 @@ npm run build:exe
 # - release/chatgpt-docker-puppeteer-win.exe
 ```
 
-> **Nota**: O build executável usa Node.js 18 (via pkg) devido a limitações de compatibilidade com recursos modernos do Node.js 24+ (como top-level await). Os executáveis são totalmente funcionais mas usam uma versão ligeiramente mais antiga do runtime.
+> **Nota**: O build executável usa Node.js 18 (via pkg) devido a limitações de compatibilidade com
+> recursos modernos do Node.js 24+ (como top-level await). Os executáveis são totalmente funcionais
+> mas usam uma versão ligeiramente mais antiga do runtime.
 
 ### Estratégia de Build
+
 - **Copy-first**: Copia todos os arquivos fonte para `dist/`
 - **Bundle inteligente**: Usa ESBuild para otimizar módulos compatíveis
-- **External dependencies**: Mantém dependências nativas externas (@pm2/blessed, term.js, pty.js, @lancedb/lancedb-*)
+- **External dependencies**: Mantém dependências nativas externas (@pm2/blessed, term.js, pty.js,
+  @lancedb/lancedb-\*)
 - **Node.js 24+**: Requer Node.js 24 ou superior
 - **ESM obrigatório**: Mantém compatibilidade com módulos ES
 - **✅ Validado**: Build de produção testado e funcional
 - **⚠️ Executável**: Usa Node.js 18 (limitações do pkg com recursos modernos)
 
 ### Distribuição Recomendada
+
 1. **Docker** (recomendado para produção)
 2. **Bundle otimizado** (`npm run build:prod`) - ✅ Totalmente funcional
 3. **Executável standalone** (`npm run build:exe`) - ⚠️ Funcional mas limitado
@@ -166,33 +183,33 @@ npm run build:exe
 
 ### Variáveis de Ambiente
 
-| Variável | Descrição | Padrão |
-|----------|-----------|---------|
-| `NODE_ENV` | Ambiente (development/production) | development |
-| `SERVER_MODE` | Modo do servidor (integrated/split/disabled) | integrated |
-| `SERVER_AUTHORITY` | Autoridade do servidor (standalone/delegated) | standalone |
-| `FORCE_HTTPS` | Forçar HTTPS em produção | true (produção) |
-| `MAX_CONCURRENT_TASKS` | Máximo de tarefas simultâneas | 1 |
-| `OLLAMA_CLOUD_API_KEY` | Chave API Ollama Cloud | - |
-| `OLLAMA_NON_EMBEDDING_RUNTIME` | Roteamento de geração/chat (`auto|cloud|local`) | auto |
-| `OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK` | Fallback local quando cloud falhar (`true|false`) | true |
-| `OLLAMA_LOCAL_MODEL_PROFILE` | Perfil de segurança para modelos locais (`light|custom`) | light |
-| `OLLAMA_LOCAL_ALLOWED_MODELS` | Allowlist opcional de modelos locais (CSV) | - |
-| `RAG_PROFILE_DEFAULT` | Perfil de escopo RAG (`core|dev|full`) | core |
-| `RAG_DEGRADED_MODE_ENABLED` | Fallback lexical no RAG (`true|false`) | true |
-| `RAG_AST_CHUNK_ENABLED` | Ativa chunking AST-aware em JS/TS (`true|false`) | true |
-| `RAG_CHUNK_TARGET_CHARS` | Alvo de tamanho de chunk (chars) | 2400 |
-| `RAG_CHUNK_MAX_CHARS` | Limite máximo de chunk (chars) | 4200 |
-| `RAG_EXPAND_DEFAULT_LINES` | Linhas padrão para `rag_expand` | 40 |
-| `RAG_EXPAND_MAX_LINES` | Limite máximo de linhas para `rag_expand` | 240 |
-| `RAG_WATCH_ENABLED` | Liga/desliga watch incremental (`true|false`) | true |
-| `RAG_WATCH_DEBOUNCE_MS` | Debounce do watch incremental (ms) | 3000 |
-| `RAG_WATCH_BATCH_MAX` | Máximo de arquivos por lote incremental | 64 |
-| `LSP_ENABLED` | Habilita ferramentas MCP de LSP/tsserver | true |
-| `LSP_TOOL_TIMEOUT_MS` | Timeout por operação LSP (ms) | 15000 |
-| `LSP_MUTATIONS_ENABLED` | Permite apply de code action (`true|false`) | false |
-| `LSP_MAX_RESULTS` | Limite de resultados por ferramenta LSP | 200 |
-| `GITHUB_PERSONAL_ACCESS_TOKEN` | Token GitHub | - |
+| Variável                              | Descrição                                       | Padrão          |
+| ------------------------------------- | ----------------------------------------------- | --------------- | ------- | ---- |
+| `NODE_ENV`                            | Ambiente (development/production)               | development     |
+| `SERVER_MODE`                         | Modo do servidor (integrated/split/disabled)    | integrated      |
+| `SERVER_AUTHORITY`                    | Autoridade do servidor (standalone/delegated)   | standalone      |
+| `FORCE_HTTPS`                         | Forçar HTTPS em produção                        | true (produção) |
+| `MAX_CONCURRENT_TASKS`                | Máximo de tarefas simultâneas                   | 1               |
+| `OLLAMA_CLOUD_API_KEY`                | Chave API Ollama Cloud                          | -               |
+| `OLLAMA_NON_EMBEDDING_RUNTIME`        | Roteamento de geração/chat (`auto               | cloud           | local`) | auto |
+| `OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK` | Fallback local quando cloud falhar (`true       | false`)         | true    |
+| `OLLAMA_LOCAL_MODEL_PROFILE`          | Perfil de segurança para modelos locais (`light | custom`)        | light   |
+| `OLLAMA_LOCAL_ALLOWED_MODELS`         | Allowlist opcional de modelos locais (CSV)      | -               |
+| `RAG_PROFILE_DEFAULT`                 | Perfil de escopo RAG (`core                     | dev             | full`)  | core |
+| `RAG_DEGRADED_MODE_ENABLED`           | Fallback lexical no RAG (`true                  | false`)         | true    |
+| `RAG_AST_CHUNK_ENABLED`               | Ativa chunking AST-aware em JS/TS (`true        | false`)         | true    |
+| `RAG_CHUNK_TARGET_CHARS`              | Alvo de tamanho de chunk (chars)                | 2400            |
+| `RAG_CHUNK_MAX_CHARS`                 | Limite máximo de chunk (chars)                  | 4200            |
+| `RAG_EXPAND_DEFAULT_LINES`            | Linhas padrão para `rag_expand`                 | 40              |
+| `RAG_EXPAND_MAX_LINES`                | Limite máximo de linhas para `rag_expand`       | 240             |
+| `RAG_WATCH_ENABLED`                   | Liga/desliga watch incremental (`true           | false`)         | true    |
+| `RAG_WATCH_DEBOUNCE_MS`               | Debounce do watch incremental (ms)              | 3000            |
+| `RAG_WATCH_BATCH_MAX`                 | Máximo de arquivos por lote incremental         | 64              |
+| `LSP_ENABLED`                         | Habilita ferramentas MCP de LSP/tsserver        | true            |
+| `LSP_TOOL_TIMEOUT_MS`                 | Timeout por operação LSP (ms)                   | 15000           |
+| `LSP_MUTATIONS_ENABLED`               | Permite apply de code action (`true             | false`)         | false   |
+| `LSP_MAX_RESULTS`                     | Limite de resultados por ferramenta LSP         | 200             |
+| `GITHUB_PERSONAL_ACCESS_TOKEN`        | Token GitHub                                    | -               |
 
 ### Arquivos de Configuração
 
@@ -276,9 +293,15 @@ npm run analyze:jsdoc      # Cobertura JSDoc
 2. **Implemente a interface**:
    ```javascript
    class NewDriver {
-     async connect() { /* ... */ }
-     async execute(task) { /* ... */ }
-     async disconnect() { /* ... */ }
+     async connect() {
+       /* ... */
+     }
+     async execute(task) {
+       /* ... */
+     }
+     async disconnect() {
+       /* ... */
+     }
    }
    ```
 3. **Registre no factory** `src/driver/factory.js`
@@ -325,6 +348,7 @@ npm run logs:watch
 ### Problemas Comuns
 
 **Chrome não conecta:**
+
 ```bash
 # Verifique se Chrome está rodando
 curl http://localhost:9224/json/version
@@ -334,6 +358,7 @@ npm run start:chrome
 ```
 
 **PM2 não inicia:**
+
 ```bash
 # Verifique configuração
 npm run validate
@@ -344,6 +369,7 @@ npm run daemon:start
 ```
 
 **Testes falhando:**
+
 ```bash
 # Execute testes individuais
 node --test tests/unit/core/test_config.spec.js

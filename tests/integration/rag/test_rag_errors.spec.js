@@ -22,7 +22,9 @@ class FakeEmbeddingsProvider {
             throw new Error('FAKE_EMBEDDING_ERROR');
         }
         // Generate deterministic vector from text hash
-        const hash = Buffer.from(text).toString('hex').slice(0, this.dim * 2);
+        const hash = Buffer.from(text)
+            .toString('hex')
+            .slice(0, this.dim * 2);
         const vector = [];
         for (let i = 0; i < this.dim; i++) {
             vector.push(parseInt(hash.slice(i * 2, i * 2 + 2), 16) / 255);
@@ -37,7 +39,7 @@ describe('RAG Error Scenarios', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
 
         try {
@@ -45,11 +47,11 @@ describe('RAG Error Scenarios', () => {
             await fs.writeFile(path.join(ws, 'test.js'), 'const x = 1;', 'utf8');
 
             // First indexation with normal embeddings
-            await ragIndex({ 
-                root: ws, 
-                paths, 
+            await ragIndex({
+                root: ws,
+                paths,
                 embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
-                profile: 'full'
+                profile: 'full',
             });
 
             // Manually corrupt the manifest to simulate schema mismatch
@@ -61,14 +63,14 @@ describe('RAG Error Scenarios', () => {
             // Try to index again - should fail with clear error
             await assert.rejects(
                 async () => {
-                    await ragIndex({ 
-                        root: ws, 
-                        paths, 
+                    await ragIndex({
+                        root: ws,
+                        paths,
                         embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
-                        profile: 'full'
+                        profile: 'full',
                     });
                 },
-                (err) => {
+                err => {
                     assert.ok(err.message.includes('SCHEMA_VERSION_MISMATCH'));
                     assert.ok(err.message.includes('npm run rag:reset'));
                     return true;
@@ -85,31 +87,31 @@ describe('RAG Error Scenarios', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
 
         try {
             await fs.writeFile(path.join(ws, 'test.js'), 'const x = 1;', 'utf8');
 
             // Index with 8-dim embeddings
-            await ragIndex({ 
-                root: ws, 
-                paths, 
+            await ragIndex({
+                root: ws,
+                paths,
                 embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
-                profile: 'full'
+                profile: 'full',
             });
 
             // Try to index with different dimension - should fail fast
             await assert.rejects(
                 async () => {
-                    await ragIndex({ 
-                        root: ws, 
-                        paths, 
+                    await ragIndex({
+                        root: ws,
+                        paths,
                         embeddingsProvider: new FakeEmbeddingsProvider({ dim: 16 }), // Different!
-                        profile: 'full'
+                        profile: 'full',
                     });
                 },
-                (err) => {
+                err => {
                     assert.ok(err.message.includes('EMBEDDING_DIM_MISMATCH'));
                     assert.ok(err.message.includes('dim=8'));
                     assert.ok(err.message.includes('dim=16'));
@@ -127,7 +129,7 @@ describe('RAG Error Scenarios', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
 
         try {
@@ -147,15 +149,15 @@ describe('RAG Error Scenarios', () => {
                     }
                     // Succeed on 3rd attempt
                     return new Array(8).fill(0.5);
-                }
+                },
             };
 
             // Should succeed after retries
-            const result = await ragIndex({ 
-                root: ws, 
-                paths, 
+            const result = await ragIndex({
+                root: ws,
+                paths,
                 embeddingsProvider: flakyProvider,
-                profile: 'full'
+                profile: 'full',
             });
 
             assert.strictEqual(result.scanned_files, 1);
@@ -171,7 +173,7 @@ describe('RAG Error Scenarios', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
 
         try {
@@ -184,7 +186,7 @@ describe('RAG Error Scenarios', () => {
                 async () => {
                     await ragReset({ paths, yes: false });
                 },
-                (err) => {
+                err => {
                     assert.ok(err.message.includes('--yes'));
                     return true;
                 }
@@ -202,7 +204,7 @@ describe('RAG Error Scenarios', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
 
         try {
@@ -212,7 +214,7 @@ describe('RAG Error Scenarios', () => {
                 root: ws,
                 paths,
                 profile: 'full',
-                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 })
+                embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8 }),
             });
 
             const result = await ragHybridSearch({
@@ -221,7 +223,7 @@ describe('RAG Error Scenarios', () => {
                 mode: 'auto',
                 degradedModeEnabled: true,
                 embeddingsProvider: new FakeEmbeddingsProvider({ dim: 8, shouldFail: true }),
-                topK: 3
+                topK: 3,
             });
 
             assert.strictEqual(result.backend, 'lexical');

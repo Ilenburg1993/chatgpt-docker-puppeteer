@@ -1,6 +1,7 @@
 # Code Graph Analyzer (TypeScript Language Server)
 
-Ferramenta de análise de grafos de código usando TypeScript Language Server para análise precisa de JavaScript.
+Ferramenta de análise de grafos de código usando TypeScript Language Server para análise precisa de
+JavaScript.
 
 ## 🎯 Recursos
 
@@ -36,10 +37,12 @@ npm run analyze:graph:export
 ## 🔍 Resultados da Última Análise
 
 ### Estatísticas Gerais
+
 - **Total de módulos**: 177
 - **Arquivos analisados**: JavaScript + JSX via jsconfig.json
 
 ### Distribuição por Camada
+
 ```
 CORE       30 módulos (17%)
 INFRA      22 módulos (12%)
@@ -53,6 +56,7 @@ KERNEL     13 módulos (7%)
 ```
 
 ### Top Importers (mais dependências)
+
 1. `src/server/main.js` - 17 deps
 2. `src/main.js` - 15 deps
 3. `src/infra/io.js` - 12 deps
@@ -60,6 +64,7 @@ KERNEL     13 módulos (7%)
 5. `src/server/engine/lifecycle.js` - 11 deps
 
 ### Top Imported (mais referências)
+
 1. `fs` - 53 refs (Node.js core)
 2. `path` - 51 refs (Node.js core)
 3. `../../core/logger` - 28 refs ⭐
@@ -67,6 +72,7 @@ KERNEL     13 módulos (7%)
 5. `child_process` - 7 refs (Node.js core)
 
 ### ⚠️ Dependência Circular Detectada
+
 ```
 src/infra/queue/task_loader.js
   → src/core/config.js
@@ -77,6 +83,7 @@ src/infra/queue/task_loader.js
 **Impacto**: Potencial deadlock durante inicialização se não houver lazy loading.
 
 **Solução sugerida**:
+
 - Mover cache de task_loader para módulo separado
 - Usar dependency injection no config.js
 - Lazy load io.js no task_loader
@@ -84,7 +91,9 @@ src/infra/queue/task_loader.js
 ## 📁 Arquivos Gerados
 
 ### `analysis/code-graph.json`
+
 JSON completo com:
+
 - Grafo de dependências (arquivo → [deps])
 - Grafo reverso (arquivo → [dependents])
 - Eventos NERV (emitters, listeners)
@@ -93,6 +102,7 @@ JSON completo com:
 - Estatísticas
 
 ### `analysis/dependency-graph.dot`
+
 Graphviz DOT format para visualização:
 
 ```bash
@@ -124,6 +134,7 @@ node scripts/analyze-code-graph.js [options]
 ## 🎯 Casos de Uso
 
 ### 1. Validar Arquitetura Zero-Coupling
+
 ```bash
 npm run analyze:graph:full > arch-report.txt
 # Verificar se componentes se comunicam apenas via NERV
@@ -131,6 +142,7 @@ grep -E "(NERV|direct import)" arch-report.txt
 ```
 
 ### 2. Antes de Refatoração
+
 ```bash
 # Mapear dependências do módulo a ser refatorado
 npm run analyze:graph:export
@@ -142,6 +154,7 @@ console.log('Dependents:', graph.reverseDependencies[target]);
 ```
 
 ### 3. Code Review
+
 ```bash
 # Verificar se PR introduz ciclos
 git checkout main
@@ -154,6 +167,7 @@ diff /tmp/main-cycles.txt /tmp/feature-cycles.txt
 ```
 
 ### 4. Documentação Automática
+
 ```bash
 # Gerar diagrama de arquitetura
 npm run analyze:graph:export
@@ -163,6 +177,7 @@ dot -Tsvg analysis/dependency-graph.dot -o DOCUMENTAÇÃO/architecture-graph.svg
 ## 🧩 Integração com CI/CD
 
 ### GitHub Actions
+
 ```yaml
 - name: Analyze Code Graph
   run: |
@@ -178,6 +193,7 @@ dot -Tsvg analysis/dependency-graph.dot -o DOCUMENTAÇÃO/architecture-graph.svg
 ```
 
 ### Pre-commit Hook
+
 ```bash
 #!/bin/bash
 # .git/hooks/pre-commit
@@ -190,14 +206,14 @@ npm run analyze:circular --silent | grep -q "Found 0" || {
 
 ## 📚 Comparação com Outras Ferramentas
 
-| Feature | TypeScript LS | madge | dependency-cruiser |
-|---------|---------------|-------|-------------------|
-| Precisão JS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Velocidade | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| NERV Events | ✅ | ❌ | ❌ |
-| AST Analysis | ✅ | Partial | ✅ |
-| Export Formats | JSON, DOT | JSON, DOT, SVG | JSON, DOT, HTML |
-| Zero Config | ✅ (via jsconfig) | ✅ | ❌ |
+| Feature        | TypeScript LS     | madge          | dependency-cruiser |
+| -------------- | ----------------- | -------------- | ------------------ |
+| Precisão JS    | ⭐⭐⭐⭐⭐        | ⭐⭐⭐⭐       | ⭐⭐⭐⭐⭐         |
+| Velocidade     | ⭐⭐⭐⭐          | ⭐⭐⭐⭐⭐     | ⭐⭐⭐             |
+| NERV Events    | ✅                | ❌             | ❌                 |
+| AST Analysis   | ✅                | Partial        | ✅                 |
+| Export Formats | JSON, DOT         | JSON, DOT, SVG | JSON, DOT, HTML    |
+| Zero Config    | ✅ (via jsconfig) | ✅             | ❌                 |
 
 ## 🐛 Limitações Conhecidas
 
@@ -214,6 +230,7 @@ npm run analyze:circular --silent | grep -q "Found 0" || {
 ## 📝 Changelog
 
 ### v1.0.0 (2026-01-20)
+
 - ✅ Initial release
 - ✅ TypeScript Language Server integration
 - ✅ Dependency graph analysis

@@ -23,7 +23,7 @@ const TASK_STATES = {
     DISCONNECTED: 'DISCONNECTED',
 
     /** Task execution has been suspended */
-    SUSPENDED: 'SUSPENDED'
+    SUSPENDED: 'SUSPENDED',
 };
 
 /**

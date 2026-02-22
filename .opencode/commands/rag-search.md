@@ -11,6 +11,7 @@ Searches the codebase using semantic vector search powered by RAG (Retrieval-Aug
 ## Overview
 
 This command uses the local RAG system to perform semantic search across the entire codebase:
+
 - **LanceDB** for vector storage
 - **Ollama** (nomic-embed-text:latest) for embeddings
 - **Incremental indexing** with fingerprint-based change detection
@@ -55,12 +56,12 @@ This command uses the local RAG system to perform semantic search across the ent
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `query` | string | (required) | Semantic search query |
-| `--topk N` | number | 8 | Number of results to return |
-| `--ext .ext` | string | all | Filter by file extension (.js, .md, .json, etc.) |
-| `--path prefix/` | string | all | Filter by path prefix (src/, tests/, etc.) |
+| Parameter        | Type   | Default    | Description                                      |
+| ---------------- | ------ | ---------- | ------------------------------------------------ |
+| `query`          | string | (required) | Semantic search query                            |
+| `--topk N`       | number | 8          | Number of results to return                      |
+| `--ext .ext`     | string | all        | Filter by file extension (.js, .md, .json, etc.) |
+| `--path prefix/` | string | all        | Filter by path prefix (src/, tests/, etc.)       |
 
 ## How It Works
 
@@ -71,24 +72,28 @@ This command uses the local RAG system to perform semantic search across the ent
 
 ## Response Format
 
-```markdown
+````markdown
 # RAG Results (8 chunks)
 
 ## 1. src/infra/proxy/chromeProxyService.js:42-58
+
 **Score:** 0.12 | **Language:** javascript
 
 ```javascript
 const CHROME_PROXY_PORT = process.env.CHROME_PROXY_PORT || 9224;
 // ...
 ```
+````
 
 ---
 
 ## 2. docs/CHROME_PROXY.md:10-25
+
 **Score:** 0.18 | **Language:** markdown
 
 ...
-```
+
+````
 
 ## Integration
 
@@ -111,16 +116,20 @@ This skill calls the RAG API endpoint:
 pm2 start ecosystem.config.cjs
 # or
 npm start
-```
+````
 
 ### "No results found"
+
 **Possible causes:**
+
 1. RAG not indexed yet → Run `npm run rag:index`
 2. Query too specific → Try broader keywords
 3. Code doesn't exist in workspace
 
 ### "Ollama connection failed"
+
 **Solution:** Ensure Ollama is running on host:
+
 ```bash
 # On host machine (not in container):
 ollama serve
@@ -130,7 +139,9 @@ curl http://host.docker.internal:11434/api/version
 ```
 
 ### "Model not found"
+
 **Solution:** Pull the embedding model on host:
+
 ```bash
 # On host machine:
 ollama pull nomic-embed-text:latest

@@ -7,6 +7,7 @@ import { createSharedTimeout } from '#infra/abort_controller_utils';
 /* ==========================================================================
    RECOVERY_CONFIG v2.0 - Zero Magic Numbers
 ========================================================================== */
+/** Constante/valor exportado: RECOVERY_CONFIG. */
 const RECOVERY_CONFIG = {
     /** Timeout para process kill (ms) - Default: 5s */
     KILL_TIMEOUT_MS: parseInt(process.env.RECOVERY_KILL_TIMEOUT || '5000'),
@@ -24,12 +25,13 @@ const RECOVERY_CONFIG = {
     FOCUS_TIMEOUT_MS: parseInt(process.env.RECOVERY_FOCUS_TIMEOUT || '2000'),
 
     /** Máximo de retries por tier - Default: 2 */
-    MAX_TIER_RETRIES: parseInt(process.env.RECOVERY_MAX_RETRIES || '2')
+    MAX_TIER_RETRIES: parseInt(process.env.RECOVERY_MAX_RETRIES || '2'),
 };
 
 /* ==========================================================================
    RECOVERY_EVENTS v2.0 - Telemetria de Recovery
 ========================================================================== */
+/** Eventos emitidos pelo RecoverySystem para telemetria e observabilidade. */
 const RECOVERY_EVENTS = {
     TIER_STARTED: 'recovery:tier_started', // Tier iniciado
     TIER_COMPLETED: 'recovery:tier_completed', // Tier concluído com sucesso
@@ -64,8 +66,8 @@ class RecoverySystem extends EventEmitter {
      * Cria RecoverySystem instance v2.0
      *
      * @constructor
- * @param {Object} driver - Driver Puppeteer (BaseDriver instance)
- * @throws {Error} Se driver inválido ou missing methods
+     * @param {Object} driver - Driver Puppeteer (BaseDriver instance)
+     * @throws {Error} Se driver inválido ou missing methods
      *
      * @example
      * const recovery = new RecoverySystem(driver);
@@ -289,10 +291,7 @@ class RecoverySystem extends EventEmitter {
                     await Promise.race([this.driver.page.mouse.click(1, 1), timeoutPromise]);
 
                     // Window focus
-                    await Promise.race([
-                        this.driver.page.evaluate(() => window.focus()),
-                        timeoutPromise
-                    ]);
+                    await Promise.race([this.driver.page.evaluate(() => window.focus()), timeoutPromise]);
 
                     log('DEBUG', '[RECOVERY] Tier 1: Focus restored successfully', correlationId);
 
@@ -442,7 +441,11 @@ class RecoverySystem extends EventEmitter {
 
         if (proc && typeof proc.kill === 'function') {
             try {
-                log('DEBUG', `[RECOVERY] Tier 3: Killing browser process with timeout=${KILL_TIMEOUT}ms...`, correlationId);
+                log(
+                    'DEBUG',
+                    `[RECOVERY] Tier 3: Killing browser process with timeout=${KILL_TIMEOUT}ms...`,
+                    correlationId
+                );
 
                 await Promise.race([
                     new Promise((resolve, reject) => {
@@ -453,7 +456,7 @@ class RecoverySystem extends EventEmitter {
                             reject(err);
                         }
                     }),
-                    this._timeout(KILL_TIMEOUT, 'browser_kill')
+                    this._timeout(KILL_TIMEOUT, 'browser_kill'),
                 ]);
 
                 log('DEBUG', `[RECOVERY] Tier 3: Browser process kill issued`, correlationId);
@@ -557,7 +560,7 @@ class RecoverySystem extends EventEmitter {
     }
 }
 
- /**
+/**
  * Factory function para criar instância do RecoverySystem
  *
  * **Side-effects:** N/A

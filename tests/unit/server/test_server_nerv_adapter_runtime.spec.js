@@ -64,7 +64,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
             identity: { actor: ActorRole.DRIVER, target: ActorRole.SERVER },
             causality: { msg_id: 'msg-1', correlation_id: 'corr-1' },
             type: { message_type: MessageType.EVENT, action_code: ActionCode.DRIVER_TASK_COMPLETED },
-            payload: { taskId: 'task-1', result: { ok: true } }
+            payload: { taskId: 'task-1', result: { ok: true } },
         };
 
         nerv.receiveHandlers[0](envelope);
@@ -84,7 +84,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
         await adapter._handleDashboardCommand({
             command: 'driver:abort',
             clientId: 'client-1',
-            payload: {}
+            payload: {},
         });
 
         const commandError = socketHub.events.find(evt => evt.name === 'command:error');
@@ -97,7 +97,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
             command: 'task:cancel',
             clientId: 'client-2',
             correlationId: 'corr-client-123',
-            payload: { task_id: 'task-xyz' }
+            payload: { task_id: 'task-xyz' },
         });
 
         const ack = socketHub.events.find(evt => evt.name === 'command:ack');
@@ -112,7 +112,7 @@ describe('ServerNERVAdapter runtime behavior', () => {
             identity: { actor: ActorRole.DRIVER, target: ActorRole.SERVER },
             causality: { msg_id: 'msg-2', correlation_id: 'corr-2' },
             type: { message_type: MessageType.EVENT, action_code: ActionCode.DRIVER_TASK_FAILED },
-            payload: { task_id: 'task-failed-1', error: 'boom' }
+            payload: { task_id: 'task-failed-1', error: 'boom' },
         };
 
         nerv.receiveHandlers[0](envelope);
@@ -122,5 +122,4 @@ describe('ServerNERVAdapter runtime behavior', () => {
         assert.strictEqual(emitted.payload.taskId, 'task-failed-1');
         assert.strictEqual(emitted.payload.correlationId, 'corr-2');
     });
-
 });

@@ -20,7 +20,7 @@ describe('NERV Core - Event Bus Central', () => {
                     actor: ActorRole.KERNEL,
                     messageType: MessageType.EVENT,
                     actionCode: 'TEST_EVENT',
-                    payload: { data: 'test' }
+                    payload: { data: 'test' },
                 });
             });
         });
@@ -34,7 +34,7 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'TASK_CREATED', // String direta, ActionCode não tem TASK_CREATED
-                payload: { taskId: 'task-001' }
+                payload: { taskId: 'task-001' },
             });
 
             assert.ok(nerv.verificarEventoEmitido('TASK_CREATED'), 'Evento deve estar registrado');
@@ -47,19 +47,19 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'EVENT_1',
-                payload: { data: 1 }
+                payload: { data: 1 },
             });
             nerv.emit({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'EVENT_2',
-                payload: { data: 2 }
+                payload: { data: 2 },
             });
             nerv.emit({
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'EVENT_3',
-                payload: { data: 3 }
+                payload: { data: 3 },
             });
 
             const eventos = nerv.obterEventosEmitidos();
@@ -74,7 +74,7 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'TASK_STATE_CHANGE',
-                payload
+                payload,
             });
 
             const envelopes = nerv.obterEventosEmitidos('TASK_STATE_CHANGE');
@@ -107,7 +107,7 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'EXEC_TEST',
-                payload: {}
+                payload: {},
             });
 
             // Aguardar execução assíncrona
@@ -129,7 +129,7 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'ONCE_TEST',
-                payload: {}
+                payload: {},
             };
 
             nerv.emit(envelope);
@@ -177,7 +177,7 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'MULTI_TEST',
-                payload: {}
+                payload: {},
             });
 
             await new Promise(resolve => {
@@ -198,7 +198,7 @@ describe('NERV Core - Event Bus Central', () => {
                     actor: ActorRole.KERNEL,
                     messageType: MessageType.EVENT,
                     actionCode: 'DELAYED_EVENT',
-                    payload: { resultado: 'sucesso' }
+                    payload: { resultado: 'sucesso' },
                 });
             }, 50);
 
@@ -238,7 +238,7 @@ describe('NERV Core - Event Bus Central', () => {
                 actor: ActorRole.KERNEL,
                 messageType: MessageType.EVENT,
                 actionCode: 'EVENT_A',
-                payload: {}
+                payload: {},
             });
 
             await new Promise(resolve => {
@@ -286,7 +286,7 @@ describe('NERV Core - Event Bus Central', () => {
                         actor: ActorRole.KERNEL,
                         messageType: MessageType.EVENT,
                         actionCode: 'PERF_TEST',
-                        payload: { index: i }
+                        payload: { index: i },
                     });
                 }
             });

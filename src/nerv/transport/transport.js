@@ -50,8 +50,8 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
                 adapter.onReceive(chunk => {
                     unpacker.push(chunk, handler);
                 });
-            }
-        }
+            },
+        },
     });
 
     /* =========================================================
@@ -60,11 +60,11 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
 
     const reconnect = reconnectPolicy
         ? createReconnect({
-            telemetry,
-            start: connection.start,
-            stop: connection.stop,
-            policy: reconnectPolicy
-        })
+              telemetry,
+              start: connection.start,
+              stop: connection.stop,
+              policy: reconnectPolicy,
+          })
         : null;
 
     /* =========================================================
@@ -119,7 +119,7 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
         start,
         stop,
         send,
-        onReceive
+        onReceive,
     });
 }
 

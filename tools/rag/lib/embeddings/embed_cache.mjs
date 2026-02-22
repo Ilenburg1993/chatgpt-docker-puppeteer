@@ -66,7 +66,7 @@ export class EmbeddingCache {
             maxSize: this.maxSize,
             hits: this.hits,
             misses: this.misses,
-            hitRate: this.hits / (this.hits + this.misses) || 0
+            hitRate: this.hits / (this.hits + this.misses) || 0,
         };
     }
 

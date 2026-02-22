@@ -12,18 +12,18 @@ describe('Task Schema Validation', () => {
                     created_at: new Date().toISOString(),
                     priority: 5,
                     source: 'api',
-                    tags: ['unit-test']
+                    tags: ['unit-test'],
                 },
                 spec: {
                     target: 'gemini',
                     payload: {
-                        user_message: 'Qual é a capital da França?'
-                    }
+                        user_message: 'Qual é a capital da França?',
+                    },
                 },
                 state: {
                     status: STATUS_VALUES.PENDING,
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             const resultado = schemas.parseTask(tarefaValida);
@@ -40,18 +40,18 @@ describe('Task Schema Validation', () => {
                     id: 'task-min',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: 'chatgpt',
                     payload: {
-                        user_message: 'Teste mínimo'
-                    }
+                        user_message: 'Teste mínimo',
+                    },
                 },
                 state: {
                     status: STATUS_VALUES.PENDING,
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             const resultado = schemas.parseTask(tarefaMinima);
@@ -68,18 +68,18 @@ describe('Task Schema Validation', () => {
                 meta: {
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'api'
+                    source: 'api',
                 },
                 spec: {
                     target: 'gemini',
                     payload: {
-                        user_message: 'ID legado'
-                    }
+                        user_message: 'ID legado',
+                    },
                 },
                 state: {
                     status: STATUS_VALUES.PENDING,
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             const resultado = schemas.parseTask(tarefaLegacyId);
@@ -93,18 +93,18 @@ describe('Task Schema Validation', () => {
                 meta: {
                     id: 'task-ts',
                     priority: 3,
-                    source: 'gui'
+                    source: 'gui',
                 },
                 spec: {
                     target: 'chatgpt',
                     payload: {
-                        user_message: 'Teste timestamps'
-                    }
+                        user_message: 'Teste timestamps',
+                    },
                 },
                 state: {
                     status: STATUS_VALUES.PENDING,
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             const resultado = schemas.parseTask(tarefaSemTimestamps);
@@ -119,14 +119,14 @@ describe('Task Schema Validation', () => {
                     id: 'task-status',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'flow_manager'
+                    source: 'flow_manager',
                 },
                 spec: {
                     target: 'gemini',
                     payload: {
-                        user_message: 'Teste status'
-                    }
-                }
+                        user_message: 'Teste status',
+                    },
+                },
             };
 
             const resultado = schemas.parseTask(tarefaSemStatus);
@@ -144,7 +144,7 @@ describe('Task Schema Validation', () => {
                     created_at: new Date().toISOString(),
                     priority: 7,
                     source: 'api',
-                    tags: ['test', 'priority']
+                    tags: ['test', 'priority'],
                 },
                 spec: {
                     target: 'chatgpt',
@@ -152,17 +152,17 @@ describe('Task Schema Validation', () => {
                     payload: {
                         system_message: 'Você é um assistente útil',
                         user_message: 'Teste completo',
-                        context: 'Contexto adicional'
+                        context: 'Contexto adicional',
                     },
                     parameters: {
                         temperature: 0.7,
-                        max_tokens: 1000
-                    }
+                        max_tokens: 1000,
+                    },
                 },
                 state: {
                     status: STATUS_VALUES.PENDING,
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             const resultado = schemas.parseTask(tarefaCompleta);
@@ -182,17 +182,17 @@ describe('Task Schema Validation', () => {
                     id: 'task-no-target',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     payload: {
-                        user_message: 'Sem target'
-                    }
+                        user_message: 'Sem target',
+                    },
                 },
                 state: {
                     status: STATUS_VALUES.PENDING,
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             assert.throws(
@@ -210,14 +210,14 @@ describe('Task Schema Validation', () => {
                     id: 'task-empty-target',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: '',
                     payload: {
-                        user_message: 'Target vazio'
-                    }
-                }
+                        user_message: 'Target vazio',
+                    },
+                },
             };
 
             assert.throws(() => {
@@ -231,12 +231,12 @@ describe('Task Schema Validation', () => {
                     id: 'task-no-msg',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: 'gemini',
-                    payload: {}
-                }
+                    payload: {},
+                },
             };
 
             assert.throws(
@@ -254,14 +254,14 @@ describe('Task Schema Validation', () => {
                     id: 'task-bad-priority',
                     created_at: new Date().toISOString(),
                     priority: -5, // Prioridade negativa é inválida
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: 'chatgpt',
                     payload: {
-                        user_message: 'Prioridade inválida'
-                    }
-                }
+                        user_message: 'Prioridade inválida',
+                    },
+                },
             };
 
             assert.throws(() => {
@@ -275,18 +275,18 @@ describe('Task Schema Validation', () => {
                     id: 'task-bad-status',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: 'gemini',
                     payload: {
-                        user_message: 'Status inválido'
-                    }
+                        user_message: 'Status inválido',
+                    },
                 },
                 state: {
                     status: 'INVALID_STATUS',
-                    attempts: 0
-                }
+                    attempts: 0,
+                },
             };
 
             assert.throws(() => {
@@ -302,18 +302,18 @@ describe('Task Schema Validation', () => {
                     'chatgpt.com': {
                         selectors: {
                             input_box: ['#prompt-textarea', 'textarea'],
-                            send_button: ['button[data-testid="send-button"]']
+                            send_button: ['button[data-testid="send-button"]'],
                         },
                         behavior_overrides: {
                             idle_sleep_ms: 100,
-                            typing_speed_factor: 1.5
-                        }
-                    }
+                            typing_speed_factor: 1.5,
+                        },
+                    },
                 },
                 global_selectors: {
                     input_box: ['textarea', '[contenteditable="true"]'],
-                    send_button: ['button[type="submit"]']
-                }
+                    send_button: ['button[type="submit"]'],
+                },
             };
 
             const resultado = schemas.DnaSchema.safeParse(dnaCompleto);
@@ -355,11 +355,11 @@ describe('Task Schema Validation', () => {
                                 isShadow: false,
                                 frameSelector: null,
                                 framePath: null,
-                                timestamp: Date.now()
-                            }
-                        }
-                    }
-                }
+                                timestamp: Date.now(),
+                            },
+                        },
+                    },
+                },
             };
 
             const resultado = schemas.DnaSchema.safeParse(dnaSADI);

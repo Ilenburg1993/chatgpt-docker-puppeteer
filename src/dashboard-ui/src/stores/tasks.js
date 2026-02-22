@@ -98,6 +98,7 @@ function _mergeTask(existing, incoming) {
     return merged;
 }
 
+/** Constante/valor exportado: useTaskStore. */
 export const useTaskStore = defineStore('tasks', {
     state: () => ({
         // Lista de tasks
@@ -110,7 +111,7 @@ export const useTaskStore = defineStore('tasks', {
         filters: {
             status: null,
             priority: null,
-            search: ''
+            search: '',
         },
 
         // Estados de loading
@@ -124,7 +125,7 @@ export const useTaskStore = defineStore('tasks', {
         stats: {
             total: 0,
             by_status: {},
-            by_priority: {}
+            by_priority: {},
         },
 
         // Última atualização
@@ -139,7 +140,7 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Tasks filtradas conforme filtros ativos
          */
-        filteredTasks: (state) => {
+        filteredTasks: state => {
             let filtered = state.tasks;
 
             // Filtro por status
@@ -155,9 +156,10 @@ export const useTaskStore = defineStore('tasks', {
             // Filtro por busca (ID ou prompt)
             if (state.filters.search) {
                 const search = state.filters.search.toLowerCase();
-                filtered = filtered.filter(t =>
-                    t.meta?.id?.toLowerCase().includes(search) ||
-                    t.spec?.payload?.user_message?.toLowerCase().includes(search)
+                filtered = filtered.filter(
+                    t =>
+                        t.meta?.id?.toLowerCase().includes(search) ||
+                        t.spec?.payload?.user_message?.toLowerCase().includes(search)
                 );
             }
 
@@ -167,50 +169,44 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Tasks em execução
          */
-        runningTasks: (state) =>
-            state.tasks.filter(t => t.unified_status === 'RUNNING'),
+        runningTasks: state => state.tasks.filter(t => t.unified_status === 'RUNNING'),
 
         /**
          * Tasks pendentes
          */
-        pendingTasks: (state) =>
-            state.tasks.filter(t => t.unified_status === 'PENDING'),
+        pendingTasks: state => state.tasks.filter(t => t.unified_status === 'PENDING'),
 
         /**
          * Tasks concluídas
          */
-        completedTasks: (state) =>
-            state.tasks.filter(t => t.unified_status === 'DONE'),
+        completedTasks: state => state.tasks.filter(t => t.unified_status === 'DONE'),
 
         /**
          * Tasks com erro
          */
-        failedTasks: (state) =>
-            state.tasks.filter(t => t.unified_status === 'FAILED'),
+        failedTasks: state => state.tasks.filter(t => t.unified_status === 'FAILED'),
 
         /**
          * Busca task por ID
          */
-        taskById: (state) => (id) =>
-            state.tasks.find(t => t.meta?.id === id || t.id === id),
+        taskById: state => id => state.tasks.find(t => t.meta?.id === id || t.id === id),
 
         /**
          * Task selecionada
          */
-        selectedTask: (state) =>
-            state.tasks.find(t => t.meta?.id === state.selectedTaskId),
+        selectedTask: state => state.tasks.find(t => t.meta?.id === state.selectedTaskId),
 
         /**
          * Contadores por status
          */
-        statusCounts: (state) => ({
+        statusCounts: state => ({
             RUNNING: state.tasks.filter(t => t.unified_status === 'RUNNING').length,
             PENDING: state.tasks.filter(t => t.unified_status === 'PENDING').length,
             DONE: state.tasks.filter(t => t.unified_status === 'DONE').length,
             FAILED: state.tasks.filter(t => t.unified_status === 'FAILED').length,
             PAUSED: state.tasks.filter(t => t.unified_status === 'PAUSED').length,
-            CANCELLED: state.tasks.filter(t => t.unified_status === 'CANCELLED').length
-        })
+            CANCELLED: state.tasks.filter(t => t.unified_status === 'CANCELLED').length,
+        }),
     },
 
     actions: {
@@ -464,7 +460,7 @@ export const useTaskStore = defineStore('tasks', {
             this.filters = {
                 status: null,
                 priority: null,
-                search: ''
+                search: '',
             };
         },
 
@@ -473,6 +469,6 @@ export const useTaskStore = defineStore('tasks', {
          */
         clearError() {
             this.error = null;
-        }
-    }
+        },
+    },
 });

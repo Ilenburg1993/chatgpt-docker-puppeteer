@@ -29,17 +29,13 @@ describe('RAG end-to-end (no Ollama)', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
         try {
             await fs.writeFile(path.join(ws, 'package.json'), JSON.stringify({ name: 'rag-test' }), 'utf8');
-            await fs.writeFile(
-                path.join(ws, 'src.ts'),
-                'export const CHROME_PROXY_PORT = 9224;\n',
-                'utf8'
-            );
+            await fs.writeFile(path.join(ws, 'src.ts'), 'export const CHROME_PROXY_PORT = 9224;\n', 'utf8');
 
             const r1 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings, profile: 'full' });
             assert.ok(r1.scanned_files >= 1);
@@ -50,27 +46,19 @@ describe('RAG end-to-end (no Ollama)', () => {
             assert.strictEqual(r2.changed_files, 0);
             assert.strictEqual(r2.embedded_chunks, 0);
 
-            await fs.writeFile(
-                path.join(ws, 'src.ts'),
-                'export const CHROME_PROXY_PORT = 9225;\n',
-                'utf8'
-            );
+            await fs.writeFile(path.join(ws, 'src.ts'), 'export const CHROME_PROXY_PORT = 9225;\n', 'utf8');
 
             const r3 = await ragIndex({ root: ws, paths, embeddingsProvider: embeddings, profile: 'full' });
             assert.strictEqual(r3.changed_files, 1);
             assert.ok(r3.embedded_chunks >= 1);
 
-            await fs.writeFile(
-                path.join(ws, 'src.ts'),
-                'export const CHROME_PROXY_PORT = 9333;\n',
-                'utf8'
-            );
+            await fs.writeFile(path.join(ws, 'src.ts'), 'export const CHROME_PROXY_PORT = 9333;\n', 'utf8');
             const inc = await ragIndexChanged({
                 root: ws,
                 paths,
                 changedPaths: ['src.ts'],
                 embeddingsProvider: embeddings,
-                profile: 'full'
+                profile: 'full',
             });
             assert.strictEqual(inc.changed_files, 1);
 
@@ -78,7 +66,7 @@ describe('RAG end-to-end (no Ollama)', () => {
                 query: 'export const CHROME_PROXY_PORT = 9333;',
                 paths,
                 embeddingsProvider: embeddings,
-                topK: 3
+                topK: 3,
             });
 
             assert.ok(Array.isArray(result.results));
@@ -89,7 +77,7 @@ describe('RAG end-to-end (no Ollama)', () => {
                 query: 'CHROME_PROXY_PORT',
                 paths,
                 embeddingsProvider: embeddings,
-                topK: 1
+                topK: 1,
             });
             assert.ok(['full', 'incremental'].includes(q.index_mode));
             assert.ok(Object.prototype.hasOwnProperty.call(q, 'index_freshness_ms'));

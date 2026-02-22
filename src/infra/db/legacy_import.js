@@ -8,9 +8,7 @@ import { insertTask, TASK_STAGES } from './task_repo.js';
 async function _listLegacyQueueFiles() {
     try {
         const files = await fsp.readdir(PATHS.QUEUE);
-        return files
-            .filter(f => f.endsWith('.json'))
-            .map(f => path.join(PATHS.QUEUE, f));
+        return files.filter(f => f.endsWith('.json')).map(f => path.join(PATHS.QUEUE, f));
     } catch (err) {
         if (err && err.code === 'ENOENT') {
             return [];
@@ -19,6 +17,7 @@ async function _listLegacyQueueFiles() {
     }
 }
 
+/** Função exportada: importLegacyQueueFromDisk. */
 async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
     const files = await _listLegacyQueueFiles();
     if (files.length === 0) {
@@ -36,7 +35,9 @@ async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
             const raw = await fsp.readFile(filePath, 'utf-8');
             const task = JSON.parse(raw);
 
-            const status = String(task?.state?.status || task?.status || 'PENDING').toUpperCase().trim();
+            const status = String(task?.state?.status || task?.status || 'PENDING')
+                .toUpperCase()
+                .trim();
             const stage = status === 'DONE' ? TASK_STAGES.ARCHIVED : TASK_STAGES.READY;
 
             const created = insertTask(task, { stage, status, actor: 'system', ifNotExists: true });
@@ -49,7 +50,10 @@ async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
             }
         } catch (err) {
             failed++;
-            log('WARN', `[DB] Legacy queue import failed for ${path.basename(filePath)}: ${err?.message || String(err)}`);
+            log(
+                'WARN',
+                `[DB] Legacy queue import failed for ${path.basename(filePath)}: ${err?.message || String(err)}`
+            );
         }
     }
 
@@ -58,4 +62,3 @@ async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
 }
 
 export { importLegacyQueueFromDisk };
-

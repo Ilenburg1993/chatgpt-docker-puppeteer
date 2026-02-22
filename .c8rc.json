@@ -3,10 +3,7 @@
 
   "all": true,
 
-  "include": [
-    "index.js",
-    "src/**/*.js"
-  ],
+  "include": ["index.js", "src/**/*.js"],
 
   "exclude": [
     "node_modules/**",
@@ -29,12 +26,7 @@
     "*.config.mjs"
   ],
 
-  "reporter": [
-    "text",
-    "html",
-    "lcov",
-    "json-summary"
-  ],
+  "reporter": ["text", "html", "lcov", "json-summary"],
 
   "report-dir": "coverage",
   "temp-directory": ".c8",

@@ -6,6 +6,7 @@ function _preview(text, maxChars) {
     return s.slice(0, maxChars);
 }
 
+/** Função exportada: parseTaskJson. */
 function parseTaskJson(raw) {
     try {
         return raw ? JSON.parse(String(raw)) : null;
@@ -37,6 +38,7 @@ function _isEditable(row) {
     return status === 'PAUSED' || (status === 'PENDING' && stage === 'READY' && attempts === 0 && !startedAt);
 }
 
+/** Função exportada: buildTaskCommandCaps. */
 function buildTaskCommandCaps(row) {
     const status = String(row?.status || '').toUpperCase();
     const editable = _isEditable(row);
@@ -62,6 +64,7 @@ function buildMissionRef(row) {
     };
 }
 
+/** Função exportada: taskRowToListItem. */
 function taskRowToListItem(row) {
     const taskJson = parseTaskJson(row.task_json);
     const orchestration = getOrchestrationSummary(taskJson, row);
@@ -102,6 +105,7 @@ function taskRowToListItem(row) {
     };
 }
 
+/** Função exportada: taskRowToDetailTask. */
 function taskRowToDetailTask(row) {
     const task = parseTaskJson(row.task_json) || {};
     task.stage = row.stage;

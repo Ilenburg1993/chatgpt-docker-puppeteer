@@ -2,6 +2,7 @@
 import { CONTROL, safeReadJSON } from './fs_core.js';
 import { STATUS_VALUES } from '#core/constants/tasks';
 
+/** Função exportada: checkControlPause. */
 async function checkControlPause() {
     try {
         const control = await safeReadJSON(CONTROL);

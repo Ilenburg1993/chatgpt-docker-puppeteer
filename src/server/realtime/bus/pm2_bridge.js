@@ -73,7 +73,7 @@ function init() {
                         uptime: data.process.pm_uptime ? Date.now() - data.process.pm_uptime : 0,
                         memory: data.process.monit ? data.process.monit.memory : null,
                         cpu: data.process.monit ? data.process.monit.cpu : null,
-                        ts: Date.now()
+                        ts: Date.now(),
                     };
 
                     log('DEBUG', `[PM2_BRIDGE] Evento: ${processName} → ${payload.event} (${payload.status})`);
@@ -89,7 +89,7 @@ function init() {
                         notify('pm2:process:critical', {
                             ...payload,
                             severity: 'critical',
-                            message: `Processo ${processName} ${data.event}`
+                            message: `Processo ${processName} ${data.event}`,
                         });
                     }
                 }
@@ -125,7 +125,7 @@ function _emitInitialSnapshot() {
                 uptime: proc.pm2_env.pm_uptime ? Date.now() - proc.pm2_env.pm_uptime : 0,
                 memory: proc.monit ? proc.monit.memory : null,
                 cpu: proc.monit ? proc.monit.cpu : null,
-                ts: Date.now()
+                ts: Date.now(),
             }));
 
         log('INFO', `[PM2_BRIDGE] Snapshot inicial: ${snapshot.length} processos`);
@@ -137,7 +137,7 @@ function _emitInitialSnapshot() {
         notify('pm2:snapshot', {
             processes: snapshot,
             count: snapshot.length,
-            ts: Date.now()
+            ts: Date.now(),
         });
     });
 }
@@ -179,7 +179,7 @@ function _startHealthCheck() {
                     uptime: proc.pm2_env.pm_uptime ? Date.now() - proc.pm2_env.pm_uptime : 0,
                     memory: proc.monit ? proc.monit.memory : null,
                     cpu: proc.monit ? proc.monit.cpu : null,
-                    ts: Date.now()
+                    ts: Date.now(),
                 }));
 
             // Atualiza cache
@@ -189,7 +189,7 @@ function _startHealthCheck() {
             notify('pm2:metrics', {
                 processes: metrics,
                 count: metrics.length,
-                ts: Date.now()
+                ts: Date.now(),
             });
 
             log('DEBUG', `[PM2_BRIDGE] Health check OK: ${metrics.length} processos ativos`);
@@ -252,7 +252,7 @@ async function refreshSnapshot() {
                     uptime: proc.pm2_env.pm_uptime ? Date.now() - proc.pm2_env.pm_uptime : 0,
                     memory: proc.monit ? proc.monit.memory : null,
                     cpu: proc.monit ? proc.monit.cpu : null,
-                    ts: Date.now()
+                    ts: Date.now(),
                 }));
 
             // Atualiza cache

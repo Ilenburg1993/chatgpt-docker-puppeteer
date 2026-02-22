@@ -13,11 +13,7 @@ describe('RAG index lock recovery', () => {
         const paths = { lockPath, dbDir: path.join(root, 'db'), indexDir: root };
 
         try {
-            await fs.writeFile(
-                lockPath,
-                JSON.stringify({ pid: 999999, started_at: Date.now() }, null, 2),
-                'utf8'
-            );
+            await fs.writeFile(lockPath, JSON.stringify({ pid: 999999, started_at: Date.now() }, null, 2), 'utf8');
             const acquired = await acquireIndexLock(paths, { staleAfterMs: 6 * 60 * 60 * 1000 });
             assert.strictEqual(acquired.acquired, true);
 
@@ -36,11 +32,7 @@ describe('RAG index lock recovery', () => {
         const paths = { lockPath, dbDir: path.join(root, 'db'), indexDir: root };
 
         try {
-            await fs.writeFile(
-                lockPath,
-                JSON.stringify({ pid: process.pid, started_at: Date.now() }, null, 2),
-                'utf8'
-            );
+            await fs.writeFile(lockPath, JSON.stringify({ pid: process.pid, started_at: Date.now() }, null, 2), 'utf8');
             const acquired = await acquireIndexLock(paths, { staleAfterMs: 6 * 60 * 60 * 1000 });
             assert.strictEqual(acquired.acquired, false);
             assert.strictEqual(acquired.reason, 'LOCKED');

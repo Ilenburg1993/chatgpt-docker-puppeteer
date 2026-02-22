@@ -26,7 +26,7 @@ describe('Infra IO Operations - Operações de Entrada/Saída', () => {
             const taskData = {
                 id: 'task-001',
                 prompt: 'Teste',
-                target: 'gemini'
+                target: 'gemini',
             };
 
             fs.writeFileSync(taskPath, JSON.stringify(taskData));
@@ -60,7 +60,7 @@ describe('Infra IO Operations - Operações de Entrada/Saída', () => {
             const taskData = {
                 id: 'task-002',
                 prompt: 'Novo teste',
-                status: 'PENDING'
+                status: 'PENDING',
             };
 
             fs.writeFileSync(taskPath, JSON.stringify(taskData, null, 2));
@@ -250,7 +250,7 @@ describe('Infra IO Operations - Operações de Entrada/Saída', () => {
         it('deve ler e escrever UTF-8 corretamente', () => {
             const taskPath = path.join(testDir, 'utf8.json');
             const data = {
-                texto: 'Olá! 你好! مرحبا! 🎉'
+                texto: 'Olá! 你好! مرحبا! 🎉',
             };
 
             fs.writeFileSync(taskPath, JSON.stringify(data), 'utf-8');
@@ -280,7 +280,7 @@ describe('Infra IO Operations - Operações de Entrada/Saída', () => {
             // Simular (apenas estrutura - teste real precisa disco cheio)
             const simulateFullDisk = () => {
                 throw Object.assign(new Error('ENOSPC: no space left'), {
-                    code: 'ENOSPC'
+                    code: 'ENOSPC',
                 });
             };
 

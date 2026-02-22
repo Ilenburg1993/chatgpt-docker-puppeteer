@@ -19,6 +19,7 @@ const ROOT_DIR = path.join(__dirname, '..');
 // MONITOR CONTÍNUO
 // ============================================================================
 
+/** Classe exportada: DevelopmentMonitor. */
 class DevelopmentMonitor {
     constructor() {
         this.isRunning = false;

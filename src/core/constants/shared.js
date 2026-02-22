@@ -149,7 +149,7 @@ const DRIVER_DOMAINS = {
     IFRAME: 'iframe',
 
     /** Driver is in popup context */
-    POPUP: 'popup'
+    POPUP: 'popup',
 };
 
 /**
@@ -166,7 +166,7 @@ const COUNTER_DEFAULTS = {
     MIN: 0,
 
     /** Default maximum value for counters */
-    MAX_COUNTER: 999999
+    MAX_COUNTER: 999999,
 };
 
 /**
@@ -189,7 +189,7 @@ const ERROR_NAMES = {
     TARGET_DRIVER_ERROR: 'TargetDriverError',
 
     /** ChatGPT driver error */
-    CHATGPT_ERROR: 'ChatGPTError'
+    CHATGPT_ERROR: 'ChatGPTError',
 };
 
 /**
@@ -206,7 +206,7 @@ const DRIVER_NAMES = {
     GENERIC: 'Generic',
 
     /** ChatGPT driver */
-    CHATGPT: 'ChatGPT'
+    CHATGPT: 'ChatGPT',
 };
 
 /**
@@ -245,5 +245,5 @@ export {
     DRIVER_DOMAINS_ARRAY,
     COUNTER_DEFAULTS,
     ERROR_NAMES,
-    DRIVER_NAMES
+    DRIVER_NAMES,
 };

@@ -8,9 +8,7 @@
                 </p>
             </div>
             <div class="flex items-center gap-2">
-                <Button variant="secondary" :loading="loading" @click="refreshTasks">
-                    Refresh
-                </Button>
+                <Button variant="secondary" :loading="loading" @click="refreshTasks"> Refresh </Button>
             </div>
         </div>
 
@@ -58,9 +56,7 @@
                 <Input v-model="searchFilter" placeholder="Search by ID or prompt..." />
             </div>
 
-            <Button variant="ghost" :disabled="!hasActiveFilters" @click="clearFilters">
-                Clear Filters
-            </Button>
+            <Button variant="ghost" :disabled="!hasActiveFilters" @click="clearFilters"> Clear Filters </Button>
         </div>
 
         <!-- Loading -->
@@ -122,14 +118,15 @@
                     >
                         Retry
                     </Button>
-                    <Button size="sm" variant="danger" @click.stop="confirmDelete(task)">
-                        Delete
-                    </Button>
+                    <Button size="sm" variant="danger" @click.stop="confirmDelete(task)"> Delete </Button>
                 </div>
             </div>
 
             <!-- Empty state -->
-            <div v-if="filteredTasks.length === 0" class="rounded-xl border border-border bg-background-secondary p-10 text-center">
+            <div
+                v-if="filteredTasks.length === 0"
+                class="rounded-xl border border-border bg-background-secondary p-10 text-center"
+            >
                 <div class="text-4xl mb-3">📭</div>
                 <div class="text-base font-medium text-foreground">No tasks found</div>
                 <div class="mt-1 text-sm text-foreground-muted">
@@ -143,26 +140,13 @@
             <Button variant="outline" :disabled="failedCount === 0" @click="retryAllFailed">
                 Retry All Failed ({{ failedCount }})
             </Button>
-            <Button variant="danger" @click="confirmClearQueue">
-                Clear Queue
-            </Button>
+            <Button variant="danger" @click="confirmClearQueue"> Clear Queue </Button>
         </div>
 
-        <Modal
-            v-model:open="confirmOpen"
-            :title="confirmTitle"
-            :description="confirmDescription"
-            size="sm"
-        >
+        <Modal v-model:open="confirmOpen" :title="confirmTitle" :description="confirmDescription" size="sm">
             <template #footer>
                 <Button variant="ghost" :disabled="confirmLoading" @click="confirmOpen = false">Cancel</Button>
-                <Button
-                    :variant="confirmVariant"
-                    :loading="confirmLoading"
-                    @click="runConfirm"
-                >
-                    Confirm
-                </Button>
+                <Button :variant="confirmVariant" :loading="confirmLoading" @click="runConfirm"> Confirm </Button>
             </template>
         </Modal>
     </div>
@@ -206,13 +190,9 @@ export default {
         const loading = computed(() => taskStore.loading);
         const error = computed(() => taskStore.error);
 
-        const hasActiveFilters = computed(() =>
-            statusFilter.value || searchFilter.value
-        );
+        const hasActiveFilters = computed(() => statusFilter.value || searchFilter.value);
 
-        const failedCount = computed(() =>
-            tasks.value.filter(t => t.unified_status === 'FAILED').length
-        );
+        const failedCount = computed(() => tasks.value.filter(t => t.unified_status === 'FAILED').length);
 
         const confirmOpen = ref(false);
         const confirmTitle = ref('');
@@ -284,12 +264,12 @@ export default {
             taskStore.clearError();
         };
 
-        const viewTask = (task) => {
+        const viewTask = task => {
             const taskId = task.meta?.id || task.id;
             router.push(`/tasks/${taskId}`);
         };
 
-        const retryTask = async (task) => {
+        const retryTask = async task => {
             try {
                 showNotice('info', 'Retry is not implemented yet.');
             } catch (err) {
@@ -297,7 +277,7 @@ export default {
             }
         };
 
-        const confirmDelete = (task) => {
+        const confirmDelete = task => {
             const taskId = task.meta?.id || task.id;
             openConfirm({
                 title: 'Delete task',
@@ -306,7 +286,7 @@ export default {
                 action: async () => {
                     await taskStore.deleteTask(taskId);
                     showNotice('success', 'Task deleted');
-                }
+                },
             });
         };
 
@@ -327,18 +307,18 @@ export default {
                 action: async () => {
                     await taskStore.clearQueue();
                     showNotice('success', 'Queue cleared');
-                }
+                },
             });
         };
 
-        const getBadgeVariant = (status) => {
+        const getBadgeVariant = status => {
             const variants = {
                 RUNNING: 'warning',
                 PENDING: 'info',
                 DONE: 'success',
                 FAILED: 'error',
                 PAUSED: 'info',
-                CANCELLED: 'default'
+                CANCELLED: 'default',
             };
             return variants[status] || 'default';
         };
@@ -349,7 +329,7 @@ export default {
             return prompt.substring(0, maxLength) + '...';
         };
 
-        const formatDate = (dateStr) => {
+        const formatDate = dateStr => {
             if (!dateStr) return '';
             const date = new Date(dateStr);
             return date.toLocaleString();
@@ -401,8 +381,8 @@ export default {
             runConfirm,
             getBadgeVariant,
             truncatePrompt,
-            formatDate
+            formatDate,
         };
-    }
+    },
 };
 </script>

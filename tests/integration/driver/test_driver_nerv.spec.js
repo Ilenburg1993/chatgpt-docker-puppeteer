@@ -40,7 +40,7 @@ runTest('TEST 1: Driver - Zero importação direta do KERNEL', () => {
     const driverFiles = [
         'src/driver/DriverLifecycleManager.js',
         'src/driver/nerv_adapter/driver_nerv_adapter.js',
-        'src/driver/factory.js'
+        'src/driver/factory.js',
     ];
 
     for (const file of driverFiles) {
@@ -69,7 +69,7 @@ runTest('TEST 2: Driver - Zero importação direta do SERVER', () => {
     const driverFiles = [
         'src/driver/DriverLifecycleManager.js',
         'src/driver/nerv_adapter/driver_nerv_adapter.js',
-        'src/driver/factory.js'
+        'src/driver/factory.js',
     ];
 
     for (const file of driverFiles) {

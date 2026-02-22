@@ -210,12 +210,7 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
  * );
  */
 export async function withRetry(operation, options = {}) {
-    const {
-        maxRetries = 3,
-        timeoutMs = 5000,
-        backoffMs = 100,
-        shouldRetry = () => true
-    } = options;
+    const { maxRetries = 3, timeoutMs = 5000, backoffMs = 100, shouldRetry = () => true } = options;
 
     let lastError = null;
 
@@ -261,11 +256,12 @@ export async function withRetry(operation, options = {}) {
  * }
  */
 export function isAbortError(error) {
-    return error && (
-        error.name === 'AbortError' ||
-        error.code === 'ABORT_ERR' ||
-        error.code === 'TIMEOUT' ||
-        (error.message && error.message.includes('abort'))
+    return (
+        error &&
+        (error.name === 'AbortError' ||
+            error.code === 'ABORT_ERR' ||
+            error.code === 'TIMEOUT' ||
+            (error.message && error.message.includes('abort')))
     );
 }
 

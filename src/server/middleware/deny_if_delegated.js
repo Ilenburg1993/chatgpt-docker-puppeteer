@@ -13,7 +13,7 @@ function denyIfDelegated(req, res, next) {
             return res.status(403).json({
                 success: false,
                 error: 'Operation not permitted: server running in delegated mode',
-                request_id: req.id
+                request_id: req.id,
             });
         }
     } catch (e) {

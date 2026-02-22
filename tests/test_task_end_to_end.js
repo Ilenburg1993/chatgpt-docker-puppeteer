@@ -9,7 +9,6 @@ import { saveResponse } from '#infra/storage/response_adapter';
 // These tests need refactoring to use dependency injection or env-var-based path config.
 // The require() calls below have been replaced with no-op comments to prevent crashes.
 
-
 // Test directories
 const TEST_DIR = path.join(import.meta.dirname, 'temp_e2e_test');
 const QUEUE_DIR = path.join(TEST_DIR, 'fila');
@@ -587,6 +586,7 @@ async function testFullE2EFlow() {
 // TEST RUNNER
 // ============================================================================
 
+/** Função exportada: runAllTests. */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
     console.log('  Task Processing End-to-End Tests');

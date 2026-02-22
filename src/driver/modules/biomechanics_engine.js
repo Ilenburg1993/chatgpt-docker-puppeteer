@@ -59,7 +59,7 @@ const BIOMECH_CONFIG = {
     ECHO_THRESHOLD_SHORT: parseFloat(process.env.BIOMECH_ECHO_SHORT || '0.5'),
 
     /** TTL do cache de modifier (ms) - Default: 1h */
-    MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000')
+    MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000'),
 };
 
 /**
@@ -79,7 +79,7 @@ const MODIFIER_KEYS = {
     SHIFT: 'Shift',
 
     /** Alt key */
-    ALT: 'Alt'
+    ALT: 'Alt',
 };
 
 /**
@@ -140,7 +140,7 @@ const BIOMECH_EVENTS = {
     MODIFIERS_RELEASE_STARTED: 'biomech:modifiers_release_started',
 
     /** Emitido quando release de modifiers completa */
-    MODIFIERS_RELEASE_COMPLETED: 'biomech:modifiers_release_completed'
+    MODIFIERS_RELEASE_COMPLETED: 'biomech:modifiers_release_completed',
 };
 
 /**
@@ -235,7 +235,7 @@ class BiomechanicsEngine extends EventEmitter {
             keepAliveTriggered: 0,
             totalTypingDuration: 0,
             maxTypingDuration: 0,
-            totalCharsTyped: 0
+            totalCharsTyped: 0,
         };
     }
 
@@ -458,7 +458,7 @@ class BiomechanicsEngine extends EventEmitter {
         // ✅ BUG #4 fix: Timeout protection
         return Promise.race([
             this._executeGetStableRect(ctx, selector),
-            this._timeout(BIOMECH_CONFIG.STABLE_RECT_TIMEOUT_MS, 'getStableRect')
+            this._timeout(BIOMECH_CONFIG.STABLE_RECT_TIMEOUT_MS, 'getStableRect'),
         ]);
     }
 
@@ -759,7 +759,7 @@ class BiomechanicsEngine extends EventEmitter {
 
             await Promise.race([
                 this._executeTypeText(ctx, selector, text, signal),
-                this._timeout(timeout, 'typeText')
+                this._timeout(timeout, 'typeText'),
             ]);
 
             const duration = Date.now() - startTime;
@@ -771,7 +771,7 @@ class BiomechanicsEngine extends EventEmitter {
             this.emit(BIOMECH_EVENTS.TYPING_COMPLETED, {
                 selector,
                 length: text.length,
-                error: err.message
+                error: err.message,
             });
             throw err;
         }
@@ -813,7 +813,7 @@ class BiomechanicsEngine extends EventEmitter {
                 this.stats.totalTyping > 0
                     ? ((this.stats.zenModeActivations / this.stats.totalTyping) * 100).toFixed(2) + '%'
                     : '0%',
-            config: { ...BIOMECH_CONFIG }
+            config: { ...BIOMECH_CONFIG },
         };
     }
 

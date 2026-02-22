@@ -5,6 +5,7 @@ import * as adaptive from '#logic/adaptive';
 // ============================================
 // CONFIGURATION (Externalized from v2.0)
 // ============================================
+/** Constante/valor exportado: STABILIZER_CONFIG. */
 const STABILIZER_CONFIG = {
     // Network idle
     NETWORK_IDLE_TIME: 500, // ms to consider network idle
@@ -55,7 +56,7 @@ const STABILIZER_CONFIG = {
     PHASE_TIMEOUT_ENTROPY: 0.3, // 30% for DOM entropy
     PHASE_TIMEOUT_HYDRATION: 0.1, // 10% for hydration
     PHASE_TIMEOUT_FRAME: 0.1, // 10% for frame sync
-    PHASE_TIMEOUT_CPU: 0.1 // 10% for CPU lag
+    PHASE_TIMEOUT_CPU: 0.1, // 10% for CPU lag
 };
 
 // ============================================
@@ -134,7 +135,11 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                                 const rects = node.getClientRects();
                                 if (rects.length > 0 && node.offsetParent !== null) {
                                     const st = window.getComputedStyle(node);
-                                    if (st.display !== 'none' && st.visibility !== 'hidden' && parseFloat(st.opacity || '1') > 0.1) {
+                                    if (
+                                        st.display !== 'none' &&
+                                        st.visibility !== 'hidden' &&
+                                        parseFloat(st.opacity || '1') > 0.1
+                                    ) {
                                         const hasSize = Array.from(rects).some(r => r.width > 0 && r.height > 0);
                                         if (hasSize) return true;
                                     }
@@ -145,7 +150,11 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                             if (nodeWithShadow.shadowRoot && checkSpinnersDeep(nodeWithShadow.shadowRoot)) return true;
                             if (node.tagName === 'IFRAME') {
                                 try {
-                                    if (nodeWithContent.contentDocument && checkSpinnersDeep(nodeWithContent.contentDocument)) return true;
+                                    if (
+                                        nodeWithContent.contentDocument &&
+                                        checkSpinnersDeep(nodeWithContent.contentDocument)
+                                    )
+                                        return true;
                                 } catch (_err) {
                                     // Ignore cross-origin iframe access errors
                                 }
@@ -185,7 +194,6 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
     }
     return false;
 }
-
 
 // ============================================
 // MAIN STABILIZATION FUNCTION (v2.0 - Complete)
@@ -227,7 +235,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
         finalLag: null,
         domain: 'unknown',
         timeout: false,
-        lagMeasurements: []
+        lagMeasurements: [],
     };
 
     // Make result coercible to boolean for backward compatibility
@@ -239,7 +247,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
 
     const assertPageOpen = () => {
         if (isPageClosed()) {
-            throw new Error('page is closed');  
+            throw new Error('page is closed');
         }
     };
 
@@ -291,7 +299,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             try {
                 await page.waitForNetworkIdle({
                     idleTime: STABILIZER_CONFIG.NETWORK_IDLE_TIME,
-                    timeout: Math.max(1000, phase1Deadline - Date.now())
+                    timeout: Math.max(1000, phase1Deadline - Date.now()),
                 });
 
                 throwIfAborted('NETWORK_IDLE');
@@ -307,7 +315,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 driver._emitVital('PHASE_FAILURE', {
                     phase: 'NETWORK_IDLE',
                     error: err.message,
-                    recoverable: true
+                    recoverable: true,
                 });
                 result.phasesFailed.push('NETWORK_IDLE');
             }
@@ -432,8 +440,10 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                     let node = walker.nextNode();
                                     while (node) {
                                         if (node instanceof Element) {
-                                            const nodeWithShadow = /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
-                                            const nodeWithContent = /** @type {Element & {contentDocument?: Document|null}} */ (node);
+                                            const nodeWithShadow =
+                                                /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
+                                            const nodeWithContent =
+                                                /** @type {Element & {contentDocument?: Document|null}} */ (node);
                                             if (nodeWithShadow.shadowRoot) {
                                                 roots.push(nodeWithShadow.shadowRoot);
                                                 queue.push(nodeWithShadow.shadowRoot);
@@ -464,7 +474,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                             characterData: true,
                                             attributes: true,
                                             attributeFilter: ['class', 'aria-busy', 'data-loading', 'data-testid'],
-                                            attributeOldValue: false
+                                            attributeOldValue: false,
                                         });
                                         observers.push(obs);
                                         window.__STABILIZER_OBSERVERS.push(obs);
@@ -511,7 +521,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 driver._emitVital('PHASE_FAILURE', {
                     phase: 'DOM_ENTROPY',
                     error: evaluateErr.message,
-                    recoverable: true
+                    recoverable: true,
                 });
                 result.phasesFailed.push('DOM_ENTROPY');
             } finally {
@@ -631,7 +641,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                 requestAnimationFrame(() => requestAnimationFrame(r));
                             })
                     ),
-                    new Promise(r => setTimeout(r, STABILIZER_CONFIG.FRAME_SYNC_TIMEOUT))
+                    new Promise(r => setTimeout(r, STABILIZER_CONFIG.FRAME_SYNC_TIMEOUT)),
                 ]);
 
                 throwIfAborted('FRAME_SYNC');
@@ -671,7 +681,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 if (lag > STABILIZER_CONFIG.CPU_LAG_THRESHOLD) {
                     driver._emitVital('CPU_LAG_HIGH', {
                         lag,
-                        measurements: result.lagMeasurements.length
+                        measurements: result.lagMeasurements.length,
                     });
                     await new Promise(r => setTimeout(r, STABILIZER_CONFIG.CPU_LAG_RETRY_DELAY));
                 }
@@ -693,7 +703,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 phase: 'CPU_LAG',
                 duration: phase6Duration,
                 finalLag: lag,
-                measurements: result.lagMeasurements.length
+                measurements: result.lagMeasurements.length,
             });
             result.phasesCompleted.push('CPU_LAG');
         }
@@ -707,7 +717,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             duration: result.duration,
             phasesCompleted: result.phasesCompleted.length,
             phasesFailed: result.phasesFailed.length,
-            phasesSkipped: result.phasesSkipped.length
+            phasesSkipped: result.phasesSkipped.length,
         });
 
         return result;
@@ -739,7 +749,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('STABILITY_ERROR', {
                 error: message,
                 critical: true,
-                duration: result.duration
+                duration: result.duration,
             });
 
             if (e?.message && /page is closed/i.test(e.message)) {
@@ -755,14 +765,14 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             result.timeout = true;
             driver._emitVital('STABILITY_TIMEOUT', {
                 duration: result.duration,
-                error: msg
+                error: msg,
             });
         } else {
             log('WARN', `[STABILIZER] Stabilization error (${result.duration}ms): ${msg}`, correlationId);
             driver._emitVital('STABILITY_ERROR', {
                 error: msg,
                 critical: false,
-                duration: result.duration
+                duration: result.duration,
             });
         }
 

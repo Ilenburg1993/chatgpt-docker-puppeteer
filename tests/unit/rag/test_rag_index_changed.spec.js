@@ -31,7 +31,7 @@ describe('ragIndexChanged', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -53,7 +53,7 @@ describe('ragIndexChanged', () => {
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
                 profile: 'full',
-                changedPaths: ['a.ts']
+                changedPaths: ['a.ts'],
             });
 
             assert.strictEqual(report.changed_files, 1);
@@ -69,7 +69,7 @@ describe('ragIndexChanged', () => {
                 query: 'A = 999',
                 topK: 2,
                 paths: ragPaths,
-                embeddingsProvider: embeddings
+                embeddingsProvider: embeddings,
             });
 
             assert.ok(Array.isArray(query.results));
@@ -89,7 +89,7 @@ describe('ragIndexChanged', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -105,7 +105,7 @@ describe('ragIndexChanged', () => {
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
                 profile: 'full',
-                changedPaths: ['gone.ts']
+                changedPaths: ['gone.ts'],
             });
 
             assert.strictEqual(report.deleted_files, 1);

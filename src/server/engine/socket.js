@@ -75,7 +75,7 @@ function ensureConfigUpdatedListener() {
         log('INFO', `[HUB] Socket CORS allowlist atualizada (${dashboardAllowedOrigins.size} origens)`);
     };
 
-    if (typeof /** @type {any} */ (CONFIG).on === 'function') {
+    if (typeof (/** @type {any} */ (CONFIG).on) === 'function') {
         /** @type {any} */ (CONFIG).on('updated', configUpdatedHandler);
     }
 }
@@ -84,7 +84,7 @@ function removeConfigUpdatedListener() {
     if (!configUpdatedHandler) {
         return;
     }
-    if (typeof /** @type {any} */ (CONFIG).off === 'function') {
+    if (typeof (/** @type {any} */ (CONFIG).off) === 'function') {
         /** @type {any} */ (CONFIG).off('updated', configUpdatedHandler);
     }
     configUpdatedHandler = null;
@@ -543,17 +543,25 @@ function broadcastTaskUpdate(taskId, data) {
     }, 50); // 50ms debounce window
 }
 
+/** Constante/valor exportado: getRegistry. */
 export const getRegistry = () =>
     Array.from(agentRegistry.entries()).map(([robot_id, entry]) => ({
         robot_id,
         ...entry,
     }));
+/** Constante/valor exportado: getIO. */
 export const getIO = () => ioInstance;
+/** Constante/valor exportado: on. */
 export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
+/** Constante/valor exportado: once. */
 export const once = (eventName, handler) => internalEmitter.once(eventName, handler);
+/** Constante/valor exportado: off. */
 export const off = (eventName, handler) => internalEmitter.off(eventName, handler);
-export const emit = (eventName, ...args) => /** @type {import('node:events').EventEmitter} */ (internalEmitter).emit(eventName, ...args);
+/** Constante/valor exportado: emit. */
+export const emit = (eventName, ...args) =>
+    /** @type {import('node:events').EventEmitter} */ (internalEmitter).emit(eventName, ...args);
 
+/** Constante/valor exportado: sendToClient. */
 export const sendToClient = (clientId, eventName, data) => {
     if (!ioInstance) {
         log('WARN', '[HUB] Tentativa de enviar evento sem io instance');
@@ -567,6 +575,7 @@ export const sendToClient = (clientId, eventName, data) => {
     }
 };
 
+/** Constante/valor exportado: connectExternal. */
 export const connectExternal = async (port = 3008) => {
     const { io: ioClient } = await import('socket.io-client');
     const url = `http://localhost:${port}`;

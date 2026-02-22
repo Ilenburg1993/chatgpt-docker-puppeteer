@@ -16,8 +16,8 @@ na análise estática e dinâmica atual.
 
 ## 2. Status das Tarefas
 
-| ID     | Tarefa                                           | Status        | Prioridade |
-| :----- | :----------------------------------------------- | :------------ | :--------- |
+| ID     | Tarefa                                           | Status         | Prioridade |
+| :----- | :----------------------------------------------- | :------------- | :--------- |
 | **01** | **Análise Inicial e Varredura**                  | ✅ Concluído   | P0         |
 | **02** | **Consolidação de Pools (Hot/Cold)**             | ✅ Concluído   | P0         |
 | **03** | **Correção `ResilientLock` (No-Crash)**          | ✅ Concluído   | P0         |

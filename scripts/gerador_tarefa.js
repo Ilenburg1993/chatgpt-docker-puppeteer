@@ -67,7 +67,7 @@ function parseArgs(args) {
         prompt: [],
         template: null,
         after: null,
-        interactive: args.length === 0
+        interactive: args.length === 0,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -141,24 +141,24 @@ function createTask(opts, promptText) {
             created_at: new Date().toISOString(),
             priority: Math.max(0, Math.min(100, opts.prio)),
             source: 'cli',
-            tags: ['manual', ...opts.tags]
+            tags: ['manual', ...opts.tags],
         },
         spec: {
             target: opts.target.toLowerCase(),
             model: opts.model,
             payload: {
                 system_message: opts.system || '',
-                user_message: promptText
+                user_message: promptText,
             },
-            config: { reset_context: false }
+            config: { reset_context: false },
         },
         policy: {
             max_attempts: 3,
             timeout_ms: 'auto',
             dependencies: [],
-            execute_after: executeAfter
+            execute_after: executeAfter,
         },
-        state: { status: 'PENDING', attempts: 0, history: [] }
+        state: { status: 'PENDING', attempts: 0, history: [] },
     };
 
     try {
@@ -219,7 +219,7 @@ async function runInteractive() {
             target,
             system,
             after,
-            tags: []
+            tags: [],
         },
         prompt
     );

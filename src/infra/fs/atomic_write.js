@@ -18,10 +18,7 @@ async function atomicWrite(filepath, content, encoding) {
     const tmpPath = `${filepath}.tmp.${process.pid}.${uuid}`;
 
     try {
-        const isBinary =
-            content &&
-            (Buffer.isBuffer(content) ||
-                ArrayBuffer.isView(content));
+        const isBinary = content && (Buffer.isBuffer(content) || ArrayBuffer.isView(content));
         if (isBinary) {
             await fs.writeFile(tmpPath, content);
         } else {

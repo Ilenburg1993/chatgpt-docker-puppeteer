@@ -21,7 +21,7 @@ async function getHealth(req, res) {
             timestamp: Date.now(),
             uptime: process.uptime(),
             memory: process.memoryUsage(),
-            pid: process.pid
+            pid: process.pid,
         });
     } catch (err) {
         log('ERROR', `[HEALTH] Erro no health check: ${err.message}`);
@@ -51,14 +51,14 @@ async function getChromeHealth(req, res) {
                 status: 'ok',
                 endpoint: browserEndpoint.url,
                 wsEndpoint: browserEndpoint.wsEndpoint || null,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         } else {
             res.status(503).json({
                 status: 'unavailable',
                 endpoint: browserEndpoint.url,
                 message: 'Chrome não está respondendo no endpoint configurado',
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         }
     } catch (err) {
@@ -66,7 +66,7 @@ async function getChromeHealth(req, res) {
         res.status(500).json({
             status: 'error',
             message: err.message,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
     }
 }
@@ -82,7 +82,7 @@ async function getPm2Health(req, res) {
         res.json({
             status: 'ok',
             processes: snapshot || [],
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
     } catch (err) {
         log('ERROR', `[HEALTH] Erro no PM2 health check: ${err.message}`);

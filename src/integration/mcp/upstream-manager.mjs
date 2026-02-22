@@ -106,7 +106,7 @@ let _shutdownHookInstalled = false;
 const _shutdownHookHandlers = {
     exit: null,
     sigint: null,
-    sigterm: null
+    sigterm: null,
 };
 
 function ensureShutdownHook() {
@@ -170,6 +170,7 @@ function setOneStatus(next) {
     _status.upstreams.push(next);
 }
 
+/** Função exportada: getUpstreamStatus. */
 export function getUpstreamStatus() {
     // Return a shallow clone to avoid accidental mutation
     return { upstreams: _status.upstreams.map(u => ({ ...u })) };
@@ -217,7 +218,17 @@ export function parseUpstreamsFromEnv(env = process.env) {
                     const initTimeoutMs = raw.initTimeoutMs ? Number(raw.initTimeoutMs) : undefined;
                     const callTimeoutMs = raw.callTimeoutMs ? Number(raw.callTimeoutMs) : undefined;
 
-                    upstreams.push({ alias, transport, command, args, envFrom, toolPrefix, required, initTimeoutMs, callTimeoutMs });
+                    upstreams.push({
+                        alias,
+                        transport,
+                        command,
+                        args,
+                        envFrom,
+                        toolPrefix,
+                        required,
+                        initTimeoutMs,
+                        callTimeoutMs,
+                    });
                 }
             }
         }
@@ -249,7 +260,7 @@ export function parseUpstreamsFromEnv(env = process.env) {
             args,
             envFrom: ['GITHUB_PERSONAL_ACCESS_TOKEN'],
             toolPrefix,
-            required: false
+            required: false,
         });
     }
 
@@ -316,7 +327,11 @@ function scheduleRetry(cfg, registry, env, options) {
         existing.timer = null;
         _retryState.set(alias, existing);
         try {
-            const { status } = await registerOneUpstream(cfg, registry, env, { refresh: options.refresh, force: options.force, restart });
+            const { status } = await registerOneUpstream(cfg, registry, env, {
+                refresh: options.refresh,
+                force: options.force,
+                restart,
+            });
             setOneStatus(status);
         } catch {
             // ignore; registerOneUpstream already sets status + lastError
@@ -345,8 +360,8 @@ async function registerOneUpstream(cfg, registry, env, options) {
                     ...prev,
                     toolPrefix: prev.toolPrefix || cfg.toolPrefix,
                     required: typeof prev.required === 'boolean' ? prev.required : Boolean(cfg.required || false),
-                    state: prev.state || (prev.ready ? 'ready' : 'not-ready')
-                }
+                    state: prev.state || (prev.ready ? 'ready' : 'not-ready'),
+                },
             };
         }
         return {
@@ -354,22 +369,23 @@ async function registerOneUpstream(cfg, registry, env, options) {
                 alias: cfg.alias,
                 transport: cfg.transport,
                 toolPrefix: cfg.toolPrefix,
-                target: cfg.transport === 'http' ? String(cfg.url || '') : `${cfg.command} ${(cfg.args || []).join(' ')}`.trim(),
+                target:
+                    cfg.transport === 'http'
+                        ? String(cfg.url || '')
+                        : `${cfg.command} ${(cfg.args || []).join(' ')}`.trim(),
                 enabled: true,
                 required: Boolean(cfg.required || false),
                 ready: true,
                 registeredCount: 0,
                 lastInitAt: null,
                 lastError: null,
-                state: 'ready'
-            }
+                state: 'ready',
+            },
         };
     }
 
     const target =
-        cfg.transport === 'http'
-            ? String(cfg.url || '')
-            : `${cfg.command} ${(cfg.args || []).join(' ')}`.trim();
+        cfg.transport === 'http' ? String(cfg.url || '') : `${cfg.command} ${(cfg.args || []).join(' ')}`.trim();
 
     /** @type {UpstreamStatus} */
     const st = {
@@ -383,7 +399,7 @@ async function registerOneUpstream(cfg, registry, env, options) {
         registeredCount: 0,
         lastInitAt: new Date().toISOString(),
         lastError: null,
-        state: 'not-ready'
+        state: 'not-ready',
     };
     const prev = _status.upstreams.find(u => u.alias === cfg.alias);
     if (!refresh && prev && typeof prev.registeredCount === 'number') {
@@ -413,7 +429,7 @@ async function registerOneUpstream(cfg, registry, env, options) {
                             return await client.callTool({
                                 name: upstreamName,
                                 arguments: params,
-                                signal: execOptions.signal
+                                signal: execOptions.signal,
                             });
                         } catch (err) {
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
@@ -446,7 +462,7 @@ async function registerOneUpstream(cfg, registry, env, options) {
                     args: cfg.args || [],
                     env: childEnv,
                     initTimeoutMs: cfg.initTimeoutMs || Number(env.MCP_UPSTREAM_INIT_TIMEOUT_MS || 30000),
-                    callTimeoutMs: cfg.callTimeoutMs || Number(env.MCP_TOOL_TIMEOUT || 90000)
+                    callTimeoutMs: cfg.callTimeoutMs || Number(env.MCP_TOOL_TIMEOUT || 90000),
                 });
                 _stdioClients.set(cfg.alias, client);
             }
@@ -470,7 +486,7 @@ async function registerOneUpstream(cfg, registry, env, options) {
                             return await client.callTool({
                                 name: upstreamName,
                                 arguments: params,
-                                signal: execOptions.signal
+                                signal: execOptions.signal,
                             });
                         } catch (err) {
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
@@ -504,14 +520,16 @@ function markUpstreamCallFailure(cfg, err, registry, env, restart) {
         alias: cfg.alias,
         transport: cfg.transport,
         toolPrefix: cfg.toolPrefix,
-        target: prev?.target || (cfg.transport === 'http' ? String(cfg.url || '') : `${cfg.command} ${(cfg.args || []).join(' ')}`.trim()),
+        target:
+            prev?.target ||
+            (cfg.transport === 'http' ? String(cfg.url || '') : `${cfg.command} ${(cfg.args || []).join(' ')}`.trim()),
         enabled: true,
         required: Boolean(cfg.required || false),
         ready: false,
         registeredCount: typeof prev?.registeredCount === 'number' ? prev.registeredCount : 0,
         lastInitAt: prev?.lastInitAt || new Date().toISOString(),
         lastError: err && err.message ? err.message : String(err),
-        state: 'not-ready'
+        state: 'not-ready',
     };
     setOneStatus(next);
 
@@ -530,8 +548,7 @@ export async function registerUpstreams(registry, options = {}) {
     const env = options.env || process.env;
     const refresh = String(env.MCP_UPSTREAM_REFRESH || '') === 'true';
     const restart = getRestartConfig(env);
-    const installShutdownHook =
-        options.installShutdownHook ?? envFlag(env.MCP_UPSTREAM_INSTALL_GLOBAL_HOOK, true);
+    const installShutdownHook = options.installShutdownHook ?? envFlag(env.MCP_UPSTREAM_INSTALL_GLOBAL_HOOK, true);
 
     const configs = parseUpstreamsFromEnv(env);
     if (configs.length === 0) {
@@ -558,6 +575,7 @@ export async function registerUpstreams(registry, options = {}) {
     return getUpstreamStatus();
 }
 
+/** Função exportada: shutdownUpstreams. */
 export async function shutdownUpstreams() {
     for (const entry of _retryState.values()) {
         if (entry.timer) clearTimeout(entry.timer);

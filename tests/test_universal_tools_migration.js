@@ -13,7 +13,7 @@ const colors = {
     green: '\x1b[32m',
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
-    bold: '\x1b[1m'
+    bold: '\x1b[1m',
 };
 
 // ============================================
@@ -76,7 +76,7 @@ const newFiles = [
     'src/shared/biomechanics/human.js',
     'src/shared/page_stability/stabilizer.js',
     'src/shared/biomechanics/README.md',
-    'src/shared/page_stability/README.md'
+    'src/shared/page_stability/README.md',
 ];
 
 newFiles.forEach(file => {
@@ -99,7 +99,7 @@ const modulesToLoad = [
     { path: 'src/shared/page_stability/stabilizer.js', name: 'Page Stabilizer' },
     { path: 'src/driver/modules/biomechanics_engine.js', name: 'Biomechanics Engine' },
     { path: 'src/driver/modules/triage.js', name: 'Triage System' },
-    { path: 'src/driver/modules/recovery_system.js', name: 'Recovery System' }
+    { path: 'src/driver/modules/recovery_system.js', name: 'Recovery System' },
 ];
 
 for (const { path: modulePath, name } of modulesToLoad) {
@@ -134,7 +134,9 @@ try {
 }
 
 try {
-    const stabilizer = await import(pathToFileURL(path.join(process.cwd(), 'src/shared/page_stability/stabilizer.js')).href);
+    const stabilizer = await import(
+        pathToFileURL(path.join(process.cwd(), 'src/shared/page_stability/stabilizer.js')).href
+    );
 
     const stabilizerFunctions = ['waitForStability', 'measureEventLoopLag', 'getPageLoadStatus'];
     stabilizerFunctions.forEach(fn => {
@@ -158,18 +160,18 @@ const filesToCheck = [
     {
         path: 'src/driver/modules/biomechanics_engine.js',
         oldImports: ["require('./human')", "require('./stabilizer')"],
-        newImports: ["require('@shared/biomechanics/human')", "require('@shared/page_stability/stabilizer')"]
+        newImports: ["require('@shared/biomechanics/human')", "require('@shared/page_stability/stabilizer')"],
     },
     {
         path: 'src/driver/modules/triage.js',
         oldImports: ["require('./stabilizer')"],
-        newImports: ["require('@shared/page_stability/stabilizer')"]
+        newImports: ["require('@shared/page_stability/stabilizer')"],
     },
     {
         path: 'src/driver/modules/recovery_system.js',
         oldImports: ["require('./stabilizer')"],
-        newImports: ["require('@shared/page_stability/stabilizer')"]
-    }
+        newImports: ["require('@shared/page_stability/stabilizer')"],
+    },
 ];
 
 filesToCheck.forEach(({ path: filePath, oldImports, newImports }) => {
@@ -214,14 +216,14 @@ try {
             'src/shared/page_stability/stabilizer.js',
             'src/driver/modules/biomechanics_engine.js',
             'src/driver/modules/triage.js',
-            'src/driver/modules/recovery_system.js'
+            'src/driver/modules/recovery_system.js',
         ];
 
         filesToLint.forEach(file => {
             try {
                 execSync(`"${eslintPath}" "${file}" --max-warnings 0`, {
                     stdio: 'pipe',
-                    cwd: process.cwd()
+                    cwd: process.cwd(),
                 });
                 pass(`ESLint: ${file}`);
             } catch (err) {
@@ -246,12 +248,12 @@ section('Test 7: Verify README Content');
 const readmesToCheck = [
     {
         path: 'src/shared/biomechanics/README.md',
-        requiredSections: ['Overview', 'API Reference', 'humanClick', 'humanType', 'wakeUpMove']
+        requiredSections: ['Overview', 'API Reference', 'humanClick', 'humanType', 'wakeUpMove'],
     },
     {
         path: 'src/shared/page_stability/README.md',
-        requiredSections: ['Overview', 'API Reference', 'waitForStability', 'measureEventLoopLag', 'getPageLoadStatus']
-    }
+        requiredSections: ['Overview', 'API Reference', 'waitForStability', 'measureEventLoopLag', 'getPageLoadStatus'],
+    },
 ];
 
 readmesToCheck.forEach(({ path: readmePath, requiredSections }) => {

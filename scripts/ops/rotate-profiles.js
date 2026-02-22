@@ -53,7 +53,7 @@ async function rotateProfile() {
             rotated: true,
             backupPath,
             backupSizeMB: parseFloat(backupSizeMB),
-            timestamp
+            timestamp,
         };
     } catch (error) {
         log('ERROR', `[ROTATE] Erro ao rotacionar profile: ${error.message}`);
@@ -170,7 +170,7 @@ async function getBackupStats() {
             name: backup.name,
             sizeMB: parseFloat((size / 1024 / 1024).toFixed(2)),
             created: stats.birthtime,
-            ageDays: parseFloat(((Date.now() - stats.mtimeMs) / 1000 / 60 / 60 / 24).toFixed(1))
+            ageDays: parseFloat(((Date.now() - stats.mtimeMs) / 1000 / 60 / 60 / 24).toFixed(1)),
         });
     }
 
@@ -180,7 +180,7 @@ async function getBackupStats() {
     return {
         count: backups.length,
         totalSizeMB: parseFloat((totalSize / 1024 / 1024).toFixed(2)),
-        backups: backupDetails
+        backups: backupDetails,
     };
 }
 

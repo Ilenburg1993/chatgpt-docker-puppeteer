@@ -21,7 +21,9 @@ function parseBoolean(value, fallback = true) {
 }
 
 function resolveMetricMode(value, fallback = 'auto') {
-    const normalized = String(value || fallback).trim().toLowerCase();
+    const normalized = String(value || fallback)
+        .trim()
+        .toLowerCase();
     if (normalized === 'system' || normalized === 'process') return normalized;
     return 'auto';
 }
@@ -34,7 +36,8 @@ function sumCpuTimes(cpus) {
         const t = cpu?.times;
         if (!t) continue;
         const cpuIdle = Number(t.idle || 0);
-        const cpuTotal = Number(t.user || 0) + Number(t.nice || 0) + Number(t.sys || 0) + Number(t.idle || 0) + Number(t.irq || 0);
+        const cpuTotal =
+            Number(t.user || 0) + Number(t.nice || 0) + Number(t.sys || 0) + Number(t.idle || 0) + Number(t.irq || 0);
         idle += cpuIdle;
         total += cpuTotal;
     }
@@ -104,9 +107,7 @@ export class AdaptiveThrottler {
         const nowUsage = process.cpuUsage();
         const nowNs = process.hrtime.bigint();
         const elapsedUs = Number(nowNs - this.prevProcessTimeNs) / 1000;
-        const usedUs =
-            (nowUsage.user - this.prevProcessUsage.user) +
-            (nowUsage.system - this.prevProcessUsage.system);
+        const usedUs = nowUsage.user - this.prevProcessUsage.user + (nowUsage.system - this.prevProcessUsage.system);
 
         this.prevProcessUsage = nowUsage;
         this.prevProcessTimeNs = nowNs;
@@ -155,7 +156,7 @@ export class AdaptiveThrottler {
         this.lastLoggedAtMs = now;
         console.log(
             `[RAG][Adaptive] metric=${this.lastCpuSource} cpu=${avgCPU.toFixed(1)}% target=${this.targetCPU}% ` +
-            `delay ${oldDelay.toFixed(0)}ms -> ${this.currentDelay.toFixed(0)}ms (${action})`
+                `delay ${oldDelay.toFixed(0)}ms -> ${this.currentDelay.toFixed(0)}ms (${action})`
         );
     }
 
@@ -165,7 +166,7 @@ export class AdaptiveThrottler {
      */
     async throttle() {
         if (!this.enabled) {
-            await new Promise((resolve) => setTimeout(resolve, this.currentDelay));
+            await new Promise(resolve => setTimeout(resolve, this.currentDelay));
             return { cpu: null, delay: this.currentDelay, action: 'disabled', metric: this.lastCpuSource };
         }
 
@@ -202,7 +203,7 @@ export class AdaptiveThrottler {
         this.currentDelay = clamp(this.currentDelay, this.minDelay, this.maxDelay);
         this.maybeLogAdjustment(action, avgCPU, oldDelay);
 
-        await new Promise((resolve) => setTimeout(resolve, this.currentDelay));
+        await new Promise(resolve => setTimeout(resolve, this.currentDelay));
         return { cpu: avgCPU, delay: this.currentDelay, action, metric: this.lastCpuSource };
     }
 
@@ -210,9 +211,7 @@ export class AdaptiveThrottler {
      * Get current stats for reporting.
      */
     getStats() {
-        const avgCPU = this.samples.length > 0
-            ? this.samples.reduce((a, b) => a + b, 0) / this.samples.length
-            : 0;
+        const avgCPU = this.samples.length > 0 ? this.samples.reduce((a, b) => a + b, 0) / this.samples.length : 0;
 
         return {
             enabled: this.enabled,
@@ -225,26 +224,27 @@ export class AdaptiveThrottler {
             maxDelay: this.maxDelay,
             sampleSize: this.sampleSize,
             sampleIntervalMs: this.sampleIntervalMs,
-            samples: this.samples.length
+            samples: this.samples.length,
         };
     }
 }
 
 export function createRagAdaptiveThrottler(options = {}) {
     const mode = String(options.mode || 'full') === 'incremental' ? 'incremental' : 'full';
-    const defaults = mode === 'incremental'
-        ? {
-            targetCPU: 72,
-            minDelay: 40,
-            maxDelay: 4000,
-            initialDelay: 180
-        }
-        : {
-            targetCPU: 72,
-            minDelay: 60,
-            maxDelay: 5000,
-            initialDelay: 260
-        };
+    const defaults =
+        mode === 'incremental'
+            ? {
+                  targetCPU: 72,
+                  minDelay: 40,
+                  maxDelay: 4000,
+                  initialDelay: 180,
+              }
+            : {
+                  targetCPU: 72,
+                  minDelay: 60,
+                  maxDelay: 5000,
+                  initialDelay: 260,
+              };
 
     const metric = resolveMetricMode(process.env.RAG_THROTTLE_METRIC, 'auto');
     const enabled = parseBoolean(process.env.RAG_THROTTLE_ENABLED, true);
@@ -263,6 +263,6 @@ export function createRagAdaptiveThrottler(options = {}) {
         highWatermark: parseNumber(process.env.RAG_THROTTLE_HIGH_WATERMARK_PCT, 8),
         lowWatermark: parseNumber(process.env.RAG_THROTTLE_LOW_WATERMARK_PCT, 15),
         logCooldownMs: parseIntSafe(process.env.RAG_THROTTLE_LOG_COOLDOWN_MS, 4000),
-        ...options
+        ...options,
     });
 }

@@ -8,7 +8,7 @@ const registryStub = {
     has() {
         return false;
     },
-    register() {}
+    register() {},
 };
 
 function captureCounts(events) {
@@ -48,7 +48,7 @@ test('wave6: upstream manager installs and removes listeners deterministically w
         MCP_UPSTREAM_ENABLED: 'true',
         MCP_UPSTREAM_URL: 'http://127.0.0.1:1',
         MCP_UPSTREAM_ALIAS: 'wave6_dummy',
-        MCP_UPSTREAM_RESTART_ENABLED: 'false'
+        MCP_UPSTREAM_RESTART_ENABLED: 'false',
     };
 
     try {

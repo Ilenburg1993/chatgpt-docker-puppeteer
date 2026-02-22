@@ -10,7 +10,7 @@ class MockNERV extends EventEmitter {
         super();
         this.buffers = {
             dequeueInbound: () => null,
-            dequeueOutbound: () => null
+            dequeueOutbound: () => null,
         };
         this.emittedCommands = [];
         this.emittedEvents = [];
@@ -82,20 +82,20 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                     version: '5.0',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: 'chatgpt',
                     payload: { user_message: 'Test prompt' },
                     execution: { strategy: 'SINGLE_SHOT' },
-                    validation: { validators: [] }
+                    validation: { validators: [] },
                 },
                 state: {
                     status: 'pending',
                     created_at: new Date().toISOString(),
-                    history: []
+                    history: [],
                 },
-                policy: { max_cost_cents: 100, dependencies: [] }
+                policy: { max_cost_cents: 100, dependencies: [] },
             };
 
             await kernel.executeTask(taskV5, 'corr-001');
@@ -118,9 +118,9 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
         });
     });
 
-	    describe('2b. Retry scheduling', () => {
-	        it('should keep dispatch payload available until retry handler consumes it', async () => {
-	            kernel.start();
+    describe('2b. Retry scheduling', () => {
+        it('should keep dispatch payload available until retry handler consumes it', async () => {
+            kernel.start();
 
             const retryableTask = {
                 meta: {
@@ -128,49 +128,53 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                     version: '5.0',
                     created_at: new Date().toISOString(),
                     priority: 5,
-                    source: 'manual'
+                    source: 'manual',
                 },
                 spec: {
                     target: 'chatgpt',
                     payload: { user_message: 'Trigger retry path' },
                     execution: { strategy: 'SINGLE_SHOT' },
-                    validation: { validators: [] }
+                    validation: { validators: [] },
                 },
                 state: {
                     status: 'pending',
                     created_at: new Date().toISOString(),
-                    history: []
+                    history: [],
                 },
-                policy: { max_cost_cents: 100, dependencies: [] }
+                policy: { max_cost_cents: 100, dependencies: [] },
             };
 
             await kernel.executeTask(retryableTask, 'corr-retry-001');
             assert.strictEqual(nerv.emittedCommands.length, 1, 'Primeiro dispatch enviado ao driver');
 
             // Simula falha retryable do driver
-	            nerv.receive({
-	                messageType: MessageType.EVENT,
-	                actionCode: ActionCode.DRIVER_TASK_FAILED,
-	                correlationId: 'corr-retry-001',
-	                payload: {
-	                    taskId: 'task-retry-payload',
-	                    retryable: true,
-	                    suggestedDelayMs: 0,
-	                    reason: 'driver transient failure',
-	                    error: 'transient'
-	                }
-	            });
+            nerv.receive({
+                messageType: MessageType.EVENT,
+                actionCode: ActionCode.DRIVER_TASK_FAILED,
+                correlationId: 'corr-retry-001',
+                payload: {
+                    taskId: 'task-retry-payload',
+                    retryable: true,
+                    suggestedDelayMs: 0,
+                    reason: 'driver transient failure',
+                    error: 'transient',
+                },
+            });
 
-	            // No novo modelo SSOT, o Kernel NÃO re-dispatcha retries.
-	            // Ele encerra/limpa runtime e deixa o worker/DB reagendar.
-	            await new Promise(resolve => setTimeout(resolve, 25));
+            // No novo modelo SSOT, o Kernel NÃO re-dispatcha retries.
+            // Ele encerra/limpa runtime e deixa o worker/DB reagendar.
+            await new Promise(resolve => setTimeout(resolve, 25));
 
-	            assert.strictEqual(nerv.emittedCommands.length, 1, 'Kernel não deve reenviar task no caminho de retry');
-	            assert.strictEqual(kernel.getTask('task-retry-payload'), null, 'runtime deve ser esquecido após retry solicitado');
+            assert.strictEqual(nerv.emittedCommands.length, 1, 'Kernel não deve reenviar task no caminho de retry');
+            assert.strictEqual(
+                kernel.getTask('task-retry-payload'),
+                null,
+                'runtime deve ser esquecido após retry solicitado'
+            );
 
-	            kernel.stop();
-	        });
-	    });
+            kernel.stop();
+        });
+    });
 
     describe('3. Task execution flow (ITERATIVE strategy)', () => {
         it('should execute task V5 with ITERATIVE strategy and handle RETRY', async () => {
@@ -182,7 +186,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                     version: '5.0',
                     created_at: new Date().toISOString(),
                     priority: 8,
-                    source: 'api'
+                    source: 'api',
                 },
                 spec: {
                     target: 'chatgpt',
@@ -191,19 +195,19 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                         strategy: 'ITERATIVE',
                         iterative_config: {
                             max_iterations: 3,
-                            validation_criteria: { min_quality_score: 75 }
-                        }
+                            validation_criteria: { min_quality_score: 75 },
+                        },
                     },
                     validation: {
-                        validators: [{ type: 'length', config: { min_length: 500 } }]
-                    }
+                        validators: [{ type: 'length', config: { min_length: 500 } }],
+                    },
                 },
                 state: {
                     status: 'pending',
                     created_at: new Date().toISOString(),
-                    history: []
+                    history: [],
                 },
-                policy: { max_cost_cents: 300, dependencies: [] }
+                policy: { max_cost_cents: 300, dependencies: [] },
             };
 
             await kernel.executeTask(taskV5, 'corr-002');
@@ -220,9 +224,9 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                     taskId: 'task-iterative',
                     result: {
                         output: 'Short text',
-                        raw_output_preview: 'Short text'
-                    }
-                }
+                        raw_output_preview: 'Short text',
+                    },
+                },
             });
 
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -242,7 +246,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                     created_at: new Date().toISOString(),
                     priority: 5,
                     source: 'manual',
-                    workflow_id: 'workflow-001'
+                    workflow_id: 'workflow-001',
                 },
                 spec: {
                     target: 'chatgpt',
@@ -252,18 +256,18 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                         workflow_config: {
                             steps: [
                                 { id: 'step-1', action: 'execute_prompt', config: { prompt: 'Step 1' } },
-                                { id: 'step-2', action: 'execute_prompt', config: { prompt: 'Step 2' } }
-                            ]
-                        }
+                                { id: 'step-2', action: 'execute_prompt', config: { prompt: 'Step 2' } },
+                            ],
+                        },
                     },
-                    validation: { validators: [] }
+                    validation: { validators: [] },
                 },
                 state: {
                     status: 'pending',
                     created_at: new Date().toISOString(),
-                    history: []
+                    history: [],
                 },
-                policy: { max_cost_cents: 200, dependencies: [] }
+                policy: { max_cost_cents: 200, dependencies: [] },
             };
 
             await kernel.executeTask(taskV5, 'corr-003');
@@ -318,7 +322,7 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
             afterTaskExecution: async (task, result) => ({ action: 'DONE', task, feedback: null }),
             processOrchestrationDecision: async (decision, correlationId) => {},
             emitCommand: params => nerv.emitCommand(params),
-            emitEvent: params => nerv.emitEvent(params)
+            emitEvent: params => nerv.emitEvent(params),
         };
 
         const { TaskExecutionOrchestrator } = await import('#kernel/task_execution_orchestrator');
@@ -329,7 +333,7 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
         it('should call beforeTaskExecution and emit DRIVER_EXECUTE_TASK', async () => {
             const task = {
                 meta: { id: 'task-001', version: '5.0' },
-                spec: { target: 'chatgpt', execution: { strategy: 'SINGLE_SHOT' } }
+                spec: { target: 'chatgpt', execution: { strategy: 'SINGLE_SHOT' } },
             };
 
             await orchestrator.executeTask(task, 'corr-test');
@@ -341,7 +345,7 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
         it('should track active executions', async () => {
             const task = {
                 meta: { id: 'task-tracked', version: '5.0' },
-                spec: { target: 'chatgpt', execution: { strategy: 'SINGLE_SHOT' } }
+                spec: { target: 'chatgpt', execution: { strategy: 'SINGLE_SHOT' } },
             };
 
             await orchestrator.executeTask(task, 'corr-tracked');
@@ -355,7 +359,7 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
         it('should clear active executions', async () => {
             const task = {
                 meta: { id: 'task-cleanup', version: '5.0' },
-                spec: { target: 'chatgpt', execution: { strategy: 'SINGLE_SHOT' } }
+                spec: { target: 'chatgpt', execution: { strategy: 'SINGLE_SHOT' } },
             };
 
             await orchestrator.executeTask(task, 'corr-cleanup');

@@ -23,10 +23,10 @@ try {
             stream: false,
             options: {
                 temperature: 0.3,
-                num_predict: 150
-            }
+                num_predict: 150,
+            },
         }),
-        signal: AbortSignal.timeout(60000)
+        signal: AbortSignal.timeout(60000),
     });
 
     if (!response.ok) {
@@ -61,10 +61,10 @@ try {
             stream: false,
             options: {
                 temperature: 0.7,
-                num_predict: 150
-            }
+                num_predict: 150,
+            },
         }),
-        signal: AbortSignal.timeout(60000)
+        signal: AbortSignal.timeout(60000),
     });
 
     if (!response.ok) {

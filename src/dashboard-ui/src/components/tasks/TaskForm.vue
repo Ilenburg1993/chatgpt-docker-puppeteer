@@ -142,9 +142,8 @@ const handleSubmit = async () => {
         emit('submit', taskData);
         handleClose();
     } catch (error) {
-        const errorMessage = error?.response?.data?.message ||
-                           error?.message ||
-                           'Erro ao enviar formulário. Tente novamente.';
+        const errorMessage =
+            error?.response?.data?.message || error?.message || 'Erro ao enviar formulário. Tente novamente.';
         showError(errorMessage);
     } finally {
         loading.value = false;

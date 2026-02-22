@@ -2,6 +2,7 @@
 import { createEnvelope } from '#shared/nerv/envelope';
 import { MessageType } from '#shared/nerv/constants';
 
+/** Função exportada: makeEnvelope. */
 function makeEnvelope({ actor, target = null, messageType, actionCode, payload = {}, correlationId = null }) {
     return createEnvelope({ actor, target, messageType, actionCode, payload, correlationId });
 }
@@ -25,7 +26,7 @@ async function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = 
         messageType: MessageType.EVENT,
         actionCode,
         payload,
-        correlationId
+        correlationId,
     });
     if (!nerv || typeof nerv.emitEvent !== 'function') {
         throw new Error('NERV instance with emitEvent required');
@@ -53,7 +54,7 @@ async function sendCommand(nerv, actor, actionCode, payload = {}, correlationId 
         messageType: MessageType.COMMAND,
         actionCode,
         payload,
-        correlationId
+        correlationId,
     });
     if (!nerv || typeof nerv.emitCommand !== 'function') {
         throw new Error('NERV instance with emitCommand required');
@@ -80,7 +81,7 @@ async function sendAck(nerv, actor, actionCode, correlationId = null, target = n
         messageType: MessageType.ACK,
         actionCode,
         payload: {},
-        correlationId
+        correlationId,
     });
     if (!nerv || typeof nerv.emitAck !== 'function') {
         throw new Error('NERV instance with emitAck required');

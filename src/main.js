@@ -259,10 +259,7 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
         process.env.SPLIT_CONNECT_RETRY_BASE_MS ?? process.env.BOOT_RETRY_BASE_MS,
         1000
     );
-    const maxDelayMs = readPositiveInt(
-        process.env.SPLIT_CONNECT_RETRY_MAX_MS ?? process.env.BOOT_RETRY_MAX_MS,
-        8000
-    );
+    const maxDelayMs = readPositiveInt(process.env.SPLIT_CONNECT_RETRY_MAX_MS ?? process.env.BOOT_RETRY_MAX_MS, 8000);
     const waitForHealth = process.env.SPLIT_WAIT_HEALTH === 'true';
     let attempt = 0;
     try {
@@ -657,7 +654,10 @@ async function boot() {
                     const validStrategies = new Set(['round-robin', 'least-loaded', 'target-affinity']);
                     return validStrategies.has(strategyRaw) ? strategyRaw : 'round-robin';
                 })(),
-                healthCheckInterval: readPositiveInt(process.env.HEALTH_CHECK_INTERVAL ?? CONFIG.HEALTH_CHECK_INTERVAL, 30000),
+                healthCheckInterval: readPositiveInt(
+                    process.env.HEALTH_CHECK_INTERVAL ?? CONFIG.HEALTH_CHECK_INTERVAL,
+                    30000
+                ),
                 pageTtlMs: readPositiveInt(process.env.BROWSER_PAGE_TTL_MS ?? CONFIG.BROWSER_PAGE_TTL_MS, 3600000),
                 allocateMaxAttempts: readPositiveInt(
                     process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ?? CONFIG.BROWSER_ALLOCATE_MAX_ATTEMPTS,
@@ -1960,6 +1960,10 @@ function __resetShutdownStateForTests() {
     _shutdownPromise = null;
 }
 
+/**
+ * Hooks de teste do entrypoint principal.
+ * Expostos para regressões de lifecycle/sinais sem acionar bootstrap real do processo.
+ */
 const __mainTestHooks = Object.freeze({
     setupSignalHandlers,
     cleanupSignalHandlers,

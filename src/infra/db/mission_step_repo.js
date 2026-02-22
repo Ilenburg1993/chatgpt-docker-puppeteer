@@ -2,6 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
+/** Constante/valor exportado: STEP_STATUS. */
 const STEP_STATUS = Object.freeze({
     PENDING: 'PENDING',
     RUNNING: 'RUNNING',
@@ -32,6 +33,7 @@ function _rowToStep(row) {
     };
 }
 
+/** Função exportada: listMissionSteps. */
 function listMissionSteps(missionId) {
     const db = getDb();
     const rows = db
@@ -48,6 +50,7 @@ function listMissionSteps(missionId) {
     return rows.map(_rowToStep).filter(Boolean);
 }
 
+/** Função exportada: getMissionStep. */
 function getMissionStep(missionId, stepId, attemptSeq = null) {
     const db = getDb();
     const mission = String(missionId || '').trim();
@@ -81,6 +84,7 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
     return _rowToStep(row);
 }
 
+/** Função exportada: syncMissionStepsFromWorkflow. */
 function syncMissionStepsFromWorkflow(missionId, workflow) {
     const db = getDb();
     const mission = String(missionId || '').trim();
@@ -153,6 +157,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
     return listMissionSteps(mission);
 }
 
+/** Função exportada: markMissionStepStatus. */
 function markMissionStepStatus({
     missionId,
     stepId,
@@ -192,6 +197,7 @@ function markMissionStepStatus({
     return getMissionStep(mission, step, existing.attempt_seq);
 }
 
+/** Função exportada: createNextStepAttempt. */
 function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 }) {
     const db = getDb();
     const mission = String(missionId || '').trim();

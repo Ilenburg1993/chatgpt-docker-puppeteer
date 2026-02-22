@@ -160,9 +160,11 @@ async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', 
     // ✅ P1-22: Validate artifact size before writing to prevent disk exhaustion
     const sizeBytes = Buffer.byteLength(body, 'utf8');
     if (sizeBytes > MAX_TEXT_ARTIFACT_BYTES) {
-        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (new Error(
-            `Text artifact size ${sizeBytes} bytes exceeds limit ${MAX_TEXT_ARTIFACT_BYTES} bytes (${(MAX_TEXT_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
-        ));
+        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (
+            new Error(
+                `Text artifact size ${sizeBytes} bytes exceeds limit ${MAX_TEXT_ARTIFACT_BYTES} bytes (${(MAX_TEXT_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
+            )
+        );
         error.code = 'ARTIFACT_SIZE_LIMIT_EXCEEDED';
         error.sizeBytes = sizeBytes;
         error.maxBytes = MAX_TEXT_ARTIFACT_BYTES;
@@ -223,9 +225,11 @@ async function putBuffer({
 
     // ✅ P1-22: Validate artifact size before writing to prevent disk exhaustion
     if (body.length > MAX_BINARY_ARTIFACT_BYTES) {
-        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (new Error(
-            `Binary artifact size ${body.length} bytes exceeds limit ${MAX_BINARY_ARTIFACT_BYTES} bytes (${(MAX_BINARY_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
-        ));
+        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (
+            new Error(
+                `Binary artifact size ${body.length} bytes exceeds limit ${MAX_BINARY_ARTIFACT_BYTES} bytes (${(MAX_BINARY_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
+            )
+        );
         error.code = 'ARTIFACT_SIZE_LIMIT_EXCEEDED';
         error.sizeBytes = body.length;
         error.maxBytes = MAX_BINARY_ARTIFACT_BYTES;
@@ -261,9 +265,11 @@ async function putJson({ kind, json, relPath, ext = 'json', mime = 'application/
     // ✅ P1-22: Validate JSON artifact size before writing (stricter limit than text)
     const sizeBytes = Buffer.byteLength(body, 'utf8');
     if (sizeBytes > MAX_JSON_ARTIFACT_BYTES) {
-        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (new Error(
-            `JSON artifact size ${sizeBytes} bytes exceeds limit ${MAX_JSON_ARTIFACT_BYTES} bytes (${(MAX_JSON_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
-        ));
+        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (
+            new Error(
+                `JSON artifact size ${sizeBytes} bytes exceeds limit ${MAX_JSON_ARTIFACT_BYTES} bytes (${(MAX_JSON_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
+            )
+        );
         error.code = 'ARTIFACT_SIZE_LIMIT_EXCEEDED';
         error.sizeBytes = sizeBytes;
         error.maxBytes = MAX_JSON_ARTIFACT_BYTES;
@@ -375,4 +381,15 @@ async function deleteArtifact(artifactId) {
     return true;
 }
 
-export { _resolveArtifactsRoot, _isUnderRoot, putText, putBuffer, putJson, resolveUri, readText, readBuffer, stat, deleteArtifact };
+export {
+    _resolveArtifactsRoot,
+    _isUnderRoot,
+    putText,
+    putBuffer,
+    putJson,
+    resolveUri,
+    readText,
+    readBuffer,
+    stat,
+    deleteArtifact,
+};

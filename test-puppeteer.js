@@ -13,7 +13,7 @@ const puppeteer = require('puppeteer');
         console.log('[TEST] Conectando via WebSocket direto...');
         const browser = await puppeteer.connect({
             browserWSEndpoint: wsEndpoint,
-            defaultViewport: null
+            defaultViewport: null,
         });
 
         console.log('[TEST] Conectado com sucesso');
@@ -23,7 +23,7 @@ const puppeteer = require('puppeteer');
 
         await page.goto('https://example.com', {
             waitUntil: 'networkidle2',
-            timeout: 60000
+            timeout: 60000,
         });
 
         console.log('[TEST] Página carregada');

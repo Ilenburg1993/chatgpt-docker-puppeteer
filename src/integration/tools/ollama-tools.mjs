@@ -11,31 +11,30 @@ import { z } from 'zod';
 import { ollama } from '../../../tools/ollama/client.mjs';
 
 const OllamaGenerateSchema = z.object({
-    prompt: z.string()
+    prompt: z
+        .string()
         .min(1, 'Prompt cannot be empty')
         .max(10000, 'Prompt too long (max 10000 chars) - potential DoS attack'),
-    model: z.string()
+    model: z
+        .string()
         .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
         .optional(),
     runtime: z.enum(['auto', 'cloud', 'local']).optional(),
-    temperature: z.number()
-        .min(0, 'Temperature must be >= 0')
-        .max(2, 'Temperature must be <= 2')
-        .optional(),
-    max_tokens: z.number()
+    temperature: z.number().min(0, 'Temperature must be >= 0').max(2, 'Temperature must be <= 2').optional(),
+    max_tokens: z
+        .number()
         .int('max_tokens must be an integer')
         .min(1, 'max_tokens must be >= 1')
         .max(4000, 'max_tokens cannot exceed 4000 - potential DoS attack')
-        .optional()
+        .optional(),
 });
 
 const OllamaEmbedSchema = z.object({
-    text: z.string()
-        .min(1, 'Text cannot be empty')
-        .max(8000, 'Text too long (max 8000 chars) - potential DoS attack'),
-    model: z.string()
+    text: z.string().min(1, 'Text cannot be empty').max(8000, 'Text too long (max 8000 chars) - potential DoS attack'),
+    model: z
+        .string()
         .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
-        .optional()
+        .optional(),
 });
 
 function formatModelBlock(models) {
@@ -70,19 +69,13 @@ async function ollamaGenerateHandler(params, options = {}) {
         throw error;
     }
 
-    const {
-        prompt,
-        model,
-        runtime = 'auto',
-        temperature = 0.7,
-        max_tokens
-    } = validated;
+    const { prompt, model, runtime = 'auto', temperature = 0.7, max_tokens } = validated;
 
     const selectedModel = model || process.env.OLLAMA_DEFAULT_MODEL || 'qwen3-coder-next';
     const selectedMaxTokens = max_tokens || Number(process.env.OLLAMA_MAX_TOKENS || 1000);
 
     if (options.signal?.aborted) {
-        throw new Error('Generation cancelled before execution');  
+        throw new Error('Generation cancelled before execution');
     }
 
     try {
@@ -90,7 +83,7 @@ async function ollamaGenerateHandler(params, options = {}) {
             temperature,
             num_predict: selectedMaxTokens,
             runtime,
-            signal: options.signal
+            signal: options.signal,
         });
 
         let formatted = '# Ollama Generation\n\n';
@@ -131,12 +124,12 @@ async function ollamaEmbedHandler(params, options = {}) {
     const { text, model = 'nomic-embed-text' } = validated;
 
     if (options.signal?.aborted) {
-        throw new Error('Embedding cancelled before execution');  
+        throw new Error('Embedding cancelled before execution');
     }
 
     try {
         const embedding = await ollama.embed(text, model, {
-            signal: options.signal
+            signal: options.signal,
         });
 
         let formatted = '# Ollama Embedding\n\n';
@@ -145,7 +138,10 @@ async function ollamaEmbedHandler(params, options = {}) {
         formatted += `**Input Text:** "${text.slice(0, 100)}${text.length > 100 ? '...' : ''}"\n`;
         formatted += `**Dimensions:** ${embedding.length}\n\n`;
         formatted += '**First 10 values:**\n```\n';
-        formatted += embedding.slice(0, 10).map((v, i) => `[${i}]: ${v.toFixed(6)}`).join('\n');
+        formatted += embedding
+            .slice(0, 10)
+            .map((v, i) => `[${i}]: ${v.toFixed(6)}`)
+            .join('\n');
         formatted += '\n```\n\n';
         formatted += '**Statistics:**\n';
         formatted += `- Min: ${Math.min(...embedding).toFixed(6)}\n`;
@@ -230,35 +226,35 @@ Embeddings remain local-only in a separate tool (ollama_embed).`,
                 properties: {
                     prompt: {
                         type: 'string',
-                        description: 'The prompt to generate from'
+                        description: 'The prompt to generate from',
                     },
                     model: {
                         type: 'string',
-                        description: 'Model name (default: OLLAMA_DEFAULT_MODEL)'
+                        description: 'Model name (default: OLLAMA_DEFAULT_MODEL)',
                     },
                     runtime: {
                         type: 'string',
                         description: 'Runtime policy for non-embedding (default: auto = cloud-first)',
                         enum: ['auto', 'cloud', 'local'],
-                        default: 'auto'
+                        default: 'auto',
                     },
                     temperature: {
                         type: 'number',
                         description: 'Temperature 0-2 (default: 0.7)',
                         default: 0.7,
                         minimum: 0,
-                        maximum: 2
+                        maximum: 2,
                     },
                     max_tokens: {
                         type: 'number',
                         description: 'Maximum tokens to generate (default: 1000)',
                         default: 1000,
                         minimum: 1,
-                        maximum: 4000
-                    }
+                        maximum: 4000,
+                    },
                 },
-                required: ['prompt']
-            }
+                required: ['prompt'],
+            },
         },
         ollamaGenerateHandler
     );
@@ -276,16 +272,16 @@ Important:
                 properties: {
                     text: {
                         type: 'string',
-                        description: 'Text to embed (code, docs, query, etc.)'
+                        description: 'Text to embed (code, docs, query, etc.)',
                     },
                     model: {
                         type: 'string',
                         description: 'Embedding model (default: nomic-embed-text)',
-                        default: 'nomic-embed-text'
-                    }
+                        default: 'nomic-embed-text',
+                    },
                 },
-                required: ['text']
-            }
+                required: ['text'],
+            },
         },
         ollamaEmbedHandler
     );
@@ -301,8 +297,8 @@ Important:
 Also reports runtime errors per backend when unavailable.`,
             inputSchema: {
                 type: 'object',
-                properties: {}
-            }
+                properties: {},
+            },
         },
         ollamaModelsHandler
     );

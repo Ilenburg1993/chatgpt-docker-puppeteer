@@ -115,9 +115,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
 
     const RESPONSE_DIR = _responseDir();
     const attemptId = opts?.attemptId ? String(opts.attemptId) : null;
-    const basePath = attemptId
-        ? path.join(RESPONSE_DIR, taskId, attemptId)
-        : path.join(RESPONSE_DIR, taskId, 'latest');
+    const basePath = attemptId ? path.join(RESPONSE_DIR, taskId, attemptId) : path.join(RESPONSE_DIR, taskId, 'latest');
     const formatMap = {
         text: `${basePath}.txt`,
         markdown: `${basePath}.md`,
@@ -128,7 +126,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
     const filePath = formatMap[format];
 
     if (!filePath) {
-        throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`);  
+        throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`);
     }
 
     try {

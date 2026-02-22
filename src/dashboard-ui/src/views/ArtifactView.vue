@@ -96,7 +96,10 @@ watch(artifactId, async () => {
                 <template #header>
                     <div class="text-sm font-semibold text-slate-200">Prévia (texto)</div>
                 </template>
-                <div v-if="text" class="text-xs text-slate-200 whitespace-pre-wrap font-mono bg-slate-950/50 border border-slate-800 rounded-lg p-3 max-h-[520px] overflow-auto">
+                <div
+                    v-if="text"
+                    class="text-xs text-slate-200 whitespace-pre-wrap font-mono bg-slate-950/50 border border-slate-800 rounded-lg p-3 max-h-[520px] overflow-auto"
+                >
                     {{ text }}
                 </div>
                 <div v-else class="text-sm text-slate-400">Sem prévia disponível.</div>
@@ -104,4 +107,3 @@ watch(artifactId, async () => {
         </div>
     </div>
 </template>
-

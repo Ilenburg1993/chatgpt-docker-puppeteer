@@ -10,7 +10,7 @@ const colors = {
     red: '\x1b[31m',
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
-    cyan: '\x1b[36m'
+    cyan: '\x1b[36m',
 };
 
 const log = {
@@ -18,7 +18,7 @@ const log = {
     success: msg => console.log(`${colors.green}✅ ${msg}${colors.reset}`),
     error: msg => console.log(`${colors.red}❌ ${msg}${colors.reset}`),
     warn: msg => console.log(`${colors.yellow}⚠️  ${msg}${colors.reset}`),
-    section: msg => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`)
+    section: msg => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`),
 };
 
 import GLOBAL_CONFIG from '/workspaces/chatgpt-docker-puppeteer/config.json' with { type: 'json' };
@@ -203,7 +203,9 @@ async function testScriptFiles() {
 async function testPrioritizationLogic() {
     log.section('TESTE 3: Validação de Lógica de Priorização');
 
-    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(m => m.default ?? m);
+    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
+        m => m.default ?? m
+    );
 
     // 3.1 - Ordem de portas está correta
     const ports = chromeConfig.connection.ports;
@@ -231,7 +233,7 @@ async function testPrioritizationLogic() {
     const firstAttempt = {
         host: hosts[0],
         port: ports[0],
-        url: `http://${hosts[0]}:${ports[0]}/json/version`
+        url: `http://${hosts[0]}:${ports[0]}/json/version`,
     };
 
     assert(
@@ -257,7 +259,7 @@ async function testURLRewriting() {
         'User-Agent': 'Mozilla/5.0...',
         'V8-Version': '12.4.254.20',
         'WebKit-Version': '537.36 (@...)',
-        webSocketDebuggerUrl: `ws://localhost:${PROXY_PORT}/devtools/browser/12345678-1234-1234-1234-123456789012`
+        webSocketDebuggerUrl: `ws://localhost:${PROXY_PORT}/devtools/browser/12345678-1234-1234-1234-123456789012`,
     };
 
     // 4.2 - Simular rewrite do proxy (localhost → IP público)
@@ -303,7 +305,9 @@ async function testURLRewriting() {
 async function testHealthEndpoints() {
     log.section('TESTE 5: Validação de Health Endpoints');
 
-    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(m => m.default ?? m);
+    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
+        m => m.default ?? m
+    );
 
     // 5.1 - Health URLs estão definidas
     assert(chromeConfig.health.chromeDebugUrl !== undefined, 'chromeDebugUrl está definido');

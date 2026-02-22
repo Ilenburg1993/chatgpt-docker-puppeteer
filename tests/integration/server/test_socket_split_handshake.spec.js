@@ -40,4 +40,3 @@ test('split mode external connection performs handshake and remains connected', 
     await socketEngine.stop();
     await closeServer(httpServer);
 });
-

@@ -17,6 +17,7 @@ import requestId from '../middleware/request_id.js';
    0. INSTÂNCIA SOBERANA
 -------------------------------------------------------------------------- */
 
+/** Constante/valor exportado: default. */
 const app = express();
 const RAG_MANIFEST_PATH = process.env.RAG_MANIFEST_PATH || '/home/node/.local/share/rag-index/manifest.v1.json';
 
@@ -164,7 +165,7 @@ function updateCorsOrigins() {
 
 // Inicializa e escuta mudanças
 updateCorsOrigins();
-if (typeof /** @type {any} */ (CONFIG).on === 'function') {
+if (typeof (/** @type {any} */ (CONFIG).on) === 'function') {
     /** @type {any} */ (CONFIG).on('updated', updateCorsOrigins);
 }
 

@@ -25,6 +25,7 @@ function normalizeHeaders(extraHeaders) {
     return {};
 }
 
+/** Classe exportada: MCPUpstreamError. */
 export class MCPUpstreamError extends Error {
     /**
      * @param {string} message
@@ -59,7 +60,7 @@ export function createMcpHttpClient(config = {}) {
             jsonrpc: '2.0',
             id,
             method,
-            params: params ?? {}
+            params: params ?? {},
         };
 
         let response;
@@ -68,10 +69,10 @@ export function createMcpHttpClient(config = {}) {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
-                    ...baseHeaders
+                    ...baseHeaders,
                 },
                 body: JSON.stringify(body),
-                signal
+                signal,
             });
         } catch (error) {
             if (error?.name === 'AbortError') {
@@ -85,20 +86,19 @@ export function createMcpHttpClient(config = {}) {
 
         if (!response.ok) {
             const upstreamMessage =
-                json?.error?.message ||
-                (typeof text === 'string' && text.trim() ? text.trim() : response.statusText);
+                json?.error?.message || (typeof text === 'string' && text.trim() ? text.trim() : response.statusText);
 
             throw new MCPUpstreamError(`Upstream HTTP ${response.status}: ${upstreamMessage}`, {
                 status: response.status,
                 code: json?.error?.code,
-                data: json?.error?.data
+                data: json?.error?.data,
             });
         }
 
         if (!json || json.jsonrpc !== '2.0') {
             throw new MCPUpstreamError('Upstream returned non-JSON-RPC response', {
                 status: response.status,
-                data: text
+                data: text,
             });
         }
 
@@ -106,7 +106,7 @@ export function createMcpHttpClient(config = {}) {
             throw new MCPUpstreamError(json.error.message || 'Upstream JSON-RPC error', {
                 status: response.status,
                 code: json.error.code,
-                data: json.error.data
+                data: json.error.data,
             });
         }
 
@@ -124,7 +124,7 @@ export function createMcpHttpClient(config = {}) {
             return request({
                 method: 'tools/call',
                 params: { name, arguments: args },
-                signal
+                signal,
             });
         },
         /** @param {{ signal?: AbortSignal }} [payload] */
@@ -135,6 +135,6 @@ export function createMcpHttpClient(config = {}) {
                 throw new Error('resources/read requires uri');
             }
             return request({ method: 'resources/read', params: { uri }, signal });
-        }
+        },
     };
 }

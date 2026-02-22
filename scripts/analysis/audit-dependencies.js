@@ -15,7 +15,7 @@ if (!fs.existsSync(pkgPath)) {
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 const allDeps = {
     ...(pkg.dependencies || {}),
-    ...(pkg.devDependencies || {})
+    ...(pkg.devDependencies || {}),
 };
 
 // Modules found in code (manually curated list - could be automated with AST parsing)
@@ -43,7 +43,7 @@ const usedModules = [
     'tree-kill',
     'user-agents',
     'uuid',
-    'zod'
+    'zod',
 ];
 
 // Native Node.js modules (don't need package.json entry)
@@ -64,7 +64,7 @@ const nativeModules = [
     'util',
     'url',
     'querystring',
-    'zlib'
+    'zlib',
 ];
 
 // Analysis
@@ -84,13 +84,13 @@ if (JSON_OUTPUT) {
             externalUsed: externalUsed.length,
             nativeUsed: nativeUsed.length,
             missing: missing.length,
-            possiblyUnused: unused.length
+            possiblyUnused: unused.length,
         },
         missing,
         possiblyUnused: unused,
         declared: Object.keys(allDeps),
         used: usedModules,
-        native: nativeUsed
+        native: nativeUsed,
     };
     console.log(JSON.stringify(report, null, 2));
 } else {

@@ -10,49 +10,49 @@
 // ============================================================
 
 interface Error {
-  /** Detalhes adicionais do erro */
-  details?: string | Record<string, unknown>;
+    /** Detalhes adicionais do erro */
+    details?: string | Record<string, unknown>;
 
-  /** Causa raiz do erro (ES2022+) */
-  cause?: Error | unknown;
+    /** Causa raiz do erro (ES2022+) */
+    cause?: Error | unknown;
 
-  /** Histórico de tentativas (recovery systems) */
-  history?: Array<{
-    attempt?: number;
-    error?: unknown;
-    errorClass?: string;
-    ts?: number;
-    timestamp?: number;
-    action?: string;
-    result?: string;
-    [key: string]: unknown;
-  }>;
+    /** Histórico de tentativas (recovery systems) */
+    history?: Array<{
+        attempt?: number;
+        error?: unknown;
+        errorClass?: string;
+        ts?: number;
+        timestamp?: number;
+        action?: string;
+        result?: string;
+        [key: string]: unknown;
+    }>;
 
-  /** Número de tentativas */
-  attempts?: number;
+    /** Número de tentativas */
+    attempts?: number;
 
-  /** Operação que causou o erro */
-  operation?: string;
+    /** Operação que causou o erro */
+    operation?: string;
 
-  /** Código de erro */
-  code?: string | number;
+    /** Código de erro */
+    code?: string | number;
 
-  /** Contexto adicional */
-  context?: Record<string, unknown>;
+    /** Contexto adicional */
+    context?: Record<string, unknown>;
 
-  /** Deprecation warnings */
-  originalFunction?: string;
-  replacedBy?: string;
+    /** Deprecation warnings */
+    originalFunction?: string;
+    replacedBy?: string;
 
-  /** Status HTTP ou custom */
-  status?: number | string;
-  statusCode?: number | string;
-  timeoutMs?: number;
-  lastError?: unknown;
-  url?: string;
-  body?: unknown;
-  openaiError?: unknown;
-  reason_code?: string;
+    /** Status HTTP ou custom */
+    status?: number | string;
+    statusCode?: number | string;
+    timeoutMs?: number;
+    lastError?: unknown;
+    url?: string;
+    body?: unknown;
+    openaiError?: unknown;
+    reason_code?: string;
 }
 
 // ============================================================
@@ -60,15 +60,15 @@ interface Error {
 // ============================================================
 
 interface Navigator {
-  /** User Agent Client Hints API (experimental) */
-  userAgentData?: {
-    brands: Array<{ brand: string; version: string }>;
-    mobile: boolean;
-    platform: string;
-  };
-  keyboard?: {
-    getLayoutMap?: () => Promise<Map<string, string>>;
-  };
+    /** User Agent Client Hints API (experimental) */
+    userAgentData?: {
+        brands: Array<{ brand: string; version: string }>;
+        mobile: boolean;
+        platform: string;
+    };
+    keyboard?: {
+        getLayoutMap?: () => Promise<Map<string, string>>;
+    };
 }
 
 // ============================================================
@@ -76,73 +76,73 @@ interface Navigator {
 // ============================================================
 
 declare class Page {
-  evaluate<T>(fn: (...args: unknown[]) => T, ...args: unknown[]): Promise<T>;
-  $<T>(selector: string): Promise<T | null>;
-  $$<T>(selector: string): Promise<T[]>;
-  waitForSelector(selector: string, options?: unknown): Promise<unknown>;
-  url(): string;
-  close(): Promise<void>;
-  on(event: string, listener: (...args: any[]) => void): this;
-  once(event: string, listener: (...args: any[]) => void): this;
-  removeListener(event: string, listener: (...args: any[]) => void): this;
-  click(selector: string, options?: unknown): Promise<void>;
-  type(selector: string, text: string, options?: unknown): Promise<void>;
-  content(): Promise<string>;
-  title(): Promise<string>;
-  screenshot(options?: unknown): Promise<Buffer>;
-  viewport(): { width: number; height: number } | null;
-  browser(): Browser;
-  isClosed(): boolean;
-  [key: string]: any;
+    evaluate<T>(fn: (...args: unknown[]) => T, ...args: unknown[]): Promise<T>;
+    $<T>(selector: string): Promise<T | null>;
+    $$<T>(selector: string): Promise<T[]>;
+    waitForSelector(selector: string, options?: unknown): Promise<unknown>;
+    url(): string;
+    close(): Promise<void>;
+    on(event: string, listener: (...args: any[]) => void): this;
+    once(event: string, listener: (...args: any[]) => void): this;
+    removeListener(event: string, listener: (...args: any[]) => void): this;
+    click(selector: string, options?: unknown): Promise<void>;
+    type(selector: string, text: string, options?: unknown): Promise<void>;
+    content(): Promise<string>;
+    title(): Promise<string>;
+    screenshot(options?: unknown): Promise<Buffer>;
+    viewport(): { width: number; height: number } | null;
+    browser(): Browser;
+    isClosed(): boolean;
+    [key: string]: any;
 }
 
 declare class Browser {
-  close(): Promise<void>;
-  pages(): Promise<Page[]>;
-  wsEndpoint(): string;
-  isConnected(): boolean;
-  disconnect(): Promise<void> | void;
-  userAgent(): Promise<string>;
-  [key: string]: any;
+    close(): Promise<void>;
+    pages(): Promise<Page[]>;
+    wsEndpoint(): string;
+    isConnected(): boolean;
+    disconnect(): Promise<void> | void;
+    userAgent(): Promise<string>;
+    [key: string]: any;
 }
 
 declare class BrowserPoolManager {
-  constructor(config?: unknown);
-  allocate(options?: unknown): Promise<unknown>;
-  release(page: unknown): Promise<void>;
-  getStats(): unknown;
-  initialize?(): Promise<void>;
-  removePageFromPool?(taskId: string): void;
-  initialized?: boolean;
-  shuttingDown?: boolean;
-  stats?: Record<string, any>;
-  circuitBreaker?: {
-    shouldPauseSystem: () => boolean;
-    getStatus: () => Record<string, any>;
-    registerFailure?: (...args: any[]) => any;
-    registerRecovery?: (...args: any[]) => any;
+    constructor(config?: unknown);
+    allocate(options?: unknown): Promise<unknown>;
+    release(page: unknown): Promise<void>;
+    getStats(): unknown;
+    initialize?(): Promise<void>;
+    removePageFromPool?(taskId: string): void;
+    initialized?: boolean;
+    shuttingDown?: boolean;
+    stats?: Record<string, any>;
+    circuitBreaker?: {
+        shouldPauseSystem: () => boolean;
+        getStatus: () => Record<string, any>;
+        registerFailure?: (...args: any[]) => any;
+        registerRecovery?: (...args: any[]) => any;
+        [key: string]: any;
+    } | null;
     [key: string]: any;
-  } | null;
-  [key: string]: any;
 }
 
 declare namespace Express {
-  interface Application {
-    [key: string]: any;
-  }
-  interface Request {
-    [key: string]: any;
-  }
-  interface Response {
-    [key: string]: any;
-  }
-  interface NextFunction {
-    (...args: any[]): any;
-  }
+    interface Application {
+        [key: string]: any;
+    }
+    interface Request {
+        [key: string]: any;
+    }
+    interface Response {
+        [key: string]: any;
+    }
+    interface NextFunction {
+        (...args: any[]): any;
+    }
 }
 
 declare class ToolRegistry {
-  [key: string]: any;
+    [key: string]: any;
 }
 
 // ============================================================
@@ -150,38 +150,38 @@ declare class ToolRegistry {
 // ============================================================
 
 declare module 'puppeteer' {
-  export function executablePath(): string;
+    export function executablePath(): string;
 
-  export interface ConnectOptions {
-    browserWSEndpoint?: string;
-    browserURL?: string;
-    timeout?: number;
-    [key: string]: unknown;
-  }
+    export interface ConnectOptions {
+        browserWSEndpoint?: string;
+        browserURL?: string;
+        timeout?: number;
+        [key: string]: unknown;
+    }
 
-  export interface LaunchOptions {
-    headless?: boolean;
-    executablePath?: string;
-    args?: string[];
-    [key: string]: unknown;
-  }
+    export interface LaunchOptions {
+        headless?: boolean;
+        executablePath?: string;
+        args?: string[];
+        [key: string]: unknown;
+    }
 
-  export class Browser {
-    close(): Promise<void>;
-    pages(): Promise<Page[]>;
-    wsEndpoint(): string;
-    [key: string]: unknown;
-  }
+    export class Browser {
+        close(): Promise<void>;
+        pages(): Promise<Page[]>;
+        wsEndpoint(): string;
+        [key: string]: unknown;
+    }
 
-  export class Page {
-    evaluate<T>(fn: (...args: unknown[]) => T, ...args: unknown[]): Promise<T>;
-    $<T>(selector: string): Promise<T | null>;
-    $$<T>(selector: string): Promise<T[]>;
-    waitForSelector(selector: string, options?: unknown): Promise<unknown>;
-    url(): string;
-    close(): Promise<void>;
-    [key: string]: unknown;
-  }
+    export class Page {
+        evaluate<T>(fn: (...args: unknown[]) => T, ...args: unknown[]): Promise<T>;
+        $<T>(selector: string): Promise<T | null>;
+        $$<T>(selector: string): Promise<T[]>;
+        waitForSelector(selector: string, options?: unknown): Promise<unknown>;
+        url(): string;
+        close(): Promise<void>;
+        [key: string]: unknown;
+    }
 }
 
 // ============================================================
@@ -189,16 +189,16 @@ declare module 'puppeteer' {
 // ============================================================
 
 declare module 'puppeteer-extra' {
-  import type { Browser, ConnectOptions, LaunchOptions } from 'puppeteer';
+    import type { Browser, ConnectOptions, LaunchOptions } from 'puppeteer';
 
-  export interface PuppeteerExtra {
-    use(plugin: unknown): this;
-    connect(options?: ConnectOptions & { timeout?: number }): Promise<Browser>;
-    launch(options?: LaunchOptions): Promise<Browser>;
-  }
+    export interface PuppeteerExtra {
+        use(plugin: unknown): this;
+        connect(options?: ConnectOptions & { timeout?: number }): Promise<Browser>;
+        launch(options?: LaunchOptions): Promise<Browser>;
+    }
 
-  const puppeteer: PuppeteerExtra;
-  export default puppeteer;
+    const puppeteer: PuppeteerExtra;
+    export default puppeteer;
 }
 
 // ============================================================
@@ -206,110 +206,110 @@ declare module 'puppeteer-extra' {
 // ============================================================
 
 declare module 'zod' {
-  // Tipos básicos do Zod
-  export interface ZodType<T = any> {
-    parse(data: unknown): T;
-    safeParse(data: unknown): { success: boolean; data?: T; error?: unknown };
-    optional(): ZodType<T | undefined>;
-    nullable(): ZodType<T | null>;
-    default(value: T): ZodType<T>;
-    [key: string]: any;
-  }
+    // Tipos básicos do Zod
+    export interface ZodType<T = any> {
+        parse(data: unknown): T;
+        safeParse(data: unknown): { success: boolean; data?: T; error?: unknown };
+        optional(): ZodType<T | undefined>;
+        nullable(): ZodType<T | null>;
+        default(value: T): ZodType<T>;
+        [key: string]: any;
+    }
 
-  export interface ZodString extends ZodType<string> {
-    min(limit: number, message?: string): this;
-    max(limit: number, message?: string): this;
-    email(message?: string): this;
-    url(message?: string): this;
-    uuid(message?: string): this;
-    [key: string]: any;
-  }
+    export interface ZodString extends ZodType<string> {
+        min(limit: number, message?: string): this;
+        max(limit: number, message?: string): this;
+        email(message?: string): this;
+        url(message?: string): this;
+        uuid(message?: string): this;
+        [key: string]: any;
+    }
 
-  export interface ZodNumber extends ZodType<number> {
-    min(limit: number, message?: string): this;
-    max(limit: number, message?: string): this;
-    int(message?: string): this;
-    positive(message?: string): this;
-    nonnegative(message?: string): this;
-    [key: string]: any;
-  }
+    export interface ZodNumber extends ZodType<number> {
+        min(limit: number, message?: string): this;
+        max(limit: number, message?: string): this;
+        int(message?: string): this;
+        positive(message?: string): this;
+        nonnegative(message?: string): this;
+        [key: string]: any;
+    }
 
-  export interface ZodBoolean extends ZodType<boolean> {}
+    export interface ZodBoolean extends ZodType<boolean> {}
 
-  export interface ZodArray<T = any> extends ZodType<T[]> {
-    min(limit: number, message?: string): this;
-    max(limit: number, message?: string): this;
-    length(len: number, message?: string): this;
-    nonempty(message?: string): this;
-    [key: string]: any;
-  }
+    export interface ZodArray<T = any> extends ZodType<T[]> {
+        min(limit: number, message?: string): this;
+        max(limit: number, message?: string): this;
+        length(len: number, message?: string): this;
+        nonempty(message?: string): this;
+        [key: string]: any;
+    }
 
-  export interface ZodObject<T = any> extends ZodType<T> {
-    shape: Record<string, ZodType>;
-    extend(shape: Record<string, ZodType>): ZodObject;
-    merge(other: ZodObject): ZodObject;
-    pick(keys: Record<string, true>): ZodObject;
-    omit(keys: Record<string, true>): ZodObject;
-    partial(): ZodObject;
-    [key: string]: any;
-  }
+    export interface ZodObject<T = any> extends ZodType<T> {
+        shape: Record<string, ZodType>;
+        extend(shape: Record<string, ZodType>): ZodObject;
+        merge(other: ZodObject): ZodObject;
+        pick(keys: Record<string, true>): ZodObject;
+        omit(keys: Record<string, true>): ZodObject;
+        partial(): ZodObject;
+        [key: string]: any;
+    }
 
-  export interface ZodEnum<T extends string = string> extends ZodType<T> {
-    enum: readonly T[];
-    [key: string]: any;
-  }
+    export interface ZodEnum<T extends string = string> extends ZodType<T> {
+        enum: readonly T[];
+        [key: string]: any;
+    }
 
-  export interface ZodUnion<T = any> extends ZodType<T> {}
-  export interface ZodIntersection<T = any> extends ZodType<T> {}
-  export interface ZodTuple<T = any> extends ZodType<T> {}
-  export interface ZodRecord<T = any> extends ZodType<T> {}
-  export interface ZodMap<T = any> extends ZodType<T> {}
-  export interface ZodSet<T = any> extends ZodType<T> {}
-  export interface ZodFunction<T = any> extends ZodType<T> {}
-  export interface ZodLazy<T = any> extends ZodType<T> {}
-  export interface ZodLiteral<T = any> extends ZodType<T> {}
-  export interface ZodEffects<T = any> extends ZodType<T> {}
-  export interface ZodNative<T = any> extends ZodType<T> {}
-  export interface ZodPromise<T = any> extends ZodType<Promise<T>> {}
+    export interface ZodUnion<T = any> extends ZodType<T> {}
+    export interface ZodIntersection<T = any> extends ZodType<T> {}
+    export interface ZodTuple<T = any> extends ZodType<T> {}
+    export interface ZodRecord<T = any> extends ZodType<T> {}
+    export interface ZodMap<T = any> extends ZodType<T> {}
+    export interface ZodSet<T = any> extends ZodType<T> {}
+    export interface ZodFunction<T = any> extends ZodType<T> {}
+    export interface ZodLazy<T = any> extends ZodType<T> {}
+    export interface ZodLiteral<T = any> extends ZodType<T> {}
+    export interface ZodEffects<T = any> extends ZodType<T> {}
+    export interface ZodNative<T = any> extends ZodType<T> {}
+    export interface ZodPromise<T = any> extends ZodType<Promise<T>> {}
 
-  // ✅ CRÍTICO: Exportar z como objeto com métodos
-  // Isso permite usar z.string(), z.object(), etc. em arquivos .js com @ts-check
-  export const z: {
-    string(): ZodString;
-    number(): ZodNumber;
-    boolean(): ZodBoolean;
-    array<T>(schema: ZodType<T>): ZodArray<T>;
-    object<T extends Record<string, ZodType>>(shape: T): ZodObject;
-    object<T extends Record<string, ZodType>>(shape: T, params?: unknown): ZodObject;
-    union<T extends readonly [ZodType, ZodType, ...ZodType[]]>(types: T): ZodUnion;
-    union<T extends readonly [ZodType, ZodType, ...ZodType[]]>(types: T, params?: unknown): ZodUnion;
-    intersection<A, B>(left: ZodType<A>, right: ZodType<B>): ZodIntersection;
-    tuple<T extends [ZodType, ...ZodType[]]>(schemas: T): ZodTuple;
-    record<T>(valueSchema: ZodType<T>): ZodRecord<T>;
-    record<K, V>(keySchema: ZodType<K>, valueSchema: ZodType<V>): ZodRecord<V>;
-    map<K, V>(keySchema: ZodType<K>, valueSchema: ZodType<V>): ZodMap;
-    set<T>(schema: ZodType<T>): ZodSet<T>;
-    lazy<T>(fn: () => ZodType<T>): ZodLazy<T>;
-    literal<T>(value: T): ZodLiteral<T>;
-    effects<T>(schema: ZodType<T>): ZodEffects<T>;
-    native<T>(check: (data: unknown) => boolean): ZodNative<T>;
-    promise<T>(schema: ZodType<T>): ZodPromise<T>;
-    any(): ZodType<any>;
-    unknown(): ZodType<unknown>;
-    never(): ZodType<never>;
-    coerce: any;
+    // ✅ CRÍTICO: Exportar z como objeto com métodos
+    // Isso permite usar z.string(), z.object(), etc. em arquivos .js com @ts-check
+    export const z: {
+        string(): ZodString;
+        number(): ZodNumber;
+        boolean(): ZodBoolean;
+        array<T>(schema: ZodType<T>): ZodArray<T>;
+        object<T extends Record<string, ZodType>>(shape: T): ZodObject;
+        object<T extends Record<string, ZodType>>(shape: T, params?: unknown): ZodObject;
+        union<T extends readonly [ZodType, ZodType, ...ZodType[]]>(types: T): ZodUnion;
+        union<T extends readonly [ZodType, ZodType, ...ZodType[]]>(types: T, params?: unknown): ZodUnion;
+        intersection<A, B>(left: ZodType<A>, right: ZodType<B>): ZodIntersection;
+        tuple<T extends [ZodType, ...ZodType[]]>(schemas: T): ZodTuple;
+        record<T>(valueSchema: ZodType<T>): ZodRecord<T>;
+        record<K, V>(keySchema: ZodType<K>, valueSchema: ZodType<V>): ZodRecord<V>;
+        map<K, V>(keySchema: ZodType<K>, valueSchema: ZodType<V>): ZodMap;
+        set<T>(schema: ZodType<T>): ZodSet<T>;
+        lazy<T>(fn: () => ZodType<T>): ZodLazy<T>;
+        literal<T>(value: T): ZodLiteral<T>;
+        effects<T>(schema: ZodType<T>): ZodEffects<T>;
+        native<T>(check: (data: unknown) => boolean): ZodNative<T>;
+        promise<T>(schema: ZodType<T>): ZodPromise<T>;
+        any(): ZodType<any>;
+        unknown(): ZodType<unknown>;
+        never(): ZodType<never>;
+        coerce: any;
 
-    // Palavras reservadas do TypeScript (usando computed property names)
-    'enum'<T extends readonly [string, ...string[]]>(values: T): ZodEnum<T[number]>;
-    'enum'<T extends readonly [string, ...string[]]>(values: T, params?: unknown): ZodEnum<T[number]>;
-    'function'<Args extends ZodTuple, Returns extends ZodType>(args: Args, returns: Returns): ZodFunction;
-    'void'(): ZodType<void>;
-    'undefined'(): ZodType<undefined>;
-    'null'(): ZodType<null>;
+        // Palavras reservadas do TypeScript (usando computed property names)
+        'enum'<T extends readonly [string, ...string[]]>(values: T): ZodEnum<T[number]>;
+        'enum'<T extends readonly [string, ...string[]]>(values: T, params?: unknown): ZodEnum<T[number]>;
+        'function'<Args extends ZodTuple, Returns extends ZodType>(args: Args, returns: Returns): ZodFunction;
+        'void'(): ZodType<void>;
+        'undefined'(): ZodType<undefined>;
+        'null'(): ZodType<null>;
 
-    // Permitir qualquer outra propriedade/método (signatures dinâmicas)
-    [key: string]: any;
-  };
+        // Permitir qualquer outra propriedade/método (signatures dinâmicas)
+        [key: string]: any;
+    };
 }
 
 // ============================================================

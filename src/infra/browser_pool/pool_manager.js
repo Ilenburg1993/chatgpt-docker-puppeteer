@@ -7,6 +7,7 @@ import { PageValidator } from './PageValidator.js';
 import { PageLifecycleMonitor } from './PageLifecycleMonitor.js';
 import PeriodicHealthMonitor from './PeriodicHealthMonitor.js';
 
+/** Classe exportada: default. */
 class BrowserPoolManager {
     /**
      * @param {{
@@ -120,7 +121,9 @@ class BrowserPoolManager {
         }
 
         // ✅ Bug #3: Validar proxy ANTES de tentar conectar
-        const CONFIG = /** @type {import('#core/config').default} */ (await import('#core/config').then(m => m.default ?? m));
+        const CONFIG = /** @type {import('#core/config').default} */ (
+            await import('#core/config').then(m => m.default ?? m)
+        );
         if (CONFIG.CHROME_PROXY_ENABLED !== false) {
             await this._validateProxyAvailability();
         }
@@ -201,11 +204,7 @@ class BrowserPoolManager {
         }
 
         const configuredAttempts = Number.parseInt(
-            String(
-                process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ??
-                    this.config.allocateMaxAttempts ??
-                    ''
-            ),
+            String(process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ?? this.config.allocateMaxAttempts ?? ''),
             10
         );
         const defaultMaxAttempts = Math.max(1, Number(this.config.poolSize || this.pool.length || 1) * 3);
@@ -698,8 +697,12 @@ class BrowserPoolManager {
      * TTL: 1 hour (3600000ms) - configurable via BROWSER_PAGE_TTL_MS
      */
     async _cleanupZombiePages() {
-        const CONFIG = /** @type {import('#core/config').default} */ (await import('#core/config').then(m => m.default ?? m));
-        const ttlMs = Number(this.config.pageTtlMs || CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000);
+        const CONFIG = /** @type {import('#core/config').default} */ (
+            await import('#core/config').then(m => m.default ?? m)
+        );
+        const ttlMs = Number(
+            this.config.pageTtlMs || CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000
+        );
         const now = Date.now();
         let zombieCount = 0;
 
@@ -734,7 +737,10 @@ class BrowserPoolManager {
                 try {
                     const ageMinutes = zombie.age === 'unknown' ? 'unknown' : Math.floor(zombie.age / 60000);
 
-                    log('WARN', `[BrowserPool] Closing zombie page: ${zombie.taskId} (age: ${ageMinutes}min, reason: ${zombie.reason})`);
+                    log(
+                        'WARN',
+                        `[BrowserPool] Closing zombie page: ${zombie.taskId} (age: ${ageMinutes}min, reason: ${zombie.reason})`
+                    );
 
                     // Close page
                     await zombie.page.close();
@@ -790,7 +796,9 @@ class BrowserPoolManager {
      * @throws {Error} Se proxy não estiver disponível ou unhealthy
      */
     async _validateProxyAvailability() {
-        const CONFIG = /** @type {import('#core/config').default} */ (await import('#core/config').then(m => m.default ?? m));
+        const CONFIG = /** @type {import('#core/config').default} */ (
+            await import('#core/config').then(m => m.default ?? m)
+        );
 
         /*
          * CONTRATO DE TOPOLOGIA (CANÔNICO):

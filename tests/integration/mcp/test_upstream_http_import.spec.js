@@ -20,7 +20,7 @@ function startFakeMcpHttpServer() {
 
             let body = '';
             req.setEncoding('utf8');
-            req.on('data', (chunk) => (body += chunk));
+            req.on('data', chunk => (body += chunk));
             await once(req, 'end');
 
             const msg = JSON.parse(body);
@@ -39,10 +39,10 @@ function startFakeMcpHttpServer() {
                             inputSchema: {
                                 type: 'object',
                                 properties: { name: { type: 'string' } },
-                                required: ['name']
-                            }
-                        }
-                    ]
+                                required: ['name'],
+                            },
+                        },
+                    ],
                 };
             } else if (method === 'tools/call') {
                 if (params?.name !== 'hello') {
@@ -87,10 +87,8 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
 
     try {
         const env = {
-            MCP_UPSTREAMS_JSON: JSON.stringify([
-                { alias: 'core', transport: 'http', url, toolPrefix: 'mcp_core__' }
-            ]),
-            MCP_UPSTREAM_REFRESH: 'true'
+            MCP_UPSTREAMS_JSON: JSON.stringify([{ alias: 'core', transport: 'http', url, toolPrefix: 'mcp_core__' }]),
+            MCP_UPSTREAM_REFRESH: 'true',
         };
 
         const st = await registerUpstreams(registry, { env });
@@ -105,6 +103,6 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
         assert.equal(out?.content?.[0]?.text, 'Hello MCP');
     } finally {
         await shutdownUpstreams().catch(() => {});
-        await new Promise((r) => server.close(() => r(null)));
+        await new Promise(r => server.close(() => r(null)));
     }
 });

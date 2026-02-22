@@ -38,7 +38,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
      */
     function emitEvent(envelope) {
         telemetry.emit('nerv:emission:attempt', {
-            kind: MessageType.EVENT
+            kind: MessageType.EVENT,
         });
 
         let normalized;
@@ -53,7 +53,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.EVENT,
                 reason: 'estrutura',
-                message: error.message
+                message: error.message,
             });
             return;
         }
@@ -67,14 +67,14 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
 
         if (!accepted) {
             telemetry.emit('nerv:emission:enqueue_failed', {
-                kind: MessageType.EVENT
+                kind: MessageType.EVENT,
             });
             return;
         }
 
         // 5. Telemetria de sucesso técnico
         telemetry.emit('nerv:emission:success', {
-            kind: MessageType.EVENT
+            kind: MessageType.EVENT,
         });
     }
 
@@ -83,7 +83,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
   =========================== */
 
     return Object.freeze({
-        emitEvent
+        emitEvent,
     });
 }
 

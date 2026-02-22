@@ -50,16 +50,16 @@
 export function normalizeToolResultPayload(value) {
     if (value && typeof value === 'object' && Array.isArray(value.content)) {
         const textParts = value.content
-            .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
-            .map((part) => part.text);
+            .filter(part => part && part.type === 'text' && typeof part.text === 'string')
+            .map(part => part.text);
         return {
             text: textParts.join('\n').trim() || JSON.stringify(value, null, 2),
             json: value.structuredContent,
             flags: {
                 degraded: false,
                 mutating: false,
-                partial: false
-            }
+                partial: false,
+            },
         };
     }
 
@@ -70,8 +70,8 @@ export function normalizeToolResultPayload(value) {
             flags: {
                 degraded: Boolean(value.flags?.degraded),
                 mutating: Boolean(value.flags?.mutating),
-                partial: Boolean(value.flags?.partial)
-            }
+                partial: Boolean(value.flags?.partial),
+            },
         };
     }
 
@@ -81,8 +81,8 @@ export function normalizeToolResultPayload(value) {
             flags: {
                 degraded: false,
                 mutating: false,
-                partial: false
-            }
+                partial: false,
+            },
         };
     }
 
@@ -92,8 +92,8 @@ export function normalizeToolResultPayload(value) {
         flags: {
             degraded: false,
             mutating: false,
-            partial: false
-        }
+            partial: false,
+        },
     };
 }
 
@@ -130,15 +130,15 @@ export class ToolRegistry {
      */
     register(name, metadata, handler) {
         if (!name || typeof name !== 'string') {
-            throw new Error('Tool name must be a non-empty string');  
+            throw new Error('Tool name must be a non-empty string');
         }
 
         if (!metadata || typeof metadata !== 'object') {
-            throw new Error('Tool metadata must be an object');  
+            throw new Error('Tool metadata must be an object');
         }
 
         if (!handler || typeof handler !== 'function') {
-            throw new Error('Tool handler must be a function');  
+            throw new Error('Tool handler must be a function');
         }
 
         if (this.tools.has(name)) {
@@ -148,7 +148,7 @@ export class ToolRegistry {
         const normalizedMetadata = {
             ...metadata,
             allowMutations: metadata.allowMutations === true,
-            requiresConfirmationToken: metadata.requiresConfirmationToken === true
+            requiresConfirmationToken: metadata.requiresConfirmationToken === true,
         };
 
         this.tools.set(name, { metadata: normalizedMetadata, handler });
@@ -182,7 +182,7 @@ export class ToolRegistry {
 
         // Check if already aborted before starting
         if (options.signal?.aborted) {
-            throw new Error(`Tool ${name} was cancelled before execution`);  
+            throw new Error(`Tool ${name} was cancelled before execution`);
         }
 
         // Check if retry enabled (opt-in via env var, default: false)
@@ -202,15 +202,13 @@ export class ToolRegistry {
             });
 
             if (adaptive.circuit_broken) {
-                throw new Error(
-                    `Tool ${name} circuit breaker active: ${adaptive.warning}`
-                );
+                throw new Error(`Tool ${name} circuit breaker active: ${adaptive.warning}`);
             }
 
             toolTimeout = adaptive.timeout;
             console.error(
                 `[Tool Registry] Using adaptive timeout for ${name}: ${toolTimeout}ms ` +
-                `(learned_avg=${adaptive.breakdown.learned_avg}ms, phase=${adaptive.phase})`
+                    `(learned_avg=${adaptive.breakdown.learned_avg}ms, phase=${adaptive.phase})`
             );
         } else {
             // Fallback to fixed timeout (backward compatible)
@@ -229,7 +227,7 @@ export class ToolRegistry {
                 const status = breaker.getStatus();
                 throw new Error(
                     `Ollama ${endpoint} circuit breaker OPEN - service unavailable. ` +
-                    `Retry in ${Math.round(status.nextAttemptIn / 1000)}s`
+                        `Retry in ${Math.round(status.nextAttemptIn / 1000)}s`
                 );
             }
         }
@@ -245,7 +243,7 @@ export class ToolRegistry {
 
             console.error(
                 `[Tool Registry] Executing tool: ${name} ` +
-                `(attempt ${attempt}/${maxAttempts}${retryEnabled ? ', retry enabled' : ''})`
+                    `(attempt ${attempt}/${maxAttempts}${retryEnabled ? ', retry enabled' : ''})`
             );
 
             const internalController = new AbortController();
@@ -283,13 +281,12 @@ export class ToolRegistry {
                 if (attempt > 1) {
                     console.error(
                         `[Tool Registry] Tool ${name} succeeded on attempt ${attempt}/${maxAttempts} ` +
-                        `after ${duration}ms`
+                            `after ${duration}ms`
                     );
                 }
 
                 console.error(`[Tool Registry] Tool execution completed: ${name} (${duration}ms)`);
                 return result;
-
             } catch (error) {
                 clearTimeout(timeoutId);
                 lastError = error;
@@ -304,7 +301,7 @@ export class ToolRegistry {
 
                 console.error(
                     `[Tool Registry] Tool ${name} failed (attempt ${attempt}/${maxAttempts}): ` +
-                    `${classification.errorClass} - ${classification.reasonCode}`
+                        `${classification.errorClass} - ${classification.reasonCode}`
                 );
 
                 // Record circuit breaker failure
@@ -319,7 +316,7 @@ export class ToolRegistry {
                 if (!retryEnabled || !classification.retryable || attempt >= maxAttempts) {
                     throw new Error( // eslint-disable-line preserve-caught-error
                         `Tool ${name} execution failed: ${error.message} ` +
-                        `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`
+                            `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`
                     );
                 }
 
@@ -329,23 +326,17 @@ export class ToolRegistry {
                     classification.modelFallback &&
                     process.env.OLLAMA_MODEL_FALLBACK_ENABLED !== 'false'
                 ) {
-                    console.error(
-                        `[Tool Registry] Model fallback: ${params.model} → ${classification.modelFallback}`
-                    );
+                    console.error(`[Tool Registry] Model fallback: ${params.model} → ${classification.modelFallback}`);
                     params = { ...params, model: classification.modelFallback };
                 }
 
                 // Exponential backoff before retry
                 const maxBackoff = Number(process.env.MCP_TOOL_MAX_BACKOFF_MS || 30000);
-                const delayMs = calculateBackoff(
-                    attempt,
-                    classification.suggestedDelayMs,
-                    maxBackoff
-                );
+                const delayMs = calculateBackoff(attempt, classification.suggestedDelayMs, maxBackoff);
 
                 console.error(
                     `[Tool Registry] Retrying tool ${name} in ${delayMs}ms ` +
-                    `(strategy: ${classification.strategy}, ${classification.message})`
+                        `(strategy: ${classification.strategy}, ${classification.message})`
                 );
 
                 await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -371,7 +362,7 @@ export class ToolRegistry {
     getAllMetadata() {
         return Array.from(this.tools.entries()).map(([name, { metadata }]) => ({
             name,
-            ...metadata
+            ...metadata,
         }));
     }
 
@@ -435,7 +426,7 @@ export class ToolRegistry {
     getStats() {
         return {
             totalTools: this.tools.size,
-            tools: this.getToolNames()
+            tools: this.getToolNames(),
         };
     }
 }

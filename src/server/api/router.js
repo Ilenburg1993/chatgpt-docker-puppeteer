@@ -39,7 +39,7 @@ async function applyRoutes(app) {
                     success: false,
                     error: 'Request timeout',
                     message: `Request exceeded ${REQUEST_TIMEOUT_MS}ms limit`,
-                    request_id: req.id
+                    request_id: req.id,
                 });
             }
         });
@@ -79,7 +79,7 @@ async function applyRoutes(app) {
                 success: false,
                 ts: Date.now(),
                 chrome: { connected: false, error: err?.message || String(err) },
-                request_id: req.id
+                request_id: req.id,
             });
         }
     });
@@ -200,7 +200,7 @@ async function applyRoutes(app) {
                     ready: true,
                     toolCount,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: null
+                    lastInitError: null,
                 };
 
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: true });
@@ -233,7 +233,7 @@ async function applyRoutes(app) {
                     ready: false,
                     toolCount: null,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: error && error.message ? error.message : String(error)
+                    lastInitError: error && error.message ? error.message : String(error),
                 };
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
             } catch (e) {
@@ -249,7 +249,7 @@ async function applyRoutes(app) {
                 ready: false,
                 toolCount: null,
                 lastInitAt: new Date().toISOString(),
-                lastInitError: null
+                lastInitError: null,
             };
             app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
         } catch (e) {
@@ -276,14 +276,10 @@ async function applyRoutes(app) {
                     enabled: true,
                     ready: true,
                     endpoints: ['/v1/chat/completions', '/v1/models'],
-                    lastInitAt: new Date().toISOString()
+                    lastInitAt: new Date().toISOString(),
                 };
 
-                app.locals.runtimeReadiness = Object.assign(
-                    {},
-                    app.locals.runtimeReadiness || null,
-                    { openai: true }
-                );
+                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: true });
             } catch (e) {
                 // Non-fatal observability failure
             }
@@ -300,13 +296,9 @@ async function applyRoutes(app) {
                     enabled: true,
                     ready: false,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: error.message
+                    lastInitError: error.message,
                 };
-                app.locals.runtimeReadiness = Object.assign(
-                    {},
-                    app.locals.runtimeReadiness || null,
-                    { openai: false }
-                );
+                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: false });
             } catch (e) {
                 // noop
             }

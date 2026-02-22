@@ -297,6 +297,7 @@ function updateMissionProgressState(params) {
     return { ok: true, mission: updated };
 }
 
+/** Função exportada: executeMissionTransition. */
 function executeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
     const now = Date.now();
@@ -313,6 +314,7 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
     });
 }
 
+/** Função exportada: pauseMissionTransition. */
 function pauseMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
         missionId,
@@ -339,6 +341,7 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
     });
 }
 
+/** Função exportada: resumeMissionTransition. */
 function resumeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
     const now = Date.now();
@@ -368,6 +371,7 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
     });
 }
 
+/** Função exportada: cancelMissionTransition. */
 function cancelMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
         missionId,
@@ -395,6 +399,7 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
     });
 }
 
+/** Função exportada: failMissionTransition. */
 function failMissionTransition({
     missionId,
     failureReason,
@@ -421,6 +426,7 @@ function failMissionTransition({
     });
 }
 
+/** Função exportada: completeMissionTransition. */
 function completeMissionTransition({
     missionId,
     contextPatch = null,
@@ -445,6 +451,7 @@ function completeMissionTransition({
     });
 }
 
+/** Reexport público: MISSION_STATUS. */
 export {
     MISSION_STATUS,
     cancelMissionTransition,

@@ -22,7 +22,7 @@ const TRANSFORM_TYPES = {
     STATUS: 'STATUS',
     ERROR: 'ERROR',
     METRICS: 'METRICS',
-    RAW: 'RAW'
+    RAW: 'RAW',
 };
 
 /**

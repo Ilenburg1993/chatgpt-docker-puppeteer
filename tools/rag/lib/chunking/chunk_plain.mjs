@@ -26,4 +26,3 @@ export function chunkPlain({ lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChu
 
     return ranges;
 }
-

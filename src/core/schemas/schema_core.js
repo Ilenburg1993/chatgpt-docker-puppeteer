@@ -56,6 +56,9 @@ export const parseTask = raw => {
     const healed = healTask(r);
     // Auto-migração transparente V4 → V5
     return migrator.autoMigrateTask(healed);
-};;
+};
 
+/**
+ * Barrel canônico de schemas/artefatos de migração usados pelo núcleo.
+ */
 export { BootstrapStateSchema, DnaSchema, migrator, SelectorProtocolSchema, TaskSchema, TaskSchemaV5 };

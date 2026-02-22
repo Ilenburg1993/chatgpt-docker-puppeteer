@@ -22,4 +22,3 @@ test('wave19: useSsotRealtime aplica dedupe + reconciliação por cursor/event_i
     assert.match(eventsStore, /seenIds/);
     assert.match(eventsStore, /pushBatch/);
 });
-

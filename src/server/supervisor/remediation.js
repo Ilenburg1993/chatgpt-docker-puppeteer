@@ -13,19 +13,19 @@ const RemediationPolicy = Object.freeze({
     BROWSER_FROZEN: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
-        retryTask: true
+        retryTask: true,
     },
 
     TERMINAL_INFRA_FAILURE: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'CRITICAL',
-        retryTask: true
+        retryTask: true,
     },
 
     DIAGNOSTIC_CRASH: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
-        retryTask: true
+        retryTask: true,
     },
 
     // --- 2. BARREIRAS DE SEGURANÇA E ACESSO ---
@@ -33,19 +33,19 @@ const RemediationPolicy = Object.freeze({
     CAPTCHA_CHALLENGE: {
         action: ActionCode.ENGINE_PAUSE,
         severity: 'CRITICAL',
-        notifyUser: true // Exige intervenção humana imediata no Dashboard
+        notifyUser: true, // Exige intervenção humana imediata no Dashboard
     },
 
     INFRA_BARRIER_DETECTED: {
         action: ActionCode.BROWSER_REBOOT, // Tenta contornar via reset de sessão
         severity: 'HIGH',
-        retryTask: true
+        retryTask: true,
     },
 
     LOGIN_REQUIRED: {
         action: ActionCode.ENGINE_STOP,
         severity: 'HIGH',
-        notifyUser: true
+        notifyUser: true,
     },
 
     // --- 3. LIMITES E ERROS SEMÂNTICOS ---
@@ -53,13 +53,13 @@ const RemediationPolicy = Object.freeze({
     LIMIT_REACHED: {
         action: ActionCode.ENGINE_PAUSE,
         severity: 'MEDIUM',
-        cooldown_ms: 3600000 // 1 hora de repouso para reset de cota
+        cooldown_ms: 3600000, // 1 hora de repouso para reset de cota
     },
 
     GENERIC_ERROR_TEXT: {
         action: ActionCode.TASK_RETRY,
         severity: 'MEDIUM',
-        maxRetries: 1
+        maxRetries: 1,
     },
 
     // --- 4. ANOMALIAS DE LÓGICA E INTERFACE ---
@@ -67,26 +67,26 @@ const RemediationPolicy = Object.freeze({
     LOGICAL_LOOP: {
         action: ActionCode.CACHE_CLEAR,
         severity: 'MEDIUM',
-        retryTask: true
+        retryTask: true,
     },
 
     INPUT_NOT_FOUND: {
         action: ActionCode.BROWSER_REBOOT,
         severity: 'HIGH',
-        retryTask: true
+        retryTask: true,
     },
 
     FINISHED_ABRUPTLY: {
         action: ActionCode.TASK_RETRY,
         severity: 'LOW',
-        maxRetries: 2
+        maxRetries: 2,
     },
 
     VISUAL_ERROR_DETECTED: {
         action: ActionCode.TASK_RETRY,
         severity: 'MEDIUM',
-        maxRetries: 1
-    }
+        maxRetries: 1,
+    },
 });
 
 class RemediationEngine {
@@ -124,10 +124,11 @@ class RemediationEngine {
                 should_retry: policy.retryTask || false,
                 cooldown: policy.cooldown_ms || 0,
                 notify: policy.notifyUser || false,
-                evidence: diagnosis.evidence || {}
-            }
+                evidence: diagnosis.evidence || {},
+            },
         };
     }
 }
 
+/** Reexport público: default. */
 export default new RemediationEngine();

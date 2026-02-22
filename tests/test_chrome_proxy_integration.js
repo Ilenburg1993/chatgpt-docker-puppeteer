@@ -7,6 +7,7 @@ process.env.CHROME_PROXY_ENABLED = 'true';
 process.env.CHROME_PROXY_PORT = '9224';
 process.env.CHROME_PORT = '9225';
 
+/** Função exportada: testChromeProxyIntegration. */
 async function testChromeProxyIntegration() {
     log('INFO', '========================================');
     log('INFO', 'TESTE: Integração Chrome Proxy + Pool');
@@ -22,7 +23,7 @@ async function testChromeProxyIntegration() {
         poolValidation: false,
         poolConnection: false,
         nervEvents: [],
-        shutdown: false
+        shutdown: false,
     };
 
     try {
@@ -37,7 +38,7 @@ async function testChromeProxyIntegration() {
             mode: CONNECTION_MODES.LOCAL,
             correlation: true,
             bufferSize: 100,
-            telemetry: true
+            telemetry: true,
         });
 
         // Captura eventos NERV
@@ -46,7 +47,7 @@ async function testChromeProxyIntegration() {
                 actor: envelope.identity?.actor,
                 action: envelope.type?.action_code,
                 payload: envelope.payload,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         });
 
@@ -62,7 +63,7 @@ async function testChromeProxyIntegration() {
             PUBLIC_IP: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
             CHROME_PORT: CONFIG.CHROME_PORT || 9225,
             PROXY_PORT: CONFIG.CHROME_PROXY_PORT || 9224,
-            LOG_LEVEL: 'INFO'
+            LOG_LEVEL: 'INFO',
         });
 
         chromeProxy.setNERV(nerv);
@@ -95,8 +96,8 @@ async function testChromeProxyIntegration() {
             allocationStrategy: 'round-robin',
             healthCheckInterval: 60000,
             browserEndpoint: {
-                url: `http://${CONFIG.CHROME_PROXY_HOST || '192.168.0.2'}:${CONFIG.CHROME_PROXY_PORT || 9224}`
-            }
+                url: `http://${CONFIG.CHROME_PROXY_HOST || '192.168.0.2'}:${CONFIG.CHROME_PROXY_PORT || 9224}`,
+            },
         });
 
         // Esta chamada deve:

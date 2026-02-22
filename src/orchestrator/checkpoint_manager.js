@@ -61,8 +61,8 @@ class CheckpointManager {
             mission_state: missionState,
             metadata: {
                 ...metadata,
-                created_at: new Date(timestamp).toISOString()
-            }
+                created_at: new Date(timestamp).toISOString(),
+            },
         };
 
         const checkpointsDir = path.join(this.baseDir, missionId, 'checkpoints');
@@ -76,7 +76,9 @@ class CheckpointManager {
         const latestPath = path.join(checkpointsDir, 'checkpoint-latest.json');
         await fs.writeFile(latestPath, JSON.stringify(checkpoint, null, 2));
 
-        logger.info(`[CheckpointManager] Checkpoint saved: ${missionId} (step ${stepIndex}, checkpoint: ${checkpointId})`);
+        logger.info(
+            `[CheckpointManager] Checkpoint saved: ${missionId} (step ${stepIndex}, checkpoint: ${checkpointId})`
+        );
 
         // Auto-cleanup de checkpoints antigos
         if (this.autoCleanup) {
@@ -106,7 +108,9 @@ class CheckpointManager {
             const data = await fs.readFile(latestPath, 'utf-8');
             const checkpoint = JSON.parse(data);
 
-            logger.info(`[CheckpointManager] Checkpoint loaded: ${missionId} (step ${checkpoint.step_index}, checkpoint: ${checkpoint.checkpoint_id})`);
+            logger.info(
+                `[CheckpointManager] Checkpoint loaded: ${missionId} (step ${checkpoint.step_index}, checkpoint: ${checkpoint.checkpoint_id})`
+            );
 
             return checkpoint;
         } catch (error) {
@@ -175,7 +179,7 @@ class CheckpointManager {
                     checkpoint_id: checkpoint.checkpoint_id,
                     timestamp: checkpoint.timestamp,
                     step_index: checkpoint.step_index,
-                    created_at: checkpoint.metadata.created_at
+                    created_at: checkpoint.metadata.created_at,
                 });
             }
 
@@ -205,7 +209,9 @@ class CheckpointManager {
             logger.info(`[CheckpointManager] Checkpoint deleted: ${missionId}/${checkpointId}`);
         } catch (error) {
             if (error.code !== 'ENOENT') {
-                logger.error(`[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${error.message}`);
+                logger.error(
+                    `[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${error.message}`
+                );
             }
         }
     }
@@ -281,7 +287,7 @@ class CheckpointManager {
                 mission_id: missionId,
                 total_checkpoints: checkpoints.length,
                 has_latest: hasLatest,
-                latest_checkpoint: checkpoints.length > 0 ? checkpoints[0] : null
+                latest_checkpoint: checkpoints.length > 0 ? checkpoints[0] : null,
             };
         }
 
@@ -289,7 +295,7 @@ class CheckpointManager {
         return {
             base_dir: this.baseDir,
             keep_last: this.keepLast,
-            auto_cleanup: this.autoCleanup
+            auto_cleanup: this.autoCleanup,
         };
     }
 }

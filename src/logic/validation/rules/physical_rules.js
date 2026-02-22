@@ -19,7 +19,7 @@ function checkPhysicalIntegrity(task, stats) {
     if (!stats) {
         return {
             ok: false,
-            reason: 'FILE_NOT_FOUND: Os metadados do arquivo são nulos ou inacessíveis.'
+            reason: 'FILE_NOT_FOUND: Os metadados do arquivo são nulos ou inacessíveis.',
         };
     }
 
@@ -31,7 +31,7 @@ function checkPhysicalIntegrity(task, stats) {
     if (fileSize === 0) {
         return {
             ok: false,
-            reason: 'EMPTY_FILE: O arquivo foi criado no disco, mas não contém dados.'
+            reason: 'EMPTY_FILE: O arquivo foi criado no disco, mas não contém dados.',
         };
     }
 
@@ -43,7 +43,7 @@ function checkPhysicalIntegrity(task, stats) {
     if (fileSize < minLength) {
         return {
             ok: false,
-            reason: `TOO_SHORT: O conteúdo gerado (${fileSize} bytes) é inferior ao mínimo exigido (${minLength} bytes).`
+            reason: `TOO_SHORT: O conteúdo gerado (${fileSize} bytes) é inferior ao mínimo exigido (${minLength} bytes).`,
         };
     }
 

@@ -4,8 +4,8 @@ import { ragReset } from './lib/facade.mjs';
 
 const { values } = parseArgs({
     options: {
-        yes: { type: 'boolean', default: false }
-    }
+        yes: { type: 'boolean', default: false },
+    },
 });
 
 await ragReset({ yes: values.yes });

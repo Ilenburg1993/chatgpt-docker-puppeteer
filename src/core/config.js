@@ -161,7 +161,9 @@ const ConfigSchema = z
         DASHBOARD_LEGACY_BRIDGE_CONTINGENCY: z
             .boolean()
             .default(process.env.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY === 'true'),
-        DASHBOARD_EMIT_TASK_UPDATED_COMPAT: z.boolean().default(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT === 'true'),
+        DASHBOARD_EMIT_TASK_UPDATED_COMPAT: z
+            .boolean()
+            .default(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT === 'true'),
         CONTROL_REQUIRE_REASON: z.boolean().default(process.env.CONTROL_REQUIRE_REASON !== 'false'),
         CONTROL_REQUIRE_IDEMPOTENCY_KEY: z.boolean().default(process.env.CONTROL_REQUIRE_IDEMPOTENCY_KEY !== 'false'),
         CONTROL_STRICT_PAUSE_TO_EDIT: z.boolean().default(process.env.CONTROL_STRICT_PAUSE_TO_EDIT !== 'false'),
@@ -615,12 +617,11 @@ class ConfigurationManager extends EventEmitter {
     }
 }
 
-// Exporta como Singleton Soberano
-const manager = new ConfigurationManager();
-
 /**
- * Instância singleton do gerenciador de configuração.
- * Side-effects: Emite eventos 'updated' quando config muda.
+ * Instância singleton soberana do gerenciador de configuração.
+ * Mantém cache em RAM e coordena hot-reload via eventos.
  * @type {ConfigurationManager}
  */
+const manager = new ConfigurationManager();
+
 export default manager;

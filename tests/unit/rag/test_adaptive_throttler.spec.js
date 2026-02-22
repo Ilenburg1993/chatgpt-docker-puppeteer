@@ -10,7 +10,7 @@ describe('AdaptiveThrottler', () => {
             minDelay: 0,
             maxDelay: 200,
             initialDelay: 50,
-            sampleSize: 3
+            sampleSize: 3,
         });
         throttler.getCPUUsage = () => 95;
         throttler.maybeLogAdjustment = () => {};
@@ -29,7 +29,7 @@ describe('AdaptiveThrottler', () => {
             minDelay: 20,
             maxDelay: 300,
             initialDelay: 120,
-            sampleSize: 3
+            sampleSize: 3,
         });
         throttler.getCPUUsage = () => 18;
         throttler.maybeLogAdjustment = () => {};
@@ -48,7 +48,7 @@ describe('AdaptiveThrottler', () => {
             metric: process.env.RAG_THROTTLE_METRIC,
             target: process.env.RAG_THROTTLE_TARGET_CPU,
             minDelay: process.env.RAG_THROTTLE_MIN_DELAY_MS,
-            maxDelay: process.env.RAG_THROTTLE_MAX_DELAY_MS
+            maxDelay: process.env.RAG_THROTTLE_MAX_DELAY_MS,
         };
         try {
             process.env.RAG_THROTTLE_ENABLED = 'true';

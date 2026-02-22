@@ -79,7 +79,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
         if (isFull()) {
             telemetry.emit('nerv:buffer:inbound:pressure', {
                 size: queue.length,
-                limit: maxSize
+                limit: maxSize,
             });
             return false;
         }
@@ -87,7 +87,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
         queue.push(item);
 
         telemetry.emit('nerv:buffer:inbound:enqueue', {
-            size: queue.length
+            size: queue.length,
         });
 
         return true;
@@ -106,7 +106,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
         const item = queue.shift();
 
         telemetry.emit('nerv:buffer:inbound:dequeue', {
-            size: queue.length
+            size: queue.length,
         });
 
         return item;
@@ -144,7 +144,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
         dequeue,
         size,
         isEmpty,
-        clear
+        clear,
     });
 }
 

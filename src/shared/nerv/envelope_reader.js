@@ -8,11 +8,7 @@
  */
 function getMessageType(envelope) {
     return (
-        envelope?.kind ||
-        envelope?.messageType ||
-        envelope?.type?.message_type ||
-        envelope?.type?.messageType ||
-        null
+        envelope?.kind || envelope?.messageType || envelope?.type?.message_type || envelope?.type?.messageType || null
     );
 }
 
@@ -55,13 +51,7 @@ function getCorrelationId(envelope) {
  * @sideEffects Nenhum - função pura
  */
 function getMsgId(envelope) {
-    return (
-        envelope?.msgId ||
-        envelope?.ids?.msg_id ||
-        envelope?.ids?.msgId ||
-        envelope?.causality?.msg_id ||
-        null
-    );
+    return envelope?.msgId || envelope?.ids?.msg_id || envelope?.ids?.msgId || envelope?.causality?.msg_id || null;
 }
 
 /**

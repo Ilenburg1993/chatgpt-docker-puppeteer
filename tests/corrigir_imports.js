@@ -20,7 +20,7 @@ const correcoes = {
     'tests/e2e': '../../',
     'tests/regression': '../../',
     'tests/manual': '../../',
-    'tests/helpers': '../../'
+    'tests/helpers': '../../',
 };
 
 function corrigirArquivo(caminhoArquivo) {
@@ -44,7 +44,7 @@ function corrigirArquivo(caminhoArquivo) {
         { de: /require\(['"]\.\.\/package\.json/g, para: `require('${prefixo}package.json` },
         { de: /\.\.\/\.gitignore/g, para: `${prefixo}.gitignore` },
         { de: /\.\.\/config\.json/g, para: `${prefixo}config.json` },
-        { de: /\.\.\/dynamic_rules\.json/g, para: `${prefixo}dynamic_rules.json` }
+        { de: /\.\.\/dynamic_rules\.json/g, para: `${prefixo}dynamic_rules.json` },
     ];
 
     let novoConteudo = conteudo;

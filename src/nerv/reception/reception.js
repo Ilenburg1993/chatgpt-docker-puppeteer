@@ -31,7 +31,7 @@ function createReception({ envelopes, correlation, telemetry }) {
     const receiver = createReceive({
         envelopes,
         correlation,
-        telemetry
+        telemetry,
     });
 
     /* =========================================================
@@ -48,7 +48,7 @@ function createReception({ envelopes, correlation, telemetry }) {
         /**
          * Registra handler para envelopes recebidos.
          */
-        onReceive: receiver.onReceive
+        onReceive: receiver.onReceive,
     });
 }
 

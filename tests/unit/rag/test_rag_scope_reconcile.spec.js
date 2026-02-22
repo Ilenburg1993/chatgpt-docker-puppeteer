@@ -31,7 +31,7 @@ describe('RAG scope reconciliation', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -45,7 +45,7 @@ describe('RAG scope reconciliation', () => {
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
                 profile: 'full',
-                docsMode: 'include'
+                docsMode: 'include',
             });
             assert.strictEqual(first.scope.docs_mode, 'include');
 
@@ -54,7 +54,7 @@ describe('RAG scope reconciliation', () => {
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
                 profile: 'full',
-                docsMode: 'exclude'
+                docsMode: 'exclude',
             });
             assert.strictEqual(second.scope.docs_mode, 'exclude');
             assert.ok(second.scope_reconciled);
@@ -76,7 +76,7 @@ describe('RAG scope reconciliation', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -89,7 +89,7 @@ describe('RAG scope reconciliation', () => {
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
                 profile: 'full',
-                docsMode: 'include'
+                docsMode: 'include',
             });
 
             const report = await ragIndexChanged({
@@ -98,7 +98,7 @@ describe('RAG scope reconciliation', () => {
                 embeddingsProvider: embeddings,
                 changedPaths: [],
                 profile: 'full',
-                docsMode: 'exclude'
+                docsMode: 'exclude',
             });
             assert.ok(report.scope_reconciled);
             assert.ok(report.pruned_files >= 1);
@@ -113,4 +113,3 @@ describe('RAG scope reconciliation', () => {
         }
     });
 });
-

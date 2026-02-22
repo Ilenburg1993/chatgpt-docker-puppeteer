@@ -11,6 +11,13 @@ function normalizePath(value) {
     }
 }
 
+/**
+ * Lê flag booleana de environment com parsing resiliente.
+ *
+ * @param {unknown} value
+ * @param {boolean} [fallback=false]
+ * @returns {boolean}
+ */
 function parseEnvFlag(value, fallback = false) {
     if (value === undefined || value === null || value === '') {
         return fallback;
@@ -29,6 +36,13 @@ function resolveEntrypointFile(importMetaUrl) {
     }
 }
 
+/**
+ * Detecta execução direta do arquivo atual (entrypoint real via CLI/Node).
+ *
+ * @param {string} importMetaUrl
+ * @param {string|null|undefined} [argvFile=process.argv[1]]
+ * @returns {boolean}
+ */
 function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
     const entryFile = resolveEntrypointFile(importMetaUrl);
     const argvPath = normalizePath(argvFile);
@@ -36,6 +50,13 @@ function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
     return argvPath === entryFile;
 }
 
+/**
+ * Detecta quando o PM2 está executando exatamente este arquivo como script principal.
+ *
+ * @param {string} importMetaUrl
+ * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @returns {boolean}
+ */
 function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
     const entryFile = resolveEntrypointFile(importMetaUrl);
     if (!entryFile) return false;
@@ -44,6 +65,17 @@ function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
     return pmExecPath === entryFile;
 }
 
+/**
+ * Decide se o entrypoint deve auto-bootstrap no import atual.
+ *
+ * @param {{
+ *   importMetaUrl: string,
+ *   env?: NodeJS.ProcessEnv,
+ *   explicitAutostartEnv?: string|null,
+ *   allowPm2ExecPathMatch?: boolean,
+ * }} options
+ * @returns {boolean}
+ */
 function shouldAutobootEntrypoint({
     importMetaUrl,
     env = process.env,

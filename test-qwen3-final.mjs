@@ -14,7 +14,7 @@ import { OllamaClient } from './tools/ollama/client.mjs';
 const ollama = new OllamaClient({
     cloudEnabled: true,
     cloudBaseUrl: 'https://ollama.com',
-    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY
+    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY,
 });
 
 console.log('='.repeat(80));

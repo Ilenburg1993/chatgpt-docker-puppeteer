@@ -13,7 +13,7 @@ async function getMetrics(req, res) {
             cpu: process.cpuUsage(),
             pid: process.pid,
             platform: process.platform,
-            nodeVersion: process.version
+            nodeVersion: process.version,
         };
 
         res.json({ status: 'ok', metrics });
@@ -31,7 +31,7 @@ async function getTaskMetrics(req, res) {
         // TODO: Implementar métricas reais de tasks
         res.json({
             status: 'unknown',
-            message: 'Task metrics not implemented yet'
+            message: 'Task metrics not implemented yet',
         });
     } catch (err) {
         log('ERROR', `[METRICS] Erro ao obter métricas de tasks: ${err.message}`);

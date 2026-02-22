@@ -108,6 +108,9 @@ const TIMEOUT_MULTIPLIERS = Object.freeze({
    PageSessionTracker Class
 ========================================================================== */
 
+/**
+ * Tracker de sessão por página para métricas de saúde e timeout adaptativo.
+ */
 class PageSessionTracker {
     /**
      * Creates a new PageSessionTracker instance.

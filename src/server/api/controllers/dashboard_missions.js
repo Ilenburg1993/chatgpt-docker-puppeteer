@@ -5,6 +5,7 @@ import { getDb } from '#infra/db/sqlite';
 import { ok, fail, encodeCursor, decodeCursor, parseIncludeParam } from '../utils/api_envelope.js';
 import { taskRowToListItem } from '../utils/task_views.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 function _asInt(raw, fallback) {
@@ -73,7 +74,17 @@ function _fetchCountsForMissions(db, missionIds) {
     const out = {};
     for (const r of rows) {
         const mid = String(r.mission_id);
-        out[mid] = out[mid] || { tasks_total: 0, by_stage: {}, by_status: {}, proposed: 0, blocked: 0, running: 0, pending: 0, done: 0, failed: 0 };
+        out[mid] = out[mid] || {
+            tasks_total: 0,
+            by_stage: {},
+            by_status: {},
+            proposed: 0,
+            blocked: 0,
+            running: 0,
+            pending: 0,
+            done: 0,
+            failed: 0,
+        };
         const c = Number(r.c) || 0;
         out[mid].tasks_total += c;
         out[mid].by_stage[String(r.stage)] = (out[mid].by_stage[String(r.stage)] || 0) + c;
@@ -114,14 +125,18 @@ router.get('/missions', async (req, res) => {
             params.autonomy_mode = autonomyMode;
         }
         if (search) {
-            where.push('(instr(lower(m.title), lower(@search)) > 0 OR instr(lower(m.description), lower(@search)) > 0 OR instr(lower(m.id), lower(@search)) > 0)');
+            where.push(
+                '(instr(lower(m.title), lower(@search)) > 0 OR instr(lower(m.description), lower(@search)) > 0 OR instr(lower(m.id), lower(@search)) > 0)'
+            );
             params.search = search;
         }
 
         const cUpdated = cursor && Number(cursor.updated_at_ms);
         const cId = cursor && cursor.id ? String(cursor.id) : null;
         if (Number.isFinite(cUpdated) && cId) {
-            where.push('(m.updated_at_ms < @cursor_updated OR (m.updated_at_ms = @cursor_updated AND m.id < @cursor_id))');
+            where.push(
+                '(m.updated_at_ms < @cursor_updated OR (m.updated_at_ms = @cursor_updated AND m.id < @cursor_id))'
+            );
             params.cursor_updated = cUpdated;
             params.cursor_id = cId;
         }
@@ -146,12 +161,19 @@ router.get('/missions', async (req, res) => {
 
         const items = page.map(r => _missionRowToItem(r, counts));
         const last = page.length ? page[page.length - 1] : null;
-        const nextCursor = hasMore && last ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id }) : null;
+        const nextCursor =
+            hasMore && last
+                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id })
+                : null;
 
         ok(res, req, { items }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] missions list failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'MISSIONS_LIST_FAILED', error: 'Erro ao recuperar missions', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'MISSIONS_LIST_FAILED',
+            error: 'Erro ao recuperar missions',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -166,7 +188,11 @@ router.get('/missions/:id', async (req, res) => {
 
         const row = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
         if (!row) {
-            return fail(res, req, 404, { code: 'MISSION_NOT_FOUND', error: 'Missão não encontrada', details: { mission_id: missionId } });
+            return fail(res, req, 404, {
+                code: 'MISSION_NOT_FOUND',
+                error: 'Missão não encontrada',
+                details: { mission_id: missionId },
+            });
         }
 
         const mission = {
@@ -238,7 +264,11 @@ router.get('/missions/:id', async (req, res) => {
         ok(res, req, data, { includes: Array.from(include) });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] mission detail failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'MISSION_DETAIL_FAILED', error: 'Erro ao recuperar mission', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'MISSION_DETAIL_FAILED',
+            error: 'Erro ao recuperar mission',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -271,7 +301,9 @@ router.get('/missions/:id/tasks', async (req, res) => {
         const cUpdated = cursor && Number(cursor.updated_at_ms);
         const cId = cursor && cursor.id ? String(cursor.id) : null;
         if (Number.isFinite(cUpdated) && cId) {
-            where.push('(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))');
+            where.push(
+                '(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))'
+            );
             params.cursor_updated = cUpdated;
             params.cursor_id = cId;
         }
@@ -296,12 +328,19 @@ router.get('/missions/:id/tasks', async (req, res) => {
         const hasMore = rows.length > limit;
         const page = hasMore ? rows.slice(0, limit) : rows;
         const last = page.length ? page[page.length - 1] : null;
-        const nextCursor = hasMore && last ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id }) : null;
+        const nextCursor =
+            hasMore && last
+                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id })
+                : null;
 
         ok(res, req, { items: page.map(taskRowToListItem) }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] mission tasks failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'MISSION_TASKS_FAILED', error: 'Erro ao listar tasks da mission', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'MISSION_TASKS_FAILED',
+            error: 'Erro ao listar tasks da mission',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -315,14 +354,16 @@ router.get('/missions/:id/proposals', async (req, res) => {
         const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
         const cursor = decodeCursor(req.query.cursor);
 
-        const where = ["t.mission_id = @mission_id", "t.stage = 'PROPOSED'"];
+        const where = ['t.mission_id = @mission_id', "t.stage = 'PROPOSED'"];
         /** @type {Record<string, any>} */
         const params = { mission_id: missionId, limit: limit + 1 };
 
         const cUpdated = cursor && Number(cursor.updated_at_ms);
         const cId = cursor && cursor.id ? String(cursor.id) : null;
         if (Number.isFinite(cUpdated) && cId) {
-            where.push('(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))');
+            where.push(
+                '(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))'
+            );
             params.cursor_updated = cUpdated;
             params.cursor_id = cId;
         }
@@ -347,12 +388,19 @@ router.get('/missions/:id/proposals', async (req, res) => {
         const hasMore = rows.length > limit;
         const page = hasMore ? rows.slice(0, limit) : rows;
         const last = page.length ? page[page.length - 1] : null;
-        const nextCursor = hasMore && last ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id }) : null;
+        const nextCursor =
+            hasMore && last
+                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id })
+                : null;
 
         ok(res, req, { items: page.map(taskRowToListItem) }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] mission proposals failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'MISSION_PROPOSALS_FAILED', error: 'Erro ao listar proposals', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'MISSION_PROPOSALS_FAILED',
+            error: 'Erro ao listar proposals',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -412,7 +460,11 @@ router.get('/missions/:id/events', async (req, res) => {
         ok(res, req, { items: page }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] mission events failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'MISSION_EVENTS_FAILED', error: 'Erro ao listar eventos', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'MISSION_EVENTS_FAILED',
+            error: 'Erro ao listar eventos',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -462,7 +514,11 @@ router.get('/missions/:id/graph', async (req, res) => {
         ok(res, req, { mission_id: missionId, tasks: tasks.map(taskRowToListItem), edges, workflows }, {});
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] mission graph failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'MISSION_GRAPH_FAILED', error: 'Erro ao gerar grafo', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'MISSION_GRAPH_FAILED',
+            error: 'Erro ao gerar grafo',
+            details: err?.message || String(err),
+        });
     }
 });
 

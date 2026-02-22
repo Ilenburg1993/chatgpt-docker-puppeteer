@@ -1,6 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as driverFactory from '#driver/factory';
 
+/**
+ * Resolve ambiente/target a partir do contexto de página para seleção de driver.
+ */
 class EnvironmentResolver {
     /**
      * Resolve o ambiente atual com base no contexto do navegador.
@@ -64,8 +67,8 @@ class EnvironmentResolver {
                     metadata: {
                         hostname,
                         path: url.pathname,
-                        timestamp: Date.now()
-                    }
+                        timestamp: Date.now(),
+                    },
                 };
             }
 
@@ -87,10 +90,13 @@ class EnvironmentResolver {
             reason,
             metadata: {
                 ...metadata,
-                timestamp: Date.now()
-            }
+                timestamp: Date.now(),
+            },
         };
     }
 }
 
+/**
+ * Resolutor de ambiente baseado em URL/hostname para selecionar target de driver.
+ */
 export default EnvironmentResolver;

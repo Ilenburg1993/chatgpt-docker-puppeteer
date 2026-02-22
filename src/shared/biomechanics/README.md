@@ -1,15 +1,15 @@
 # Biomechanics Module - Human Interaction Simulation
 
-**Location**: `src/shared/biomechanics/human.js`
-**Version**: v4.0 (Migrated from driver/modules)
-**Status**: ✅ Production Ready
-**Category**: Universal Tool (Shared Layer)
+**Location**: `src/shared/biomechanics/human.js` **Version**: v4.0 (Migrated from driver/modules)
+**Status**: ✅ Production Ready **Category**: Universal Tool (Shared Layer)
 
 ---
 
 ## Overview
 
-The **Biomechanics Module** provides human-like simulation for mouse and keyboard interactions. It implements gaussian variance, typo generation, rhythm adaptation, and fatigue simulation to create realistic user behavior patterns that are indistinguishable from real human input.
+The **Biomechanics Module** provides human-like simulation for mouse and keyboard interactions. It
+implements gaussian variance, typo generation, rhythm adaptation, and fatigue simulation to create
+realistic user behavior patterns that are indistinguishable from real human input.
 
 ### Why Shared Layer?
 
@@ -27,6 +27,7 @@ The **Biomechanics Module** provides human-like simulation for mouse and keyboar
 Performs a human-like click with gaussian variance.
 
 **Parameters**:
+
 - `page` {Object} - Puppeteer Page instance
 - `ctx` {Object} - Execution context (Page or Frame)
 - `selector` {string} - CSS selector of target element
@@ -36,17 +37,19 @@ Performs a human-like click with gaussian variance.
 - `onPulse` {Function} - Callback for telemetry `({ type: 'MOUSE_MOVE', coords: {x, y} })`
 
 **Features**:
+
 - Gaussian randomization (stddev = 12% of element size)
 - Ghost-cursor smooth movement
 - Random delays (100-200ms before click, 40-80ms hold)
 - Fallback to synthetic click on error
 
 **Example**:
+
 ```javascript
 const human = require('@shared/biomechanics/human');
 
-await human.humanClick(page, page, 'button#submit', 0, 0, null, (pulse) => {
-    console.log('Mouse moved to:', pulse.coords);
+await human.humanClick(page, page, 'button#submit', 0, 0, null, pulse => {
+  console.log('Mouse moved to:', pulse.coords);
 });
 ```
 
@@ -57,6 +60,7 @@ await human.humanClick(page, page, 'button#submit', 0, 0, null, (pulse) => {
 Performs human-like typing with errors, corrections, and adaptive rhythm.
 
 **Parameters**:
+
 - `page` {Object} - Puppeteer Page instance
 - `ctx` {Object} - Execution context (Page or Frame)
 - `selector` {string} - CSS selector of input field
@@ -66,6 +70,7 @@ Performs human-like typing with errors, corrections, and adaptive rhythm.
 - `onPulse` {Function} - Callback for telemetry `({ type: 'KEY_PRESS', char, index, total })`
 
 **Features**:
+
 - **Typo simulation**: 1.2% chance per character
   - Transposes adjacent characters (30% of typos)
   - Types neighboring keys from QWERTY layout (70% of typos)
@@ -81,11 +86,12 @@ Performs human-like typing with errors, corrections, and adaptive rhythm.
 - **Security**: Sanitizes control characters (prevents protocol injection)
 
 **Example**:
+
 ```javascript
 const human = require('@shared/biomechanics/human');
 
-await human.humanType(page, page, '#prompt-textarea', 'Hello, world!', 0, null, (pulse) => {
-    console.log(`Typed: ${pulse.char} (${pulse.index + 1}/${pulse.total})`);
+await human.humanType(page, page, '#prompt-textarea', 'Hello, world!', 0, null, pulse => {
+  console.log(`Typed: ${pulse.char} (${pulse.index + 1}/${pulse.total})`);
 });
 ```
 
@@ -96,14 +102,17 @@ await human.humanType(page, page, '#prompt-textarea', 'Hello, world!', 0, null, 
 Performs a random cursor movement to "wake up" the browser window.
 
 **Parameters**:
+
 - `page` {Object} - Puppeteer Page instance
 
 **Features**:
+
 - Moves to random position within viewport (10% padding)
 - Uses ghost-cursor for smooth movement
 - Silent failure (no throw on error)
 
 **Example**:
+
 ```javascript
 const human = require('@shared/biomechanics/human');
 
@@ -117,6 +126,7 @@ await human.wakeUpMove(page); // Random cursor movement
 Currently supports **QWERTY** layout with neighbor key mapping for typo simulation.
 
 **Layout**:
+
 ```javascript
 {
     a: 'qsxz',  // Keys adjacent to 'a'
@@ -135,23 +145,23 @@ Currently supports **QWERTY** layout with neighbor key mapping for typo simulati
 Both `humanClick` and `humanType` support optional `onPulse` callbacks for real-time telemetry:
 
 ```javascript
-await human.humanType(page, page, '#input', text, 0, null, (pulse) => {
-    if (pulse.type === 'KEY_PRESS') {
-        telemetry.emit('BIOMECHANICS', {
-            action: 'TYPING',
-            char: pulse.char,
-            progress: `${pulse.index}/${pulse.total}`
-        });
-    }
+await human.humanType(page, page, '#input', text, 0, null, pulse => {
+  if (pulse.type === 'KEY_PRESS') {
+    telemetry.emit('BIOMECHANICS', {
+      action: 'TYPING',
+      char: pulse.char,
+      progress: `${pulse.index}/${pulse.total}`,
+    });
+  }
 });
 
-await human.humanClick(page, page, '#button', 0, 0, null, (pulse) => {
-    if (pulse.type === 'MOUSE_MOVE') {
-        telemetry.emit('BIOMECHANICS', {
-            action: 'CLICKING',
-            coords: pulse.coords
-        });
-    }
+await human.humanClick(page, page, '#button', 0, 0, null, pulse => {
+  if (pulse.type === 'MOUSE_MOVE') {
+    telemetry.emit('BIOMECHANICS', {
+      action: 'CLICKING',
+      coords: pulse.coords,
+    });
+  }
 });
 ```
 
@@ -160,39 +170,43 @@ await human.humanClick(page, page, '#button', 0, 0, null, (pulse) => {
 ## Usage Patterns
 
 ### Pattern 1: Driver Execution
+
 ```javascript
 // src/driver/modules/biomechanics_engine.js
 const human = require('@shared/biomechanics/human');
 
 async function click(selector) {
-    await human.humanClick(this.driver.page, ctx, selector, offsetX, offsetY);
+  await human.humanClick(this.driver.page, ctx, selector, offsetX, offsetY);
 }
 ```
 
 ### Pattern 2: Health Checks
+
 ```javascript
 // src/infra/browser_pool/pool_manager.js
 const human = require('@shared/biomechanics/human');
 
 async function testInteractivity(page) {
-    // Simulate user activity to test browser responsiveness
-    await human.wakeUpMove(page);
-    await human.humanClick(page, page, 'body', 0, 0);
+  // Simulate user activity to test browser responsiveness
+  await human.wakeUpMove(page);
+  await human.humanClick(page, page, 'body', 0, 0);
 }
 ```
 
 ### Pattern 3: E2E Testing
+
 ```javascript
 // tests/e2e/interaction_test.js
 const human = require('@shared/biomechanics/human');
 
 test('User can submit form', async () => {
-    await human.humanType(page, page, '#name', 'John Doe');
-    await human.humanClick(page, page, 'button[type="submit"]');
+  await human.humanType(page, page, '#name', 'John Doe');
+  await human.humanClick(page, page, 'button[type="submit"]');
 });
 ```
 
 ### Pattern 4: Standalone CLI Tool
+
 ```javascript
 // tools/browser-test.js
 const human = require('@shared/biomechanics/human');
@@ -212,7 +226,8 @@ await human.humanClick(page, page, 'button.search');
 | humanType (10 chars) | 450-850ms | Adaptive (depends on lag) |
 | wakeUpMove           | 100-200ms | Random                    |
 
-**Note**: Times include human-like delays. For synthetic (instant) operations, use `page.click()` and `page.type()` directly.
+**Note**: Times include human-like delays. For synthetic (instant) operations, use `page.click()`
+and `page.type()` directly.
 
 ---
 
@@ -250,16 +265,19 @@ make test-fast
 ## Troubleshooting
 
 ### Issue: Typos not happening
-**Cause**: RNG seed
-**Solution**: Typos are probabilistic (1.2% chance). Over 100 characters, expect ~1 typo.
+
+**Cause**: RNG seed **Solution**: Typos are probabilistic (1.2% chance). Over 100 characters, expect
+~1 typo.
 
 ### Issue: Empty prompt warning
-**Cause**: Text sanitization removed all characters
-**Solution**: Avoid control characters (\x00-\x1F) in input text
+
+**Cause**: Text sanitization removed all characters **Solution**: Avoid control characters
+(\x00-\x1F) in input text
 
 ### Issue: Focus lost during typing
-**Cause**: Page mutations or JS interference
-**Solution**: Focus lock re-focuses every 25 characters automatically
+
+**Cause**: Page mutations or JS interference **Solution**: Focus lock re-focuses every 25 characters
+automatically
 
 ---
 
@@ -273,6 +291,4 @@ make test-fast
 
 ---
 
-**Author**: GitHub Copilot
-**Last Updated**: Feb 2026
-**License**: Internal Use Only
+**Author**: GitHub Copilot **Last Updated**: Feb 2026 **License**: Internal Use Only

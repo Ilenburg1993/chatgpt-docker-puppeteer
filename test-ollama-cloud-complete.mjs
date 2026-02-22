@@ -13,7 +13,7 @@ import { OllamaClient } from './tools/ollama/client.mjs';
 const ollama = new OllamaClient({
     cloudEnabled: true,
     cloudBaseUrl: 'https://ollama.com',
-    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY
+    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY,
 });
 
 console.log('═'.repeat(80));
@@ -140,20 +140,18 @@ console.log();
 
 try {
     console.log('📌 Temperature 0.1 (Determinístico):');
-    const deterministico = await ollama.generate(
-        'Describe TypeScript in one sentence.',
-        'qwen3-next:80b-cloud',
-        { temperature: 0.1, num_predict: 50 }
-    );
+    const deterministico = await ollama.generate('Describe TypeScript in one sentence.', 'qwen3-next:80b-cloud', {
+        temperature: 0.1,
+        num_predict: 50,
+    });
     console.log('  →', deterministico.trim());
     console.log();
 
     console.log('📌 Temperature 0.9 (Criativo):');
-    const criativo = await ollama.generate(
-        'Describe TypeScript in one sentence.',
-        'qwen3-next:80b-cloud',
-        { temperature: 0.9, num_predict: 50 }
-    );
+    const criativo = await ollama.generate('Describe TypeScript in one sentence.', 'qwen3-next:80b-cloud', {
+        temperature: 0.9,
+        num_predict: 50,
+    });
     console.log('  →', criativo.trim());
     console.log();
 } catch (error) {

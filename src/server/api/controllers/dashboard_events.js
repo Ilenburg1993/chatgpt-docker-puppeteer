@@ -4,6 +4,7 @@ import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import { ok, fail, encodeCursor, decodeCursor } from '../utils/api_envelope.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 function _asInt(raw, fallback) {
@@ -95,9 +96,12 @@ router.get('/events', async (req, res) => {
         ok(res, req, { items }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] global events failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'DASHBOARD_EVENTS_FAILED', error: 'Erro ao listar eventos', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'DASHBOARD_EVENTS_FAILED',
+            error: 'Erro ao listar eventos',
+            details: err?.message || String(err),
+        });
     }
 });
 
 export default router;
-

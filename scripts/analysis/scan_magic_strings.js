@@ -11,6 +11,7 @@ const ROOT = CUSTOM_DIR || '/workspaces/chatgpt-docker-puppeteer';
 const DEFAULT_EXCLUDES = ['node_modules', 'backups', '.git', 'logs', 'coverage', 'profile', 'dist'];
 
 // Comprehensive pattern definitions
+/** Constante/valor exportado: PATTERNS. */
 const PATTERNS = [
     // NERV Protocol - Property assignments
     {

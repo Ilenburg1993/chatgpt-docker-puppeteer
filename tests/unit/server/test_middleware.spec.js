@@ -10,8 +10,8 @@ describe('Server Middleware - Request Processing', () => {
                 status: 500,
                 error: {
                     message: error.message,
-                    type: 'InternalError'
-                }
+                    type: 'InternalError',
+                },
             };
 
             assert.strictEqual(response.status, 500);
@@ -24,7 +24,7 @@ describe('Server Middleware - Request Processing', () => {
 
             const response = {
                 status: error.statusCode || 500,
-                error: { message: error.message }
+                error: { message: error.message },
             };
 
             assert.strictEqual(response.status, 404);
@@ -37,7 +37,7 @@ describe('Server Middleware - Request Processing', () => {
                 logs.push({
                     level: 'ERROR',
                     message: err.message,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
             };
 
@@ -54,8 +54,8 @@ describe('Server Middleware - Request Processing', () => {
             const response = {
                 error: {
                     message: error.message,
-                    stack: NODE_ENV === 'development' ? error.stack : undefined
-                }
+                    stack: NODE_ENV === 'development' ? error.stack : undefined,
+                },
             };
 
             assert.ok(response.error.stack);
@@ -68,8 +68,8 @@ describe('Server Middleware - Request Processing', () => {
             const response = {
                 error: {
                     message: error.message,
-                    stack: NODE_ENV === 'development' ? error.stack : undefined
-                }
+                    stack: NODE_ENV === 'development' ? error.stack : undefined,
+                },
             };
 
             assert.strictEqual(response.error.stack, undefined);
@@ -95,7 +95,7 @@ describe('Server Middleware - Request Processing', () => {
                     res.headers = res.headers || {};
                     res.headers[name] = value;
                 },
-                headers: {}
+                headers: {},
             };
 
             const requestId = 'req-12345';
@@ -107,8 +107,8 @@ describe('Server Middleware - Request Processing', () => {
         it('deve usar Request ID existente se fornecido', () => {
             const req = {
                 headers: {
-                    'x-request-id': 'client-req-001'
-                }
+                    'x-request-id': 'client-req-001',
+                },
             };
 
             const requestId = req.headers['x-request-id'] || `req-${Date.now()}`;
@@ -132,13 +132,13 @@ describe('Server Middleware - Request Processing', () => {
                 required: ['prompt', 'target'],
                 properties: {
                     prompt: { type: 'string' },
-                    target: { type: 'string' }
-                }
+                    target: { type: 'string' },
+                },
             };
 
             const body = {
                 prompt: 'Teste',
-                target: 'gemini'
+                target: 'gemini',
             };
 
             const hasRequired = schema.required.every(field => field in body);
@@ -148,11 +148,11 @@ describe('Server Middleware - Request Processing', () => {
 
         it('deve rejeitar requisição sem campos obrigatórios', () => {
             const schema = {
-                required: ['prompt', 'target']
+                required: ['prompt', 'target'],
             };
 
             const body = {
-                prompt: 'Teste'
+                prompt: 'Teste',
                 // target ausente
             };
 
@@ -164,7 +164,7 @@ describe('Server Middleware - Request Processing', () => {
         it('deve validar tipos de dados', () => {
             const body = {
                 prompt: 'Texto',
-                priority: '5' // Deveria ser number
+                priority: '5', // Deveria ser number
             };
 
             const isValidType = typeof body.priority === 'number';
@@ -175,15 +175,15 @@ describe('Server Middleware - Request Processing', () => {
         it('deve retornar erro 400 com detalhes', () => {
             const errors = [
                 { field: 'prompt', message: 'Required field' },
-                { field: 'target', message: 'Required field' }
+                { field: 'target', message: 'Required field' },
             ];
 
             const response = {
                 status: 400,
                 error: {
                     message: 'Validation failed',
-                    details: errors
-                }
+                    details: errors,
+                },
             };
 
             assert.strictEqual(response.status, 400);
@@ -197,7 +197,7 @@ describe('Server Middleware - Request Processing', () => {
                 prompt: 'Teste',
                 target: 'gemini',
                 _internal: 'secret',
-                __proto__: { polluted: true }
+                __proto__: { polluted: true },
             };
 
             const sanitized = {};
@@ -219,7 +219,7 @@ describe('Server Middleware - Request Processing', () => {
                     res.headers = res.headers || {};
                     res.headers[name] = value;
                 },
-                headers: {}
+                headers: {},
             };
 
             res.setHeader('Access-Control-Allow-Origin', '*');
@@ -233,8 +233,8 @@ describe('Server Middleware - Request Processing', () => {
 
             const res = {
                 headers: {
-                    'Access-Control-Allow-Headers': allowedHeaders
-                }
+                    'Access-Control-Allow-Headers': allowedHeaders,
+                },
             };
 
             assert.ok(res.headers['Access-Control-Allow-Headers'].includes('X-Request-ID'));
@@ -249,7 +249,7 @@ describe('Server Middleware - Request Processing', () => {
                 logs.push({
                     method: req.method,
                     path: req.path,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
             };
 
@@ -273,7 +273,7 @@ describe('Server Middleware - Request Processing', () => {
                 method: 'POST',
                 path: '/api/tasks',
                 status: 201,
-                duration: 150
+                duration: 150,
             };
 
             assert.strictEqual(log.status, 201);
@@ -305,7 +305,7 @@ describe('Server Middleware - Request Processing', () => {
 
             const tracker = {
                 count: 50,
-                timestamp: Date.now() - 70000 // 70 segundos atrás
+                timestamp: Date.now() - 70000, // 70 segundos atrás
             };
 
             const elapsed = Date.now() - tracker.timestamp;
@@ -326,7 +326,7 @@ describe('Server Middleware - Request Processing', () => {
 
         it('deve rejeitar requisição sem token', () => {
             const req = {
-                headers: {}
+                headers: {},
             };
 
             const hasAuth = 'authorization' in req.headers;
@@ -348,8 +348,8 @@ describe('Server Middleware - Request Processing', () => {
         it('deve adicionar header Content-Encoding', () => {
             const res = {
                 headers: {
-                    'Content-Encoding': 'gzip'
-                }
+                    'Content-Encoding': 'gzip',
+                },
             };
 
             assert.strictEqual(res.headers['Content-Encoding'], 'gzip');
@@ -359,7 +359,7 @@ describe('Server Middleware - Request Processing', () => {
     describe('9. Security Headers Middleware', () => {
         it('deve adicionar X-Content-Type-Options', () => {
             const headers = {
-                'X-Content-Type-Options': 'nosniff'
+                'X-Content-Type-Options': 'nosniff',
             };
 
             assert.strictEqual(headers['X-Content-Type-Options'], 'nosniff');
@@ -367,7 +367,7 @@ describe('Server Middleware - Request Processing', () => {
 
         it('deve adicionar X-Frame-Options', () => {
             const headers = {
-                'X-Frame-Options': 'DENY'
+                'X-Frame-Options': 'DENY',
             };
 
             assert.strictEqual(headers['X-Frame-Options'], 'DENY');
@@ -375,7 +375,7 @@ describe('Server Middleware - Request Processing', () => {
 
         it('deve adicionar Content-Security-Policy', () => {
             const headers = {
-                'Content-Security-Policy': "default-src 'self'"
+                'Content-Security-Policy': "default-src 'self'",
             };
 
             assert.ok(headers['Content-Security-Policy']);

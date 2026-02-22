@@ -2,7 +2,7 @@ name: Audit Nightly
 
 on:
   schedule:
-    - cron: '20 3 * * *'
+    - cron: "20 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -20,8 +20,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: "24"
+          cache: "npm"
 
       - name: Prepare npm environment
         run: |

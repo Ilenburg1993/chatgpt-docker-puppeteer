@@ -33,7 +33,7 @@ before(async () => {
     setupMCPHandler(app, registry);
 
     // Start server on random port
-    await new Promise((resolve) => {
+    await new Promise(resolve => {
         server = app.listen(0, () => {
             const { port } = server.address();
             baseUrl = `http://localhost:${port}`;
@@ -59,8 +59,8 @@ async function mcpRequest(method, params = {}) {
             jsonrpc: '2.0',
             id: Math.random(),
             method,
-            params
-        })
+            params,
+        }),
     });
 
     return response.json();
@@ -102,7 +102,7 @@ describe('MCP Endpoint Discovery', () => {
 
     it('GET /api/mcp with Accept: text/event-stream should return 405', async () => {
         const response = await fetch(`${baseUrl}/api/mcp`, {
-            headers: { Accept: 'text/event-stream' }
+            headers: { Accept: 'text/event-stream' },
         });
 
         assert.strictEqual(response.status, 405);
@@ -114,7 +114,7 @@ describe('MCP Protocol - initialize', () => {
         const result = await mcpRequest('initialize', {
             protocolVersion: '2024-11-05',
             capabilities: {},
-            clientInfo: { name: 'test-client', version: '0.0.0' }
+            clientInfo: { name: 'test-client', version: '0.0.0' },
         });
 
         assert.strictEqual(result.jsonrpc, '2.0');
@@ -131,8 +131,8 @@ describe('MCP Protocol - initialize', () => {
             body: JSON.stringify({
                 jsonrpc: '2.0',
                 method: 'notifications/initialized',
-                params: {}
-            })
+                params: {},
+            }),
         });
 
         assert.strictEqual(response.status, 202);
@@ -174,10 +174,7 @@ describe('MCP Protocol - tools/list', () => {
         const generateTool = tools.find(t => t.name === 'ollama_generate');
         assert.ok(generateTool, 'ollama_generate metadata not found');
         assert.ok(generateTool.inputSchema.properties.runtime, 'ollama_generate.runtime schema missing');
-        assert.deepEqual(
-            generateTool.inputSchema.properties.runtime.enum,
-            ['auto', 'cloud', 'local']
-        );
+        assert.deepEqual(generateTool.inputSchema.properties.runtime.enum, ['auto', 'cloud', 'local']);
     });
 });
 
@@ -185,7 +182,7 @@ describe('Tool: ollama_models', () => {
     it('should list available Ollama models', async () => {
         const result = await mcpRequest('tools/call', {
             name: 'ollama_models',
-            arguments: {}
+            arguments: {},
         });
 
         assert.strictEqual(result.jsonrpc, '2.0');
@@ -206,7 +203,7 @@ describe('Tool: ollama_models', () => {
         const start = Date.now();
         await mcpRequest('tools/call', {
             name: 'ollama_models',
-            arguments: {}
+            arguments: {},
         });
         const duration = Date.now() - start;
 
@@ -215,13 +212,13 @@ describe('Tool: ollama_models', () => {
 });
 
 describe('Tool: ollama_embed', () => {
-    it('should generate embeddings for text', async (t) => {
+    it('should generate embeddings for text', async t => {
         const result = await mcpRequest('tools/call', {
             name: 'ollama_embed',
             arguments: {
                 text: 'test embedding query',
-                model: 'nomic-embed-text'
-            }
+                model: 'nomic-embed-text',
+            },
         });
 
         assert.strictEqual(result.jsonrpc, '2.0');
@@ -242,8 +239,8 @@ describe('Tool: ollama_embed', () => {
             name: 'ollama_embed',
             arguments: {
                 text: '',
-                model: 'nomic-embed-text'
-            }
+                model: 'nomic-embed-text',
+            },
         });
 
         assert.ok(result.result?.isError || result.error, 'Expected MCP tool error response');
@@ -259,7 +256,7 @@ describe('Tool: ollama_embed', () => {
 });
 
 describe('Tool: ollama_generate', () => {
-    it('should generate text with qwen2.5-coder', async (t) => {
+    it('should generate text with qwen2.5-coder', async t => {
         // Skip if model not available (CI environment)
         try {
             const result = await mcpRequest('tools/call', {
@@ -268,8 +265,8 @@ describe('Tool: ollama_generate', () => {
                     prompt: 'Write a one-line comment explaining what console.log does',
                     model: 'qwen2.5-coder:3b',
                     max_tokens: 50,
-                    temperature: 0.3
-                }
+                    temperature: 0.3,
+                },
             });
 
             assert.strictEqual(result.jsonrpc, '2.0');
@@ -283,7 +280,7 @@ describe('Tool: ollama_generate', () => {
         }
     });
 
-    it('should respect temperature parameter', async (t) => {
+    it('should respect temperature parameter', async t => {
         try {
             const result = await mcpRequest('tools/call', {
                 name: 'ollama_generate',
@@ -291,8 +288,8 @@ describe('Tool: ollama_generate', () => {
                     prompt: 'Say hi',
                     model: 'qwen2.5:3b-instruct',
                     max_tokens: 10,
-                    temperature: 0.1
-                }
+                    temperature: 0.1,
+                },
             });
 
             assert.ok(result.result);
@@ -308,7 +305,7 @@ describe('Tool: rag_health', () => {
     it('should return RAG system health status', async () => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_health',
-            arguments: {}
+            arguments: {},
         });
 
         assert.strictEqual(result.jsonrpc, '2.0');
@@ -323,18 +320,20 @@ describe('Tool: rag_health', () => {
 });
 
 describe('Tool: rag_search', () => {
-    it('should search codebase for CHROME_PROXY_PORT', async (t) => {
+    it('should search codebase for CHROME_PROXY_PORT', async t => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
                 query: 'CHROME_PROXY_PORT',
-                topK: 3
-            }
+                topK: 3,
+            },
         });
 
         assert.strictEqual(result.jsonrpc, '2.0');
         if (!result.result || result.result.isError) {
-            t.skip(`rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+            );
             return;
         }
 
@@ -357,17 +356,19 @@ describe('Tool: rag_search', () => {
         }
     });
 
-    it('should respect topK parameter', async (t) => {
+    it('should respect topK parameter', async t => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
                 query: 'function',
-                topK: 2
-            }
+                topK: 2,
+            },
         });
 
         if (!result.result || result.result.isError) {
-            t.skip(`rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+            );
             return;
         }
         const text = result.result.content[0].text;
@@ -377,18 +378,20 @@ describe('Tool: rag_search', () => {
         assert.ok(resultCount <= 2, `Expected <=2 results, got ${resultCount}`);
     });
 
-    it('should filter by pathPrefix', async (t) => {
+    it('should filter by pathPrefix', async t => {
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
                 query: 'kernel',
                 topK: 3,
-                pathPrefix: 'src/kernel'
-            }
+                pathPrefix: 'src/kernel',
+            },
         });
 
         if (!result.result || result.result.isError) {
-            t.skip(`rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+            );
             return;
         }
         const text = result.result.content[0].text;
@@ -399,19 +402,21 @@ describe('Tool: rag_search', () => {
         }
     });
 
-    it('should complete search in <2 seconds', async (t) => {
+    it('should complete search in <2 seconds', async t => {
         const start = Date.now();
         const result = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
                 query: 'test query',
-                topK: 5
-            }
+                topK: 5,
+            },
         });
         const duration = Date.now() - start;
 
         if (!result.result || result.result.isError) {
-            t.skip(`rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${result?.result?.content?.[0]?.text || result?.error?.message || 'unknown error'}`
+            );
             return;
         }
         if (duration >= 2000) {
@@ -423,18 +428,20 @@ describe('Tool: rag_search', () => {
 });
 
 describe('Tool: rag_expand', () => {
-    it('should expand a chunk returned by rag_search', async (t) => {
+    it('should expand a chunk returned by rag_search', async t => {
         const search = await mcpRequest('tools/call', {
             name: 'rag_search',
             arguments: {
                 query: 'CHROME_PROXY_PORT',
                 topK: 1,
-                mode: 'auto'
-            }
+                mode: 'auto',
+            },
         });
 
         if (!search.result || search.result.isError) {
-            t.skip(`rag_search unavailable: ${search?.result?.content?.[0]?.text || search?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${search?.result?.content?.[0]?.text || search?.error?.message || 'unknown error'}`
+            );
             return;
         }
 
@@ -450,8 +457,8 @@ describe('Tool: rag_expand', () => {
                 chunk_id: chunkId,
                 mode: 'lines',
                 before_lines: 20,
-                after_lines: 20
-            }
+                after_lines: 20,
+            },
         });
 
         assert.strictEqual(expanded.jsonrpc, '2.0');
@@ -471,8 +478,8 @@ describe('MCP Protocol - Error Handling', () => {
                 jsonrpc: '1.0',
                 id: 1,
                 method: 'tools/list',
-                params: {}
-            })
+                params: {},
+            }),
         });
 
         const result = await response.json();
@@ -492,7 +499,7 @@ describe('MCP Protocol - Error Handling', () => {
     it('should handle tool execution errors gracefully', async () => {
         const result = await mcpRequest('tools/call', {
             name: 'nonexistent_tool',
-            arguments: {}
+            arguments: {},
         });
 
         assert.ok(result.error || result.result.isError);
@@ -517,7 +524,7 @@ describe('MCP Protocol - resources/list', () => {
 describe('MCP Protocol - resources/read', () => {
     it('should read rag://stats resource', async () => {
         const result = await mcpRequest('resources/read', {
-            uri: 'rag://stats'
+            uri: 'rag://stats',
         });
 
         assert.strictEqual(result.jsonrpc, '2.0');
@@ -537,7 +544,7 @@ describe('MCP Protocol - resources/read', () => {
 
     it('should reject unknown resource', async () => {
         const result = await mcpRequest('resources/read', {
-            uri: 'unknown://resource'
+            uri: 'unknown://resource',
         });
 
         assert.ok(result.error);
@@ -553,10 +560,7 @@ describe('Tool Registry - Direct Access', () => {
     });
 
     it('should throw on unknown tool', async () => {
-        await assert.rejects(
-            async () => await registry.execute('unknown_tool'),
-            /Unknown tool/
-        );
+        await assert.rejects(async () => await registry.execute('unknown_tool'), /Unknown tool/);
     });
 
     it('should return correct stats', () => {
@@ -569,7 +573,7 @@ describe('Tool Registry - Direct Access', () => {
 });
 
 describe('Performance - Cache Behavior', () => {
-    it('should cache repeated queries', async (t) => {
+    it('should cache repeated queries', async t => {
         const query = `test query ${Math.random()}`;
 
         const before = await mcpRequest('resources/read', { uri: 'rag://stats' });
@@ -579,11 +583,13 @@ describe('Performance - Cache Behavior', () => {
         const start1 = Date.now();
         const first = await mcpRequest('tools/call', {
             name: 'rag_search',
-            arguments: { query, topK: 3 }
+            arguments: { query, topK: 3 },
         });
         const duration1 = Date.now() - start1;
         if (!first.result || first.result.isError) {
-            t.skip(`rag_search unavailable: ${first?.result?.content?.[0]?.text || first?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${first?.result?.content?.[0]?.text || first?.error?.message || 'unknown error'}`
+            );
             return;
         }
 
@@ -591,11 +597,13 @@ describe('Performance - Cache Behavior', () => {
         const start2 = Date.now();
         const second = await mcpRequest('tools/call', {
             name: 'rag_search',
-            arguments: { query, topK: 3 }
+            arguments: { query, topK: 3 },
         });
         const duration2 = Date.now() - start2;
         if (!second.result || second.result.isError) {
-            t.skip(`rag_search unavailable: ${second?.result?.content?.[0]?.text || second?.error?.message || 'unknown error'}`);
+            t.skip(
+                `rag_search unavailable: ${second?.result?.content?.[0]?.text || second?.error?.message || 'unknown error'}`
+            );
             return;
         }
 
@@ -614,4 +622,6 @@ describe('Performance - Cache Behavior', () => {
     });
 });
 
-console.log('\n✅ All integration tests defined. Run with: node --test tests/integration/rag/test_multi_llm_integration.spec.js\n');
+console.log(
+    '\n✅ All integration tests defined. Run with: node --test tests/integration/rag/test_multi_llm_integration.spec.js\n'
+);

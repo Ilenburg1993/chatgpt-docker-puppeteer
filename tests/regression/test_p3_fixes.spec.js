@@ -9,7 +9,7 @@ const colors = {
     red: '\x1b[31m',
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
-    cyan: '\x1b[36m'
+    cyan: '\x1b[36m',
 };
 
 function log(type, message) {
@@ -39,7 +39,7 @@ function createMockSystem(delayMs) {
                     resolve();
                 }, delayMs);
             });
-        }
+        },
     };
 }
 
@@ -61,7 +61,7 @@ class MockRecoverySystem {
                 this.system.killProcess(pid),
                 new Promise((_, reject) => {
                     setTimeout(() => reject(new Error('KILL_TIMEOUT')), KILL_TIMEOUT_MS);
-                })
+                }),
             ]);
             return { status: 'SUCCESS', timedOut: false };
         } catch (killErr) {
@@ -79,7 +79,7 @@ class MockRecoverySystem {
 function createMockDriver() {
     return {
         correlationId: 'test-corr-001',
-        _emitVital: () => {}
+        _emitVital: () => {},
     };
 }
 
@@ -106,7 +106,7 @@ async function test1_FastKill() {
         { name: 'Kill completou', pass: result.status === 'SUCCESS' },
         { name: 'Não houve timeout', pass: !result.timedOut },
         { name: 'Tempo < 5s', pass: elapsed < 5000 },
-        { name: 'Tempo ≈ 500ms', pass: elapsed >= 500 && elapsed < 1000 }
+        { name: 'Tempo ≈ 500ms', pass: elapsed >= 500 && elapsed < 1000 },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -142,7 +142,7 @@ async function test2_SlowKillTimeout() {
         { name: 'Timeout detectado', pass: result.status === 'TIMEOUT' },
         { name: 'Flag timedOut = true', pass: result.timedOut },
         { name: 'Tempo ≈ 5s', pass: elapsed >= 5000 && elapsed < 5500 },
-        { name: 'Não aguardou 7s', pass: elapsed < 6000 }
+        { name: 'Não aguardou 7s', pass: elapsed < 6000 },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -177,7 +177,7 @@ async function test3_BorderlineKill() {
     const checks = [
         { name: 'Status válido', pass: ['SUCCESS', 'TIMEOUT'].includes(result.status) },
         { name: 'Tempo ≈ 5s', pass: elapsed >= 4800 && elapsed < 5500 },
-        { name: 'Respeitou timeout máximo', pass: elapsed < 6000 }
+        { name: 'Respeitou timeout máximo', pass: elapsed < 6000 },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -229,7 +229,7 @@ async function test4_SequentialKills() {
         { name: 'Kill 1 completou', pass: results[0].status === 'SUCCESS' },
         { name: 'Kill 2 timeout', pass: results[1].status === 'TIMEOUT' },
         { name: 'Kill 3 completou', pass: results[2].status === 'SUCCESS' },
-        { name: 'Isolamento mantido', pass: results[0].status !== results[1].status }
+        { name: 'Isolamento mantido', pass: results[0].status !== results[1].status },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -250,30 +250,38 @@ async function test5_CodeValidation() {
 
     log('INFO', 'Verificando arquivo recovery_system.js...');
 
-    const recoverySystemPath = path.join(import.meta.dirname, '..', '..', 'src', 'driver', 'modules', 'recovery_system.js');
+    const recoverySystemPath = path.join(
+        import.meta.dirname,
+        '..',
+        '..',
+        'src',
+        'driver',
+        'modules',
+        'recovery_system.js'
+    );
     const content = await fs.readFile(recoverySystemPath, 'utf-8');
 
     const checks = [
         {
             name: 'recovery_system.js contém Promise.race',
-            pass: content.includes('Promise.race')
+            pass: content.includes('Promise.race'),
         },
         {
             name: 'recovery_system.js contém KILL_TIMEOUT',
-            pass: content.includes('KILL_TIMEOUT')
+            pass: content.includes('KILL_TIMEOUT'),
         },
         {
             name: 'recovery_system.js contém timeout de 5000ms',
-            pass: content.includes('5000')
+            pass: content.includes('5000'),
         },
         {
             name: 'recovery_system.js tem try-catch no kill',
-            pass: content.includes('catch (killErr)')
+            pass: content.includes('catch (killErr)'),
         },
         {
             name: 'recovery_system.js continua após timeout',
-            pass: content.includes('Continua o fluxo') || content.includes('continua')
-        }
+            pass: content.includes('Continua o fluxo') || content.includes('continua'),
+        },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -297,7 +305,7 @@ async function runAllTests() {
         test2: await test2_SlowKillTimeout(),
         test3: await test3_BorderlineKill(),
         test4: await test4_SequentialKills(),
-        test5: await test5_CodeValidation()
+        test5: await test5_CodeValidation(),
     };
 
     summary('                    SUMÁRIO DOS TESTES                        ');

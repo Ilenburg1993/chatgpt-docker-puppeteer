@@ -56,9 +56,7 @@ function toolNamesFromList(payload) {
     if (!Array.isArray(tools)) {
         return [];
     }
-    return tools
-        .map(item => item?.name)
-        .filter(Boolean);
+    return tools.map(item => item?.name).filter(Boolean);
 }
 
 /**

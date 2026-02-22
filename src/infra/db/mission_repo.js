@@ -2,6 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
+/** Constante/valor exportado: MISSION_STATUS. */
 const MISSION_STATUS = Object.freeze({
     DRAFT: 'DRAFT',
     READY: 'READY',
@@ -12,6 +13,7 @@ const MISSION_STATUS = Object.freeze({
     CANCELLED: 'CANCELLED',
 });
 
+/** Constante/valor exportado: AUTONOMY_MODES. */
 const AUTONOMY_MODES = Object.freeze({
     USER_ONLY: 'USER_ONLY',
     LLM_SUGGEST: 'LLM_SUGGEST',
@@ -86,6 +88,7 @@ function createMission({
     return getMissionById(id);
 }
 
+/** Função exportada: listMissions. */
 function listMissions({ status = null, limit = 500 } = {}) {
     const db = getDb();
     const sql = `
@@ -102,6 +105,7 @@ function listMissions({ status = null, limit = 500 } = {}) {
     return rows.map(_rowToMission);
 }
 
+/** Função exportada: getMissionById. */
 function getMissionById(missionId) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
@@ -117,7 +121,7 @@ function _rowToMission(row) {
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[mission_repo] Invalid policy_json for mission ${row?.id}: ${msg}`);
-            policy = {};  // Fallback to empty object
+            policy = {}; // Fallback to empty object
         }
     }
 
@@ -129,7 +133,7 @@ function _rowToMission(row) {
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[mission_repo] Invalid context_json for mission ${row?.id}: ${msg}`);
-            context = {};  // Fallback to empty object
+            context = {}; // Fallback to empty object
         }
     }
 
@@ -148,6 +152,7 @@ function _rowToMission(row) {
     };
 }
 
+/** Função exportada: updateMission. */
 function updateMission(missionId, updates = {}) {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
@@ -162,9 +167,17 @@ function updateMission(missionId, updates = {}) {
     const context = updates.context ? { ...(next.context || {}), ...(updates.context || {}) } : next.context;
 
     const startedAtMs =
-        updates.started_at_ms !== undefined ? (updates.started_at_ms ? Number(updates.started_at_ms) : null) : (existing.started_at_ms ?? null);
+        updates.started_at_ms !== undefined
+            ? updates.started_at_ms
+                ? Number(updates.started_at_ms)
+                : null
+            : (existing.started_at_ms ?? null);
     const completedAtMs =
-        updates.completed_at_ms !== undefined ? (updates.completed_at_ms ? Number(updates.completed_at_ms) : null) : (existing.completed_at_ms ?? null);
+        updates.completed_at_ms !== undefined
+            ? updates.completed_at_ms
+                ? Number(updates.completed_at_ms)
+                : null
+            : (existing.completed_at_ms ?? null);
 
     db.prepare(
         `
@@ -196,6 +209,7 @@ function updateMission(missionId, updates = {}) {
     return getMissionById(missionId);
 }
 
+/** Função exportada: deleteMission. */
 function deleteMission(missionId) {
     const db = getDb();
     const res = db.prepare('DELETE FROM missions WHERE id = ?').run(missionId);

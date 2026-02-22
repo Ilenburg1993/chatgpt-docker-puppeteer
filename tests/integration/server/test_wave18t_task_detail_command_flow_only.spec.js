@@ -12,4 +12,3 @@ test('wave18t: TaskDetail usa stores command-first para mutação', async () => 
     assert.match(taskDetail, /tasksStore\.reassignTaskMission/);
     assert.doesNotMatch(taskDetail, /http\.(post|patch|put)\(\s*['"`]\/api\/tasks/);
 });
-

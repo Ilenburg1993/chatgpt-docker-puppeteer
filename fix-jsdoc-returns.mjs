@@ -20,13 +20,13 @@ let totalFixed = 0;
 for (const [file, errors] of Object.entries(byFile)) {
     let content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
-    
+
     // Agrupar erros consecutivos (mesmo bloco JSDoc)
     const blocks = [];
     let currentBlock = [errors[0]];
-    
+
     for (let i = 1; i < errors.length; i++) {
-        if (errors[i].line - errors[i-1].line === 1) {
+        if (errors[i].line - errors[i - 1].line === 1) {
             currentBlock.push(errors[i]);
         } else {
             blocks.push(currentBlock);
@@ -34,18 +34,18 @@ for (const [file, errors] of Object.entries(byFile)) {
         }
     }
     blocks.push(currentBlock);
-    
+
     // Processar cada bloco (de trás pra frente para não afetar índices)
     for (const block of blocks.reverse()) {
         const startLine = block[0].line - 1;
         const endLine = block[block.length - 1].line - 1;
-        
+
         // Encontrar início do bloco JSDoc
         let jsdocStart = startLine;
         while (jsdocStart > 0 && !lines[jsdocStart].trim().startsWith('/**')) {
             jsdocStart--;
         }
-        
+
         // Coletar propriedades
         const properties = [];
         for (let i = startLine; i <= endLine; i++) {
@@ -55,23 +55,23 @@ for (const [file, errors] of Object.entries(byFile)) {
                 properties.push({
                     type: match[1],
                     name: match[2],
-                    desc: match[3]
+                    desc: match[3],
                 });
             }
         }
-        
+
         if (properties.length > 0) {
             // Remover linhas de @returns das propriedades
             lines.splice(startLine, endLine - startLine + 1);
-            
+
             // Inserir propriedades como comentário descritivo
             const propDescLines = properties.map(p => `     *   - ${p.name} (${p.type}): ${p.desc}`);
             lines.splice(startLine, 0, `     * Propriedades do objeto retornado:`, ...propDescLines);
-            
+
             totalFixed++;
         }
     }
-    
+
     fs.writeFileSync(file, lines.join('\n'));
     console.log(`✅ ${file}: ${blocks.length} bloco(s) corrigido(s)`);
 }

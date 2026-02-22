@@ -16,7 +16,7 @@ async function indexIncremental() {
         includeGlobs: process.env.RAG_INCLUDE_GLOBS,
         excludeGlobs: process.env.RAG_EXCLUDE_GLOBS,
         docsMode: process.env.RAG_DOCS_MODE,
-        maxFileBytes: process.env.RAG_INDEX_MAX_FILE_BYTES
+        maxFileBytes: process.env.RAG_INDEX_MAX_FILE_BYTES,
     });
 
     console.log('[RAG Incremental] Starting...');
@@ -34,7 +34,7 @@ async function indexIncremental() {
             profile: scope.profile,
             includeGlobs: scope.includeGlobs,
             excludeGlobs: scope.excludeGlobs,
-            docsMode: scope.docsMode
+            docsMode: scope.docsMode,
         });
 
         console.log('\n[RAG Incremental] ✅ Complete!');

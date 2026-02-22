@@ -12,7 +12,7 @@ function mockJsonResponse(status, data) {
         },
         async text() {
             return JSON.stringify(data);
-        }
+        },
     };
 }
 
@@ -20,7 +20,7 @@ test('resolveRuntime forces local for embedding operation', () => {
     const client = new OllamaClient({
         cloudEnabled: true,
         nonEmbeddingRuntime: 'auto',
-        fetch: async () => mockJsonResponse(200, { models: [] })
+        fetch: async () => mockJsonResponse(200, { models: [] }),
     });
 
     const resolved = client.resolveRuntime({ operation: 'embedding', runtimePreference: 'cloud' });
@@ -36,10 +36,10 @@ test('generateWithMetadata uses cloud first in auto mode', async () => {
         localBaseUrl: 'http://local.example',
         nonEmbeddingRuntime: 'auto',
         nonEmbeddingLocalFallback: true,
-        fetch: async (url) => {
+        fetch: async url => {
             calls.push(String(url));
             return mockJsonResponse(200, { response: 'cloud-ok' });
-        }
+        },
     });
 
     const result = await client.generateWithMetadata('hello', 'qwen3-coder-next', { runtime: 'auto' });
@@ -59,7 +59,7 @@ test('generateWithMetadata falls back to local when cloud fails and fallback is 
         localBaseUrl: 'http://local.example',
         nonEmbeddingRuntime: 'auto',
         nonEmbeddingLocalFallback: true,
-        fetch: async (url) => {
+        fetch: async url => {
             const target = String(url);
             calls.push(target);
 
@@ -68,7 +68,7 @@ test('generateWithMetadata falls back to local when cloud fails and fallback is 
             }
 
             return mockJsonResponse(200, { response: 'local-fallback-ok' });
-        }
+        },
     });
 
     const result = await client.generateWithMetadata('hello', 'qwen2.5-coder:3b', { runtime: 'auto' });
@@ -87,7 +87,7 @@ test('generateWithMetadata returns explicit error when fallback is disabled', as
         localBaseUrl: 'http://local.example',
         nonEmbeddingRuntime: 'auto',
         nonEmbeddingLocalFallback: false,
-        fetch: async () => mockJsonResponse(503, { error: 'cloud-down' })
+        fetch: async () => mockJsonResponse(503, { error: 'cloud-down' }),
     });
 
     await assert.rejects(
@@ -105,7 +105,7 @@ test('light local profile rejects heavy local model', async () => {
         fetch: async () => {
             called = true;
             return mockJsonResponse(200, { response: 'should-not-happen' });
-        }
+        },
     });
 
     await assert.rejects(
@@ -123,10 +123,10 @@ test('custom local allowlist permits configured model', async () => {
         nonEmbeddingRuntime: 'local',
         localModelProfile: 'custom',
         localAllowedModels: ['my-local-model'],
-        fetch: async (url) => {
+        fetch: async url => {
             assert.ok(String(url).startsWith('http://local.example/api/generate'));
             return mockJsonResponse(200, { response: 'ok' });
-        }
+        },
     });
 
     const result = await client.generateWithMetadata('hello', 'my-local-model', { runtime: 'local' });
@@ -139,18 +139,18 @@ test('listModelsDetailed returns explicit cloud/local separation', async () => {
         cloudEnabled: true,
         cloudBaseUrl: 'https://cloud.example',
         localBaseUrl: 'http://local.example',
-        fetch: async (url) => {
+        fetch: async url => {
             const target = String(url);
             if (target.startsWith('https://cloud.example')) {
                 return mockJsonResponse(200, {
-                    models: [{ name: 'qwen3-coder-next', size: 1, modified_at: '2026-01-01T00:00:00.000Z' }]
+                    models: [{ name: 'qwen3-coder-next', size: 1, modified_at: '2026-01-01T00:00:00.000Z' }],
                 });
             }
 
             return mockJsonResponse(200, {
-                models: [{ name: 'nomic-embed-text', size: 1, modified_at: '2026-01-01T00:00:00.000Z' }]
+                models: [{ name: 'nomic-embed-text', size: 1, modified_at: '2026-01-01T00:00:00.000Z' }],
             });
-        }
+        },
     });
 
     const details = await client.listModelsDetailed();

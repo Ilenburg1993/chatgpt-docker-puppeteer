@@ -10,11 +10,13 @@
 
 ## Problem Statement
 
-13 critical NERV emission calls across 10 files were missing `await` keywords, causing Promises to be fire-and-forget. This resulted in:
+13 critical NERV emission calls across 10 files were missing `await` keywords, causing Promises to
+be fire-and-forget. This resulted in:
 
 - **Silent failures**: Errors during emission were never caught or logged
 - **No backpressure**: System continued without knowing if events reached NERV
-- **Lost telemetry**: Critical observability events (INFRA_EMERGENCY, FORENSICS_DUMP_CREATED) could be silently dropped
+- **Lost telemetry**: Critical observability events (INFRA_EMERGENCY, FORENSICS_DUMP_CREATED) could
+  be silently dropped
 - **Race conditions**: Callers assumed synchronous completion when operations were actually async
 
 ---
@@ -22,6 +24,7 @@
 ## Implementation Summary
 
 ### Part 1/3: Core NERV Layer (4 files)
+
 **Commit:** `352b3fe` - "fix(P1-4): add await to NERV emission calls in core layer (part 1/3)"
 
 1. **src/nerv/adapters/high_level_adapter.js** (BREAKING CHANGE)
@@ -44,7 +47,9 @@
    - Added retry-on-emit-error logic
 
 ### Part 2/3: Driver Adapter (1 file)
-**Commit:** `85144ab` - "fix(P1-4): eliminate NERV emission silent failures in driver layer (part 2/3)"
+
+**Commit:** `85144ab` - "fix(P1-4): eliminate NERV emission silent failures in driver layer (part
+2/3)"
 
 5. **src/driver/nerv_adapter/driver_nerv_adapter.js** (5 major fixes)
    - Removed `void` keyword from error handler (L221)
@@ -55,7 +60,9 @@
    - Fixed 6 ESLint `no-useless-assignment` errors
 
 ### Part 3/3: Additional Adapters (7 files)
-**Commit:** `b0e8968` - "fix(P1-4): eliminate NERV emission silent failures in 7 additional files (part 3/3)"
+
+**Commit:** `b0e8968` - "fix(P1-4): eliminate NERV emission silent failures in 7 additional files
+(part 3/3)"
 
 6. **src/core/forensics.js**
    - Added `await` to FORENSICS_DUMP_CREATED emission (L111)
@@ -85,6 +92,7 @@
     - Added `await` before return (L537)
 
 ### Caller Fix (1 file)
+
 **Commit:** `85144ab` - "fix(P1-4): make persistServerState async to await publishServerReady"
 
 13. **src/server/main.js**
@@ -96,7 +104,9 @@
 ## Breaking Changes
 
 ### 1. HighLevelNERV API (MAJOR)
+
 **Before:**
+
 ```javascript
 function sendEvent(nerv, actor, actionCode, payload, correlationId, target) {
     const envelope = createEnvelope({...});
@@ -106,6 +116,7 @@ function sendEvent(nerv, actor, actionCode, payload, correlationId, target) {
 ```
 
 **After:**
+
 ```javascript
 async function sendEvent(nerv, actor, actionCode, payload, correlationId, target) {
     const envelope = createEnvelope({...});
@@ -114,19 +125,23 @@ async function sendEvent(nerv, actor, actionCode, payload, correlationId, target
 }
 ```
 
-**Impact:** All callers of `sendEvent()`, `sendCommand()`, `sendAck()` must now `await` or handle the Promise.
+**Impact:** All callers of `sendEvent()`, `sendCommand()`, `sendAck()` must now `await` or handle
+the Promise.
 
 ### 2. Discovery.publishServerReady() (MINOR)
+
 **Before:** Synchronous function  
 **After:** Async function returning `Promise<object|null>`
 
 **Impact:** Callers must `await` (already fixed in `src/server/main.js`).
 
 ### 3. KernelTelemetry.emitEvent() (MINOR)
+
 **Before:** Synchronous function returning `{Object}`  
 **After:** Async function returning `{Promise<Object>}`
 
-**Impact:** Callers using `emit()` (which calls `emitEvent()`) are unaffected - return value typically ignored.
+**Impact:** Callers using `emit()` (which calls `emitEvent()`) are unaffected - return value
+typically ignored.
 
 ---
 
@@ -150,6 +165,7 @@ async function sendEvent(nerv, actor, actionCode, payload, correlationId, target
 ## Validation
 
 ### Pre-fix Behavior
+
 ```javascript
 // Silent failure example (forensics.js)
 try {
@@ -161,6 +177,7 @@ try {
 ```
 
 ### Post-fix Behavior
+
 ```javascript
 try {
     await HighLevelNERV.sendEvent(nerv, ActorRole.INFRA, ActionCode.FORENSICS_DUMP_CREATED, {...});
@@ -171,6 +188,7 @@ try {
 ```
 
 ### Test Coverage
+
 - **Unit tests:** All existing NERV-related tests pass (no regressions)
 - **Integration tests:** Server boot sequence completes successfully
 - **Manual validation:** Confirmed all critical events reach NERV in local testing
@@ -179,33 +197,37 @@ try {
 
 ## Metrics
 
-| Metric | Value |
-|--------|-------|
-| Files modified | 11 |
-| Lines changed | ~120 (65 insertions, 55 deletions) |
-| Methods made async | 8 |
-| `await` keywords added | 18 |
-| ESLint errors fixed | 9 |
-| Breaking changes | 3 |
-| Commits | 4 |
+| Metric                 | Value                              |
+| ---------------------- | ---------------------------------- |
+| Files modified         | 11                                 |
+| Lines changed          | ~120 (65 insertions, 55 deletions) |
+| Methods made async     | 8                                  |
+| `await` keywords added | 18                                 |
+| ESLint errors fixed    | 9                                  |
+| Breaking changes       | 3                                  |
+| Commits                | 4                                  |
 
 ---
 
 ## Impact Assessment
 
 ### Reliability ⬆️
+
 - **Before:** ~13 emission points could silently fail
 - **After:** 0 silent failures - all errors caught and logged
 
 ### Observability ⬆️
+
 - Critical alerts (INFRA_EMERGENCY, FORENSICS_DUMP_CREATED) now guaranteed to emit or throw
 - Telemetry flush prevents data loss with `Promise.allSettled()`
 
 ### Performance ⚖️
+
 - Minimal overhead: `await` adds ~0-2ms per emission (backpressure benefit outweighs cost)
 - No blocking: All emissions still async, just properly awaited
 
 ### Developer Experience ⬆️
+
 - Clear async semantics: Callers know when emission completes
 - Better error messages: Stack traces point to actual emission failures
 
@@ -214,14 +236,17 @@ try {
 ## Follow-up Work
 
 ### Immediate
+
 None - P1-4 is fully complete.
 
 ### Future (P1 Backlog)
+
 Continue with remaining P1 bugs:
+
 - **P1-1:** RAG operations timeout (5s limit)
 - **P1-7:** Dependency cycle detection (transactional)
 - **P1-17:** Optimistic locking callers (try-catch OptimisticLockError)
-- **P1-20:** JSON parsing errors (try-catch em _rowToTask)
+- **P1-20:** JSON parsing errors (try-catch em \_rowToTask)
 - **P1-22:** Artifact write size limit (MAX_ARTIFACT_SIZE_BYTES)
 
 **Total P1 progress:** 1/41 complete (2.4%)
@@ -229,6 +254,7 @@ Continue with remaining P1 bugs:
 ---
 
 ## Related Documents
+
 - [P0_ALL_15_BUGS_VALIDATION.md](P0_ALL_15_BUGS_VALIDATION.md) - All P0 bugs validated
 - [P0_FINAL_4_BUGS_COMPLETED.md](P0_FINAL_4_BUGS_COMPLETED.md) - Final 4 P0 bugs implementation
 

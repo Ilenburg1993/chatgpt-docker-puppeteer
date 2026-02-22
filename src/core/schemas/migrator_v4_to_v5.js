@@ -220,7 +220,7 @@ function migrateTaskV4toV5(taskV4) {
     } catch (error) {
         logger.error(`Falha ao migrar task ${taskV4?.meta?.id || 'unknown'} para V5: ${error.message}`, {
             error,
-            taskV4
+            taskV4,
         });
         throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${error.message}`, { cause: error });
     }
@@ -238,7 +238,7 @@ function migrateBatchV4toV5(tasksV4) {
     const results = {
         migrated: [],
         alreadyV5: [],
-        failed: []
+        failed: [],
     };
 
     for (const taskV4 of tasksV4) {
@@ -252,7 +252,7 @@ function migrateBatchV4toV5(tasksV4) {
         } catch (error) {
             results.failed.push({
                 task_id: taskV4?.meta?.id || 'unknown',
-                error: error.message
+                error: error.message,
             });
         }
     }
@@ -261,14 +261,12 @@ function migrateBatchV4toV5(tasksV4) {
         total: tasksV4.length,
         migrated: results.migrated.length,
         alreadyV5: results.alreadyV5.length,
-        failed: results.failed.length
+        failed: results.failed.length,
     });
 
     if (results.failed.length > 0) {
         logger.error(`${results.failed.length} tasks falharam na migração:`, results.failed);
-        throw new Error(
-            `Batch migration failed for ${results.failed.length} tasks. See logs for details.`
-        );
+        throw new Error(`Batch migration failed for ${results.failed.length} tasks. See logs for details.`);
     }
 
     return [...results.migrated, ...results.alreadyV5];

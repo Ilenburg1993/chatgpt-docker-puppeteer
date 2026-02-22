@@ -5,6 +5,7 @@ import { compression } from 'vite-plugin-compression2';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
+/** Reexport público: default. */
 export default defineConfig({
     plugins: [
         vue(),

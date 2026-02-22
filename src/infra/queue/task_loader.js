@@ -53,7 +53,7 @@ async function loadNextTask(targetFilter = null) {
                 task.state.history.push({
                     ts: new Date().toISOString(),
                     event: 'SYSTEM_RECOVERY',
-                    msg: 'Agente zumbi detectado e movido para FAILED.'
+                    msg: 'Agente zumbi detectado e movido para FAILED.',
                 });
 
                 isModified = true;
@@ -65,7 +65,10 @@ async function loadNextTask(targetFilter = null) {
         if (task.state.status === STATUS_VALUES.PENDING && task.policy.dependencies?.length > 0) {
             const hasFailedParent = task.policy.dependencies.some(depId => {
                 const parent = taskMap.get(depId);
-                return parent && (parent.state.status === STATUS_VALUES.FAILED || parent.state.status === STATUS_VALUES.SKIPPED);
+                return (
+                    parent &&
+                    (parent.state.status === STATUS_VALUES.FAILED || parent.state.status === STATUS_VALUES.SKIPPED)
+                );
             });
 
             if (hasFailedParent) {
@@ -129,7 +132,7 @@ async function bulkRetryFailed() {
             task.state.history.push({
                 ts: new Date().toISOString(),
                 event: 'BULK_RETRY',
-                msg: 'Tarefa reiniciada via comando administrativo.'
+                msg: 'Tarefa reiniciada via comando administrativo.',
             });
 
             await saveTask(task);

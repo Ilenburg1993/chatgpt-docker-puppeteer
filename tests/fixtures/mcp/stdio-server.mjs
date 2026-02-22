@@ -31,4 +31,3 @@ async function shutdown() {
 
 process.on('SIGINT', () => shutdown().finally(() => process.exit(0)));
 process.on('SIGTERM', () => shutdown().finally(() => process.exit(0)));
-

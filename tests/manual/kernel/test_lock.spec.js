@@ -21,7 +21,7 @@ import {
         id: TASK_ID,
         prompt: 'Teste de Lock Atomicidade',
         status: 'PENDING',
-        criadoEm: new Date().toISOString()
+        criadoEm: new Date().toISOString(),
     });
 
     console.log(`> Tarefa criada: ${TASK_ID}`);

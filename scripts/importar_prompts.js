@@ -82,7 +82,7 @@ lines.forEach((line, idx) => {
         prio: 5,
         model: 'gpt-5',
         target: 'chatgpt',
-        tags: ['bulk']
+        tags: ['bulk'],
     };
 
     // Detecção e Parsing de JSONL
@@ -127,19 +127,19 @@ lines.forEach((line, idx) => {
             created_at: new Date().toISOString(),
             priority: taskData.prio,
             source: 'bulk_import',
-            tags: [...new Set(taskData.tags)]
+            tags: [...new Set(taskData.tags)],
         },
         spec: {
             target: taskData.target,
             model: taskData.model,
             payload: {
                 system_message: taskData.system_prompt,
-                user_message: taskData.user_prompt
+                user_message: taskData.user_prompt,
             },
-            config: { reset_context: false }
+            config: { reset_context: false },
         },
         policy: { max_attempts: 3, timeout_ms: 'auto', dependencies: [] },
-        state: { status: 'PENDING', attempts: 0, history: [] }
+        state: { status: 'PENDING', attempts: 0, history: [] },
     };
 
     try {

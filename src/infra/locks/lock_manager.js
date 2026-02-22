@@ -45,7 +45,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
     const lockData = {
         taskId,
         pid: process.pid,
-        ts: new Date().toISOString()
+        ts: new Date().toISOString(),
     };
 
     try {

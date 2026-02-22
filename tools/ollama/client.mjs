@@ -19,7 +19,7 @@ const DEFAULT_LIGHT_LOCAL_MODELS = [
     'gemma2:2b',
     'phi3:mini',
     'tinyllama:1.1b',
-    'deepseek-r1:1.5b'
+    'deepseek-r1:1.5b',
 ];
 
 /**
@@ -39,18 +39,10 @@ export class OllamaClient {
      * @param {typeof fetch} [options.fetch]
      */
     constructor(options = {}) {
-        this.cloudBaseUrl =
-            options.cloudBaseUrl ||
-            process.env.OLLAMA_CLOUD_BASE_URL ||
-            'https://ollama.com';
-        this.cloudApiKey =
-            options.cloudApiKey ||
-            process.env.OLLAMA_CLOUD_API_KEY ||
-            '';
+        this.cloudBaseUrl = options.cloudBaseUrl || process.env.OLLAMA_CLOUD_BASE_URL || 'https://ollama.com';
+        this.cloudApiKey = options.cloudApiKey || process.env.OLLAMA_CLOUD_API_KEY || '';
         this.cloudEnabled =
-            options.cloudEnabled !== undefined
-                ? options.cloudEnabled
-                : process.env.OLLAMA_CLOUD_ENABLED === 'true';
+            options.cloudEnabled !== undefined ? options.cloudEnabled : process.env.OLLAMA_CLOUD_ENABLED === 'true';
 
         this.localBaseUrl =
             options.localBaseUrl ||
@@ -72,10 +64,7 @@ export class OllamaClient {
                 ? Boolean(options.nonEmbeddingLocalFallback)
                 : this._parseBoolean(process.env.OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK, true);
 
-        this.localModelProfile =
-            options.localModelProfile ||
-            process.env.OLLAMA_LOCAL_MODEL_PROFILE ||
-            'light';
+        this.localModelProfile = options.localModelProfile || process.env.OLLAMA_LOCAL_MODEL_PROFILE || 'light';
 
         this.localAllowedModels = this._buildLocalAllowedModels(
             options.localAllowedModels || process.env.OLLAMA_LOCAL_ALLOWED_MODELS || ''
@@ -102,7 +91,9 @@ export class OllamaClient {
     }
 
     _normalizeRuntimePreference(value) {
-        const raw = String(value || 'auto').trim().toLowerCase();
+        const raw = String(value || 'auto')
+            .trim()
+            .toLowerCase();
         if (raw === 'cloud' || raw === 'local' || raw === 'auto') {
             return raw;
         }
@@ -111,11 +102,7 @@ export class OllamaClient {
 
     _buildLocalAllowedModels(value) {
         if (Array.isArray(value)) {
-            return new Set(
-                value
-                    .map(v => String(v || '').trim())
-                    .filter(Boolean)
-            );
+            return new Set(value.map(v => String(v || '').trim()).filter(Boolean));
         }
 
         const text = String(value || '').trim();
@@ -139,7 +126,11 @@ export class OllamaClient {
             );
         }
 
-        if (this.localAllowedModels.size === 0 && this.localModelProfile === 'light' && !this.lightLocalModels.has(model)) {
+        if (
+            this.localAllowedModels.size === 0 &&
+            this.localModelProfile === 'light' &&
+            !this.lightLocalModels.has(model)
+        ) {
             throw new Error(
                 `Local model "${model}" is blocked by light profile (CPU-only 16GB policy). ` +
                     `Use one of: ${Array.from(this.lightLocalModels).join(', ')} ` +
@@ -168,9 +159,7 @@ export class OllamaClient {
      */
     resolveRuntime(options = {}) {
         const operation = options.operation || 'generate';
-        const requested = this._normalizeRuntimePreference(
-            options.runtimePreference || this.nonEmbeddingRuntime
-        );
+        const requested = this._normalizeRuntimePreference(options.runtimePreference || this.nonEmbeddingRuntime);
 
         if (operation === 'embedding') {
             return {
@@ -179,7 +168,7 @@ export class OllamaClient {
                 operation,
                 reason: 'embedding_local_only',
                 cloudEnabled: this.cloudEnabled,
-                localFallbackEnabled: this.nonEmbeddingLocalFallback
+                localFallbackEnabled: this.nonEmbeddingLocalFallback,
             };
         }
 
@@ -190,7 +179,7 @@ export class OllamaClient {
                 operation,
                 reason: 'explicit_local',
                 cloudEnabled: this.cloudEnabled,
-                localFallbackEnabled: this.nonEmbeddingLocalFallback
+                localFallbackEnabled: this.nonEmbeddingLocalFallback,
             };
         }
 
@@ -207,7 +196,7 @@ export class OllamaClient {
                 operation,
                 reason: 'explicit_cloud',
                 cloudEnabled: this.cloudEnabled,
-                localFallbackEnabled: this.nonEmbeddingLocalFallback
+                localFallbackEnabled: this.nonEmbeddingLocalFallback,
             };
         }
 
@@ -218,7 +207,7 @@ export class OllamaClient {
                 operation,
                 reason: 'auto_cloud_first',
                 cloudEnabled: this.cloudEnabled,
-                localFallbackEnabled: this.nonEmbeddingLocalFallback
+                localFallbackEnabled: this.nonEmbeddingLocalFallback,
             };
         }
 
@@ -229,13 +218,13 @@ export class OllamaClient {
                 operation,
                 reason: 'auto_fallback_cloud_disabled',
                 cloudEnabled: this.cloudEnabled,
-                localFallbackEnabled: this.nonEmbeddingLocalFallback
+                localFallbackEnabled: this.nonEmbeddingLocalFallback,
             };
         }
 
         throw new Error(
-            'Cloud-first runtime is unavailable: OLLAMA_CLOUD_ENABLED=false and local fallback is disabled '
-            + '(OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK=false).'
+            'Cloud-first runtime is unavailable: OLLAMA_CLOUD_ENABLED=false and local fallback is disabled ' +
+                '(OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK=false).'
         );
     }
 
@@ -256,7 +245,7 @@ export class OllamaClient {
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),
-            signal: abortSignal
+            signal: abortSignal,
         });
 
         if (!response.ok) {
@@ -312,8 +301,8 @@ export class OllamaClient {
                 temperature,
                 num_predict,
                 top_p,
-                ...otherOptions
-            }
+                ...otherOptions,
+            },
         };
 
         const resolved = this.resolveRuntime({ operation: 'generate', runtimePreference: runtime });
@@ -327,7 +316,7 @@ export class OllamaClient {
                 primaryRuntime: resolved.runtime,
                 fallbackUsed: false,
                 routingReason: resolved.reason,
-                attempts
+                attempts,
             };
         } catch (primaryError) {
             const canFallback =
@@ -371,7 +360,7 @@ export class OllamaClient {
                     primaryRuntime: 'cloud',
                     fallbackUsed: true,
                     routingReason: 'auto_cloud_first_local_fallback',
-                    attempts
+                    attempts,
                 };
             } catch (fallbackError) {
                 throw new Error(
@@ -420,7 +409,7 @@ export class OllamaClient {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model, prompt: text }),
-                signal: abortSignal
+                signal: abortSignal,
             });
 
             if (!response.ok) {
@@ -461,7 +450,7 @@ export class OllamaClient {
         const response = await this.fetch(`${baseUrl}/api/tags`, {
             method: 'GET',
             headers,
-            signal: AbortSignal.timeout(this.listTimeout)
+            signal: AbortSignal.timeout(this.listTimeout),
         });
 
         if (!response.ok) {
@@ -491,7 +480,7 @@ export class OllamaClient {
             local_model_profile: this.localModelProfile,
             cloud_models: [],
             local_models: [],
-            errors: {}
+            errors: {},
         };
 
         if (this.cloudEnabled) {
@@ -541,7 +530,7 @@ export class OllamaClient {
         const health = {
             cloud: false,
             local: false,
-            overall: false
+            overall: false,
         };
 
         if (this.cloudEnabled) {
@@ -549,7 +538,7 @@ export class OllamaClient {
                 const response = await this.fetch(`${this.cloudBaseUrl}/api/tags`, {
                     method: 'GET',
                     headers: this._getCloudHeaders(),
-                    signal: AbortSignal.timeout(this.healthTimeout)
+                    signal: AbortSignal.timeout(this.healthTimeout),
                 });
                 health.cloud = response.ok;
             } catch (_) {
@@ -560,7 +549,7 @@ export class OllamaClient {
         try {
             const response = await this.fetch(`${this.localBaseUrl}/api/tags`, {
                 method: 'GET',
-                signal: AbortSignal.timeout(this.healthTimeout)
+                signal: AbortSignal.timeout(this.healthTimeout),
             });
             health.local = response.ok;
         } catch (_) {
@@ -580,23 +569,21 @@ export class OllamaClient {
     async modelInfo(modelName, options = {}) {
         const resolved = this.resolveRuntime({
             operation: 'model_info',
-            runtimePreference: options.runtime
+            runtimePreference: options.runtime,
         });
 
-        const tryRuntime = async (runtime) => {
+        const tryRuntime = async runtime => {
             const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
             const headers = runtime === 'cloud' ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
 
             const timeoutSignal = AbortSignal.timeout(this.listTimeout);
-            const abortSignal = options.signal
-                ? AbortSignal.any([options.signal, timeoutSignal])
-                : timeoutSignal;
+            const abortSignal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
 
             const response = await this.fetch(`${baseUrl}/api/show`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ name: modelName }),
-                signal: abortSignal
+                signal: abortSignal,
             });
 
             if (!response.ok) {

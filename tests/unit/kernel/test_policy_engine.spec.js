@@ -5,7 +5,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
     describe('1. Políticas de Retry', () => {
         it('deve ter política padrão de 3 tentativas', () => {
             const policy = {
-                maxRetries: 3
+                maxRetries: 3,
             };
 
             assert.strictEqual(policy.maxRetries, 3);
@@ -14,7 +14,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve decidir se deve retentar', () => {
             const task = {
                 attempts: 2,
-                maxRetries: 3
+                maxRetries: 3,
             };
 
             const deveRetentar = task.attempts < task.maxRetries;
@@ -25,7 +25,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('não deve retentar após atingir limite', () => {
             const task = {
                 attempts: 3,
-                maxRetries: 3
+                maxRetries: 3,
             };
 
             const deveRetentar = task.attempts < task.maxRetries;
@@ -72,7 +72,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve classificar como erro temporário', () => {
             const error = {
                 type: 'NETWORK_ERROR',
-                code: 'ECONNREFUSED'
+                code: 'ECONNREFUSED',
             };
 
             const isTemporary = ['NETWORK_ERROR', 'TIMEOUT'].includes(error.type);
@@ -83,7 +83,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve classificar como erro permanente', () => {
             const error = {
                 type: 'VALIDATION_ERROR',
-                message: 'Dados inválidos'
+                message: 'Dados inválidos',
             };
 
             const isPermanent = ['VALIDATION_ERROR', 'AUTH_ERROR'].includes(error.type);
@@ -106,7 +106,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
             const MIN_COOLDOWN = 1000; // 1 segundo
 
             const policy = {
-                minCooldown: MIN_COOLDOWN
+                minCooldown: MIN_COOLDOWN,
             };
 
             assert.strictEqual(policy.minCooldown, 1000);
@@ -129,7 +129,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
 
             const circuitBreaker = {
                 consecutiveFailures: 6,
-                threshold: THRESHOLD
+                threshold: THRESHOLD,
             };
 
             const isOpen = circuitBreaker.consecutiveFailures >= circuitBreaker.threshold;
@@ -140,14 +140,14 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve fechar circuit após sucesso', () => {
             let circuitBreaker = {
                 consecutiveFailures: 3,
-                state: 'HALF_OPEN'
+                state: 'HALF_OPEN',
             };
 
             // Sucesso reseta o contador
             circuitBreaker = {
                 ...circuitBreaker,
                 consecutiveFailures: 0,
-                state: 'CLOSED'
+                state: 'CLOSED',
             };
 
             assert.strictEqual(circuitBreaker.consecutiveFailures, 0);
@@ -160,14 +160,14 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
             let task = {
                 id: 'task-001',
                 priority: 8,
-                failures: 0
+                failures: 0,
             };
 
             // Simular falha
             task = {
                 ...task,
                 failures: task.failures + 1,
-                priority: Math.max(1, task.priority - 2)
+                priority: Math.max(1, task.priority - 2),
             };
 
             assert.strictEqual(task.priority, 6);
@@ -178,7 +178,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
                 id: 'task-002',
                 priority: 5,
                 createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 dia atrás
-                ageInHours: 24
+                ageInHours: 24,
             };
 
             const boost = Math.min(3, Math.floor(task.ageInHours / 12));
@@ -195,7 +195,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
             const runningTasks = [
                 { id: 't1', status: 'RUNNING' },
                 { id: 't2', status: 'RUNNING' },
-                { id: 't3', status: 'RUNNING' }
+                { id: 't3', status: 'RUNNING' },
             ];
 
             const podeIniciar = runningTasks.length < MAX_CONCURRENT;
@@ -206,7 +206,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve verificar disponibilidade de recursos', () => {
             const recursos = {
                 browsers: { available: 2, total: 3 },
-                memory: { free: 500, total: 1000 }
+                memory: { free: 500, total: 1000 },
             };
 
             const temRecursos = recursos.browsers.available > 0 && recursos.memory.free > 100;
@@ -239,14 +239,14 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve decidir executar tarefa imediatamente', () => {
             const task = {
                 priority: 10,
-                attempts: 0
+                attempts: 0,
             };
 
             const recursos = { available: true };
 
             const decision = {
                 action: 'EXECUTE',
-                immediate: true
+                immediate: true,
             };
 
             assert.strictEqual(decision.action, 'EXECUTE');
@@ -255,14 +255,14 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve decidir adiar execução', () => {
             const task = {
                 priority: 3,
-                attempts: 2
+                attempts: 2,
             };
 
             const recursos = { available: false };
 
             const decision = {
                 action: 'DEFER',
-                reason: 'NO_RESOURCES'
+                reason: 'NO_RESOURCES',
             };
 
             assert.strictEqual(decision.action, 'DEFER');
@@ -272,12 +272,12 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
             const task = {
                 priority: 1,
                 attempts: 5,
-                maxRetries: 3
+                maxRetries: 3,
             };
 
             const decision = {
                 action: 'CANCEL',
-                reason: 'MAX_RETRIES_EXCEEDED'
+                reason: 'MAX_RETRIES_EXCEEDED',
             };
 
             assert.strictEqual(decision.action, 'CANCEL');

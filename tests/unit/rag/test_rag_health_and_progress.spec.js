@@ -30,7 +30,7 @@ describe('ragHealth availability + indexing progress logs', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
 
         try {
@@ -47,7 +47,7 @@ describe('ragHealth availability + indexing progress logs', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -71,7 +71,7 @@ describe('ragHealth availability + indexing progress logs', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
         const logs = [];
@@ -85,7 +85,7 @@ describe('ragHealth availability + indexing progress logs', () => {
             console.log = (...args) => logs.push(args.join(' '));
             await ragIndex({ root: ws, paths: ragPaths, embeddingsProvider: embeddings, profile: 'full' });
 
-            const progressLine = logs.find((line) => line.includes('[RAG] progress files='));
+            const progressLine = logs.find(line => line.includes('[RAG] progress files='));
             assert.ok(progressLine, 'Expected progress line with percentages');
             assert.ok(progressLine.includes('remaining='));
             assert.ok(progressLine.includes('chunks~'));
@@ -96,10 +96,10 @@ describe('ragHealth availability + indexing progress logs', () => {
             assert.ok(Number(progressMatch[1]) >= 0 && Number(progressMatch[1]) <= 100);
             assert.ok(Number(progressMatch[2]) >= 0 && Number(progressMatch[2]) <= 100);
 
-            const oldBrokenPattern = logs.some((line) => /Embedding chunk \d+\/\d+:/.test(line));
+            const oldBrokenPattern = logs.some(line => /Embedding chunk \d+\/\d+:/.test(line));
             assert.strictEqual(oldBrokenPattern, false);
 
-            const fileChunkLines = logs.filter((line) => line.includes('Embedding chunk file '));
+            const fileChunkLines = logs.filter(line => line.includes('Embedding chunk file '));
             assert.ok(fileChunkLines.length > 0, 'Expected per-file chunk logs');
             for (const line of fileChunkLines) {
                 const match = line.match(/Embedding chunk file (\d+)\/(\d+)/);

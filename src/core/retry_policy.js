@@ -1,10 +1,26 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
+/**
+ * Normaliza inteiro positivo para parâmetros de retry/backoff.
+ *
+ * @param {unknown} rawValue
+ * @param {number} fallback
+ * @returns {number}
+ */
 function readPositiveInt(rawValue, fallback) {
     const parsed = Number.parseInt(String(rawValue ?? fallback), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * Calcula atraso exponencial com jitter para políticas de retry.
+ *
+ * @param {number} attempt
+ * @param {number} baseDelayMs
+ * @param {number} maxDelayMs
+ * @param {number} [jitterRatio=0.2]
+ * @returns {number}
+ */
 function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitterRatio = 0.2) {
     const normalizedAttempt = Math.max(1, Number(attempt) || 1);
     const exponentialDelay = Math.min(maxDelayMs, baseDelayMs * 2 ** (normalizedAttempt - 1));

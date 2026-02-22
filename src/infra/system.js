@@ -68,7 +68,7 @@ const pm2p = {
                 }
             });
         }),
-    disconnect: () => pm2.disconnect()
+    disconnect: () => pm2.disconnect(),
 };
 
 /* ==========================================================================
@@ -93,7 +93,7 @@ async function getAgentStatus() {
             agent: app.pm2_env.status, // 'online', 'stopped', 'errored', etc.
             memory: app.monit.memory || 0,
             uptime: app.pm2_env.status === 'online' ? Date.now() - app.pm2_env.pm_uptime : 0,
-            pid: app.pid
+            pid: app.pid,
         };
     } catch (e) {
         log('ERROR', `[SYSTEM] Falha ao obter status PM2: ${e.message}`);
@@ -129,7 +129,7 @@ async function controlAgent(action) {
                         node_args: agenteSpec.node_args,
                         max_memory_restart: agenteSpec.max_memory_restart,
                         exp_backoff_restart_delay: agenteSpec.exp_backoff_restart_delay,
-                        env: agenteSpec.env
+                        env: agenteSpec.env,
                     });
                 }
                 break;
@@ -273,4 +273,5 @@ async function killChromeGlobal() {
     });
 }
 
+/** Reexport público: pm2Raw. */
 export { getAgentStatus, controlAgent, killProcess, killChromeGlobal, pm2 as pm2Raw };

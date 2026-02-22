@@ -31,7 +31,7 @@ function extractEnvelopeData(envelope) {
         source: envelope?.identity?.actor || envelope?.header?.source || 'unknown',
         timestamp: envelope?.protocol?.timestamp ?? envelope?.header?.timestamp ?? Date.now(),
         kind: getMessageType(envelope),
-        payload: getPayload(envelope)
+        payload: getPayload(envelope),
     };
 }
 
@@ -104,7 +104,7 @@ class KernelNERVBridge {
         }
 
         this.telemetry.info('nerv_bridge_starting', {
-            at: Date.now()
+            at: Date.now(),
         });
 
         // Registra handler de recepção de envelopes
@@ -115,7 +115,7 @@ class KernelNERVBridge {
         this.started = true;
 
         this.telemetry.info('nerv_bridge_started', {
-            at: Date.now()
+            at: Date.now(),
         });
     }
 
@@ -129,7 +129,7 @@ class KernelNERVBridge {
         }
 
         this.telemetry.info('nerv_bridge_stopping', {
-            at: Date.now()
+            at: Date.now(),
         });
 
         if (this.unsubscribe) {
@@ -140,7 +140,7 @@ class KernelNERVBridge {
         this.started = false;
 
         this.telemetry.info('nerv_bridge_stopped', {
-            at: Date.now()
+            at: Date.now(),
         });
     }
 
@@ -159,7 +159,7 @@ class KernelNERVBridge {
     _handleInboundEnvelope(envelope) {
         if (!isValidEnvelope(envelope)) {
             this.telemetry.warning('nerv_bridge_invalid_envelope', {
-                at: Date.now()
+                at: Date.now(),
             });
             return;
         }
@@ -170,7 +170,7 @@ class KernelNERVBridge {
             kind: data.kind,
             msgId: data.msgId,
             correlationId: data.correlationId,
-            at: Date.now()
+            at: Date.now(),
         });
 
         // Apenas EVENTs são fatos do mundo
@@ -183,7 +183,7 @@ class KernelNERVBridge {
         if (data.kind === MessageType.ACK) {
             this.telemetry.info('nerv_bridge_ack_received', {
                 msgId: data.msgId,
-                at: Date.now()
+                at: Date.now(),
             });
             return;
         }
@@ -193,7 +193,7 @@ class KernelNERVBridge {
             this.telemetry.warning('nerv_bridge_unexpected_command', {
                 msgId: data.msgId,
                 source: data.source,
-                at: Date.now()
+                at: Date.now(),
             });
             return;
         }
@@ -201,7 +201,7 @@ class KernelNERVBridge {
         // Tipo desconhecido
         this.telemetry.warning('nerv_bridge_unknown_envelope_kind', {
             kind: data.kind,
-            at: Date.now()
+            at: Date.now(),
         });
     }
 
@@ -216,13 +216,13 @@ class KernelNERVBridge {
             this.telemetry.info('nerv_bridge_event_ingested', {
                 msgId: data.msgId,
                 correlationId: data.correlationId,
-                at: Date.now()
+                at: Date.now(),
             });
         } catch (error) {
             this.telemetry.critical('nerv_bridge_event_ingestion_failed', {
                 msgId: data.msgId,
                 error: error.message,
-                at: Date.now()
+                at: Date.now(),
             });
         }
     }
@@ -253,23 +253,30 @@ class KernelNERVBridge {
         }
         // Extract actionCode from payload if present
         const actionCode = (payload && payload.actionCode) || ActionCode.KERNEL_INTERNAL_ERROR;
-        const targetRole = target ? (ActorRole[target.toUpperCase()] || null) : null;
+        const targetRole = target ? ActorRole[target.toUpperCase()] || null : null;
 
         try {
-            const envelope = await HighLevelNERV.sendCommand(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole); // ✅ P1-4: Added await
+            const envelope = await HighLevelNERV.sendCommand(
+                this.nerv,
+                ActorRole.KERNEL,
+                actionCode,
+                payload,
+                correlationId,
+                targetRole
+            ); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_command_emitted', {
                 msgId,
                 correlationId,
                 target: target ?? 'unknown',
-                at: Date.now()
+                at: Date.now(),
             });
         } catch (error) {
             this.telemetry.critical('nerv_bridge_command_emission_failed', {
                 error: error.message,
                 correlationId,
-                at: Date.now()
+                at: Date.now(),
             });
 
             throw error;
@@ -299,23 +306,30 @@ class KernelNERVBridge {
 
         // Extrair actionCode do payload (ou usar genérico)
         const actionCode = payload.actionCode || ActionCode.KERNEL_TELEMETRY;
-        const targetRole = target ? (ActorRole[target.toUpperCase()] || null) : null;
+        const targetRole = target ? ActorRole[target.toUpperCase()] || null : null;
 
         try {
-            const envelope = await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, actionCode, payload, correlationId, targetRole); // ✅ P1-4: Added await
+            const envelope = await HighLevelNERV.sendEvent(
+                this.nerv,
+                ActorRole.KERNEL,
+                actionCode,
+                payload,
+                correlationId,
+                targetRole
+            ); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_event_emitted', {
                 msgId,
                 correlationId,
                 target: target ?? 'broadcast',
-                at: Date.now()
+                at: Date.now(),
             });
         } catch (error) {
             this.telemetry.critical('nerv_bridge_event_emission_failed', {
                 error: error.message,
                 correlationId,
-                at: Date.now()
+                at: Date.now(),
             });
 
             throw error;
@@ -343,7 +357,7 @@ class KernelNERVBridge {
             this.telemetry.info('nerv_bridge_task_no_orchestration', {
                 taskId: task.meta?.id,
                 strategy: task.spec?.execution?.strategy || 'SINGLE_SHOT',
-                at: Date.now()
+                at: Date.now(),
             });
             return task;
         }
@@ -351,7 +365,7 @@ class KernelNERVBridge {
         this.telemetry.info('nerv_bridge_task_orchestration_start', {
             taskId: task.meta?.id,
             strategy: task.spec?.execution?.strategy,
-            at: Date.now()
+            at: Date.now(),
         });
 
         // Prepara task (inicializa state de workflow/iteração)
@@ -361,7 +375,7 @@ class KernelNERVBridge {
         // Cacheia task para afterExecution
         this.orchestrationCache.set(task.meta.id, {
             task: preparedTask,
-            startedAt: Date.now()
+            startedAt: Date.now(),
         });
 
         return preparedTask;
@@ -388,7 +402,7 @@ class KernelNERVBridge {
         this.telemetry.info('nerv_bridge_task_orchestration_evaluate', {
             taskId: task.meta.id,
             executionDuration: cached ? Date.now() - cached.startedAt : 0,
-            at: Date.now()
+            at: Date.now(),
         });
 
         // Orchestrator decide próxima ação
@@ -399,7 +413,7 @@ class KernelNERVBridge {
             action: decision.action,
             hasFeedback: !!decision.feedback,
             hasNextStep: !!decision.nextStep,
-            at: Date.now()
+            at: Date.now(),
         });
 
         // Limpa cache se decisão for DONE
@@ -437,7 +451,7 @@ class KernelNERVBridge {
                 this.telemetry.info('nerv_bridge_orchestration_done', {
                     taskId: task.meta.id,
                     correlationId,
-                    at: Date.now()
+                    at: Date.now(),
                 });
                 break;
 
@@ -445,7 +459,7 @@ class KernelNERVBridge {
                 this.telemetry.warning('nerv_bridge_orchestration_unknown_action', {
                     action,
                     taskId: task.meta.id,
-                    at: Date.now()
+                    at: Date.now(),
                 });
         }
     }
@@ -453,22 +467,25 @@ class KernelNERVBridge {
     /**
      * Handler interno: RETRY action
      */
-	async _handleRetryAction(task, feedback, correlationId) {
+    async _handleRetryAction(task, feedback, correlationId) {
         this.telemetry.info('nerv_bridge_orchestration_retry', {
             taskId: task.meta.id,
             iteration: task.state?.iteration_state?.current_iteration,
             feedbackLength: feedback?.length || 0,
             correlationId,
-            at: Date.now()
+            at: Date.now(),
         });
 
-		// Injeta feedback no prompt original (imutável: payload pode estar congelado)
-		const prevSpec = task && typeof task.spec === 'object' && task.spec !== null ? task.spec : null;
-		const prevPayload = prevSpec && typeof prevSpec.payload === 'object' && prevSpec.payload !== null ? prevSpec.payload : null;
-		const originalPrompt = prevPayload?.user_message || prevPayload?.prompt || '';
-		const nextPayload = prevPayload ? { ...prevPayload, user_message: originalPrompt + '\n\n' + feedback } : prevPayload;
-		const nextSpec = prevSpec ? { ...prevSpec, payload: nextPayload } : prevSpec;
-		const retryTask = { ...task, spec: nextSpec };
+        // Injeta feedback no prompt original (imutável: payload pode estar congelado)
+        const prevSpec = task && typeof task.spec === 'object' && task.spec !== null ? task.spec : null;
+        const prevPayload =
+            prevSpec && typeof prevSpec.payload === 'object' && prevSpec.payload !== null ? prevSpec.payload : null;
+        const originalPrompt = prevPayload?.user_message || prevPayload?.prompt || '';
+        const nextPayload = prevPayload
+            ? { ...prevPayload, user_message: originalPrompt + '\n\n' + feedback }
+            : prevPayload;
+        const nextSpec = prevSpec ? { ...prevSpec, payload: nextPayload } : prevSpec;
+        const retryTask = { ...task, spec: nextSpec };
 
         // Emite comando para re-executar task com feedback
         await this.emitCommand({
@@ -476,8 +493,8 @@ class KernelNERVBridge {
             correlationId,
             payload: {
                 actionCode: ActionCode.DRIVER_EXECUTE_TASK,
-                task: retryTask
-            }
+                task: retryTask,
+            },
         });
     }
 
@@ -507,7 +524,9 @@ class KernelNERVBridge {
         }
 
         const workflowState =
-            task?.state?.workflow_state && typeof task.state.workflow_state === 'object' ? task.state.workflow_state : {};
+            task?.state?.workflow_state && typeof task.state.workflow_state === 'object'
+                ? task.state.workflow_state
+                : {};
         const completedStepIds = Array.isArray(workflowState.completed_steps) ? workflowState.completed_steps : [];
         const accumulatedContext =
             workflowState.accumulated_context && typeof workflowState.accumulated_context === 'object'
@@ -520,7 +539,9 @@ class KernelNERVBridge {
                 workflowState.current_step_index ??
                 completedStepIds.length
         );
-        const nextStepIndex = Number.isFinite(inferredIndex) ? Math.max(0, inferredIndex) : Math.max(0, completedStepIds.length);
+        const nextStepIndex = Number.isFinite(inferredIndex)
+            ? Math.max(0, inferredIndex)
+            : Math.max(0, completedStepIds.length);
         const attemptId = correlationId ? String(correlationId) : null;
 
         this.telemetry.info('nerv_bridge_orchestration_next_step', {
@@ -577,7 +598,7 @@ class KernelNERVBridge {
                 step_id: nextStepId,
                 previous_task_id: taskId,
                 child_task_id: childId,
-            }
+            },
         });
 
         this.telemetry.info('nerv_bridge_next_step_task_created', {
@@ -603,7 +624,7 @@ class KernelNERVBridge {
             started: this.started,
             nerv: this.nerv ? 'connected' : 'disconnected',
             orchestrator: this.orchestrator ? 'enabled' : 'disabled',
-            orchestratedTasks: this.orchestrationCache.size
+            orchestratedTasks: this.orchestrationCache.size,
         });
     }
 }

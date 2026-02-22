@@ -16,12 +16,12 @@ test('imports tools from stdio upstream (SDK) and proxies calls', async () => {
                 transport: 'stdio',
                 command: process.execPath,
                 args: [fixturePath],
-                toolPrefix: 'mcp_fixture__'
-            }
+                toolPrefix: 'mcp_fixture__',
+            },
         ]),
         MCP_UPSTREAM_REFRESH: 'true',
         MCP_UPSTREAM_INIT_TIMEOUT_MS: '15000',
-        MCP_TOOL_TIMEOUT: '15000'
+        MCP_TOOL_TIMEOUT: '15000',
     };
 
     try {
@@ -43,4 +43,3 @@ test('imports tools from stdio upstream (SDK) and proxies calls', async () => {
         await shutdownUpstreams().catch(() => {});
     }
 });
-

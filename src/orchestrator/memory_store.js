@@ -9,7 +9,7 @@ const PATTERN_TYPE = {
     VALIDATION: 'validation', // Resultados de validação
     ERROR: 'error', // Erros encontrados
     SUCCESS: 'success', // Sucessos (boas práticas)
-    CUSTOM: 'custom' // Pattern customizado
+    CUSTOM: 'custom', // Pattern customizado
 };
 
 /**
@@ -26,7 +26,7 @@ class MemoryStore {
         this.config = {
             maxSize: options.maxSize || 1000, // Max patterns armazenados
             persistToDisk: options.persistToDisk || false, // Persistir em disk (TODO)
-            storePath: options.storePath || './missions/memory_store.json'
+            storePath: options.storePath || './missions/memory_store.json',
         };
 
         // Array de patterns
@@ -40,7 +40,7 @@ class MemoryStore {
             total_added: 0,
             total_searches: 0,
             total_hits: 0,
-            evictions: 0
+            evictions: 0,
         };
 
         log('INFO', `[MemoryStore] Inicializado com maxSize=${this.config.maxSize}`);
@@ -63,7 +63,7 @@ class MemoryStore {
             metadata: pattern.metadata || {},
             created_at: Date.now(),
             last_accessed: Date.now(),
-            access_count: 0
+            access_count: 0,
         };
 
         // Adiciona ao array
@@ -113,7 +113,7 @@ class MemoryStore {
         matches.sort((a, b) => b.score - a.score);
 
         // Pega top N
-        const results = matches.slice(0, limit).map((m) => {
+        const results = matches.slice(0, limit).map(m => {
             // Atualiza last_accessed e access_count
             m.pattern.last_accessed = Date.now();
             m.pattern.access_count++;
@@ -138,8 +138,8 @@ class MemoryStore {
 
         const results = patternIds
             .slice(0, limit)
-            .map((id) => this.patterns.find((p) => p.id === id))
-            .filter((p) => p !== undefined);
+            .map(id => this.patterns.find(p => p.id === id))
+            .filter(p => p !== undefined);
 
         return results;
     }
@@ -233,10 +233,8 @@ class MemoryStore {
         return {
             total_patterns: this.patterns.length,
             max_size: this.config.maxSize,
-            types: Object.fromEntries(
-                Array.from(this.indexByType.entries()).map(([type, ids]) => [type, ids.length])
-            ),
-            ...this.stats
+            types: Object.fromEntries(Array.from(this.indexByType.entries()).map(([type, ids]) => [type, ids.length])),
+            ...this.stats,
         };
     }
 

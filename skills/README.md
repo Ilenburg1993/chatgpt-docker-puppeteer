@@ -24,8 +24,12 @@ node tools/generate_skills_index.js
 
 Como usar:
 
-1. Coloque suas skills em `.github/skills/<skill-name>/SKILL.md` para skills específicas do repositório, ou em `~/.copilot/skills/<skill-name>/SKILL.md` para skills pessoais.
-2. Rode `bash tools/skills_sync.sh` para copiar skill folders para `skills/personal` e `skills/project`.
-3. Rode `node tools/generate_skills_index.js` para criar `skills/index.json` e atualizar este README com uma lista resumida.
+1. Coloque suas skills em `.github/skills/<skill-name>/SKILL.md` para skills específicas do
+   repositório, ou em `~/.copilot/skills/<skill-name>/SKILL.md` para skills pessoais.
+2. Rode `bash tools/skills_sync.sh` para copiar skill folders para `skills/personal` e
+   `skills/project`.
+3. Rode `node tools/generate_skills_index.js` para criar `skills/index.json` e atualizar este README
+   com uma lista resumida.
 
-Padrão suportado: GitHub Agent Skills — `SKILL.md` com frontmatter YAML (veja `skills/template/SKILL.md`).
+Padrão suportado: GitHub Agent Skills — `SKILL.md` com frontmatter YAML (veja
+`skills/template/SKILL.md`).

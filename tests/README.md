@@ -47,7 +47,9 @@ tests/
 ## 🧪 Test Types
 
 ### Unit Tests
+
 Fast, isolated tests for individual functions/modules.
+
 ```bash
 npm run test:unit
 npm run test:coverage:unit
@@ -55,20 +57,26 @@ npm run test:watch:unit
 ```
 
 ### Integration Tests
+
 Test cross-component interactions.
+
 ```bash
 npm run test:integration
 npm run test:coverage:integration
 ```
 
 ### E2E Tests
+
 Full workflow tests simulating real usage.
+
 ```bash
 npm run test:e2e
 ```
 
 ### Regression Tests
+
 Validate bug fixes and prevent regressions.
+
 ```bash
 npm run test:regression
 ```
@@ -76,6 +84,7 @@ npm run test:regression
 ## 🚀 Running Tests
 
 ### All Tests
+
 ```bash
 npm test                # Run all tests
 npm run test:coverage   # With coverage report
@@ -83,17 +92,20 @@ npm run test:ci         # CI mode (fails on low coverage)
 ```
 
 ### Watch Mode
+
 ```bash
 npm run test:watch      # Watch all tests
 npm run test:watch:unit # Watch unit tests only
 ```
 
 ### Debug Mode
+
 ```bash
 npm run test:debug      # Run with debugger
 ```
 
 ### Clean Artifacts
+
 ```bash
 npm run test:clean      # Remove coverage/ and tmp/
 ```
@@ -109,56 +121,60 @@ npm run test:clean      # Remove coverage/ and tmp/
 ## 📝 Writing Tests
 
 ### Naming Convention
+
 - **Test files**: `test_[module].spec.js`
 - **Mock files**: `mock_[component].js`
 - **Fixture files**: `[name].fixture.json`
 
 ### Unit Test Template
+
 ```javascript
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 
 describe('[Module] Unit Tests', () => {
-    let instance;
+  let instance;
 
-    before(() => {
-        // Setup
-    });
+  before(() => {
+    // Setup
+  });
 
-    after(() => {
-        // Cleanup
-    });
+  after(() => {
+    // Cleanup
+  });
 
-    it('should do something', () => {
-        // Test
-        assert.strictEqual(result, expected);
-    });
+  it('should do something', () => {
+    // Test
+    assert.strictEqual(result, expected);
+  });
 });
 ```
 
 ### Integration Test Template
+
 ```javascript
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 
 describe('[Feature] Integration Tests', () => {
-    before(async () => {
-        // Setup components
-    });
+  before(async () => {
+    // Setup components
+  });
 
-    after(async () => {
-        // Cleanup resources
-    });
+  after(async () => {
+    // Cleanup resources
+  });
 
-    it('should integrate components', async () => {
-        // Test cross-component behavior
-    });
+  it('should integrate components', async () => {
+    // Test cross-component behavior
+  });
 });
 ```
 
 ## 📦 Fixtures
 
 Reusable test data in `fixtures/`:
+
 ```javascript
 const taskFixture = require('../fixtures/tasks/valid-task.fixture.json');
 ```
@@ -166,6 +182,7 @@ const taskFixture = require('../fixtures/tasks/valid-task.fixture.json');
 ## 🎭 Mocks
 
 Reusable mock objects in `mocks/`:
+
 ```javascript
 const mockLogger = require('../mocks/mock_logger');
 const mockNERV = require('../mocks/mock_nerv');
@@ -174,16 +191,19 @@ const mockNERV = require('../mocks/mock_nerv');
 ## 🔍 Coverage Reports
 
 After running tests with coverage:
+
 ```bash
 npm run test:coverage
 ```
 
 Reports are generated in:
+
 - `coverage/index.html` - Interactive HTML report
 - `coverage/lcov.info` - LCOV format for CI tools
 - `coverage/coverage-summary.json` - JSON summary
 
 Open HTML report:
+
 ```bash
 $BROWSER coverage/index.html
 ```
@@ -212,16 +232,19 @@ $BROWSER coverage/index.html
 ## 🐛 Debugging Failed Tests
 
 1. Run single test file:
+
    ```bash
    node --test tests/unit/core/test_config.spec.js
    ```
 
 2. Use debugger:
+
    ```bash
    npm run test:debug
    ```
 
 3. Check coverage gaps:
+
    ```bash
    npm run test:coverage
    $BROWSER coverage/index.html
@@ -232,11 +255,13 @@ $BROWSER coverage/index.html
 ## 🔄 CI/CD Integration
 
 GitHub Actions workflow uses:
+
 ```bash
 npm run test:ci
 ```
 
 This fails if coverage thresholds are not met:
+
 - Lines < 80%
 - Branches < 75%
 - Functions < 75%
@@ -252,6 +277,7 @@ This fails if coverage thresholds are not met:
 ## 🤝 Contributing
 
 When adding new features:
+
 1. Write tests FIRST (TDD)
 2. Ensure all tests pass
 3. Meet coverage thresholds
@@ -271,5 +297,4 @@ Target: **80%+ coverage**, **350+ tests**, **< 15 min execution time**
 
 ---
 
-**Last Updated**: January 2026
-**Maintained by**: Development Team
+**Last Updated**: January 2026 **Maintained by**: Development Team

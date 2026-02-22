@@ -36,17 +36,13 @@ export function validateOpenAIRequest(body) {
 
     // 2. Reject multiple completions (n > 1)
     if (body.n && body.n > 1) {
-        throw buildValidationError(
-            `Multiple completions not supported (n=${body.n}). Set n=1 or omit the parameter.`
-        );
+        throw buildValidationError(`Multiple completions not supported (n=${body.n}). Set n=1 or omit the parameter.`);
     }
 
     // 3. Check for vision content (array format with images)
     for (const msg of body.messages) {
         if (Array.isArray(msg.content)) {
-            throw buildValidationError(
-                'Vision content (images) not supported. Only text messages are supported.'
-            );
+            throw buildValidationError('Vision content (images) not supported. Only text messages are supported.');
         }
     }
 
@@ -88,9 +84,7 @@ export function translateRequestToOllama(openaiReq) {
     const prompt = messages
         .map(msg => {
             // Map OpenAI roles to readable prefixes
-            const rolePrefix = msg.role === 'system' ? 'System' :
-                             msg.role === 'assistant' ? 'Assistant' :
-                             'User';
+            const rolePrefix = msg.role === 'system' ? 'System' : msg.role === 'assistant' ? 'Assistant' : 'User';
 
             return `${rolePrefix}: ${msg.content}`;
         })
@@ -99,12 +93,12 @@ export function translateRequestToOllama(openaiReq) {
     return {
         model: model || 'qwen3-coder-next',
         prompt,
-        stream: false,  // V1.0: no streaming support
+        stream: false, // V1.0: no streaming support
         options: {
             temperature: temperature ?? 0.7,
             num_predict: max_tokens ?? 1000,
-            top_p: top_p ?? 0.9
-        }
+            top_p: top_p ?? 0.9,
+        },
     };
 }
 
@@ -158,19 +152,21 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
         object: 'chat.completion',
         created: Math.floor(Date.now() / 1000),
         model: model || 'qwen3-coder-next',
-        choices: [{
-            index: 0,
-            message: {
-                role: 'assistant',
-                content: response
+        choices: [
+            {
+                index: 0,
+                message: {
+                    role: 'assistant',
+                    content: response,
+                },
+                finish_reason: 'stop', // Ollama always completes fully (no length limit)
             },
-            finish_reason: 'stop'  // Ollama always completes fully (no length limit)
-        }],
+        ],
         usage: {
             prompt_tokens: promptTokens,
             completion_tokens: completionTokens,
-            total_tokens: promptTokens + completionTokens
-        }
+            total_tokens: promptTokens + completionTokens,
+        },
     };
 }
 
@@ -197,8 +193,8 @@ export function buildOpenAIError(message, type = 'invalid_request_error', code =
         error: {
             message,
             type,
-            code
-        }
+            code,
+        },
     };
 }
 

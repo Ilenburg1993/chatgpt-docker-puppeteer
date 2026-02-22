@@ -4,9 +4,7 @@
 
         <form @submit.prevent="handleLogin" class="space-y-4">
             <div>
-                <label for="username" class="block text-sm font-medium text-foreground mb-1">
-                    Usuário
-                </label>
+                <label for="username" class="block text-sm font-medium text-foreground mb-1"> Usuário </label>
                 <Input
                     id="username"
                     v-model="form.username"
@@ -17,9 +15,7 @@
             </div>
 
             <div>
-                <label for="password" class="block text-sm font-medium text-foreground mb-1">
-                    Senha
-                </label>
+                <label for="password" class="block text-sm font-medium text-foreground mb-1"> Senha </label>
                 <Input
                     id="password"
                     v-model="form.password"
@@ -35,15 +31,10 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
-                <Button variant="ghost" type="button" @click="handleClose" :disabled="loading">
-                    Cancelar
-                </Button>
-                <Button variant="primary" type="submit" :loading="loading">
-                    Entrar
-                </Button>
+                <Button variant="ghost" type="button" @click="handleClose" :disabled="loading"> Cancelar </Button>
+                <Button variant="primary" type="submit" :loading="loading"> Entrar </Button>
             </div>
         </form>
-
     </Modal>
 </template>
 

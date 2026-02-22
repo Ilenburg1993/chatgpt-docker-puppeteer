@@ -68,7 +68,7 @@ function createIPCTelemetry(config = {}) {
     const metrics = {
         counters: Object.create(null),
         gauges: Object.create(null),
-        timestamps: Object.create(null)
+        timestamps: Object.create(null),
     };
 
     /* ===========================
@@ -117,7 +117,7 @@ function createIPCTelemetry(config = {}) {
         const event = {
             timestamp: now(),
             type,
-            meta: meta || undefined
+            meta: meta || undefined,
         };
 
         // Atualizações internas de métricas (não causais)
@@ -160,7 +160,7 @@ function createIPCTelemetry(config = {}) {
         return {
             counters: { ...metrics.counters },
             gauges: { ...metrics.gauges },
-            timestamps: { ...metrics.timestamps }
+            timestamps: { ...metrics.timestamps },
         };
     }
 
@@ -187,7 +187,7 @@ function createIPCTelemetry(config = {}) {
         // APIs técnicas opcionais para outros módulos
         _incCounter: incCounter,
         _setGauge: setGauge,
-        _mark: mark
+        _mark: mark,
     });
 }
 

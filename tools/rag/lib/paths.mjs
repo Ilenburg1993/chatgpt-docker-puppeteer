@@ -11,7 +11,7 @@ export function getRagPaths(overrides = {}) {
         dbDir,
         indexDir,
         manifestPath: overrides.manifestPath || path.join(indexDir, 'manifest.v1.json'),
-        lockPath: overrides.lockPath || path.join(indexDir, 'index.lock')
+        lockPath: overrides.lockPath || path.join(indexDir, 'index.lock'),
     };
 }
 

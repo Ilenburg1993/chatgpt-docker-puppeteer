@@ -13,7 +13,7 @@ const EXIT = Object.freeze({
     RAG_INDEX_FAILED: 7,
     RAG_HEALTH_FAILED: 8,
     MCP_SMOKE_FAILED: 9,
-    ARG_ERROR: 10
+    ARG_ERROR: 10,
 });
 
 const { values } = parseArgs({
@@ -24,8 +24,8 @@ const { values } = parseArgs({
         'docs-mode': { type: 'string' },
         'max-file-bytes': { type: 'string' },
         'skip-pm2': { type: 'boolean', default: false },
-        json: { type: 'boolean', default: false }
-    }
+        json: { type: 'boolean', default: false },
+    },
 });
 
 const baseUrl = process.env.MCP_DIAG_URL || 'http://localhost:3008';
@@ -38,17 +38,17 @@ const report = {
         intent_scope: 'code-first',
         auto_expand: false,
         expand_mode: 'symbol',
-        expand_top_n: 0
+        expand_top_n: 0,
     },
     effective_scope: {
         docs_mode: values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include',
         include_globs: values['include-glob'] || [],
         exclude_globs: values['exclude-glob'] || [],
-        max_file_bytes: values['max-file-bytes'] ? Number(values['max-file-bytes']) : null
+        max_file_bytes: values['max-file-bytes'] ? Number(values['max-file-bytes']) : null,
     },
     steps: [],
     startedAt: new Date().toISOString(),
-    finishedAt: null
+    finishedAt: null,
 };
 
 function addStep(name, ok, details = {}) {
@@ -56,7 +56,7 @@ function addStep(name, ok, details = {}) {
         name,
         ok: Boolean(ok),
         at: new Date().toISOString(),
-        ...details
+        ...details,
     });
 }
 
@@ -77,10 +77,10 @@ async function runCommand(label, cmd, args, { allowFailure = false } = {}) {
     return new Promise((resolve, reject) => {
         const child = spawn(cmd, args, {
             stdio: 'inherit',
-            env: process.env
+            env: process.env,
         });
         child.on('error', reject);
-        child.on('exit', (code) => {
+        child.on('exit', code => {
             if (code === 0 || allowFailure) {
                 resolve(code ?? 0);
                 return;
@@ -113,25 +113,25 @@ async function waitForHttp(url, timeoutMs = 90000, intervalMs = 2000) {
         } catch (error) {
             lastError = error;
         }
-        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
     throw new Error(`Timeout waiting for ${url}: ${lastError?.message || 'unknown error'}`);
 }
 
 async function isPm2FullyOnline() {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const child = spawn('npx', ['pm2', 'jlist'], {
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: process.env
+            env: process.env,
         });
 
         let stdout = '';
-        child.stdout.on('data', (chunk) => {
+        child.stdout.on('data', chunk => {
             stdout += String(chunk);
         });
 
         child.on('error', () => resolve(false));
-        child.on('exit', (code) => {
+        child.on('exit', code => {
             if (code !== 0) {
                 resolve(false);
                 return;
@@ -141,11 +141,11 @@ async function isPm2FullyOnline() {
                 const required = new Set(['agente-gpt', 'dashboard-web', 'chrome-proxy']);
                 const online = new Set(
                     parsed
-                        .filter((proc) => proc?.pm2_env?.status === 'online')
-                        .map((proc) => proc?.name)
+                        .filter(proc => proc?.pm2_env?.status === 'online')
+                        .map(proc => proc?.name)
                         .filter(Boolean)
                 );
-                resolve([...required].every((name) => online.has(name)));
+                resolve([...required].every(name => online.has(name)));
             } catch {
                 resolve(false);
             }
@@ -165,15 +165,15 @@ async function smokeRagSearch() {
                 topK: 1,
                 profile: 'core',
                 mode: 'auto',
-                includeDiagnostics: true
-            }
-        }
+                includeDiagnostics: true,
+            },
+        },
     };
 
     const res = await fetchJson(`${baseUrl}/api/mcp`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -269,7 +269,7 @@ async function main() {
                 includeGlobs: report.effective_scope.include_globs,
                 excludeGlobs: report.effective_scope.exclude_globs,
                 maxFileBytes: report.effective_scope.max_file_bytes,
-                intentDefaults: report.defaults
+                intentDefaults: report.defaults,
             });
         } catch (error) {
             addStep('rag-index', false, { reason: error.message, profile });

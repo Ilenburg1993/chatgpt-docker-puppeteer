@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import child_process from 'node:child_process';
 
+/** Constante/valor exportado: ROOT. */
 const ROOT = path.resolve(import.meta.dirname, '..');
+/** Constante/valor exportado: QUEUE_DIR. */
 const QUEUE_DIR = path.join(ROOT, 'fila');
 const LOG_DIR = path.join(ROOT, 'logs');
 const RUN_LOCK = path.join(ROOT, 'RUNNING.lock');
@@ -13,11 +15,13 @@ if (!fs.existsSync(TMP_DIR)) {
     fs.mkdirSync(TMP_DIR, { recursive: true });
 }
 
+/** Constante/valor exportado: sleep. */
 const sleep = ms =>
     new Promise(r => {
         setTimeout(r, ms);
     });
 
+/** Função exportada: ensureDirs. */
 function ensureDirs() {
     [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach(d => {
         if (!fs.existsSync(d)) {
@@ -27,6 +31,7 @@ function ensureDirs() {
 }
 
 // GERA TAREFA NO FORMATO SCHEMA V3
+/** Função exportada: writeTask. */
 function writeTask(options) {
     ensureDirs();
     const id = options.id || `TEST-${Date.now()}`;
@@ -38,27 +43,27 @@ function writeTask(options) {
             created_at: new Date().toISOString(),
             priority: options.priority || 5,
             source: 'test_suite',
-            tags: ['test']
+            tags: ['test'],
         },
         spec: {
             target: 'chatgpt',
             model: 'gpt-5',
             payload: {
-                user_message: options.prompt || 'Test prompt'
+                user_message: options.prompt || 'Test prompt',
             },
-            config: { reset_context: false }
+            config: { reset_context: false },
         },
         policy: {
             max_attempts: 3,
             timeout_ms: 30000, // Timeout curto para testes
-            dependencies: []
+            dependencies: [],
         },
         state: {
             status: options.status || 'PENDING',
             attempts: 0,
             started_at: options.startedEm || null, // Compatibilidade com teste de recovery
-            history: []
-        }
+            history: [],
+        },
     };
 
     const fp = path.join(QUEUE_DIR, `${id}.json`);
@@ -66,6 +71,7 @@ function writeTask(options) {
     return fp;
 }
 
+/** Função exportada: readTask. */
 function readTask(id) {
     try {
         const fp = path.join(QUEUE_DIR, `${id}.json`);
@@ -78,6 +84,7 @@ function readTask(id) {
     }
 }
 
+/** Função exportada: removeRunLock. */
 function removeRunLock() {
     try {
         if (fs.existsSync(RUN_LOCK)) {
@@ -88,6 +95,7 @@ function removeRunLock() {
     }
 }
 
+/** Função exportada: cleanTmp. */
 function cleanTmp() {
     try {
         if (fs.existsSync(TMP_DIR)) {
@@ -98,6 +106,7 @@ function cleanTmp() {
     }
 }
 
+/** Função exportada: readLatestGlobalLogTail. */
 function readLatestGlobalLogTail(lines = 50) {
     try {
         if (!fs.existsSync(LOG_FILE_CURRENT)) {
@@ -110,6 +119,7 @@ function readLatestGlobalLogTail(lines = 50) {
     }
 }
 
+/** Função exportada: startAgent. */
 function startAgent(timeoutMs = 15000) {
     ensureDirs();
     const outPath = path.join(TMP_DIR, `stdout-${Date.now()}.log`);
@@ -120,7 +130,7 @@ function startAgent(timeoutMs = 15000) {
     const proc = child_process.spawn('node', ['index.js'], {
         cwd: ROOT,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: childEnv
+        env: childEnv,
     });
 
     proc.stdout.pipe(outStream);
@@ -156,6 +166,7 @@ function startAgent(timeoutMs = 15000) {
     return { proc, ready };
 }
 
+/** Função exportada: stopAgent. */
 function stopAgent(proc) {
     if (!proc || proc.killed) {
         return;
@@ -174,6 +185,7 @@ function stopAgent(proc) {
     }
 }
 
+/** Função exportada: waitForCondition. */
 async function waitForCondition(fn, timeout = 10000, interval = 500) {
     const end = Date.now() + timeout;
     while (Date.now() < end) {
@@ -189,4 +201,17 @@ async function waitForCondition(fn, timeout = 10000, interval = 500) {
     return false;
 }
 
-export { writeTask, readTask, removeRunLock, cleanTmp, startAgent, stopAgent, waitForCondition, readLatestGlobalLogTail, sleep, ensureDirs, ROOT, QUEUE_DIR };
+export {
+    writeTask,
+    readTask,
+    removeRunLock,
+    cleanTmp,
+    startAgent,
+    stopAgent,
+    waitForCondition,
+    readLatestGlobalLogTail,
+    sleep,
+    ensureDirs,
+    ROOT,
+    QUEUE_DIR,
+};

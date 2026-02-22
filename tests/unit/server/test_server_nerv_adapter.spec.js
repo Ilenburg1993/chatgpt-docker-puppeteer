@@ -12,17 +12,17 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             emit: sinon.stub(),
             on: sinon.stub(),
             once: sinon.stub(),
-            off: sinon.stub()
+            off: sinon.stub(),
         };
 
         mockIO = {
             emit: sinon.stub(),
-            to: sinon.stub().returnsThis()
+            to: sinon.stub().returnsThis(),
         };
 
         adapter = {
             nerv: mockNERV,
-            io: mockIO
+            io: mockIO,
         };
     });
 
@@ -50,8 +50,8 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 type: 'TASK_STATE_CHANGE',
                 data: {
                     taskId: 'task-001',
-                    status: 'RUNNING'
-                }
+                    status: 'RUNNING',
+                },
             };
 
             // Simular conversão
@@ -66,8 +66,8 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 type: 'AGENT_STATUS_UPDATE',
                 data: {
                     state: 'IDLE',
-                    tasksRunning: 0
-                }
+                    tasksRunning: 0,
+                },
             };
 
             mockIO.emit('agent:status', statusEvent.data);
@@ -80,8 +80,8 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 type: 'TASK_COMPLETED',
                 data: {
                     taskId: 'task-002',
-                    result: 'success'
-                }
+                    result: 'success',
+                },
             };
 
             mockIO.emit('task:completed', completeEvent.data);
@@ -97,7 +97,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             // Simular conversão
             mockNERV.emit('CONTROL_COMMAND', {
                 command: 'PAUSE',
-                source: 'SERVER'
+                source: 'SERVER',
             });
 
             assert.ok(mockNERV.emit.calledOnce);
@@ -107,7 +107,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
         it('deve enviar comando de adicionar tarefa', () => {
             const task = {
                 prompt: 'Teste',
-                target: 'gemini'
+                target: 'gemini',
             };
 
             mockNERV.emit('TASK_ADD', task);
@@ -118,7 +118,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
         it('deve solicitar status ao kernel', () => {
             mockNERV.emit('STATUS_REQUEST', {
                 requestId: 'req-001',
-                source: 'SERVER'
+                source: 'SERVER',
             });
 
             assert.ok(mockNERV.emit.calledOnce);
@@ -130,7 +130,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             const events = [
                 { type: 'DEBUG', severity: 'DEBUG' },
                 { type: 'INFO', severity: 'INFO' },
-                { type: 'ERROR', severity: 'ERROR' }
+                { type: 'ERROR', severity: 'ERROR' },
             ];
 
             const filtered = events.filter(e => e.severity !== 'DEBUG');
@@ -142,7 +142,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             const events = [
                 { taskId: 'task-001', type: 'START' },
                 { taskId: 'task-001', type: 'UPDATE' },
-                { taskId: 'task-002', type: 'START' }
+                { taskId: 'task-002', type: 'START' },
             ];
 
             const grouped = events.reduce((acc, evt) => {
@@ -205,9 +205,9 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 actor: 'SERVER',
                 payload: {
                     taskId: 'task-001',
-                    status: 'RUNNING'
+                    status: 'RUNNING',
                 },
-                timestamp: Date.now()
+                timestamp: Date.now(),
             };
 
             const json = JSON.stringify(envelope);
@@ -221,17 +221,17 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 taskId: 'task-001',
                 status: 'DONE',
                 _internal: 'metadata',
-                __proto__: { polluted: true }
+                __proto__: { polluted: true },
             };
 
             const sanitized = {
                 taskId: event.taskId,
-                status: event.status
+                status: event.status,
             };
 
             assert.ok(!('_internal' in sanitized));
             // __proto__ existe em todos os objetos, mas não deve ter a propriedade polluted
-             
+
             assert.ok(!sanitized.__proto__ || !sanitized.__proto__.polluted);
         });
     });
@@ -240,7 +240,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
         it('deve limitar eventos de alta frequência', () => {
             const events = Array.from({ length: 100 }, (_, i) => ({
                 type: 'PROGRESS',
-                value: i
+                value: i,
             }));
 
             // Simular throttle: apenas 1 a cada 100ms
@@ -293,7 +293,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                     if (event === 'disconnect') {
                         handler();
                     }
-                }
+                },
             };
 
             socket.on('disconnect', () => {
@@ -310,7 +310,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 TASK_STATE_CHANGE: 'task:update',
                 TASK_COMPLETED: 'task:completed',
                 TASK_FAILED: 'task:failed',
-                AGENT_STATUS_UPDATE: 'agent:status'
+                AGENT_STATUS_UPDATE: 'agent:status',
             };
 
             assert.strictEqual(mapping['TASK_STATE_CHANGE'], 'task:update');
@@ -322,7 +322,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 'control:pause': 'CONTROL_PAUSE',
                 'control:resume': 'CONTROL_RESUME',
                 'task:add': 'TASK_ADD',
-                'status:request': 'STATUS_REQUEST'
+                'status:request': 'STATUS_REQUEST',
             };
 
             assert.strictEqual(socketToNerv['control:pause'], 'CONTROL_PAUSE');

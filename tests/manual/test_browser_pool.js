@@ -10,8 +10,8 @@ import BrowserPoolManager from '#infra/browser_pool/pool_manager';
             url:
                 process.env.CHROME_WS_ENDPOINT ||
                 process.env.CHROME_URL ||
-                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`
-        }
+                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`,
+        },
     };
 
     const pool = new BrowserPoolManager(config);

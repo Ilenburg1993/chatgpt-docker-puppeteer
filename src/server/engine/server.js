@@ -25,10 +25,7 @@ const HOST = process.env.HOST || '0.0.0.0';
  * Limite máximo de escalonamento de porta.
  * Evita subir fora da faixa forwardada do devcontainer.
  */
-const MAX_PORT_OFFSET = Number.parseInt(
-    process.env.PORT_HUNT_LIMIT || '5',
-    10
-);
+const MAX_PORT_OFFSET = Number.parseInt(process.env.PORT_HUNT_LIMIT || '5', 10);
 
 /* ---------------------------------------------------------------------------
    SSL/TLS CONFIGURATION
@@ -43,8 +40,7 @@ const MAX_PORT_OFFSET = Number.parseInt(
  */
 function getSSLOptions() {
     // Forçar HTTPS em produção, opcional em desenvolvimento
-    const forceHTTPS = process.env.NODE_ENV === 'production' ||
-                      process.env.FORCE_HTTPS === 'true';
+    const forceHTTPS = process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === 'true';
 
     if (!forceHTTPS) {
         return null; // Usar HTTP
@@ -56,9 +52,7 @@ function getSSLOptions() {
     // Verificar se certificados existem
     if (!fs.existsSync(sslKeyPath) || !fs.existsSync(sslCertPath)) {
         if (process.env.NODE_ENV === 'production') {
-            throw new Error(
-                `[ENGINE] Certificados SSL obrigatórios em produção: ${sslKeyPath}, ${sslCertPath}`
-            );
+            throw new Error(`[ENGINE] Certificados SSL obrigatórios em produção: ${sslKeyPath}, ${sslCertPath}`);
         } else {
             log('WARN', '[ENGINE] Certificados SSL não encontrados, gerando auto-assinados para desenvolvimento');
             // Em desenvolvimento, permitir HTTP se certificados não existirem
@@ -76,8 +70,8 @@ function getSSLOptions() {
                 'ECDHE-RSA-AES128-GCM-SHA256',
                 'ECDHE-RSA-AES256-GCM-SHA384',
                 'ECDHE-RSA-AES128-SHA256',
-                'ECDHE-RSA-AES256-SHA384'
-            ].join(':')
+                'ECDHE-RSA-AES256-SHA384',
+            ].join(':'),
         };
     } catch (err) {
         throw new Error(`[ENGINE] Erro ao carregar certificados SSL: ${err.message}`); // eslint-disable-line preserve-caught-error
@@ -215,7 +209,7 @@ async function stop(gracefulTimeout = 30000) {
         }, gracefulTimeout);
 
         // Graceful close
-        httpServer.close((err) => {
+        httpServer.close(err => {
             clearTimeout(forceTimeout);
 
             if (err) {

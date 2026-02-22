@@ -35,11 +35,15 @@ Os comandos já estão expostos no `package.json`:
 Flags úteis:
 
 - `rag:health`: `--json`, `--ollama-base-url`, `--model`
-- `rag:index`: `--root`, `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--json`, `--ollama-base-url`, `--model`
-- `rag:watch`: `--root`, `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--debounce-ms`, `--batch-max`
-- `rag:ask`: `--topk`, `--ext`, `--path-prefix`, `--tag` (repetível), `--profile`, `--mode`, `--diagnostics`, `--json`, `--ollama-base-url`, `--model`
+- `rag:index`: `--root`, `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível),
+  `--docs-mode include|exclude|only`, `--max-file-bytes`, `--json`, `--ollama-base-url`, `--model`
+- `rag:watch`: `--root`, `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível),
+  `--docs-mode include|exclude|only`, `--max-file-bytes`, `--debounce-ms`, `--batch-max`
+- `rag:ask`: `--topk`, `--ext`, `--path-prefix`, `--tag` (repetível), `--profile`, `--mode`,
+  `--diagnostics`, `--json`, `--ollama-base-url`, `--model`
 - `rag:expand`: `--chunk-id`, `--mode lines|symbol`, `--before-lines`, `--after-lines`, `--json`
-- `rag:rebuild:zero`: `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível), `--docs-mode include|exclude|only`, `--max-file-bytes`, `--skip-pm2`, `--json`
+- `rag:rebuild:zero`: `--profile`, `--include-glob` (repetível), `--exclude-glob` (repetível),
+  `--docs-mode include|exclude|only`, `--max-file-bytes`, `--skip-pm2`, `--json`
 
 Parâmetros importantes do `rag_search` (via MCP):
 
@@ -63,7 +67,8 @@ Política de consumo da LLM:
 
 - Fonte primária: `structuredContent.data` (metadados completos)
 - Fallback legível: `content[].text`
-- Metadados por resultado incluem `path_root_rel`, `file_mtime_*`, `indexed_at_*`, `content_class` e sinais de ranking
+- Metadados por resultado incluem `path_root_rel`, `file_mtime_*`, `indexed_at_*`, `content_class` e
+  sinais de ranking
 
 Configuração de escopo (unificada em index/full/incremental/watch/rebuild):
 
@@ -135,8 +140,10 @@ O manifesto guarda:
   - `GET /v1/models`
   - `POST /v1/embeddings` com `{ model, input }`
 - Normaliza vetor para `number[]` e valida `dim` contra o manifesto.
-- Limite de segurança de entrada por embedding configurável via `OLLAMA_EMBED_MAX_CHARS` (default `8000`).
-- Em overflow de contexto, reduz input automaticamente e aprende `runtime_safe_chars` na execução (controlável por `OLLAMA_EMBED_CONTEXT_FAST_SHRINK`, default `true`).
+- Limite de segurança de entrada por embedding configurável via `OLLAMA_EMBED_MAX_CHARS` (default
+  `8000`).
+- Em overflow de contexto, reduz input automaticamente e aprende `runtime_safe_chars` na execução
+  (controlável por `OLLAMA_EMBED_CONTEXT_FAST_SHRINK`, default `true`).
 
 ### Camada D — Chunking determinístico (AST-aware v2)
 
@@ -156,7 +163,8 @@ Estratégias:
 - Code: quebra por âncoras heurísticas (export/class/function/etc) (`chunk_code.mjs`)
 - Plain/JSON/YAML: quebra por blocos de linhas (`chunk_plain.mjs`)
 - `merge_ranges.mjs`: junta chunks muito pequenos com o vizinho quando couber no limite
-- Defaults recomendados para estabilidade de embedding: `RAG_CHUNK_TARGET_CHARS=1800` e `RAG_CHUNK_MAX_CHARS=2800` (ambos ajustáveis via env)
+- Defaults recomendados para estabilidade de embedding: `RAG_CHUNK_TARGET_CHARS=1800` e
+  `RAG_CHUNK_MAX_CHARS=2800` (ambos ajustáveis via env)
 
 ### Camada E — Storage (LanceDB)
 
@@ -200,10 +208,10 @@ Operações:
 
 Para cada arquivo elegível:
 
-1) **Fingerprint** do conteúdo (dual):
+1. **Fingerprint** do conteúdo (dual):
    - `xxhash64` (rápido) + `sha256` (forte)
-2) Se `sha256/xxhash64/size` não mudaram vs manifesto ⇒ **skip**
-3) Se mudou:
+2. Se `sha256/xxhash64/size` não mudaram vs manifesto ⇒ **skip**
+3. Se mudou:
    - `deleteByPath(path)` (remove chunks antigos daquele arquivo)
    - chunking determinístico
    - embedding de cada chunk (serial, default)
@@ -242,19 +250,23 @@ Além disso:
 ## Melhorias Recentes (v1.1)
 
 ### Robustez
+
 - ✅ **Retry Logic**: Embeddings agora retentam 3x com backoff exponencial (1s, 2s, 4s)
 - ✅ **Validação Early**: Dimensão do embedding validada antes da indexação (fail-fast)
 - ✅ **Error Messages**: Mensagens detalhadas com instruções de recovery
 
 ### Performance
+
 - ✅ **Query Caching**: Cache LRU de 100 queries reduz latência em ~100-300ms por hit
 - ✅ **Progress Reporting**: Feedback a cada 25 arquivos durante indexação
 
 ### UX
+
 - ✅ **Health Check Visual**: Output com checkmarks ✅/❌ e troubleshooting automático
 - ✅ **Indexing Summary**: Estatísticas visuais ao final (arquivos, chunks, taxa de skip)
 - ✅ **Script Rebuild**: `npm run rag:full-rebuild` para reset + index em um comando
-- ✅ **Pipeline Operacional Canônico**: `npm run rag:rebuild:zero` para validar PM2/MCP e rebuild completo
+- ✅ **Pipeline Operacional Canônico**: `npm run rag:rebuild:zero` para validar PM2/MCP e rebuild
+  completo
 
 ## Extensibilidade
 
@@ -289,7 +301,7 @@ export function chunk<Tipo>(lines, options = {}) {
 ```javascript
 const CHUNKERS_BY_LANG = {
   javascript: chunkCode,
-  python: chunkPython,  // Adicionar aqui
+  python: chunkPython, // Adicionar aqui
   // ...
 };
 ```
@@ -327,7 +339,7 @@ import { CustomEmbeddingsProvider } from './embeddings/custom.mjs';
 
 await ragIndex({
   root: '/path/to/workspace',
-  embeddingsProvider: new CustomEmbeddingsProvider({ model: 'my-model' })
+  embeddingsProvider: new CustomEmbeddingsProvider({ model: 'my-model' }),
 });
 ```
 
@@ -339,17 +351,27 @@ Para usar outro vector DB além do LanceDB:
 
 ```javascript
 // Funções obrigatórias:
-export async function openDb(dbDir) { /* ... */ }
-export async function ensureTable(db, dim) { /* ... */ }
-export async function deleteByPath(table, path) { /* ... */ }
-export async function addChunks(table, rows) { /* ... */ }
-export async function search(table, vector, options) { /* ... */ }
+export async function openDb(dbDir) {
+  /* ... */
+}
+export async function ensureTable(db, dim) {
+  /* ... */
+}
+export async function deleteByPath(table, path) {
+  /* ... */
+}
+export async function addChunks(table, rows) {
+  /* ... */
+}
+export async function search(table, vector, options) {
+  /* ... */
+}
 ```
 
 2. **Atualizar imports** em `tools/rag/lib/facade.mjs`:
 
 ```javascript
-import * as storage from './storage/milvus.mjs';  // Novo backend
+import * as storage from './storage/milvus.mjs'; // Novo backend
 ```
 
 ### Migrar Schema Entre Versões
@@ -374,14 +396,14 @@ export const MIGRATIONS = {
     manifest.schema_version = 2;
 
     return manifest;
-  }
+  },
 };
 ```
 
 2. **Atualizar SCHEMA_VERSION** em `tools/rag/lib/contract.mjs`:
 
 ```javascript
-export const SCHEMA_VERSION = 2;  // Era 1
+export const SCHEMA_VERSION = 2; // Era 1
 ```
 
 3. A migração será **aplicada automaticamente** no próximo `rag:index`.

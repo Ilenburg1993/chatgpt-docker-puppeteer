@@ -1,8 +1,7 @@
-Code Explainer Agent
-====================
+# Code Explainer Agent
 
-Agente CLI que lê código-fonte (arquivo único ou múltiplos) e gera um arquivo Markdown com
-uma explicação técnica detalhada direcionada a outro LLM (linguagem técnica, seções claras).
+Agente CLI que lê código-fonte (arquivo único ou múltiplos) e gera um arquivo Markdown com uma
+explicação técnica detalhada direcionada a outro LLM (linguagem técnica, seções claras).
 
 Uso
 

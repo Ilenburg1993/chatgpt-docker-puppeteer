@@ -7,7 +7,7 @@
 
 <script>
 export default {
-    name: 'Templates'
+    name: 'Templates',
 };
 </script>
 

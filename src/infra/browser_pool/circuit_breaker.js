@@ -12,7 +12,7 @@ const FailureCause = Object.freeze({
     PROXY_FAILURE: 'PROXY_FAILURE',
     OUT_OF_MEMORY: 'OUT_OF_MEMORY',
     PROCESS_SUSPENDED: 'PROCESS_SUSPENDED',
-    UNKNOWN: 'UNKNOWN'
+    UNKNOWN: 'UNKNOWN',
 });
 
 /**
@@ -21,10 +21,11 @@ const FailureCause = Object.freeze({
 const CircuitState = Object.freeze({
     OPERATIONAL: 'OPERATIONAL', // 3/3 healthy
     DEGRADED: 'DEGRADED', // 1-2 healthy
-    CIRCUIT_OPEN: 'CIRCUIT_OPEN' // 0 healthy, sistema pausado
+    CIRCUIT_OPEN: 'CIRCUIT_OPEN', // 0 healthy, sistema pausado
 });
 
 // Gerenciador inteligente de falhas do Chrome.
+/** Classe exportada: CircuitBreakerManager. */
 class CircuitBreakerManager {
     constructor({ poolSize = 3, nerv = null }) {
         this.poolSize = poolSize;
@@ -55,50 +56,50 @@ class CircuitBreakerManager {
                 shouldPause: true,
                 autoRestart: false,
                 pollingInterval: 5000,
-                maxRetries: Infinity
+                maxRetries: Infinity,
             },
             [FailureCause.TECHNICAL_CRASH]: {
                 shouldPause: true,
                 autoRestart: true,
                 pollingInterval: 10000,
-                maxRetries: 3
+                maxRetries: 3,
             },
             [FailureCause.CHROME_RESTARTED]: {
                 shouldPause: false, // Momentâneo
                 autoRestart: true,
                 pollingInterval: 1000,
-                maxRetries: 5
+                maxRetries: 5,
             },
             [FailureCause.NETWORK_ISSUE]: {
                 shouldPause: false, // Degraded mode OK
                 autoRestart: false,
                 pollingInterval: 2000,
-                maxRetries: Infinity // Por instância
+                maxRetries: Infinity, // Por instância
             },
             [FailureCause.PROXY_FAILURE]: {
                 shouldPause: true,
                 autoRestart: true, // PM2 restart
                 pollingInterval: 5000,
-                maxRetries: 3
+                maxRetries: 3,
             },
             [FailureCause.OUT_OF_MEMORY]: {
                 shouldPause: true,
                 autoRestart: false, // Requer intervenção manual
                 pollingInterval: 0, // Manual recovery
-                maxRetries: 0
+                maxRetries: 0,
             },
             [FailureCause.PROCESS_SUSPENDED]: {
                 shouldPause: false, // Momentâneo
                 autoRestart: false,
                 pollingInterval: 10000,
-                maxRetries: 10
+                maxRetries: 10,
             },
             [FailureCause.UNKNOWN]: {
                 shouldPause: true,
                 autoRestart: false,
                 pollingInterval: 5000,
-                maxRetries: 3
-            }
+                maxRetries: 3,
+            },
         };
     }
 
@@ -126,7 +127,7 @@ class CircuitBreakerManager {
             cause,
             error: error.message,
             timestamp,
-            context
+            context,
         });
 
         // Limita histórico
@@ -164,7 +165,7 @@ class CircuitBreakerManager {
             cause,
             shouldPause: policy.shouldPause,
             policy,
-            state: this.state
+            state: this.state,
         };
     }
 
@@ -345,8 +346,8 @@ class CircuitBreakerManager {
                 cause,
                 timestamp: this.lastStateChange,
                 healthyCount: this._getHealthyCount(),
-                totalInstances: this.poolSize
-            }
+                totalInstances: this.poolSize,
+            },
         };
 
         log('WARN', `[CircuitBreaker] 🔴 Estado mudou: ${previousState} → ${newState} (Causa: ${cause})`);
@@ -401,7 +402,7 @@ class CircuitBreakerManager {
 │ Detectado: Chrome sem memória para criar páginas          │
 │ Ação: PAUSADO - Requer intervenção manual                 │
 │ Solução: Feche abas do Chrome ou reinicie o processo      │
-└────────────────────────────────────────────────────────────┘`
+└────────────────────────────────────────────────────────────┘`,
         };
 
         const message =
@@ -431,7 +432,7 @@ class CircuitBreakerManager {
             maxRecoveryAttempts: this.maxRecoveryAttempts,
             lastStateChange: this.lastStateChange,
             failureHistory: this.failureHistory.slice(-5), // Últimas 5
-            isPaused: this.shouldPauseSystem()
+            isPaused: this.shouldPauseSystem(),
         };
     }
 

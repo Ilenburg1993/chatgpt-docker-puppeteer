@@ -15,8 +15,8 @@
  */
 export function maximalMarginalRelevance(results, options = {}) {
     const {
-        lambda = 0.7,   // 1.0 = only relevance, 0.0 = only diversity
-        topK = 8
+        lambda = 0.7, // 1.0 = only relevance, 0.0 = only diversity
+        topK = 8,
     } = options;
 
     if (results.length === 0) return [];

@@ -6,6 +6,7 @@ import { getArtifactById } from '#infra/db/artifact_repo';
 import { _resolveArtifactsRoot, _isUnderRoot, readText, stat as statArtifact } from '#infra/storage/artifact_store';
 import { ok, fail } from '../utils/api_envelope.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 router.get('/:id', async (req, res) => {
@@ -20,7 +21,11 @@ router.get('/:id', async (req, res) => {
         ok(res, req, { artifact: withStat }, {});
     } catch (err) {
         log('ERROR', `[API_ARTIFACTS] metadata failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'ARTIFACT_METADATA_FAILED', error: 'Erro ao recuperar artefato', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'ARTIFACT_METADATA_FAILED',
+            error: 'Erro ao recuperar artefato',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -68,7 +73,11 @@ router.get('/:id/content', async (req, res) => {
         stream.pipe(res);
     } catch (err) {
         log('ERROR', `[API_ARTIFACTS] content failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'ARTIFACT_CONTENT_FAILED', error: 'Erro ao baixar artefato', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'ARTIFACT_CONTENT_FAILED',
+            error: 'Erro ao baixar artefato',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -100,9 +109,12 @@ router.get('/:id/text', async (req, res) => {
         );
     } catch (err) {
         log('ERROR', `[API_ARTIFACTS] text failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'ARTIFACT_TEXT_FAILED', error: 'Erro ao ler artefato', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'ARTIFACT_TEXT_FAILED',
+            error: 'Erro ao ler artefato',
+            details: err?.message || String(err),
+        });
     }
 });
 
 export default router;
-

@@ -117,7 +117,7 @@ const report = {
     timestamp: new Date().toISOString(),
     root: ROOT,
     apply: !!APPLY,
-    changed_files: edits.map(e => ({ file: path.relative(process.cwd(), e.file), changes: e.changes }))
+    changed_files: edits.map(e => ({ file: path.relative(process.cwd(), e.file), changes: e.changes })),
 };
 
 try {

@@ -81,11 +81,11 @@ function createCorrelationStore({ telemetry, limits = {} }) {
         if (!store[correlationId]) {
             store[correlationId] = {
                 createdAt: now(),
-                entries: []
+                entries: [],
             };
 
             telemetry.emit('nerv:correlation:created', {
-                correlation_id: correlationId
+                correlation_id: correlationId,
             });
         }
     }
@@ -103,7 +103,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
                 expiredCount++;
                 telemetry.emit('nerv:correlation:expired', {
                     correlation_id: id,
-                    ttl: TTL
+                    ttl: TTL,
                 });
             }
         }
@@ -111,7 +111,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
         if (expiredCount > 0) {
             telemetry.emit('nerv:correlation:cleanup', {
                 expired_count: expiredCount,
-                remaining: Object.keys(store).length
+                remaining: Object.keys(store).length,
             });
         }
     }, 60000); // Check a cada 1 minuto
@@ -133,7 +133,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
             timestamp: now(),
             kind: messageType,
             msg_id: msgId,
-            _cached_json: cachedJson
+            _cached_json: cachedJson,
         });
     }
 
@@ -159,7 +159,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
 
         telemetry.emit('nerv:correlation:append', {
             correlation_id: correlationId,
-            size: records.length
+            size: records.length,
         });
 
         // Limite técnico opcional (não causal)
@@ -167,7 +167,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
             telemetry.emit('nerv:correlation:size_exceeded', {
                 correlation_id: correlationId,
                 size: records.length,
-                limit: MAX_ENTRIES
+                limit: MAX_ENTRIES,
             });
         }
     }
@@ -229,7 +229,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
         get,
         has,
         size,
-        list
+        list,
     });
 }
 

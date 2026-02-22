@@ -86,11 +86,10 @@ try {
     console.log('Chamando Ollama Cloud via proxy local...');
     console.log();
 
-    const cloudResult = await ollama.generate(
-        'What is 2+2? Answer in one sentence.',
-        'gemini-3-flash-preview:cloud',
-        { temperature: 0.7, num_predict: 30 }
-    );
+    const cloudResult = await ollama.generate('What is 2+2? Answer in one sentence.', 'gemini-3-flash-preview:cloud', {
+        temperature: 0.7,
+        num_predict: 30,
+    });
 
     console.log('RESPOSTA LITERAL (Cloud Model via Proxy):');
     console.log('-'.repeat(80));

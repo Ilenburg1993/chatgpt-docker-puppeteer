@@ -51,7 +51,7 @@ export function createAsyncInit(initFn) {
                 return initPromise.then.bind(initPromise);
             }
             return target[prop];
-        }
+        },
     });
 
     const reset = () => {

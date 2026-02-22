@@ -50,11 +50,10 @@ async function runTests() {
         // Test 4: Small Generation (should succeed)
         console.log('[4/6] Testing small generation (200 tokens)...');
         const smallStart = Date.now();
-        const smallResult = await ollama.generate(
-            'Say hello in one sentence.',
-            process.env.OLLAMA_DEFAULT_MODEL,
-            { num_predict: 200, temperature: 0.3 }
-        );
+        const smallResult = await ollama.generate('Say hello in one sentence.', process.env.OLLAMA_DEFAULT_MODEL, {
+            num_predict: 200,
+            temperature: 0.3,
+        });
         const smallTime = Date.now() - smallStart;
         assert.ok(smallResult.length > 0, 'Should generate text');
         console.log(`✅ Generated ${smallResult.length} chars in ${smallTime}ms`);
@@ -102,7 +101,6 @@ async function runTests() {
         console.log('1. Test MCP integration: ./tests/manual/test_mcp_ollama.sh');
         console.log('2. Test with Claude Desktop or GitHub Copilot');
         console.log('3. Monitor performance: pm2 logs dashboard-web');
-
     } catch (error) {
         console.error('\n❌ Test failed:');
         console.error(error);

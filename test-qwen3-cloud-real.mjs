@@ -16,7 +16,7 @@ const ollama = new OllamaClient({
     cloudEnabled: true,
     cloudBaseUrl: process.env.OLLAMA_CLOUD_BASE_URL || 'https://ollama.com',
     cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY,
-    localBaseUrl: process.env.OLLAMA_LOCAL_BASE_URL || 'http://host.docker.internal:11434'
+    localBaseUrl: process.env.OLLAMA_LOCAL_BASE_URL || 'http://host.docker.internal:11434',
 });
 
 console.log('='.repeat(80));
@@ -27,7 +27,10 @@ console.log('📋 Configuração:');
 console.log('  - Cloud URL:', ollama.cloudBaseUrl);
 console.log('  - Cloud Enabled:', ollama.cloudEnabled);
 console.log('  - Has API Key:', ollama.cloudApiKey ? '✅ Sim' : '❌ Não');
-console.log('  - API Key (primeiros 20 chars):', ollama.cloudApiKey ? ollama.cloudApiKey.substring(0, 20) + '...' : 'N/A');
+console.log(
+    '  - API Key (primeiros 20 chars):',
+    ollama.cloudApiKey ? ollama.cloudApiKey.substring(0, 20) + '...' : 'N/A'
+);
 console.log();
 console.log('='.repeat(80));
 console.log();
@@ -47,7 +50,7 @@ try {
         'qwen3-coder-next',
         {
             temperature: 0.3,
-            num_predict: 150
+            num_predict: 150,
         }
     );
 
@@ -77,14 +80,10 @@ console.log();
 try {
     const startTime = Date.now();
 
-    const textResult = await ollama.generate(
-        'Explain what is TypeScript in 2 sentences.',
-        'qwen3-next',
-        {
-            temperature: 0.7,
-            num_predict: 100
-        }
-    );
+    const textResult = await ollama.generate('Explain what is TypeScript in 2 sentences.', 'qwen3-next', {
+        temperature: 0.7,
+        num_predict: 100,
+    });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 

@@ -13,6 +13,7 @@ puppeteerExtra.use(StealthPlugin());
 /* ========================================================================
    ESTADOS GLOBAIS
 ======================================================================== */
+/** Constante/valor exportado: STATES. */
 const STATES = Object.freeze({
     INIT: 'INIT',
     DETECTING_ENV: 'DETECTING_ENV',
@@ -26,7 +27,7 @@ const STATES = Object.freeze({
     VALIDATING_PAGE: 'VALIDATING_PAGE',
     PAGE_VALIDATED: 'PAGE_VALIDATED',
     PAGE_INVALID: 'PAGE_INVALID',
-    READY: 'READY'
+    READY: 'READY',
 });
 
 const ISSUE_KIND = Object.freeze({ EVENT: 'EVENT', ERROR: 'ERROR' });
@@ -35,7 +36,7 @@ const ISSUE_TYPES = Object.freeze({
     BROWSER_DISCONNECTED: 'BROWSER_DISCONNECTED',
     PAGE_NOT_FOUND: 'PAGE_NOT_FOUND',
     PAGE_CLOSED_BY_USER: 'PAGE_CLOSED_BY_USER',
-    PAGE_INVALID: 'PAGE_INVALID'
+    PAGE_INVALID: 'PAGE_INVALID',
 });
 
 /* ========================================================================
@@ -49,7 +50,7 @@ const DEFAULTS = {
     // Keep keys present so @ts-check can type-narrow correctly.
     browserEndpoint: {
         url: '',
-        wsEndpoint: ''
+        wsEndpoint: '',
     },
 
     // Connection targets (DevContainer: localhost:9224 = Chrome Proxy)
@@ -72,7 +73,7 @@ const DEFAULTS = {
 
     // State & Fallback
     stateHistorySize: 50,
-    autoFallback: true
+    autoFallback: true,
 };
 
 // Porta canonical do proxy (container-facing). Pode ser sobrescrita por env/config
@@ -199,8 +200,7 @@ class ConnectionOrchestrator {
         } // Evita spam de estado igual
         this.state = next;
         this._pushStateHistory(next, meta);
-        const metaObj =
-            typeof meta === 'object' && meta !== null ? /** @type {Record<string, unknown>} */ (meta) : {};
+        const metaObj = typeof meta === 'object' && meta !== null ? /** @type {Record<string, unknown>} */ (meta) : {};
         const correlationIdRaw =
             metaObj['correlation_id'] || metaObj['correlationId'] || metaObj['taskId'] || metaObj['task_id'] || null;
         const correlationId = correlationIdRaw ? String(correlationIdRaw) : '-';
@@ -280,7 +280,7 @@ class ConnectionOrchestrator {
                 return await puppeteerCore.connect({
                     browserURL: this.config.browserEndpoint.url,
                     defaultViewport: null,
-                    protocolTimeout: 5000
+                    protocolTimeout: 5000,
                 });
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
@@ -308,7 +308,7 @@ class ConnectionOrchestrator {
                     return await puppeteerCore.connect({
                         browserURL,
                         defaultViewport: null,
-                        protocolTimeout: 5000
+                        protocolTimeout: 5000,
                     });
                 } catch (e) {
                     errors.push(`${host}:${port} - ${e.message}`);
@@ -343,7 +343,7 @@ class ConnectionOrchestrator {
                 return await puppeteerCore.connect({
                     browserWSEndpoint: this.config.browserEndpoint.wsEndpoint,
                     defaultViewport: null,
-                    protocolTimeout: 10000
+                    protocolTimeout: 10000,
                 });
             } catch (e) {
                 const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${e.message}`;
@@ -382,7 +382,7 @@ class ConnectionOrchestrator {
                     return await puppeteerCore.connect({
                         browserWSEndpoint: json.webSocketDebuggerUrl,
                         defaultViewport: null,
-                        protocolTimeout: 10000
+                        protocolTimeout: 10000,
                     });
                 } finally {
                     if (timeoutId !== null) {
@@ -445,7 +445,7 @@ class ConnectionOrchestrator {
                         return await puppeteerCore.connect({
                             browserWSEndpoint: json.webSocketDebuggerUrl,
                             defaultViewport: null,
-                            protocolTimeout: 10000
+                            protocolTimeout: 10000,
                         });
                     }
                     errors.push(`${host}:${port} - No WS URL in response`);
@@ -756,7 +756,7 @@ class ConnectionOrchestrator {
             pageUrl: this.page?.url() || null,
             lastIssue: this.lastIssue,
             attemptedModes: this.attemptedModes,
-            retryCount: this.retryCount
+            retryCount: this.retryCount,
         };
     }
 
@@ -769,7 +769,7 @@ class ConnectionOrchestrator {
         const report = {
             checked: [],
             reachable: [],
-            unreachable: []
+            unreachable: [],
         };
 
         const hosts = options.hosts && options.hosts.length ? options.hosts : DEFAULTS.hosts;
@@ -814,7 +814,7 @@ class ConnectionOrchestrator {
         report.summary = {
             totalChecked: report.checked.length,
             reachable: report.reachable.length,
-            unreachable: report.unreachable.length
+            unreachable: report.unreachable.length,
         };
 
         return report;

@@ -31,12 +31,12 @@ function createBuffers({ telemetry, limits = {} }) {
 
     const outbound = createOutboundQueue({
         telemetry,
-        maxSize: limits.outbound ?? null
+        maxSize: limits.outbound ?? null,
     });
 
     const inbound = createInboundQueue({
         telemetry,
-        maxSize: limits.inbound ?? null
+        maxSize: limits.inbound ?? null,
     });
 
     /* ===========================
@@ -52,7 +52,7 @@ function createBuffers({ telemetry, limits = {} }) {
                 telemetry.emit('nerv:buffer:overflow', {
                     buffer: 'outbound',
                     size: outbound.size(),
-                    limit: 10000
+                    limit: 10000,
                 });
                 throw new Error('BUFFER_OVERFLOW: Outbound buffer exceeded 10000 items');
             }
@@ -62,7 +62,7 @@ function createBuffers({ telemetry, limits = {} }) {
                 backpressure.signal({
                     buffer: 'outbound',
                     size: outbound.size(),
-                    limit: limits.outbound ?? null
+                    limit: limits.outbound ?? null,
                 });
 
                 // Blocking option: rejeita se backpressure ativo
@@ -89,7 +89,7 @@ function createBuffers({ telemetry, limits = {} }) {
                 backpressure.signal({
                     buffer: 'inbound',
                     size: inbound.size(),
-                    limit: limits.inbound ?? null
+                    limit: limits.inbound ?? null,
                 });
 
                 // Blocking option: rejeita se backpressure ativo
@@ -117,7 +117,7 @@ function createBuffers({ telemetry, limits = {} }) {
         clear() {
             outbound.clear();
             inbound.clear();
-        }
+        },
     });
 }
 

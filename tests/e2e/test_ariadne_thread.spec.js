@@ -140,15 +140,19 @@ async function test2_NERVChannel() {
  * TEST 3: Shutdown Sequence
  */
 async function test3_Shutdown() {
-    await runTest('TEST 3: Shutdown Gracioso', async () => {
-        if (!context) {
-            throw new Error('Context não disponível');
-        }
+    await runTest(
+        'TEST 3: Shutdown Gracioso',
+        async () => {
+            if (!context) {
+                throw new Error('Context não disponível');
+            }
 
-        console.log('> Iniciando shutdown...');
-        await shutdown(context);
-        console.log('  ✓ Shutdown completado');
-    }, 15000);
+            console.log('> Iniciando shutdown...');
+            await shutdown(context);
+            console.log('  ✓ Shutdown completado');
+        },
+        15000
+    );
 }
 
 /**

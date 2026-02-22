@@ -9,7 +9,10 @@ test('wave18: caminhos legados permanecem em contingência explícita', async ()
     const envExample = await fs.readFile(path.join(process.cwd(), '.env.example'), 'utf8');
 
     assert.match(serverMain, /DASHBOARD_LEGACY_BRIDGE_CONTINGENCY/);
-    assert.match(serverMain, /dashboardTaskSyncMode\s*=\s*requestedSyncMode\s*===\s*'legacy_bridge'\s*&&\s*legacyBridgeContingency/);
+    assert.match(
+        serverMain,
+        /dashboardTaskSyncMode\s*=\s*requestedSyncMode\s*===\s*'legacy_bridge'\s*&&\s*legacyBridgeContingency/
+    );
 
     assert.match(config, /LEGACY_PATHS_CONTINGENCY/);
     assert.match(envExample, /LEGACY_PATHS_CONTINGENCY=false/);

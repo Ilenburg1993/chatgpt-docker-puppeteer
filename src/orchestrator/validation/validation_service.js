@@ -163,6 +163,7 @@ class ValidationService {
         const validation_results = [];
         const issues = [];
         let totalScore = 0;
+        let scoredValidators = 0;
 
         // Executa cada validator
         for (const validator of validators) {
@@ -188,7 +189,10 @@ class ValidationService {
                     suggestions: result.suggestions,
                 });
 
-                totalScore += result.score;
+                if (typeof result.score === 'number' && Number.isFinite(result.score)) {
+                    totalScore += result.score;
+                    scoredValidators += 1;
+                }
 
                 if (!result.passed) {
                     issues.push(`${type}: ${result.feedback}`);
@@ -206,7 +210,7 @@ class ValidationService {
         }
 
         // Calcula score geral (média)
-        const overall_score = validators.length > 0 ? totalScore / validators.length : 0;
+        const overall_score = scoredValidators > 0 ? totalScore / scoredValidators : 100;
 
         // Verifica se passou baseado no score mínimo
         const min_quality_score = criteria.min_quality_score || 70;

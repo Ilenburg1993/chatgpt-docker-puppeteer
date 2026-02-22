@@ -15,7 +15,7 @@ import { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, RO
         id: TASK_ID,
         prompt: 'Esta tarefa deve esperar',
         status: 'PENDING',
-        criadoEm: new Date().toISOString()
+        criadoEm: new Date().toISOString(),
     });
 
     const agent = startAgent();

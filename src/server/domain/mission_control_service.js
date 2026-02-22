@@ -6,6 +6,7 @@ import { AUTONOMY_MODES, createMission } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { asRecord } from '#types/guards';
 
+/** Constante/valor exportado: MISSION_STATUS. */
 const MISSION_STATUS = Object.freeze({
     READY: 'READY',
     RUNNING: 'RUNNING',
@@ -201,7 +202,16 @@ function _cancelMissionTasksCascadeTx(db, missionId) {
     return affectedTaskIds;
 }
 
-function _recordMissionEvents({ missionId, actorId, actorType = 'user', operation, before, after, reason, metadata = {} }) {
+function _recordMissionEvents({
+    missionId,
+    actorId,
+    actorType = 'user',
+    operation,
+    before,
+    after,
+    reason,
+    metadata = {},
+}) {
     try {
         recordEvent({
             entityType: 'mission',
@@ -222,6 +232,7 @@ function _recordMissionEvents({ missionId, actorId, actorType = 'user', operatio
     }
 }
 
+/** Função exportada: createMissionCommand. */
 function createMissionCommand({ actor = {}, reason, payload = {} }) {
     const actorView = asRecord(actor);
     const payloadView = asRecord(payload);
@@ -276,6 +287,7 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
     };
 }
 
+/** Função exportada: executeMissionCommand. */
 function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
     const actorView = asRecord(actor);
     const db = getDb();
@@ -310,6 +322,7 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
     return result;
 }
 
+/** Função exportada: pauseMissionCommand. */
 function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
     const db = getDb();
@@ -340,6 +353,7 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
     return result;
 }
 
+/** Função exportada: resumeMissionCommand. */
 function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
     const db = getDb();
@@ -370,6 +384,7 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     return result;
 }
 
+/** Função exportada: cancelMissionCommand. */
 function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
 
@@ -407,7 +422,9 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
         after: result.after,
         reason,
         metadata: {
-            cascaded_tasks_count: Array.isArray(result.metadata?.cascaded_tasks) ? result.metadata.cascaded_tasks.length : 0,
+            cascaded_tasks_count: Array.isArray(result.metadata?.cascaded_tasks)
+                ? result.metadata.cascaded_tasks.length
+                : 0,
         },
     });
 
@@ -432,6 +449,7 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     return result;
 }
 
+/** Função exportada: patchMissionCommand. */
 function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const actorView = asRecord(actor);
     const patchView = asRecord(patch);
@@ -469,7 +487,15 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
     return result;
 }
 
-function setMissionPolicyCommand({ missionId, actor = {}, reason, ifVersion = null, policy = null, autonomyMode = null }) {
+/** Função exportada: setMissionPolicyCommand. */
+function setMissionPolicyCommand({
+    missionId,
+    actor = {},
+    reason,
+    ifVersion = null,
+    policy = null,
+    autonomyMode = null,
+}) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -479,9 +505,14 @@ function setMissionPolicyCommand({ missionId, actor = {}, reason, ifVersion = nu
 
         const fromStatus = String(row.status || '').toUpperCase();
         if (!EDITABLE_MISSION.has(fromStatus)) {
-            throw _error(409, 'MISSION_POLICY_REQUIRES_PAUSED', 'Policy da missão pode ser alterada apenas em READY ou PAUSED', {
-                status: row.status,
-            });
+            throw _error(
+                409,
+                'MISSION_POLICY_REQUIRES_PAUSED',
+                'Policy da missão pode ser alterada apenas em READY ou PAUSED',
+                {
+                    status: row.status,
+                }
+            );
         }
 
         const currentPolicy = _safeJsonParse(row.policy_json, {});
@@ -507,6 +538,7 @@ function setMissionPolicyCommand({ missionId, actor = {}, reason, ifVersion = nu
     return result;
 }
 
+/** Função exportada: reorderMissionStepsCommand. */
 function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {
     const actorView = asRecord(actor);
     const db = getDb();

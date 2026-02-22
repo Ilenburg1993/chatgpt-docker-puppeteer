@@ -9,33 +9,33 @@ const CONFIG_FILES = {
         schema: {
             BROWSER_MODE: ['launcher', 'remote'],
             CYCLE_DELAY: { type: 'number', min: 100 },
-            allowedDomains: { type: 'array' }
-        }
+            allowedDomains: { type: 'array' },
+        },
     },
     'dynamic_rules.json': {
         required: true,
         schema: {
             _meta: { type: 'object' },
-            targets: { type: 'object' }
-        }
+            targets: { type: 'object' },
+        },
     },
     '.env': {
         required: false,
-        warning: 'Recommended for production'
+        warning: 'Recommended for production',
     },
     'package.json': {
         required: true,
         schema: {
             name: { type: 'string' },
             version: { type: 'string' },
-            main: { type: 'string' }
-        }
-    }
+            main: { type: 'string' },
+        },
+    },
 };
 
 const REQUIRED_ENV_VARS = {
     production: ['NODE_ENV', 'PORT', 'CHROME_WS_ENDPOINT'],
-    development: ['NODE_ENV']
+    development: ['NODE_ENV'],
 };
 
 /**
@@ -63,7 +63,7 @@ class ConfigValidator {
         const prefix = {
             ERROR: '\x1b[31m[ERROR]\x1b[0m',
             WARN: '\x1b[33m[WARN]\x1b[0m',
-            INFO: '\x1b[32m[INFO]\x1b[0m'
+            INFO: '\x1b[32m[INFO]\x1b[0m',
         };
         console.log(`${prefix[level]} ${message}`);
     }

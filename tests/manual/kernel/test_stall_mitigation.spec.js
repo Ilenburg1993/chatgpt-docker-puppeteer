@@ -1,13 +1,6 @@
 import puppeteer from 'puppeteer-core';
 
-import {
-    writeTask,
-    startAgent,
-    stopAgent,
-    readLatestGlobalLogTail,
-    waitForCondition,
-    sleep,
-} from './helpers.js';
+import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondition, sleep } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Stall Mitigation (Watchdog V4) ===');
@@ -16,7 +9,7 @@ import {
     writeTask({
         id: TASK_ID,
         prompt: 'Teste de Stall Simulado',
-        status: 'PENDING'
+        status: 'PENDING',
     });
 
     const agent = startAgent();
@@ -30,7 +23,7 @@ import {
             browserURL:
                 process.env.CHROME_WS_ENDPOINT ||
                 process.env.CHROME_URL ||
-                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`
+                `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`,
         });
         const pages = await browser.pages();
         const page = pages.find(p => p.url().includes('chatgpt.com'));

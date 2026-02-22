@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { http, formatHttpError } from '@/lib/http';
 
+/** Constante/valor exportado: useEventsVNextStore. */
 export const useEventsVNextStore = defineStore('events_vnext', {
     state: () => ({
         items: /** @type {any[]} */ ([]),

@@ -837,4 +837,5 @@ class MissionManager {
     }
 }
 
+/** Reexport público: MISSION_STATUS. */
 export { MissionManager, MISSION_STATUS };

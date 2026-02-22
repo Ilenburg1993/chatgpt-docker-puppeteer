@@ -12,7 +12,7 @@ export function createEmptyManifest() {
         embedding: { model: DEFAULT_EMBEDDING_MODEL, dim: null, base_url_default: DEFAULT_OLLAMA_BASE_URL },
         last_scope: null,
         last_scope_hash: null,
-        files: {}
+        files: {},
     };
 }
 
@@ -23,10 +23,10 @@ export async function loadManifest(paths) {
         if (!parsed || parsed.schema_version !== SCHEMA_VERSION) {
             throw new Error(
                 `SCHEMA_VERSION_MISMATCH: Index schema is v${parsed?.schema_version || 'unknown'}, ` +
-                `but code expects v${SCHEMA_VERSION}.\n\n` +
-                `Solution: Reset the index (this will re-index all files):\n` +
-                `  npm run rag:reset -- --yes\n` +
-                `  npm run rag:index\n`
+                    `but code expects v${SCHEMA_VERSION}.\n\n` +
+                    `Solution: Reset the index (this will re-index all files):\n` +
+                    `  npm run rag:reset -- --yes\n` +
+                    `  npm run rag:index\n`
             );
         }
         if (!parsed.files || typeof parsed.files !== 'object') {

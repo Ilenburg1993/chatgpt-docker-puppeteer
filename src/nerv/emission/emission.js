@@ -35,21 +35,21 @@ function createEmission({ envelopes, buffers, correlation, telemetry }) {
         envelopes,
         buffers,
         correlation,
-        telemetry
+        telemetry,
     });
 
     const eventEmitter = createEmitEvent({
         envelopes,
         buffers,
         correlation,
-        telemetry
+        telemetry,
     });
 
     const ackEmitter = createEmitAck({
         envelopes,
         buffers,
         correlation,
-        telemetry
+        telemetry,
     });
 
     /* =========================================================
@@ -59,7 +59,7 @@ function createEmission({ envelopes, buffers, correlation, telemetry }) {
     return Object.freeze({
         emitCommand: commandEmitter.emitCommand,
         emitEvent: eventEmitter.emitEvent,
-        emitAck: ackEmitter.emitAck
+        emitAck: ackEmitter.emitAck,
     });
 }
 

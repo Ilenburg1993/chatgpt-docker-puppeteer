@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
+/** Constante/valor exportado: default. */
 const router = express.Router();
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,7 @@ router.get('/agents', (req, res) => {
             status: 'ONLINE',
             last_seen: entry.last_seen,
             capabilities: entry.identity.capabilities,
-            metadata: entry.identity.metadata
+            metadata: entry.identity.metadata,
         }));
 
         res.json({
@@ -36,14 +37,14 @@ router.get('/agents', (req, res) => {
             count: agents.length,
             timestamp: Date.now(),
             agents,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha ao listar agentes: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao acessar o Registry de Agentes.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -60,7 +61,7 @@ router.post('/agents/:id/command', async (req, res) => {
         return res.status(400).json({
             success: false,
             error: "O campo 'command' é obrigatório para execução remota.",
-            request_id: req.id
+            request_id: req.id,
         });
     }
 
@@ -70,7 +71,7 @@ router.post('/agents/:id/command', async (req, res) => {
             target_robot: id,
             command,
             payload,
-            request_id: req.id
+            request_id: req.id,
         });
 
         // Tenta enviar via Hub (Roteamento por sala privada agent:ID)
@@ -80,7 +81,7 @@ router.post('/agents/:id/command', async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: `Agente ${id} não localizado ou offline.`,
-                request_id: req.id
+                request_id: req.id,
             });
         }
 
@@ -89,14 +90,14 @@ router.post('/agents/:id/command', async (req, res) => {
             msg_id: msgId,
             status: 'DISPATCHED',
             target: id,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha interna no barramento de comando.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -114,14 +115,14 @@ router.get('/health', async (req, res) => {
         const report = await doctor.runFullCheck();
         res.json({
             ...report,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha no motor de diagnóstico: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao executar diagnóstico de saúde.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -135,14 +136,14 @@ router.get('/status', async (req, res) => {
         const status = await system.getAgentStatus();
         res.json({
             ...status,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha ao obter status do processo: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao obter status do processo.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -164,21 +165,21 @@ router.post('/control/:action', async (req, res) => {
             return res.status(403).json({
                 success: false,
                 error: 'Operation not permitted: server running in delegated mode',
-                request_id: req.id
+                request_id: req.id,
             });
         }
         await audit('PROCESS_CONTROL', { action, source: 'API', request_id: req.id });
         const result = await system.controlAgent(action);
         res.json({
             ...result,
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: `Falha ao executar comando de processo: ${action}`,
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });
@@ -199,10 +200,12 @@ router.get('/locks', async (req, res) => {
                     return null;
                 }
                 const safeContent =
-                    typeof content === 'object' && content !== null ? /** @type {Record<string, unknown>} */ (content) : {};
+                    typeof content === 'object' && content !== null
+                        ? /** @type {Record<string, unknown>} */ (content)
+                        : {};
                 return {
                     target: f.replace('RUNNING_', '').replace('.lock', ''),
-                    ...safeContent
+                    ...safeContent,
                 };
             })
         );
@@ -210,14 +213,14 @@ router.get('/locks', async (req, res) => {
         res.json({
             success: true,
             locks: locks.filter(l => l !== null),
-            request_id: req.id
+            request_id: req.id,
         });
     } catch (e) {
         log('ERROR', `[API_SYSTEM] Falha ao listar travas: ${e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao listar travas ativas no sistema.',
-            request_id: req.id
+            request_id: req.id,
         });
     }
 });

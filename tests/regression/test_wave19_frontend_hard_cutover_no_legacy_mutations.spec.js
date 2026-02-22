@@ -31,10 +31,12 @@ test('wave19: router ativo não aponta para views legadas e não usa useRealtime
     const missionDetail = await read('src/dashboard-ui/src/views/MissionDetail.vue');
     const missionsView = await read('src/dashboard-ui/src/views/Missions.vue');
 
-    assert.doesNotMatch(routerContent, /Dashboard\.vue|TaskQueue\.vue|PerformanceMetrics\.vue|WorkflowEditor\.vue|Templates\.vue/);
+    assert.doesNotMatch(
+        routerContent,
+        /Dashboard\.vue|TaskQueue\.vue|PerformanceMetrics\.vue|WorkflowEditor\.vue|Templates\.vue/
+    );
     assert.doesNotMatch(tasksView, /useRealtime/);
     assert.doesNotMatch(taskDetail, /useRealtime/);
     assert.doesNotMatch(missionDetail, /useRealtime/);
     assert.doesNotMatch(missionsView, /useRealtime/);
 });
-

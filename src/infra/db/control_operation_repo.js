@@ -2,6 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
+/** Constante/valor exportado: CONTROL_OPERATION_STATUS. */
 const CONTROL_OPERATION_STATUS = Object.freeze({
     PENDING: 'PENDING',
     RUNNING: 'RUNNING',
@@ -52,6 +53,7 @@ function _rowToOperation(row) {
     };
 }
 
+/** Função exportada: createControlOperation. */
 function createControlOperation({
     command,
     entityType,
@@ -84,7 +86,9 @@ function createControlOperation({
     `
     ).run({
         id,
-        command: String(command || '').trim().toUpperCase(),
+        command: String(command || '')
+            .trim()
+            .toUpperCase(),
         entity_type: String(entityType || '').trim(),
         entity_id: String(entityId || '').trim(),
         actor_id: actorId ? String(actorId) : null,
@@ -100,12 +104,14 @@ function createControlOperation({
     return getControlOperationById(id);
 }
 
+/** Função exportada: getControlOperationById. */
 function getControlOperationById(id) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM control_operations WHERE id = ?').get(String(id || '').trim());
     return _rowToOperation(row);
 }
 
+/** Função exportada: getControlOperationByIdempotencyKey. */
 function getControlOperationByIdempotencyKey(idempotencyKey) {
     const db = getDb();
     const row = db
@@ -114,6 +120,7 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
     return _rowToOperation(row);
 }
 
+/** Função exportada: updateControlOperation. */
 function updateControlOperation(id, updates = {}) {
     const db = getDb();
     const existing = getControlOperationById(id);
@@ -148,6 +155,7 @@ function updateControlOperation(id, updates = {}) {
     return getControlOperationById(existing.id);
 }
 
+/** Função exportada: listControlOperations. */
 function listControlOperations({ limit = 100, entityType = null, entityId = null } = {}) {
     const db = getDb();
     const where = [];

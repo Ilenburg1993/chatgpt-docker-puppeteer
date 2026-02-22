@@ -2,19 +2,22 @@
 
 ## 📋 Visão Geral
 
-Este projeto está migrando do **PKG** (ferramenta deprecated) para **Single Executable Applications (SEA)** do Node.js, que são a solução oficial para criar executáveis standalone.
+Este projeto está migrando do **PKG** (ferramenta deprecated) para **Single Executable Applications
+(SEA)** do Node.js, que são a solução oficial para criar executáveis standalone.
 
 ## ⚠️ Status Atual: VERSÃO INFORMATIVA
 
 **O SEA ainda não suporta completamente projetos ESM complexos como o chatgpt-docker-puppeteer.**
 
 ### Limitações Técnicas Atuais
+
 - ❌ `import()` dinâmico não funciona no snapshot do Node.js
 - ❌ Projetos ESM complexos têm problemas de compatibilidade
 - ❌ Dependências nativas (`better-sqlite3`) requerem compilação cruzada
 - ❌ Múltiplas features ESM avançadas ainda não são suportadas
 
 ### O Que Já Funciona no SEA
+
 - ✅ Node.js 24+ (vs PKG limitado a Node.js 18)
 - ✅ Top-level await (resolve o problema crítico do projeto)
 - ✅ Snapshots para inicialização mais rápida
@@ -22,48 +25,55 @@ Este projeto está migrando do **PKG** (ferramenta deprecated) para **Single Exe
 
 ## ✅ Vantagens do SEA vs PKG
 
-| Aspecto             | SEA (Node.js)            | PKG (Deprecated) |
-| ------------------- | ------------------------ | ---------------- |
-| **Status**          | 🟢 Oficial/Node.js        | 🔴 Arquivado      |
-| **Node.js 24+**     | ✅                        | ❌                |
-| **Top-level await** | ✅                        | ❌                |
-| **ESM complexo**    | ✅ (futuro)               | ⚠️ Limitado       |
-| **Manutenção**      | 🟢 Ativa                  | 🔴 Morto          |
-| **Snapshots**       | ✅ (inicialização rápida) | ❌                |
-| **Assets nativos**  | ✅ (API `sea.*`)          | ✅                |
+| Aspecto             | SEA (Node.js)             | PKG (Deprecated) |
+| ------------------- | ------------------------- | ---------------- |
+| **Status**          | 🟢 Oficial/Node.js        | 🔴 Arquivado     |
+| **Node.js 24+**     | ✅                        | ❌               |
+| **Top-level await** | ✅                        | ❌               |
+| **ESM complexo**    | ✅ (futuro)               | ⚠️ Limitado      |
+| **Manutenção**      | 🟢 Ativa                  | 🔴 Morto         |
+| **Snapshots**       | ✅ (inicialização rápida) | ❌               |
+| **Assets nativos**  | ✅ (API `sea.*`)          | ✅               |
 
 ## 🏗️ Como Usar a Versão Atual
 
 ### Build (Desenvolvimento)
+
 ```bash
 npm run build:sea
 ```
 
 ### Build (Produção - com validações)
+
 ```bash
 npm run build:sea:prod
 ```
 
 ### Executável Gerado
+
 ```bash
 ./release/chatgpt-docker-puppeteer-info.sh
 ```
 
-Este executável informativo explica as limitações atuais e fornece recomendações contextuais baseadas no ambiente detectado.
+Este executável informativo explica as limitações atuais e fornece recomendações contextuais
+baseadas no ambiente detectado.
 
 ## 🆕 Melhorias Recentes (2025)
 
 ### ✅ Sistema de Validação Pré-Voo
+
 - **Integração automática** no build SEA
 - **Detecção de ambiente** inteligente (dev vs prod)
 - **Validações contextuais** baseadas no modo de execução
 
 ### ✅ Recomendações Contextuais
+
 - **Desenvolvimento**: Sugere comandos de desenvolvimento
 - **Produção**: Sugere comandos com validações de produção
 - **Feedback visual** claro sobre limitações atuais
 
 ### ✅ Robustez Operacional
+
 - **Build validado** antes da geração do executável
 - **Dependências verificadas** automaticamente
 - **Ambiente consistente** entre builds
@@ -89,17 +99,20 @@ O executável informativo agora adapta suas recomendações baseado no ambiente 
 Enquanto o SEA amadurece, use estas alternativas robustas:
 
 ### 1. Docker (Recomendado)
+
 ```bash
 docker build -t chatgpt-docker-puppeteer .
 docker run chatgpt-docker-puppeteer
 ```
 
 ### 2. NPM/Node.js Direto
+
 ```bash
 npm start
 ```
 
 ### 3. PM2 (Produção)
+
 ```bash
 npm run daemon:start
 ```
@@ -159,10 +172,10 @@ Dependências nativas precisam ser compiladas para a arquitetura alvo.
 ## 📊 Comparação de Tamanho
 
 | Método     | Tamanho Aproximado | Vantagens                  |
-| ---------- | ------------------ | -------------------------- |
+| ---------- | ------------------ | -------------------------- | ------------- |
 | **SEA**    | ~150-200MB         | Completo, oficial, moderno |
 | **PKG**    | ~100-150MB         | -                          | ❌ Deprecated |
-| **Docker** | ~500MB+            | Portabilidade máxima       |              |
+| **Docker** | ~500MB+            | Portabilidade máxima       |               |
 
 ## 🔄 Migração do PKG
 
@@ -191,7 +204,8 @@ Dependências nativas precisam ser compiladas para a arquitetura alvo.
 
 **O PKG está morto** - foi arquivado pelo Vercel e não suporta Node.js moderno.
 
-**O SEA é o futuro** - é oficial, moderno e resolve os problemas do PKG. A infraestrutura já está preparada para quando o SEA estiver pronto para projetos complexos.
+**O SEA é o futuro** - é oficial, moderno e resolve os problemas do PKG. A infraestrutura já está
+preparada para quando o SEA estiver pronto para projetos complexos.
 
 **Para produção hoje**: Use Docker ou PM2, que são soluções robustas e bem testadas.
 

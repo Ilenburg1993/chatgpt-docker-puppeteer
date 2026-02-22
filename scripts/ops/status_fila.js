@@ -21,7 +21,7 @@ const C = {
     YELLOW: '\x1b[33m',
     CYAN: '\x1b[36m',
     WHITE: '\x1b[37m',
-    BLUE: '\x1b[34m'
+    BLUE: '\x1b[34m',
 };
 
 const STATUS_COLORS = {
@@ -31,7 +31,7 @@ const STATUS_COLORS = {
     FAILED: C.RED,
     PAUSED: C.CYAN,
     SCHEDULED: C.BLUE,
-    SKIPPED: C.DIM + C.WHITE
+    SKIPPED: C.DIM + C.WHITE,
 };
 
 // --- HELPERS DE DADOS (V2/V3 ADAPTER) ---
@@ -114,7 +114,7 @@ function render() {
                 started: getStarted(t),
                 error: getError(t),
                 schedule,
-                tags
+                tags,
             };
 
             if (status === 'FAILED') {

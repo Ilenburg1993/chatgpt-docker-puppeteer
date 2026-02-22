@@ -33,6 +33,7 @@ const signalHandlers = {
     unhandledRejection: null,
 };
 
+/** Função exportada: setAllowProcessExit. */
 function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
 }
@@ -255,6 +256,7 @@ function listenToSignals() {
     signalsListening = true;
 }
 
+/** Função exportada: cleanupSignalListeners. */
 function cleanupSignalListeners() {
     if (!signalsListening) {
         return;
@@ -279,6 +281,7 @@ function __resetLifecycleStateForTests() {
     allowProcessExit = true;
 }
 
+/** Constante/valor exportado: __lifecycleTestHooks. */
 const __lifecycleTestHooks = Object.freeze({
     getSignalHandlers: () => signalHandlers,
     isShuttingDown: () => isShuttingDown,

@@ -8,5 +8,9 @@ test('wave20b: wrapper PM2 do chrome-proxy mantém ownership único de sinais', 
     const source = await readFile(wrapperPath, 'utf8');
 
     assert.match(source, /AUTO_HANDLE_SIGNALS:\s*false/, 'wrapper deve desabilitar handlers internos no serviço');
-    assert.doesNotMatch(source, /process\.removeAllListeners\s*\(/, 'wrapper não deve usar cleanup global de listeners');
+    assert.doesNotMatch(
+        source,
+        /process\.removeAllListeners\s*\(/,
+        'wrapper não deve usar cleanup global de listeners'
+    );
 });

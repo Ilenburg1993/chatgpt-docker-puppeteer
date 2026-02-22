@@ -108,6 +108,7 @@ function upsertAttempt(input) {
     });
 }
 
+/** Função exportada: updateAttempt. */
 function updateAttempt(attemptId, updates = {}) {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId);
@@ -118,11 +119,13 @@ function updateAttempt(attemptId, updates = {}) {
     return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
 }
 
+/** Função exportada: getAttemptById. */
 function getAttemptById(attemptId) {
     const db = getDb();
     return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
 }
 
+/** Função exportada: listAttemptsByTask. */
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {
     const db = getDb();
     const lim = Math.max(1, Math.min(Number(limit) || 200, 2000));

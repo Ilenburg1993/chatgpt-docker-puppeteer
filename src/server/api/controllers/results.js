@@ -9,6 +9,7 @@ import { getTaskById } from '#infra/db/task_repo';
 import { _resolveArtifactsRoot, _isUnderRoot } from '#infra/storage/artifact_store';
 import { log } from '#core/logger';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 const fsp = fs.promises;
 
@@ -137,13 +138,20 @@ router.get('/:id', async (req, res) => {
         const safeDisposition = disposition === 'attachment' ? 'attachment' : 'inline';
 
         res.setHeader('Content-Type', _contentTypeForExt(ext));
-        res.setHeader('Content-Disposition', `${safeDisposition}; filename="${taskId}${attemptId ? `-${attemptId}` : ''}${ext}"`);
+        res.setHeader(
+            'Content-Disposition',
+            `${safeDisposition}; filename="${taskId}${attemptId ? `-${attemptId}` : ''}${ext}"`
+        );
 
         const stream = fs.createReadStream(filePath);
         stream.on('error', err => {
             log('ERROR', `[API_RESULTS] stream error for ${taskId}: ${err?.message || String(err)}`, requestId);
             if (!res.headersSent) {
-                res.status(500).json({ success: false, error: 'Erro na transmissão do arquivo.', request_id: requestId });
+                res.status(500).json({
+                    success: false,
+                    error: 'Erro na transmissão do arquivo.',
+                    request_id: requestId,
+                });
             } else {
                 res.end();
             }
@@ -156,4 +164,3 @@ router.get('/:id', async (req, res) => {
 });
 
 export default router;
-

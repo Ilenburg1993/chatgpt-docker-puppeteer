@@ -24,6 +24,7 @@
    Tipos de Proposta de Decisão
 =========================== */
 
+/** Constante/valor exportado: DecisionKind. */
 const DecisionKind = Object.freeze({
     // Controle de tarefas
     PROPOSE_ACTIVATE_TASK: 'PROPOSE_ACTIVATE_TASK',
@@ -35,13 +36,14 @@ const DecisionKind = Object.freeze({
     PROPOSE_EMIT_EVENT: 'PROPOSE_EMIT_EVENT',
 
     // Gestão de observações
-    PROPOSE_RECONCILE_OBSERVATIONS: 'PROPOSE_RECONCILE_OBSERVATIONS'
+    PROPOSE_RECONCILE_OBSERVATIONS: 'PROPOSE_RECONCILE_OBSERVATIONS',
 });
 
 /* ===========================
    Fábrica do ExecutionEngine
 =========================== */
 
+/** Classe exportada: ExecutionEngine. */
 class ExecutionEngine {
     /**
      * @param {Object} params
@@ -102,7 +104,7 @@ class ExecutionEngine {
     evaluate({ tickId, at }) {
         this.telemetry.info('execution_engine_evaluation_start', {
             tickId,
-            at
+            at,
         });
 
         const proposals = [];
@@ -122,7 +124,7 @@ class ExecutionEngine {
         this.telemetry.info('execution_engine_evaluation_complete', {
             tickId,
             proposalsCount: proposals.length,
-            at: Date.now()
+            at: Date.now(),
         });
 
         return proposals;
@@ -156,14 +158,14 @@ class ExecutionEngine {
         const policyAssessment = this.policyEngine.assess({
             task,
             observations,
-            at
+            at,
         });
 
         // 3. Interpretação semântica
         const semanticDecisions = this._interpretObservations({
             task,
             observations,
-            at
+            at,
         });
 
         // 4. Combinação de avaliação normativa + semântica
@@ -172,7 +174,7 @@ class ExecutionEngine {
             observations,
             policyAssessment,
             semanticDecisions,
-            at
+            at,
         });
 
         if (proposal) {
@@ -180,7 +182,7 @@ class ExecutionEngine {
                 taskId: task.taskId,
                 kind: proposal.kind,
                 tickId,
-                at: Date.now()
+                at: Date.now(),
             });
 
             proposals.push(proposal);
@@ -209,7 +211,7 @@ class ExecutionEngine {
             hasCompletionSignal: false,
             hasErrorSignal: false,
             hasProgressSignal: false,
-            lastObservationAt: null
+            lastObservationAt: null,
         };
 
         if (observations.length === 0) {
@@ -246,7 +248,7 @@ class ExecutionEngine {
             observationsCount: observations.length,
             hasCompletionSignal: result.hasCompletionSignal,
             hasErrorSignal: result.hasErrorSignal,
-            at
+            at,
         });
 
         return result;
@@ -275,7 +277,7 @@ class ExecutionEngine {
                 reason: 'Avaliação normativa crítica',
                 policyLevel: policyAssessment.level,
                 alerts: policyAssessment.alerts,
-                at
+                at,
             };
         }
 
@@ -285,7 +287,7 @@ class ExecutionEngine {
                 kind: DecisionKind.PROPOSE_TERMINATE_TASK,
                 taskId: task.taskId,
                 reason: 'Sinal de conclusão recebido',
-                at
+                at,
             };
         }
 
@@ -295,7 +297,7 @@ class ExecutionEngine {
                 kind: DecisionKind.PROPOSE_SUSPEND_TASK,
                 taskId: task.taskId,
                 reason: 'Sinal de erro detectado',
-                at
+                at,
             };
         }
 
@@ -308,7 +310,7 @@ class ExecutionEngine {
                 kind: DecisionKind.PROPOSE_ACTIVATE_TASK,
                 taskId: task.taskId,
                 reason: 'Tempo mínimo de inicialização atingido',
-                at
+                at,
             };
         }
 

@@ -41,43 +41,43 @@ import { asRecord } from '#types/guards';
  * @returns {Promise<void>}
  */
 export async function handleRagAsk(req, res) {
-  try {
-    const { query, topK = 8, pathPrefix, ext, tags } = req.body;
+    try {
+        const { query, topK = 8, pathPrefix, ext, tags } = req.body;
 
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing or invalid "query" parameter (string required)'
-      });
+        if (!query || typeof query !== 'string') {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing or invalid "query" parameter (string required)',
+            });
+        }
+
+        const result = await ragAsk({
+            query,
+            topK: Number(topK),
+            pathPrefix,
+            ext: ext ? (Array.isArray(ext) ? ext : [ext]) : undefined,
+            tags: tags ? (Array.isArray(tags) ? tags : [tags]) : undefined,
+        });
+
+        return res.json({
+            success: true,
+            markdown: result.markdown,
+            chunks: result.result.results.length,
+            metadata: {
+                query,
+                topK: result.result.topK,
+                dim: result.result.dim,
+                timestamp: Date.now(),
+            },
+        });
+    } catch (error) {
+        log.error('[RAG API] handleRagAsk error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            code: error.code || 'RAG_ASK_ERROR',
+        });
     }
-
-    const result = await ragAsk({
-      query,
-      topK: Number(topK),
-      pathPrefix,
-      ext: ext ? (Array.isArray(ext) ? ext : [ext]) : undefined,
-      tags: tags ? (Array.isArray(tags) ? tags : [tags]) : undefined
-    });
-
-    return res.json({
-      success: true,
-      markdown: result.markdown,
-      chunks: result.result.results.length,
-      metadata: {
-        query,
-        topK: result.result.topK,
-        dim: result.result.dim,
-        timestamp: Date.now()
-      }
-    });
-  } catch (error) {
-    log.error('[RAG API] handleRagAsk error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'RAG_ASK_ERROR'
-    });
-  }
 }
 
 /**
@@ -95,58 +95,58 @@ export async function handleRagAsk(req, res) {
  * @returns {Promise<void>}
  */
 export async function handleRagQuery(req, res) {
-  try {
-    const { query, topK = 8, filters = {} } = req.body;
+    try {
+        const { query, topK = 8, filters = {} } = req.body;
 
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing or invalid "query" parameter (string required)'
-      });
+        if (!query || typeof query !== 'string') {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing or invalid "query" parameter (string required)',
+            });
+        }
+
+        const result = await ragQuery({
+            query,
+            topK: Number(topK),
+            filters,
+        });
+
+        return res.json({
+            success: true,
+            results: result.results.map(r => ({
+                path: r.path,
+                score: r.score,
+                startLine: r.start_line,
+                endLine: r.end_line,
+                text: r.text,
+                language: r.language || null,
+                tags: r.tags || [],
+                ext: r.ext,
+                indexed_at: r.indexed_at || null,
+                indexed_at_iso: r.indexed_at_iso || null,
+                indexed_at_local: r.indexed_at_local || null,
+            })),
+            metadata: {
+                query,
+                topK: result.topK,
+                dim: result.dim,
+                index_mode: result.index_mode || 'full',
+                index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
+                index_updated_at_iso: result.index_updated_at_iso || null,
+                last_index_scope: result.last_index_scope || null,
+                scope_hash: result.scope_hash || null,
+                query_at_iso: result.query_at_iso || null,
+                timestamp: Date.now(),
+            },
+        });
+    } catch (error) {
+        log.error('[RAG API] handleRagQuery error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            code: error.code || 'RAG_QUERY_ERROR',
+        });
     }
-
-    const result = await ragQuery({
-      query,
-      topK: Number(topK),
-      filters
-    });
-
-    return res.json({
-      success: true,
-      results: result.results.map(r => ({
-        path: r.path,
-        score: r.score,
-        startLine: r.start_line,
-        endLine: r.end_line,
-        text: r.text,
-        language: r.language || null,
-        tags: r.tags || [],
-        ext: r.ext,
-        indexed_at: r.indexed_at || null,
-        indexed_at_iso: r.indexed_at_iso || null,
-        indexed_at_local: r.indexed_at_local || null
-      })),
-      metadata: {
-        query,
-        topK: result.topK,
-        dim: result.dim,
-        index_mode: result.index_mode || 'full',
-        index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
-        index_updated_at_iso: result.index_updated_at_iso || null,
-        last_index_scope: result.last_index_scope || null,
-        scope_hash: result.scope_hash || null,
-        query_at_iso: result.query_at_iso || null,
-        timestamp: Date.now()
-      }
-    });
-  } catch (error) {
-    log.error('[RAG API] handleRagQuery error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'RAG_QUERY_ERROR'
-    });
-  }
 }
 
 /**
@@ -160,21 +160,21 @@ export async function handleRagQuery(req, res) {
  * @returns {Promise<void>}
  */
 export async function handleRagHealth(req, res) {
-  try {
-    const health = await ragHealth();
-    return res.json({
-      ...health,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    log.error('[RAG API] handleRagHealth error:', error);
-    return res.status(500).json({
-      success: false,
-      ok: false,
-      error: error.message,
-      code: error.code || 'RAG_HEALTH_ERROR'
-    });
-  }
+    try {
+        const health = await ragHealth();
+        return res.json({
+            ...health,
+            timestamp: Date.now(),
+        });
+    } catch (error) {
+        log.error('[RAG API] handleRagHealth error:', error);
+        return res.status(500).json({
+            success: false,
+            ok: false,
+            error: error.message,
+            code: error.code || 'RAG_HEALTH_ERROR',
+        });
+    }
 }
 
 /**
@@ -190,62 +190,59 @@ export async function handleRagHealth(req, res) {
  * @returns {Promise<void>}
  */
 export async function handleRagIndex(req, res) {
-  try {
-    const body = asRecord(req.body || {});
-    const {
-      root,
-      profile,
-      includeGlobs,
-      excludeGlobs,
-      docsMode,
-      maxFileBytes
-    } = body;
+    try {
+        const body = asRecord(req.body || {});
+        const { root, profile, includeGlobs, excludeGlobs, docsMode, maxFileBytes } = body;
 
-    const normalizedIncludeGlobs = Array.isArray(includeGlobs)
-      ? includeGlobs
-      : (typeof includeGlobs === 'string' && includeGlobs.trim() ? [includeGlobs.trim()] : undefined);
-    const normalizedExcludeGlobs = Array.isArray(excludeGlobs)
-      ? excludeGlobs
-      : (typeof excludeGlobs === 'string' && excludeGlobs.trim() ? [excludeGlobs.trim()] : undefined);
-    const normalizedMaxFileBytes = Number.isFinite(Number(maxFileBytes)) ? Number(maxFileBytes) : undefined;
-    const resolvedScope = resolveRagScopeConfig({
-      profile,
-      includeGlobs: normalizedIncludeGlobs,
-      excludeGlobs: normalizedExcludeGlobs,
-      docsMode,
-      maxFileBytes: normalizedMaxFileBytes
-    });
+        const normalizedIncludeGlobs = Array.isArray(includeGlobs)
+            ? includeGlobs
+            : typeof includeGlobs === 'string' && includeGlobs.trim()
+              ? [includeGlobs.trim()]
+              : undefined;
+        const normalizedExcludeGlobs = Array.isArray(excludeGlobs)
+            ? excludeGlobs
+            : typeof excludeGlobs === 'string' && excludeGlobs.trim()
+              ? [excludeGlobs.trim()]
+              : undefined;
+        const normalizedMaxFileBytes = Number.isFinite(Number(maxFileBytes)) ? Number(maxFileBytes) : undefined;
+        const resolvedScope = resolveRagScopeConfig({
+            profile,
+            includeGlobs: normalizedIncludeGlobs,
+            excludeGlobs: normalizedExcludeGlobs,
+            docsMode,
+            maxFileBytes: normalizedMaxFileBytes,
+        });
 
-    // Inicia indexação em background (não aguarda conclusão)
-    ragIndex({
-      root,
-      profile: resolvedScope.profile,
-      includeGlobs: resolvedScope.includeGlobs,
-      excludeGlobs: resolvedScope.excludeGlobs,
-      docsMode: resolvedScope.docsMode,
-      maxFileBytes: resolvedScope.maxFileBytes
-    })
-      .then(() => {
-        log.info('[RAG API] Background indexing completed successfully');
-      })
-      .catch(err => {
-        log.error('[RAG API] Background indexing failed:', err);
-      });
+        // Inicia indexação em background (não aguarda conclusão)
+        ragIndex({
+            root,
+            profile: resolvedScope.profile,
+            includeGlobs: resolvedScope.includeGlobs,
+            excludeGlobs: resolvedScope.excludeGlobs,
+            docsMode: resolvedScope.docsMode,
+            maxFileBytes: resolvedScope.maxFileBytes,
+        })
+            .then(() => {
+                log.info('[RAG API] Background indexing completed successfully');
+            })
+            .catch(err => {
+                log.error('[RAG API] Background indexing failed:', err);
+            });
 
-    return res.json({
-      success: true,
-      message: 'RAG indexing started in background',
-      scope: resolvedScope.scope,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    log.error('[RAG API] handleRagIndex error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'RAG_INDEX_ERROR'
-    });
-  }
+        return res.json({
+            success: true,
+            message: 'RAG indexing started in background',
+            scope: resolvedScope.scope,
+            timestamp: Date.now(),
+        });
+    } catch (error) {
+        log.error('[RAG API] handleRagIndex error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            code: error.code || 'RAG_INDEX_ERROR',
+        });
+    }
 }
 
 /**
@@ -269,82 +266,82 @@ export async function handleRagIndex(req, res) {
  * @returns {Promise<void>}
  */
 export async function handleRagHybridSearch(req, res) {
-  try {
-    const {
-      query,
-      topK = 8,
-      pathPrefix,
-      ext,
-      tags,
-      rerank = true,
-      rerankWeights,
-      mmr = true,
-      mmrLambda = 0.7
-    } = req.body;
+    try {
+        const {
+            query,
+            topK = 8,
+            pathPrefix,
+            ext,
+            tags,
+            rerank = true,
+            rerankWeights,
+            mmr = true,
+            mmrLambda = 0.7,
+        } = req.body;
 
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing or invalid "query" parameter (string required)'
-      });
+        if (!query || typeof query !== 'string') {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing or invalid "query" parameter (string required)',
+            });
+        }
+
+        const result = await ragHybridSearch({
+            query,
+            topK: Number(topK),
+            pathPrefix,
+            ext,
+            tags: tags ? (Array.isArray(tags) ? tags : [tags]) : undefined,
+            rerank,
+            rerankWeights,
+            mmr,
+            mmrLambda: mmrLambda ? Number(mmrLambda) : 0.7,
+        });
+
+        return res.json({
+            success: true,
+            results: result.results.map(r => ({
+                path: r.path,
+                score: r.score,
+                distance: r.distance,
+                rerank_score: r.rerank_score,
+                rerank_signals: r.rerank_signals,
+                start_line: r.start_line,
+                end_line: r.end_line,
+                text: r.text,
+                language: r.language || null,
+                tags: r.tags || [],
+                ext: r.ext,
+                indexed_at: r.indexed_at || null,
+                indexed_at_iso: r.indexed_at_iso || null,
+                indexed_at_local: r.indexed_at_local || null,
+            })),
+            metadata: {
+                query: result.query,
+                topK: result.topK,
+                dim: result.dim,
+                model: result.model,
+                hybridMode: result.hybridMode,
+                rerank: result.rerank,
+                mmr: result.mmr,
+                mmrLambda: result.mmrLambda,
+                index_mode: result.index_mode || 'full',
+                index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
+                index_updated_at_iso: result.index_updated_at_iso || null,
+                last_index_scope: result.last_index_scope || null,
+                scope_hash: result.scope_hash || null,
+                query_at_iso: result.query_at_iso || null,
+                timestamp: Date.now(),
+            },
+        });
+    } catch (error) {
+        log.error('[RAG API] handleRagHybridSearch error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            code: error.code || 'RAG_HYBRID_SEARCH_ERROR',
+        });
     }
-
-    const result = await ragHybridSearch({
-      query,
-      topK: Number(topK),
-      pathPrefix,
-      ext,
-      tags: tags ? (Array.isArray(tags) ? tags : [tags]) : undefined,
-      rerank,
-      rerankWeights,
-      mmr,
-      mmrLambda: mmrLambda ? Number(mmrLambda) : 0.7
-    });
-
-    return res.json({
-      success: true,
-      results: result.results.map(r => ({
-        path: r.path,
-        score: r.score,
-        distance: r.distance,
-        rerank_score: r.rerank_score,
-        rerank_signals: r.rerank_signals,
-        start_line: r.start_line,
-        end_line: r.end_line,
-        text: r.text,
-        language: r.language || null,
-        tags: r.tags || [],
-        ext: r.ext,
-        indexed_at: r.indexed_at || null,
-        indexed_at_iso: r.indexed_at_iso || null,
-        indexed_at_local: r.indexed_at_local || null
-      })),
-      metadata: {
-        query: result.query,
-        topK: result.topK,
-        dim: result.dim,
-        model: result.model,
-        hybridMode: result.hybridMode,
-        rerank: result.rerank,
-        mmr: result.mmr,
-        mmrLambda: result.mmrLambda,
-        index_mode: result.index_mode || 'full',
-        index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
-        index_updated_at_iso: result.index_updated_at_iso || null,
-        last_index_scope: result.last_index_scope || null,
-        scope_hash: result.scope_hash || null,
-        query_at_iso: result.query_at_iso || null,
-        timestamp: Date.now()
-      }
-    });
-  } catch (error) {
-    log.error('[RAG API] handleRagHybridSearch error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'RAG_HYBRID_SEARCH_ERROR'
-    });
-  }
 }
 
 /**
@@ -358,26 +355,27 @@ export async function handleRagHybridSearch(req, res) {
  * @returns {Promise<void>}
  */
 export async function handleRagStats(req, res) {
-  try {
-    const stats = getRagCacheStats();
+    try {
+        const stats = getRagCacheStats();
 
-    return res.json({
-      success: true,
-      stats: {
-        ...stats,
-        hitRate: (stats.hitRate * 100).toFixed(2) + '%',
-        efficiency: stats.hits > 0
-          ? `Saved ${stats.hits} embedding calls (~${(stats.hits * 200).toFixed(0)}ms)`
-          : 'No cache hits yet'
-      },
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    log.error('[RAG API] handleRagStats error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'RAG_STATS_ERROR'
-    });
-  }
+        return res.json({
+            success: true,
+            stats: {
+                ...stats,
+                hitRate: (stats.hitRate * 100).toFixed(2) + '%',
+                efficiency:
+                    stats.hits > 0
+                        ? `Saved ${stats.hits} embedding calls (~${(stats.hits * 200).toFixed(0)}ms)`
+                        : 'No cache hits yet',
+            },
+            timestamp: Date.now(),
+        });
+    } catch (error) {
+        log.error('[RAG API] handleRagStats error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            code: error.code || 'RAG_STATS_ERROR',
+        });
+    }
 }

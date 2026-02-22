@@ -13,7 +13,6 @@ import {
     upsertRuntimeResource,
 } from '#core/runtime_resource_registry';
 
-
 /* ==========================================================================
    IPC DISCOVERY STATE — PERSISTÊNCIA CANÔNICA
 ========================================================================== */
@@ -72,7 +71,8 @@ function envFlag(name, defaultValue) {
 
 function validateDashboardAuthConfig(config) {
     const authRequired = config?.DASHBOARD_AUTH_REQUIRED ?? envFlag('DASHBOARD_AUTH_REQUIRED', true);
-    const socketAuthRequired = config?.DASHBOARD_SOCKET_AUTH_REQUIRED ?? envFlag('DASHBOARD_SOCKET_AUTH_REQUIRED', true);
+    const socketAuthRequired =
+        config?.DASHBOARD_SOCKET_AUTH_REQUIRED ?? envFlag('DASHBOARD_SOCKET_AUTH_REQUIRED', true);
     if (!authRequired) {
         if (!socketAuthRequired) {
             return;
@@ -87,7 +87,9 @@ function validateDashboardAuthConfig(config) {
     }
 
     if (authRequired && password.length < 12) {
-        throw new Error('[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_PASSWORD deve ter ao menos 12 caracteres');
+        throw new Error(
+            '[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_PASSWORD deve ter ao menos 12 caracteres'
+        );
     }
 
     // Garante contrato de segurança do JWT antes do runtime aceitar conexões dashboard.
@@ -102,14 +104,7 @@ function sendReadySignalOnce() {
     __readySignalSent = true;
 }
 
-async function publishServerReadyWithRetry({
-    nerv,
-    payload,
-    highLevelNerv,
-    actorRole,
-    actionCode,
-    config,
-}) {
+async function publishServerReadyWithRetry({ nerv, payload, highLevelNerv, actorRole, actionCode, config }) {
     let attempt = 0;
     const maxAttempts = Math.max(2, Math.min(3, readPositiveInt(config?.BOOT_RETRY_MAX_ATTEMPTS, 3)));
     const baseDelayMs = readPositiveInt(config?.BOOT_RETRY_BASE_MS, 1000);
@@ -136,7 +131,6 @@ async function publishServerReadyWithRetry({
 
     return { attempt, maxAttempts };
 }
-
 
 /* ==========================================================================
    BOOTSTRAP — SEQUÊNCIA SOBERANA DE INICIALIZAÇÃO
@@ -819,7 +813,6 @@ async function bootstrap(options = {}) {
         throw err;
     }
 }
-
 
 /* ==========================================================================
    ENTRYPOINT CONTROL — COMPATIBILITY LAYER

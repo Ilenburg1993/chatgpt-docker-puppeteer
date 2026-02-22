@@ -22,6 +22,7 @@ const colors = {
 // ============================================================================
 // Parser de .env
 // ============================================================================
+/** Função exportada: parseEnvFile. */
 function parseEnvFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const env = {};
@@ -43,6 +44,7 @@ function parseEnvFile(filePath) {
 // ============================================================================
 // Validador
 // ============================================================================
+/** Classe exportada: EnvValidator. */
 class EnvValidator {
     constructor(schemaPath) {
         this.schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
@@ -224,7 +226,9 @@ class EnvValidator {
             const legacyRequired = !upstreamsJson;
 
             if (legacyRequired && !String(envData.MCP_UPSTREAM_URL || '').trim()) {
-                this.errors.push('CONSTRAINT: MCP_UPSTREAM_ENABLED=true requer MCP_UPSTREAM_URL (quando MCP_UPSTREAMS_JSON está vazio)');
+                this.errors.push(
+                    'CONSTRAINT: MCP_UPSTREAM_ENABLED=true requer MCP_UPSTREAM_URL (quando MCP_UPSTREAMS_JSON está vazio)'
+                );
                 console.log(`  ${colors.red}✗${colors.reset} MCP upstream (legacy): FALHOU (falta: MCP_UPSTREAM_URL)`);
             } else {
                 console.log(`  ${colors.green}✓${colors.reset} MCP upstream: OK`);
@@ -236,7 +240,9 @@ class EnvValidator {
         if (String(envData.MCP_GITHUB_PROXY_ENABLED || '').toLowerCase() === 'true') {
             const token = String(envData.GITHUB_PERSONAL_ACCESS_TOKEN || '').trim();
             if (!token) {
-                this.warnings.push('CONSTRAINT: MCP_GITHUB_PROXY_ENABLED=true mas GITHUB_PERSONAL_ACCESS_TOKEN está vazio (upstream GitHub ficará not-ready)');
+                this.warnings.push(
+                    'CONSTRAINT: MCP_GITHUB_PROXY_ENABLED=true mas GITHUB_PERSONAL_ACCESS_TOKEN está vazio (upstream GitHub ficará not-ready)'
+                );
                 console.log(`  ${colors.yellow}!${colors.reset} GitHub proxy: WARNING (token ausente)`);
             } else {
                 console.log(`  ${colors.green}✓${colors.reset} GitHub proxy: OK`);

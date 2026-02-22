@@ -9,6 +9,7 @@ const LOCK_DIR = ROOT;
 // TEST 1: Lock Manager - Two-Phase Commit
 // ============================================================================
 
+/** Função exportada: testLockTwoPhaseCommit. */
 async function testLockTwoPhaseCommit() {
     console.log('\n=== TEST 1: Lock Manager - Two-Phase Commit ===');
 
@@ -68,6 +69,7 @@ async function testLockTwoPhaseCommit() {
 // TEST 2: Lock Manager - Concorrência Extrema
 // ============================================================================
 
+/** Função exportada: testLockConcurrency. */
 async function testLockConcurrency() {
     console.log('\n=== TEST 2: Lock Manager - Concorrência (10 tentativas simultâneas) ===');
 
@@ -124,6 +126,7 @@ async function testLockConcurrency() {
 // TEST 3: Lock Manager - Validação de Temp Files
 // ============================================================================
 
+/** Função exportada: testLockNoTempOrphans. */
 async function testLockNoTempOrphans() {
     console.log('\n=== TEST 3: Lock Manager - Sem arquivos .tmp órfãos ===');
 
@@ -164,6 +167,7 @@ async function testLockNoTempOrphans() {
 // TEST 4: BrowserPool - Promise Memoization (Mock)
 // ============================================================================
 
+/** Função exportada: testBrowserPoolMemoization. */
 async function testBrowserPoolMemoization() {
     console.log('\n=== TEST 4: BrowserPool - Promise Memoization ===');
 
@@ -245,6 +249,7 @@ async function testBrowserPoolMemoization() {
 // TEST 5: Validação de Integração
 // ============================================================================
 
+/** Função exportada: testIntegrationValidation. */
 async function testIntegrationValidation() {
     console.log('\n=== TEST 5: Validação de Integração ===');
 
@@ -318,6 +323,7 @@ async function testIntegrationValidation() {
 // EXECUTOR PRINCIPAL
 // ============================================================================
 
+/** Função exportada: runAllTests. */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
     console.log('║  Suite de Testes - Correções P1 (Critical Cases Analysis)   ║');
@@ -328,7 +334,7 @@ async function runAllTests() {
         { name: 'Concorrência Extrema', fn: testLockConcurrency },
         { name: 'Cleanup Temp Files', fn: testLockNoTempOrphans },
         { name: 'Promise Memoization', fn: testBrowserPoolMemoization },
-        { name: 'Validação Integração', fn: testIntegrationValidation }
+        { name: 'Validação Integração', fn: testIntegrationValidation },
     ];
 
     const results = [];
@@ -376,4 +382,11 @@ if (import.meta.filename === process.argv[1]) {
     });
 }
 
-export { testLockTwoPhaseCommit, testLockConcurrency, testLockNoTempOrphans, testBrowserPoolMemoization, testIntegrationValidation, runAllTests };
+export {
+    testLockTwoPhaseCommit,
+    testLockConcurrency,
+    testLockNoTempOrphans,
+    testBrowserPoolMemoization,
+    testIntegrationValidation,
+    runAllTests,
+};

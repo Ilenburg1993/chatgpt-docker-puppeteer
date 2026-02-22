@@ -1,7 +1,7 @@
 import config from '../config.json' with { type: 'json' };
 
 console.log('🔍 VERIFICAÇÃO DE CONFIGURAÇÃO');
-console.log('=' .repeat(70));
+console.log('='.repeat(70));
 console.log('');
 
 console.log('📄 config.json (Configuração Runtime - Única Fonte de Verdade)');

@@ -35,7 +35,7 @@ export function buildSchema(embeddingDim) {
         new Field('content_sha256', new Utf8(), false),
         new Field('embedding_model', new Utf8(), false),
         new Field('vector', new FixedSizeList(embeddingDim, new Field('item', new Float32(), true)), false),
-        new Field('indexed_at', new Int64(), false)
+        new Field('indexed_at', new Int64(), false),
     ]);
 }
 
@@ -101,7 +101,9 @@ export async function addChunks(table, rows, { batchSize = 32 } = {}) {
                     await table.add(fallbackBatch);
                     if (!retriedWithoutContentClass) {
                         retriedWithoutContentClass = true;
-                        console.warn('[RAG] Table schema without content_class detected; writing fallback rows (rebuild recommended).');
+                        console.warn(
+                            '[RAG] Table schema without content_class detected; writing fallback rows (rebuild recommended).'
+                        );
                     }
                 }
                 total += batch.length;
@@ -117,11 +119,7 @@ export async function getChunkById(table, chunkId) {
     return await withTimeout(
         async () => {
             const safe = String(chunkId || '').replace(/'/g, "''");
-            const rows = await table
-                .query()
-                .where(`chunk_id = '${safe}'`)
-                .limit(1)
-                .toArray();
+            const rows = await table.query().where(`chunk_id = '${safe}'`).limit(1).toArray();
             if (!rows.length) return null;
             return formatResult(rows[0]);
         },
@@ -155,11 +153,13 @@ export async function getChunkStats(table) {
                 chunk_count: chunkCount,
                 has_rows: Boolean(sampleRow),
                 sample_has_v2_fields: sampleRow
-                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every((k) => Object.prototype.hasOwnProperty.call(sampleRow, k))
+                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every(k =>
+                          Object.prototype.hasOwnProperty.call(sampleRow, k)
+                      )
                     : null,
                 sample_has_content_class: sampleRow
                     ? Object.prototype.hasOwnProperty.call(sampleRow, 'content_class')
-                    : null
+                    : null,
             };
         },
         15000,
@@ -211,7 +211,7 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter((r) => Array.isArray(r.tags) && [...required].every((t) => r.tags.includes(t)));
+                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
             }
 
             filtered.sort((a, b) => {
@@ -247,13 +247,10 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
                 rerankWeights,
                 intentScope = 'code-first',
                 mmr: shouldMMR = true,
-                mmrLambda = 0.7
+                mmrLambda = 0.7,
             } = options;
 
-            let q = table
-                .query()
-                .fullTextSearch(textQuery)
-                .nearestTo(vector);
+            let q = table.query().fullTextSearch(textQuery).nearestTo(vector);
 
             if (distanceRange) {
                 const [min, max] = Array.isArray(distanceRange)
@@ -273,7 +270,7 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter((r) => Array.isArray(r.tags) && [...required].every((t) => r.tags.includes(t)));
+                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
             }
 
             filtered.sort((a, b) => {
@@ -296,7 +293,7 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
                 console.log(`[RAG] Applying MMR for diversity (lambda=${mmrLambda})...`);
                 results = maximalMarginalRelevance(results, {
                     lambda: mmrLambda,
-                    topK
+                    topK,
                 });
             } else {
                 results = results.slice(0, topK);
@@ -327,9 +324,7 @@ export async function lexicalSearch(table, textQuery, options = {}) {
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter((r) =>
-                    Array.isArray(r.tags) && [...required].every((t) => r.tags.includes(t))
-                );
+                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
             }
 
             filtered.sort((a, b) => {
@@ -341,9 +336,9 @@ export async function lexicalSearch(table, textQuery, options = {}) {
                 return String(a.chunk_id).localeCompare(String(b.chunk_id));
             });
 
-            return filtered.slice(0, topK).map((row) => ({
+            return filtered.slice(0, topK).map(row => ({
                 ...formatResult(row),
-                score: typeof row._score === 'number' ? row._score : 0
+                score: typeof row._score === 'number' ? row._score : 0,
             }));
         },
         45000,
@@ -379,7 +374,7 @@ function formatResult(row) {
         embedding_model: row.embedding_model,
         indexed_at: indexedAtMs,
         indexed_at_iso: indexedAtMs ? toIsoSecond(indexedAtMs) : null,
-        indexed_at_local: indexedAtMs ? toLocalSecond(indexedAtMs) : null
+        indexed_at_local: indexedAtMs ? toLocalSecond(indexedAtMs) : null,
     };
 }
 
@@ -400,6 +395,6 @@ function toIsoSecond(epochMs) {
 
 function toLocalSecond(epochMs) {
     const d = new Date(epochMs);
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }

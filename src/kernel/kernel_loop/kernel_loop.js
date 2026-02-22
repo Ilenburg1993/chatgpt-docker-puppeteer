@@ -25,12 +25,13 @@
    Estados técnicos do KernelLoop
 =========================== */
 
+/** Constante/valor exportado: KernelLoopState. */
 const KernelLoopState = Object.freeze({
     INACTIVE: 'INACTIVE',
     ACTIVE: 'ACTIVE',
     PAUSED: 'PAUSED', // ✅ Novo estado: Pausado por Circuit Breaker
     DEGRADED: 'DEGRADED',
-    STOPPING: 'STOPPING'
+    STOPPING: 'STOPPING',
 });
 
 import { DecisionKind } from '../execution_engine/execution_engine.js';

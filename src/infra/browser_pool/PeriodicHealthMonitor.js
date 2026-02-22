@@ -115,6 +115,9 @@ const MONITOR_EVENTS = {
    PeriodicHealthMonitor Class
 ========================================================================== */
 
+/**
+ * Monitor periódico de saúde do BrowserPool baseado em CDP (sem acesso a processo).
+ */
 class PeriodicHealthMonitor extends EventEmitter {
     /**
      * Creates monitor instance.

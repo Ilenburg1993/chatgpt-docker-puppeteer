@@ -8,7 +8,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
                 taskId: 'task-001',
                 target: 'gemini',
                 environment: 'production',
-                isolado: true
+                isolado: true,
             };
 
             assert.ok(contexto.taskId, 'Contexto deve ter taskId');
@@ -30,8 +30,8 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
                 env: {
                     NODE_ENV: 'test',
                     TARGET: 'gemini',
-                    TIMEOUT: '30000'
-                }
+                    TIMEOUT: '30000',
+                },
             };
 
             assert.strictEqual(runtime.env.NODE_ENV, 'test');
@@ -51,7 +51,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const DEFAULT_TIMEOUT = 60000;
 
             const runtime = {
-                timeout: DEFAULT_TIMEOUT
+                timeout: DEFAULT_TIMEOUT,
             };
 
             assert.strictEqual(runtime.timeout, 60000);
@@ -59,7 +59,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
 
         it('deve aceitar timeout customizado', () => {
             const runtime = {
-                timeout: 120000 // 2 minutos
+                timeout: 120000, // 2 minutos
             };
 
             assert.strictEqual(runtime.timeout, 120000);
@@ -87,8 +87,8 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const runtime = {
                 logger: {
                     log: () => {},
-                    error: () => {}
-                }
+                    error: () => {},
+                },
             };
 
             assert.ok(typeof runtime.logger.log === 'function');
@@ -98,8 +98,8 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const runtime = {
                 browser: {
                     navigate: () => {},
-                    click: () => {}
-                }
+                    click: () => {},
+                },
             };
 
             assert.ok(typeof runtime.browser.navigate === 'function');
@@ -109,8 +109,8 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const runtime = {
                 storage: {
                     save: () => {},
-                    load: () => {}
-                }
+                    load: () => {},
+                },
             };
 
             assert.ok(typeof runtime.storage.save === 'function');
@@ -120,7 +120,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
     describe('5. Estado do Runtime', () => {
         it('deve rastrear estado atual', () => {
             const runtime = {
-                state: 'INITIALIZING'
+                state: 'INITIALIZING',
             };
 
             assert.strictEqual(runtime.state, 'INITIALIZING');
@@ -153,7 +153,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const runtime = {
                 cleanup: () => {
                     cleanupExecutado = true;
-                }
+                },
             };
 
             runtime.cleanup();
@@ -166,8 +166,8 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
         it('deve registrar tempo de inicialização', () => {
             const runtime = {
                 metrics: {
-                    initTime: 150 // ms
-                }
+                    initTime: 150, // ms
+                },
             };
 
             assert.strictEqual(runtime.metrics.initTime, 150);
@@ -176,8 +176,8 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
         it('deve registrar tempo de execução', () => {
             const runtime = {
                 metrics: {
-                    executionTime: 3500 // ms
-                }
+                    executionTime: 3500, // ms
+                },
             };
 
             assert.ok(runtime.metrics.executionTime > 0);
@@ -186,7 +186,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
         it('deve calcular overhead do runtime', () => {
             const metrics = {
                 totalTime: 5000,
-                executionTime: 3500
+                executionTime: 3500,
             };
 
             const overhead = metrics.totalTime - metrics.executionTime;
@@ -215,7 +215,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const runtime = {
                 onError: error => {
                     recoveryExecutado = true;
-                }
+                },
             };
 
             runtime.onError(new Error('test'));
@@ -241,7 +241,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const runtimes = [
                 { id: 'rt-1', taskId: 'task-001' },
                 { id: 'rt-2', taskId: 'task-002' },
-                { id: 'rt-3', taskId: 'task-003' }
+                { id: 'rt-3', taskId: 'task-003' },
             ];
 
             assert.strictEqual(runtimes.length, 3);

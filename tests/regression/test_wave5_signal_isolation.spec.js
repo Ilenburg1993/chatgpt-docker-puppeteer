@@ -50,7 +50,7 @@ test('wave5: chrome proxy installs and removes signal handlers deterministically
             PROXY_BIND: '127.0.0.1',
             ALLOWED_ORIGINS: ['http://localhost:3000'],
             AUTO_HANDLE_SIGNALS: true,
-            LOG_LEVEL: 'ERROR'
+            LOG_LEVEL: 'ERROR',
         });
 
         await service.start();

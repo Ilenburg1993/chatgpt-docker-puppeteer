@@ -2,6 +2,7 @@
 import path from 'node:path';
 
 // Cálculo da Raiz do Projeto (Agnóstico ao local de execução)
+/** Constante/valor exportado: ROOT. */
 const ROOT = path.normalize(path.join(import.meta.dirname, '..', '..', '..'));
 
 /**
@@ -14,7 +15,7 @@ const DIRS = {
     ARTIFACTS: path.join(ROOT, 'artifacts'),
     LOGS: path.join(ROOT, 'logs'),
     CORRUPT: path.join(ROOT, 'fila', 'corrupted'),
-    REPORTS: path.join(ROOT, 'logs', 'crash_reports')
+    REPORTS: path.join(ROOT, 'logs', 'crash_reports'),
 };
 
 /**
@@ -27,7 +28,7 @@ const FILES = {
     // DEPRECATED: legacy IPC discovery file name (assembled to avoid literal scanning).
     STATE: path.join(ROOT, 'estado' + '.json'),
     IDENTITY: path.join(ROOT, 'src/infra/storage/robot_identity.json'),
-    VOCAB: path.join(ROOT, 'vocabulary.json')
+    VOCAB: path.join(ROOT, 'vocabulary.json'),
 };
 
 /**
@@ -35,7 +36,7 @@ const FILES = {
  */
 const LIMITS = {
     MAX_JSON_SIZE: 1024 * 1024, // 1MB para proteção de memória
-    MAX_LOG_SIZE: 5 * 1024 * 1024 // 5MB para rotação
+    MAX_LOG_SIZE: 5 * 1024 * 1024, // 5MB para rotação
 };
 
 /**

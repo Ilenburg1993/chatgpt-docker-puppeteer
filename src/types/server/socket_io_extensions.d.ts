@@ -9,10 +9,10 @@
 export {};
 
 declare module 'socket.io' {
-  interface Socket {
-    authorized?: boolean;
-    robot_id?: string;
-    instance_id?: string;
-    [key: string]: unknown;
-  }
+    interface Socket {
+        authorized?: boolean;
+        robot_id?: string;
+        instance_id?: string;
+        [key: string]: unknown;
+    }
 }

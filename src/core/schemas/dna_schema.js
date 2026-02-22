@@ -14,7 +14,7 @@ const SelectorProtocolSchema = z.object({
     framePath: z.string().nullable().default(null),
     // [FIX 1.5] Sincronia de Protocolo: timestamp deve ser Unix Epoch em ms
     // Alinhado com Date.now() usado no Driver e no Stabilizer para evitar dessincronia.
-    timestamp: z.number().optional()
+    timestamp: z.number().optional(),
 });
 
 /**
@@ -29,7 +29,7 @@ const DomainRulesSchema = z
                 z.string(), // Key: nome do seletor (input_box, send_button, etc)
                 z.union([
                     z.array(z.string()), // Legado: Lista de seletores em string
-                    SelectorProtocolSchema // Moderno: Protocolo estruturado SADI V10+
+                    SelectorProtocolSchema, // Moderno: Protocolo estruturado SADI V10+
                 ])
             )
             .default({}),
@@ -39,9 +39,9 @@ const DomainRulesSchema = z
             .object({
                 idle_sleep_ms: z.number().optional(),
                 stability_threshold: z.number().optional(),
-                typing_speed_factor: z.number().optional()
+                typing_speed_factor: z.number().optional(),
             })
-            .default({})
+            .default({}),
     })
     .passthrough(); // Permite evolução genética para novas propriedades de IA
 
@@ -55,14 +55,14 @@ const DnaSchema = z
                 version: z.number().default(1),
                 last_updated: TIMESTAMP_SCHEMA,
                 updated_by: z.string().default('system_init'),
-                evolution_count: z.number().nonnegative().default(0)
+                evolution_count: z.number().nonnegative().default(0),
             })
             .optional()
             .default({
                 version: 1,
                 last_updated: new Date().toISOString(),
                 updated_by: 'system_init',
-                evolution_count: 0
+                evolution_count: 0,
             }),
 
         // Mapeamento de Domínio -> Regras (ex: { "chatgpt.com": { ... } })
@@ -74,9 +74,9 @@ const DnaSchema = z
         global_selectors: z.record(z.string(), z.array(z.string())).default(
             /** @type {any} */ ({
                 input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
-                send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
+                send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"],
             })
-        )
+        ),
     })
     .passthrough();
 

@@ -70,8 +70,11 @@ const ARCH_VIOLATION_MESSAGE =
  */
 const isLaunchDisabled = process.env.PUPPETEER_LOCAL_LAUNCH_DISABLED === 'true';
 
+/** Constante/valor exportado: active. */
 let active = false;
+/** Constante/valor exportado: guarded. */
 let guarded = false;
+/** Constante/valor exportado: originalLaunch. */
 let originalLaunch = null;
 
 if (isLaunchDisabled) {
@@ -124,7 +127,7 @@ if (isLaunchDisabled) {
         try {
             Object.defineProperty(puppeteer, 'launch', {
                 configurable: false,
-                writable: false
+                writable: false,
             });
         } catch (_) {
             // Ambiente não permite redefinir property — ignora

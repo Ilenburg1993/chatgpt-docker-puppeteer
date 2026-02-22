@@ -72,18 +72,18 @@ function createHealth({ telemetry, thresholds = {} }) {
         transport: {
             connected: null,
             reconnecting: false,
-            lastError: null
+            lastError: null,
         },
 
         buffers: {
             inbound: 0,
-            outbound: 0
+            outbound: 0,
         },
 
         activity: {
             lastEmission: null,
-            lastReception: null
-        }
+            lastReception: null,
+        },
     };
 
     const listeners = new Set();
@@ -97,7 +97,7 @@ function createHealth({ telemetry, thresholds = {} }) {
         state.timestamp = now();
 
         telemetry.emit('nerv:health:update', {
-            snapshot: state
+            snapshot: state,
         });
 
         for (const handler of listeners) {
@@ -117,7 +117,7 @@ function createHealth({ telemetry, thresholds = {} }) {
             telemetry.emit('nerv:health:anomaly', {
                 type: 'outbound_buffer_pressure',
                 value: state.buffers.outbound,
-                limit: thresholds.maxOutboundBuffer
+                limit: thresholds.maxOutboundBuffer,
             });
         }
 
@@ -125,7 +125,7 @@ function createHealth({ telemetry, thresholds = {} }) {
             telemetry.emit('nerv:health:anomaly', {
                 type: 'inbound_buffer_pressure',
                 value: state.buffers.inbound,
-                limit: thresholds.maxInboundBuffer
+                limit: thresholds.maxInboundBuffer,
             });
         }
     }
@@ -148,8 +148,8 @@ function createHealth({ telemetry, thresholds = {} }) {
                     transport: {
                         ...state.transport,
                         connected: true,
-                        lastError: null
-                    }
+                        lastError: null,
+                    },
                 });
                 break;
 
@@ -157,8 +157,8 @@ function createHealth({ telemetry, thresholds = {} }) {
                 update({
                     transport: {
                         ...state.transport,
-                        connected: false
-                    }
+                        connected: false,
+                    },
                 });
                 break;
 
@@ -166,8 +166,8 @@ function createHealth({ telemetry, thresholds = {} }) {
                 update({
                     transport: {
                         ...state.transport,
-                        lastError: data.message || 'erro físico'
-                    }
+                        lastError: data.message || 'erro físico',
+                    },
                 });
                 break;
 
@@ -175,8 +175,8 @@ function createHealth({ telemetry, thresholds = {} }) {
                 update({
                     buffers: {
                         inbound: typeof data.inbound === 'number' ? data.inbound : state.buffers.inbound,
-                        outbound: typeof data.outbound === 'number' ? data.outbound : state.buffers.outbound
-                    }
+                        outbound: typeof data.outbound === 'number' ? data.outbound : state.buffers.outbound,
+                    },
                 });
                 checkThresholds();
                 break;
@@ -185,8 +185,8 @@ function createHealth({ telemetry, thresholds = {} }) {
                 update({
                     activity: {
                         ...state.activity,
-                        lastEmission: now()
-                    }
+                        lastEmission: now(),
+                    },
                 });
                 break;
 
@@ -194,8 +194,8 @@ function createHealth({ telemetry, thresholds = {} }) {
                 update({
                     activity: {
                         ...state.activity,
-                        lastReception: now()
-                    }
+                        lastReception: now(),
+                    },
                 });
                 break;
 
@@ -235,7 +235,7 @@ function createHealth({ telemetry, thresholds = {} }) {
     return Object.freeze({
         report,
         getStatus,
-        onChange
+        onChange,
     });
 }
 

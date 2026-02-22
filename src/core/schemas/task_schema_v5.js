@@ -25,7 +25,7 @@ const MetaSchemaV5 = z.object({
     created_at: TIMESTAMP_SCHEMA,
     priority: PRIORITY_SCHEMA,
     source: SOURCE_SCHEMA,
-    tags: z.array(z.string()).default([])
+    tags: z.array(z.string()).default([]),
 });
 
 /**
@@ -34,31 +34,39 @@ const MetaSchemaV5 = z.object({
  * Captura contexto completo de execução: driver usado, ambiente, retry telemetry.
  * Preenchido automaticamente pelo BaseDriver e ExecutionEngine.
  */
-const ExecutionSchemaV5 = z.object({
-    // Driver context
-    driver: z.object({
-        type: z.string().default('Unknown'),                                // 'ChatGPTDriver', 'GeminiDriver'
-        version: z.string().default('1.0'),                                 // Driver version (ex: '2.0')
-        connection_mode: z.enum(['launcher', 'external', 'auto']).default('auto'),
-        browser_pool_health: z.enum(['stable', 'degraded', 'circuit_open', 'unknown']).default('unknown')
-    }).default({}),
+const ExecutionSchemaV5 = z
+    .object({
+        // Driver context
+        driver: z
+            .object({
+                type: z.string().default('Unknown'), // 'ChatGPTDriver', 'GeminiDriver'
+                version: z.string().default('1.0'), // Driver version (ex: '2.0')
+                connection_mode: z.enum(['launcher', 'external', 'auto']).default('auto'),
+                browser_pool_health: z.enum(['stable', 'degraded', 'circuit_open', 'unknown']).default('unknown'),
+            })
+            .default({}),
 
-    // Environment context
-    environment: z.object({
-        platform: z.string().default(process.platform),                    // 'linux', 'win32', 'darwin'
-        node_version: z.string().default(process.version),                 // 'v24.0.0'
-        container: z.boolean().default(false),                             // true se Docker
-        chrome_version: z.string().default('unknown')                      // '120.0.6099.109'
-    }).default({}),
+        // Environment context
+        environment: z
+            .object({
+                platform: z.string().default(process.platform), // 'linux', 'win32', 'darwin'
+                node_version: z.string().default(process.version), // 'v24.0.0'
+                container: z.boolean().default(false), // true se Docker
+                chrome_version: z.string().default('unknown'), // '120.0.6099.109'
+            })
+            .default({}),
 
-    // Retry telemetry (agregado Driver + Kernel)
-    retry: z.object({
-        tactical_attempts: z.number().int().nonnegative().default(0),     // Driver retry (operações browser)
-        strategic_attempts: z.number().int().nonnegative().default(0),    // Kernel retry (reagendamento task)
-        errors_recovered: z.array(z.string()).default([]),                // Lista de erros recuperados
-        total_backoff_ms: z.number().nonnegative().default(0)             // Tempo total aguardado entre retries
-    }).default({})
-}).default({});
+        // Retry telemetry (agregado Driver + Kernel)
+        retry: z
+            .object({
+                tactical_attempts: z.number().int().nonnegative().default(0), // Driver retry (operações browser)
+                strategic_attempts: z.number().int().nonnegative().default(0), // Kernel retry (reagendamento task)
+                errors_recovered: z.array(z.string()).default([]), // Lista de erros recuperados
+                total_backoff_ms: z.number().nonnegative().default(0), // Tempo total aguardado entre retries
+            })
+            .default({}),
+    })
+    .default({});
 
 /**
  * 1.6 MissionSchemaV5: Mission System Context (NOVO - Unified V5)
@@ -66,14 +74,16 @@ const ExecutionSchemaV5 = z.object({
  * Suporte completo para Mission System: agrupa tasks em workflows,
  * permite context flow entre steps, checkpoint recovery.
  */
-const MissionSchemaV5 = z.object({
-    mission_id: z.string().nullable().default(null),                       // ID da missão
-    step_id: z.string().nullable().default(null),                          // ID do step no workflow
-    step_index: z.number().int().nonnegative().default(0),                 // Posição no workflow (0-based)
-    step_dependencies: z.array(z.string()).default([]),                    // Steps que devem completar antes
-    mission_context: z.object({}).passthrough().default({}),               // Contexto acumulado (outputs de steps anteriores)
-    is_checkpoint: z.boolean().default(false)                              // Step é checkpoint para recovery?
-}).default({});
+const MissionSchemaV5 = z
+    .object({
+        mission_id: z.string().nullable().default(null), // ID da missão
+        step_id: z.string().nullable().default(null), // ID do step no workflow
+        step_index: z.number().int().nonnegative().default(0), // Posição no workflow (0-based)
+        step_dependencies: z.array(z.string()).default([]), // Steps que devem completar antes
+        mission_context: z.object({}).passthrough().default({}), // Contexto acumulado (outputs de steps anteriores)
+        is_checkpoint: z.boolean().default(false), // Step é checkpoint para recovery?
+    })
+    .default({});
 
 /**
  * 2. SpecSchema V5: A Intenção + Estratégias de Execução.
@@ -85,7 +95,7 @@ const SpecSchemaV5 = z.object({
     payload: z.object({
         system_message: CLEAN_STRING_SCHEMA.default(''),
         user_message: CLEAN_STRING_SCHEMA,
-        context: z.any().optional() // Pode conter objetos complexos (previous results, external data)
+        context: z.any().optional(), // Pode conter objetos complexos (previous results, external data)
     }),
 
     parameters: z
@@ -95,7 +105,7 @@ const SpecSchemaV5 = z.object({
             top_p: z.number().min(0).max(1).optional(),
             frequency_penalty: z.number().min(-2).max(2).optional(),
             presence_penalty: z.number().min(-2).max(2).optional(),
-            stop_sequences: z.array(z.string()).default([])
+            stop_sequences: z.array(z.string()).default([]),
         })
         .default({}),
 
@@ -110,7 +120,7 @@ const SpecSchemaV5 = z.object({
                     'ITERATIVE', // Executa → Valida → Retry com feedback (até max_iterations)
                     'MULTI_STEP', // Executa workflow com múltiplos steps
                     'TREE_OF_THOUGHT', // Gera N branches, avalia, escolhe melhor
-                    'CHAIN_OF_THOUGHT' // Reasoning explícito step-by-step
+                    'CHAIN_OF_THOUGHT', // Reasoning explícito step-by-step
                 ])
                 .default('SINGLE_SHOT'),
 
@@ -122,10 +132,10 @@ const SpecSchemaV5 = z.object({
                         .object({
                             validators: z.array(z.string()).default([]), // ['regex', 'schema', 'llm_judge']
                             min_quality_score: z.number().min(0).max(100).default(70),
-                            custom_validator: z.any().optional() // Função customizada
+                            custom_validator: z.any().optional(), // Função customizada
                         })
                         .optional(),
-                    convergence_detection: z.boolean().default(true) // Detecta quando output estabiliza
+                    convergence_detection: z.boolean().default(true), // Detecta quando output estabiliza
                 })
                 .optional(),
 
@@ -142,15 +152,15 @@ const SpecSchemaV5 = z.object({
                                 'validate', // Valida output de step anterior
                                 'branch', // Decisão condicional
                                 'loop', // Repete step N vezes
-                                'spawn_subtask' // Cria nova task (fork)
+                                'spawn_subtask', // Cria nova task (fork)
                             ]),
                             config: z.any(), // Step-specific config
                             dependencies: z.array(z.string()).default([]), // Step IDs que devem completar primeiro
-                            on_failure: z.enum(['retry', 'skip', 'abort']).default('abort')
+                            on_failure: z.enum(['retry', 'skip', 'abort']).default('abort'),
                         })
                     ),
                     max_subtasks: z.number().int().positive().default(50),
-                    subtask_concurrency: z.number().int().positive().default(3)
+                    subtask_concurrency: z.number().int().positive().default(3),
                 })
                 .optional(),
 
@@ -159,9 +169,9 @@ const SpecSchemaV5 = z.object({
                 .object({
                     num_branches: z.number().int().min(2).max(10).default(3),
                     evaluation_criteria: z.string(), // Critérios para avaliar cada branch
-                    selection_strategy: z.enum(['best', 'combine', 'vote']).default('best')
+                    selection_strategy: z.enum(['best', 'combine', 'vote']).default('best'),
                 })
-                .optional()
+                .optional(),
         })
         .default({ strategy: 'SINGLE_SHOT' }),
 
@@ -179,9 +189,9 @@ const SpecSchemaV5 = z.object({
                             'length', // Valida min/max length
                             'format', // Valida formato (JSON, markdown, etc)
                             'llm_judge', // LLM-as-judge (qualidade semântica)
-                            'custom' // Função customizada
+                            'custom', // Função customizada
                         ]),
-                        config: z.any() // Validator-specific config
+                        config: z.any(), // Validator-specific config
                     })
                 )
                 .default([]),
@@ -191,7 +201,7 @@ const SpecSchemaV5 = z.object({
             min_length: z.number().default(10),
             required_format: z.enum(['text', 'json', 'markdown', 'code']).default('text'),
             required_pattern: z.string().optional(),
-            forbidden_terms: z.array(z.string()).default([])
+            forbidden_terms: z.array(z.string()).default([]),
         })
         .default({}),
 
@@ -203,7 +213,7 @@ const SpecSchemaV5 = z.object({
             inject_previous_results: z.boolean().default(false), // Injeta outputs de steps anteriores
             context_window_strategy: z.enum(['full', 'chunked', 'summarized']).default('full'),
             max_context_tokens: z.number().int().positive().optional(),
-            memory_keys: z.array(z.string()).default([]) // Keys para buscar de long-term memory
+            memory_keys: z.array(z.string()).default([]), // Keys para buscar de long-term memory
         })
         .optional(),
 
@@ -212,9 +222,9 @@ const SpecSchemaV5 = z.object({
         .object({
             reset_context: z.boolean().default(false),
             require_history: z.boolean().default(true),
-            output_format: z.enum(['markdown', 'json', 'raw']).default('markdown')
+            output_format: z.enum(['markdown', 'json', 'raw']).default('markdown'),
         })
-        .default({})
+        .default({}),
 });
 
 /**
@@ -234,9 +244,9 @@ const PolicySchemaV5 = z.object({
         .object({
             max_execution_time_ms: z.number().int().positive().optional(), // Timeout total do workflow
             budget_limit_usd: z.number().positive().optional(), // Limite de custo
-            quality_threshold: z.number().min(0).max(100).optional() // Score mínimo para aprovar
+            quality_threshold: z.number().min(0).max(100).optional(), // Score mínimo para aprovar
         })
-        .optional()
+        .optional(),
 });
 
 /**
@@ -358,18 +368,18 @@ const StateSchemaV5 = z.object({
                 .default([]),
 
             // NOVO V5: Summary (agregações úteis para análise rápida)
-	            summary: z
-	                .object({
-	                    total_events: z.number().int().default(0),
-	                    errors_count: z.number().int().default(0),
-	                    warnings_count: z.number().int().default(0),
-	                    retry_count: z.number().int().default(0),
-	                    // Zod v4: record(keyType, valueType)
-		                    phase_durations: z.record(z.string(), z.number()).default(/** @type {any} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
-	                })
-	                .default({}),
-	        })
-	        .default({ events: [], summary: {} }),
+            summary: z
+                .object({
+                    total_events: z.number().int().default(0),
+                    errors_count: z.number().int().default(0),
+                    warnings_count: z.number().int().default(0),
+                    retry_count: z.number().int().default(0),
+                    // Zod v4: record(keyType, valueType)
+                    phase_durations: z.record(z.string(), z.number()).default(/** @type {any} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
+                })
+                .default({}),
+        })
+        .default({ events: [], summary: {} }),
 });
 
 /**
@@ -499,4 +509,13 @@ const TaskSchemaV5 = z
     })
     .passthrough();
 
-export { TaskSchemaV5, MetaSchemaV5, SpecSchemaV5, PolicySchemaV5, ExecutionSchemaV5, MissionSchemaV5, StateSchemaV5, ResultSchemaV5 };
+export {
+    TaskSchemaV5,
+    MetaSchemaV5,
+    SpecSchemaV5,
+    PolicySchemaV5,
+    ExecutionSchemaV5,
+    MissionSchemaV5,
+    StateSchemaV5,
+    ResultSchemaV5,
+};

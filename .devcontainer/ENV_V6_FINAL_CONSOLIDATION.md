@@ -1,8 +1,7 @@
 # ENV System v6.0 - Consolidação Final
 
-**Documento**: ENV_V6_FINAL_CONSOLIDATION.md
-**Data**: 2026-02-03
-**Status**: ✅ FASE 1, 2 e 3 COMPLETAS
+**Documento**: ENV_V6_FINAL_CONSOLIDATION.md **Data**: 2026-02-03 **Status**: ✅ FASE 1, 2 e 3
+COMPLETAS
 
 ---
 
@@ -19,6 +18,7 @@ Sistema de variáveis de ambiente **completamente reestruturado** e **sincroniza
 ### ✅ Sincronização Completa
 
 Todos os ENVs estão **sincronizados e compatíveis** entre:
+
 - `.devcontainer/devcontainer.json` v5.4
 - `.devcontainer/Dockerfile` (ENVs padrão atualizados)
 - `.devcontainer/scripts/post-create.sh` v6.0
@@ -34,14 +34,16 @@ Todos os ENVs estão **sincronizados e compatíveis** entre:
 ### 📄 Novos Arquivos (3)
 
 #### 1.1. `.env.schema.json`
-**Propósito**: Schema de validação JSON com tipos, ranges, dependências
-**Conteúdo**:
+
+**Propósito**: Schema de validação JSON com tipos, ranges, dependências **Conteúdo**:
+
 - 6 categorias: STRUCTURAL, INFRASTRUCTURE, OPERATIONAL, TUNING, FEATURE_FLAGS, DEBUG
 - 50+ propriedades com validação de tipo
 - Constraints semânticos (unique_ports, production_constraints, browser_mode_dependencies)
 - Definições reutilizáveis (port, ip_address, hostname, milliseconds)
 
 **Exemplo**:
+
 ```json
 {
   "categories": {
@@ -60,8 +62,9 @@ Todos os ENVs estão **sincronizados e compatíveis** entre:
 ```
 
 #### 1.2. `scripts/validate-env.js`
-**Propósito**: Script de validação Node.js que lê .env.schema.json
-**Funcionalidades**:
+
+**Propósito**: Script de validação Node.js que lê .env.schema.json **Funcionalidades**:
+
 - Parser de .env files (ignora comentários)
 - Validação por categoria (STRUCTURAL → INFRASTRUCTURE → OPERATIONAL → FLAGS)
 - Validação de tipos (integer, string, boolean, enum, pattern)
@@ -70,6 +73,7 @@ Todos os ENVs estão **sincronizados e compatíveis** entre:
 - Exit code 0 (sucesso) ou 1 (erro)
 
 **Uso**:
+
 ```bash
 node scripts/validate-env.js --file .env.development
 node scripts/validate-env.js --all
@@ -77,20 +81,22 @@ make validate-env
 ```
 
 #### 1.3. `.devcontainer/ENV_ANALYSIS_V6.md`
-**Propósito**: Análise completa do sistema ENV (8 seções, 600+ linhas)
-**Conteúdo**: Taxonomia, inventário, problemas, propostas, roadmap
+
+**Propósito**: Análise completa do sistema ENV (8 seções, 600+ linhas) **Conteúdo**: Taxonomia,
+inventário, problemas, propostas, roadmap
 
 ### 📝 Arquivos Modificados (8)
 
 #### 2.1. `.devcontainer/scripts/post-create.sh` (v5.2.2 → v6.0)
 
 **Mudanças**:
+
 - **STRUCTURAL_ENV_VARS**: 1 → 4 variáveis (NODE_ENV, SERVER_MODE, SERVER_AUTHORITY, BROWSER_MODE)
 - **INFRASTRUCTURE_ENV_VARS**: Nova categoria com 6 variáveis
 - **OPERATIONAL_ENV_VARS**: 4 → 13 variáveis
 - **FEATURE_FLAG_ENV_VARS**: Nova categoria com 3 variáveis
 - **Validação estratificada**: Por NODE_ENV (production=FATAL, dev=WARNING)
-- **Validação de dependências**: BROWSER_MODE→CHROME_*, ALLOW_DEGRADED_MODE
+- **Validação de dependências**: BROWSER*MODE→CHROME*\*, ALLOW_DEGRADED_MODE
 - **Trap handler**: Snapshot de ENV em erro
 
 **Linhas modificadas**: ~180
@@ -98,14 +104,17 @@ make validate-env
 #### 2.2. `.devcontainer/devcontainer.json` (v5.3 → v5.4)
 
 **Mudanças**:
+
 - **PORT removido** (duplicado de SERVER_PORT)
 - Comentário explicativo sobre deprecação
 
 #### 2.3. `.env.development` (v5.x → v6.0)
 
 **Mudanças**:
+
 - **Metadata** adicionada (version, schema, updated, compatible with)
-- **Seções reorganizadas**: [1] STRUCTURAL → [2] INFRASTRUCTURE → [3] OPERATIONAL → [4] TUNING → [5] FLAGS
+- **Seções reorganizadas**: [1] STRUCTURAL → [2] INFRASTRUCTURE → [3] OPERATIONAL → [4] TUNING → [5]
+  FLAGS
 - **PORT comentado** com nota DEPRECATED
 - **Comentários aprimorados**: Criticidade + validação + mudança
 
@@ -116,6 +125,7 @@ make validate-env
 #### 2.5. `.env.test` (v5.x → v6.0)
 
 **Mudanças**:
+
 - **Metadata** adicionada
 - **Seções reorganizadas**
 - **PORT comentado**
@@ -124,12 +134,14 @@ make validate-env
 #### 2.6. `.devcontainer/Dockerfile` (v5.2 → v6.0)
 
 **Mudanças**:
+
 - **ENVs categorizados**: STRUCTURAL → INFRASTRUCTURE → OPERATIONAL → FLAGS
 - **PORT removido**
 - **Defaults expandidos**: Mais 20 variáveis com valores seguros
 - **Comentários organizados**: Por categoria
 
 **Exemplo**:
+
 ```dockerfile
 # STRUCTURAL (identidade do sistema)
 ENV NODE_ENV=development \
@@ -147,10 +159,12 @@ ENV SERVER_PORT=3008 \
 #### 2.7. `Makefile` (v4.0 → v4.1)
 
 **Mudanças**:
+
 - **Novo target**: `validate-env`
 - **Help menu atualizado**: Adicionado na seção "Health & Validação"
 
 **Uso**:
+
 ```bash
 make validate-env
 # Output:
@@ -168,6 +182,7 @@ make validate-env
 #### 2.8. `.env.example` (v5.x → v6.0)
 
 **Mudanças**:
+
 - **PORT documentado** como deprecated
 - **Aviso**: NÃO USE PORT
 
@@ -177,45 +192,47 @@ make validate-env
 
 ### 2.1. Variáveis STRUCTURAL (Identidade do Sistema)
 
-| Variável         | .devcontainer | Dockerfile | post-create | .env files | Status |
-| ---------------- | ------------- | ---------- | ----------- | ---------- | ------ |
-| NODE_ENV         | ✅             | ✅          | ✅           | ✅          | ✅ SYNC |
-| SERVER_MODE      | ✅             | ✅          | ✅           | ✅          | ✅ SYNC |
-| SERVER_AUTHORITY | ✅             | ✅          | ✅           | ✅          | ✅ SYNC |
-| BROWSER_MODE     | ✅             | ✅          | ✅           | ✅          | ✅ SYNC |
+| Variável         | .devcontainer | Dockerfile | post-create | .env files | Status  |
+| ---------------- | ------------- | ---------- | ----------- | ---------- | ------- |
+| NODE_ENV         | ✅            | ✅         | ✅          | ✅         | ✅ SYNC |
+| SERVER_MODE      | ✅            | ✅         | ✅          | ✅         | ✅ SYNC |
+| SERVER_AUTHORITY | ✅            | ✅         | ✅          | ✅         | ✅ SYNC |
+| BROWSER_MODE     | ✅            | ✅         | ✅          | ✅         | ✅ SYNC |
 
 **Validação**: Todos os 4 ENVs estão presentes e sincronizados.
 
 ### 2.2. Variáveis INFRASTRUCTURE (Conectividade Essencial)
 
-| Variável          | .devcontainer | Dockerfile | post-create | .env files  | Status |
-| ----------------- | ------------- | ---------- | ----------- | ----------- | ------ |
-| SERVER_PORT       | ✅             | ✅          | ✅           | ✅           | ✅ SYNC |
-| PORT (DEPRECATED) | ❌ REMOVIDO    | ❌ REMOVIDO | ❌ N/A       | ⚠️ COMENTADO | ✅ OK   |
-| CHROME_PROXY_PORT | ✅             | ✅          | ✅           | ✅           | ✅ SYNC |
-| CHROME_PORT       | ✅             | ✅          | ✅           | ✅           | ✅ SYNC |
-| CHROME_HOST       | ✅             | ✅          | ✅           | ✅           | ✅ SYNC |
-| CHROME_PROXY_BIND | ❌             | ✅          | ✅           | ✅           | ✅ OK   |
-| HOST              | ❌             | ✅          | ✅           | ✅           | ✅ OK   |
+| Variável          | .devcontainer | Dockerfile  | post-create | .env files   | Status  |
+| ----------------- | ------------- | ----------- | ----------- | ------------ | ------- |
+| SERVER_PORT       | ✅            | ✅          | ✅          | ✅           | ✅ SYNC |
+| PORT (DEPRECATED) | ❌ REMOVIDO   | ❌ REMOVIDO | ❌ N/A      | ⚠️ COMENTADO | ✅ OK   |
+| CHROME_PROXY_PORT | ✅            | ✅          | ✅          | ✅           | ✅ SYNC |
+| CHROME_PORT       | ✅            | ✅          | ✅          | ✅           | ✅ SYNC |
+| CHROME_HOST       | ✅            | ✅          | ✅          | ✅           | ✅ SYNC |
+| CHROME_PROXY_BIND | ❌            | ✅          | ✅          | ✅           | ✅ OK   |
+| HOST              | ❌            | ✅          | ✅          | ✅           | ✅ OK   |
 
 **Validação**:
+
 - ✅ PORT completamente removido/deprecado
 - ✅ Todas as variáveis essenciais presentes
 - ℹ️ CHROME_PROXY_BIND e HOST não estão em devcontainer.json (opcional, defaults no Dockerfile)
 
 ### 2.3. Variáveis OPERATIONAL (Comportamento Runtime)
 
-| Categoria               | Dockerfile | post-create | .env files | Status |
-| ----------------------- | ---------- | ----------- | ---------- | ------ |
-| Browser Pool (8 vars)   | ✅          | ✅           | ✅          | ✅ SYNC |
-| Chrome Proxy (3 vars)   | ✅          | ✅           | ✅          | ✅ SYNC |
-| Logging (3 vars)        | ✅          | ✅           | ✅          | ✅ SYNC |
-| Kernel (1 var)          | ✅          | ❌           | ✅          | ✅ OK   |
-| Context (3 vars)        | ✅          | ❌           | ✅          | ✅ OK   |
-| Missions (2 vars)       | ✅          | ❌           | ✅          | ✅ OK   |
-| Driver Factory (2 vars) | ✅          | ❌           | ✅          | ✅ OK   |
+| Categoria               | Dockerfile | post-create | .env files | Status  |
+| ----------------------- | ---------- | ----------- | ---------- | ------- |
+| Browser Pool (8 vars)   | ✅         | ✅          | ✅         | ✅ SYNC |
+| Chrome Proxy (3 vars)   | ✅         | ✅          | ✅         | ✅ SYNC |
+| Logging (3 vars)        | ✅         | ✅          | ✅         | ✅ SYNC |
+| Kernel (1 var)          | ✅         | ❌          | ✅         | ✅ OK   |
+| Context (3 vars)        | ✅         | ❌          | ✅         | ✅ OK   |
+| Missions (2 vars)       | ✅         | ❌          | ✅         | ✅ OK   |
+| Driver Factory (2 vars) | ✅         | ❌          | ✅         | ✅ OK   |
 
 **Validação**:
+
 - ✅ Variáveis críticas (pool, logging, proxy) validadas em post-create.sh
 - ℹ️ Variáveis de tuning (kernel, context, missions) não validadas em boot (correto, são opcionais)
 
@@ -224,9 +241,10 @@ make validate-env
 **Status**: ✅ OK - Não validadas em boot (comportamento esperado)
 
 60+ variáveis:
-- TRIAGE_* (12 vars)
-- FRAME_NAV_* (5 vars)
-- BIOMECH_* (13 vars)
+
+- TRIAGE\_\* (12 vars)
+- FRAME*NAV*\* (5 vars)
+- BIOMECH\_\* (13 vars)
 - Outras (30+ vars)
 
 **Validação**: Defaults no código, não requerem validação em boot.
@@ -235,13 +253,14 @@ make validate-env
 
 | Variável                        | .devcontainer | Dockerfile | post-create | .env files | Status |
 | ------------------------------- | ------------- | ---------- | ----------- | ---------- | ------ |
-| MOCK_CHROME                     | ❌             | ✅          | ✅           | ✅          | ✅ OK   |
-| PUPPETEER_LOCAL_LAUNCH_DISABLED | ❌             | ✅          | ✅           | ✅          | ✅ OK   |
-| FACTORY_VALIDATE_BOOT           | ❌             | ✅          | ✅           | ✅          | ✅ OK   |
-| ENABLE_STATE_FILE               | ✅             | ✅          | ❌           | ❌          | ✅ OK   |
-| REEXECUTE_POST_CREATE           | ✅             | ❌          | ❌           | ❌          | ✅ OK   |
+| MOCK_CHROME                     | ❌            | ✅         | ✅          | ✅         | ✅ OK  |
+| PUPPETEER_LOCAL_LAUNCH_DISABLED | ❌            | ✅         | ✅          | ✅         | ✅ OK  |
+| FACTORY_VALIDATE_BOOT           | ❌            | ✅         | ✅          | ✅         | ✅ OK  |
+| ENABLE_STATE_FILE               | ✅            | ✅         | ❌          | ❌         | ✅ OK  |
+| REEXECUTE_POST_CREATE           | ✅            | ❌         | ❌          | ❌         | ✅ OK  |
 
 **Validação**:
+
 - ✅ MOCK_CHROME e FACTORY_VALIDATE_BOOT validados em post-create (constraints)
 - ℹ️ ENABLE_STATE_FILE e REEXECUTE_POST_CREATE são específicos do DevContainer (correto)
 
@@ -252,25 +271,29 @@ make validate-env
 ### ✅ Checklist de Compatibilidade
 
 #### 3.1. devcontainer.json ↔ Dockerfile
+
 - [x] STRUCTURAL: Todos sincronizados
-- [x] INFRASTRUCTURE: SERVER_PORT, CHROME_* sincronizados
+- [x] INFRASTRUCTURE: SERVER*PORT, CHROME*\* sincronizados
 - [x] PORT removido de ambos
 - [x] LOG_LEVEL sincronizado
 - [x] ENABLE_STATE_FILE sincronizado
 
 #### 3.2. Dockerfile ↔ post-create.sh
+
 - [x] STRUCTURAL: Validados em post-create
 - [x] INFRASTRUCTURE: Validados em post-create
 - [x] OPERATIONAL: Subset validado (pool, logging, proxy)
 - [x] Defaults do Dockerfile são safe para boot
 
 #### 3.3. post-create.sh ↔ .env files
+
 - [x] STRUCTURAL: 4 variáveis validadas
 - [x] INFRASTRUCTURE: 6 variáveis validadas (estratificado por NODE_ENV)
 - [x] OPERATIONAL: 13 variáveis validadas (INFO em dev)
 - [x] FLAGS: 3 variáveis validadas (constraints)
 
 #### 3.4. .env files ↔ .env.schema.json
+
 - [x] Schema completo com 50+ propriedades
 - [x] Tipos, ranges, enums definidos
 - [x] Constraints semânticos implementados
@@ -279,6 +302,7 @@ make validate-env
 ### ✅ Checklist de Processos (Etapas do Boot)
 
 #### Etapa 1: Dockerfile Build
+
 ```
 ENVs defaults → Gravados na imagem
 STRUCTURAL   → development, split, standalone, wsEndpoint
@@ -287,6 +311,7 @@ OPERATIONAL  → Defaults seguros (pool=3, LOG_LEVEL=info, etc)
 ```
 
 #### Etapa 2: DevContainer Init
+
 ```
 devcontainer.json remoteEnv → Sobrescreve defaults do Dockerfile
 STRUCTURAL   → ${localEnv:NODE_ENV:development}
@@ -295,6 +320,7 @@ FLAGS        → ENABLE_STATE_FILE, REEXECUTE_POST_CREATE
 ```
 
 #### Etapa 3: post-create.sh (Boot)
+
 ```
 VALIDAÇÃO:
 1. STRUCTURAL   → FATAL se ausente
@@ -307,6 +333,7 @@ RESULTADO: Container só sobe se ENVs STRUCTURAL+INFRASTRUCTURE estão corretos
 ```
 
 #### Etapa 4: Runtime (.env files)
+
 ```
 .env.development / .env.production / .env.test
 
@@ -474,11 +501,13 @@ validate-env.js (CI/CD):
 ### 🔲 Fase 4: Automação (Não Implementada)
 
 #### CI/CD ENV Validation
+
 - [ ] GitHub Actions workflow para validar .env files
 - [ ] Pre-commit hook para validar .env antes de commit
 - [ ] Fail-fast se .env files divergem do schema
 
 #### Dashboard ENV Inspector
+
 - [ ] Endpoint `/api/env/status` no dashboard
 - [ ] UI para visualizar ENV atual vs esperado
 - [ ] Alertas para ENVs ausentes/inválidas
@@ -536,16 +565,19 @@ make validate-env
 ## 8. REFERÊNCIAS
 
 ### Documentos Criados (v6.0)
+
 1. `.devcontainer/ENV_ANALYSIS_V6.md` (análise completa)
 2. `.devcontainer/ENV_UPGRADE_V6_SUMMARY.md` (resumo de mudanças)
 3. `.devcontainer/ENV_V6_FINAL_CONSOLIDATION.md` (este documento)
 
 ### Documentos Relacionados (v5.x)
+
 4. `.devcontainer/DEVCONTAINER_BUILD_ANALYSIS.md` (SSH problem diagnosis)
 5. `.devcontainer/POST_CREATE_ANALYSIS.md` (idempotency analysis)
 6. `.devcontainer/POST_CREATE_FIXES_V5.2.2.md` (trap handler v5.2.2)
 
 ### Arquivos de Configuração
+
 - `.env.schema.json` (schema de validação)
 - `scripts/validate-env.js` (validador)
 - `.env.development` (valores dev)
@@ -557,7 +589,5 @@ make validate-env
 
 **Status Final**: ✅ **SISTEMA COMPLETAMENTE SINCRONIZADO E VALIDADO**
 
-**Versão**: 6.0
-**Data**: 2026-02-03
-**Implementado**: Fases 1, 2 e 3
-**Pendente**: Fase 4 (Automação - opcional)
+**Versão**: 6.0 **Data**: 2026-02-03 **Implementado**: Fases 1, 2 e 3 **Pendente**: Fase 4
+(Automação - opcional)

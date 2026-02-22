@@ -5,28 +5,26 @@ const data = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 const byFile = {};
 
 data.errors.forEach(d => {
-  const file = d.file;
-  if (!byFile[file]) byFile[file] = [];
-  byFile[file].push(d.code);
+    const file = d.file;
+    if (!byFile[file]) byFile[file] = [];
+    byFile[file].push(d.code);
 });
 
 const sorted = Object.entries(byFile)
-  .map(([file, codes]) => ({ file, count: codes.length, codes: [...new Set(codes)] }))
-  .sort((a, b) => b.count - a.count)
-  .slice(0, 40);
+    .map(([file, codes]) => ({ file, count: codes.length, codes: [...new Set(codes)] }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 40);
 
 console.log('📊 Top 40 arquivos com MAIS erros:\n');
 sorted.forEach(({ file, count, codes }) => {
-  const shortFile = file.replace('/workspaces/chatgpt-docker-puppeteer/', '');
-  console.log(`${count.toString().padStart(3)} erros - ${shortFile}`);
-  console.log(`        Códigos: ${codes.join(', ')}\n`);
+    const shortFile = file.replace('/workspaces/chatgpt-docker-puppeteer/', '');
+    console.log(`${count.toString().padStart(3)} erros - ${shortFile}`);
+    console.log(`        Códigos: ${codes.join(', ')}\n`);
 });
 
 console.log('\n📈 Categorização de erros:');
 console.log('\nBrowser globals (TS2304, TS2584):');
-const browserErrors = data.errors.filter(d =>
-  d.code === 2304 || d.code === 2584
-);
+const browserErrors = data.errors.filter(d => d.code === 2304 || d.code === 2584);
 console.log(`   Total: ${browserErrors.length} erros`);
 
 const browserFiles = new Set(browserErrors.map(d => d.file.replace('/workspaces/chatgpt-docker-puppeteer/', '')));

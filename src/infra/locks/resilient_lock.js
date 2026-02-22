@@ -95,8 +95,10 @@ class ResilientLockManager {
         // Compatibility + cleanup safety:
         // We keep passive fatal hooks so active locks are released under crash paths,
         // but avoid taking ownership of the process lifecycle when another handler exists.
-        this._fatalHookRegistration.uncaughtExceptionHadExternalListener = process.listenerCount('uncaughtException') > 0;
-        this._fatalHookRegistration.unhandledRejectionHadExternalListener = process.listenerCount('unhandledRejection') > 0;
+        this._fatalHookRegistration.uncaughtExceptionHadExternalListener =
+            process.listenerCount('uncaughtException') > 0;
+        this._fatalHookRegistration.unhandledRejectionHadExternalListener =
+            process.listenerCount('unhandledRejection') > 0;
         this._cleanupHandlers.uncaughtException = err => {
             void cleanup('uncaughtException').finally(() => {
                 if (!this._fatalHookRegistration.uncaughtExceptionHadExternalListener) {

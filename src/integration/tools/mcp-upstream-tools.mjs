@@ -36,8 +36,9 @@ function sanitizeToolMetadata(tool) {
     return { description, inputSchema };
 }
 
+/** Função exportada: registerUpstreamMcpTools. */
 export async function registerUpstreamMcpTools(registry, options = {}) {
-    const enabled = options.enabled ?? (process.env.MCP_UPSTREAM_ENABLED === 'true');
+    const enabled = options.enabled ?? process.env.MCP_UPSTREAM_ENABLED === 'true';
     if (!enabled) {
         return { enabled: false, registered: 0 };
     }
@@ -50,10 +51,7 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
     const alias = options.alias ?? process.env.MCP_UPSTREAM_ALIAS ?? 'upstream';
     const prefix = options.prefix ?? process.env.MCP_UPSTREAM_TOOL_PREFIX ?? `mcp_${alias}__`;
 
-    const headers =
-        options.headers ??
-        parseJsonObject(process.env.MCP_UPSTREAM_HEADERS_JSON) ??
-        undefined;
+    const headers = options.headers ?? parseJsonObject(process.env.MCP_UPSTREAM_HEADERS_JSON) ?? undefined;
 
     const client = createMcpHttpClient({ url, headers });
 
@@ -75,13 +73,13 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
             localName,
             {
                 description: `[Upstream:${alias}] ${description}`,
-                inputSchema
+                inputSchema,
             },
             async (params = {}, execOptions = {}) => {
                 const result = await client.callTool({
                     name: upstreamName,
                     arguments: params,
-                    signal: execOptions.signal
+                    signal: execOptions.signal,
                 });
 
                 // Pass through MCP tool result shape when available.
@@ -96,4 +94,3 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
     console.error(`[MCP Upstream] Registered ${registered} tools from ${url} as prefix "${prefix}"`);
     return { enabled: true, registered, alias, prefix, url };
 }
-

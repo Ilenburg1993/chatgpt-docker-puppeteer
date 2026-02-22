@@ -171,26 +171,26 @@ try {
                 created_at: new Date().toISOString(),
                 priority: t.prio || defaults.prio || 5,
                 source: 'flow_manager',
-                tags: [doc.project, t.id, ...(defaults.tags || [])]
+                tags: [doc.project, t.id, ...(defaults.tags || [])],
             },
             spec: {
                 target: t.target || defaults.target || 'chatgpt',
                 model: t.model || defaults.model || 'gpt-5',
                 payload: {
                     system_message: t.system || defaults.system || '',
-                    user_message: finalPrompt
+                    user_message: finalPrompt,
                 },
                 config: {
-                    reset_context: t.reset_context !== undefined ? t.reset_context : defaults.reset_context || false
-                }
+                    reset_context: t.reset_context !== undefined ? t.reset_context : defaults.reset_context || false,
+                },
             },
             policy: {
                 max_attempts: t.max_attempts || defaults.max_attempts || 3,
                 timeout_ms: t.timeout_ms || defaults.timeout_ms || 'auto',
                 dependencies: realDeps,
-                execute_after: executeAfterDate
+                execute_after: executeAfterDate,
             },
-            state: { status: 'PENDING', attempts: 0, history: [] }
+            state: { status: 'PENDING', attempts: 0, history: [] },
         };
 
         const filePath = path.join(QUEUE_DIR, `${t.realId}.json`);

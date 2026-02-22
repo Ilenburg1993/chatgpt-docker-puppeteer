@@ -10,12 +10,7 @@
  * - rag_expand: Context expansion by chunk_id (lines or symbol span)
  */
 
-import {
-    ragHybridSearch,
-    ragHealth,
-    ragExpand,
-    getRagCacheStats
-} from '../../../tools/rag/lib/facade.mjs';
+import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../../tools/rag/lib/facade.mjs';
 
 /**
  * rag_search tool: Hybrid semantic search
@@ -51,7 +46,7 @@ async function ragSearchHandler({
     auto_expand = false,
     expand_mode = 'symbol',
     expand_top_n = 0,
-    includeDiagnostics = false
+    includeDiagnostics = false,
 }) {
     console.error(`[RAG Tool] rag_search: "${query}" (topK=${topK})`);
 
@@ -63,21 +58,23 @@ async function ragSearchHandler({
     const validTopK = Math.min(Math.max(Number(topK) || 5, 1), 20);
 
     try {
-        const result = await ragHybridSearch(/** @type {any} */ ({
-            query,
-            topK: validTopK,
-            profile,
-            mode,
-            pathPrefix,
-            ext,
-            intentScope: intent_scope,
-            autoExpand: auto_expand,
-            expandMode: expand_mode,
-            expandTopN: expand_top_n,
-            rerank: true,
-            mmr: true,
-            mmrLambda: 0.7
-        }));
+        const result = await ragHybridSearch(
+            /** @type {any} */ ({
+                query,
+                topK: validTopK,
+                profile,
+                mode,
+                pathPrefix,
+                ext,
+                intentScope: intent_scope,
+                autoExpand: auto_expand,
+                expandMode: expand_mode,
+                expandTopN: expand_top_n,
+                rerank: true,
+                mmr: true,
+                mmrLambda: 0.7,
+            })
+        );
 
         console.error(`[RAG Tool] Found ${result.results.length} results`);
 
@@ -190,13 +187,14 @@ async function ragSearchHandler({
                     scope_hash: result.scope_hash || null,
                     index_updated_at: result.index_updated_at || null,
                     index_updated_at_iso: result.index_updated_at_iso || null,
-                    index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
-                    last_index_scope: result.last_index_scope || null
+                    index_freshness_ms:
+                        typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
+                    last_index_scope: result.last_index_scope || null,
                 },
                 result_policy: result.result_policy || {
                     intent_scope: result.intent_scope || intent_scope,
                     docs_filtered: false,
-                    auto_expand_applied: false
+                    auto_expand_applied: false,
                 },
                 index_mode: result.index_mode || 'full',
                 index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
@@ -209,7 +207,7 @@ async function ragSearchHandler({
                 ...(result.reason_code ? { reason_code: result.reason_code } : {}),
                 ...(result.degraded_reason ? { degraded_reason: result.degraded_reason } : {}),
                 result_count: result.results.length,
-                results: result.results.map((r) => ({
+                results: result.results.map(r => ({
                     chunk_id: r.chunk_id,
                     path: r.path,
                     content_class: r.content_class || null,
@@ -218,12 +216,12 @@ async function ragSearchHandler({
                         file_mtime_ms: r.file_mtime_ms || null,
                         file_mtime_iso: r.file_mtime_iso || null,
                         indexed_at_ms: r.indexed_at || null,
-                        indexed_at_iso: r.indexed_at_iso || null
+                        indexed_at_iso: r.indexed_at_iso || null,
                     },
                     ranking: {
                         backend_score: typeof r.score === 'number' ? r.score : null,
                         rerank_score: typeof r.rerank_score === 'number' ? r.rerank_score : null,
-                        rerank_signals: r.rerank_signals || null
+                        rerank_signals: r.rerank_signals || null,
                     },
                     language: r.language || null,
                     kind: r.kind || 'module_fallback',
@@ -239,14 +237,14 @@ async function ragSearchHandler({
                     indexed_at_local: r.indexed_at_local || null,
                     expanded_context: r.expanded_context || null,
                     expanded_context_error: r.expanded_context_error || null,
-                    expanded_context_skipped: r.expanded_context_skipped || null
-                }))
+                    expanded_context_skipped: r.expanded_context_skipped || null,
+                })),
             },
             flags: {
                 degraded: Boolean(result.degraded),
                 mutating: false,
-                partial: Boolean(result.degraded)
-            }
+                partial: Boolean(result.degraded),
+            },
         };
     } catch (error) {
         console.error('[RAG Tool] rag_search error:', error);
@@ -327,20 +325,17 @@ async function ragHealthHandler() {
     }
 }
 
-async function ragExpandHandler({
-    chunk_id,
-    before_lines,
-    after_lines,
-    mode = 'lines'
-}) {
+async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'lines' }) {
     console.error(`[RAG Tool] rag_expand: chunk_id=${chunk_id} mode=${mode}`);
 
-    const expanded = /** @type {any} */ (await ragExpand({
-        chunkId: chunk_id,
-        beforeLines: before_lines,
-        afterLines: after_lines,
-        mode
-    }));
+    const expanded = /** @type {any} */ (
+        await ragExpand({
+            chunkId: chunk_id,
+            beforeLines: before_lines,
+            afterLines: after_lines,
+            mode,
+        })
+    );
 
     if (!expanded?.ok) {
         return {
@@ -349,8 +344,8 @@ async function ragExpandHandler({
             flags: {
                 degraded: false,
                 mutating: false,
-                partial: true
-            }
+                partial: true,
+            },
         };
     }
 
@@ -385,8 +380,8 @@ async function ragExpandHandler({
         flags: {
             degraded: false,
             mutating: false,
-            partial: false
-        }
+            partial: false,
+        },
     };
 }
 
@@ -426,63 +421,63 @@ Examples:
                 properties: {
                     query: {
                         type: 'string',
-                        description: 'The search query (supports natural language and exact terms)'
+                        description: 'The search query (supports natural language and exact terms)',
                     },
                     topK: {
                         type: 'number',
                         description: 'Number of results to return (default: 5, max: 20)',
-                        default: 5
+                        default: 5,
                     },
                     pathPrefix: {
                         type: 'string',
-                        description: 'Optional: Only search in files under this path (e.g., "src/kernel")'
+                        description: 'Optional: Only search in files under this path (e.g., "src/kernel")',
                     },
                     ext: {
                         type: 'string',
-                        description: 'Optional: Only search files with this extension (e.g., ".js", ".mjs")'
+                        description: 'Optional: Only search files with this extension (e.g., ".js", ".mjs")',
                     },
                     profile: {
                         type: 'string',
                         enum: ['core', 'dev', 'full'],
                         default: process.env.RAG_PROFILE_DEFAULT || 'core',
-                        description: 'Optional: RAG scope profile'
+                        description: 'Optional: RAG scope profile',
                     },
                     mode: {
                         type: 'string',
                         enum: ['hybrid', 'lexical-only', 'auto'],
                         default: 'auto',
-                        description: 'Search mode (auto enables degraded fallback)'
+                        description: 'Search mode (auto enables degraded fallback)',
                     },
                     intent_scope: {
                         type: 'string',
                         enum: ['code-first', 'docs-first', 'all'],
                         default: 'code-first',
-                        description: 'Intent policy for ranking/prioritization'
+                        description: 'Intent policy for ranking/prioritization',
                     },
                     auto_expand: {
                         type: 'boolean',
                         default: false,
-                        description: 'Expand top chunk(s) automatically in the same response'
+                        description: 'Expand top chunk(s) automatically in the same response',
                     },
                     expand_mode: {
                         type: 'string',
                         enum: ['lines', 'symbol'],
                         default: 'symbol',
-                        description: 'Expansion mode for auto_expand'
+                        description: 'Expansion mode for auto_expand',
                     },
                     expand_top_n: {
                         type: 'number',
                         default: 0,
-                        description: 'Number of top results to expand when auto_expand=true'
+                        description: 'Number of top results to expand when auto_expand=true',
                     },
                     includeDiagnostics: {
                         type: 'boolean',
                         default: false,
-                        description: 'Include diagnostic fields in text output'
-                    }
+                        description: 'Include diagnostic fields in text output',
+                    },
                 },
-                required: ['query']
-            }
+                required: ['query'],
+            },
         },
         ragSearchHandler
     );
@@ -494,8 +489,8 @@ Examples:
             description: 'Check RAG system health (database, Ollama, cache stats)',
             inputSchema: {
                 type: 'object',
-                properties: {}
-            }
+                properties: {},
+            },
         },
         ragHealthHandler
     );
@@ -509,27 +504,27 @@ Examples:
                 properties: {
                     chunk_id: {
                         type: 'string',
-                        description: 'Chunk identifier returned by rag_search'
+                        description: 'Chunk identifier returned by rag_search',
                     },
                     before_lines: {
                         type: 'number',
                         default: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
-                        description: 'Number of lines to include before base range'
+                        description: 'Number of lines to include before base range',
                     },
                     after_lines: {
                         type: 'number',
                         default: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
-                        description: 'Number of lines to include after base range'
+                        description: 'Number of lines to include after base range',
                     },
                     mode: {
                         type: 'string',
                         enum: ['lines', 'symbol'],
                         default: 'lines',
-                        description: 'Expansion mode: surrounding lines or full symbol scope'
-                    }
+                        description: 'Expansion mode: surrounding lines or full symbol scope',
+                    },
                 },
-                required: ['chunk_id']
-            }
+                required: ['chunk_id'],
+            },
         },
         ragExpandHandler
     );

@@ -31,7 +31,7 @@ describe('ragExpand', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-expand-store-'));
         const paths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -43,13 +43,13 @@ describe('ragExpand', () => {
                 root: ws,
                 paths,
                 embeddingsProvider: embeddings,
-                profile: 'full'
+                profile: 'full',
             });
 
             const result = await ragExpand({
                 paths,
                 root: ws,
-                chunkId: 'non-existent'
+                chunkId: 'non-existent',
             });
             assert.strictEqual(result.ok, false);
             assert.strictEqual(result.reason_code, 'CHUNK_NOT_FOUND');
@@ -64,7 +64,7 @@ describe('ragExpand', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-expand-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -80,7 +80,7 @@ describe('ragExpand', () => {
                     '}',
                     '',
                     'export const value = 42;',
-                    ''
+                    '',
                 ].join('\n'),
                 'utf8'
             );
@@ -89,14 +89,14 @@ describe('ragExpand', () => {
                 root: ws,
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
-                profile: 'full'
+                profile: 'full',
             });
 
             const query = await ragQuery({
                 query: 'hello(name)',
                 topK: 1,
                 paths: ragPaths,
-                embeddingsProvider: embeddings
+                embeddingsProvider: embeddings,
             });
             const chunkId = query.results?.[0]?.chunk_id;
             assert.ok(chunkId, 'Expected at least one indexed chunk');
@@ -107,7 +107,7 @@ describe('ragExpand', () => {
                 chunkId,
                 mode: 'lines',
                 beforeLines: 200,
-                afterLines: 200
+                afterLines: 200,
             });
 
             assert.strictEqual(expanded.ok, true);
@@ -128,7 +128,7 @@ describe('ragExpand', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-expand-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -139,13 +139,7 @@ describe('ragExpand', () => {
             const body = Array.from({ length: 700 }, (_, i) => `  const line_${i} = ${i};`).join('\n');
             await fs.writeFile(
                 path.join(ws, 'src', 'big.ts'),
-                [
-                    'export function heavySymbol() {',
-                    body,
-                    '  return line_1 + line_699;',
-                    '}',
-                    ''
-                ].join('\n'),
+                ['export function heavySymbol() {', body, '  return line_1 + line_699;', '}', ''].join('\n'),
                 'utf8'
             );
 
@@ -153,14 +147,14 @@ describe('ragExpand', () => {
                 root: ws,
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
-                profile: 'full'
+                profile: 'full',
             });
 
             const query = await ragQuery({
                 query: 'line_699',
                 topK: 1,
                 paths: ragPaths,
-                embeddingsProvider: embeddings
+                embeddingsProvider: embeddings,
             });
             const chunkId = query.results?.[0]?.chunk_id;
             assert.ok(chunkId, 'Expected indexed chunk for heavySymbol');
@@ -171,7 +165,7 @@ describe('ragExpand', () => {
                 chunkId,
                 mode: 'symbol',
                 beforeLines: 0,
-                afterLines: 0
+                afterLines: 0,
             });
 
             assert.strictEqual(expanded.ok, true);

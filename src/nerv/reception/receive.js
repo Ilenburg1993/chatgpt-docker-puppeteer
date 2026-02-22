@@ -37,7 +37,7 @@ function safeCall(handler, envelope, telemetry) {
         handler(envelope);
     } catch (error) {
         telemetry.emit('nerv:reception:handler_error', {
-            message: error.message
+            message: error.message,
         });
     }
 }
@@ -87,7 +87,7 @@ function createReception({ envelopes, correlation, telemetry }) {
             envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
         } catch (error) {
             telemetry.emit('nerv:reception:deserialization_failed', {
-                message: error.message
+                message: error.message,
             });
             return;
         }
@@ -102,7 +102,7 @@ function createReception({ envelopes, correlation, telemetry }) {
             envelopes.assertValid(normalized);
         } catch (error) {
             telemetry.emit('nerv:reception:invalid_envelope', {
-                message: error.message
+                message: error.message,
             });
             return;
         }
@@ -112,7 +112,7 @@ function createReception({ envelopes, correlation, telemetry }) {
         if (correlationId) correlation.append(correlationId, normalized);
 
         telemetry.emit('nerv:reception:accepted', {
-            kind: getMessageType(normalized)
+            kind: getMessageType(normalized),
         });
 
         // 5. Notificação de handlers
@@ -144,7 +144,7 @@ function createReception({ envelopes, correlation, telemetry }) {
 
     return Object.freeze({
         receive,
-        onReceive
+        onReceive,
     });
 }
 

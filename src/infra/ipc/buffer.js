@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
+/** Classe exportada: default. */
 class IPCBuffer {
     /**
      * @param {number} maxSize - Limite máximo de mensagens para evitar Out-of-Memory.

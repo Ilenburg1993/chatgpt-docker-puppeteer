@@ -110,6 +110,7 @@ const ADAPTER_EVENTS = {
 // DriverNERVAdapter Class (EventEmitter v2.0)
 // ============================================================================
 
+/** Classe exportada: DriverNERVAdapter. */
 class DriverNERVAdapter extends EventEmitter {
     constructor(nerv, browserPool, config) {
         super();
@@ -559,351 +560,351 @@ class DriverNERVAdapter extends EventEmitter {
                 });
             }, ADAPTER_CONFIG.TASK_HEARTBEAT_INTERVAL_MS);
 
-        // Marca abortedTasks quando houver abort (interno ou externo)
-        abortHandler = () => {
-            log('WARN', `[DriverNERVAdapter] Abort signal received for task ${taskId}`, correlationId);
+            // Marca abortedTasks quando houver abort (interno ou externo)
+            abortHandler = () => {
+                log('WARN', `[DriverNERVAdapter] Abort signal received for task ${taskId}`, correlationId);
 
-            const existing = this.abortedTasks.get(taskId) || {};
-            this.abortedTasks.set(taskId, {
-                ...existing,
-                aborting: true,
-                abortReason: existing.abortReason || 'USER_ABORT',
-                timestamp: Date.now(),
-            });
-        };
-        signal.addEventListener('abort', abortHandler, { once: true });
+                const existing = this.abortedTasks.get(taskId) || {};
+                this.abortedTasks.set(taskId, {
+                    ...existing,
+                    aborting: true,
+                    abortReason: existing.abortReason || 'USER_ABORT',
+                    timestamp: Date.now(),
+                });
+            };
+            signal.addEventListener('abort', abortHandler, { once: true });
 
-        // ✅ v3.1: Hot Pool - Acquire driver (may include page)
-        const poolAcquireStart = Date.now();
-        driver = await this._withTimeout(
-            driverFactory.acquireFromPool(target),
-            ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
-            'driverFactory.acquireFromPool'
-        );
-        activeEntry.driver = driver;
-
-        // Hot vs Cold Pool Logic
-        if (driver.page && !driver.page.isClosed()) {
-            // Hot Driver: Page already attached
-            page = driver.page;
-            log('DEBUG', `[DriverNERVAdapter] Hot Driver acquired (page attached).`, correlationId);
-        } else {
-            // Cold Driver: Allocate new page (legacy/fallback)
-            log(
-                'WARN',
-                `[DriverNERVAdapter] Cold Driver detected (no page). Allocating page manually.`,
-                correlationId
-            );
-            page = await this._withTimeout(
-                this.browserPool.allocate(target),
+            // ✅ v3.1: Hot Pool - Acquire driver (may include page)
+            const poolAcquireStart = Date.now();
+            driver = await this._withTimeout(
+                driverFactory.acquireFromPool(target),
                 ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
-                'browserPool.allocate'
+                'driverFactory.acquireFromPool'
             );
-        }
-        activeEntry.page = page;
+            activeEntry.driver = driver;
 
-        timings.poolAcquire = Date.now() - poolAcquireStart;
-
-        if (this.browserPool.updatePageTaskId) {
-            this.browserPool.updatePageTaskId(page, taskId);
-        }
-
-        log(
-            'DEBUG',
-            `[DriverNERVAdapter] Resources acquired for task ${taskId} (driver=${driver.target})`,
-            correlationId
-        );
-
-        // Attach context
-        const attachStart = Date.now();
-        driver.attachContext(page, signal, correlationId);
-        timings.contextAttach = Date.now() - attachStart;
-
-        log('DEBUG', `[DriverNERVAdapter] Context attached to driver (state=${driver.state})`, correlationId);
-
-        listeners = this._attachDriverTelemetry(driver, taskId, correlationId);
-        activeEntry.listeners = listeners;
-
-        // Driver ready check
-        if (!driver) {
-            throw new Error('[DriverNERVAdapter] Driver is null after acquire');
-        }
-        if (driver.destroyed) {
-            throw new Error('[DriverNERVAdapter] Driver is destroyed after acquire');
-        }
-        if (driver.state !== 'IDLE') {
-            log(
-                'WARN',
-                `[DriverNERVAdapter] Driver state is '${driver.state}' (expected 'IDLE'). Forçando reset para IDLE antes de executar.`,
-                correlationId
-            );
-            if (typeof driver.setState === 'function') {
-                driver.setState('IDLE');
+            // Hot vs Cold Pool Logic
+            if (driver.page && !driver.page.isClosed()) {
+                // Hot Driver: Page already attached
+                page = driver.page;
+                log('DEBUG', `[DriverNERVAdapter] Hot Driver acquired (page attached).`, correlationId);
+            } else {
+                // Cold Driver: Allocate new page (legacy/fallback)
+                log(
+                    'WARN',
+                    `[DriverNERVAdapter] Cold Driver detected (no page). Allocating page manually.`,
+                    correlationId
+                );
+                page = await this._withTimeout(
+                    this.browserPool.allocate(target),
+                    ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
+                    'browserPool.allocate'
+                );
             }
-        }
-        if (!driver.page || driver.page.isClosed()) {
-            throw new Error('[DriverNERVAdapter] Driver page is null or closed after acquire');
-        }
+            activeEntry.page = page;
 
-        let pageUrl = null;
-        try {
-            pageUrl = driver.page.url();
-        } catch (pageUrlError) {
+            timings.poolAcquire = Date.now() - poolAcquireStart;
+
+            if (this.browserPool.updatePageTaskId) {
+                this.browserPool.updatePageTaskId(page, taskId);
+            }
+
             log(
                 'DEBUG',
-                `[DriverNERVAdapter] Não foi possível obter URL da página para ${taskId}: ${pageUrlError?.message || String(pageUrlError)}`,
+                `[DriverNERVAdapter] Resources acquired for task ${taskId} (driver=${driver.target})`,
                 correlationId
             );
-            pageUrl = null;
-        }
 
-        // Preflight diagnostic (before STARTED): classify environment/user/UI problems deterministically.
-        if (retryCount === 0) {
-            const preflight = await this._runPreflight({ driver, page: driver.page, task, taskId, target, signal });
-            if (!preflight.ok) {
-                const diag = await this._captureDiagnostics({
+            // Attach context
+            const attachStart = Date.now();
+            driver.attachContext(page, signal, correlationId);
+            timings.contextAttach = Date.now() - attachStart;
+
+            log('DEBUG', `[DriverNERVAdapter] Context attached to driver (state=${driver.state})`, correlationId);
+
+            listeners = this._attachDriverTelemetry(driver, taskId, correlationId);
+            activeEntry.listeners = listeners;
+
+            // Driver ready check
+            if (!driver) {
+                throw new Error('[DriverNERVAdapter] Driver is null after acquire');
+            }
+            if (driver.destroyed) {
+                throw new Error('[DriverNERVAdapter] Driver is destroyed after acquire');
+            }
+            if (driver.state !== 'IDLE') {
+                log(
+                    'WARN',
+                    `[DriverNERVAdapter] Driver state is '${driver.state}' (expected 'IDLE'). Forçando reset para IDLE antes de executar.`,
+                    correlationId
+                );
+                if (typeof driver.setState === 'function') {
+                    driver.setState('IDLE');
+                }
+            }
+            if (!driver.page || driver.page.isClosed()) {
+                throw new Error('[DriverNERVAdapter] Driver page is null or closed after acquire');
+            }
+
+            let pageUrl = null;
+            try {
+                pageUrl = driver.page.url();
+            } catch (pageUrlError) {
+                log(
+                    'DEBUG',
+                    `[DriverNERVAdapter] Não foi possível obter URL da página para ${taskId}: ${pageUrlError?.message || String(pageUrlError)}`,
+                    correlationId
+                );
+                pageUrl = null;
+            }
+
+            // Preflight diagnostic (before STARTED): classify environment/user/UI problems deterministically.
+            if (retryCount === 0) {
+                const preflight = await this._runPreflight({ driver, page: driver.page, task, taskId, target, signal });
+                if (!preflight.ok) {
+                    const diag = await this._captureDiagnostics({
+                        taskId,
+                        correlationId,
+                        target,
+                        driver,
+                        page: driver.page,
+                        phase: 'preflight',
+                        diagnosis: preflight.diagnosis || null,
+                    });
+
+                    await this._emitBoth(
+                        ADAPTER_EVENTS.TASK_FAILED,
+                        ActionCode.DRIVER_TASK_FAILED,
+                        {
+                            taskId,
+                            error: preflight.failure?.error || 'Preflight failed',
+                            reason: preflight.failure?.reason_code || preflight.failure?.reason || 'PREFLIGHT_FAILED',
+                            reason_class: preflight.failure?.reason_class || 'ENV_UNAVAILABLE',
+                            reason_code: preflight.failure?.reason_code || 'PREFLIGHT_FAILED',
+                            cause_layer: preflight.failure?.cause_layer || 'PAGE',
+                            retryable: Boolean(preflight.failure?.retryable),
+                            next_action: preflight.failure?.next_action || 'RETRY_LATER',
+                            suggestedDelayMs: preflight.failure?.suggestedDelayMs ?? null,
+                            count_attempt: Boolean(preflight.failure?.count_attempt),
+                            details: {
+                                ...(preflight.failure?.details || {}),
+                                ...(diag ? { diagnostic_storage: diag.storage, diagnosis_summary: diag.summary } : {}),
+                            },
+                        },
+                        correlationId
+                    );
+
+                    this.stats.tasksRejected++;
+                    return;
+                }
+            }
+
+            // Tactical retries (browser-level) are still the same SSOT attempt (same correlationId).
+            // Emit DRIVER_TASK_STARTED only once per attempt to avoid inflating strategic attempts.
+            if (retryCount === 0) {
+                await this._emitBoth(
+                    ADAPTER_EVENTS.TASK_STARTED,
+                    ActionCode.DRIVER_TASK_STARTED,
+                    {
+                        taskId,
+                        target,
+                        driverType: driver.constructor.name,
+                        driverState: driver.state,
+                        pageUrl,
+                        activeDrivers: this.activeDrivers.size,
+                    },
+                    correlationId
+                );
+            }
+
+            // Execute (timeout)
+            const executeStart = Date.now();
+            const systemMessage =
+                typeof task?.spec?.payload?.system_message === 'string' ? task.spec.payload.system_message.trim() : '';
+            const userMessage =
+                typeof task?.spec?.payload?.user_message === 'string' ? task.spec.payload.user_message.trim() : '';
+            const legacyPrompt =
+                typeof task?.spec?.prompt === 'string'
+                    ? task.spec.prompt
+                    : typeof task?.prompt === 'string'
+                      ? task.prompt
+                      : '';
+            const prompt = userMessage
+                ? systemMessage
+                    ? `SYSTEM:\n${systemMessage}\n\nUSER:\n${userMessage}`
+                    : userMessage
+                : legacyPrompt;
+            if (!prompt) {
+                throw new Error('[DriverNERVAdapter] Task prompt missing (expected spec.payload.user_message)');
+            }
+            const result = await this._withTimeout(
+                driver.execute(prompt),
+                ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
+                'driver.execute'
+            );
+            timings.execute = Date.now() - executeStart;
+
+            const duration = Date.now() - startTime;
+            this.stats.totalTaskDuration += duration;
+            this.stats.maxTaskDuration = Math.max(this.stats.maxTaskDuration, duration);
+            this.stats.minTaskDuration = Math.min(this.stats.minTaskDuration, duration);
+
+            timings.total = duration;
+            this._recordPerformanceMetrics(timings);
+
+            // Persist response (sem ReferenceError)
+            let persisted = null;
+            try {
+                persisted = await this._persistResponse(taskId, result, task, correlationId);
+                if (persisted) {
+                    log('INFO', `[DriverNERVAdapter] Response saved for task ${taskId}`, correlationId);
+                }
+            } catch (saveError) {
+                log(
+                    'ERROR',
+                    `[DriverNERVAdapter] Failed to save response for ${taskId}: ${saveError?.message || String(saveError)}`,
+                    correlationId
+                );
+            }
+
+            await this._emitBoth(
+                ADAPTER_EVENTS.TASK_COMPLETED,
+                ActionCode.DRIVER_TASK_COMPLETED,
+                {
                     taskId,
-                    correlationId,
-                    target,
-                    driver,
-                    page: driver.page,
-                    phase: 'preflight',
-                    diagnosis: preflight.diagnosis || null,
-                });
+                    result,
+                    storage: persisted?.storage || null,
+                    storage_format: persisted?.format || null,
+                    timings: {
+                        poolAcquire: timings.poolAcquire,
+                        contextAttach: timings.contextAttach,
+                        execute: timings.execute,
+                        total: duration,
+                    },
+                },
+                correlationId
+            );
+
+            this.stats.tasksExecuted++;
+            this._recordSuccess(target);
+        } catch (error) {
+            const abortEntry = this.abortedTasks.get(taskId);
+            const wasAborted = abortEntry?.aborting;
+
+            if (wasAborted) {
+                if (!abortEntry.reported) {
+                    log('WARN', `[DriverNERVAdapter] Task ${taskId} aborted during execution`, correlationId);
+
+                    await this._emitBoth(
+                        ADAPTER_EVENTS.TASK_ABORTED,
+                        ActionCode.DRIVER_TASK_ABORTED,
+                        {
+                            taskId,
+                            reason: abortEntry.abortReason || 'USER_ABORT',
+                            message: 'Task execution was aborted by AbortSignal',
+                        },
+                        correlationId
+                    );
+
+                    abortEntry.reported = true;
+                    this.abortedTasks.set(taskId, abortEntry);
+                    this.stats.tasksAborted++;
+                }
+            } else {
+                const failure = this._classifyFailure(error);
+                if (failure.isTimeout) {
+                    this.stats.tasksTimedOut++;
+                }
+
+                let diag = null;
+                try {
+                    if (driver?.page && !(driver.page.isClosed && driver.page.isClosed())) {
+                        diag = await this._captureDiagnostics({
+                            taskId,
+                            correlationId,
+                            target,
+                            driver,
+                            page: driver.page,
+                            phase: 'execute',
+                            diagnosis: failure.details || null,
+                        });
+                    }
+                } catch (_) {
+                    diag = null;
+                }
+
+                log(
+                    'ERROR',
+                    `[DriverNERVAdapter] Task failed (${failure.reason_class}/${failure.reason}): ${failure.error}`,
+                    correlationId
+                );
 
                 await this._emitBoth(
                     ADAPTER_EVENTS.TASK_FAILED,
                     ActionCode.DRIVER_TASK_FAILED,
                     {
                         taskId,
-                        error: preflight.failure?.error || 'Preflight failed',
-                        reason: preflight.failure?.reason_code || preflight.failure?.reason || 'PREFLIGHT_FAILED',
-                        reason_class: preflight.failure?.reason_class || 'ENV_UNAVAILABLE',
-                        reason_code: preflight.failure?.reason_code || 'PREFLIGHT_FAILED',
-                        cause_layer: preflight.failure?.cause_layer || 'PAGE',
-                        retryable: Boolean(preflight.failure?.retryable),
-                        next_action: preflight.failure?.next_action || 'RETRY_LATER',
-                        suggestedDelayMs: preflight.failure?.suggestedDelayMs ?? null,
-                        count_attempt: Boolean(preflight.failure?.count_attempt),
+                        error: failure.error,
+                        reason: failure.reason,
+                        reason_class: failure.reason_class,
+                        reason_code: failure.reason_code || failure.reason,
+                        cause_layer: failure.cause_layer || null,
+                        retryable: failure.retryable,
+                        next_action: failure.next_action,
+                        suggestedDelayMs: failure.suggestedDelayMs,
+                        count_attempt: failure.count_attempt,
                         details: {
-                            ...(preflight.failure?.details || {}),
+                            ...(failure.details || {}),
                             ...(diag ? { diagnostic_storage: diag.storage, diagnosis_summary: diag.summary } : {}),
                         },
                     },
                     correlationId
                 );
 
-                this.stats.tasksRejected++;
-                return;
+                this.stats.driversCrashed++;
+                const targetForFailure = task?.spec?.target || payload?.target || 'chatgpt';
+                this._recordFailure(targetForFailure);
             }
-        }
-
-        // Tactical retries (browser-level) are still the same SSOT attempt (same correlationId).
-        // Emit DRIVER_TASK_STARTED only once per attempt to avoid inflating strategic attempts.
-        if (retryCount === 0) {
-            await this._emitBoth(
-                ADAPTER_EVENTS.TASK_STARTED,
-                ActionCode.DRIVER_TASK_STARTED,
-                {
-                    taskId,
-                    target,
-                    driverType: driver.constructor.name,
-                    driverState: driver.state,
-                    pageUrl,
-                    activeDrivers: this.activeDrivers.size,
-                },
-                correlationId
-            );
-        }
-
-        // Execute (timeout)
-        const executeStart = Date.now();
-        const systemMessage =
-            typeof task?.spec?.payload?.system_message === 'string' ? task.spec.payload.system_message.trim() : '';
-        const userMessage =
-            typeof task?.spec?.payload?.user_message === 'string' ? task.spec.payload.user_message.trim() : '';
-        const legacyPrompt =
-            typeof task?.spec?.prompt === 'string'
-                ? task.spec.prompt
-                : typeof task?.prompt === 'string'
-                  ? task.prompt
-                  : '';
-        const prompt = userMessage
-            ? systemMessage
-                ? `SYSTEM:\n${systemMessage}\n\nUSER:\n${userMessage}`
-                : userMessage
-            : legacyPrompt;
-        if (!prompt) {
-            throw new Error('[DriverNERVAdapter] Task prompt missing (expected spec.payload.user_message)');
-        }
-        const result = await this._withTimeout(
-            driver.execute(prompt),
-            ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
-            'driver.execute'
-        );
-        timings.execute = Date.now() - executeStart;
-
-        const duration = Date.now() - startTime;
-        this.stats.totalTaskDuration += duration;
-        this.stats.maxTaskDuration = Math.max(this.stats.maxTaskDuration, duration);
-        this.stats.minTaskDuration = Math.min(this.stats.minTaskDuration, duration);
-
-        timings.total = duration;
-        this._recordPerformanceMetrics(timings);
-
-        // Persist response (sem ReferenceError)
-        let persisted = null;
-        try {
-            persisted = await this._persistResponse(taskId, result, task, correlationId);
-            if (persisted) {
-                log('INFO', `[DriverNERVAdapter] Response saved for task ${taskId}`, correlationId);
-            }
-        } catch (saveError) {
-            log(
-                'ERROR',
-                `[DriverNERVAdapter] Failed to save response for ${taskId}: ${saveError?.message || String(saveError)}`,
-                correlationId
-            );
-        }
-
-        await this._emitBoth(
-            ADAPTER_EVENTS.TASK_COMPLETED,
-            ActionCode.DRIVER_TASK_COMPLETED,
-            {
-                taskId,
-                result,
-                storage: persisted?.storage || null,
-                storage_format: persisted?.format || null,
-                timings: {
-                    poolAcquire: timings.poolAcquire,
-                    contextAttach: timings.contextAttach,
-                    execute: timings.execute,
-                    total: duration,
-                },
-            },
-            correlationId
-        );
-
-        this.stats.tasksExecuted++;
-        this._recordSuccess(target);
-    } catch (error) {
-        const abortEntry = this.abortedTasks.get(taskId);
-        const wasAborted = abortEntry?.aborting;
-
-        if (wasAborted) {
-            if (!abortEntry.reported) {
-                log('WARN', `[DriverNERVAdapter] Task ${taskId} aborted during execution`, correlationId);
-
-                await this._emitBoth(
-                    ADAPTER_EVENTS.TASK_ABORTED,
-                    ActionCode.DRIVER_TASK_ABORTED,
-                    {
-                        taskId,
-                        reason: abortEntry.abortReason || 'USER_ABORT',
-                        message: 'Task execution was aborted by AbortSignal',
-                    },
-                    correlationId
-                );
-
-                abortEntry.reported = true;
-                this.abortedTasks.set(taskId, abortEntry);
-                this.stats.tasksAborted++;
-            }
-        } else {
-            const failure = this._classifyFailure(error);
-            if (failure.isTimeout) {
-                this.stats.tasksTimedOut++;
-            }
-
-            let diag = null;
+        } finally {
             try {
-                if (driver?.page && !(driver.page.isClosed && driver.page.isClosed())) {
-                    diag = await this._captureDiagnostics({
-                        taskId,
-                        correlationId,
-                        target,
-                        driver,
-                        page: driver.page,
-                        phase: 'execute',
-                        diagnosis: failure.details || null,
-                    });
+                if (activeEntry?.heartbeatTimer) {
+                    clearInterval(activeEntry.heartbeatTimer);
+                    activeEntry.heartbeatTimer = null;
                 }
             } catch (_) {
-                diag = null;
+                /* ignore */
             }
 
-            log(
-                'ERROR',
-                `[DriverNERVAdapter] Task failed (${failure.reason_class}/${failure.reason}): ${failure.error}`,
-                correlationId
-            );
-
-            await this._emitBoth(
-                ADAPTER_EVENTS.TASK_FAILED,
-                ActionCode.DRIVER_TASK_FAILED,
-                {
-                    taskId,
-                    error: failure.error,
-                    reason: failure.reason,
-                    reason_class: failure.reason_class,
-                    reason_code: failure.reason_code || failure.reason,
-                    cause_layer: failure.cause_layer || null,
-                    retryable: failure.retryable,
-                    next_action: failure.next_action,
-                    suggestedDelayMs: failure.suggestedDelayMs,
-                    count_attempt: failure.count_attempt,
-                    details: {
-                        ...(failure.details || {}),
-                        ...(diag ? { diagnostic_storage: diag.storage, diagnosis_summary: diag.summary } : {}),
-                    },
-                },
-                correlationId
-            );
-
-            this.stats.driversCrashed++;
-            const targetForFailure = task?.spec?.target || payload?.target || 'chatgpt';
-            this._recordFailure(targetForFailure);
-        }
-    } finally {
-        try {
-            if (activeEntry?.heartbeatTimer) {
-                clearInterval(activeEntry.heartbeatTimer);
-                activeEntry.heartbeatTimer = null;
+            // Cleanup listeners
+            try {
+                if (signal && abortHandler) {
+                    signal.removeEventListener('abort', abortHandler);
+                }
+            } catch (removeAbortListenerError) {
+                log(
+                    'WARN',
+                    `[DriverNERVAdapter] Falha ao remover listener de abort interno para ${taskId}: ${removeAbortListenerError?.message || String(removeAbortListenerError)}`,
+                    correlationId
+                );
             }
-        } catch (_) {
-            /* ignore */
-        }
 
-        // Cleanup listeners
-        try {
-            if (signal && abortHandler) {
-                signal.removeEventListener('abort', abortHandler);
+            // Remove forwarder do signal externo (evita leak)
+            try {
+                if (externalSignal && externalAbortForwarder) {
+                    externalSignal.removeEventListener('abort', externalAbortForwarder);
+                }
+            } catch (removeExternalAbortError) {
+                log(
+                    'WARN',
+                    `[DriverNERVAdapter] Falha ao remover listener de abort externo para ${taskId}: ${removeExternalAbortError?.message || String(removeExternalAbortError)}`,
+                    correlationId
+                );
             }
-        } catch (removeAbortListenerError) {
-            log(
-                'WARN',
-                `[DriverNERVAdapter] Falha ao remover listener de abort interno para ${taskId}: ${removeAbortListenerError?.message || String(removeAbortListenerError)}`,
-                correlationId
-            );
+
+            this.abortedTasks.delete(taskId);
+
+            await this._finallyCleanup(taskId, page, driver, listeners);
         }
-
-        // Remove forwarder do signal externo (evita leak)
-        try {
-            if (externalSignal && externalAbortForwarder) {
-                externalSignal.removeEventListener('abort', externalAbortForwarder);
-            }
-        } catch (removeExternalAbortError) {
-            log(
-                'WARN',
-                `[DriverNERVAdapter] Falha ao remover listener de abort externo para ${taskId}: ${removeExternalAbortError?.message || String(removeExternalAbortError)}`,
-                correlationId
-            );
-        }
-
-        this.abortedTasks.delete(taskId);
-
-        await this._finallyCleanup(taskId, page, driver, listeners);
-    }
     }
 
     async _abortTask(payload, correlationId) {
@@ -972,7 +973,11 @@ class DriverNERVAdapter extends EventEmitter {
 
         try {
             if (this.browserPool) {
-                browserPoolHealth = await this._withTimeout(this.browserPool.getHealth(), 5000, 'browserPool.getHealth');
+                browserPoolHealth = await this._withTimeout(
+                    this.browserPool.getHealth(),
+                    5000,
+                    'browserPool.getHealth'
+                );
             } else {
                 browserPoolHealth = { status: 'DEGRADED', reason: 'Pool not available' };
                 healthStatus = STATUS_VALUES.DEGRADED;
@@ -1243,14 +1248,19 @@ class DriverNERVAdapter extends EventEmitter {
 
             // Emit all events and wait for completion
             const results = await Promise.allSettled(
-                batch.map(({ actionCode, payload, correlationId }) => this._emitEvent(actionCode, payload, correlationId))
+                batch.map(({ actionCode, payload, correlationId }) =>
+                    this._emitEvent(actionCode, payload, correlationId)
+                )
             );
 
             const failedItems = [];
             results.forEach((result, index) => {
                 if (result.status === 'rejected') {
                     failedItems.push(batch[index]);
-                    log('WARN', `[DriverNERVAdapter] Telemetry emission failed: ${result.reason?.message || String(result.reason)}`);
+                    log(
+                        'WARN',
+                        `[DriverNERVAdapter] Telemetry emission failed: ${result.reason?.message || String(result.reason)}`
+                    );
                 }
             });
 
@@ -2229,7 +2239,10 @@ class DriverNERVAdapter extends EventEmitter {
                 try {
                     await this._withTimeout(this._flushTelemetry(), 5000, 'final_telemetry_flush');
                 } catch (err) {
-                    log('WARN', `[DriverNERVAdapter] Final telemetry flush failed during shutdown: ${err?.message || String(err)}`);
+                    log(
+                        'WARN',
+                        `[DriverNERVAdapter] Final telemetry flush failed during shutdown: ${err?.message || String(err)}`
+                    );
                 }
             }
 
@@ -2304,7 +2317,7 @@ class DriverNERVAdapter extends EventEmitter {
 
     async _persistResponse(taskId, result, task, correlationId) {
         const saver = this.config?.saveResponse;
-        if ( typeof saver !== 'function') return null;
+        if (typeof saver !== 'function') return null;
         return await saver(taskId, result, task, correlationId);
     }
 }

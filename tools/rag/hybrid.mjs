@@ -15,8 +15,8 @@ const { positionals, values } = parseArgs({
         model: { type: 'string' },
         rerank: { type: 'boolean', default: true },
         mmr: { type: 'boolean', default: true },
-        'mmr-lambda': { type: 'string' }
-    }
+        'mmr-lambda': { type: 'string' },
+    },
 });
 
 const query = positionals.join(' ').trim();
@@ -57,7 +57,7 @@ const result = await ragHybridSearch({
     model: values.model,
     rerank: values.rerank,
     mmr: values.mmr,
-    mmrLambda: values['mmr-lambda'] ? Number(values['mmr-lambda']) : undefined
+    mmrLambda: values['mmr-lambda'] ? Number(values['mmr-lambda']) : undefined,
 });
 
 if (values.json) {
@@ -67,7 +67,9 @@ if (values.json) {
     console.log(`Model: ${result.model} (${result.dim}D)`);
     console.log(`Features: Vector + FTS${result.rerank ? ' + Rerank' : ''}${result.mmr ? ' + MMR' : ''}`);
     if (result.mmr) {
-        console.log(`MMR lambda: ${result.mmrLambda} (${(result.mmrLambda * 100).toFixed(0)}% relevance, ${((1 - result.mmrLambda) * 100).toFixed(0)}% diversity)`);
+        console.log(
+            `MMR lambda: ${result.mmrLambda} (${(result.mmrLambda * 100).toFixed(0)}% relevance, ${((1 - result.mmrLambda) * 100).toFixed(0)}% diversity)`
+        );
     }
     console.log(`Found ${result.results.length} results:\n`);
 
@@ -78,7 +80,9 @@ if (values.json) {
         if (typeof r.rerank_score === 'number') {
             console.log(`    Rerank Score: ${r.rerank_score.toFixed(4)}`);
             if (r.rerank_signals) {
-                console.log(`    Signals: sem=${r.rerank_signals.semantic} lex=${r.rerank_signals.lexical} rec=${r.rerank_signals.recency} type=${r.rerank_signals.fileType} len=${r.rerank_signals.length} pos=${r.rerank_signals.position}`);
+                console.log(
+                    `    Signals: sem=${r.rerank_signals.semantic} lex=${r.rerank_signals.lexical} rec=${r.rerank_signals.recency} type=${r.rerank_signals.fileType} len=${r.rerank_signals.length} pos=${r.rerank_signals.position}`
+                );
             }
         } else {
             const score = typeof r.score === 'number' ? r.score.toFixed(4) : 'N/A';

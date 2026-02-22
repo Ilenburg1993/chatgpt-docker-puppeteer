@@ -6,7 +6,10 @@ import path from 'node:path';
 test('wave19: vite build mantém split/lazy e guardrails de bundle', async () => {
     const viteConfig = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/vite.config.js'), 'utf8');
     const taskDetail = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/src/views/TaskDetail.vue'), 'utf8');
-    const missionDetail = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/src/views/MissionDetail.vue'), 'utf8');
+    const missionDetail = await fs.readFile(
+        path.join(process.cwd(), 'src/dashboard-ui/src/views/MissionDetail.vue'),
+        'utf8'
+    );
 
     assert.match(viteConfig, /chunkSizeWarningLimit:\s*1000/);
     assert.match(viteConfig, /manualChunks/);
@@ -19,4 +22,3 @@ test('wave19: vite build mantém split/lazy e guardrails de bundle', async () =>
     assert.match(missionDetail, /defineAsyncComponent/);
     assert.match(missionDetail, /import\('\@\/components\/graphs\/VisGraph\.vue'\)/);
 });
-

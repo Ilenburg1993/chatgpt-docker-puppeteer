@@ -1,13 +1,16 @@
 # 🏠 Ambientes: Desenvolvimento vs Produção
 
 ## 🎯 O Problema
+
 Durante o desenvolvimento, é fácil confundir:
+
 - **Código fonte** (raiz do projeto) - para editar
 - **Código buildado** (`dist/`) - para executar
 
 ## 📋 Regras de Ouro
 
 ### ✅ SEMPRE edite código na RAIZ
+
 ```
 💻 /workspaces/chatgpt-docker-puppeteer/  ← EDIÇÃO AQUI
 ├── src/
@@ -17,6 +20,7 @@ Durante o desenvolvimento, é fácil confundir:
 ```
 
 ### ✅ SEMPRE execute da DIST
+
 ```
 📦 /workspaces/chatgpt-docker-puppeteer/dist/  ← EXECUÇÃO AQUI
 ├── main.bundle.js
@@ -27,22 +31,25 @@ Durante o desenvolvimento, é fácil confundir:
 ## 🔍 Como Verificar Ambiente
 
 ### Comando Rápido:
+
 ```bash
 npm run check:env
 ```
 
 ### Manual:
+
 ```bash
 # Na raiz (desenvolvimento)
 pwd  # Deve mostrar: /workspaces/chatgpt-docker-puppeteer
 
-# Na dist (produção)  
+# Na dist (produção)
 pwd  # Deve mostrar: /workspaces/chatgpt-docker-puppeteer/dist
 ```
 
 ## 🚀 Comandos por Ambiente
 
 ### Desenvolvimento (raiz):
+
 ```bash
 npm start              # Executar desenvolvimento
 npm run dev           # Com hot-reload
@@ -51,6 +58,7 @@ npm run test          # Testes
 ```
 
 ### Produção (dist/):
+
 ```bash
 cd dist
 node start.js                    # Executar
@@ -60,12 +68,14 @@ npx pm2 start ecosystem.config.cjs  # PM2
 ## ⚠️ Sinais de Alerta
 
 ### ❌ NUNCA faça isso:
+
 - Editar arquivos em `dist/`
 - Executar `npm install` em `dist/`
 - Commits com mudanças em `dist/`
 - Deploy direto da raiz (sem build)
 
 ### ✅ SEMPRE faça isso:
+
 - Edite apenas na raiz
 - Execute build antes do deploy
 - Use `npm run check:env` se duvidar
@@ -85,16 +95,19 @@ graph TD
 ## 🛠️ Ferramentas de Ajuda
 
 ### Verificar ambiente:
+
 ```bash
 npm run check:env
 ```
 
 ### Build e verificação:
+
 ```bash
 npm run build && npm run check:env
 ```
 
 ### Limpeza se necessário:
+
 ```bash
 rm -rf dist/          # Remove build
 npm run build        # Recria
@@ -111,6 +124,7 @@ npm run build        # Recria
 ## 📞 Quando Duvidar
 
 **Sempre pergunte:**
+
 1. `pwd` - Onde estou?
 2. `npm run check:env` - Que ambiente é este?
 3. Estou editando ou executando?

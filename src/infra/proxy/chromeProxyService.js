@@ -75,7 +75,7 @@ const LOCAL_CONFIG = {
     AUTO_HANDLE_SIGNALS: String(process.env.CHROME_PROXY_AUTO_HANDLE_SIGNALS || 'true').toLowerCase() !== 'false',
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',')
-        : ['http://localhost:3008', 'http://127.0.0.1:3008', 'http://localhost:8080', 'http://127.0.0.1:8080']
+        : ['http://localhost:3008', 'http://127.0.0.1:3008', 'http://localhost:8080', 'http://127.0.0.1:8080'],
 };
 
 /* ==========================================================================
@@ -127,7 +127,7 @@ class CircuitBreaker {
         if (this.state === 'OPEN') {
             if (Date.now() < this.nextAttempt) {
                 const waitMs = this.nextAttempt - Date.now();
-                throw new Error(`Circuit breaker [${this.name}] OPEN (retry in ${Math.ceil(waitMs/1000)}s)`);
+                throw new Error(`Circuit breaker [${this.name}] OPEN (retry in ${Math.ceil(waitMs / 1000)}s)`);
             }
             this.state = 'HALF_OPEN';
         }
@@ -183,7 +183,7 @@ class CircuitBreaker {
         return {
             state: this.state,
             failures: this.failures,
-            nextAttempt: this.nextAttempt > Date.now() ? this.nextAttempt - Date.now() : 0
+            nextAttempt: this.nextAttempt > Date.now() ? this.nextAttempt - Date.now() : 0,
         };
     }
 }
@@ -235,7 +235,7 @@ class ChromeProxyService {
         this._signalHandlersInstalled = false;
         this._signalHandlers = {
             sigint: null,
-            sigterm: null
+            sigterm: null,
         };
         this.stats = {
             httpRequests: 0,
@@ -243,7 +243,7 @@ class ChromeProxyService {
             errors: 0,
             startTime: Date.now(),
             cacheHits: 0,
-            cacheMisses: 0
+            cacheMisses: 0,
         };
 
         this.logger = logger;
@@ -261,58 +261,58 @@ class ChromeProxyService {
             httpRequests: new promClient.Counter({
                 name: 'chrome_proxy_http_requests_total',
                 help: 'Total HTTP requests',
-                labelNames: ['method', 'path', 'status']
+                labelNames: ['method', 'path', 'status'],
             }),
             wsUpgrades: new promClient.Counter({
                 name: 'chrome_proxy_ws_upgrades_total',
                 help: 'Total WebSocket upgrades',
-                labelNames: ['success']
+                labelNames: ['success'],
             }),
             proxyErrors: new promClient.Counter({
                 name: 'chrome_proxy_errors_total',
                 help: 'Total proxy errors',
-                labelNames: ['type']
+                labelNames: ['type'],
             }),
             activeConnections: new promClient.Gauge({
                 name: 'chrome_proxy_active_connections',
-                help: 'Active WebSocket connections'
+                help: 'Active WebSocket connections',
             }),
             requestDuration: new promClient.Histogram({
                 name: 'chrome_proxy_request_duration_seconds',
                 help: 'Request duration in seconds',
                 labelNames: ['method', 'path'],
-                buckets: [0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5]
+                buckets: [0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5],
             }),
             cacheHits: new promClient.Counter({
                 name: 'chrome_proxy_cache_hits_total',
-                help: 'Cache hits'
+                help: 'Cache hits',
             }),
             cacheMisses: new promClient.Counter({
                 name: 'chrome_proxy_cache_misses_total',
-                help: 'Cache misses'
+                help: 'Cache misses',
             }),
             circuitBreakerState: new promClient.Gauge({
                 name: 'chrome_proxy_circuit_breaker_state',
-                help: 'Circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)'
+                help: 'Circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)',
             }),
             // ✅ v3.0 New Metrics
             wsPerIPRejections: new promClient.Counter({
                 name: 'chrome_proxy_ws_per_ip_rejections_total',
-                help: 'Total WebSocket upgrades rejected due to per-IP limit'
+                help: 'Total WebSocket upgrades rejected due to per-IP limit',
             }),
             wsGlobalRejections: new promClient.Counter({
                 name: 'chrome_proxy_ws_global_rejections_total',
-                help: 'Total WebSocket upgrades rejected due to global limit'
+                help: 'Total WebSocket upgrades rejected due to global limit',
             }),
             httpBuffered: new promClient.Counter({
                 name: 'chrome_proxy_http_buffered_total',
                 help: 'Total HTTP responses buffered for rewriting',
-                labelNames: ['path']
+                labelNames: ['path'],
             }),
             httpStreamed: new promClient.Counter({
                 name: 'chrome_proxy_http_streamed_total',
-                help: 'Total HTTP responses streamed without buffering'
-            })
+                help: 'Total HTTP responses streamed without buffering',
+            }),
         };
 
         // Circuit breaker for Chrome connection
@@ -322,7 +322,7 @@ class ChromeProxyService {
         this.cache = {
             version: null,
             versionTTL: 30000, // 30s cache
-            versionExpires: 0
+            versionExpires: 0,
         };
 
         // Detect PUBLIC_IP
@@ -341,10 +341,10 @@ class ChromeProxyService {
         );
 
         // ✅ WebSocket Rate Limiting (DoS Protection)
-        this.wsConnectionsPerIP = new Map();  // IP → count
+        this.wsConnectionsPerIP = new Map(); // IP → count
         this.MAX_WS_GLOBAL = parseInt(process.env.CHROME_PROXY_MAX_WS_GLOBAL || '200', 10);
         this.MAX_WS_PER_IP = parseInt(process.env.CHROME_PROXY_MAX_WS_PER_IP || '20', 10);
-        this.WS_IP_CLEANUP_INTERVAL = 60000;  // Clean stale entries every 60s
+        this.WS_IP_CLEANUP_INTERVAL = 60000; // Clean stale entries every 60s
 
         // ✅ P1.5: Store cleanup interval handle for graceful shutdown
         this._ipCleanupInterval = setInterval(() => {
@@ -363,7 +363,7 @@ class ChromeProxyService {
             this.wsProxy = httpProxy.createProxyServer({
                 target: `http://${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`,
                 ws: true,
-                changeOrigin: true
+                changeOrigin: true,
             });
             this.wsProxy.on('error', (err, req, res) => {
                 this.stats.errors++;
@@ -384,7 +384,7 @@ class ChromeProxyService {
         }
     }
 
-        /* ======================================================================
+    /* ======================================================================
        Configuration Validation
     ====================================================================== */
     _validateConfig() {
@@ -499,7 +499,7 @@ class ChromeProxyService {
             // Non-critical: log once, don't spam
             this.log('debug', 'Metric increment failed (non-critical)', {
                 metric: metric?.name || 'unknown',
-                error: err.message
+                error: err.message,
             });
         }
     }
@@ -510,7 +510,7 @@ class ChromeProxyService {
         } catch (err) {
             this.log('debug', 'Metric observe failed (non-critical)', {
                 metric: metric?.name || 'unknown',
-                error: err.message
+                error: err.message,
             });
         }
     }
@@ -521,7 +521,7 @@ class ChromeProxyService {
         } catch (err) {
             this.log('debug', 'Metric set failed (non-critical)', {
                 metric: metric?.name || 'unknown',
-                error: err.message
+                error: err.message,
             });
         }
     }
@@ -530,7 +530,7 @@ class ChromeProxyService {
        NERV Integration (Optional)
     ====================================================================== */
     setNERV(nerv) {
-        this.nerv = nerv;  // ✅ Use this.nerv (not this._nerv) - align with all NERV adapters
+        this.nerv = nerv; // ✅ Use this.nerv (not this._nerv) - align with all NERV adapters
         this.log('info', 'NERV integration enabled');
     }
 
@@ -679,7 +679,7 @@ class ChromeProxyService {
             timeout = setTimeout(() => controller.abort(), 3000);
 
             const res = await fetch(`http://${this.config.CHROME_HOST}:${this.config.CHROME_PORT}/json/version`, {
-                signal: controller.signal
+                signal: controller.signal,
             });
 
             if (!res.ok) {
@@ -692,7 +692,7 @@ class ChromeProxyService {
                 healthy: true,
                 browser: json.Browser,
                 protocolVersion: json['Protocol-Version'],
-                webSocketDebuggerUrl: json.webSocketDebuggerUrl
+                webSocketDebuggerUrl: json.webSocketDebuggerUrl,
             };
         } catch (err) {
             return { healthy: false, error: err.message };
@@ -715,7 +715,7 @@ class ChromeProxyService {
 
                 const delay = baseDelay * Math.pow(2, attempt);
                 this.log('warn', `Retry ${attempt + 1}/${maxRetries} after ${delay}ms`, {
-                    error: err.message
+                    error: err.message,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -773,7 +773,7 @@ class ChromeProxyService {
                 'Content-Type': 'application/json',
                 'Content-Length': Buffer.byteLength(this.cache.version),
                 'X-Cache': 'HIT',
-                ...this._getCORSHeaders(req)
+                ...this._getCORSHeaders(req),
             });
             res.end(this.cache.version);
 
@@ -796,11 +796,11 @@ class ChromeProxyService {
             port: this.config.CHROME_PORT,
             path: url,
             method: method,
-            headers: req.headers
+            headers: req.headers,
         };
 
         // ✅ Wrap Chrome request with circuit breaker
-        const MAX_JSON_BUFFER_SIZE = 10 * 1024 * 1024;  // 10MB limit
+        const MAX_JSON_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB limit
 
         const proxyRequest = () => {
             return new Promise((resolve, reject) => {
@@ -863,19 +863,18 @@ class ChromeProxyService {
                         ...headers,
                         'Content-Length': Buffer.byteLength(finalData),
                         'X-Cache': 'MISS',
-                        ...this._getCORSHeaders(req)
+                        ...this._getCORSHeaders(req),
                     });
                     res.end(finalData);
 
                     this.log('debug', 'HTTP response sent (buffered)', {
                         status: proxyRes.statusCode,
                         length: finalData.length,
-                        rewritten: true
+                        rewritten: true,
                     });
 
                     // ✅ Metric: Buffered response
                     this._incrementMetric(this.metrics.httpBuffered, { path: url });
-
                 } else {
                     // ✅ Handle streamed response (no buffering)
                     const status = String(proxyRes.statusCode);
@@ -883,7 +882,7 @@ class ChromeProxyService {
 
                     res.writeHead(proxyRes.statusCode, {
                         ...proxyRes.headers,
-                        ...this._getCORSHeaders(req)
+                        ...this._getCORSHeaders(req),
                     });
 
                     proxyRes.pipe(res);
@@ -898,7 +897,7 @@ class ChromeProxyService {
                         if (!res.headersSent) {
                             res.writeHead(502, {
                                 'Content-Type': 'text/plain',
-                                ...this._getCORSHeaders(req)
+                                ...this._getCORSHeaders(req),
                             });
                             res.end('Stream error');
                         }
@@ -906,7 +905,7 @@ class ChromeProxyService {
 
                     this.log('debug', 'HTTP response streaming', {
                         status: proxyRes.statusCode,
-                        streaming: true
+                        streaming: true,
                     });
 
                     // ✅ Metric: Streamed response
@@ -930,7 +929,7 @@ class ChromeProxyService {
                             status: proxyRes.statusCode,
                             durationSeconds: duration,
                             buffered: needsRewrite,
-                            rewritten: needsRewrite
+                            rewritten: needsRewrite,
                         },
                         correlationId
                     );
@@ -948,11 +947,11 @@ class ChromeProxyService {
                 if (isCircuitBreakerError) {
                     // Circuit breaker is OPEN - return 503 with Retry-After
                     const cbState = this.circuitBreaker.getState();
-                    const retryInMs = cbState.nextAttempt;  // ✅ P0.2 FIX: Already "ms remaining", not timestamp
+                    const retryInMs = cbState.nextAttempt; // ✅ P0.2 FIX: Already "ms remaining", not timestamp
 
                     this.log('warn', 'Circuit breaker OPEN, rejecting HTTP request', {
                         path: url,
-                        retryInMs
+                        retryInMs,
                     });
 
                     this._incrementMetric(this.metrics.httpRequests, { method, path: url, status: '503' });
@@ -962,7 +961,7 @@ class ChromeProxyService {
                         res.writeHead(503, {
                             'Content-Type': 'application/json',
                             'Retry-After': Math.ceil(retryInMs / 1000),
-                            ...this._getCORSHeaders(req)
+                            ...this._getCORSHeaders(req),
                         });
 
                         res.end(
@@ -970,7 +969,7 @@ class ChromeProxyService {
                                 error: 'Chrome temporarily unavailable',
                                 circuitBreaker: 'OPEN',
                                 retryAfter: `${Math.ceil(retryInMs / 1000)}s`,
-                                hint: 'Chrome circuit breaker is protecting against cascading failures'
+                                hint: 'Chrome circuit breaker is protecting against cascading failures',
                             })
                         );
                     }
@@ -985,14 +984,14 @@ class ChromeProxyService {
                     if (!res.headersSent) {
                         res.writeHead(502, {
                             'Content-Type': 'application/json',
-                            ...this._getCORSHeaders(req)
+                            ...this._getCORSHeaders(req),
                         });
 
                         res.end(
                             JSON.stringify({
                                 error: 'Chrome unreachable',
                                 message: err.message,
-                                hint: `Ensure Chrome is running with --remote-debugging-port=${this.config.CHROME_PORT}`
+                                hint: `Ensure Chrome is running with --remote-debugging-port=${this.config.CHROME_PORT}`,
                             })
                         );
                     }
@@ -1034,14 +1033,14 @@ class ChromeProxyService {
                 errors: this.stats.errors,
                 activeConnections: this.activeConnections.size,
                 cacheHits: this.stats.cacheHits,
-                cacheMisses: this.stats.cacheMisses
-            }
+                cacheMisses: this.stats.cacheMisses,
+            },
         });
 
         res.writeHead(statusCode, {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(body),
-            ...this._getCORSHeaders(req)
+            ...this._getCORSHeaders(req),
         });
         res.end(body);
     }
@@ -1054,7 +1053,7 @@ class ChromeProxyService {
 
         // No origin header (same-origin request or curl)
         if (!origin) {
-            return {};  // ✅ No CORS headers (same-origin always allowed)
+            return {}; // ✅ No CORS headers (same-origin always allowed)
         }
 
         // Check whitelist
@@ -1063,7 +1062,7 @@ class ChromeProxyService {
                 'Access-Control-Allow-Origin': origin,
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-Request-Id, X-Correlation-Id',
-                'Access-Control-Allow-Credentials': 'true'
+                'Access-Control-Allow-Credentials': 'true',
             };
         }
 
@@ -1107,7 +1106,7 @@ class ChromeProxyService {
         this.stats.wsUpgrades++;
 
         const rawIP = socket.remoteAddress;
-        const clientIP = this._normalizeIP(rawIP);  // ✅ P1.6: Normalize IPv6-mapped addresses
+        const clientIP = this._normalizeIP(rawIP); // ✅ P1.6: Normalize IPv6-mapped addresses
         const url = req.url;
 
         this.log('info', `WebSocket upgrade: ${url}`, { from: clientIP });
@@ -1117,7 +1116,7 @@ class ChromeProxyService {
         if (origin && !this.config.ALLOWED_ORIGINS.includes(origin)) {
             this.log('warn', 'WebSocket upgrade rejected: Origin not in whitelist', {
                 origin,
-                url
+                url,
             });
 
             this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
@@ -1137,11 +1136,11 @@ class ChromeProxyService {
             // Check if it's time to attempt recovery (transition to HALF_OPEN)
             if (Date.now() < this.circuitBreaker.nextAttempt) {
                 const cbState = this.circuitBreaker.getState();
-                const retryInMs = cbState.nextAttempt;  // Already "ms remaining"
+                const retryInMs = cbState.nextAttempt; // Already "ms remaining"
 
                 this.log('warn', 'Circuit breaker OPEN, rejecting WS upgrade', {
                     url,
-                    retryInMs
+                    retryInMs,
                 });
 
                 this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
@@ -1167,12 +1166,12 @@ class ChromeProxyService {
             this.log('warn', 'Global WS limit reached', {
                 active: this.activeConnections.size,
                 limit: this.MAX_WS_GLOBAL,
-                from: clientIP
+                from: clientIP,
             });
 
             this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
             this._incrementMetric(this.metrics.proxyErrors, { type: 'ws_global_limit' });
-            this._incrementMetric(this.metrics.wsGlobalRejections);  // ✅ Specific metric
+            this._incrementMetric(this.metrics.wsGlobalRejections); // ✅ Specific metric
 
             socket.write('HTTP/1.1 503 Service Unavailable\r\n');
             socket.write('Content-Type: text/plain\r\n');
@@ -1189,12 +1188,12 @@ class ChromeProxyService {
             this.log('warn', 'Per-IP WS limit reached', {
                 ip: clientIP,
                 connections: ipConnections,
-                limit: this.MAX_WS_PER_IP
+                limit: this.MAX_WS_PER_IP,
             });
 
             this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
             this._incrementMetric(this.metrics.proxyErrors, { type: 'ws_per_ip_limit' });
-            this._incrementMetric(this.metrics.wsPerIPRejections);  // ✅ Specific metric
+            this._incrementMetric(this.metrics.wsPerIPRejections); // ✅ Specific metric
 
             socket.write('HTTP/1.1 429 Too Many Requests\r\n');
             socket.write('Content-Type: text/plain\r\n');
@@ -1211,7 +1210,7 @@ class ChromeProxyService {
         this.log('info', `WebSocket upgrade accepted: ${url}`, {
             from: clientIP,
             ipConnections: ipConnections + 1,
-            globalConnections: this.activeConnections.size + 1
+            globalConnections: this.activeConnections.size + 1,
         });
 
         /**
@@ -1230,18 +1229,18 @@ class ChromeProxyService {
         socket.on('data', () => markActive(socket));
 
         // ✅ TCP Keep-Alive (corrected from WebSocket API)
-        socket.setKeepAlive(true, 30000);  // Enable with 30s initial delay
+        socket.setKeepAlive(true, 30000); // Enable with 30s initial delay
 
         // ✅ Timeout mechanism (instead of ping/pong)
         const idleTimeout = this._idleTimeoutMs;
         socket.setTimeout(idleTimeout);
 
-            socket.on('timeout', () => {
-                const trackedSocket = /** @type {net.Socket & { __lastActivity?: number }} */ (socket);
-                const inactiveMs = Date.now() - (trackedSocket.__lastActivity || Date.now());
-                this.log('warn', 'WebSocket idle timeout', {
-                    idleMs: inactiveMs,
-                    threshold: idleTimeout
+        socket.on('timeout', () => {
+            const trackedSocket = /** @type {net.Socket & { __lastActivity?: number }} */ (socket);
+            const inactiveMs = Date.now() - (trackedSocket.__lastActivity || Date.now());
+            this.log('warn', 'WebSocket idle timeout', {
+                idleMs: inactiveMs,
+                threshold: idleTimeout,
             });
 
             socket.destroy();
@@ -1255,14 +1254,14 @@ class ChromeProxyService {
             if (cleanupDone) return;
             cleanupDone = true;
 
-            socket.setTimeout(0);  // Clear timeout
+            socket.setTimeout(0); // Clear timeout
             this.activeConnections.delete(socket);
-            this._decrementIPConnection(clientIP);  // ✅ Decrement per-IP counter
+            this._decrementIPConnection(clientIP); // ✅ Decrement per-IP counter
             this._setMetric(this.metrics.activeConnections, this.activeConnections.size);
 
             this.log('debug', 'WebSocket cleanup complete', {
                 ip: clientIP,
-                remainingFromIP: this.wsConnectionsPerIP.get(clientIP) || 0
+                remainingFromIP: this.wsConnectionsPerIP.get(clientIP) || 0,
             });
         };
         socket.on('close', cleanup);
@@ -1419,7 +1418,7 @@ class ChromeProxyService {
             this.log('info', 'http-proxy module ready');
         } catch (err) {
             this.log('warn', 'http-proxy initialization failed, using fallback', {
-                error: err.message
+                error: err.message,
             });
             this.wsProxy = null;
         }
@@ -1444,7 +1443,7 @@ class ChromeProxyService {
                 }
             } catch (err) {
                 this.log('warn', 'NERV initialization failed or not available, continuing without NERV', {
-                    error: err.message
+                    error: err.message,
                 });
                 this.nerv = null;
                 createNERV = null;
@@ -1472,7 +1471,7 @@ class ChromeProxyService {
                             if (req.headers['x-no-compression']) return false;
                             return compression.filter(req, res);
                         },
-                        threshold: 512
+                        threshold: 512,
                     })
                 );
             } catch (err) {
@@ -1487,7 +1486,7 @@ class ChromeProxyService {
                     message: 'Too many requests, please try again later',
                     standardHeaders: true,
                     legacyHeaders: false,
-                    skip: req => req.url === '/health' || req.url === '/healthz'
+                    skip: req => req.url === '/health' || req.url === '/healthz',
                 });
                 this.app.use(limiter);
             } catch (err) {
@@ -1530,11 +1529,13 @@ class ChromeProxyService {
                     this.log('error', 'Health check endpoint error', { error: err.message });
                     res.statusCode = 500;
                     res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({
-                        status: 'error',
-                        error: err.message,
-                        timestamp: Date.now()
-                    }));
+                    res.end(
+                        JSON.stringify({
+                            status: 'error',
+                            error: err.message,
+                            timestamp: Date.now(),
+                        })
+                    );
                 }
             });
 
@@ -1545,10 +1546,10 @@ class ChromeProxyService {
             this.server = http.createServer(this.app);
 
             // ✅ Configure HTTP timeouts (Node.js best practices)
-            this.server.headersTimeout = 65000;    // Headers timeout (65s > HAProxy 60s)
-            this.server.requestTimeout = 120000;   // Request timeout (2 minutes)
-            this.server.keepAliveTimeout = 65000;  // Keep-alive timeout
-            this.server.timeout = 0;               // Socket timeout (0 = disabled, use requestTimeout)
+            this.server.headersTimeout = 65000; // Headers timeout (65s > HAProxy 60s)
+            this.server.requestTimeout = 120000; // Request timeout (2 minutes)
+            this.server.keepAliveTimeout = 65000; // Keep-alive timeout
+            this.server.timeout = 0; // Socket timeout (0 = disabled, use requestTimeout)
 
             this.server.on('upgrade', this.handleWebSocketUpgrade.bind(this));
 
@@ -1640,7 +1641,10 @@ class ChromeProxyService {
             await this.stop();
             process.exit(0);
         } catch (err) {
-            this.log('error', 'Shutdown handler failed', { signal, error: err && err.message ? err.message : String(err) });
+            this.log('error', 'Shutdown handler failed', {
+                signal,
+                error: err && err.message ? err.message : String(err),
+            });
             process.exit(1);
         }
     }
@@ -1677,7 +1681,7 @@ class ChromeProxyService {
                 errors: this.stats.errors,
                 activeConnections: this.activeConnections.size,
                 cacheHits: this.stats.cacheHits,
-                cacheMisses: this.stats.cacheMisses
+                cacheMisses: this.stats.cacheMisses,
             });
 
             // Clear idle check interval

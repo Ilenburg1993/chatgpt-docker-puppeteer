@@ -19,7 +19,7 @@ describe('RAG env bootstrap', () => {
 
             const result = bootstrapRagEnv({ rootDir: tmpDir, useGlobalFlag: false });
             assert.ok(Array.isArray(result.loaded));
-            assert.ok(result.loaded.some((p) => p.endsWith('/.env')));
+            assert.ok(result.loaded.some(p => p.endsWith('/.env')));
             assert.strictEqual(process.env[varName], 'ok');
         } finally {
             delete process.env[varName];

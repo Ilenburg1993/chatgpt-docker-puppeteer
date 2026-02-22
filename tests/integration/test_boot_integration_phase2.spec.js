@@ -24,14 +24,14 @@ describe('Boot Integration - Phase 2 Components', () => {
             mode: 'local',
             correlation: true,
             bufferSize: 1000,
-            telemetry: false
+            telemetry: false,
         });
 
         // Fase 3.5: ContextManager Compartilhado
         contextManager = new ContextManager({
             strategy: 'sliding_window',
             maxTokens: 100000,
-            summarizationPolicy: 'on_overflow'
+            summarizationPolicy: 'on_overflow',
         });
 
         // Fase 4: Kernel (com ContextManager)
@@ -40,23 +40,23 @@ describe('Boot Integration - Phase 2 Components', () => {
             contextManager, // Compartilhado!
             telemetry: {
                 source: 'kernel',
-                retention: 1000
+                retention: 1000,
             },
             policy: {},
             loop: {
-                cycleInterval: 50
-            }
+                cycleInterval: 50,
+            },
         });
 
         // Fase 5.5: Mission Orchestration
         feedbackProcessor = new FeedbackProcessor({
-            contextManager
+            contextManager,
         });
 
         checkpointManager = new CheckpointManager({
             baseDir: 'missions-test-boot',
             keepLast: 10,
-            autoCleanup: true
+            autoCleanup: true,
         });
 
         missionManager = new MissionManager({
@@ -64,7 +64,7 @@ describe('Boot Integration - Phase 2 Components', () => {
             nerv,
             contextManager, // Compartilhado!
             feedbackProcessor,
-            checkpointManager
+            checkpointManager,
         });
 
         await missionManager.initialize();
@@ -124,7 +124,7 @@ describe('Boot Integration - Phase 2 Components', () => {
             feedbackProcessor.contextManager.addPattern({
                 type: 'FEEDBACK',
                 content: 'Test shared pattern',
-                metadata: { source: 'boot_test' }
+                metadata: { source: 'boot_test' },
             });
 
             // Verifica que pattern está acessível via MissionManager's contextManager
@@ -160,8 +160,8 @@ describe('Boot Integration - Phase 2 Components', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Boot Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             assert.ok(mission);
@@ -179,8 +179,8 @@ describe('Boot Integration - Phase 2 Components', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Feedback',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             // Adiciona feedback
@@ -200,17 +200,14 @@ describe('Boot Integration - Phase 2 Components', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Checkpoint',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             // Simula checkpoint save
-            const checkpointId = await checkpointManager.saveCheckpoint(
-                mission.id,
-                1,
-                mission,
-                { reason: 'boot_test' }
-            );
+            const checkpointId = await checkpointManager.saveCheckpoint(mission.id, 1, mission, {
+                reason: 'boot_test',
+            });
 
             assert.ok(checkpointId);
             assert.ok(checkpointId.startsWith('checkpoint-'));

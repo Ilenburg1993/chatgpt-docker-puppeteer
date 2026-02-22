@@ -1,15 +1,11 @@
 <template>
-    <TransitionGroup
-        name="notification"
-        tag="div"
-        class="fixed top-4 right-4 z-50 space-y-2 max-w-sm"
-    >
+    <TransitionGroup name="notification" tag="div" class="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
         <div
             v-for="notification in notifications"
             :key="notification.id"
             :class="[
                 'p-4 rounded-lg shadow-lg border-l-4 flex items-start justify-between max-w-sm',
-                getNotificationClasses(notification.type)
+                getNotificationClasses(notification.type),
             ]"
         >
             <div class="flex-1 pr-2">
@@ -21,7 +17,11 @@
                 :aria-label="'Fechar notificação'"
             >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    <path
+                        fill-rule="evenodd"
+                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                        clip-rule="evenodd"
+                    ></path>
                 </svg>
             </button>
         </div>
@@ -45,7 +45,7 @@ const { notifications, removeNotification } = useNotifications();
  * @param {'success'|'error'|'warning'|'info'} type - Tipo da notificação
  * @returns {string} Classes CSS para o tipo
  */
-const getNotificationClasses = (type) => {
+const getNotificationClasses = type => {
     const baseClasses = 'bg-white text-gray-800 border-gray-300';
 
     switch (type) {

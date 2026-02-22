@@ -26,10 +26,10 @@ try {
             stream: false,
             options: {
                 temperature: 0.3,
-                num_predict: 200
-            }
+                num_predict: 200,
+            },
         }),
-        signal: AbortSignal.timeout(60000)
+        signal: AbortSignal.timeout(60000),
     });
 
     const data = await response.json();
@@ -47,7 +47,10 @@ try {
         console.log('  - Modelo:', data.model);
         console.log('  - Duração total:', (data.total_duration / 1e9).toFixed(2), 'segundos');
         console.log('  - Tokens gerados:', data.eval_count || 'N/A');
-        console.log('  - Velocidade:', data.eval_count ? ((data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s') : 'N/A');
+        console.log(
+            '  - Velocidade:',
+            data.eval_count ? (data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s' : 'N/A'
+        );
     }
     console.log();
 } catch (error) {
@@ -72,10 +75,10 @@ try {
             stream: false,
             options: {
                 temperature: 0.7,
-                num_predict: 200
-            }
+                num_predict: 200,
+            },
         }),
-        signal: AbortSignal.timeout(60000)
+        signal: AbortSignal.timeout(60000),
     });
 
     const data = await response.json();
@@ -93,7 +96,10 @@ try {
         console.log('  - Modelo:', data.model);
         console.log('  - Duração total:', (data.total_duration / 1e9).toFixed(2), 'segundos');
         console.log('  - Tokens gerados:', data.eval_count || 'N/A');
-        console.log('  - Velocidade:', data.eval_count ? ((data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s') : 'N/A');
+        console.log(
+            '  - Velocidade:',
+            data.eval_count ? (data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s' : 'N/A'
+        );
     }
     console.log();
 } catch (error) {

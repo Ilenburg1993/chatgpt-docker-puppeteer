@@ -22,7 +22,7 @@ function waitForEvent(socket, eventName, timeoutMs = 1500) {
             reject(new Error(`Timeout waiting for ${eventName}`));
         }, timeoutMs);
 
-        socket.once(eventName, (data) => {
+        socket.once(eventName, data => {
             clearTimeout(timeout);
             resolve(data);
         });
@@ -43,7 +43,10 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_dashboard_realtime_contract_jwt_secret_123456789';
         process.env.DASHBOARD_SOCKET_AUTH_REQUIRED = 'true';
 
-        dbPath = path.join(os.tmpdir(), `maestro-test-dashboard-realtime-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+        dbPath = path.join(
+            os.tmpdir(),
+            `maestro-test-dashboard-realtime-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        );
         process.env.MAESTRO_DB_PATH = dbPath;
         try {
             fs.rmSync(dbPath, { force: true });
@@ -52,7 +55,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         const app = express();
         httpServer = http.createServer(app);
 
-        await new Promise((resolve) => {
+        await new Promise(resolve => {
             httpServer.listen(0, '127.0.0.1', () => resolve());
         });
 
@@ -94,7 +97,12 @@ describe('Dashboard realtime contract (Socket.io)', () => {
             result: {},
         });
         insertTask(seedTask, { stage: 'READY', status: 'PENDING', actor: 'system', ifNotExists: true });
-        recordEvent({ entityType: 'task', entityId: 'task-seed', eventType: 'TASK_SEEDED', payload: { id: 'task-seed' } });
+        recordEvent({
+            entityType: 'task',
+            entityId: 'task-seed',
+            eventType: 'TASK_SEEDED',
+            payload: { id: 'task-seed' },
+        });
 
         await waitForEvent(client, 'task:updates_batch', 8000);
     });
@@ -131,7 +139,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         try {
             if (httpServer) {
-                await new Promise((resolve) => httpServer.close(() => resolve()));
+                await new Promise(resolve => httpServer.close(() => resolve()));
                 httpServer = null;
             }
         } catch {}

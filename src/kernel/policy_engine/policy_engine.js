@@ -30,17 +30,19 @@
    Níveis Normativos
 =========================== */
 
+/** Constante/valor exportado: PolicyLevel. */
 const PolicyLevel = Object.freeze({
     LOW: 'LOW',
     MEDIUM: 'MEDIUM',
     HIGH: 'HIGH',
-    CRITICAL: 'CRITICAL'
+    CRITICAL: 'CRITICAL',
 });
 
 /* ===========================
    Tipos de Alerta Normativo
 =========================== */
 
+/** Constante/valor exportado: PolicyAlertType. */
 const PolicyAlertType = Object.freeze({
     BUDGET_PRESSURE: 'BUDGET_PRESSURE',
     OBSERVATION_INCONSISTENCY: 'OBSERVATION_INCONSISTENCY',
@@ -49,13 +51,14 @@ const PolicyAlertType = Object.freeze({
     TASK_AGE_EXCEEDED: 'TASK_AGE_EXCEEDED',
     CONFIGURATION_RISK: 'CONFIGURATION_RISK',
     OBSERVATION_GAP: 'OBSERVATION_GAP',
-    DUPLICATE_OBSERVATIONS: 'DUPLICATE_OBSERVATIONS'
+    DUPLICATE_OBSERVATIONS: 'DUPLICATE_OBSERVATIONS',
 });
 
 /* ===========================
    Fábrica do PolicyEngine
 =========================== */
 
+/** Classe exportada: PolicyEngine. */
 class PolicyEngine {
     /**
      * @param {Object} params
@@ -81,7 +84,7 @@ class PolicyEngine {
             maxStalledCycles: limits.maxStalledCycles ?? 10,
             maxObservationGapMs: limits.maxObservationGapMs ?? 30000, // 30 segundos
             maxDuplicateRatio: limits.maxDuplicateRatio ?? 0.3, // 30%
-            ...limits
+            ...limits,
         };
     }
 
@@ -132,7 +135,7 @@ class PolicyEngine {
         const assessment = Object.freeze({
             level,
             alerts: Object.freeze(alerts),
-            at
+            at,
         });
 
         // Telemetria normativa
@@ -140,7 +143,7 @@ class PolicyEngine {
             taskId: task.taskId,
             level,
             alertsCount: alerts.length,
-            at
+            at,
         });
 
         return assessment;
@@ -161,7 +164,7 @@ class PolicyEngine {
                     message: 'Volume elevado de observações para a tarefa',
                     value: observations.length,
                     limit: this.limits.maxObservationsPerTask,
-                    severity: 'HIGH'
+                    severity: 'HIGH',
                 })
             );
         }
@@ -181,7 +184,7 @@ class PolicyEngine {
                         message: 'Tarefa com idade lógica elevada',
                         value: ageMs,
                         limit: this.limits.maxTaskAgeMs,
-                        severity: 'CRITICAL'
+                        severity: 'CRITICAL',
                     })
                 );
             }
@@ -213,7 +216,7 @@ class PolicyEngine {
                     message: 'Gap temporal excessivo desde última observação',
                     value: gapMs,
                     limit: this.limits.maxObservationGapMs,
-                    severity: 'MEDIUM'
+                    severity: 'MEDIUM',
                 })
             );
         }
@@ -247,7 +250,7 @@ class PolicyEngine {
                     message: 'Taxa elevada de observações duplicadas',
                     value: duplicateRatio,
                     limit: this.limits.maxDuplicateRatio,
-                    severity: 'MEDIUM'
+                    severity: 'MEDIUM',
                 })
             );
         }
@@ -264,7 +267,7 @@ class PolicyEngine {
                     type: PolicyAlertType.CONFIGURATION_RISK,
                     message: 'Tarefa suspensa com observações acumuladas',
                     value: observations.length,
-                    severity: 'LOW'
+                    severity: 'LOW',
                 })
             );
         }
@@ -278,7 +281,7 @@ class PolicyEngine {
                     type: PolicyAlertType.CONFIGURATION_RISK,
                     message: 'Tarefa criada mas não ativada após tempo limite',
                     value: ageMs,
-                    severity: 'MEDIUM'
+                    severity: 'MEDIUM',
                 })
             );
         }
@@ -308,7 +311,7 @@ class PolicyEngine {
                         type: PolicyAlertType.TASK_STAGNATION,
                         message: 'Tarefa ativa sem progresso recente',
                         value: stalledMs,
-                        severity: 'HIGH'
+                        severity: 'HIGH',
                     })
                 );
             }
@@ -322,7 +325,7 @@ class PolicyEngine {
                         type: PolicyAlertType.TASK_STAGNATION,
                         message: 'Tarefa excedeu máximo de ciclos sem progresso',
                         value: task.stalledCycleCount,
-                        severity: 'CRITICAL'
+                        severity: 'CRITICAL',
                     })
                 );
             }
@@ -385,7 +388,7 @@ class PolicyEngine {
 
         this.telemetry.info('policy_engine_limits_updated', {
             limits: this.limits,
-            at: Date.now()
+            at: Date.now(),
         });
     }
 

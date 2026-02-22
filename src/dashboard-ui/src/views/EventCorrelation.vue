@@ -36,17 +36,26 @@ onMounted(() => {
                 </p>
             </div>
             <div class="flex items-center gap-2">
-                <Button size="sm" variant="ghost" @click="tab = 'ao_vivo'" :disabled="tab === 'ao_vivo'">Ao vivo</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'historico'" :disabled="tab === 'historico'">Histórico</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'ao_vivo'" :disabled="tab === 'ao_vivo'"
+                    >Ao vivo</Button
+                >
+                <Button size="sm" variant="ghost" @click="tab = 'historico'" :disabled="tab === 'historico'"
+                    >Histórico</Button
+                >
             </div>
         </div>
 
-        <div v-if="tab === 'ao_vivo'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+        <div
+            v-if="tab === 'ao_vivo'"
+            class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden"
+        >
             <div v-if="liveItems.length === 0" class="px-4 py-6 text-slate-400">Nenhum evento recebido ainda.</div>
             <div v-else class="divide-y divide-slate-800">
                 <div v-for="e in liveItems" :key="e.id" class="px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
-                        <div class="text-xs text-slate-400 font-mono truncate">#{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}</div>
+                        <div class="text-xs text-slate-400 font-mono truncate">
+                            #{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}
+                        </div>
                         <div class="text-xs text-slate-500">{{ new Date(e.ts_ms).toLocaleString() }}</div>
                     </div>
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
@@ -54,14 +63,22 @@ onMounted(() => {
                         <Badge size="sm">{{ e.actor_type }}</Badge>
                         <Badge v-if="e.actor_id" size="sm">{{ e.actor_id }}</Badge>
                     </div>
-                    <pre class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56">{{ JSON.stringify(e.payload, null, 2) }}</pre>
+                    <pre
+                        class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56"
+                        >{{ JSON.stringify(e.payload, null, 2) }}</pre
+                    >
                 </div>
             </div>
         </div>
 
         <div v-else class="space-y-4">
-            <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                <select v-model="store.filters.entity_type" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+            <div
+                class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-4 gap-3"
+            >
+                <select
+                    v-model="store.filters.entity_type"
+                    class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                >
                     <option :value="null">entity_type (todos)</option>
                     <option value="task">task</option>
                     <option value="mission">mission</option>
@@ -71,7 +88,9 @@ onMounted(() => {
                 <Input v-model="store.filters.entity_id" placeholder="entity_id (opcional)" />
                 <Input v-model="store.filters.event_type" placeholder="event_type (opcional)" />
                 <div class="flex justify-end">
-                    <Button size="sm" variant="primary" @click="refreshHistory" :disabled="store.loading">Aplicar</Button>
+                    <Button size="sm" variant="primary" @click="refreshHistory" :disabled="store.loading"
+                        >Aplicar</Button
+                    >
                 </div>
             </div>
 
@@ -86,7 +105,9 @@ onMounted(() => {
                 <div v-else class="divide-y divide-slate-800">
                     <div v-for="e in store.items" :key="e.id" class="px-4 py-3">
                         <div class="flex items-center justify-between gap-4">
-                            <div class="text-xs text-slate-400 font-mono truncate">#{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}</div>
+                            <div class="text-xs text-slate-400 font-mono truncate">
+                                #{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}
+                            </div>
                             <div class="text-xs text-slate-500">{{ new Date(e.ts_ms).toLocaleString() }}</div>
                         </div>
                         <div class="flex items-center gap-2 mt-1 flex-wrap">
@@ -94,15 +115,23 @@ onMounted(() => {
                             <Badge size="sm">{{ e.actor_type }}</Badge>
                             <Badge v-if="e.actor_id" size="sm">{{ e.actor_id }}</Badge>
                         </div>
-                        <pre class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56">{{ JSON.stringify(e.payload, null, 2) }}</pre>
+                        <pre
+                            class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56"
+                            >{{ JSON.stringify(e.payload, null, 2) }}</pre
+                        >
                     </div>
                 </div>
             </div>
 
             <div class="flex justify-center" v-if="store.hasMore">
-                <Button variant="secondary" size="sm" @click="store.fetchNextPage({ limit: 200 })" :disabled="store.loading">Carregar mais</Button>
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    @click="store.fetchNextPage({ limit: 200 })"
+                    :disabled="store.loading"
+                    >Carregar mais</Button
+                >
             </div>
         </div>
     </div>
 </template>
-

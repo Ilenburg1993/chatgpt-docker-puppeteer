@@ -53,7 +53,7 @@ test('wave2: shutdown does not call process.exit by default', async () => {
     }
 });
 
-test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async (t) => {
+test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async t => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wave2-env-bootstrap-'));
     t.after(async () => {
         await rm(tmpDir, { recursive: true, force: true });

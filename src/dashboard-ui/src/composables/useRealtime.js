@@ -26,33 +26,33 @@ export function useRealtime(options = {}) {
     // Handlers para eventos Socket.io
     const handlers = {
         // Telemetria (1Hz)
-        'telemetry:metrics': (data) => {
+        'telemetry:metrics': data => {
             telemetryStore.handleTelemetryMetrics(data);
         },
 
         // Batch de updates de tasks (debounced)
-        'task:updates_batch': (data) => {
+        'task:updates_batch': data => {
             taskStore.handleTaskUpdatesBatch(data);
         },
 
         // Alertas
-        'alert:triggered': (data) => {
+        'alert:triggered': data => {
             systemStore.handleAlert(data);
         },
 
         // Health updates por componente
-        'health:api': (data) => {
+        'health:api': data => {
             systemStore.handleHealthUpdate('api', data);
         },
-        'health:queue': (data) => {
+        'health:queue': data => {
             systemStore.handleHealthUpdate('queue', data);
         },
-        'health:memory': (data) => {
+        'health:memory': data => {
             systemStore.handleHealthUpdate('memory', data);
         },
-        'health:kernel': (data) => {
+        'health:kernel': data => {
             systemStore.handleHealthUpdate('kernel', data);
-        }
+        },
     };
 
     /**
@@ -76,7 +76,7 @@ export function useRealtime(options = {}) {
     };
 
     // Watch connection status
-    watch(isConnected, (connected) => {
+    watch(isConnected, connected => {
         telemetryStore.setConnected(connected);
 
         if (connected) {
@@ -108,7 +108,7 @@ export function useRealtime(options = {}) {
         isConnected,
         taskStore,
         telemetryStore,
-        systemStore
+        systemStore,
     };
 }
 

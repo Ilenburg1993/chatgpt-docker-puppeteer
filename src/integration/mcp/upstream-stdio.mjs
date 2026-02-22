@@ -25,6 +25,7 @@
 import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 
+/** Classe exportada: MCPUpstreamStdio. */
 export class MCPUpstreamStdio extends EventEmitter {
     /**
      * Create MCP Upstream Stdio handler
@@ -66,16 +67,16 @@ export class MCPUpstreamStdio extends EventEmitter {
         // Spawn process
         this.process = spawn(this.command, this.args, {
             env: this.env,
-            stdio: ['pipe', 'pipe', 'pipe']
+            stdio: ['pipe', 'pipe', 'pipe'],
         });
 
         // Handle stdout (JSON-RPC responses)
-        this.process.stdout.on('data', (data) => {
+        this.process.stdout.on('data', data => {
             this._handleStdout(data);
         });
 
         // Handle stderr (logs from upstream server)
-        this.process.stderr.on('data', (data) => {
+        this.process.stderr.on('data', data => {
             const msg = data.toString().trim();
             if (msg) {
                 console.error(`[MCP Upstream] stderr: ${msg}`);
@@ -90,7 +91,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         });
 
         // Handle process errors
-        this.process.on('error', (error) => {
+        this.process.on('error', error => {
             console.error(`[MCP Upstream] Process error:`, error);
             this.emit('error', error);
         });
@@ -103,12 +104,12 @@ export class MCPUpstreamStdio extends EventEmitter {
             const initResult = await this._sendRequest('initialize', {
                 protocolVersion: '2024-11-05',
                 capabilities: {
-                    tools: {}
+                    tools: {},
                 },
                 clientInfo: {
                     name: 'chatgpt-docker-upstream',
-                    version: '1.0.0'
-                }
+                    version: '1.0.0',
+                },
             });
 
             console.error('[MCP Upstream] Initialize response:', JSON.stringify(initResult, null, 2));
@@ -118,7 +119,6 @@ export class MCPUpstreamStdio extends EventEmitter {
 
             this.initialized = true;
             console.error('[MCP Upstream] Ready');
-
         } catch (error) {
             this.stop();
             throw new Error(`Failed to initialize upstream: ${error.message}`); // eslint-disable-line preserve-caught-error
@@ -211,7 +211,7 @@ export class MCPUpstreamStdio extends EventEmitter {
             jsonrpc: '2.0',
             id,
             method,
-            params
+            params,
         };
 
         return new Promise((resolve, reject) => {
@@ -235,14 +235,14 @@ export class MCPUpstreamStdio extends EventEmitter {
             const originalReject = reject;
 
             this.pendingRequests.set(id, {
-                resolve: (result) => {
+                resolve: result => {
                     clearTimeout(timeoutId);
                     originalResolve(result);
                 },
-                reject: (error) => {
+                reject: error => {
                     clearTimeout(timeoutId);
                     originalReject(error);
-                }
+                },
             });
         });
     }
@@ -258,7 +258,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         const notification = {
             jsonrpc: '2.0',
             method,
-            params
+            params,
         };
 
         const line = JSON.stringify(notification) + '\n';
@@ -273,7 +273,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      */
     async listTools() {
         if (!this.initialized) {
-            throw new Error('MCP Upstream not initialized');  
+            throw new Error('MCP Upstream not initialized');
         }
 
         return this._sendRequest('tools/list');
@@ -289,12 +289,12 @@ export class MCPUpstreamStdio extends EventEmitter {
      */
     async callTool(name, args = {}) {
         if (!this.initialized) {
-            throw new Error('MCP Upstream not initialized');  
+            throw new Error('MCP Upstream not initialized');
         }
 
         return this._sendRequest('tools/call', {
             name,
-            arguments: args
+            arguments: args,
         });
     }
 
@@ -319,11 +319,11 @@ export class MCPUpstreamStdio extends EventEmitter {
         }
 
         // Wait for process to exit (max 5s)
-        const exitPromise = new Promise((resolve) => {
+        const exitPromise = new Promise(resolve => {
             this.process.once('exit', resolve);
         });
 
-        const timeoutPromise = new Promise((resolve) => {
+        const timeoutPromise = new Promise(resolve => {
             setTimeout(() => {
                 console.error('[MCP Upstream] Process did not exit gracefully, killing...');
                 this.process.kill('SIGTERM');

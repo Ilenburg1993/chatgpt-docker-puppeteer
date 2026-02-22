@@ -35,7 +35,7 @@ function offsetToLineChar(sourceFile, offset) {
     const lc = ts.getLineAndCharacterOfPosition(sourceFile, Math.max(0, offset || 0));
     return {
         line: lc.line + 1,
-        character: lc.character + 1
+        character: lc.character + 1,
     };
 }
 
@@ -48,10 +48,7 @@ function applyTextChanges(originalText, textChanges) {
     const sorted = [...textChanges].sort((a, b) => b.start - a.start);
     let next = originalText;
     for (const change of sorted) {
-        next =
-            next.slice(0, change.start) +
-            change.newText +
-            next.slice(change.start + change.length);
+        next = next.slice(0, change.start) + change.newText + next.slice(change.start + change.length);
     }
     return next;
 }
@@ -66,7 +63,7 @@ function createLanguageService(rootDir, extraFile) {
         checkJs: true,
         module: ts.ModuleKind.NodeNext,
         moduleResolution: ts.ModuleResolutionKind.NodeNext,
-        target: ts.ScriptTarget.ES2022
+        target: ts.ScriptTarget.ES2022,
     };
     let fileNames = [];
 
@@ -85,13 +82,13 @@ function createLanguageService(rootDir, extraFile) {
         fileNames.push(fullExtra);
     }
 
-    const scriptVersions = new Map(fileNames.map((f) => [normalizePath(f), '1']));
+    const scriptVersions = new Map(fileNames.map(f => [normalizePath(f), '1']));
     const normalizedFileNames = [...new Set(fileNames.map(normalizePath))];
 
     const host = {
         getScriptFileNames: () => normalizedFileNames,
-        getScriptVersion: (fileName) => scriptVersions.get(normalizePath(fileName)) || '1',
-        getScriptSnapshot: (fileName) => {
+        getScriptVersion: fileName => scriptVersions.get(normalizePath(fileName)) || '1',
+        getScriptSnapshot: fileName => {
             const full = normalizePath(fileName);
             if (!fs.existsSync(full)) return undefined;
             const content = fs.readFileSync(full, 'utf8');
@@ -99,21 +96,22 @@ function createLanguageService(rootDir, extraFile) {
         },
         getCurrentDirectory: () => rootDir,
         getCompilationSettings: () => compilerOptions,
-        getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
+        getDefaultLibFileName: options => ts.getDefaultLibFilePath(options),
         fileExists: ts.sys.fileExists,
         readFile: ts.sys.readFile,
         readDirectory: ts.sys.readDirectory,
         directoryExists: ts.sys.directoryExists,
-        getDirectories: ts.sys.getDirectories
+        getDirectories: ts.sys.getDirectories,
     };
 
     const languageService = ts.createLanguageService(host, ts.createDocumentRegistry());
     return {
         languageService,
-        dispose: () => languageService.dispose()
+        dispose: () => languageService.dispose(),
     };
 }
 
+/** Classe exportada: TsserverDaemon. */
 class TsserverDaemon {
     constructor(options = {}) {
         this.rootDir = normalizePath(options.rootDir || process.cwd());
@@ -131,7 +129,7 @@ class TsserverDaemon {
         return {
             started: true,
             rootDir: this.rootDir,
-            timeoutMs: this.timeoutMs
+            timeoutMs: this.timeoutMs,
         };
     }
 
@@ -210,21 +208,23 @@ class TsserverDaemon {
             if (!source) return [];
             const offset = lineCharToOffset(source, params.line, params.character);
             const defs = languageService.getDefinitionAtPosition(filePath, offset) || [];
-            return defs.map((d) => {
-                const sourceFile = languageService.getProgram()?.getSourceFile(d.fileName);
-                if (!sourceFile) return null;
-                const start = offsetToLineChar(sourceFile, d.textSpan.start);
-                const end = offsetToLineChar(sourceFile, d.textSpan.start + d.textSpan.length);
-                return {
-                    filePath: d.fileName,
-                    line: start.line,
-                    character: start.character,
-                    endLine: end.line,
-                    endCharacter: end.character,
-                    kind: d.kind,
-                    name: d.name
-                };
-            }).filter(Boolean);
+            return defs
+                .map(d => {
+                    const sourceFile = languageService.getProgram()?.getSourceFile(d.fileName);
+                    if (!sourceFile) return null;
+                    const start = offsetToLineChar(sourceFile, d.textSpan.start);
+                    const end = offsetToLineChar(sourceFile, d.textSpan.start + d.textSpan.length);
+                    return {
+                        filePath: d.fileName,
+                        line: start.line,
+                        character: start.character,
+                        endLine: end.line,
+                        endCharacter: end.character,
+                        kind: d.kind,
+                        name: d.name,
+                    };
+                })
+                .filter(Boolean);
         } finally {
             dispose();
         }
@@ -239,22 +239,25 @@ class TsserverDaemon {
             if (!source) return [];
             const offset = lineCharToOffset(source, params.line, params.character);
             const refs = languageService.getReferencesAtPosition(filePath, offset) || [];
-            return refs.slice(0, DEFAULT_MAX_RESULTS).map((ref) => {
-                const sourceFile = languageService.getProgram()?.getSourceFile(ref.fileName);
-                if (!sourceFile) return null;
-                const start = offsetToLineChar(sourceFile, ref.textSpan.start);
-                const end = offsetToLineChar(sourceFile, ref.textSpan.start + ref.textSpan.length);
-                const refAny = /** @type {any} */ (ref);
-                return {
-                    filePath: ref.fileName,
-                    line: start.line,
-                    character: start.character,
-                    endLine: end.line,
-                    endCharacter: end.character,
-                    isDefinition: Boolean(refAny.isDefinition),
-                    isWriteAccess: Boolean(refAny.isWriteAccess)
-                };
-            }).filter(Boolean);
+            return refs
+                .slice(0, DEFAULT_MAX_RESULTS)
+                .map(ref => {
+                    const sourceFile = languageService.getProgram()?.getSourceFile(ref.fileName);
+                    if (!sourceFile) return null;
+                    const start = offsetToLineChar(sourceFile, ref.textSpan.start);
+                    const end = offsetToLineChar(sourceFile, ref.textSpan.start + ref.textSpan.length);
+                    const refAny = /** @type {any} */ (ref);
+                    return {
+                        filePath: ref.fileName,
+                        line: start.line,
+                        character: start.character,
+                        endLine: end.line,
+                        endCharacter: end.character,
+                        isDefinition: Boolean(refAny.isDefinition),
+                        isWriteAccess: Boolean(refAny.isWriteAccess),
+                    };
+                })
+                .filter(Boolean);
         } finally {
             dispose();
         }
@@ -274,7 +277,7 @@ class TsserverDaemon {
                 kind: info.kind,
                 kindModifiers: info.kindModifiers,
                 display: ts.displayPartsToString(info.displayParts || []),
-                documentation: ts.displayPartsToString(info.documentation || [])
+                documentation: ts.displayPartsToString(info.documentation || []),
             };
         } finally {
             dispose();
@@ -296,7 +299,7 @@ class TsserverDaemon {
                         kind: node.kind,
                         parent,
                         start: span.start,
-                        length: span.length
+                        length: span.length,
                     });
                 }
                 for (const child of node.childItems || []) {
@@ -317,12 +320,12 @@ class TsserverDaemon {
         try {
             const maxResultCount = Number(params.maxResults || DEFAULT_MAX_RESULTS);
             const items = languageService.getNavigateToItems(query, undefined, undefined) || [];
-            return items.slice(0, maxResultCount).map((item) => ({
+            return items.slice(0, maxResultCount).map(item => ({
                 name: item.name,
                 kind: item.kind,
                 filePath: item.fileName,
                 containerName: item.containerName,
-                matchKind: item.matchKind
+                matchKind: item.matchKind,
             }));
         } finally {
             dispose();
@@ -339,9 +342,9 @@ class TsserverDaemon {
             const diagnostics = [
                 ...languageService.getSyntacticDiagnostics(filePath),
                 ...languageService.getSemanticDiagnostics(filePath),
-                ...languageService.getSuggestionDiagnostics(filePath)
+                ...languageService.getSuggestionDiagnostics(filePath),
             ];
-            return diagnostics.slice(0, DEFAULT_MAX_RESULTS).map((diag) => {
+            return diagnostics.slice(0, DEFAULT_MAX_RESULTS).map(diag => {
                 const start = offsetToLineChar(source, diag.start || 0);
                 const end = offsetToLineChar(source, (diag.start || 0) + (diag.length || 0));
                 return {
@@ -351,7 +354,7 @@ class TsserverDaemon {
                     line: start.line,
                     character: start.character,
                     endLine: end.line,
-                    endCharacter: end.character
+                    endCharacter: end.character,
                 };
             });
         } finally {
@@ -368,29 +371,27 @@ class TsserverDaemon {
             if (!source) return [];
 
             const start = lineCharToOffset(source, params.line, params.character);
-            const end = lineCharToOffset(source, params.endLine || params.line, params.endCharacter || params.character);
+            const end = lineCharToOffset(
+                source,
+                params.endLine || params.line,
+                params.endCharacter || params.character
+            );
             const diagnostics = [
                 ...languageService.getSyntacticDiagnostics(filePath),
-                ...languageService.getSemanticDiagnostics(filePath)
+                ...languageService.getSemanticDiagnostics(filePath),
             ];
             const rangeCodes = diagnostics
-                .filter((diag) => {
+                .filter(diag => {
                     const dStart = diag.start || 0;
                     const dEnd = dStart + (diag.length || 0);
                     return dStart <= end && dEnd >= start;
                 })
-                .map((diag) => diag.code);
+                .map(diag => diag.code);
 
             if (rangeCodes.length === 0) return [];
 
-            const fixes = languageService.getCodeFixesAtPosition(
-                filePath,
-                start,
-                end,
-                [...new Set(rangeCodes)],
-                {},
-                {}
-            ) || [];
+            const fixes =
+                languageService.getCodeFixesAtPosition(filePath, start, end, [...new Set(rangeCodes)], {}, {}) || [];
 
             const maxResults = Number(params.maxResults || process.env.LSP_MAX_RESULTS || DEFAULT_MAX_RESULTS);
             return fixes.slice(0, maxResults).map((fix, index) => ({
@@ -399,14 +400,14 @@ class TsserverDaemon {
                 kind: 'quickfix',
                 source: 'typescript',
                 fixName: fix.fixName,
-                edits: (fix.changes || []).flatMap((change) =>
-                    (change.textChanges || []).map((textChange) => ({
+                edits: (fix.changes || []).flatMap(change =>
+                    (change.textChanges || []).map(textChange => ({
                         filePath: change.fileName,
                         start: textChange.span.start,
                         length: textChange.span.length,
-                        newText: textChange.newText
+                        newText: textChange.newText,
                     }))
-                )
+                ),
             }));
         } finally {
             dispose();
@@ -434,7 +435,7 @@ class TsserverDaemon {
             list.push({
                 start: Number(edit.start || 0),
                 length: Number(edit.length || 0),
-                newText: String(edit.newText || '')
+                newText: String(edit.newText || ''),
             });
             grouped.set(fullPath, list);
         }
@@ -447,7 +448,7 @@ class TsserverDaemon {
                 filePath,
                 editCount: fileEdits.length,
                 beforeBytes: Buffer.byteLength(before, 'utf8'),
-                afterBytes: Buffer.byteLength(after, 'utf8')
+                afterBytes: Buffer.byteLength(after, 'utf8'),
             });
         }
 
@@ -457,7 +458,7 @@ class TsserverDaemon {
                 title: action.title || 'Code action preview',
                 files: previews,
                 totalEdits: edits.length,
-                totalBytes
+                totalBytes,
             };
         }
 
@@ -483,23 +484,25 @@ class TsserverDaemon {
             title: action.title || 'Code action applied',
             files: previews,
             totalEdits: edits.length,
-            totalBytes
+            totalBytes,
         };
     }
 }
 
 let singleton = null;
 
+/** Função exportada: getTsserverDaemon. */
 export function getTsserverDaemon() {
     if (!singleton) {
         singleton = new TsserverDaemon({
             rootDir: process.cwd(),
-            timeoutMs: Number(process.env.LSP_TOOL_TIMEOUT_MS || DEFAULT_TIMEOUT_MS)
+            timeoutMs: Number(process.env.LSP_TOOL_TIMEOUT_MS || DEFAULT_TIMEOUT_MS),
         });
     }
     return singleton;
 }
 
+/** Função exportada: startTsserverDaemon. */
 export async function startTsserverDaemon(options = {}) {
     const daemon = getTsserverDaemon();
     if (options.timeoutMs) {
@@ -508,6 +511,7 @@ export async function startTsserverDaemon(options = {}) {
     return daemon.start();
 }
 
+/** Função exportada: stopTsserverDaemon. */
 export async function stopTsserverDaemon() {
     if (!singleton) return { stopped: true };
     return singleton.stop();

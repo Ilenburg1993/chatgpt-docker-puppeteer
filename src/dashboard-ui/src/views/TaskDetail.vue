@@ -69,7 +69,9 @@ function resolveReason(defaultReason, errorMessage) {
     const typed = String(commandReason.value || '').trim();
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-        const prompted = String(window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '').trim();
+        const prompted = String(
+            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || ''
+        ).trim();
         if (prompted) {
             commandReason.value = prompted;
             return prompted;
@@ -131,12 +133,7 @@ async function saveBasics() {
             },
         },
     };
-    await tasksStore.patchTask(
-        taskId.value,
-        payload,
-        reason,
-        currentTaskVersion()
-    );
+    await tasksStore.patchTask(taskId.value, payload, reason, currentTaskVersion());
     await fetchDetail();
 }
 
@@ -155,12 +152,7 @@ async function saveDependencies() {
         alert('JSON de dependências inválido (use ["task-..."]).');
         return;
     }
-    await tasksStore.setDependencies(
-        taskId.value,
-        deps,
-        reason,
-        currentTaskVersion()
-    );
+    await tasksStore.setDependencies(taskId.value, deps, reason, currentTaskVersion());
     await fetchDetail();
 }
 
@@ -176,12 +168,7 @@ async function saveJsonAdvanced() {
         alert('JSON inválido');
         return;
     }
-    await tasksStore.patchTask(
-        taskId.value,
-        obj,
-        reason,
-        currentTaskVersion()
-    );
+    await tasksStore.patchTask(taskId.value, obj, reason, currentTaskVersion());
     await fetchDetail();
 }
 
@@ -219,12 +206,7 @@ async function reassignMission() {
     ) {
         return;
     }
-    await tasksStore.reassignTaskMission(
-        taskId.value,
-        reassignMissionId.value,
-        reason,
-        currentTaskVersion()
-    );
+    await tasksStore.reassignTaskMission(taskId.value, reassignMissionId.value, reason, currentTaskVersion());
     await fetchDetail();
 }
 
@@ -278,28 +260,65 @@ watch(taskId, () => void fetchDetail());
                             <div class="text-sm text-slate-400">Stage/Status/Target</div>
                             <div class="flex items-center gap-2 flex-wrap mt-1">
                                 <Badge size="sm">{{ task.stage }}</Badge>
-                                <Badge size="sm" :variant="statusVariant(task.unified_status)">{{ task.unified_status }}</Badge>
+                                <Badge size="sm" :variant="statusVariant(task.unified_status)">{{
+                                    task.unified_status
+                                }}</Badge>
                                 <Badge size="sm">{{ task.spec?.target }}</Badge>
                                 <Badge size="sm">pri: {{ task.meta?.priority ?? 0 }}</Badge>
                                 <Badge size="sm" v-if="task.mission_ref?.id">
                                     mission:
-                                    <button class="font-mono underline-offset-2 hover:underline" @click.stop="router.push(`/missions/${task.mission_ref.id}`)">
+                                    <button
+                                        class="font-mono underline-offset-2 hover:underline"
+                                        @click.stop="router.push(`/missions/${task.mission_ref.id}`)"
+                                    >
                                         {{ task.mission_ref.title || task.mission_ref.id }}
                                     </button>
                                 </Badge>
                             </div>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap justify-end">
-                            <Button v-if="task.command_caps?.can_pause" variant="secondary" size="sm" @click="action('pause')">Pausar</Button>
-                            <Button v-if="task.command_caps?.can_resume" variant="secondary" size="sm" @click="action('resume')">Retomar</Button>
-                            <Button v-if="task.command_caps?.can_unblock" variant="secondary" size="sm" @click="action('unblock')">Desbloquear</Button>
-                            <Button v-if="task.command_caps?.can_retry" variant="ghost" size="sm" @click="action('retry')">Reexecutar</Button>
-                            <Button v-if="task.command_caps?.can_cancel" variant="danger" size="sm" @click="action('cancel')">Cancelar</Button>
+                            <Button
+                                v-if="task.command_caps?.can_pause"
+                                variant="secondary"
+                                size="sm"
+                                @click="action('pause')"
+                                >Pausar</Button
+                            >
+                            <Button
+                                v-if="task.command_caps?.can_resume"
+                                variant="secondary"
+                                size="sm"
+                                @click="action('resume')"
+                                >Retomar</Button
+                            >
+                            <Button
+                                v-if="task.command_caps?.can_unblock"
+                                variant="secondary"
+                                size="sm"
+                                @click="action('unblock')"
+                                >Desbloquear</Button
+                            >
+                            <Button
+                                v-if="task.command_caps?.can_retry"
+                                variant="ghost"
+                                size="sm"
+                                @click="action('retry')"
+                                >Reexecutar</Button
+                            >
+                            <Button
+                                v-if="task.command_caps?.can_cancel"
+                                variant="danger"
+                                size="sm"
+                                @click="action('cancel')"
+                                >Cancelar</Button
+                            >
                         </div>
                     </div>
                 </template>
 
-                <div class="text-sm text-slate-300 whitespace-pre-wrap bg-slate-950/40 border border-slate-800 rounded-lg p-3 font-mono">
+                <div
+                    class="text-sm text-slate-300 whitespace-pre-wrap bg-slate-950/40 border border-slate-800 rounded-lg p-3 font-mono"
+                >
                     {{ task.spec?.payload?.user_message || '' }}
                 </div>
                 <div class="mt-3">
@@ -310,11 +329,19 @@ watch(taskId, () => void fetchDetail());
 
             <div class="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="ghost" @click="tab = 'resumo'" :disabled="tab === 'resumo'">Resumo</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'attempts'" :disabled="tab === 'attempts'">Tentativas</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'artifacts'" :disabled="tab === 'artifacts'">Artefatos</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'eventos'" :disabled="tab === 'eventos'">Eventos</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'attempts'" :disabled="tab === 'attempts'"
+                    >Tentativas</Button
+                >
+                <Button size="sm" variant="ghost" @click="tab = 'artifacts'" :disabled="tab === 'artifacts'"
+                    >Artefatos</Button
+                >
+                <Button size="sm" variant="ghost" @click="tab = 'eventos'" :disabled="tab === 'eventos'"
+                    >Eventos</Button
+                >
                 <Button size="sm" variant="ghost" @click="tab = 'deps'" :disabled="tab === 'deps'">Dependências</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'json'" :disabled="tab === 'json'">JSON avançado</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'json'" :disabled="tab === 'json'"
+                    >JSON avançado</Button
+                >
             </div>
 
             <div v-if="tab === 'resumo'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -324,7 +351,10 @@ watch(taskId, () => void fetchDetail());
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label class="text-sm text-slate-300">Stage</label>
-                                <select v-model="edit.stage" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                                <select
+                                    v-model="edit.stage"
+                                    class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                >
                                     <option value="DRAFT">DRAFT</option>
                                     <option value="PROPOSED">PROPOSED</option>
                                     <option value="READY">READY</option>
@@ -334,7 +364,10 @@ watch(taskId, () => void fetchDetail());
                             </div>
                             <div>
                                 <label class="text-sm text-slate-300">Status</label>
-                                <select v-model="edit.status" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                                <select
+                                    v-model="edit.status"
+                                    class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                >
                                     <option value="PENDING">PENDING</option>
                                     <option value="PAUSED">PAUSED</option>
                                     <option value="CANCELLED">CANCELLED</option>
@@ -344,7 +377,10 @@ watch(taskId, () => void fetchDetail());
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                                 <label class="text-sm text-slate-300">Target</label>
-                                <select v-model="edit.target" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                                <select
+                                    v-model="edit.target"
+                                    class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                >
                                     <option value="auto">auto</option>
                                     <option value="chatgpt">chatgpt</option>
                                     <option value="gemini">gemini</option>
@@ -358,36 +394,65 @@ watch(taskId, () => void fetchDetail());
                             </div>
                             <div>
                                 <label class="text-sm text-slate-300">Prioridade</label>
-                                <input v-model.number="edit.priority" type="number" min="0" max="10" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                                <input
+                                    v-model.number="edit.priority"
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                                />
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div class="text-xs text-slate-400 md:col-span-2">
-                                Reatribuição de missão é comando dedicado (`TASK_REASSIGN_MISSION`) e não faz parte do patch genérico.
+                                Reatribuição de missão é comando dedicado (`TASK_REASSIGN_MISSION`) e não faz parte do
+                                patch genérico.
                             </div>
                         </div>
                         <div>
                             <label class="text-sm text-slate-300">System message</label>
-                            <textarea v-model="edit.system_message" rows="2" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                            <textarea
+                                v-model="edit.system_message"
+                                rows="2"
+                                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                            />
                         </div>
                         <div>
                             <label class="text-sm text-slate-300">User message</label>
-                            <textarea v-model="edit.user_message" rows="6" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                            <textarea
+                                v-model="edit.user_message"
+                                rows="6"
+                                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                            />
                         </div>
                         <div class="flex justify-end">
-                            <Button variant="primary" size="sm" @click="saveBasics" :disabled="!task.command_caps?.can_patch">Salvar Task</Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                @click="saveBasics"
+                                :disabled="!task.command_caps?.can_patch"
+                                >Salvar Task</Button
+                            >
                         </div>
                     </div>
                 </Card>
 
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">Contexto da Missão</div></template>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Contexto da Missão</div></template
+                    >
                     <div v-if="missionContext?.mission" class="space-y-3">
                         <div class="text-sm text-slate-200">
-                            <button class="font-semibold text-sky-300 hover:underline" @click="router.push(`/missions/${missionContext.mission.id}`)">
+                            <button
+                                class="font-semibold text-sky-300 hover:underline"
+                                @click="router.push(`/missions/${missionContext.mission.id}`)"
+                            >
                                 {{ missionContext.mission.title || missionContext.mission.id }}
                             </button>
-                            <div class="text-xs text-slate-400 font-mono">{{ missionContext.mission.id }} · {{ missionContext.mission.status }} · {{ missionContext.mission.autonomy_mode }}</div>
+                            <div class="text-xs text-slate-400 font-mono">
+                                {{ missionContext.mission.id }} · {{ missionContext.mission.status }} ·
+                                {{ missionContext.mission.autonomy_mode }}
+                            </div>
                         </div>
                         <div class="text-xs text-slate-300">
                             Tasks na missão: {{ missionContext.counts?.tasks_total ?? 0 }}
@@ -404,7 +469,12 @@ watch(taskId, () => void fetchDetail());
                                     {{ m.title || m.id }} ({{ m.status }})
                                 </option>
                             </select>
-                            <Button variant="secondary" size="sm" @click="reassignMission" :disabled="!task.command_caps?.can_reassign_mission">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                @click="reassignMission"
+                                :disabled="!task.command_caps?.can_reassign_mission"
+                            >
                                 Reatribuir Missão
                             </Button>
                         </div>
@@ -438,7 +508,12 @@ watch(taskId, () => void fetchDetail());
                             <div class="text-xs text-slate-400 truncate">{{ t.spec_user_message_preview }}</div>
                         </div>
                         <div class="pt-2">
-                            <Button v-if="task.meta?.workflow_id" variant="secondary" size="sm" @click="router.push(`/workflows/${task.meta.workflow_id}`)">
+                            <Button
+                                v-if="task.meta?.workflow_id"
+                                variant="secondary"
+                                size="sm"
+                                @click="router.push(`/workflows/${task.meta.workflow_id}`)"
+                            >
                                 Abrir workflow
                             </Button>
                         </div>
@@ -447,7 +522,10 @@ watch(taskId, () => void fetchDetail());
                 </Card>
             </div>
 
-            <div v-else-if="tab === 'attempts'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+            <div
+                v-else-if="tab === 'attempts'"
+                class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden"
+            >
                 <div v-if="attempts.length === 0" class="px-4 py-6 text-slate-400">Nenhuma tentativa registrada.</div>
                 <div v-else class="divide-y divide-slate-800">
                     <div v-for="a in attempts" :key="a.id" class="px-4 py-3 space-y-2">
@@ -456,74 +534,142 @@ watch(taskId, () => void fetchDetail());
                             <Badge size="sm" :variant="statusVariant(a.status)">{{ a.status }}</Badge>
                         </div>
                         <div class="text-xs text-slate-400">
-                            criado: {{ a.created_at_ms ? new Date(a.created_at_ms).toLocaleString() : '-' }} ·
-                            ended: {{ a.ended_at_ms ? new Date(a.ended_at_ms).toLocaleString() : '-' }}
+                            criado: {{ a.created_at_ms ? new Date(a.created_at_ms).toLocaleString() : '-' }} · ended:
+                            {{ a.ended_at_ms ? new Date(a.ended_at_ms).toLocaleString() : '-' }}
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <Button v-if="a.rendered_prompt_artifact_id" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/artifacts/${a.rendered_prompt_artifact_id}`)">
+                            <Button
+                                v-if="a.rendered_prompt_artifact_id"
+                                variant="ghost"
+                                size="sm"
+                                class="h-7 px-2 text-xs"
+                                @click="router.push(`/artifacts/${a.rendered_prompt_artifact_id}`)"
+                            >
                                 Prompt renderizado
                             </Button>
-                            <Button v-if="a.response_text_artifact_id" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/artifacts/${a.response_text_artifact_id}`)">
+                            <Button
+                                v-if="a.response_text_artifact_id"
+                                variant="ghost"
+                                size="sm"
+                                class="h-7 px-2 text-xs"
+                                @click="router.push(`/artifacts/${a.response_text_artifact_id}`)"
+                            >
                                 Resposta (txt)
                             </Button>
-                            <Button v-if="a.response_v2_json_artifact_id" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/artifacts/${a.response_v2_json_artifact_id}`)">
+                            <Button
+                                v-if="a.response_v2_json_artifact_id"
+                                variant="ghost"
+                                size="sm"
+                                class="h-7 px-2 text-xs"
+                                @click="router.push(`/artifacts/${a.response_v2_json_artifact_id}`)"
+                            >
                                 Resposta (json)
                             </Button>
-                            <Button v-if="a.response_md_artifact_id" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/artifacts/${a.response_md_artifact_id}`)">
+                            <Button
+                                v-if="a.response_md_artifact_id"
+                                variant="ghost"
+                                size="sm"
+                                class="h-7 px-2 text-xs"
+                                @click="router.push(`/artifacts/${a.response_md_artifact_id}`)"
+                            >
                                 Resposta (md)
                             </Button>
-                            <Button v-if="a.response_html_artifact_id" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/artifacts/${a.response_html_artifact_id}`)">
+                            <Button
+                                v-if="a.response_html_artifact_id"
+                                variant="ghost"
+                                size="sm"
+                                class="h-7 px-2 text-xs"
+                                @click="router.push(`/artifacts/${a.response_html_artifact_id}`)"
+                            >
                                 Resposta (html)
                             </Button>
                         </div>
-                        <div v-if="a.error" class="text-xs text-red-200 bg-red-950/30 border border-red-500/30 rounded-lg p-2 whitespace-pre-wrap font-mono">{{ a.error }}</div>
+                        <div
+                            v-if="a.error"
+                            class="text-xs text-red-200 bg-red-950/30 border border-red-500/30 rounded-lg p-2 whitespace-pre-wrap font-mono"
+                        >
+                            {{ a.error }}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div v-else-if="tab === 'artifacts'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+            <div
+                v-else-if="tab === 'artifacts'"
+                class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden"
+            >
                 <div v-if="artifacts.length === 0" class="px-4 py-6 text-slate-400">Nenhum artefato listado.</div>
                 <div v-else class="divide-y divide-slate-800">
-                    <div v-for="a in artifacts" :key="a.id" class="px-4 py-3 flex items-center justify-between gap-4 hover:bg-slate-900/40 cursor-pointer" @click="router.push(`/artifacts/${a.id}`)">
+                    <div
+                        v-for="a in artifacts"
+                        :key="a.id"
+                        class="px-4 py-3 flex items-center justify-between gap-4 hover:bg-slate-900/40 cursor-pointer"
+                        @click="router.push(`/artifacts/${a.id}`)"
+                    >
                         <div class="min-w-0">
                             <div class="text-sm font-mono text-slate-200 truncate">{{ a.id }}</div>
-                            <div class="text-xs text-slate-400 truncate">{{ a.kind }} · {{ a.mime }} · {{ a.size_bytes }} bytes</div>
+                            <div class="text-xs text-slate-400 truncate">
+                                {{ a.kind }} · {{ a.mime }} · {{ a.size_bytes }} bytes
+                            </div>
                         </div>
                         <Badge size="sm">{{ a.kind }}</Badge>
                     </div>
                 </div>
             </div>
 
-            <div v-else-if="tab === 'eventos'" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+            <div
+                v-else-if="tab === 'eventos'"
+                class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm overflow-hidden"
+            >
                 <div v-if="events.length === 0" class="px-4 py-6 text-slate-400">Sem eventos.</div>
                 <div v-else class="divide-y divide-slate-800">
                     <div v-for="e in events" :key="e.id" class="px-4 py-3">
                         <div class="flex items-center justify-between gap-4">
-                            <div class="text-xs text-slate-400 font-mono truncate">#{{ e.id }} · {{ e.actor_type }} · {{ e.actor_id || '-' }}</div>
+                            <div class="text-xs text-slate-400 font-mono truncate">
+                                #{{ e.id }} · {{ e.actor_type }} · {{ e.actor_id || '-' }}
+                            </div>
                             <div class="text-xs text-slate-500">{{ new Date(e.ts_ms).toLocaleString() }}</div>
                         </div>
                         <div class="text-sm text-slate-200 font-semibold">{{ e.event_type }}</div>
-                        <pre class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56">{{ JSON.stringify(e.payload, null, 2) }}</pre>
+                        <pre
+                            class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56"
+                            >{{ JSON.stringify(e.payload, null, 2) }}</pre
+                        >
                     </div>
                 </div>
             </div>
 
             <div v-else-if="tab === 'deps'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">Editar dependências</div></template>
-                    <textarea v-model="depsText" rows="10" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs" />
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Editar dependências</div></template
+                    >
+                    <textarea
+                        v-model="depsText"
+                        rows="10"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs"
+                    />
                     <div class="flex justify-end mt-3">
                         <Button variant="primary" size="sm" @click="saveDependencies">Salvar deps</Button>
                     </div>
-                    <div class="text-xs text-slate-400 mt-2">Formato: <span class="font-mono">["task-...","task-..."]</span></div>
+                    <div class="text-xs text-slate-400 mt-2">
+                        Formato: <span class="font-mono">["task-...","task-..."]</span>
+                    </div>
                 </Card>
                 <div class="space-y-3">
                     <VisGraph :nodes="depsGraphNodes" :edges="depsGraphEdges" height="480px" />
                     <Card>
-                        <template #header><div class="text-sm font-semibold text-slate-200">Dependências atuais</div></template>
+                        <template #header
+                            ><div class="text-sm font-semibold text-slate-200">Dependências atuais</div></template
+                        >
                         <div v-if="dependencies.length === 0" class="text-sm text-slate-400">Nenhuma.</div>
                         <div v-else class="space-y-2">
-                            <div v-for="d in dependencies" :key="d.id" class="text-xs font-mono text-slate-200 cursor-pointer hover:underline" @click="router.push(`/tasks/${d.id}`)">
+                            <div
+                                v-for="d in dependencies"
+                                :key="d.id"
+                                class="text-xs font-mono text-slate-200 cursor-pointer hover:underline"
+                                @click="router.push(`/tasks/${d.id}`)"
+                            >
                                 {{ d.id }}
                             </div>
                         </div>
@@ -533,8 +679,14 @@ watch(taskId, () => void fetchDetail());
 
             <div v-else-if="tab === 'json'" class="space-y-3">
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">JSON avançado (Task V5)</div></template>
-                    <textarea v-model="jsonText" rows="22" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs" />
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">JSON avançado (Task V5)</div></template
+                    >
+                    <textarea
+                        v-model="jsonText"
+                        rows="22"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 font-mono text-xs"
+                    />
                     <div class="flex justify-end mt-3">
                         <Button variant="primary" size="sm" @click="saveJsonAdvanced">Salvar JSON</Button>
                     </div>

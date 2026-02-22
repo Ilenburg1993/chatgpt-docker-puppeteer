@@ -52,7 +52,7 @@ describe('Mission System Integration (E2E)', () => {
                 mode: 'local',
                 correlation: true,
                 bufferSize: 100,
-                telemetry: false
+                telemetry: false,
             });
 
             assert.ok(nerv, 'NERV deveria estar inicializado');
@@ -62,7 +62,7 @@ describe('Mission System Integration (E2E)', () => {
                 nerv,
                 telemetry: { source: 'test', retention: 100 },
                 policy: {},
-                loop: { cycleInterval: 50 }
+                loop: { cycleInterval: 50 },
             });
 
             assert.ok(kernel, 'Kernel deveria estar inicializado');
@@ -78,7 +78,7 @@ describe('Mission System Integration (E2E)', () => {
             missionManager = new MissionManager({
                 kernel,
                 nerv,
-                stateManager
+                stateManager,
             });
 
             await missionManager.initialize();
@@ -107,8 +107,8 @@ describe('Mission System Integration (E2E)', () => {
                 params: {
                     topic: 'Integration Testing',
                     num_chapters: 5,
-                    target_pages: 100
-                }
+                    target_pages: 100,
+                },
             });
 
             assert.ok(mission, 'Mission deveria ser criada');
@@ -154,8 +154,8 @@ describe('Mission System Integration (E2E)', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Execution Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             testMissionId = mission.id;
@@ -203,8 +203,8 @@ describe('Mission System Integration (E2E)', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Feedback Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             feedbackMissionId = mission.id;
@@ -245,11 +245,15 @@ describe('Mission System Integration (E2E)', () => {
                     topic: 'Workflow Testing',
                     num_chapters: 10,
                     target_pages: 200,
-                    quality_threshold: 80
-                }
+                    quality_threshold: 80,
+                },
             });
 
-            assert.strictEqual(mission.workflow.steps.length, 12, 'Workflow deveria ter 12 steps (10 chapters + outline + consistency)');
+            assert.strictEqual(
+                mission.workflow.steps.length,
+                12,
+                'Workflow deveria ter 12 steps (10 chapters + outline + consistency)'
+            );
         });
 
         it('should reject invalid parameters', async () => {
@@ -262,8 +266,8 @@ describe('Mission System Integration (E2E)', () => {
                         templateId: 'book_writing',
                         params: {
                             topic: 'Test',
-                            num_chapters: 2 // MIN = 5
-                        }
+                            num_chapters: 2, // MIN = 5
+                        },
                     });
                 },
                 /num_chapters deve ser >= 5/,
@@ -278,8 +282,8 @@ describe('Mission System Integration (E2E)', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Expansion Test',
-                    num_chapters: 15
-                }
+                    num_chapters: 15,
+                },
             });
 
             // 1 outline + 15 chapters + 1 consistency = 17 steps
@@ -308,17 +312,14 @@ describe('Mission System Integration (E2E)', () => {
                 params: {
                     topic: 'JavaScript Advanced',
                     num_chapters: 5,
-                    target_audience: 'senior developers'
-                }
+                    target_audience: 'senior developers',
+                },
             });
 
             const outlineStep = mission.workflow.steps[0];
 
             // Verifica substituição de placeholders
-            assert.ok(
-                outlineStep.prompt_template.includes('JavaScript Advanced'),
-                'Prompt deveria conter topic'
-            );
+            assert.ok(outlineStep.prompt_template.includes('JavaScript Advanced'), 'Prompt deveria conter topic');
             assert.ok(
                 outlineStep.prompt_template.includes('senior developers'),
                 'Prompt deveria conter target_audience'
@@ -336,8 +337,8 @@ describe('Mission System Integration (E2E)', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Progress Tracking',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             progressMissionId = mission.id;

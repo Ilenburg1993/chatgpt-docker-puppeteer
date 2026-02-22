@@ -19,7 +19,7 @@ try {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+            Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
             model: 'qwen3-coder-next',
@@ -27,9 +27,9 @@ try {
             stream: false,
             options: {
                 temperature: 0.7,
-                num_predict: 300
-            }
-        })
+                num_predict: 300,
+            },
+        }),
     });
 
     console.log('Status:', response.status);
@@ -62,7 +62,7 @@ try {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+            Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
             model: 'qwen3-next:80b-cloud',
@@ -70,9 +70,9 @@ try {
             stream: false,
             options: {
                 temperature: 0.7,
-                num_predict: 300
-            }
-        })
+                num_predict: 300,
+            },
+        }),
     });
 
     console.log('Status:', response.status);

@@ -77,7 +77,7 @@ function createMetrics() {
         return {
             counters: { ...counters },
             gauges: { ...gauges },
-            timestamps: { ...timestamps }
+            timestamps: { ...timestamps },
         };
     }
 
@@ -102,7 +102,7 @@ function createMetrics() {
         setGauge,
         mark,
         snapshot,
-        reset
+        reset,
     });
 }
 

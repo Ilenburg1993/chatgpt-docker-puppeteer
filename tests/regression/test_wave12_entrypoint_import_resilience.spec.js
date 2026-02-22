@@ -52,5 +52,9 @@ test('wave12: importing entrypoints without boot side effects remains valid', as
     const serverMainModule = await import('../../src/server/main.js');
 
     assert.equal(typeof mainModule.boot, 'function', 'main entrypoint should export boot function');
-    assert.equal(typeof serverMainModule.serverBootstrap, 'function', 'server entrypoint should export serverBootstrap');
+    assert.equal(
+        typeof serverMainModule.serverBootstrap,
+        'function',
+        'server entrypoint should export serverBootstrap'
+    );
 });

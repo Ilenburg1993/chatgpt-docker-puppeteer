@@ -11,7 +11,10 @@ import { KernelNERVBridge } from '#kernel/nerv_bridge/kernel_nerv_bridge';
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
-    return path.join(dir, `maestro-wave15-bridge-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+    return path.join(
+        dir,
+        `maestro-wave15-bridge-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+    );
 }
 
 test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicação', async t => {
@@ -96,17 +99,7 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicaç�
         INSERT INTO missions (id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
-    ).run(
-        'mission-wave15',
-        'mission-wave15',
-        'test',
-        'RUNNING',
-        'USER_ONLY',
-        '{}',
-        '{}',
-        Date.now(),
-        Date.now()
-    );
+    ).run('mission-wave15', 'mission-wave15', 'test', 'RUNNING', 'USER_ONLY', '{}', '{}', Date.now(), Date.now());
 
     insertTask(parentTask, { stage: 'ARCHIVED', status: 'DONE', actor: 'system', ifNotExists: true });
 
@@ -127,7 +120,9 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicaç�
     await bridge._handleNextStepAction(parentTask, nextStep, null, correlationId);
     await bridge._handleNextStepAction(parentTask, nextStep, null, correlationId);
 
-    const row = db.prepare('SELECT id, parent_id, mission_id, workflow_id, stage, status FROM tasks WHERE id = ?').get(expected.childId);
+    const row = db
+        .prepare('SELECT id, parent_id, mission_id, workflow_id, stage, status FROM tasks WHERE id = ?')
+        .get(expected.childId);
     assert.ok(row, 'task filha deve existir');
     assert.equal(row.parent_id, parentTask.meta.id);
     assert.equal(row.mission_id, parentTask.meta.mission_id);
@@ -139,8 +134,10 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicaç�
     assert.equal(countTasks, 1, 'reprocessamento não deve duplicar task filha');
 
     const eventCount =
-        db.prepare(
-            "SELECT COUNT(1) AS c FROM events WHERE entity_id = ? AND event_type = 'TASK_ORCHESTRATION_NEXT_STEP_CREATED'"
-        ).get(parentTask.meta.id)?.c || 0;
+        db
+            .prepare(
+                "SELECT COUNT(1) AS c FROM events WHERE entity_id = ? AND event_type = 'TASK_ORCHESTRATION_NEXT_STEP_CREATED'"
+            )
+            .get(parentTask.meta.id)?.c || 0;
     assert.equal(eventCount, 1, 'evento de next-step deve ser idempotente por dedupKey');
 });

@@ -51,7 +51,7 @@ async function main() {
     try {
         browser = await puppeteer.connect({
             browserWSEndpoint: wsEndpoint,
-            defaultViewport: null
+            defaultViewport: null,
         });
         console.log('✅ Puppeteer connected');
     } catch (err) {

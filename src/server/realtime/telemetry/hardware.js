@@ -69,7 +69,7 @@ function _pushMetrics() {
             cpu_load: Number(metrics.cpu_usage_percent ?? metrics.cpu_load ?? 0), // legado
             ram_free: metrics.ram_free_gb,
             ram_usage_pct: metrics.ram_usage_pct,
-            ts: metrics.ts || Date.now()
+            ts: metrics.ts || Date.now(),
         };
 
         // Broadcast global para todos os terminais conectados (Dashboards)

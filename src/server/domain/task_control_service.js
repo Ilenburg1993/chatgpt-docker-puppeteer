@@ -54,14 +54,22 @@ function _assertIfVersion(row, ifVersion) {
 function _assertPauseToEditTask(row) {
     const status = String(row.status || '').toUpperCase();
     const canEditPendingNotStarted =
-        status === 'PENDING' && Number(row.attempts || 0) === 0 && !row.started_at_ms && row.stage === TASK_STAGES.READY;
+        status === 'PENDING' &&
+        Number(row.attempts || 0) === 0 &&
+        !row.started_at_ms &&
+        row.stage === TASK_STAGES.READY;
 
     if (status !== 'PAUSED' && !canEditPendingNotStarted) {
-        throw _error(409, 'TASK_EDIT_REQUIRES_PAUSED', 'Edição livre de task só é permitida em PAUSED (ou READY não iniciada)', {
-            status,
-            stage: row.stage,
-            attempts: Number(row.attempts || 0),
-        });
+        throw _error(
+            409,
+            'TASK_EDIT_REQUIRES_PAUSED',
+            'Edição livre de task só é permitida em PAUSED (ou READY não iniciada)',
+            {
+                status,
+                stage: row.stage,
+                attempts: Number(row.attempts || 0),
+            }
+        );
     }
 }
 
@@ -70,7 +78,9 @@ function _buildTaskV5FromPayload(payload = {}) {
     const providedId = payload?.meta?.id ? String(payload.meta.id) : null;
     const taskId = (providedId || `task-${uuidv4()}`).replace(/[^a-zA-Z0-9._-]/g, '');
 
-    const target = String(payload?.spec?.target || payload?.target || 'auto').toLowerCase().trim();
+    const target = String(payload?.spec?.target || payload?.target || 'auto')
+        .toLowerCase()
+        .trim();
     const task = schemas.core.TaskSchemaV5.parse({
         meta: {
             id: taskId,
@@ -149,7 +159,10 @@ function _recordMissionEvent({ missionId, actor, eventType, reason, payload = {}
             dedupKey: `mission:${missionId}:${eventType}:${Date.now()}`,
         });
     } catch (err) {
-        log('WARN', `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${err?.message || String(err)}`);
+        log(
+            'WARN',
+            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${err?.message || String(err)}`
+        );
     }
 }
 
@@ -164,13 +177,23 @@ function _patchTouchesMissionBinding(patch = {}) {
     if (_hasOwn(patch, 'parentId') || _hasOwn(patch, 'workflowId')) return true;
     if (_hasOwn(patch, 'meta')) {
         const meta = patch.meta;
-        if (_hasOwn(meta, 'mission_id') || _hasOwn(meta, 'missionId') || _hasOwn(meta, 'parent_id') || _hasOwn(meta, 'workflow_id')) {
+        if (
+            _hasOwn(meta, 'mission_id') ||
+            _hasOwn(meta, 'missionId') ||
+            _hasOwn(meta, 'parent_id') ||
+            _hasOwn(meta, 'workflow_id')
+        ) {
             return true;
         }
     }
     if (_hasOwn(patch, 'mission')) {
         const mission = patch.mission;
-        if (_hasOwn(mission, 'mission_id') || _hasOwn(mission, 'missionId') || _hasOwn(mission, 'step_id') || _hasOwn(mission, 'stepId')) {
+        if (
+            _hasOwn(mission, 'mission_id') ||
+            _hasOwn(mission, 'missionId') ||
+            _hasOwn(mission, 'step_id') ||
+            _hasOwn(mission, 'stepId')
+        ) {
             return true;
         }
     }
@@ -239,6 +262,7 @@ function _isTaskBoundToMissionStep(db, row, task) {
     return Boolean(binding);
 }
 
+/** Função exportada: createTaskCommand. */
 function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = false }) {
     const actorView = asRecord(actor);
     const payloadView = asRecord(payload);
@@ -271,6 +295,7 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
     };
 }
 
+/** Função exportada: patchTaskCommand. */
 function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const patchView = asRecord(patch);
     const db = getDb();
@@ -304,7 +329,9 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
             ...(existingTask.spec || {}),
             ...(patchView.spec && typeof patchView.spec === 'object' ? patchView.spec : {}),
             target:
-                patchView.target !== undefined ? String(patchView.target).toLowerCase().trim() : existingTask.spec?.target,
+                patchView.target !== undefined
+                    ? String(patchView.target).toLowerCase().trim()
+                    : existingTask.spec?.target,
             model: patchView.model !== undefined ? patchView.model : existingTask.spec?.model,
             payload: {
                 ...(existingTask.spec?.payload || {}),
@@ -362,6 +389,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
     };
 }
 
+/** Função exportada: reassignTaskMissionCommand. */
 function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifVersion = null }) {
     const destinationMissionId = missionId === null || missionId === undefined ? '' : String(missionId).trim();
     if (!destinationMissionId) {
@@ -460,6 +488,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
     };
 }
 
+/** Função exportada: pauseTaskCommand. */
 function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
     const row = _readTaskRowTx(db, taskId);
@@ -489,6 +518,7 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     };
 }
 
+/** Função exportada: resumeTaskCommand. */
 function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
     const row = _readTaskRowTx(db, taskId);
@@ -527,6 +557,7 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     };
 }
 
+/** Função exportada: cancelTaskCommand. */
 function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
     const row = _readTaskRowTx(db, taskId);
@@ -561,6 +592,7 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     };
 }
 
+/** Função exportada: retryTaskCommand. */
 function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
     const row = _readTaskRowTx(db, taskId);
@@ -599,6 +631,7 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     };
 }
 
+/** Função exportada: purgeTaskCommand. */
 function purgeTaskCommand({ taskId, actor = {}, reason }) {
     const before = getTaskById(taskId);
     if (!before) {
@@ -619,6 +652,7 @@ function purgeTaskCommand({ taskId, actor = {}, reason }) {
     };
 }
 
+/** Função exportada: bulkTaskActionCommand. */
 function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reason }) {
     const normalized = Array.isArray(ids) ? ids.map(id => String(id)).filter(Boolean) : [];
     const paramsView = asRecord(params);

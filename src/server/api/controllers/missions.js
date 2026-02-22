@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import schemaGuard from '../../middleware/schema_guard.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 const workflowGenerator = new WorkflowGenerator();
@@ -166,7 +167,8 @@ async function _runMissionControlCommand(req, res, command, payload = {}) {
             payload: {
                 ...payload,
                 reason: payload.reason || req.body?.reason || `${command.toLowerCase()} via /api/missions`,
-                idempotency_key: payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
+                idempotency_key:
+                    payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
             },
             actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
         });
@@ -1077,6 +1079,7 @@ router.delete('/:id/purge', async (req, res) => {
  */
 export default router;
 
+/** Função exportada: setMissionManager. */
 function setMissionManager(_) {
     log('WARN', '[MISSIONS_API] setMissionManager() ignored (SSOT missions controller)');
 }

@@ -1,5 +1,10 @@
 import path from 'node:path';
-import { MAX_CHUNK_CHARS_CODE, MAX_CHUNK_CHARS_DOCS, RAG_CHUNK_MAX_CHARS, RAG_CHUNK_TARGET_CHARS } from '../contract.mjs';
+import {
+    MAX_CHUNK_CHARS_CODE,
+    MAX_CHUNK_CHARS_DOCS,
+    RAG_CHUNK_MAX_CHARS,
+    RAG_CHUNK_TARGET_CHARS,
+} from '../contract.mjs';
 import { chunkMarkdown } from './chunk_md.mjs';
 import { chunkCode } from './chunk_code.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
@@ -53,7 +58,19 @@ function isAstChunkingEnabled() {
     return String(process.env.RAG_AST_CHUNK_ENABLED || 'true') !== 'false';
 }
 
-function buildHeaderText({ relPath, language, kind, symbol, exported, tags, imports, anchor, jsdoc, subchunkIndex, subchunkTotal }) {
+function buildHeaderText({
+    relPath,
+    language,
+    kind,
+    symbol,
+    exported,
+    tags,
+    imports,
+    anchor,
+    jsdoc,
+    subchunkIndex,
+    subchunkTotal,
+}) {
     const lines = [];
     lines.push(`path: ${relPath}`);
     lines.push(`language: ${language || 'unknown'}`);
@@ -69,32 +86,34 @@ function buildHeaderText({ relPath, language, kind, symbol, exported, tags, impo
 }
 
 function enrichRanges(ranges, defaults) {
-    return ranges.map((r) => {
+    return ranges.map(r => {
         const kind = r.kind || defaults.kind;
         const symbol = r.symbol || null;
         const exported = typeof r.exported === 'boolean' ? r.exported : defaults.exported;
         const imports = Array.isArray(r.imports) ? r.imports : [];
         const jsdoc = r.jsdoc || null;
-        const headerText = r.headerText || buildHeaderText({
-            relPath: defaults.relPath,
-            language: defaults.language,
-            kind,
-            symbol,
-            exported,
-            tags: defaults.tags,
-            imports,
-            anchor: r.anchor || null,
-            jsdoc,
-            subchunkIndex: r.subchunk_index || null,
-            subchunkTotal: r.subchunk_total || null
-        });
+        const headerText =
+            r.headerText ||
+            buildHeaderText({
+                relPath: defaults.relPath,
+                language: defaults.language,
+                kind,
+                symbol,
+                exported,
+                tags: defaults.tags,
+                imports,
+                anchor: r.anchor || null,
+                jsdoc,
+                subchunkIndex: r.subchunk_index || null,
+                subchunkTotal: r.subchunk_total || null,
+            });
         return {
             ...r,
             kind,
             symbol,
             exported,
             jsdoc,
-            headerText
+            headerText,
         };
     });
 }
@@ -106,9 +125,10 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
     // Optimize chunk size by file type
     // Docs need larger chunks for context, code needs smaller chunks for precision
     if (!maxChunkChars) {
-        maxChunkChars = (language === 'markdown')
-            ? Math.min(RAG_CHUNK_MAX_CHARS, Math.max(MAX_CHUNK_CHARS_DOCS, RAG_CHUNK_TARGET_CHARS))
-            : Math.min(RAG_CHUNK_MAX_CHARS, Math.max(MAX_CHUNK_CHARS_CODE, RAG_CHUNK_TARGET_CHARS));
+        maxChunkChars =
+            language === 'markdown'
+                ? Math.min(RAG_CHUNK_MAX_CHARS, Math.max(MAX_CHUNK_CHARS_DOCS, RAG_CHUNK_TARGET_CHARS))
+                : Math.min(RAG_CHUNK_MAX_CHARS, Math.max(MAX_CHUNK_CHARS_CODE, RAG_CHUNK_TARGET_CHARS));
     }
 
     if ((language === 'js' || language === 'ts') && isAstChunkingEnabled()) {
@@ -117,7 +137,7 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
                 relPath,
                 lines,
                 language,
-                maxChunkChars: Math.min(maxChunkChars, RAG_CHUNK_MAX_CHARS)
+                maxChunkChars: Math.min(maxChunkChars, RAG_CHUNK_MAX_CHARS),
             });
             if (astRanges.length > 0) {
                 return enrichRanges(astRanges, {
@@ -125,7 +145,7 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
                     language,
                     kind: 'module_fallback',
                     exported: false,
-                    tags
+                    tags,
                 });
             }
         } catch (error) {
@@ -139,7 +159,7 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
             language,
             kind: 'doc_section',
             exported: false,
-            tags
+            tags,
         });
     }
     if (language === 'js' || language === 'ts' || language === 'sh' || language === 'ps1') {
@@ -148,7 +168,7 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
             language,
             kind: 'module_fallback',
             exported: false,
-            tags
+            tags,
         });
     }
     return enrichRanges(chunkPlain({ lines, maxChunkChars, minChunkChars, linesPerBlock: 80 }), {
@@ -156,6 +176,6 @@ export function chunkByType({ relPath, lines, maxChunkChars, minChunkChars = 200
         language,
         kind: language === 'json' || language === 'yaml' ? 'config_section' : 'text_block',
         exported: false,
-        tags
+        tags,
     });
 }

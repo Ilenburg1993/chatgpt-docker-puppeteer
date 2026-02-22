@@ -12,7 +12,7 @@ const COLORS = {
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
     cyan: '\x1b[36m',
-    gray: '\x1b[90m'
+    gray: '\x1b[90m',
 };
 
 let testsPassed = 0;
@@ -31,7 +31,7 @@ function log(color, message) {
 async function request(method, url, body = null) {
     const options = {
         method,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
     };
     if (body) {
         options.body = JSON.stringify(body);
@@ -41,7 +41,7 @@ async function request(method, url, body = null) {
     return {
         status: response.status,
         headers: Object.fromEntries(response.headers.entries()),
-        body: text ? JSON.parse(text) : null
+        body: text ? JSON.parse(text) : null,
     };
 }
 
@@ -99,7 +99,7 @@ async function runTests() {
 
     await test('1.2 GET /api/mcp - SSE request should return 405', async () => {
         const res = await fetch(BASE_URL, {
-            headers: { 'Accept': 'text/event-stream' }
+            headers: { Accept: 'text/event-stream' },
         });
         assert(res.status === 405, `Expected 405, got ${res.status}`);
     });
@@ -112,7 +112,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 1,
             method: 'initialize',
-            params: { protocolVersion: '2024-11-05' }
+            params: { protocolVersion: '2024-11-05' },
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(res.body.jsonrpc === '2.0', 'Invalid JSON-RPC version');
@@ -128,7 +128,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 2,
             method: 'initialize',
-            params: {}
+            params: {},
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(res.body.result.protocolVersion === '2024-11-05', 'Should use default version');
@@ -141,7 +141,7 @@ async function runTests() {
         const res = await request('POST', BASE_URL, {
             jsonrpc: '2.0',
             method: 'notifications/initialized',
-            params: {}
+            params: {},
         });
         assert(res.status === 202, `Expected 202, got ${res.status}`, res.body);
         assert(res.body === null, 'Notification should not return response body');
@@ -151,7 +151,7 @@ async function runTests() {
         const res = await request('POST', BASE_URL, {
             jsonrpc: '2.0',
             method: 'notifications/cancelled',
-            params: { requestId: 'test-123', reason: 'User cancelled' }
+            params: { requestId: 'test-123', reason: 'User cancelled' },
         });
         assert(res.status === 202, `Expected 202, got ${res.status}`, res.body);
         assert(res.body === null, 'Notification should not return response body');
@@ -165,7 +165,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 3,
             method: 'ping',
-            params: {}
+            params: {},
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(res.body.result !== undefined, 'Ping should return result');
@@ -179,7 +179,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 4,
             method: 'tools/list',
-            params: {}
+            params: {},
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(Array.isArray(res.body.result.tools), 'Tools should be an array');
@@ -204,7 +204,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 5,
             method: 'tools/call',
-            params: { name: 'ollama_models', arguments: {} }
+            params: { name: 'ollama_models', arguments: {} },
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(res.body.result.content !== undefined, 'Should have content');
@@ -218,7 +218,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 6,
             method: 'tools/call',
-            params: { name: 'rag_health', arguments: {} }
+            params: { name: 'rag_health', arguments: {} },
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(res.body.result.content !== undefined, 'Should have content');
@@ -231,7 +231,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 7,
             method: 'tools/call',
-            params: { name: 'invalid_tool', arguments: {} }
+            params: { name: 'invalid_tool', arguments: {} },
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(res.body.result.isError === true, 'Should return error flag');
@@ -246,7 +246,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 8,
             method: 'resources/list',
-            params: {}
+            params: {},
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(Array.isArray(res.body.result.resources), 'Resources should be an array');
@@ -264,7 +264,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 9,
             method: 'resources/read',
-            params: { uri: 'rag://stats' }
+            params: { uri: 'rag://stats' },
         });
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(Array.isArray(res.body.result.contents), 'Contents should be an array');
@@ -278,7 +278,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 10,
             method: 'resources/read',
-            params: { uri: 'invalid://resource' }
+            params: { uri: 'invalid://resource' },
         });
         assert(res.status === 500, `Expected 500, got ${res.status}`, res.body);
         assert(res.body.error !== undefined, 'Should return error');
@@ -292,7 +292,7 @@ async function runTests() {
         const res = await request('POST', BASE_URL, [
             { jsonrpc: '2.0', id: 11, method: 'ping', params: {} },
             { jsonrpc: '2.0', id: 12, method: 'tools/list', params: {} },
-            { jsonrpc: '2.0', id: 13, method: 'resources/list', params: {} }
+            { jsonrpc: '2.0', id: 13, method: 'resources/list', params: {} },
         ]);
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(Array.isArray(res.body), 'Batch response should be an array');
@@ -306,7 +306,7 @@ async function runTests() {
     await test('8.2 POST /api/mcp - Batch with notifications (no response)', async () => {
         const res = await request('POST', BASE_URL, [
             { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
-            { jsonrpc: '2.0', method: 'notifications/cancelled', params: {} }
+            { jsonrpc: '2.0', method: 'notifications/cancelled', params: {} },
         ]);
         assert(res.status === 202, `Expected 202, got ${res.status}`, res.body);
         assert(res.body === null, 'Notification-only batch should not return body');
@@ -316,7 +316,7 @@ async function runTests() {
         const res = await request('POST', BASE_URL, [
             { jsonrpc: '2.0', id: 14, method: 'ping', params: {} },
             { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
-            { jsonrpc: '2.0', id: 15, method: 'ping', params: {} }
+            { jsonrpc: '2.0', id: 15, method: 'ping', params: {} },
         ]);
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(Array.isArray(res.body), 'Should return array');
@@ -331,7 +331,7 @@ async function runTests() {
             jsonrpc: '1.0',
             id: 16,
             method: 'ping',
-            params: {}
+            params: {},
         });
         assert(res.status === 400, `Expected 400, got ${res.status}`, res.body);
         assert(res.body.error.code === -32600, 'Should be Invalid Request error');
@@ -342,7 +342,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 17,
             method: 'invalid_method',
-            params: {}
+            params: {},
         });
         assert(res.status === 404, `Expected 404, got ${res.status}`, res.body);
         assert(res.body.error.code === -32601, 'Should be Method not found error');
@@ -353,7 +353,7 @@ async function runTests() {
             const res = await fetch(BASE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: '{ invalid json }'
+                body: '{ invalid json }',
             });
             // If we get here, the server handled it
             assert(res.status >= 400, 'Should return error status for invalid JSON');
@@ -372,7 +372,7 @@ async function runTests() {
             jsonrpc: '2.0',
             id: 100 + i,
             method: 'ping',
-            params: {}
+            params: {},
         }));
 
         const start = Date.now();
@@ -382,7 +382,7 @@ async function runTests() {
         assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
         assert(Array.isArray(res.body), 'Should return array');
         assert(res.body.length === batchSize, `Expected ${batchSize} responses`);
-        log('gray', `    Completed ${batchSize} requests in ${elapsed}ms (${(elapsed/batchSize).toFixed(2)}ms/req)`);
+        log('gray', `    Completed ${batchSize} requests in ${elapsed}ms (${(elapsed / batchSize).toFixed(2)}ms/req)`);
     });
 
     await test('10.2 POST /api/mcp - Concurrent requests (5 parallel)', async () => {
@@ -394,7 +394,7 @@ async function runTests() {
                 jsonrpc: '2.0',
                 id: 200 + i,
                 method: 'ping',
-                params: {}
+                params: {},
             })
         );
 

@@ -16,4 +16,3 @@ test('wave18t: views ativas não usam mutação direta /api/tasks', async () => 
     assert.doesNotMatch(taskDetail, /http\.(post|patch|put)\(\s*['"`]\/api\/tasks/);
     assert.doesNotMatch(missionDetail, /http\.(post|patch|put)\(\s*['"`]\/api\/tasks/);
 });
-

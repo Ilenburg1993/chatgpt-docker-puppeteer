@@ -31,7 +31,7 @@ describe('ragHybridSearch intent scope + source metadata', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-intent-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -51,7 +51,7 @@ describe('ragHybridSearch intent scope + source metadata', () => {
                 intentScope: 'code-first',
                 profile: 'full',
                 paths: ragPaths,
-                embeddingsProvider: embeddings
+                embeddingsProvider: embeddings,
             });
 
             assert.ok(query.results.length >= 1);
@@ -72,7 +72,7 @@ describe('ragHybridSearch intent scope + source metadata', () => {
         const store = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-intent-store-'));
         const ragPaths = {
             dbDir: path.join(store, 'rag-db'),
-            indexDir: path.join(store, 'rag-index')
+            indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
 
@@ -97,7 +97,7 @@ describe('ragHybridSearch intent scope + source metadata', () => {
                 profile: 'full',
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
-                root: ws
+                root: ws,
             });
 
             assert.ok(query.results.length >= 1);

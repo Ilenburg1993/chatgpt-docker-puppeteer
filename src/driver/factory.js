@@ -10,6 +10,7 @@ import TargetDriver from './core/TargetDriver.js';
 /* ==========================================================================
    FACTORY CONSTANTS
 ========================================================================== */
+/** Constante/valor exportado: FACTORY_CONFIG. */
 const CONSTANTS = {
     // Discovery
     TARGETS_DIR: path.join(import.meta.dirname, 'targets'),
@@ -22,6 +23,7 @@ const CONSTANTS = {
 /* ==========================================================================
    FACTORY_EVENTS v3.0 - Pool Telemetry
 ========================================================================== */
+/** Constante/valor exportado: FACTORY_EVENTS. */
 const FACTORY_EVENTS = {
     DISCOVERY_COMPLETE: 'factory:discovery_complete',
     DRIVER_CREATED: 'factory:driver_created',
@@ -328,7 +330,10 @@ class DriverFactory extends EventEmitter {
         const barrier = new Promise(resolve => {
             release = /** @type {() => void} */ (resolve);
         });
-        this._targetSerializers.set(target, previous.then(() => barrier));
+        this._targetSerializers.set(
+            target,
+            previous.then(() => barrier)
+        );
 
         await previous;
         try {
@@ -862,9 +867,14 @@ class DriverFactory extends EventEmitter {
                 continue;
             } catch (_timeoutError) {
                 if (CONFIG.DRIVER_BACKPRESSURE_TEMP) {
-                    log('WARN', '[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)');
+                    log(
+                        'WARN',
+                        '[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)'
+                    );
                     const tempDriver = await this.createDriver(key, this.config, { skipEnsureReady: true });
-                    /** @type {import('#types/driver/contracts').IDriver} */ (/** @type {unknown} */ (tempDriver))._isTemporary = true;
+                    /** @type {import('#types/driver/contracts').IDriver} */ (
+                        /** @type {unknown} */ (tempDriver)
+                    )._isTemporary = true;
                     this.metrics.temporaryDriversCreated++;
                     return tempDriver;
                 }
@@ -1069,8 +1079,7 @@ class DriverFactory extends EventEmitter {
                         }
 
                         const idleTime = now - (entry.lastUsedAt || entry.createdAt);
-                        const shouldRemove =
-                            idleTime > idleTimeoutMs && pool.length > minPoolSize;
+                        const shouldRemove = idleTime > idleTimeoutMs && pool.length > minPoolSize;
 
                         if (shouldRemove) {
                             log('DEBUG', `[FACTORY] GC: Removing idle driver: ${target} (idle: ${idleTime}ms)`);
@@ -1527,7 +1536,10 @@ class DriverFactory extends EventEmitter {
             // Este signal será substituído quando a task real assumir o driver (Hot Swap)
             const warmupController = new AbortController();
 
-            const attachableDriver = /** @type {TargetDriver & { attachContext: (page: import('puppeteer-core').Page, signal?: AbortSignal|null, taskId?: string|null) => void }} */ (driver);
+            const attachableDriver =
+                /** @type {TargetDriver & { attachContext: (page: import('puppeteer-core').Page, signal?: AbortSignal|null, taskId?: string|null) => void }} */ (
+                    driver
+                );
             attachableDriver.attachContext(page, warmupController.signal, 'pool-warmup');
 
             // Marca driver como 'Hot' para métricas

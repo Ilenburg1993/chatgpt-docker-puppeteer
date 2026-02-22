@@ -1,9 +1,7 @@
 # Análise de Variáveis de Ambiente v6.0
 
-**Documento**: ENV_ANALYSIS_V6.md
-**Versão**: 6.0
-**Data**: 2026-02-03
-**Escopo**: Análise completa do sistema de ENV + integração com trap handler
+**Documento**: ENV_ANALYSIS_V6.md **Versão**: 6.0 **Data**: 2026-02-03 **Escopo**: Análise completa
+do sistema de ENV + integração com trap handler
 
 ---
 
@@ -12,6 +10,7 @@
 ### 1.1 Situação Atual
 
 O sistema possui **4 camadas de ENV**:
+
 1. **Dockerfile** (defaults - 97 variáveis)
 2. **devcontainer.json** (remoteEnv - 13 variáveis)
 3. **.env files** (runtime - 127 variáveis em .development, 99 em .production)
@@ -20,26 +19,32 @@ O sistema possui **4 camadas de ENV**:
 ### 1.2 Problemas Identificados
 
 #### ❌ CRÍTICOS
-1. **Falta de categorização formal**: Apenas 5 variáveis validadas (NODE_ENV, SERVER_PORT, CHROME_HOST, CHROME_PORT, CHROME_PROXY_PORT)
+
+1. **Falta de categorização formal**: Apenas 5 variáveis validadas (NODE_ENV, SERVER_PORT,
+   CHROME_HOST, CHROME_PORT, CHROME_PROXY_PORT)
 2. **Trap handler não captura contexto ENV**: Em caso de erro, não registra estado completo das ENVs
-3. **Inconsistência entre .env.development e .env.production**: Valores diferentes para mesma variável estrutural
-4. **Sem validação de dependências**: Ex: BROWSER_MODE=wsEndpoint REQUER CHROME_PROXY_PORT, mas não é validado
+3. **Inconsistência entre .env.development e .env.production**: Valores diferentes para mesma
+   variável estrutural
+4. **Sem validação de dependências**: Ex: BROWSER_MODE=wsEndpoint REQUER CHROME_PROXY_PORT, mas não
+   é validado
 
 #### ⚠️ MÉDIOS
+
 5. **Duplicação PORT vs SERVER_PORT**: Ambas setadas, sem hierarquia clara
 6. **Variáveis MOCK não validadas**: MOCK_CHROME pode quebrar sistema silenciosamente
 7. **Sem validação de consistência NODE_ENV**: .env.development pode ter NODE_ENV=production
 8. **OPERATIONAL_ENV_VARS muito genérico**: Não captura todas as variáveis críticas de runtime
 
 #### ℹ️ MENORES
+
 9. **Comentários em .env files muito verbosos**: Dificulta manutenção
 10. **Sem versionamento de .env schema**: Mudanças não são trackadas
 
 ### 1.3 Impacto do Trap Handler (v5.2.2)
 
-✅ **BOM**: Trap handler preserva IN_PROGRESS_MARKER e fornece diagnóstico
-❌ **RUIM**: Trap handler não captura estado ENV antes do erro
-❌ **RUIM**: Mensagem de erro não sugere validação de ENV específica
+✅ **BOM**: Trap handler preserva IN_PROGRESS_MARKER e fornece diagnóstico ❌ **RUIM**: Trap handler
+não captura estado ENV antes do erro ❌ **RUIM**: Mensagem de erro não sugere validação de ENV
+específica
 
 ---
 
@@ -63,6 +68,7 @@ O sistema possui **4 camadas de ENV**:
 ### 2.2 Definições
 
 #### **STRUCTURAL** (Identidade do Sistema)
+
 - **Definição**: Variáveis que definem QUEM o sistema é
 - **Critério**: Mudar valor = mudar SEMÂNTICA do sistema
 - **Validação**: Pre-boot (post-create.sh)
@@ -74,6 +80,7 @@ O sistema possui **4 camadas de ENV**:
   - `BROWSER_MODE` (launcher|connect|wsEndpoint|auto)
 
 #### **INFRASTRUCTURE** (Conectividade Essencial)
+
 - **Definição**: Variáveis necessárias para o sistema EXISTIR na rede
 - **Critério**: Ausência = sistema não consegue boot/bind
 - **Validação**: Pre-boot (post-create.sh)
@@ -86,6 +93,7 @@ O sistema possui **4 camadas de ENV**:
   - `HOST` (bind address)
 
 #### **OPERATIONAL** (Comportamento Runtime)
+
 - **Definição**: Variáveis que afetam COMO o sistema opera
 - **Critério**: Ausência = degradação de funcionalidade
 - **Validação**: Runtime (lazy, on-demand)
@@ -98,6 +106,7 @@ O sistema possui **4 camadas de ENV**:
   - `LOG_LEVEL`
 
 #### **TUNING** (Performance/Otimização)
+
 - **Definição**: Variáveis que otimizam operações específicas
 - **Critério**: Ausência = usa default safe
 - **Validação**: N/A (código valida)
@@ -109,6 +118,7 @@ O sistema possui **4 camadas de ENV**:
   - `CONTEXT_MAX_TOKENS`
 
 #### **FEATURE_FLAGS** (Funcionalidades Opt-in)
+
 - **Definição**: Variáveis que ativam/desativam features
 - **Critério**: Ausência = feature disabled
 - **Validação**: N/A (código valida)
@@ -121,6 +131,7 @@ O sistema possui **4 camadas de ENV**:
   - `NERV_TELEMETRY`
 
 #### **DEBUG** (Desenvolvimento/Diagnóstico)
+
 - **Definição**: Variáveis apenas para desenvolvimento
 - **Critério**: Ausência = sem efeito
 - **Validação**: N/A
@@ -138,12 +149,13 @@ O sistema possui **4 camadas de ENV**:
 
 | Variável           | Fonte               | Valor Dev   | Valor Prod | Status |
 | ------------------ | ------------------- | ----------- | ---------- | ------ |
-| `NODE_ENV`         | .env + devcontainer | development | production | ✅      |
-| `SERVER_MODE`      | .env + devcontainer | split       | split      | ✅      |
-| `SERVER_AUTHORITY` | .env + devcontainer | standalone  | standalone | ✅      |
-| `BROWSER_MODE`     | .env + devcontainer | wsEndpoint  | wsEndpoint | ✅      |
+| `NODE_ENV`         | .env + devcontainer | development | production | ✅     |
+| `SERVER_MODE`      | .env + devcontainer | split       | split      | ✅     |
+| `SERVER_AUTHORITY` | .env + devcontainer | standalone  | standalone | ✅     |
+| `BROWSER_MODE`     | .env + devcontainer | wsEndpoint  | wsEndpoint | ✅     |
 
 **AÇÃO NECESSÁRIA**: Adicionar ao array `STRUCTURAL_ENV_VARS` em post-create.sh:
+
 - `SERVER_MODE`
 - `SERVER_AUTHORITY`
 - `BROWSER_MODE`
@@ -152,15 +164,16 @@ O sistema possui **4 camadas de ENV**:
 
 | Variável            | Fonte               | Valor Dev         | Valor Prod        | Status |
 | ------------------- | ------------------- | ----------------- | ----------------- | ------ |
-| `SERVER_PORT`       | .env + devcontainer | 3008              | 3008              | ✅      |
-| `PORT`              | .env                | 3008              | 3008              | ⚠️ DUP  |
-| `CHROME_PROXY_PORT` | .env + devcontainer | 9224              | 9224              | ✅      |
-| `CHROME_PORT`       | .env + devcontainer | 9225              | 9225              | ✅      |
-| `CHROME_HOST`       | .env + devcontainer | host.docker.int.. | host.docker.int.. | ✅      |
-| `CHROME_PROXY_BIND` | .env                | 0.0.0.0           | 0.0.0.0           | ⚠️      |
-| `HOST`              | .env                | 0.0.0.0           | 0.0.0.0           | ⚠️      |
+| `SERVER_PORT`       | .env + devcontainer | 3008              | 3008              | ✅     |
+| `PORT`              | .env                | 3008              | 3008              | ⚠️ DUP |
+| `CHROME_PROXY_PORT` | .env + devcontainer | 9224              | 9224              | ✅     |
+| `CHROME_PORT`       | .env + devcontainer | 9225              | 9225              | ✅     |
+| `CHROME_HOST`       | .env + devcontainer | host.docker.int.. | host.docker.int.. | ✅     |
+| `CHROME_PROXY_BIND` | .env                | 0.0.0.0           | 0.0.0.0           | ⚠️     |
+| `HOST`              | .env                | 0.0.0.0           | 0.0.0.0           | ⚠️     |
 
 **AÇÃO NECESSÁRIA**:
+
 1. **PORT vs SERVER_PORT**: Deprecar `PORT`, usar apenas `SERVER_PORT`
 2. **Validar consistência**: Todas devem estar presentes se BROWSER_MODE=wsEndpoint
 3. **Adicionar validação de bind**: 0.0.0.0 vs 127.0.0.1 vs container IP
@@ -168,6 +181,7 @@ O sistema possui **4 camadas de ENV**:
 ### 3.3 OPERATIONAL (32 variáveis)
 
 **Browser Pool (8)**:
+
 - `BROWSER_POOL_SIZE` (2 dev, 5 prod)
 - `ALLOCATION_STRATEGY` (round-robin dev, least-busy prod)
 - `HEALTH_CHECK_INTERVAL` (30000)
@@ -178,29 +192,35 @@ O sistema possui **4 camadas de ENV**:
 - `CONNECTION_TIMEOUT` (30000)
 
 **Chrome Proxy (3)**:
+
 - `NERV_INTEGRATION` (true)
 - `WS_IDLE_TIMEOUT_MS` (300000)
 - `ALLOWED_ORIGINS` (localhost:3008,... dev | https://... prod) ⚠️ INCONSISTENTE
 
 **Logging (3)**:
+
 - `LOG_LEVEL` (debug dev, info prod) ⚠️ INCONSISTENTE
 - `NERV_BUFFER_SIZE` (1000 dev, 2000 prod)
 - `NERV_TELEMETRY` (true)
 
 **Missions (2)**:
+
 - `MISSIONS_DIR` (missions)
 - `CHECKPOINT_KEEP_LAST` (10 dev, 20 prod)
 
 **Context (3)**:
+
 - `CONTEXT_STRATEGY` (sliding_window)
 - `CONTEXT_MAX_TOKENS` (100000)
 - `SUMMARIZATION_POLICY` (on_overflow)
 
 **Driver Factory (2)**:
+
 - `FACTORY_DEFAULT_TARGET` (chatgpt)
 - `FACTORY_VALIDATE_BOOT` (false dev, true prod) ⚠️ INCONSISTENTE
 
 **Outros (11)**:
+
 - `KERNEL_CYCLE_INTERVAL` (50)
 - `PUBLIC_IP` (vazio, auto-detectado)
 - `PORT_HUNT_LIMIT` (.env.example, ausente em dev/prod)
@@ -211,6 +231,7 @@ O sistema possui **4 camadas de ENV**:
 ### 3.4 TUNING (60+ variáveis)
 
 **Triage (12)**:
+
 - `TRIAGE_LAG_THRESHOLD` (1500 dev, 2000 prod)
 - `TRIAGE_LAG_RETRIES` (3)
 - `TRIAGE_SNAPSHOT_DELAY` (600)
@@ -223,6 +244,7 @@ O sistema possui **4 camadas de ENV**:
 - `TRIAGE_IFRAME_THRESHOLD` (0.4)
 
 **Frame Navigator (5)**:
+
 - `FRAME_NAV_MAX_DEPTH` (10)
 - `FRAME_NAV_TIMEOUT` (15000 dev, 20000 prod)
 - `FRAME_NAV_BBOX_TIMEOUT` (2000 dev, 3000 prod)
@@ -230,6 +252,7 @@ O sistema possui **4 camadas de ENV**:
 - `FRAME_NAV_DISPOSE_DELAY` (100)
 
 **Biomechanics Engine (13)**:
+
 - `BIOMECH_MAX_ITERATIONS` (50)
 - `BIOMECH_KEEP_ALIVE` (25000)
 - `BIOMECH_WAIT_POLL` (800)
@@ -250,12 +273,12 @@ O sistema possui **4 camadas de ENV**:
 | Variável                          | Valor Dev | Valor Prod | Impacto              |
 | --------------------------------- | --------- | ---------- | -------------------- |
 | `MOCK_CHROME`                     | 0         | 0          | Desabilita browser   |
-| `ALLOW_DEGRADED_MODE`             | true      | false      | ⚠️ INCONSISTENTE      |
+| `ALLOW_DEGRADED_MODE`             | true      | false      | ⚠️ INCONSISTENTE     |
 | `AUTO_RETRY_CHROME`               | true      | true       | Retry automático     |
 | `NERV_INTEGRATION`                | true      | true       | Event bus            |
 | `NERV_TELEMETRY`                  | true      | true       | Telemetria           |
 | `PUPPETEER_LOCAL_LAUNCH_DISABLED` | true      | true       | Força conexão remota |
-| `FACTORY_VALIDATE_BOOT`           | false     | true       | ⚠️ INCONSISTENTE      |
+| `FACTORY_VALIDATE_BOOT`           | false     | true       | ⚠️ INCONSISTENTE     |
 
 ### 3.6 DEBUG (3 variáveis)
 
@@ -273,6 +296,7 @@ O sistema possui **4 camadas de ENV**:
 #### Problema 1: Falta de Captura de Contexto ENV
 
 **Situação Atual**:
+
 ```bash
 cleanup_on_error() {
     local exit_code=$?
@@ -287,6 +311,7 @@ cleanup_on_error() {
 ```
 
 **Proposta**:
+
 ```bash
 cleanup_on_error() {
     local exit_code=$?
@@ -319,12 +344,14 @@ cleanup_on_error() {
 #### Problema 2: Validação Não Falha em Desenvolvimento
 
 **Situação Atual**:
+
 ```bash
 # Apenas NODE_ENV validado como STRUCTURAL
 # SERVER_PORT, etc são OPERATIONAL (warning only)
 ```
 
 **Proposta**:
+
 ```bash
 # Validação estratificada por NODE_ENV
 if [[ "${NODE_ENV}" == "production" ]]; then
@@ -339,11 +366,13 @@ fi
 #### Problema 3: Sem Validação de Dependências
 
 **Situação Atual**:
+
 ```bash
 # BROWSER_MODE=wsEndpoint não valida se CHROME_PROXY_PORT existe
 ```
 
 **Proposta**:
+
 ```bash
 # Validação de dependências semânticas
 if [[ "${BROWSER_MODE}" == "wsEndpoint" ]]; then
@@ -361,6 +390,7 @@ fi
 #### Problema: Duplicação PORT vs SERVER_PORT
 
 **devcontainer.json**:
+
 ```jsonc
 "remoteEnv": {
   "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
@@ -369,6 +399,7 @@ fi
 ```
 
 **.env.development**:
+
 ```bash
 SERVER_PORT=3008
 PORT=3008  # ← Duplicado
@@ -378,11 +409,11 @@ PORT=3008  # ← Duplicado
 
 #### Problema: Inconsistência de Valores Entre Ambientes
 
-| Variável                | Dev         | Prod       | Problema                  |
-| ----------------------- | ----------- | ---------- | ------------------------- |
-| `ALLOW_DEGRADED_MODE`   | true        | false      | OK - esperado             |
-| `LOG_LEVEL`             | debug       | info       | OK - esperado             |
-| `FACTORY_VALIDATE_BOOT` | false       | true       | OK - esperado             |
+| Variável                | Dev         | Prod       | Problema                   |
+| ----------------------- | ----------- | ---------- | -------------------------- |
+| `ALLOW_DEGRADED_MODE`   | true        | false      | OK - esperado              |
+| `LOG_LEVEL`             | debug       | info       | OK - esperado              |
+| `FACTORY_VALIDATE_BOOT` | false       | true       | OK - esperado              |
 | `BROWSER_POOL_SIZE`     | 2           | 5          | ⚠️ Dev deveria testar prod |
 | `ALLOCATION_STRATEGY`   | round-robin | least-busy | ⚠️ Estratégia diferente    |
 
@@ -669,18 +700,21 @@ PUBLIC_IP=  # Auto-detectado
 #### Mudança 2: Remover PORT de todos os .env files
 
 **.env.development**:
+
 ```bash
 SERVER_PORT=3008
 # PORT=3008  # ← REMOVED v6.0
 ```
 
 **.env.production**:
+
 ```bash
 SERVER_PORT=3008
 # PORT=3008  # ← REMOVED v6.0
 ```
 
 **.env.example**:
+
 ```bash
 # Porta do Dashboard Web
 SERVER_PORT=3008
@@ -777,16 +811,19 @@ SERVER_PORT=3008
 ### Fase 1: Correções Críticas (Imediato)
 
 #### ✅ TAREFA 1.1: Expandir Validação em post-create.sh
+
 - [x] Adicionar `SERVER_MODE`, `SERVER_AUTHORITY`, `BROWSER_MODE` ao `STRUCTURAL_ENV_VARS`
 - [x] Criar `INFRASTRUCTURE_ENV_VARS` array
 - [x] Implementar validação estratificada por NODE_ENV
 
 #### ✅ TAREFA 1.2: Aprimorar Trap Handler
+
 - [x] Adicionar snapshot de ENV no `cleanup_on_error()`
 - [x] Listar variáveis STRUCTURAL na mensagem de erro
 - [x] Adicionar referência a ENV_ANALYSIS_V6.md no diagnóstico
 
 #### ✅ TAREFA 1.3: Remover Duplicação PORT
+
 - [x] Deprecar `PORT` no devcontainer.json (usar apenas `SERVER_PORT`)
 - [x] Remover `PORT` de .env.development
 - [x] Remover `PORT` de .env.production
@@ -795,11 +832,13 @@ SERVER_PORT=3008
 ### Fase 2: Validação Semântica (Curto Prazo - 1 semana)
 
 #### 🔲 TAREFA 2.1: Implementar Validação de Dependências
+
 - [ ] BROWSER_MODE=wsEndpoint → Validar CHROME_PROXY_PORT, CHROME_PORT, CHROME_HOST
 - [ ] NODE_ENV=production → Proibir ALLOW_DEGRADED_MODE=true
 - [ ] Validar unicidade de portas (SERVER_PORT ≠ CHROME_PORT ≠ CHROME_PROXY_PORT)
 
 #### 🔲 TAREFA 2.2: Criar .env.schema.json
+
 - [ ] Definir schema JSON completo
 - [ ] Implementar script de validação (validate-env.js)
 - [ ] Adicionar ao Makefile: `make validate-env`
@@ -807,11 +846,13 @@ SERVER_PORT=3008
 ### Fase 3: Reorganização (Médio Prazo - 2 semanas)
 
 #### 🔲 TAREFA 3.1: Reorganizar .env Files
+
 - [ ] Adicionar metadata (version, schema, updated)
 - [ ] Reorganizar em seções: STRUCTURAL → INFRASTRUCTURE → OPERATIONAL → TUNING → FLAGS → DEBUG
 - [ ] Adicionar comentários explicativos para cada categoria
 
 #### 🔲 TAREFA 3.2: Criar .env.test
+
 - [ ] Copiar valores de produção
 - [ ] Ajustar LOG_LEVEL=debug
 - [ ] Documentar diferenças
@@ -819,11 +860,13 @@ SERVER_PORT=3008
 ### Fase 4: Automação (Longo Prazo - 1 mês)
 
 #### 🔲 TAREFA 4.1: CI/CD ENV Validation
+
 - [ ] GitHub Actions workflow para validar .env files
 - [ ] Pre-commit hook para validar .env antes de commit
 - [ ] Fail-fast se .env files divergem do schema
 
 #### 🔲 TAREFA 4.2: Dashboard ENV Inspector
+
 - [ ] Endpoint `/api/env/status` no dashboard
 - [ ] UI para visualizar ENV atual vs esperado
 - [ ] Alertas para ENVs ausentes/inválidas
@@ -833,6 +876,7 @@ SERVER_PORT=3008
 ## 7. CHECKLIST DE VALIDAÇÃO
 
 ### ✅ Post-Create.sh
+
 - [x] Arrays expandidos: STRUCTURAL, INFRASTRUCTURE, OPERATIONAL
 - [x] Validação estratificada por NODE_ENV
 - [x] Trap handler captura snapshot de ENV
@@ -840,17 +884,20 @@ SERVER_PORT=3008
 - [x] Referência a documentação no diagnóstico
 
 ### ✅ DevContainer.json
+
 - [x] PORT removido (usar apenas SERVER_PORT)
 - [x] Comentários explicam cada variável
 - [x] remoteEnv sincronizado com .env files
 
 ### ✅ .env Files
+
 - [x] PORT removido de .development e .production
 - [x] Metadata adicionada (version, schema)
 - [x] Seções reorganizadas por categoria
 - [x] Comentários explicam criticidade
 
 ### 🔲 Validação Automática
+
 - [ ] .env.schema.json criado
 - [ ] validate-env.js implementado
 - [ ] Makefile target `validate-env` adicionado
@@ -861,12 +908,14 @@ SERVER_PORT=3008
 ## 8. REFERÊNCIAS
 
 ### Documentos Relacionados
+
 - `.devcontainer/DEVCONTAINER_BUILD_ANALYSIS.md` (SSH problem diagnosis)
 - `.devcontainer/POST_CREATE_ANALYSIS.md` (Idempotency analysis)
 - `.devcontainer/POST_CREATE_FIXES_V5.2.2.md` (Trap handler implementation)
 - `.devcontainer/TROUBLESHOOTING_SSH.md` (User troubleshooting guide)
 
 ### Arquivos Envolvidos
+
 - `.devcontainer/scripts/post-create.sh` (validação de ENV)
 - `.devcontainer/devcontainer.json` (remoteEnv)
 - `.devcontainer/Dockerfile` (ENV defaults)
@@ -875,6 +924,7 @@ SERVER_PORT=3008
 - `.env.example` (template)
 
 ### Standards
+
 - [Twelve-Factor App - III. Config](https://12factor.net/config)
 - [VS Code - devcontainer.json reference](https://containers.dev/implementors/json_reference/)
 - [Docker - Environment variables precedence](https://docs.docker.com/compose/environment-variables/envvars-precedence/)

@@ -19,66 +19,38 @@
     },
     "openai.com": {
       "selectors": {
-        "input_box": [
-          "#prompt-textarea"
-        ],
-        "send_button": [
-          "[data-testid='send-button']"
-        ]
+        "input_box": ["#prompt-textarea"],
+        "send_button": ["[data-testid='send-button']"]
       },
       "behavior_overrides": {},
       "// --- ALIAS ---": "Mapeamento para compatibilidade de subdomínios"
     },
     "test-domain.com": {
       "selectors": {
-        "test_input": [
-          "#test-selector-001"
-        ]
+        "test_input": ["#test-selector-001"]
       },
       "behavior_overrides": {}
     },
     "test-rate-limit.com": {
       "selectors": {
-        "test_rate_0": [
-          "#test-rate-0"
-        ],
-        "test_rate_1": [
-          "#test-rate-1"
-        ],
-        "test_rate_2": [
-          "#test-rate-2"
-        ],
-        "test_rate_3": [
-          "#test-rate-3"
-        ],
-        "test_rate_4": [
-          "#test-rate-4"
-        ]
+        "test_rate_0": ["#test-rate-0"],
+        "test_rate_1": ["#test-rate-1"],
+        "test_rate_2": ["#test-rate-2"],
+        "test_rate_3": ["#test-rate-3"],
+        "test_rate_4": ["#test-rate-4"]
       },
       "behavior_overrides": {}
     },
     "test-duplicate.com": {
       "selectors": {
-        "test_duplicate": [
-          "#test-duplicate-selector"
-        ]
+        "test_duplicate": ["#test-duplicate-selector"]
       },
       "behavior_overrides": {}
     }
   },
   "global_selectors": {
-    "input_box": [
-      "textarea",
-      "div[contenteditable='true']",
-      "[role='textbox']",
-      "input[type='text']"
-    ],
-    "send_button": [
-      "button[type='submit']",
-      "[data-testid*='send']",
-      "[aria-label*='Send']",
-      "button:has(svg)"
-    ]
+    "input_box": ["textarea", "div[contenteditable='true']", "[role='textbox']", "input[type='text']"],
+    "send_button": ["button[type='submit']", "[data-testid*='send']", "[aria-label*='Send']", "button:has(svg)"]
   },
   "// --- REGRAS POR ALVO (TARGETS) ---": "Isolamento semântico por domínio IA",
   "// --- SELETORES GLOBAIS (FALLBACK) ---": "Padrões universais de interfaces de chat"

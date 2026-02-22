@@ -360,7 +360,7 @@ export interface HumanBehaviorConfig {
 /**
  * Triage system types
  */
-export type TriageErrorType = 
+export type TriageErrorType =
     | 'TIMEOUT'
     | 'ABORTED'
     | 'INVALID_PAGE'

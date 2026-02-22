@@ -9,11 +9,7 @@ test('wave13: browserpool allocate retry loop is iterative and bounded', async (
     const filePath = path.join(ROOT, 'src/infra/browser_pool/pool_manager.js');
     const content = await fs.readFile(filePath, 'utf8');
 
-    assert.doesNotMatch(
-        content,
-        /return\s+this\.allocate\(/,
-        'allocate() should not use recursive retry anymore'
-    );
+    assert.doesNotMatch(content, /return\s+this\.allocate\(/, 'allocate() should not use recursive retry anymore');
 
     assert.match(
         content,

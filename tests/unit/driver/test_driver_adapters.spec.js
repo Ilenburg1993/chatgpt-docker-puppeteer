@@ -7,7 +7,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             const selectors = {
                 promptInput: 'div[contenteditable="true"]',
                 sendButton: 'button[data-testid="send-button"]',
-                responseContainer: '.markdown-response'
+                responseContainer: '.markdown-response',
             };
 
             assert.ok(selectors.promptInput);
@@ -18,7 +18,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve navegar para URL correta', () => {
             const adapter = {
                 baseUrl: 'https://chat.openai.com',
-                navigate: async () => 'https://chat.openai.com/chat'
+                navigate: async () => 'https://chat.openai.com/chat',
             };
 
             assert.ok(adapter.baseUrl.includes('chat.openai.com'));
@@ -33,7 +33,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
                         setTimeout(resolve, 100);
                     });
                     carregado = true;
-                }
+                },
             };
 
             await adapter.waitForLoad();
@@ -47,7 +47,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             const selectors = {
                 promptInput: 'textarea[aria-label="Enter a prompt"]',
                 sendButton: 'button[aria-label="Send"]',
-                responseContainer: '.response-content'
+                responseContainer: '.response-content',
             };
 
             assert.ok(selectors.promptInput);
@@ -57,7 +57,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve usar URL correta do Gemini', () => {
             const adapter = {
                 baseUrl: 'https://gemini.google.com',
-                navigate: async () => 'https://gemini.google.com/app'
+                navigate: async () => 'https://gemini.google.com/app',
             };
 
             assert.ok(adapter.baseUrl.includes('gemini.google.com'));
@@ -103,7 +103,6 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve sanitizar prompt', () => {
             const promptBruto = 'Texto com\nquebras\re\u0000caracteres\u0001especiais';
 
-             
             const sanitizado = promptBruto.replace(/[\x00-\x1F\x7F]/g, ' ').trim();
 
             assert.ok(!sanitizado.includes('\u0000'));
@@ -124,7 +123,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve coletar resposta completa', () => {
             const resposta = {
                 chunks: ['parte 1', 'parte 2', 'parte 3'],
-                complete: true
+                complete: true,
             };
 
             const texto = resposta.chunks.join(' ');
@@ -162,7 +161,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve detectar IA respondendo', () => {
             const selectors = {
                 generatingIndicator: '.generating-indicator',
-                stopButton: 'button[aria-label="Stop"]'
+                stopButton: 'button[aria-label="Stop"]',
             };
 
             const isGenerating = page => {
@@ -171,7 +170,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             };
 
             const mockPage = {
-                hasElement: sel => sel === '.generating-indicator'
+                hasElement: sel => sel === '.generating-indicator',
             };
 
             assert.ok(isGenerating(mockPage));
@@ -181,7 +180,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             const indicators = {
                 generating: false,
                 hasContent: true,
-                stopButtonVisible: false
+                stopButtonVisible: false,
             };
 
             const isComplete = !indicators.generating && indicators.hasContent;
@@ -194,7 +193,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve detectar erro de seletor não encontrado', () => {
             const error = {
                 type: 'SELECTOR_NOT_FOUND',
-                selector: 'div.inexistente'
+                selector: 'div.inexistente',
             };
 
             assert.strictEqual(error.type, 'SELECTOR_NOT_FOUND');
@@ -203,7 +202,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve detectar erro de timeout', () => {
             const error = {
                 type: 'TIMEOUT',
-                message: 'Seletor não apareceu em 30s'
+                message: 'Seletor não apareceu em 30s',
             };
 
             assert.strictEqual(error.type, 'TIMEOUT');
@@ -212,7 +211,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve detectar erro de navegação', () => {
             const error = {
                 type: 'NAVIGATION_ERROR',
-                url: 'https://example.com'
+                url: 'https://example.com',
             };
 
             assert.strictEqual(error.type, 'NAVIGATION_ERROR');
@@ -223,7 +222,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('ChatGPT deve usar contenteditable', () => {
             const chatgpt = {
                 inputType: 'contenteditable',
-                selector: 'div[contenteditable="true"]'
+                selector: 'div[contenteditable="true"]',
             };
 
             assert.strictEqual(chatgpt.inputType, 'contenteditable');
@@ -232,7 +231,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('Gemini deve usar textarea', () => {
             const gemini = {
                 inputType: 'textarea',
-                selector: 'textarea[aria-label="Enter a prompt"]'
+                selector: 'textarea[aria-label="Enter a prompt"]',
             };
 
             assert.strictEqual(gemini.inputType, 'textarea');
@@ -241,11 +240,11 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve adaptar estratégia de coleta', () => {
             const adapters = {
                 chatgpt: {
-                    collectStrategy: 'markdown-parser'
+                    collectStrategy: 'markdown-parser',
                 },
                 gemini: {
-                    collectStrategy: 'dom-observer'
-                }
+                    collectStrategy: 'dom-observer',
+                },
             };
 
             assert.notStrictEqual(adapters.chatgpt.collectStrategy, adapters.gemini.collectStrategy);
@@ -290,7 +289,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             const events = [];
 
             const adapter = {
-                emit: event => events.push(event)
+                emit: event => events.push(event),
             };
 
             adapter.emit({ type: 'DRIVER_READY' });
@@ -306,7 +305,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             const adapter = {
                 onCommand: cmd => {
                     comandoRecebido = cmd;
-                }
+                },
             };
 
             adapter.onCommand({ type: 'EXECUTE_TASK', taskId: 'task-001' });

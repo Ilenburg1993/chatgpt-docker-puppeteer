@@ -255,7 +255,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                     // Chrome iniciado! Tenta reconectar Browser Pool usando createBrowserPool
                     try {
                         const { default: CONFIG } = await import('./config.js');
-                        const all = asRecord((/** @type {any} */ (CONFIG)).all);
+                        const all = asRecord(/** @type {any} */ (CONFIG).all);
 
                         const browserPool = await createBrowserPool({
                             poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
@@ -342,7 +342,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                 try {
                     const { default: CONFIG } = await import('./config.js');
-                    const all = asRecord((/** @type {any} */ (CONFIG)).all);
+                    const all = asRecord(/** @type {any} */ (CONFIG).all);
 
                     const browserPool = await createBrowserPool({
                         poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,

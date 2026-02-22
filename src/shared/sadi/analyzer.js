@@ -15,7 +15,7 @@ const SADI_CONFIG = {
     RESPONSE_GROWTH_DELAY: 400, // 400ms para detectar crescimento
     MIN_CONFIDENCE_SCORE: 50, // Score mínimo para aceitar candidato
     MAX_CANDIDATES: 50, // Limita candidatos para performance
-    CACHE_TTL: 30000 // 30s TTL para cache
+    CACHE_TTL: 30000, // 30s TTL para cache
 };
 
 /**
@@ -54,7 +54,7 @@ const SVG_SIGNATURES = [
 
     // Plus (new chat)
     'M12 5v14m-7-7h14',
-    'M12 6v12m-6-6h12'
+    'M12 6v12m-6-6h12',
 ].map(sig => sig.replace(/[\s,]/g, '').slice(0, 20));
 
 /**
@@ -215,7 +215,7 @@ const sadiLogic = (terms, svgSigs) => {
                 SADI.query('[aria-busy="true"]')[0],
                 SADI.query('[class*="typing"], [class*="loading"]')[0],
                 SADI.query('[class*="thinking"], [class*="generating"]')[0],
-                SADI.query('button:disabled[data-testid*="send"]')[0] // Send button disabled
+                SADI.query('button:disabled[data-testid*="send"]')[0], // Send button disabled
             ];
 
             // Streaming dots detection
@@ -276,9 +276,9 @@ const sadiLogic = (terms, svgSigs) => {
                 isShadow: el.getRootNode() && el.getRootNode().nodeType === 11,
                 context: win !== window.top ? 'iframe' : 'root',
                 framePath: path.join(' > '),
-                timestamp: Date.now()
+                timestamp: Date.now(),
             };
-        }
+        },
     };
     return SADI;
 };
@@ -446,9 +446,9 @@ async function findChatInputSelector(page, langCode = 'en') {
                                   top: best.getBoundingClientRect().top,
                                   left: best.getBoundingClientRect().left,
                                   width: best.getBoundingClientRect().width,
-                                  height: best.getBoundingClientRect().height
-                              }
-                          }
+                                  height: best.getBoundingClientRect().height,
+                              },
+                          },
                       }
                     : null;
             },
@@ -594,7 +594,7 @@ async function findSendButtonSelector(page, inputProtocol) {
                           confidence: score,
                           detection_time_ms: Date.now() - startTs,
                           has_svg: best.querySelector('path') !== null,
-                          is_disabled: best.disabled || false
+                          is_disabled: best.disabled || false,
                       }
                     : null;
             },
@@ -672,7 +672,7 @@ async function findResponseArea(page) {
                                       isBusy: SADI.checkSystemStatus(),
                                       growth_delta: maxDelta,
                                       detection_time_ms: Date.now() - startTs,
-                                      content_length: final.innerText.length
+                                      content_length: final.innerText.length,
                                   }
                                 : null
                         );
@@ -749,6 +749,7 @@ async function validateCandidateInteractivity(page, protocol) {
     }
 }
 
+/** Constante/valor exportado: findInputSelector. */
 const findInputSelector = findChatInputSelector;
 
 export {

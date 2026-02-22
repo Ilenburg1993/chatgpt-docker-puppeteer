@@ -213,7 +213,10 @@ class MissionRunner {
                     },
                 });
                 if (!progressResult.ok) {
-                    log('WARN', `[MissionRunner] progress update rejected: ${progressResult.code || progressResult.error}`);
+                    log(
+                        'WARN',
+                        `[MissionRunner] progress update rejected: ${progressResult.code || progressResult.error}`
+                    );
                 }
                 return;
             }
@@ -259,12 +262,15 @@ class MissionRunner {
 
         const step = workflow.steps[currentStepIndex];
         const stepId = step?.id || `step-${currentStepIndex}`;
-        const parentTaskId = Array.isArray(progress.completed) && progress.completed.length > 0
-            ? String(progress.completed[progress.completed.length - 1])
-            : null;
+        const parentTaskId =
+            Array.isArray(progress.completed) && progress.completed.length > 0
+                ? String(progress.completed[progress.completed.length - 1])
+                : null;
 
         const attemptSeqByStep =
-            progress?.step_attempt_seq && typeof progress.step_attempt_seq === 'object' ? progress.step_attempt_seq : {};
+            progress?.step_attempt_seq && typeof progress.step_attempt_seq === 'object'
+                ? progress.step_attempt_seq
+                : {};
         const currentAttemptSeq = Number(attemptSeqByStep[stepId] || 0) || 0;
         const nextAttemptSeq = Math.max(1, currentAttemptSeq + 1);
         const deterministicSeed = `${missionId}|${stepId}|${nextAttemptSeq}`;

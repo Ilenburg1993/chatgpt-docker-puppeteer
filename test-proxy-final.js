@@ -14,7 +14,7 @@ const puppeteer = require('puppeteer-core');
 const CONFIG = {
     PROXY_URL: 'http://localhost:9224',
     TEST_URL: 'https://example.com',
-    TIMEOUT: 15000
+    TIMEOUT: 15000,
 };
 
 async function runTest() {
@@ -38,7 +38,7 @@ async function runTest() {
         console.log('\n[2/5] Conectando Puppeteer ao Chrome...');
         browser = await puppeteer.connect({
             browserWSEndpoint: versionData.webSocketDebuggerUrl,
-            defaultViewport: null
+            defaultViewport: null,
         });
         console.log(`✓ Conectado! Browser: ${await browser.version()}`);
         testsPassed++;
@@ -48,7 +48,7 @@ async function runTest() {
         const page = await browser.newPage();
         await page.goto(CONFIG.TEST_URL, {
             waitUntil: 'networkidle2',
-            timeout: CONFIG.TIMEOUT
+            timeout: CONFIG.TIMEOUT,
         });
         const title = await page.title();
         console.log(`✓ Página carregada: "${title}"`);

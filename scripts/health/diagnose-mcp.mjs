@@ -5,7 +5,14 @@ import { parseArgs } from 'node:util';
 const DEFAULT_BASE = process.env.MCP_DIAG_URL || 'http://localhost:3008';
 const LSP_ENABLED = String(process.env.LSP_ENABLED || 'true') !== 'false';
 
-const REQUIRED_CORE_TOOLS = ['rag_search', 'rag_health', 'rag_expand', 'ollama_generate', 'ollama_embed', 'ollama_models'];
+const REQUIRED_CORE_TOOLS = [
+    'rag_search',
+    'rag_health',
+    'rag_expand',
+    'ollama_generate',
+    'ollama_embed',
+    'ollama_models',
+];
 const REQUIRED_LSP_TOOLS = [
     'lsp_definition',
     'lsp_references',
@@ -138,13 +145,20 @@ async function main() {
         const degraded = ragStructured.data.degraded;
         const indexMode = ragStructured.data.index_mode;
         const freshness = ragStructured.data.index_freshness_ms;
-        console.log(`[MCP DIAG] rag_search backend=${backend} degraded=${degraded} index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`);
+        console.log(
+            `[MCP DIAG] rag_search backend=${backend} degraded=${degraded} index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`
+        );
     }
 
     const firstChunkId = ragStructured?.data?.results?.[0]?.chunk_id || null;
-    const ragExpandProbe = await callTool(base, 4, 'rag_expand', firstChunkId
-        ? { chunk_id: firstChunkId, mode: 'lines', before_lines: 20, after_lines: 20 }
-        : { chunk_id: '__diag_missing_chunk__', mode: 'lines', before_lines: 5, after_lines: 5 });
+    const ragExpandProbe = await callTool(
+        base,
+        4,
+        'rag_expand',
+        firstChunkId
+            ? { chunk_id: firstChunkId, mode: 'lines', before_lines: 20, after_lines: 20 }
+            : { chunk_id: '__diag_missing_chunk__', mode: 'lines', before_lines: 5, after_lines: 5 }
+    );
     printResult('POST /api/mcp tools/call rag_expand', ragExpandProbe);
 
     let lspFunctionalOk = false;
@@ -155,7 +169,8 @@ async function main() {
 
         const diagnosticsData = lspDiagnostics.json?.result?.structuredContent?.data;
         const definitionData = lspDefinition.json?.result?.structuredContent?.data;
-        const diagnosticsOk = lspDiagnostics.ok && !lspDiagnostics.json?.error && Array.isArray(diagnosticsData?.diagnostics);
+        const diagnosticsOk =
+            lspDiagnostics.ok && !lspDiagnostics.json?.error && Array.isArray(diagnosticsData?.diagnostics);
         const definitionOk = lspDefinition.ok && !lspDefinition.json?.error && Array.isArray(definitionData?.locations);
         lspFunctionalOk = diagnosticsOk && definitionOk;
 
@@ -180,7 +195,8 @@ async function main() {
     }
 
     const report = {
-        ok: health.ok &&
+        ok:
+            health.ok &&
             ready.ok &&
             discovery.ok &&
             ping.ok &&

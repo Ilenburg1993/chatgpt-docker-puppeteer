@@ -19,7 +19,7 @@ const DENY_DIR_PREFIXES = [
     'coverage/',
     '.vscode-server/',
     '.devcontainer/state/',
-    'analysis/' // Exclude heavy analysis docs (1.1MB+) to reduce indexing load
+    'analysis/', // Exclude heavy analysis docs (1.1MB+) to reduce indexing load
 ];
 
 export const RAG_SCAN_PROFILES = {
@@ -32,7 +32,7 @@ export const RAG_SCAN_PROFILES = {
         '*.config.cjs',
         '*.config.mjs',
         'jsconfig.json',
-        'tsconfig.json'
+        'tsconfig.json',
     ],
     dev: [
         'src/**',
@@ -46,9 +46,9 @@ export const RAG_SCAN_PROFILES = {
         '*.config.cjs',
         '*.config.mjs',
         'jsconfig.json',
-        'tsconfig.json'
+        'tsconfig.json',
     ],
-    full: []
+    full: [],
 };
 
 function isAllowedByExt(relPath) {
@@ -61,7 +61,9 @@ function isAllowedByExt(relPath) {
 }
 
 function resolveDocsMode(rawMode) {
-    const normalized = String(rawMode || '').trim().toLowerCase();
+    const normalized = String(rawMode || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'exclude' || normalized === 'only') return normalized;
     return 'include';
 }
@@ -118,9 +120,9 @@ function globToRegExp(pattern) {
 
 function compileGlobs(globs = []) {
     return globs
-        .map((g) => String(g || '').trim())
+        .map(g => String(g || '').trim())
         .filter(Boolean)
-        .map((g) => ({ raw: g, re: globToRegExp(g) }));
+        .map(g => ({ raw: g, re: globToRegExp(g) }));
 }
 
 function matchesAny(relPath, compiledGlobs) {
@@ -143,7 +145,7 @@ function buildCompiledGlobs({ profile = 'full', includeGlobs = [], excludeGlobs 
     return {
         compiledInclude,
         compiledExclude,
-        shouldFilterByInclude: compiledInclude.length > 0
+        shouldFilterByInclude: compiledInclude.length > 0,
     };
 }
 
@@ -189,7 +191,7 @@ export async function loadWorkspaceFile(rootDir, relPath, options = {}) {
             fullPath,
             size: stat.size,
             mtimeMs: stat.mtimeMs,
-            buffer
+            buffer,
         };
     } catch {
         return null;
@@ -203,7 +205,7 @@ export async function scanWorkspace(
         includeGlobs = [],
         excludeGlobs = [],
         maxFileBytes = 2_000_000,
-        docsMode = process.env.RAG_DOCS_MODE || 'include'
+        docsMode = process.env.RAG_DOCS_MODE || 'include',
     } = {}
 ) {
     const root = path.resolve(rootDir);
@@ -218,7 +220,7 @@ export async function scanWorkspace(
     const { compiledInclude, compiledExclude, shouldFilterByInclude } = buildCompiledGlobs({
         profile,
         includeGlobs,
-        excludeGlobs
+        excludeGlobs,
     });
     const resolvedDocsMode = resolveDocsMode(docsMode);
 
@@ -271,7 +273,7 @@ export async function scanWorkspace(
                     fullPath,
                     size: stat.size,
                     mtimeMs: stat.mtimeMs,
-                    buffer: buf
+                    buffer: buf,
                 });
             } catch (_) {
                 continue;

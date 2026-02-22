@@ -5,6 +5,7 @@
    Responsabilidade: Monitoramento de volume e prevenção de overflow.
 ========================================================================== */
 
+/** Limite global padrão de contexto (em caracteres) usado pelo budget manager. */
 const GLOBAL_CONTEXT_LIMIT = 500000; // 500k caracteres teto
 
 /**

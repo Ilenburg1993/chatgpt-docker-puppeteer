@@ -38,7 +38,7 @@ module.exports = function (fileInfo, api) {
         'LOADER',
         'DNA_STORE',
         'SIGNAL',
-        'LOG_WATCHER'
+        'LOG_WATCHER',
     ];
 
     let hasChanges = false;
@@ -46,7 +46,7 @@ module.exports = function (fileInfo, api) {
 
     // Find log() calls and replace category strings
     root.find(j.CallExpression, {
-        callee: { name: 'log' }
+        callee: { name: 'log' },
     }).forEach(path => {
         const args = path.value.arguments;
         if (args.length > 0 && args[0].type === 'Literal' && typeof args[0].value === 'string') {
@@ -92,8 +92,8 @@ module.exports = function (fileInfo, api) {
                 id: { type: 'ObjectPattern' },
                 init: {
                     callee: { name: 'require' },
-                    arguments: [{ value: importPath }]
-                }
+                    arguments: [{ value: importPath }],
+                },
             })
             .size() > 0;
 
@@ -103,16 +103,16 @@ module.exports = function (fileInfo, api) {
             j.variableDeclarator(
                 j.objectPattern([j.property('init', j.identifier('LOG_CATEGORIES'), j.identifier('LOG_CATEGORIES'))]),
                 j.callExpression(j.identifier('require'), [j.literal(importPath)])
-            )
+            ),
         ]);
 
         const firstRequire = root
             .find(j.VariableDeclaration, {
                 declarations: [
                     {
-                        init: { callee: { name: 'require' } }
-                    }
-                ]
+                        init: { callee: { name: 'require' } },
+                    },
+                ],
             })
             .at(0);
 

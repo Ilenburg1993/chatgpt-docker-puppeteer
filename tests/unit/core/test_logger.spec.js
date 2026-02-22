@@ -176,7 +176,7 @@ describe('Logger - Sistema de Logging Unificado', () => {
             const contexto = {
                 action: 'TASK_CREATED',
                 taskId: 'task-456',
-                user: 'system'
+                user: 'system',
             };
 
             assert.doesNotThrow(() => {

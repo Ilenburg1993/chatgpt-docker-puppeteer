@@ -8,7 +8,7 @@ const mockLogger = {
     info: () => {},
     warn: () => {},
     error: () => {},
-    debug: () => {}
+    debug: () => {},
 };
 
 // Mock config
@@ -16,7 +16,7 @@ const mockConfig = {
     CHROME_PROXY_PORT: 9224,
     CHROME_HOST: 'host.docker.internal',
     CHROME_PORT: 9225,
-    CHROME_PROXY_BIND: '0.0.0.0'
+    CHROME_PROXY_BIND: '0.0.0.0',
 };
 
 import Module from 'node:module';
@@ -87,7 +87,7 @@ let service = new ChromeProxyService({
     PROXY_PORT: 9224,
     CHROME_PORT: 9225,
     CHROME_HOST: 'host.docker.internal',
-    PUBLIC_IP: 'localhost'
+    PUBLIC_IP: 'localhost',
 });
 
 // Access circuit breaker
@@ -124,7 +124,7 @@ console.log('✅ Circuit breaker opens after threshold failures');
 console.log('Test 3: URL rewriting');
 
 const data = JSON.stringify({
-    webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/page/abc123'
+    webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/page/abc123',
 });
 
 const rewritten = service.rewriteWebSocketURL(data, 'localhost:9224');
@@ -145,12 +145,12 @@ if (parsed.webSocketDebuggerUrl.includes('localhost') && parsed.webSocketDebugge
 const arrayData = JSON.stringify([
     {
         id: 'page1',
-        webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/page/1'
+        webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/page/1',
     },
     {
         id: 'page2',
-        webSocketDebuggerUrl: 'ws://localhost:9225/devtools/page/2'
-    }
+        webSocketDebuggerUrl: 'ws://localhost:9225/devtools/page/2',
+    },
 ]);
 
 const rewrittenArray = service.rewriteWebSocketURL(arrayData, 'localhost:9224');
@@ -173,8 +173,8 @@ if (
 console.log('Test 4: CORS headers (whitelist)');
 const mockReq = {
     headers: {
-        origin: 'http://localhost:3008'
-    }
+        origin: 'http://localhost:3008',
+    },
 };
 
 const corsHeaders = service._getCORSHeaders(mockReq);
@@ -184,8 +184,8 @@ console.log('✅ CORS whitelist works for allowed origin');
 
 const mockReqUnknown = {
     headers: {
-        origin: 'http://evil.com'
-    }
+        origin: 'http://evil.com',
+    },
 };
 
 const corsHeadersUnknown = service._getCORSHeaders(mockReqUnknown);
@@ -222,7 +222,7 @@ const mockMetric = {
     name: 'test_metric',
     inc: () => {
         throw new Error('Prometheus error');
-    }
+    },
 };
 
 try {

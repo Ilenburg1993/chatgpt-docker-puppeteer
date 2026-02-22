@@ -2,6 +2,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 import { audit, log } from '#core/logger';
@@ -339,7 +340,12 @@ router.post('/', async (req, res) => {
             // Return existing task
         } else {
             // Create new task
-            persistTaskInsert(taskV5, { stage: desiredStage, status: 'PENDING', actor: 'gui', promptTemplateArtifactId });
+            persistTaskInsert(taskV5, {
+                stage: desiredStage,
+                status: 'PENDING',
+                actor: 'gui',
+                promptTemplateArtifactId,
+            });
             created = true;
 
             await audit('CREATE_TASK', {

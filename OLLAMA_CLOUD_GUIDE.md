@@ -4,12 +4,13 @@
 
 Este projeto usa **Ollama Cloud** para geração de código e texto, com dois modelos principais:
 
-| Modelo | Uso | Specs | Velocidade |
-|--------|-----|-------|------------|
-| **qwen3-coder-next** | 💻 Código | 80B MoE (3B active), 256k context | 0.9-4s |
-| **qwen3-next:80b-cloud** | 💬 Chat/Texto | 80B hybrid attention, high-sparsity MoE | 2-5s |
+| Modelo                   | Uso           | Specs                                   | Velocidade |
+| ------------------------ | ------------- | --------------------------------------- | ---------- |
+| **qwen3-coder-next**     | 💻 Código     | 80B MoE (3B active), 256k context       | 0.9-4s     |
+| **qwen3-next:80b-cloud** | 💬 Chat/Texto | 80B hybrid attention, high-sparsity MoE | 2-5s       |
 
 **Arquitetura Dual-URL:**
+
 - **Cloud** (https://ollama.com): Geração de código/texto
 - **Local** (host.docker.internal:11434): Embeddings para RAG (nomic-embed-text)
 
@@ -57,9 +58,9 @@ import { ollama } from './tools/ollama/client.mjs';
 
 // Geração de código
 const code = await ollama.generate(
-    'Write a JavaScript function to validate email',
-    'qwen3-coder-next',
-    { temperature: 0.3, num_predict: 200 }
+  'Write a JavaScript function to validate email',
+  'qwen3-coder-next',
+  { temperature: 0.3, num_predict: 200 }
 );
 
 console.log(code);
@@ -72,11 +73,10 @@ console.log(code);
 import { ollama } from './tools/ollama/client.mjs';
 
 // Chat geral
-const answer = await ollama.generate(
-    'Explain async/await in JavaScript',
-    'qwen3-next:80b-cloud',
-    { temperature: 0.7, num_predict: 200 }
-);
+const answer = await ollama.generate('Explain async/await in JavaScript', 'qwen3-next:80b-cloud', {
+  temperature: 0.7,
+  num_predict: 200,
+});
 
 console.log(answer);
 // Output: Explicação clara e concisa
@@ -136,8 +136,8 @@ curl -X POST http://localhost:3008/api/mcp \
 
 **Configuração `claude_desktop_config.json`:**
 
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows:** `%AppData%/Claude/claude_desktop_config.json`
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json` **Windows:**
+`%AppData%/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -183,7 +183,7 @@ node test-qwen3-final.mjs
 
 **Saída esperada:**
 
-```
+````
 ✅ TESTE 1: CÓDIGO com qwen3-coder-next
 ════════════════════════════════════════
 ```python
@@ -191,14 +191,14 @@ def factorial(n):
     if n == 0 or n == 1:
         return 1
     return n * factorial(n - 1)
-```
-⏱️  Duração: 0.93s | 📏 Tamanho: 105 chars
+````
 
-✅ TESTE 3: CÓDIGO COMPLEXO com qwen3-coder-next
-════════════════════════════════════════
-[ApiClient class completa com error handling]
-⏱️  Duração: 4.07s | 📏 Tamanho: 1253 chars
-```
+⏱️ Duração: 0.93s | 📏 Tamanho: 105 chars
+
+✅ TESTE 3: CÓDIGO COMPLEXO com qwen3-coder-next ════════════════════════════════════════ [ApiClient
+class completa com error handling] ⏱️ Duração: 4.07s | 📏 Tamanho: 1253 chars
+
+````
 
 ---
 
@@ -230,20 +230,21 @@ const embedding = await ollama.embed(
     'nomic-embed-text'
 );
 // Returns: Array[768] (dimensões)
-```
+````
 
 ### Parâmetros Importantes
 
-| Parâmetro | Tipo | Descrição | Padrão |
-|-----------|------|-----------|--------|
-| `prompt` | string | Texto/pergunta/tarefa | (obrigatório) |
-| `model` | string | `qwen3-coder-next` ou `qwen3-next:80b-cloud` | `qwen3-coder-next` |
-| `temperature` | number | 0-1 (0=determinístico, 1=criativo) | 0.7 |
-| `num_predict` | number | Máximo de tokens a gerar (1-4000) | 1000 |
+| Parâmetro     | Tipo   | Descrição                                    | Padrão             |
+| ------------- | ------ | -------------------------------------------- | ------------------ |
+| `prompt`      | string | Texto/pergunta/tarefa                        | (obrigatório)      |
+| `model`       | string | `qwen3-coder-next` ou `qwen3-next:80b-cloud` | `qwen3-coder-next` |
+| `temperature` | number | 0-1 (0=determinístico, 1=criativo)           | 0.7                |
+| `num_predict` | number | Máximo de tokens a gerar (1-4000)            | 1000               |
 
 ### Escolha de Modelo
 
 **Use qwen3-coder-next quando:**
+
 - ✅ Precisa gerar código (qualquer linguagem)
 - ✅ Precisa completar código existente
 - ✅ Precisa refatorar código
@@ -251,6 +252,7 @@ const embedding = await ollama.embed(
 - ✅ Precisa documentar código (docstrings)
 
 **Use qwen3-next:80b-cloud quando:**
+
 - ✅ Precisa explicar conceitos
 - ✅ Precisa responder perguntas gerais
 - ✅ Precisa gerar texto/documentação
@@ -301,6 +303,7 @@ cat .env.local | grep OLLAMA_CLOUD
 **Soluções:**
 
 1. **Aumente timeout:**
+
    ```bash
    # Em .env.local
    OLLAMA_GENERATE_TIMEOUT=120000  # 2 minutos
@@ -318,21 +321,21 @@ cat .env.local | grep OLLAMA_CLOUD
 
 **Baseado em testes reais:**
 
-| Operação | Modelo | Duração Média | Tokens |
-|----------|--------|---------------|--------|
-| Código simples | qwen3-coder-next | 0.9-2s | 50-100 |
-| Código complexo | qwen3-coder-next | 3-5s | 200-300 |
-| Chat simples | qwen3-next:80b-cloud | 2-3s | 50-100 |
-| Embedding | nomic-embed-text (local) | <0.5s | 768D |
+| Operação        | Modelo                   | Duração Média | Tokens  |
+| --------------- | ------------------------ | ------------- | ------- |
+| Código simples  | qwen3-coder-next         | 0.9-2s        | 50-100  |
+| Código complexo | qwen3-coder-next         | 3-5s          | 200-300 |
+| Chat simples    | qwen3-next:80b-cloud     | 2-3s          | 50-100  |
+| Embedding       | nomic-embed-text (local) | <0.5s         | 768D    |
 
 **Comparação Cloud vs Local:**
 
-| Aspecto | Cloud (qwen3) | Local (qwen2.5:3b) |
-|---------|---------------|--------------------|
-| Velocidade | 0.9-5s | 30-120s |
-| Qualidade | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Custo | Subscription | Grátis |
-| Hardware necessário | Nenhum (cloud GPUs) | 8GB+ RAM |
+| Aspecto             | Cloud (qwen3)       | Local (qwen2.5:3b) |
+| ------------------- | ------------------- | ------------------ |
+| Velocidade          | 0.9-5s              | 30-120s            |
+| Qualidade           | ⭐⭐⭐⭐⭐          | ⭐⭐⭐             |
+| Custo               | Subscription        | Grátis             |
+| Hardware necessário | Nenhum (cloud GPUs) | 8GB+ RAM           |
 
 ---
 
@@ -363,12 +366,14 @@ cat .env.local | grep OLLAMA_CLOUD
 ## 📚 8. Recursos Adicionais
 
 **Documentação Oficial:**
+
 - [Ollama Cloud Docs](https://docs.ollama.com/cloud)
 - [qwen3-coder-next Library](https://ollama.com/library/qwen3-coder-next)
 - [qwen3-next Library](https://ollama.com/library/qwen3-next)
 - [Ollama Pricing](https://ollama.com/pricing)
 
 **Exemplos de Código:**
+
 - `test-qwen3-final.mjs` - Teste completo de ambos os modelos
 - `tools/ollama/client.mjs` - Cliente Ollama (código-fonte)
 - `src/integration/tools/ollama-tools.mjs` - Ferramentas MCP
@@ -389,24 +394,20 @@ cat .env.local | grep OLLAMA_CLOUD
 import { ollama } from './tools/ollama/client.mjs';
 
 // Geração de código
-const code = await ollama.generate(
-    'Write a factorial function in Python',
-    'qwen3-coder-next',
-    { temperature: 0.3, num_predict: 100 }
-);
+const code = await ollama.generate('Write a factorial function in Python', 'qwen3-coder-next', {
+  temperature: 0.3,
+  num_predict: 100,
+});
 
 // Chat/explicação
 const explanation = await ollama.generate(
-    'Explain recursion in simple terms',
-    'qwen3-next:80b-cloud',
-    { temperature: 0.7, num_predict: 150 }
+  'Explain recursion in simple terms',
+  'qwen3-next:80b-cloud',
+  { temperature: 0.7, num_predict: 150 }
 );
 
 // Embedding (RAG)
-const vector = await ollama.embed(
-    'search query text',
-    'nomic-embed-text'
-);
+const vector = await ollama.embed('search query text', 'nomic-embed-text');
 ```
 
 **Pronto! 🎉**

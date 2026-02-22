@@ -84,7 +84,7 @@ function createCorrelationContext({ store, telemetry }) {
 
         telemetry.emit('nerv:correlation:read', {
             correlation_id: correlationId,
-            size: history.length
+            size: history.length,
         });
 
         return history;
@@ -128,7 +128,7 @@ function createCorrelationContext({ store, telemetry }) {
         const ids = store.list();
 
         telemetry.emit('nerv:correlation:list', {
-            count: ids.length
+            count: ids.length,
         });
 
         return ids.slice();
@@ -142,7 +142,7 @@ function createCorrelationContext({ store, telemetry }) {
         getHistory,
         exists,
         size,
-        list
+        list,
     });
 }
 

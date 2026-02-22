@@ -40,7 +40,7 @@ function makeMockNerv() {
                     /* ignore */
                 }
             });
-        }
+        },
     };
 }
 

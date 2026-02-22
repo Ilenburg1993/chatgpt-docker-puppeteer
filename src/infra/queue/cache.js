@@ -152,7 +152,7 @@ function getCacheMetrics() {
         hitRate: parseFloat(hitRate),
         queueSize: globalQueueCache.length,
         lastScan: lastFullScan,
-        isDirty: isCacheDirty
+        isDirty: isCacheDirty,
     };
 }
 

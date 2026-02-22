@@ -18,18 +18,21 @@ const SKIP_DIRS = new Set([
     'fila',
     'respostas',
     '.vscode-server',
-    'analysis'
+    'analysis',
 ]);
 
 function toPosix(relPath) {
-    return String(relPath || '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
+    return String(relPath || '')
+        .replace(/\\/g, '/')
+        .replace(/^\.\//, '')
+        .replace(/^\/+/, '');
 }
 
 function shouldSkipDir(relDir) {
     const normalized = toPosix(relDir);
     if (!normalized) return false;
     const parts = normalized.split('/').filter(Boolean);
-    return parts.some((p) => SKIP_DIRS.has(p));
+    return parts.some(p => SKIP_DIRS.has(p));
 }
 
 export class RagWatchBatcher {
@@ -130,8 +133,8 @@ async function main() {
             'docs-mode': { type: 'string' },
             'max-file-bytes': { type: 'string' },
             'debounce-ms': { type: 'string' },
-            'batch-max': { type: 'string' }
-        }
+            'batch-max': { type: 'string' },
+        },
     });
 
     if (String(process.env.RAG_WATCH_ENABLED || 'true') === 'false') {
@@ -153,7 +156,7 @@ async function main() {
     const batcher = new RagWatchBatcher({
         debounceMs,
         batchMax,
-        onBatch: async (batch) => {
+        onBatch: async batch => {
             const started = Date.now();
             const report = await ragIndexChanged({
                 root,
@@ -162,15 +165,15 @@ async function main() {
                 excludeGlobs,
                 docsMode,
                 maxFileBytes,
-                changedPaths: batch
+                changedPaths: batch,
             });
             const tookMs = Date.now() - started;
             console.log(
                 `[RAG Watch] batch=${batch.length} changed=${report.changed_files} ` +
-                `deleted=${report.deleted_files} skipped=${report.skipped_files} chunks=${report.inserted_chunks} ` +
-                `mode=incremental took=${tookMs}ms`
+                    `deleted=${report.deleted_files} skipped=${report.skipped_files} chunks=${report.inserted_chunks} ` +
+                    `mode=incremental took=${tookMs}ms`
             );
-        }
+        },
     });
 
     const onFsEvent = ({ eventType, relPath, relDir }) => {
@@ -196,7 +199,7 @@ async function main() {
     if (excludeGlobs?.length) console.log(`[RAG Watch] excludeGlobs=${excludeGlobs.join(',')}`);
     console.log(`[RAG Watch] debounce=${debounceMs}ms batchMax=${batchMax}`);
 
-    const shutdown = async (signal) => {
+    const shutdown = async signal => {
         console.log(`[RAG Watch] stopping (${signal})...`);
         for (const watcher of watchers.values()) {
             try {
@@ -221,7 +224,7 @@ async function main() {
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
-    main().catch((error) => {
+    main().catch(error => {
         console.error('[RAG Watch] fatal:', error?.message || error);
         process.exit(1);
     });

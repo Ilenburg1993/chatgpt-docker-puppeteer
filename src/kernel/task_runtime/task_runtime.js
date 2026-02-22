@@ -5,11 +5,12 @@ import EventEmitter from 'node:events';
    Estados lógicos de tarefa
 =========================== */
 
+/** Constante/valor exportado: TaskState. */
 const TaskState = Object.freeze({
     CREATED: 'CREATED',
     ACTIVE: 'ACTIVE',
     SUSPENDED: 'SUSPENDED',
-    TERMINATED: 'TERMINATED'
+    TERMINATED: 'TERMINATED',
 });
 
 /**
@@ -24,13 +25,16 @@ const ALLOWED_TRANSITIONS = Object.freeze({
     [TaskState.CREATED]: [TaskState.ACTIVE, TaskState.TERMINATED],
     [TaskState.ACTIVE]: [TaskState.SUSPENDED, TaskState.TERMINATED],
     [TaskState.SUSPENDED]: [TaskState.ACTIVE, TaskState.TERMINATED],
-    [TaskState.TERMINATED]: []
+    [TaskState.TERMINATED]: [],
 });
 
 /* ===========================
    Fábrica do TaskRuntime
 =========================== */
 
+/**
+ * Runtime lógico de tarefas do kernel com FSM de estados e trilha de telemetria.
+ */
 class TaskRuntime extends EventEmitter {
     /**
      * @param {Object} params
@@ -103,20 +107,20 @@ class TaskRuntime extends EventEmitter {
              * Metadados livres.
              * Definidos externamente, nunca interpretados aqui.
              */
-            metadata: { ...metadata }
+            metadata: { ...metadata },
         };
 
         this.tasks.set(taskId, task);
 
         this._recordHistory(task, {
             type: 'TASK_CREATED',
-            at: now
+            at: now,
         });
 
         this.telemetry.info('task_runtime_task_created', {
             taskId,
             state: task.state,
-            at: now
+            at: now,
         });
 
         // Emite evento para observadores externos
@@ -196,7 +200,7 @@ class TaskRuntime extends EventEmitter {
             from: expectedState,
             to: newState,
             reason,
-            at: now
+            at: now,
         });
 
         this.telemetry.info('task_runtime_state_changed', {
@@ -204,7 +208,7 @@ class TaskRuntime extends EventEmitter {
             from: expectedState,
             to: newState,
             reason,
-            at: now
+            at: now,
         });
 
         // Emite evento para observadores
@@ -213,7 +217,7 @@ class TaskRuntime extends EventEmitter {
             from: expectedState,
             to: newState,
             reason,
-            snapshot: this._snapshot(task)
+            snapshot: this._snapshot(task),
         });
 
         return this._snapshot(task);
@@ -238,12 +242,12 @@ class TaskRuntime extends EventEmitter {
         this._recordHistory(task, {
             type: 'INTENT_REFERENCED',
             intent,
-            at: Date.now()
+            at: Date.now(),
         });
 
         this.telemetry.info('task_runtime_intent_referenced', {
             taskId,
-            intent: intent?.kind ?? 'unknown'
+            intent: intent?.kind ?? 'unknown',
         });
     }
 
@@ -262,12 +266,12 @@ class TaskRuntime extends EventEmitter {
         this._recordHistory(task, {
             type: 'OBSERVATION_REFERENCED',
             observation: observation?.msgId ?? 'unknown',
-            at: Date.now()
+            at: Date.now(),
         });
 
         this.telemetry.info('task_runtime_observation_referenced', {
             taskId,
-            observationId: observation?.msgId ?? 'unknown'
+            observationId: observation?.msgId ?? 'unknown',
         });
     }
 
@@ -287,12 +291,12 @@ class TaskRuntime extends EventEmitter {
 
         this._recordHistory(task, {
             type: 'METADATA_UPDATED',
-            at: task.updatedAt
+            at: task.updatedAt,
         });
 
         this.telemetry.info('task_runtime_metadata_updated', {
             taskId,
-            at: task.updatedAt
+            at: task.updatedAt,
         });
     }
 
@@ -351,7 +355,7 @@ class TaskRuntime extends EventEmitter {
 
         return Object.freeze({
             total: this.tasks.size,
-            byState
+            byState,
         });
     }
 
@@ -395,7 +399,7 @@ class TaskRuntime extends EventEmitter {
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
             metadata: Object.freeze({ ...task.metadata }),
-            history: Object.freeze([...task.history])
+            history: Object.freeze([...task.history]),
         });
     }
 }

@@ -99,11 +99,20 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
 
         insertTask(
             {
-                meta: { id: taskId, version: '5.0', created_at: new Date(now).toISOString(), priority: 5, source: 'gui' },
+                meta: {
+                    id: taskId,
+                    version: '5.0',
+                    created_at: new Date(now).toISOString(),
+                    priority: 5,
+                    source: 'gui',
+                },
                 spec: {
                     target: 'chatgpt',
                     payload: { system_message: '', user_message: 'base prompt', context: { inputs: [] } },
-                    execution: { strategy: 'ITERATIVE', iterative_config: { max_iterations: 3, validation_criteria: { min_quality_score: 100 } } },
+                    execution: {
+                        strategy: 'ITERATIVE',
+                        iterative_config: { max_iterations: 3, validation_criteria: { min_quality_score: 100 } },
+                    },
                     validation: {
                         validators: [{ type: 'regex', config: { pattern: '^PASS$' } }],
                         on_validation_failure: 'retry',
@@ -134,7 +143,10 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         const row = db.prepare('SELECT stage, status, execute_after_ms, task_json FROM tasks WHERE id = ?').get(taskId);
         assert.strictEqual(row.stage, 'READY');
         assert.strictEqual(row.status, 'PENDING');
-        assert.ok(typeof row.execute_after_ms === 'number' && row.execute_after_ms > Date.now(), 'execute_after_ms deve estar no futuro');
+        assert.ok(
+            typeof row.execute_after_ms === 'number' && row.execute_after_ms > Date.now(),
+            'execute_after_ms deve estar no futuro'
+        );
 
         const task = JSON.parse(row.task_json);
         const inputs = task?.spec?.payload?.context?.inputs || [];
@@ -160,11 +172,20 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
 
         insertTask(
             {
-                meta: { id: taskId, version: '5.0', created_at: new Date(now).toISOString(), priority: 5, source: 'gui' },
+                meta: {
+                    id: taskId,
+                    version: '5.0',
+                    created_at: new Date(now).toISOString(),
+                    priority: 5,
+                    source: 'gui',
+                },
                 spec: {
                     target: 'chatgpt',
                     payload: { system_message: '', user_message: 'base prompt', context: { inputs: [] } },
-                    execution: { strategy: 'ITERATIVE', iterative_config: { max_iterations: 3, validation_criteria: { min_quality_score: 100 } } },
+                    execution: {
+                        strategy: 'ITERATIVE',
+                        iterative_config: { max_iterations: 3, validation_criteria: { min_quality_score: 100 } },
+                    },
                     validation: {
                         validators: [{ type: 'regex', config: { pattern: '^PASS$' } }],
                         on_validation_failure: 'manual_review',
@@ -191,7 +212,9 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         const worker = new TaskOrchestrationWorker({ intervalMs: 999999, batchSize: 50, workerId: 'orch_test' });
         await worker.tick();
 
-        const row = db.prepare('SELECT status, blocked_reason, blocked_details_json FROM tasks WHERE id = ?').get(taskId);
+        const row = db
+            .prepare('SELECT status, blocked_reason, blocked_details_json FROM tasks WHERE id = ?')
+            .get(taskId);
         assert.strictEqual(row.status, 'BLOCKED');
         assert.strictEqual(row.blocked_reason, 'VALIDATION_MANUAL_REVIEW');
 
@@ -210,7 +233,13 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
 
         insertTask(
             {
-                meta: { id: taskId, version: '5.0', created_at: new Date(now).toISOString(), priority: 5, source: 'gui' },
+                meta: {
+                    id: taskId,
+                    version: '5.0',
+                    created_at: new Date(now).toISOString(),
+                    priority: 5,
+                    source: 'gui',
+                },
                 spec: {
                     target: 'chatgpt',
                     payload: { system_message: '', user_message: 'step0', context: { inputs: [] } },
@@ -219,7 +248,12 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
                         workflow_config: {
                             steps: [
                                 { id: 's0', action: 'execute_prompt', name: 'Step 0' },
-                                { id: 's1', action: 'execute_prompt', name: 'Step 1', config: { prompt: 'step1 prompt' } },
+                                {
+                                    id: 's1',
+                                    action: 'execute_prompt',
+                                    name: 'Step 1',
+                                    config: { prompt: 'step1 prompt' },
+                                },
                             ],
                         },
                     },
@@ -252,7 +286,10 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         assert.strictEqual(child.stage, 'READY');
         assert.strictEqual(child.status, 'PENDING');
 
-        const dep = db.prepare('SELECT COUNT(1) AS c FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?').get(childId, taskId)?.c || 0;
+        const dep =
+            db
+                .prepare('SELECT COUNT(1) AS c FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?')
+                .get(childId, taskId)?.c || 0;
         assert.strictEqual(dep, 1, 'dependency parent->child deve existir');
 
         const tasksCount = db.prepare('SELECT COUNT(1) AS c FROM tasks').get()?.c || 0;
@@ -260,7 +297,9 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
 
         const childTask = JSON.parse(child.task_json);
         assert.strictEqual(childTask.meta.parent_id, taskId);
-        assert.ok(Array.isArray(childTask.policy.dependencies) && childTask.policy.dependencies.includes(taskId), 'child task deve depender do parent');
+        assert.ok(
+            Array.isArray(childTask.policy.dependencies) && childTask.policy.dependencies.includes(taskId),
+            'child task deve depender do parent'
+        );
     });
 });
-

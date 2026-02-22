@@ -26,7 +26,7 @@ async function loadResponse(taskId, signal = null) {
         try {
             // 1. Check de Aborto Precoce (Soberania do Kernel)
             if (signal?.aborted) {
-                throw new Error('OPERATION_ABORTED');  
+                throw new Error('OPERATION_ABORTED');
             }
 
             // 2. Validação de Tamanho (Proteção contra Out-of-Memory)
@@ -38,7 +38,7 @@ async function loadResponse(taskId, signal = null) {
             // 3. Leitura Assíncrona com suporte a sinal de cancelamento
             const content = await fs.readFile(filepath, {
                 encoding: 'utf-8',
-                signal: signal
+                signal: signal,
             });
 
             // 4. Sanitização Universal (Remoção de caracteres de controle)

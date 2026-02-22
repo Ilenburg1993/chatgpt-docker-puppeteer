@@ -1,11 +1,4 @@
-import {
-    writeTask,
-    readTask,
-    startAgent,
-    stopAgent,
-    waitForCondition,
-    removeRunLock,
-} from './helpers.js';
+import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Recovery de Zumbis (Schema V3) ===');
@@ -19,7 +12,7 @@ import {
         id: TASK_ID,
         prompt: 'Zombie task',
         status: 'RUNNING',
-        startedEm: twoHoursAgo // O helper coloca isso em state.started_at
+        startedEm: twoHoursAgo, // O helper coloca isso em state.started_at
     });
 
     const agent = startAgent();

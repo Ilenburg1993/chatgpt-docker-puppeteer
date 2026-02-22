@@ -23,8 +23,8 @@ console.log(`[DIAGNOSTIC] Identidade Simulada: ${ROBOT_ID}\n`);
 const adapter = createSocketAdapter({
     url: SERVER_URL,
     options: {
-        query: { robot_id: ROBOT_ID } // Alguns servidores exigem ID na query string
-    }
+        query: { robot_id: ROBOT_ID }, // Alguns servidores exigem ID na query string
+    },
 });
 
 // 2. Criar o NERV (O Cérebro)
@@ -32,8 +32,8 @@ const nerv = createNerv({
     connection: adapter,
     identity: {
         robot_id: ROBOT_ID,
-        capabilities: ['TEST_PULSE', 'DIAGNOSTIC_MODE']
-    }
+        capabilities: ['TEST_PULSE', 'DIAGNOSTIC_MODE'],
+    },
 });
 
 // 3. Monitorar Telemetria (Os Sinais Vitais)
@@ -81,8 +81,8 @@ function sendTestPing() {
         payload: {
             uptime: process.uptime(),
             cpu: 0.1,
-            ram: process.memoryUsage().heapUsed
-        }
+            ram: process.memoryUsage().heapUsed,
+        },
     });
 
     nerv.send(pingEnvelope);

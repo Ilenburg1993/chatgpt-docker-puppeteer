@@ -1,20 +1,20 @@
 # 📐 Configuração Centralizada de Conexão
 
-**Versão**: 1.0
-**Data**: 02 de Fevereiro de 2026
-**Status**: ✅ Configuração Canônica Centralizada
+**Versão**: 1.0 **Data**: 02 de Fevereiro de 2026 **Status**: ✅ Configuração Canônica Centralizada
 
 ---
 
 ## 📋 Visão Geral
 
-Este documento descreve a **configuração centralizada de conexão** entre Puppeteer, Chrome Proxy Service e Chrome Real, gerenciada pelo arquivo `src/core/config.js`.
+Este documento descreve a **configuração centralizada de conexão** entre Puppeteer, Chrome Proxy
+Service e Chrome Real, gerenciada pelo arquivo `src/core/config.js`.
 
 ---
 
 ## 🎯 Objetivo
 
 Centralizar todas as configurações de rede e conexão em um único local (`config.js`), eliminando:
+
 - ❌ Valores hardcoded espalhados pelo código
 - ❌ Fallbacks inconsistentes entre módulos
 - ❌ Múltiplas fontes de verdade
@@ -31,6 +31,7 @@ Centralizar todas as configurações de rede e conexão em um único local (`con
 | `CHROME_HOST` | Host onde Chrome está rodando               | `host.docker.internal` | config.json ou `CHROME_HOST` env |
 
 **Onde é usado**:
+
 - `chromeProxyService.js`: Para encaminhar conexões
 - `ConnectionOrchestrator.js`: Para descoberta de endpoints
 
@@ -46,6 +47,7 @@ Centralizar todas as configurações de rede e conexão em um único local (`con
 | `CHROME_PROXY_ENABLED` | Flag para habilitar/desabilitar proxy | `true`       | config.json                            |
 
 **Onde é usado**:
+
 - `pool_manager.js`: Para validar disponibilidade do proxy
 - `chromeProxyService.js`: Para configurar servidor
 - `main.js`: Para iniciar proxy inline
@@ -61,12 +63,12 @@ Centralizar todas as configurações de rede e conexão em um único local (`con
 const CONFIG = require('@core/config');
 
 // Acessar configurações
-const chromeHost = CONFIG.CHROME_HOST;               // 'host.docker.internal'
-const chromePort = CONFIG.CHROME_PORT;               // 9225
-const proxyHost = CONFIG.CHROME_PROXY_HOST;          // 'localhost'
-const proxyPort = CONFIG.CHROME_PROXY_PORT;          // 9224
-const proxyBind = CONFIG.CHROME_PROXY_BIND;          // '0.0.0.0'
-const proxyEnabled = CONFIG.CHROME_PROXY_ENABLED;    // true
+const chromeHost = CONFIG.CHROME_HOST; // 'host.docker.internal'
+const chromePort = CONFIG.CHROME_PORT; // 9225
+const proxyHost = CONFIG.CHROME_PROXY_HOST; // 'localhost'
+const proxyPort = CONFIG.CHROME_PROXY_PORT; // 9224
+const proxyBind = CONFIG.CHROME_PROXY_BIND; // '0.0.0.0'
+const proxyEnabled = CONFIG.CHROME_PROXY_ENABLED; // true
 ```
 
 ### **2. No config.json**
@@ -101,23 +103,26 @@ export CHROME_PROXY_BIND=127.0.0.1
 **Ordem de Precedência** (do mais alto para o mais baixo):
 
 1. **Parâmetros diretos** (passados ao construtor)
+
    ```javascript
-   new ChromeProxyService({ CHROME_HOST: '192.168.1.100' })
+   new ChromeProxyService({ CHROME_HOST: '192.168.1.100' });
    ```
 
 2. **Variáveis de Ambiente**
+
    ```bash
    export CHROME_HOST=192.168.1.100
    ```
 
 3. **config.json** (via `src/core/config.js`)
+
    ```json
    { "CHROME_HOST": "host.docker.internal" }
    ```
 
 4. **Valores Padrão** (no schema Zod)
    ```javascript
-   CHROME_HOST: z.string().default('host.docker.internal')
+   CHROME_HOST: z.string().default('host.docker.internal');
    ```
 
 ---
@@ -188,7 +193,7 @@ export CHROME_PORT=9225
 // config.json
 {
   "CHROME_PROXY_ENABLED": false,
-  "CHROME_HOST": "192.168.1.100",  // Acesso direto
+  "CHROME_HOST": "192.168.1.100", // Acesso direto
   "CHROME_PORT": 9225
 }
 
@@ -203,12 +208,14 @@ export CHROME_PORT=9225
 ### **1. NUNCA Hardcode Portas**
 
 ❌ **Errado**:
+
 ```javascript
 const proxyUrl = 'http://localhost:9224';
 const chromeHost = 'host.docker.internal';
 ```
 
 ✅ **Correto**:
+
 ```javascript
 const CONFIG = require('@core/config');
 const proxyUrl = `http://${CONFIG.CHROME_PROXY_HOST}:${CONFIG.CHROME_PROXY_PORT}`;
@@ -218,11 +225,13 @@ const chromeHost = CONFIG.CHROME_HOST;
 ### **2. Sempre Usar Getters**
 
 ❌ **Errado**:
+
 ```javascript
 const port = CONFIG.currentConfig.CHROME_PROXY_PORT;
 ```
 
 ✅ **Correto**:
+
 ```javascript
 const port = CONFIG.CHROME_PROXY_PORT;
 ```
@@ -230,13 +239,15 @@ const port = CONFIG.CHROME_PROXY_PORT;
 ### **3. Fallbacks Devem Estar no config.js**
 
 ❌ **Errado** (fallback duplicado):
+
 ```javascript
 const host = CONFIG.CHROME_PROXY_HOST || 'localhost';
 ```
 
 ✅ **Correto** (confiar no padrão do config):
+
 ```javascript
-const host = CONFIG.CHROME_PROXY_HOST;  // Já tem default 'localhost'
+const host = CONFIG.CHROME_PROXY_HOST; // Já tem default 'localhost'
 ```
 
 ---
@@ -294,12 +305,13 @@ curl http://localhost:9224/json/version
 ## 🔄 Changelog
 
 - **v1.0** (2026-02-02): Configuração inicial centralizada
-  - Adicionadas constantes: `CHROME_HOST`, `CHROME_PROXY_HOST`, `CHROME_PROXY_BIND`, `CHROME_PROXY_ENABLED`
+  - Adicionadas constantes: `CHROME_HOST`, `CHROME_PROXY_HOST`, `CHROME_PROXY_BIND`,
+    `CHROME_PROXY_ENABLED`
   - Migração de valores hardcoded para CONFIG
-  - Atualização de `chromeProxyService.js`, `pool_manager.js`, `main.js`, `boot_resilience_manager.js`
+  - Atualização de `chromeProxyService.js`, `pool_manager.js`, `main.js`,
+    `boot_resilience_manager.js`
 
 ---
 
-**Última Atualização**: 02 de Fevereiro de 2026
-**Mantido por**: Sistema de Automação GPT
+**Última Atualização**: 02 de Fevereiro de 2026 **Mantido por**: Sistema de Automação GPT
 **Status**: ✅ Produção - Configuração Canônica

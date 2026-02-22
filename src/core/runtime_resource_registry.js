@@ -36,7 +36,9 @@ function normalizeCriticality(value) {
  * @returns {RuntimeResourceState}
  */
 function normalizeState(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'ready') return 'ready';
     if (normalized === 'degraded') return 'degraded';
     if (normalized === 'not-ready') return 'not-ready';
@@ -92,8 +94,8 @@ function upsertRuntimeResource(resource) {
         reasonCode: resource?.reasonCode ?? existing?.reasonCode ?? null,
         message: resource?.message ?? existing?.message ?? null,
         updatedAt: now(),
-        stop: typeof resource?.stop === 'function' ? resource.stop : existing?.stop ?? null,
-        health: typeof resource?.health === 'function' ? resource.health : existing?.health ?? null,
+        stop: typeof resource?.stop === 'function' ? resource.stop : (existing?.stop ?? null),
+        health: typeof resource?.health === 'function' ? resource.health : (existing?.health ?? null),
     };
 
     runtimeResources.set(id, next);
@@ -118,6 +120,12 @@ function setRuntimeResourceState(id, state, details = {}) {
     });
 }
 
+/**
+ * Retorna snapshot serializável dos recursos runtime registrados.
+ *
+ * @param {{ owner?: string|null }} [options]
+ * @returns {Array<{id:string, owner:string, criticality:RuntimeResourceCriticality, state:RuntimeResourceState, reasonCode:string|null, message:string|null, updatedAt:number, health:unknown}>}
+ */
 function getRuntimeResourcesSnapshot({ owner = null } = {}) {
     const values = [...runtimeResources.values()]
         .filter(item => !owner || item.owner === owner)
@@ -144,6 +152,18 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
     return values;
 }
 
+/**
+ * Consolida readiness/degraded/not-ready a partir do registry de recursos runtime.
+ *
+ * @param {{ owner?: string|null, requiredComponents?: string[], allowDegradedReady?: boolean }} [options]
+ * @returns {{
+ *   status: 'ready'|'degraded'|'not-ready',
+ *   required_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
+ *   degraded_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
+ *   not_ready_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
+ *   resources: ReturnType<typeof getRuntimeResourcesSnapshot>,
+ * }}
+ */
 function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], allowDegradedReady = true } = {}) {
     const resources = getRuntimeResourcesSnapshot({ owner });
     const explicitRequired = new Set(requiredComponents || []);
@@ -172,7 +192,14 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
     }
 
     const requiredNotReady = required.filter(item => item.state !== 'ready');
-    const status = requiredNotReady.length > 0 ? 'not-ready' : degraded.length > 0 && !allowDegradedReady ? 'not-ready' : degraded.length > 0 ? 'degraded' : 'ready';
+    const status =
+        requiredNotReady.length > 0
+            ? 'not-ready'
+            : degraded.length > 0 && !allowDegradedReady
+              ? 'not-ready'
+              : degraded.length > 0
+                ? 'degraded'
+                : 'ready';
 
     return {
         status,
@@ -183,6 +210,12 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
     };
 }
 
+/**
+ * Para recursos registrados em ordem reversa de criação, com timeout por recurso.
+ *
+ * @param {{ owner?: string|null, timeoutMs?: number, logger?: ((level: string, message: string) => void)|null }} [options]
+ * @returns {Promise<Array<{id:string, ok:boolean, error?:string, timeout?:boolean}>>}
+ */
 async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = null } = {}) {
     const entries = [...runtimeResources.values()].filter(item => !owner || item.owner === owner);
     entries.reverse();
@@ -197,7 +230,10 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = n
 
         try {
             await runWithTimeout(() => Promise.resolve(resource.stop()), timeoutMs);
-            setRuntimeResourceState(resource.id, 'stopped', { owner: resource.owner, criticality: resource.criticality });
+            setRuntimeResourceState(resource.id, 'stopped', {
+                owner: resource.owner,
+                criticality: resource.criticality,
+            });
             results.push({ id: resource.id, ok: true });
         } catch (error) {
             setRuntimeResourceState(resource.id, 'degraded', {
@@ -213,7 +249,10 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = n
                 error: error?.message || String(error),
             });
             if (logger && typeof logger === 'function') {
-                logger('WARN', `[RUNTIME_REGISTRY] Falha ao parar recurso ${resource.id}: ${error?.message || String(error)}`);
+                logger(
+                    'WARN',
+                    `[RUNTIME_REGISTRY] Falha ao parar recurso ${resource.id}: ${error?.message || String(error)}`
+                );
             }
         }
     }
@@ -221,6 +260,12 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = n
     return results;
 }
 
+/**
+ * Remove recursos do registry (todos ou apenas de um owner).
+ *
+ * @param {string|null} [owner=null]
+ * @returns {void}
+ */
 function clearRuntimeResources(owner = null) {
     if (!owner) {
         runtimeResources.clear();

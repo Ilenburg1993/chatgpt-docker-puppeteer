@@ -10,68 +10,68 @@ const promiseExecutorFixes = [
         file: 'src/kernel/kernel_loop/kernel_loop.js',
         line: 323,
         pattern: /return setTimeout\(resolve, delay\);/,
-        replacement: 'setTimeout(resolve, delay);'
+        replacement: 'setTimeout(resolve, delay);',
     },
     {
         file: 'tests/unit/core/test_logger.spec.js',
         line: 139,
         pattern: /return setTimeout\(resolve, 100\);/,
-        replacement: 'setTimeout(resolve, 100);'
+        replacement: 'setTimeout(resolve, 100);',
     },
     {
         file: 'tests/unit/driver/test_driver_adapters.spec.js',
         line: 39,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/driver/test_driver_adapters.spec.js',
         line: 153,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/driver/test_driver_adapters.spec.js',
         line: 262,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/driver/test_driver_adapters.spec.js',
         line: 274,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/nerv/test_nerv_core.spec.js',
         line: 121,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/nerv/test_nerv_core.spec.js',
         line: 143,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/nerv/test_nerv_core.spec.js',
         line: 186,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/nerv/test_nerv_core.spec.js',
         line: 245,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
+        replacement: 'setTimeout(resolve, 10);',
     },
     {
         file: 'tests/unit/server/test_server_nerv_adapter.spec.js',
         line: 270,
         pattern: /return setTimeout\(resolve, 10\);/,
-        replacement: 'setTimeout(resolve, 10);'
-    }
+        replacement: 'setTimeout(resolve, 10);',
+    },
 ];
 
 // ============================================================================
@@ -82,14 +82,14 @@ const protoFixes = [
         file: 'tests/unit/server/test_middleware.spec.js',
         line: 219,
         pattern: /req\.__proto__ = Object\.create\(http\.IncomingMessage\.prototype\);/,
-        replacement: 'Object.setPrototypeOf(req, Object.create(http.IncomingMessage.prototype));'
+        replacement: 'Object.setPrototypeOf(req, Object.create(http.IncomingMessage.prototype));',
     },
     {
         file: 'tests/unit/server/test_server_nerv_adapter.spec.js',
         line: 241,
         pattern: /req\.__proto__ = Object\.create\(http\.IncomingMessage\.prototype\);/,
-        replacement: 'Object.setPrototypeOf(req, Object.create(http.IncomingMessage.prototype));'
-    }
+        replacement: 'Object.setPrototypeOf(req, Object.create(http.IncomingMessage.prototype));',
+    },
 ];
 
 // ============================================================================
@@ -99,13 +99,13 @@ const controlRegexFixes = [
     {
         file: 'src/driver/modules/human.js',
         line: 157,
-        addComment: '// eslint-disable-next-line no-control-regex'
+        addComment: '// eslint-disable-next-line no-control-regex',
     },
     {
         file: 'tests/unit/driver/test_driver_adapters.spec.js',
         line: 111,
-        addComment: '// eslint-disable-next-line no-control-regex'
-    }
+        addComment: '// eslint-disable-next-line no-control-regex',
+    },
 ];
 
 // ============================================================================

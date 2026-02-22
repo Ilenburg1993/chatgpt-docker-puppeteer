@@ -17,7 +17,7 @@ const schemaGuard = schema => (req, res, next) => {
         return res.status(400).json({
             success: false,
             error: 'Payload vazio detectado. A operação exige um corpo JSON íntegro.',
-            request_id: requestId
+            request_id: requestId,
         });
     }
 
@@ -30,7 +30,7 @@ const schemaGuard = schema => (req, res, next) => {
         // Converte a árvore de erros do Zod em uma lista simples de campo/mensagem.
         const errorDetails = result.error.issues.map(issue => ({
             field: issue.path.join('.'),
-            message: issue.message
+            message: issue.message,
         }));
 
         // 4. Registro de Auditoria Administrativa
@@ -40,7 +40,7 @@ const schemaGuard = schema => (req, res, next) => {
             method: req.method,
             errors: errorDetails,
             request_id: requestId,
-            ip: req.ip
+            ip: req.ip,
         });
 
         log('WARN', `[GUARD] Violação de contrato em ${req.originalUrl}: ${errorDetails.length} erro(s).`, requestId);
@@ -50,7 +50,7 @@ const schemaGuard = schema => (req, res, next) => {
             success: false,
             error: 'O payload enviado viola o contrato de dados do sistema.',
             request_id: requestId,
-            details: errorDetails
+            details: errorDetails,
         });
     }
 

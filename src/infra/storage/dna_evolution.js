@@ -207,4 +207,11 @@ function getEvolutionStats() {
     return stats;
 }
 
-export { evolveWithSadiProtocol, evolveWithFullProtocol, resetEvolutionCounters, getEvolutionStats, MIN_CONFIDENCE_THRESHOLD, MAX_EVOLUTIONS_PER_DOMAIN };
+export {
+    evolveWithSadiProtocol,
+    evolveWithFullProtocol,
+    resetEvolutionCounters,
+    getEvolutionStats,
+    MIN_CONFIDENCE_THRESHOLD,
+    MAX_EVOLUTIONS_PER_DOMAIN,
+};

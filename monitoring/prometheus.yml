@@ -4,8 +4,8 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    cluster: 'chatgpt-agent'
-    environment: 'production'
+    cluster: "chatgpt-agent"
+    environment: "production"
 
 # Alertmanager configuration (optional)
 # alerting:
@@ -16,31 +16,31 @@ global:
 # Scrape configurations
 scrape_configs:
   # Agent metrics
-  - job_name: 'chatgpt-agent'
+  - job_name: "chatgpt-agent"
     static_configs:
-      - targets: ['agent:9090']
+      - targets: ["agent:9090"]
         labels:
-          service: 'agent'
-    
+          service: "agent"
+
     # Metrics path (if not default /metrics)
     # metrics_path: '/metrics'
-    
+
     # Scrape interval override
     scrape_interval: 10s
     scrape_timeout: 5s
 
   # Docker daemon metrics (if exposed)
-  - job_name: 'docker'
+  - job_name: "docker"
     static_configs:
-      - targets: ['host.docker.internal:9323']
+      - targets: ["host.docker.internal:9323"]
         labels:
-          service: 'docker'
-    
+          service: "docker"
+
     # Optional: relabel to add instance info
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
-        replacement: 'docker-host'
+        replacement: "docker-host"
 
   # Node exporter (if deployed for host metrics)
   # - job_name: 'node-exporter'
@@ -48,11 +48,11 @@ scrape_configs:
   #     - targets: ['node-exporter:9100']
 
   # Prometheus self-monitoring
-  - job_name: 'prometheus'
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["localhost:9090"]
         labels:
-          service: 'prometheus'
+          service: "prometheus"
 
 # Alert rules (create separate file: alerts.yml)
 # rule_files:

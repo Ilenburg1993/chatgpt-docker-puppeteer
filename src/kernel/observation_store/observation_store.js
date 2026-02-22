@@ -28,7 +28,7 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
         payload: Object.freeze(payload),
         payloadSerialized,
         originalTimestamp: originalTimestamp ?? null,
-        ingestedAt: Date.now()
+        ingestedAt: Date.now(),
     });
 }
 
@@ -36,6 +36,9 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
    Fábrica do ObservationStore
 =========================== */
 
+/**
+ * Store de observações do kernel com indexação por correlação, tempo e deduplicação.
+ */
 class ObservationStore extends EventEmitter {
     /**
      * @param {Object} params
@@ -114,7 +117,7 @@ class ObservationStore extends EventEmitter {
             correlationId,
             source,
             payload,
-            originalTimestamp
+            originalTimestamp,
         });
 
         // Inicializa lista de observações se necessário
@@ -129,7 +132,7 @@ class ObservationStore extends EventEmitter {
             this.telemetry.warning('observation_store_limit_exceeded', {
                 correlationId,
                 limit: this.maxObservationsPerCorrelation,
-                at: Date.now()
+                at: Date.now(),
             });
 
             // Remove observação mais antiga (FIFO técnico)
@@ -138,7 +141,7 @@ class ObservationStore extends EventEmitter {
             this.telemetry.info('observation_store_observation_discarded', {
                 correlationId,
                 discardedMsgId: discarded.msgId,
-                at: Date.now()
+                at: Date.now(),
             });
         }
 
@@ -160,21 +163,21 @@ class ObservationStore extends EventEmitter {
             correlationId,
             source,
             duplicate: isDuplicate,
-            at: record.ingestedAt
+            at: record.ingestedAt,
         });
 
         if (isDuplicate) {
             this.telemetry.warning('observation_store_duplicate_detected', {
                 msgId,
                 correlationId,
-                at: record.ingestedAt
+                at: record.ingestedAt,
             });
         }
 
         // Emite evento para observadores
         this.emit('observation_ingested', {
             record,
-            isDuplicate
+            isDuplicate,
         });
 
         return record;
@@ -298,7 +301,7 @@ class ObservationStore extends EventEmitter {
             observations: totalObservations,
             uniqueMsgIds: this.seenMsgIds.size,
             maxObservationsInCorrelation,
-            temporalIndexSize: this.temporalIndex.length
+            temporalIndexSize: this.temporalIndex.length,
         });
     }
 
@@ -319,7 +322,7 @@ class ObservationStore extends EventEmitter {
 
             this.telemetry.info('observation_store_correlation_purged', {
                 correlationId,
-                at: Date.now()
+                at: Date.now(),
             });
         }
     }
@@ -349,7 +352,7 @@ class ObservationStore extends EventEmitter {
         this.telemetry.info('observation_store_purged_old', {
             purgedCount,
             olderThan,
-            at: Date.now()
+            at: Date.now(),
         });
     }
 }

@@ -251,8 +251,8 @@ O script será criado em `scripts/analysis/analyze-variables.mjs` com as seguint
 
 ### Nomenclatura (Boas Práticas)
 
-| Padrão               | Exemplo                  | Status    |
-| -------------------- | ------------------------ | --------- |
+| Padrão               | Exemplo                  | Status     |
+| -------------------- | ------------------------ | ---------- |
 | SCREAMING_SNAKE_CASE | `const MAX_RETRIES`      | ✅         |
 | camelCase            | `let userName`           | ✅         |
 | PascalCase           | `class TaskManager`      | ✅         |

@@ -2,16 +2,14 @@
 import { COMMANDS, executeCommand, validateCommand } from '#server/domain/control_command_service';
 import { RBAC_PERMISSIONS, RBAC_ROLES, getRbacUserByUsername, upsertRbacUser } from '#infra/db/rbac_repo';
 import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
-import {
-    getControlOperationById,
-    listControlOperations,
-} from '#infra/db/control_operation_repo';
+import { getControlOperationById, listControlOperations } from '#infra/db/control_operation_repo';
 import express from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/authorize.js';
 import schemaGuard from '../../middleware/schema_guard.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 const commandSchema = z.object({

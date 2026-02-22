@@ -19,7 +19,7 @@ const SIMPLE_SCENARIOS = [
         args: [],
         env: { NODE_ENV: 'test', DEBUG: 'basic' },
         duration: 10000,
-        description: 'Teste básico de execução da aplicação'
+        description: 'Teste básico de execução da aplicação',
     },
     {
         name: 'Error Simulation',
@@ -27,7 +27,7 @@ const SIMPLE_SCENARIOS = [
         args: [],
         env: { NODE_ENV: 'test', FORCE_ERRORS: '1', DEBUG: 'errors' },
         duration: 8000,
-        description: 'Simular cenários de erro'
+        description: 'Simular cenários de erro',
     },
     {
         name: 'Memory Stress',
@@ -35,8 +35,8 @@ const SIMPLE_SCENARIOS = [
         args: [],
         env: { NODE_ENV: 'test', MEMORY_STRESS: '1', DEBUG: 'memory' },
         duration: 12000,
-        description: 'Teste de estresse de memória'
-    }
+        description: 'Teste de estresse de memória',
+    },
 ];
 
 async function runSimpleScenario(scenario) {
@@ -44,22 +44,22 @@ async function runSimpleScenario(scenario) {
     console.log(`   📝 ${scenario.description}`);
     console.log(`   ⏱️  ${scenario.duration}ms`);
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const child = spawn('node', [scenario.script, ...scenario.args], {
             cwd: ROOT_DIR,
             env: { ...process.env, ...scenario.env },
-            stdio: ['pipe', 'pipe', 'pipe']
+            stdio: ['pipe', 'pipe', 'pipe'],
         });
 
         let stdout = '';
         let stderr = '';
         let startTime = Date.now();
 
-        child.stdout.on('data', (data) => {
+        child.stdout.on('data', data => {
             stdout += data.toString();
         });
 
-        child.stderr.on('data', (data) => {
+        child.stderr.on('data', data => {
             stderr += data.toString();
         });
 
@@ -85,30 +85,34 @@ async function runSimpleScenario(scenario) {
                 duration,
                 hasErrors: stderr.includes('Error') || stderr.includes('uncaught'),
                 hasWarnings: stderr.includes('Warning') || stderr.includes('deprecated'),
-                success: code === 0 && !signal
+                success: code === 0 && !signal,
             };
 
             console.log(`   ✅ Concluído (exit: ${code}, duração: ${duration}ms)`);
             if (result.hasErrors) {
-                console.log(`   🚨 Erros detectados: ${stderr.split('\n').filter(line =>
-                    line.includes('Error') || line.includes('uncaught')).length}`);
+                console.log(
+                    `   🚨 Erros detectados: ${
+                        stderr.split('\n').filter(line => line.includes('Error') || line.includes('uncaught')).length
+                    }`
+                );
             }
 
             resolve(result);
         });
 
-        child.on('error', (error) => {
+        child.on('error', error => {
             clearTimeout(timeout);
             console.error(`   ❌ Erro: ${error.message}`);
             resolve({
                 scenario: scenario.name,
                 error: error.message,
-                success: false
+                success: false,
             });
         });
     });
 }
 
+/** Função exportada: runSimpleDebug. */
 async function main() {
     console.log('🧪 RUNTIME DEBUG - Versão Simplificada');
     console.log('=====================================\n');
@@ -132,7 +136,7 @@ async function main() {
             results.push({
                 scenario: scenario.name,
                 error: error.message,
-                success: false
+                success: false,
             });
         }
     }
@@ -153,19 +157,28 @@ async function main() {
 
     if (withErrors > 0) {
         console.log('\n🔍 CENÁRIOS COM ERROS:');
-        results.filter(r => r.hasErrors).forEach(result => {
-            console.log(`   • ${result.scenario}`);
-        });
+        results
+            .filter(r => r.hasErrors)
+            .forEach(result => {
+                console.log(`   • ${result.scenario}`);
+            });
     }
 
     // Salvar relatório
     const reportPath = path.join(ROOT_DIR, 'debug-profiles', `simple-debug-${Date.now()}.json`);
     fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-    fs.writeFileSync(reportPath, JSON.stringify({
-        timestamp: new Date().toISOString(),
-        results,
-        summary: { successful, failed, withErrors, withWarnings }
-    }, null, 2));
+    fs.writeFileSync(
+        reportPath,
+        JSON.stringify(
+            {
+                timestamp: new Date().toISOString(),
+                results,
+                summary: { successful, failed, withErrors, withWarnings },
+            },
+            null,
+            2
+        )
+    );
 
     console.log(`\n💾 Relatório salvo: ${reportPath}`);
 

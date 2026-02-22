@@ -12,17 +12,17 @@ describe('human.js v2.0 - Unit Tests', () => {
         mockPage = {
             mouse: {
                 move: mock.fn(async () => {}),
-                click: mock.fn(async () => {})
+                click: mock.fn(async () => {}),
             },
             keyboard: {
                 type: mock.fn(async () => {}),
-                press: mock.fn(async () => {})
+                press: mock.fn(async () => {}),
             },
             evaluate: mock.fn(async () => true),
             waitForSelector: mock.fn(async () => ({})),
             $: mock.fn(async () => null),
             isClosed: mock.fn(() => false),
-            url: mock.fn(() => 'https://example.com')
+            url: mock.fn(() => 'https://example.com'),
         };
 
         // Mock driver object
@@ -30,7 +30,7 @@ describe('human.js v2.0 - Unit Tests', () => {
             page: mockPage,
             _emitVital: mock.fn(() => {}),
             currentTarget: 'chatgpt',
-            correlationId: 'test-123'
+            correlationId: 'test-123',
         };
 
         // Import module fresh for each test
@@ -97,7 +97,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await humanClick(null, '#button'), {
                     name: 'TypeError',
-                    message: /driver is required/
+                    message: /driver is required/,
                 });
             });
 
@@ -106,7 +106,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await humanClick(mockDriver, null), {
                     name: 'TypeError',
-                    message: /selector is required/
+                    message: /selector is required/,
                 });
             });
 
@@ -115,7 +115,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await humanType(null, '#input', 'text'), {
                     name: 'TypeError',
-                    message: /driver is required/
+                    message: /driver is required/,
                 });
             });
 
@@ -124,7 +124,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await humanType(mockDriver, null, 'text'), {
                     name: 'TypeError',
-                    message: /selector is required/
+                    message: /selector is required/,
                 });
             });
 
@@ -133,7 +133,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await humanType(mockDriver, '#input', null), {
                     name: 'TypeError',
-                    message: /text is required/
+                    message: /text is required/,
                 });
             });
 
@@ -271,7 +271,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 });
 
                 await assert.rejects(async () => await humanClick(mockDriver, '#nonexistent'), {
-                    message: /Selector timeout/
+                    message: /Selector timeout/,
                 });
 
                 const calls = mockDriver._emitVital.mock.calls;
@@ -308,7 +308,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 });
 
                 await assert.rejects(async () => await humanClick(mockDriver, '#button'), {
-                    message: /Persistent error/
+                    message: /Persistent error/,
                 });
 
                 // Deve ter tentado 3 vezes + 1 inicial
@@ -341,7 +341,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 setTimeout(() => controller.abort(), 10);
 
                 const result = await humanType(mockDriver, '#input', 'very long text that would take time to type', {
-                    signal: controller.signal
+                    signal: controller.signal,
                 });
 
                 // Deve ter parado antes de completar
@@ -412,7 +412,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 });
 
                 mockPage.$ = mock.fn(async () => ({
-                    boundingBox: async () => ({ x: 5000, y: 5000, width: 100, height: 50 })
+                    boundingBox: async () => ({ x: 5000, y: 5000, width: 100, height: 50 }),
                 }));
 
                 await humanClick(mockDriver, '#button');
@@ -446,7 +446,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 mockPage.isClosed = mock.fn(() => true);
 
                 await assert.rejects(async () => await humanType(mockDriver, '#input', 'test'), {
-                    message: /page is closed/
+                    message: /page is closed/,
                 });
 
                 const calls = mockDriver._emitVital.mock.calls;
@@ -492,7 +492,7 @@ describe('human.js v2.0 - Unit Tests', () => {
             setTimeout(() => controller.abort(), 5);
 
             const result = await humanType(mockDriver, '#username', 'very long username that should be interrupted', {
-                signal: controller.signal
+                signal: controller.signal,
             });
 
             assert.strictEqual(result, false, 'Deve retornar false quando abortado');
@@ -508,7 +508,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
             for (let i = 0; i < 5; i++) {
                 await assert.rejects(async () => await humanClick(mockDriver, `#button${i}`), {
-                    message: /Selector not found/
+                    message: /Selector not found/,
                 });
             }
 

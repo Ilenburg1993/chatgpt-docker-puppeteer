@@ -35,7 +35,7 @@ describe('RAG chunking determinism', () => {
                 relPath,
                 startByte,
                 endByte,
-                contentSha256: sha256HexForString(chunkText)
+                contentSha256: sha256HexForString(chunkText),
             });
         });
 
@@ -45,7 +45,7 @@ describe('RAG chunking determinism', () => {
                 relPath,
                 startByte,
                 endByte,
-                contentSha256: sha256HexForString(chunkText)
+                contentSha256: sha256HexForString(chunkText),
             });
         });
 
@@ -91,7 +91,7 @@ describe('RAG chunking determinism', () => {
         const buf = Buffer.from(text, 'utf8');
         const { lines } = buildLineIndex(buf);
         const ranges = chunkByType({ relPath, lines, maxChunkChars: 800 });
-        const fnChunk = ranges.find((r) => r.symbol === 'sum');
+        const fnChunk = ranges.find(r => r.symbol === 'sum');
 
         assert.ok(fnChunk, 'Expected AST chunk for symbol "sum"');
         assert.strictEqual(fnChunk.kind, 'function');
@@ -119,22 +119,23 @@ describe('RAG chunking determinism', () => {
         const { lines } = buildLineIndex(buf);
         const ranges = chunkByType({ relPath, lines, maxChunkChars: 80 });
 
-        const methodChunks = ranges.filter((r) => String(r.symbol || '').startsWith('Service.'));
+        const methodChunks = ranges.filter(r => String(r.symbol || '').startsWith('Service.'));
         assert.ok(methodChunks.length >= 2, 'Expected class to split into method chunks');
-        assert.ok(methodChunks.every((r) => r.kind === 'class_method' || String(r.kind).startsWith('class_method')));
+        assert.ok(methodChunks.every(r => r.kind === 'class_method' || String(r.kind).startsWith('class_method')));
     });
 
     it('falls back to heuristic chunking when AST parse fails', () => {
         const relPath = 'src/invalid.js';
-        const text =
-            'export function broken( {\n' +
-            '  return 1;\n';
+        const text = 'export function broken( {\n' + '  return 1;\n';
         const buf = Buffer.from(text, 'utf8');
         const { lines } = buildLineIndex(buf);
 
         const ranges = chunkByType({ relPath, lines, maxChunkChars: 200 });
         assert.ok(ranges.length >= 1, 'Fallback should still return chunks');
-        assert.ok(ranges.every((r) => r.kind), 'Fallback chunks should have kind metadata');
+        assert.ok(
+            ranges.every(r => r.kind),
+            'Fallback chunks should have kind metadata'
+        );
     });
 
     it('handles plain text and JSON with line-based chunking', () => {

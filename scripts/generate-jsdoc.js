@@ -31,7 +31,7 @@ function isJSFile(filepath) {
 function extractFunctions(content) {
     const functions = [];
     const lines = content.split('\n');
-    
+
     // Regex para detectar diferentes tipos de funções
     const functionPatterns = [
         /(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(/,
@@ -42,21 +42,21 @@ function extractFunctions(content) {
         /static\s+(\w+)\s*\(/,
         /(?:async\s+)?(\w+)\s*\(/,
     ];
-    
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        
+
         // Pular linhas que já têm JSDOC
         if (line.startsWith('/**') || line.includes('* @')) {
             continue;
         }
-        
+
         // Verificar cada padrão de função
         for (const pattern of functionPatterns) {
             const match = line.match(pattern);
             if (match) {
                 const funcName = match[1];
-                
+
                 // Verificar se esta função faz parte de uma classe
                 let funcType = 'function';
                 if (line.includes('constructor')) {
@@ -68,18 +68,18 @@ function extractFunctions(content) {
                 } else {
                     funcType = 'method';
                 }
-                
+
                 functions.push({
                     name: funcName,
                     type: funcType,
-                    startLine: i
+                    startLine: i,
                 });
-                
+
                 break;
             }
         }
     }
-    
+
     return functions;
 }
 
@@ -92,7 +92,7 @@ function extractFunctions(content) {
 function generateJSDoc(funcName, funcType) {
     let params = '';
     let returns = '';
-    
+
     // Dependendo do tipo, podemos inferir diferentes coisas
     switch (funcType) {
         case 'async-function':
@@ -104,7 +104,7 @@ function generateJSDoc(funcName, funcType) {
         default:
             returns = '\n * @returns {any} ';
     }
-    
+
     return `/**
  * ${funcName} - Descrição da função.
  * Side-effects: Adicione aqui os efeitos colaterais da função se houver.
@@ -142,29 +142,29 @@ function processFile(filepath) {
     const content = fs.readFileSync(filepath, 'utf-8');
     const lines = content.split('\n');
     const functions = extractFunctions(content);
-    
+
     let addedCount = 0;
     const newLines = [...lines];
-    
+
     // Processar funções de trás para frente para manter os índices corretos
     for (let i = functions.length - 1; i >= 0; i--) {
         const func = functions[i];
-        
+
         // Verificar se já tem JSDOC acima
         if (!hasJSDocAbove(lines, func.startLine)) {
             const jsdoc = generateJSDoc(func.name, func.type);
-            
+
             // Inserir o JSDOC antes da linha da função
             newLines.splice(func.startLine, 0, jsdoc);
             addedCount++;
         }
     }
-    
+
     if (addedCount > 0) {
         fs.writeFileSync(filepath, newLines.join('\n'), 'utf-8');
         console.log(`📝 Adicionado(s) ${addedCount} JSDOC(s) em: ${filepath}`);
     }
-    
+
     return addedCount;
 }
 
@@ -176,13 +176,13 @@ function processFile(filepath) {
 function processDirectory(dir) {
     let totalAdded = 0;
     let totalProcessed = 0;
-    
+
     const items = fs.readdirSync(dir);
-    
+
     for (const item of items) {
         const fullPath = path.join(dir, item);
         const stat = fs.statSync(fullPath);
-        
+
         if (stat.isDirectory()) {
             const subDirStats = processDirectory(fullPath);
             totalAdded += subDirStats.totalAdded;
@@ -199,7 +199,7 @@ function processDirectory(dir) {
             }
         }
     }
-    
+
     return { totalAdded, totalProcessed };
 }
 
@@ -209,16 +209,16 @@ function processDirectory(dir) {
  */
 function main() {
     console.log('🚀 Iniciando geração automática de JSDOC...\n');
-    
+
     const startTime = Date.now();
     const stats = processDirectory(ROOT_DIR);
     const endTime = Date.now();
-    
+
     console.log('\n✅ Processamento concluído!');
     console.log(`📊 Total de arquivos processados: ${stats.totalProcessed}`);
     console.log(`📝 Total de JSDOCs adicionados: ${stats.totalAdded}`);
     console.log(`⏱️  Tempo de execução: ${endTime - startTime}ms`);
-    
+
     if (stats.totalAdded === 0) {
         console.log('ℹ️  Nenhum JSDOC foi adicionado - talvez os arquivos já estejam devidamente documentados.');
     }

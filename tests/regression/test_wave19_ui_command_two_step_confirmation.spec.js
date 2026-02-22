@@ -24,4 +24,3 @@ test('wave19: UI usa confirmação em 2 etapas e motivo obrigatório para comand
     assert.match(missionDetail, /confirmTwoStepAction/);
     assert.match(missionsView, /confirmTwoStepAction/);
 });
-

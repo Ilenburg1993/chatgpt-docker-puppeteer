@@ -55,5 +55,4 @@ async function main() {
     ok('`.env.local` is not tracked');
 }
 
-main().catch((err) => fail(err?.message || String(err)));
-
+main().catch(err => fail(err?.message || String(err)));

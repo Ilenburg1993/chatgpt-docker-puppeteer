@@ -16,10 +16,10 @@ const BASE_VOCAB = {
             'policy violation',
             'limit reached',
             'connection lost',
-            'error generating'
+            'error generating',
         ],
         close_actions: ['ok', 'okay', 'next', 'close', 'dismiss', 'accept', 'skip', 'done', 'got it'],
-        input_placeholders: ['message', 'ask', 'prompt', 'type', 'search']
+        input_placeholders: ['message', 'ask', 'prompt', 'type', 'search'],
     },
     pt: {
         error_indicators: [
@@ -28,10 +28,10 @@ const BASE_VOCAB = {
             'violação',
             'limite atingido',
             'conexão perdida',
-            'erro ao gerar'
+            'erro ao gerar',
         ],
         close_actions: ['próximo', 'fechar', 'entendi', 'aceitar', 'pular', 'concluir', 'ok'],
-        input_placeholders: ['mensagem', 'pergunte', 'digite', 'conversar', 'envie', 'busca']
+        input_placeholders: ['mensagem', 'pergunte', 'digite', 'conversar', 'envie', 'busca'],
     },
     blocked: [
         'search',
@@ -43,8 +43,8 @@ const BASE_VOCAB = {
         'feedback',
         'report',
         'history',
-        'histórico'
-    ]
+        'histórico',
+    ],
 };
 
 let vocabCache = null;

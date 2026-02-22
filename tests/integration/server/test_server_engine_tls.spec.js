@@ -67,4 +67,3 @@ test('server engine starts in HTTPS when FORCE_HTTPS=true and cert files exist',
     assert.equal(result.protocol, 'HTTPS');
     await serverEngine.stop(2000);
 });
-

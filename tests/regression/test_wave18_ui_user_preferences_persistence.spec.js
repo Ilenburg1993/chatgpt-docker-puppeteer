@@ -9,7 +9,10 @@ import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_r
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
-    return path.join(dir, `maestro-wave18-prefs-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+    return path.join(
+        dir,
+        `maestro-wave18-prefs-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+    );
 }
 
 test('wave18: preferências de UI persistem em sqlite por usuário', async t => {

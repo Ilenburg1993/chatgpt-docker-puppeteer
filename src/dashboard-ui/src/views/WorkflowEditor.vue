@@ -4,7 +4,9 @@
         <div class="page-header">
             <div class="header-left">
                 <h1>Workflow Editor</h1>
-                <span class="workflow-count">{{ workflows.length }} workflow{{ workflows.length !== 1 ? 's' : '' }}</span>
+                <span class="workflow-count"
+                    >{{ workflows.length }} workflow{{ workflows.length !== 1 ? 's' : '' }}</span
+                >
             </div>
             <div class="header-actions">
                 <button class="btn btn-primary" @click="createNewWorkflow">+ Novo Workflow</button>
@@ -27,9 +29,7 @@
                         <span class="wf-name">{{ wf.name }}</span>
                         <span class="wf-nodes">{{ (wf.nodes || []).length }} nós</span>
                     </div>
-                    <div class="list-empty" v-if="workflows.length === 0">
-                        Nenhum workflow criado
-                    </div>
+                    <div class="list-empty" v-if="workflows.length === 0">Nenhum workflow criado</div>
                 </div>
             </div>
 
@@ -99,11 +99,21 @@
                     </div>
                     <div class="form-group" v-if="selectedNode.data.type === 'prompt'">
                         <label>Template do Prompt</label>
-                        <textarea v-model="selectedNode.data.prompt" rows="5" class="input" placeholder="Use {step_id} para referenciar resultados anteriores"></textarea>
+                        <textarea
+                            v-model="selectedNode.data.prompt"
+                            rows="5"
+                            class="input"
+                            placeholder="Use {step_id} para referenciar resultados anteriores"
+                        ></textarea>
                     </div>
                     <div class="form-group" v-if="selectedNode.data.type === 'validate'">
                         <label>Critérios de Validação</label>
-                        <textarea v-model="selectedNode.data.criteria" rows="3" class="input" placeholder="coerência, precisão, formato"></textarea>
+                        <textarea
+                            v-model="selectedNode.data.criteria"
+                            rows="3"
+                            class="input"
+                            placeholder="coerência, precisão, formato"
+                        ></textarea>
                     </div>
                     <div class="form-group">
                         <label>Em caso de falha</label>
@@ -158,20 +168,64 @@ export default {
                 id: 'wf-default',
                 name: 'Exemplo: Escrita de Documento',
                 nodes: [
-                    { data: { id: 'n1', label: 'Gerar Outline', type: 'prompt', description: 'Cria a estrutura do documento', prompt: 'Gere um outline detalhado para: {topic}', onFailure: 'abort' } },
-                    { data: { id: 'n2', label: 'Escrever Seção 1', type: 'prompt', description: 'Primeira seção', prompt: 'Escreva a seção 1 baseada no outline: {n1}', onFailure: 'retry' } },
-                    { data: { id: 'n3', label: 'Escrever Seção 2', type: 'prompt', description: 'Segunda seção', prompt: 'Escreva a seção 2 baseada no outline: {n1}', onFailure: 'retry' } },
-                    { data: { id: 'n4', label: 'Revisar', type: 'validate', description: 'Verifica coerência', criteria: 'coerência, precisão, estilo', onFailure: 'abort' } },
-                    { data: { id: 'n5', label: 'Compilar Final', type: 'aggregate', description: 'Junta todas as seções', onFailure: 'abort' } }
+                    {
+                        data: {
+                            id: 'n1',
+                            label: 'Gerar Outline',
+                            type: 'prompt',
+                            description: 'Cria a estrutura do documento',
+                            prompt: 'Gere um outline detalhado para: {topic}',
+                            onFailure: 'abort',
+                        },
+                    },
+                    {
+                        data: {
+                            id: 'n2',
+                            label: 'Escrever Seção 1',
+                            type: 'prompt',
+                            description: 'Primeira seção',
+                            prompt: 'Escreva a seção 1 baseada no outline: {n1}',
+                            onFailure: 'retry',
+                        },
+                    },
+                    {
+                        data: {
+                            id: 'n3',
+                            label: 'Escrever Seção 2',
+                            type: 'prompt',
+                            description: 'Segunda seção',
+                            prompt: 'Escreva a seção 2 baseada no outline: {n1}',
+                            onFailure: 'retry',
+                        },
+                    },
+                    {
+                        data: {
+                            id: 'n4',
+                            label: 'Revisar',
+                            type: 'validate',
+                            description: 'Verifica coerência',
+                            criteria: 'coerência, precisão, estilo',
+                            onFailure: 'abort',
+                        },
+                    },
+                    {
+                        data: {
+                            id: 'n5',
+                            label: 'Compilar Final',
+                            type: 'aggregate',
+                            description: 'Junta todas as seções',
+                            onFailure: 'abort',
+                        },
+                    },
                 ],
                 edges: [
                     { data: { source: 'n1', target: 'n2' } },
                     { data: { source: 'n1', target: 'n3' } },
                     { data: { source: 'n2', target: 'n4' } },
                     { data: { source: 'n3', target: 'n4' } },
-                    { data: { source: 'n4', target: 'n5' } }
-                ]
-            }
+                    { data: { source: 'n4', target: 'n5' } },
+                ],
+            },
         ]);
 
         // Node type colors
@@ -179,7 +233,7 @@ export default {
             prompt: '#3498db',
             validate: '#27ae60',
             branch: '#f39c12',
-            aggregate: '#9b59b6'
+            aggregate: '#9b59b6',
         };
 
         // Initialize Cytoscape
@@ -192,10 +246,7 @@ export default {
                 cy = null;
             }
 
-            const elements = [
-                ...(currentWorkflow.value.nodes || []),
-                ...(currentWorkflow.value.edges || [])
-            ];
+            const elements = [...(currentWorkflow.value.nodes || []), ...(currentWorkflow.value.edges || [])];
 
             cy = cytoscape({
                 container: cytoscapeMount.value,
@@ -204,66 +255,66 @@ export default {
                     {
                         selector: 'node',
                         css: {
-                            'background-color': (ele) => typeColors[ele.data('type')] || '#64748b',
-                            'label': 'data(label)',
-                            'color': '#fff',
+                            'background-color': ele => typeColors[ele.data('type')] || '#64748b',
+                            label: 'data(label)',
+                            color: '#fff',
                             'text-align': 'center',
                             'text-valign': 'middle',
                             'font-size': '11px',
                             'font-weight': '600',
-                            'width': '120px',
-                            'height': '50px',
+                            width: '120px',
+                            height: '50px',
                             'border-radius': '8px',
                             'border-width': '2px',
                             'border-color': '#fff',
                             'box-shadow-color': 'rgba(0,0,0,0.15)',
                             'box-shadow-blur-radius': '6px',
                             'box-shadow-offset-x': '0px',
-                            'box-shadow-offset-y': '2px'
-                        }
+                            'box-shadow-offset-y': '2px',
+                        },
                     },
                     {
                         selector: 'node:selected',
                         css: {
                             'border-color': '#fbbf24',
-                            'border-width': '3px'
-                        }
+                            'border-width': '3px',
+                        },
                     },
                     {
                         selector: 'edge',
                         css: {
-                            'width': '2px',
+                            width: '2px',
                             'line-color': '#94a3b8',
                             'target-arrow-color': '#94a3b8',
                             'target-arrow-shape': 'classic',
                             'curve-style': 'bezier',
                             'source-endpoint': 'south',
-                            'target-endpoint': 'north'
-                        }
+                            'target-endpoint': 'north',
+                        },
                     },
                     {
                         selector: 'edge:selected',
                         css: {
                             'line-color': '#3498db',
                             'target-arrow-color': '#3498db',
-                            'width': '3px'
-                        }
-                    }
+                            width: '3px',
+                        },
+                    },
                 ],
                 layout: {
                     name: 'dagre',
                     rankDir: 'TB',
                     padding: 20,
-                    spacingFactor: 1.5
+                    spacingFactor: 1.5,
                 },
                 userDragPan: true,
                 userZoomable: true,
                 autoEdgesAsLines: true,
-                autoArrowsAsEdges: true
+                autoArrowsAsEdges: true,
             });
 
             // Node click handler
-            cy.on('tap', 'node', (evt) => {
+            cy.on('tap', 'node', evt => {
                 const node = evt.target;
 
                 if (edgeMode) {
@@ -286,13 +337,13 @@ export default {
                     // Select node for editing
                     const nodeData = node.data();
                     selectedNode.value = {
-                        data: { ...nodeData }
+                        data: { ...nodeData },
                     };
                 }
             });
 
             // Background click: deselect
-            cy.on('tap', (evt) => {
+            cy.on('tap', evt => {
                 if (evt.target === cy) {
                     deselectNode();
                     if (edgeMode) {
@@ -328,7 +379,7 @@ export default {
             currentWorkflow.value.edges = [];
             cy.edges().forEach(edge => {
                 currentWorkflow.value.edges.push({
-                    data: { source: edge.source().id(), target: edge.target().id() }
+                    data: { source: edge.source().id(), target: edge.target().id() },
                 });
             });
         }
@@ -345,8 +396,8 @@ export default {
                     type: 'prompt',
                     description: '',
                     prompt: '',
-                    onFailure: 'abort'
-                }
+                    onFailure: 'abort',
+                },
             };
 
             currentWorkflow.value.nodes.push(newNode);
@@ -446,7 +497,7 @@ export default {
                 id: `wf-${Date.now()}`,
                 name: 'Novo Workflow',
                 nodes: [],
-                edges: []
+                edges: [],
             };
 
             workflows.value.push(newWorkflow);
@@ -468,7 +519,9 @@ export default {
 
             // Check: cycle detection (simple DFS)
             const adj = {};
-            nodes.forEach(n => { adj[n.data.id] = []; });
+            nodes.forEach(n => {
+                adj[n.data.id] = [];
+            });
             edges.forEach(e => {
                 if (adj[e.data.source]) {
                     adj[e.data.source].push(e.data.target);
@@ -482,7 +535,7 @@ export default {
                 visited.add(node);
                 inStack.add(node);
 
-                for (const neighbor of (adj[node] || [])) {
+                for (const neighbor of adj[node] || []) {
                     if (inStack.has(neighbor)) return true;
                     if (!visited.has(neighbor) && hasCycle(neighbor)) return true;
                 }
@@ -494,7 +547,10 @@ export default {
             for (const node of nodes) {
                 if (!visited.has(node.data.id)) {
                     if (hasCycle(node.data.id)) {
-                        validationResult.value = { status: 'invalid', message: 'Ciclo detectado no grafo de dependências.' };
+                        validationResult.value = {
+                            status: 'invalid',
+                            message: 'Ciclo detectado no grafo de dependências.',
+                        };
                         return;
                     }
                 }
@@ -511,7 +567,7 @@ export default {
             if (orphans.length > 0 && nodes.length > 1) {
                 validationResult.value = {
                     status: 'warning',
-                    message: `${orphans.length} nó(s) sem conexão: ${orphans.map(o => o.data.label).join(', ')}`
+                    message: `${orphans.length} nó(s) sem conexão: ${orphans.map(o => o.data.label).join(', ')}`,
                 };
                 return;
             }
@@ -579,9 +635,9 @@ export default {
             createNewWorkflow,
             validateWorkflow,
             saveWorkflow,
-            executeWorkflow
+            executeWorkflow,
         };
-    }
+    },
 };
 </script>
 

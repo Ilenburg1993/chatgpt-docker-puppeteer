@@ -155,11 +155,7 @@ test(
 
         child.kill('SIGQUIT');
 
-        const [code, signal] = await waitForExitWithTimeout(
-            child,
-            20000,
-            'Timeout waiting child exit (SIGQUIT)'
-        );
+        const [code, signal] = await waitForExitWithTimeout(child, 20000, 'Timeout waiting child exit (SIGQUIT)');
 
         assert.equal(signal, null, `subprocess should exit by code, stderr=${stderr}`);
         assert.equal(code, 0, `expected graceful exit code 0, stdout=${stdout}, stderr=${stderr}`);

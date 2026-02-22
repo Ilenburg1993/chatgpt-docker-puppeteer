@@ -94,58 +94,58 @@
   //
   // Documentação: DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md
   // ===========================================================
-"remoteEnv": {
-  // Ambiente
-  "NODE_ENV": "${localEnv:NODE_ENV:development}",
-  "SERVER_MODE": "split",
-  "SERVER_AUTHORITY": "standalone",
-  // Portas (fonte única: SERVER_PORT)
-  "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
-  // PORT deprecated v6.0: Use apenas SERVER_PORT
-  "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
-  "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
-  "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
-  "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
-  "HOST": "${localEnv:HOST:0.0.0.0}",
-  // Browser (contrato estrutural)
-  "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
-  // Logging
-  "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
-  // State & lifecycle
-  "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
-  "REEXECUTE_POST_CREATE": "${localEnv:REEXECUTE_POST_CREATE:false}"
-  // ============================================================
-  // SSH AGENT FORWARDING
-  // ============================================================
-  // NOTA v5.3: SSH forwarding agora é NATIVO do VS Code.
-  //
-  // MUDANÇA ARQUITETURAL (v5.2 → v5.3):
-  // - REMOVIDO: Mount manual de socket (/ssh-agent)
-  // - REMOVIDO: SSH_AUTH_SOCK hardcoded
-  // - ADICIONADO: VS Code native SSH forwarding (automático)
-  //
-  // JUSTIFICATIVA:
-  // • Mount manual causava type mismatch (socket vs directory)
-  // • Container não iniciava se SSH agent não estivesse disponível
-  // • Configuração manual conflitava com política "opt-in" do post-create.sh
-  //
-  // NOVO COMPORTAMENTO:
-  // • VS Code detecta SSH_AUTH_SOCK no host automaticamente
-  // • Se disponível: forwarding transparente para o container
-  // • Se ausente: container inicia normalmente (git via HTTPS)
-  // • Zero configuração manual necessária
-  //
-  // COMPATIBILIDADE:
-  // • ✅ Windows + WSL2 + Docker Desktop
-  // • ✅ Linux nativo + Docker
-  // • ✅ macOS + Docker Desktop
-  //
-  // REFERÊNCIAS:
-  // • https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
-  // • post-create.sh Section 7 (SSH Contract - observacional)
-  // • DEVCONTAINER_BUILD_ANALYSIS.md (Solução 3)
-  // ============================================================
-},
+  "remoteEnv": {
+    // Ambiente
+    "NODE_ENV": "${localEnv:NODE_ENV:development}",
+    "SERVER_MODE": "split",
+    "SERVER_AUTHORITY": "standalone",
+    // Portas (fonte única: SERVER_PORT)
+    "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
+    // PORT deprecated v6.0: Use apenas SERVER_PORT
+    "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
+    "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
+    "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
+    "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
+    "HOST": "${localEnv:HOST:0.0.0.0}",
+    // Browser (contrato estrutural)
+    "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
+    // Logging
+    "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
+    // State & lifecycle
+    "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
+    "REEXECUTE_POST_CREATE": "${localEnv:REEXECUTE_POST_CREATE:false}"
+    // ============================================================
+    // SSH AGENT FORWARDING
+    // ============================================================
+    // NOTA v5.3: SSH forwarding agora é NATIVO do VS Code.
+    //
+    // MUDANÇA ARQUITETURAL (v5.2 → v5.3):
+    // - REMOVIDO: Mount manual de socket (/ssh-agent)
+    // - REMOVIDO: SSH_AUTH_SOCK hardcoded
+    // - ADICIONADO: VS Code native SSH forwarding (automático)
+    //
+    // JUSTIFICATIVA:
+    // • Mount manual causava type mismatch (socket vs directory)
+    // • Container não iniciava se SSH agent não estivesse disponível
+    // • Configuração manual conflitava com política "opt-in" do post-create.sh
+    //
+    // NOVO COMPORTAMENTO:
+    // • VS Code detecta SSH_AUTH_SOCK no host automaticamente
+    // • Se disponível: forwarding transparente para o container
+    // • Se ausente: container inicia normalmente (git via HTTPS)
+    // • Zero configuração manual necessária
+    //
+    // COMPATIBILIDADE:
+    // • ✅ Windows + WSL2 + Docker Desktop
+    // • ✅ Linux nativo + Docker
+    // • ✅ macOS + Docker Desktop
+    //
+    // REFERÊNCIAS:
+    // • https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
+    // • post-create.sh Section 7 (SSH Contract - observacional)
+    // • DEVCONTAINER_BUILD_ANALYSIS.md (Solução 3)
+    // ============================================================
+  },
   // ============================================================
   // FEATURES - Auto-install tools and utilities
   // ============================================================
@@ -302,77 +302,77 @@
   // • Qualquer tentativa de acesso direto é violação arquitetural
   // ============================================================================
 
-"forwardPorts": [
-  3008, // Dashboard Principal — Mission Control (HTTP + Socket.io + API)
-5173, // Vite Dev Server — Vue Dashboard (dev only)
-  9224, // Chrome Proxy Service (Container → Windows Host)
-  9229, // Node.js Debug — Primary (agente-gpt --inspect)
-  9230 // Node.js Debug — Fallback (dashboard-web --inspect)
-],
+  "forwardPorts": [
+    3008, // Dashboard Principal — Mission Control (HTTP + Socket.io + API)
+    5173, // Vite Dev Server — Vue Dashboard (dev only)
+    9224, // Chrome Proxy Service (Container → Windows Host)
+    9229, // Node.js Debug — Primary (agente-gpt --inspect)
+    9230 // Node.js Debug — Fallback (dashboard-web --inspect)
+  ],
 
-"portsAttributes": {
-  // ----------------------------------------------------------
-  // Política global: DENY-BY-DEFAULT
-  // ----------------------------------------------------------
-  // • Qualquer porta NÃO declarada explicitamente é ignorada
-  // • Nenhuma inferência automática é permitida
-  // ----------------------------------------------------------
-  "*": {
-    "onAutoForward": "ignore"
+  "portsAttributes": {
+    // ----------------------------------------------------------
+    // Política global: DENY-BY-DEFAULT
+    // ----------------------------------------------------------
+    // • Qualquer porta NÃO declarada explicitamente é ignorada
+    // • Nenhuma inferência automática é permitida
+    // ----------------------------------------------------------
+    "*": {
+      "onAutoForward": "ignore"
+    },
+    // ================== UI HUMANA ==============================
+    "3008": {
+      "label": "Dashboard Principal — Mission Control (HTTP + Socket.io + API)",
+      "onAutoForward": "notify",
+      "protocol": "http",
+      "webRoot": "${containerWorkspaceFolder}/src/server"
+    },
+    "5173": {
+      "label": "Vite Dev Server — Vue Dashboard (dev only)",
+      "onAutoForward": "notify",
+      "protocol": "http",
+      "webRoot": "${containerWorkspaceFolder}/src/dashboard-ui"
+      // NOTA: HMR (Hot Module Reload) configurado no vite.config.js
+      // - port: 5173 (HTTP + WebSocket na MESMA porta)
+      // - hmr.clientPort: 5173 (WebSocket fixado)
+      // - hmr.host: 'localhost' (Windows acesso via port forwarding)
+      // - watch.usePolling: true (Docker volumes file watching)
+      // ✅ WebSocket HMR usa a MESMA porta 5173 (não precisa forward adicional)
+    },
+    // ================== INFRAESTRUTURA =========================
+    "9224": {
+      "label": "Chrome Proxy Service (Container → Windows Host)",
+      "onAutoForward": "ignore",
+      "protocol": "http"
+      // NOTA ARQUITETURAL:
+      // • Esta porta ESTÁ em forwardPorts (sempre disponível)
+      // • onAutoForward: "ignore" = não notifica o usuário (porta interna)
+      // • Reconciliação conceitual: forward != auto-forward
+      //   - forwardPorts: política de DISPONIBILIDADE (sempre expor)
+      //   - onAutoForward: política de UX (notificar humano ou não)
+      //
+      // FUNÇÃO:
+      // • Proxy transparente HTTP + WebSocket (CDP)
+      // • Puppeteer → localhost:9224 → host.docker.internal:9225
+      // • ÚNICA fronteira autorizada para Chrome externo
+      // • Porta 9225 (Chrome Real, Windows) NUNCA acessada diretamente
+    },
+    // ================== DEBUG ==================================
+    "9229": {
+      "label": "Node.js Debug — Primary (agente-gpt)",
+      "onAutoForward": "silent",
+      "protocol": "http"
+      // NOTA: Node Inspector expõe endpoints HTTP (/json/list, /json/version)
+      // Não é HTTP REST típico, mas protocol: "http" evita interpretações erradas
+      // ⚠️  Só funciona se processo rodar com: --inspect=0.0.0.0:9229
+    },
+    "9230": {
+      "label": "Node.js Debug — Fallback (dashboard-web)",
+      "onAutoForward": "silent",
+      "protocol": "http"
+      // ⚠️  Só funciona se processo rodar com: --inspect=0.0.0.0:9230
+    }
   },
-// ================== UI HUMANA ==============================
-"3008": {
-    "label": "Dashboard Principal — Mission Control (HTTP + Socket.io + API)",
-    "onAutoForward": "notify",
-    "protocol": "http",
-    "webRoot": "${containerWorkspaceFolder}/src/server"
-  },
-  "5173": {
-    "label": "Vite Dev Server — Vue Dashboard (dev only)",
-    "onAutoForward": "notify",
-    "protocol": "http",
-    "webRoot": "${containerWorkspaceFolder}/src/dashboard-ui"
-    // NOTA: HMR (Hot Module Reload) configurado no vite.config.js
-    // - port: 5173 (HTTP + WebSocket na MESMA porta)
-    // - hmr.clientPort: 5173 (WebSocket fixado)
-    // - hmr.host: 'localhost' (Windows acesso via port forwarding)
-    // - watch.usePolling: true (Docker volumes file watching)
-    // ✅ WebSocket HMR usa a MESMA porta 5173 (não precisa forward adicional)
-  },
-// ================== INFRAESTRUTURA =========================
-"9224": {
-  "label": "Chrome Proxy Service (Container → Windows Host)",
-  "onAutoForward": "ignore",
-  "protocol": "http"
-    // NOTA ARQUITETURAL:
-    // • Esta porta ESTÁ em forwardPorts (sempre disponível)
-    // • onAutoForward: "ignore" = não notifica o usuário (porta interna)
-    // • Reconciliação conceitual: forward != auto-forward
-    //   - forwardPorts: política de DISPONIBILIDADE (sempre expor)
-    //   - onAutoForward: política de UX (notificar humano ou não)
-    //
-    // FUNÇÃO:
-    // • Proxy transparente HTTP + WebSocket (CDP)
-    // • Puppeteer → localhost:9224 → host.docker.internal:9225
-    // • ÚNICA fronteira autorizada para Chrome externo
-    // • Porta 9225 (Chrome Real, Windows) NUNCA acessada diretamente
-  },
-// ================== DEBUG ==================================
-"9229": {
-  "label": "Node.js Debug — Primary (agente-gpt)",
-  "onAutoForward": "silent",
-  "protocol": "http"
-  // NOTA: Node Inspector expõe endpoints HTTP (/json/list, /json/version)
-  // Não é HTTP REST típico, mas protocol: "http" evita interpretações erradas
-  // ⚠️  Só funciona se processo rodar com: --inspect=0.0.0.0:9229
-},
-"9230": {
-  "label": "Node.js Debug — Fallback (dashboard-web)",
-  "onAutoForward": "silent",
-  "protocol": "http"
-  // ⚠️  Só funciona se processo rodar com: --inspect=0.0.0.0:9230
-}
-},
   // ============================================================
   // RUNTIME ARGS - Docker runtime configuration (v5.2)
   // ============================================================
@@ -390,43 +390,43 @@
     // STABILITY: Evita erro de "Too many open files" no VS Code/Node
     "--ulimit",
     "nofile=65536:65536",
-// ============================================================================
-// IDENTITY & SECURITY: Docker CLI Access
-// ============================================================================
-// ⚠️  SECURITY NOTICE (CRITICAL):
-//
-// --group-add=docker fornece acesso ao Docker daemon do HOST.
-// Isso é EQUIVALENTE A ROOT NO HOST (full privilege escalation).
-//
-// IMPLICAÇÕES:
-// • Container pode criar/deletar/manipular QUALQUER container/imagem no host
-// • Container pode montar QUALQUER volume do host
-// • Container pode ler/escrever no filesystem do host (via bind mounts)
-// • Container pode executar comandos privilegiados no host
-//
-// JUSTIFICATIVA (Ambiente DEV):
-// • Necessário para docker-compose, docker build, docker run dentro do container
-// • Facilita workflows de desenvolvimento (testcontainers, builds locais)
-// • VS Code DevContainers requer isso para certas funcionalidades
-//
-// PROTEÇÕES:
-// • Uso EXCLUSIVO em ambiente de desenvolvimento LOCAL
-// • NUNCA usar em CI/CD, staging ou produção
-// • Host deve ser trusted (sua máquina pessoal)
-// • Container não deve processar input de fontes não confiáveis
-//
-// ALTERNATIVAS (se não precisar de Docker-in-Docker):
-// • Remover --group-add=docker
-// • Usar Docker externo via API remota (docker -H tcp://...)
-// • Usar podman (rootless containers)
-//
-// DECISÃO DO PROJETO:
-// Manter --group-add=docker porque:
-// 1. Facilita workflows de desenvolvimento (docker-compose local)
-// 2. Projeto é ambiente DEV (não prod)
-// 3. Documentação clara de riscos (este bloco)
-// ============================================================================
-"--group-add=docker",
+    // ============================================================================
+    // IDENTITY & SECURITY: Docker CLI Access
+    // ============================================================================
+    // ⚠️  SECURITY NOTICE (CRITICAL):
+    //
+    // --group-add=docker fornece acesso ao Docker daemon do HOST.
+    // Isso é EQUIVALENTE A ROOT NO HOST (full privilege escalation).
+    //
+    // IMPLICAÇÕES:
+    // • Container pode criar/deletar/manipular QUALQUER container/imagem no host
+    // • Container pode montar QUALQUER volume do host
+    // • Container pode ler/escrever no filesystem do host (via bind mounts)
+    // • Container pode executar comandos privilegiados no host
+    //
+    // JUSTIFICATIVA (Ambiente DEV):
+    // • Necessário para docker-compose, docker build, docker run dentro do container
+    // • Facilita workflows de desenvolvimento (testcontainers, builds locais)
+    // • VS Code DevContainers requer isso para certas funcionalidades
+    //
+    // PROTEÇÕES:
+    // • Uso EXCLUSIVO em ambiente de desenvolvimento LOCAL
+    // • NUNCA usar em CI/CD, staging ou produção
+    // • Host deve ser trusted (sua máquina pessoal)
+    // • Container não deve processar input de fontes não confiáveis
+    //
+    // ALTERNATIVAS (se não precisar de Docker-in-Docker):
+    // • Remover --group-add=docker
+    // • Usar Docker externo via API remota (docker -H tcp://...)
+    // • Usar podman (rootless containers)
+    //
+    // DECISÃO DO PROJETO:
+    // Manter --group-add=docker porque:
+    // 1. Facilita workflows de desenvolvimento (docker-compose local)
+    // 2. Projeto é ambiente DEV (não prod)
+    // 3. Documentação clara de riscos (este bloco)
+    // ============================================================================
+    "--group-add=docker",
 
     // METADATA: Sincronizado com a Section 0 do Dockerfile
     "--label",
@@ -467,44 +467,44 @@
         // - NPM Scripts Explorer (builtin)
         // - Node.js Debugger (builtin)
         // ========================================================
-// === AI & CODE INTELLIGENCE ===
-//"GitHub.copilot", // Assistente IA (contexto de código) - Extensão preterida, substituída por copilot-chat
-"GitHub.copilot-chat", // Chat contextual com IA
-// === CODE QUALITY & LINTING ===
-"dbaeumer.vscode-eslint", // Linting JS/Node (strict mode)
-"esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
-"usernamehw.errorlens", // Erros e warnings inline (feedback visual)
-// === INFRASTRUCTURE & DEVOPS ===
-"ms-azuretools.vscode-docker", // Docker / DevContainer DX
-"ms-vscode.makefile-tools", // Makefile como árbitro do sistema
-// === GIT & VERSION CONTROL ===
-"eamodio.gitlens", // Histórico avançado, blame, graph
-// === NAVIGATION & AUTOCOMPLETE ===
-"christian-kohler.path-intellisense", // Autocomplete de paths
-"christian-kohler.npm-intellisense", // Autocomplete de módulos npm
-// === FILE TYPES & SYNTAX ===
-"timonwong.shellcheck", // Validação de scripts bash/sh
-"redhat.vscode-yaml", // YAML syntax + schema validation
-// === TESTING & DEBUGGING ===
-"hbenl.vscode-test-explorer", // Test Explorer UI (universal runner)
-"ryanluker.vscode-coverage-gutters", // Cobertura inline
-// === DATA & API ===
-"humao.rest-client", // HTTP client (alternativa ao Postman)
-"ZainChen.json", // JSON advanced tools
-// === PRODUCTIVITY & UI ===
-"oderwat.indent-rainbow", // Indentação colorida (Python/YAML)
-"aaron-bond.better-comments", // Highlight TODO, FIXME, NOTE
-"PKief.material-icon-theme", // Ícones de arquivos (legibilidade)
-// === DOCUMENTATION & SPELL CHECK ===
-"yzhang.markdown-all-in-one", // Documentação Markdown viva
-"streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
-"streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
-// === PRODUCTIVITY TOOLS ===
-"gruntfuggly.todo-tree", // Visão global de TODOs
-"pflannery.vscode-versionlens", // Visibilidade de versões de deps
-"EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
-// === POWERSHELL (INSTRUMENTAL SHELL) ===
-"ms-vscode.powershell" // PowerShell IntelliSense + debug
+        // === AI & CODE INTELLIGENCE ===
+        //"GitHub.copilot", // Assistente IA (contexto de código) - Extensão preterida, substituída por copilot-chat
+        "GitHub.copilot-chat", // Chat contextual com IA
+        // === CODE QUALITY & LINTING ===
+        "dbaeumer.vscode-eslint", // Linting JS/Node (strict mode)
+        "esbenp.prettier-vscode", // Formatação (integrada ao ESLint)
+        "usernamehw.errorlens", // Erros e warnings inline (feedback visual)
+        // === INFRASTRUCTURE & DEVOPS ===
+        "ms-azuretools.vscode-docker", // Docker / DevContainer DX
+        "ms-vscode.makefile-tools", // Makefile como árbitro do sistema
+        // === GIT & VERSION CONTROL ===
+        "eamodio.gitlens", // Histórico avançado, blame, graph
+        // === NAVIGATION & AUTOCOMPLETE ===
+        "christian-kohler.path-intellisense", // Autocomplete de paths
+        "christian-kohler.npm-intellisense", // Autocomplete de módulos npm
+        // === FILE TYPES & SYNTAX ===
+        "timonwong.shellcheck", // Validação de scripts bash/sh
+        "redhat.vscode-yaml", // YAML syntax + schema validation
+        // === TESTING & DEBUGGING ===
+        "hbenl.vscode-test-explorer", // Test Explorer UI (universal runner)
+        "ryanluker.vscode-coverage-gutters", // Cobertura inline
+        // === DATA & API ===
+        "humao.rest-client", // HTTP client (alternativa ao Postman)
+        "ZainChen.json", // JSON advanced tools
+        // === PRODUCTIVITY & UI ===
+        "oderwat.indent-rainbow", // Indentação colorida (Python/YAML)
+        "aaron-bond.better-comments", // Highlight TODO, FIXME, NOTE
+        "PKief.material-icon-theme", // Ícones de arquivos (legibilidade)
+        // === DOCUMENTATION & SPELL CHECK ===
+        "yzhang.markdown-all-in-one", // Documentação Markdown viva
+        "streetsidesoftware.code-spell-checker", // Correção ortográfica (EN)
+        "streetsidesoftware.code-spell-checker-portuguese-brazilian", // PT-BR
+        // === PRODUCTIVITY TOOLS ===
+        "gruntfuggly.todo-tree", // Visão global de TODOs
+        "pflannery.vscode-versionlens", // Visibilidade de versões de deps
+        "EditorConfig.EditorConfig", // Consistência editorial (.editorconfig)
+        // === POWERSHELL (INSTRUMENTAL SHELL) ===
+        "ms-vscode.powershell" // PowerShell IntelliSense + debug
       ],
       "settings": {
         // ========================================================
@@ -531,9 +531,7 @@
           "pwsh": {
             "path": "/usr/bin/pwsh",
             "icon": "terminal-powershell",
-            "args": [
-              "-NoLogo"
-            ]
+            "args": ["-NoLogo"]
           }
         },
         // --------------------------------------------------------
@@ -636,10 +634,7 @@
         // ========================================================
         // ESLINT (fonte de verdade para qualidade)
         // ========================================================
-        "eslint.validate": [
-          "javascript",
-          "javascriptreact"
-        ],
+        "eslint.validate": ["javascript", "javascriptreact"],
         "eslint.workingDirectories": [
           {
             "mode": "auto"

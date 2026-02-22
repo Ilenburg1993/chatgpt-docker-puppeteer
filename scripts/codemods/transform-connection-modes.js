@@ -19,7 +19,7 @@ module.exports = function (fileInfo, api) {
         auto: 'AUTO',
         launcher: 'LAUNCHER',
         remote: 'REMOTE',
-        singularity: 'SINGULARITY'
+        singularity: 'SINGULARITY',
     };
 
     let hasChanges = false;
@@ -64,8 +64,8 @@ module.exports = function (fileInfo, api) {
                 id: { type: 'ObjectPattern' },
                 init: {
                     callee: { name: 'require' },
-                    arguments: [{ value: importPath }]
-                }
+                    arguments: [{ value: importPath }],
+                },
             })
             .size() > 0;
 
@@ -74,19 +74,19 @@ module.exports = function (fileInfo, api) {
         const importStatement = j.variableDeclaration('const', [
             j.variableDeclarator(
                 j.objectPattern([
-                    j.property('init', j.identifier('CONNECTION_MODES'), j.identifier('CONNECTION_MODES'))
+                    j.property('init', j.identifier('CONNECTION_MODES'), j.identifier('CONNECTION_MODES')),
                 ]),
                 j.callExpression(j.identifier('require'), [j.literal(importPath)])
-            )
+            ),
         ]);
 
         const firstRequire = root
             .find(j.VariableDeclaration, {
                 declarations: [
                     {
-                        init: { callee: { name: 'require' } }
-                    }
-                ]
+                        init: { callee: { name: 'require' } },
+                    },
+                ],
             })
             .at(0);
 

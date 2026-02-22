@@ -9,7 +9,9 @@ const CONFIG_BASENAMES = new Set(['dockerfile', 'makefile']);
  * @returns {'code-first'|'docs-first'|'all'}
  */
 export function normalizeIntentScope(rawScope) {
-    const scope = String(rawScope || '').trim().toLowerCase();
+    const scope = String(rawScope || '')
+        .trim()
+        .toLowerCase();
     if (scope === 'docs-first' || scope === 'all') return scope;
     return 'code-first';
 }
@@ -21,7 +23,9 @@ export function normalizeIntentScope(rawScope) {
  * @returns {'code'|'config'|'docs'}
  */
 export function normalizeContentClass(value, relPath, extHint = null) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'code' || normalized === 'config' || normalized === 'docs') {
         return normalized;
     }

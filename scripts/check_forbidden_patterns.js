@@ -37,8 +37,9 @@ function mapOutputFindings(findings) {
 /**
  * @param {any[]} dslFindings
  * @param {any[]} legacyFindings
+ * @param {Set<string>} [comparableContractIds]
  */
-function parityReport(dslFindings, legacyFindings) {
+function parityReport(dslFindings, legacyFindings, comparableContractIds = null) {
     /** @type {Map<string, number>} */
     const dslMap = new Map();
     /** @type {Map<string, number>} */
@@ -52,7 +53,17 @@ function parityReport(dslFindings, legacyFindings) {
 
     /** @type {Array<{ contract_id: string, dsl: number, legacy: number }>} */
     const mismatches = [];
-    const allKeys = new Set([...dslMap.keys(), ...legacyMap.keys()]);
+    const allKeys = comparableContractIds
+        ? new Set([...comparableContractIds])
+        : new Set([...dslMap.keys(), ...legacyMap.keys()]);
+    let ignoredDslOnlyContracts = 0;
+    if (comparableContractIds) {
+        for (const key of dslMap.keys()) {
+            if (!comparableContractIds.has(key)) {
+                ignoredDslOnlyContracts += 1;
+            }
+        }
+    }
     for (const key of allKeys) {
         const dslCount = dslMap.get(key) || 0;
         const legacyCount = legacyMap.get(key) || 0;
@@ -66,16 +77,21 @@ function parityReport(dslFindings, legacyFindings) {
         dsl_findings: dslFindings.length,
         legacy_findings: legacyFindings.length,
         mismatches,
+        compared_contracts: comparableContractIds ? comparableContractIds.size : allKeys.size,
+        ignored_dsl_only_contracts: ignoredDslOnlyContracts,
     };
 }
 
 function main() {
-    const mode = ['legacy', 'hybrid', 'strict'].includes(values['contracts-mode']) ? values['contracts-mode'] : 'hybrid';
+    const mode = ['legacy', 'hybrid', 'strict'].includes(values['contracts-mode'])
+        ? values['contracts-mode']
+        : 'hybrid';
     const parityEnabled = values['parity-mode'] === true;
 
     const registry = loadContractRegistry();
     const activeDslContracts = registry.contracts.filter(item => item.kind === 'static' && item.status === 'active');
     const legacyContracts = getLegacyStaticContracts();
+    const legacyContractIds = new Set(legacyContracts.map(item => String(item?.id || '').trim()).filter(Boolean));
 
     let primaryContracts = legacyContracts;
     if (mode === 'strict' || mode === 'hybrid') {
@@ -109,7 +125,7 @@ function main() {
             contracts: legacyContracts,
             allowlists: {},
         });
-        parity = parityReport(dslEval.findings, legacyEval.findings);
+        parity = parityReport(dslEval.findings, legacyEval.findings, legacyContractIds);
     }
 
     const findings = mapOutputFindings(primaryEval.findings);
@@ -140,7 +156,9 @@ function main() {
         for (const f of findings) {
             console.error(`- [${f.contract_id}] ${f.file || 'n/a'}#L${f.line || 1}: ${f.evidence}`);
             console.error(`  -> ${f.message}`);
-            console.error(`  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`);
+            console.error(
+                `  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`
+            );
         }
         if (parity.enabled && parity.mismatches.length > 0) {
             console.error('[check_forbidden_patterns] Parity mismatch (DSL vs legado):');

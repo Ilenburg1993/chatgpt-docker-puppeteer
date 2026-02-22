@@ -55,7 +55,7 @@ async function validateTaskResult(task, filePath, signal = null) {
         log('ERROR', `[VALIDATOR] Colapso na orquestração: ${valErr.message}`, taskId);
         return {
             ok: false,
-            reason: `VALIDATOR_INTERNAL_ERROR: ${valErr.message}`
+            reason: `VALIDATOR_INTERNAL_ERROR: ${valErr.message}`,
         };
     }
 }

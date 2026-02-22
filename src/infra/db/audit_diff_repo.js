@@ -36,6 +36,7 @@ function _rowToAuditDiff(row) {
     };
 }
 
+/** Função exportada: insertAuditDiff. */
 function insertAuditDiff({ operationId, entityType, entityId, before = {}, after = {} }) {
     const db = getDb();
     const id = `adf-${uuidv4()}`;
@@ -64,12 +65,14 @@ function insertAuditDiff({ operationId, entityType, entityId, before = {}, after
     return getAuditDiffById(id);
 }
 
+/** Função exportada: getAuditDiffById. */
 function getAuditDiffById(id) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM audit_diffs WHERE id = ?').get(String(id || '').trim());
     return _rowToAuditDiff(row);
 }
 
+/** Função exportada: listAuditDiffsByOperation. */
 function listAuditDiffsByOperation(operationId) {
     const db = getDb();
     const rows = db
@@ -86,6 +89,7 @@ function listAuditDiffsByOperation(operationId) {
     return rows.map(_rowToAuditDiff).filter(Boolean);
 }
 
+/** Função exportada: listAuditDiffsByEntity. */
 function listAuditDiffsByEntity(entityType, entityId, limit = 100) {
     const db = getDb();
     const rows = db
@@ -98,7 +102,11 @@ function listAuditDiffsByEntity(entityType, entityId, limit = 100) {
             LIMIT ?
         `
         )
-        .all(String(entityType || '').trim(), String(entityId || '').trim(), Math.max(1, Math.min(Number(limit) || 100, 500)));
+        .all(
+            String(entityType || '').trim(),
+            String(entityId || '').trim(),
+            Math.max(1, Math.min(Number(limit) || 100, 500))
+        );
 
     return rows.map(_rowToAuditDiff).filter(Boolean);
 }

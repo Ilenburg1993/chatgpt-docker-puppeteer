@@ -156,6 +156,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
     return parts.length ? `\n\n${parts.join('\n\n')}` : '';
 }
 
+/** Classe exportada: QueueWorker. */
 class QueueWorker {
     /**
      * Cria um worker da fila para reivindicar e executar tarefas.

@@ -8,7 +8,6 @@ import { saveResponse, loadResponse } from '#infra/storage/response_adapter';
 // dependency injection or env-var-based path config.
 // The require() calls below have been replaced with no-op comments to prevent crashes.
 
-
 // Test directories
 const TEST_DIR = path.join(import.meta.dirname, 'temp_e2e_simple');
 const RESPONSES_DIR = path.join(TEST_DIR, 'respostas');
@@ -62,6 +61,7 @@ async function runTest(name, testFn) {
     }
 }
 
+/** Função exportada: runAllTests. */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
     console.log('  Task E2E Tests (Simplified - Focus on Integration)');

@@ -117,32 +117,32 @@ let _gaussianCache = null;
 function _generateTypo(char) {
     // Keyboard layout mapping for common typos
     const keyboardMap = {
-        'a': ['s', 'q', 'w', 'z'],
-        'b': ['v', 'n', 'g', 'h'],
-        'c': ['x', 'v', 'f', 'd'],
-        'd': ['s', 'f', 'c', 'e'],
-        'e': ['w', 'r', 'd', 's'],
-        'f': ['d', 'g', 'r', 't'],
-        'g': ['f', 'h', 't', 'y'],
-        'h': ['g', 'j', 'y', 'u'],
-        'i': ['u', 'o', 'k', 'j'],
-        'j': ['h', 'k', 'u', 'i'],
-        'k': ['j', 'l', 'i', 'o'],
-        'l': ['k', ';', 'o', 'p'],
-        'm': ['n', ',', 'j', 'k'],
-        'n': ['b', 'm', 'h', 'j'],
-        'o': ['i', 'p', 'l', 'k'],
-        'p': ['o', '[', ';', 'l'],
-        'q': ['w', 'a', '1', '2'],
-        'r': ['e', 't', 'f', 'g'],
-        's': ['a', 'd', 'w', 'x'],
-        't': ['r', 'y', 'g', 'h'],
-        'u': ['y', 'i', 'j', 'h'],
-        'v': ['c', 'b', 'f', 'g'],
-        'w': ['q', 'e', 's', 'a'],
-        'x': ['z', 'c', 's', 'd'],
-        'y': ['t', 'u', 'h', 'j'],
-        'z': ['a', 'x', 's', 'd']
+        a: ['s', 'q', 'w', 'z'],
+        b: ['v', 'n', 'g', 'h'],
+        c: ['x', 'v', 'f', 'd'],
+        d: ['s', 'f', 'c', 'e'],
+        e: ['w', 'r', 'd', 's'],
+        f: ['d', 'g', 'r', 't'],
+        g: ['f', 'h', 't', 'y'],
+        h: ['g', 'j', 'y', 'u'],
+        i: ['u', 'o', 'k', 'j'],
+        j: ['h', 'k', 'u', 'i'],
+        k: ['j', 'l', 'i', 'o'],
+        l: ['k', ';', 'o', 'p'],
+        m: ['n', ',', 'j', 'k'],
+        n: ['b', 'm', 'h', 'j'],
+        o: ['i', 'p', 'l', 'k'],
+        p: ['o', '[', ';', 'l'],
+        q: ['w', 'a', '1', '2'],
+        r: ['e', 't', 'f', 'g'],
+        s: ['a', 'd', 'w', 'x'],
+        t: ['r', 'y', 'g', 'h'],
+        u: ['y', 'i', 'j', 'h'],
+        v: ['c', 'b', 'f', 'g'],
+        w: ['q', 'e', 's', 'a'],
+        x: ['z', 'c', 's', 'd'],
+        y: ['t', 'u', 'h', 'j'],
+        z: ['a', 'x', 's', 'd'],
     };
 
     const lowerChar = char.toLowerCase();
@@ -648,6 +648,7 @@ async function humanTypeCore(
 // PUBLIC CONFIG (v2.0 - Test/Consumer Contract)
 // ============================================
 // Keep BIOMECHANICS_CONFIG for the legacy API. Expose a stable, smaller surface for consumers/tests.
+/** Constante/valor exportado: HUMAN_CONFIG. */
 const HUMAN_CONFIG = Object.freeze({
     // Movement/typing ranges (ms)
     MOVE_SPEED_MIN: 1,
@@ -801,7 +802,10 @@ async function humanClick(...args) {
     if (_isLegacyHumanClickArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */
-        const legacyArgs = /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */ (/** @type {unknown} */ (args));
+        const legacyArgs =
+            /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */ (
+                /** @type {unknown} */ (args)
+            );
         await humanClickCore(...legacyArgs);
         return true;
     }
@@ -881,11 +885,15 @@ async function humanClick(...args) {
     return true;
 }
 
+/** Função exportada: humanType. */
 async function humanType(...args) {
     if (_isLegacyHumanTypeArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */
-        const legacyArgs = /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */ (/** @type {unknown} */ (args));
+        const legacyArgs =
+            /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */ (
+                /** @type {unknown} */ (args)
+            );
         await humanTypeCore(...legacyArgs);
         return true;
     }

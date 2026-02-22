@@ -18,7 +18,7 @@ function parserPlugins(language) {
         'classPrivateMethods',
         'dynamicImport',
         'importMeta',
-        'topLevelAwait'
+        'topLevelAwait',
     ];
     if (language === 'ts') {
         plugins.push('typescript');
@@ -43,13 +43,13 @@ function readJsDocMeta(node) {
         if (!raw.startsWith('*')) continue;
         const cleaned = raw
             .split('\n')
-            .map((line) => line.replace(/^\s*\*\s?/, '').trimEnd())
+            .map(line => line.replace(/^\s*\*\s?/, '').trimEnd())
             .join('\n')
             .trim();
         if (!cleaned) continue;
         return {
             text: `/** ${cleaned.replace(/\s+/g, ' ').trim()} */`,
-            startLine: c?.loc?.start?.line || null
+            startLine: c?.loc?.start?.line || null,
         };
     }
     return null;
@@ -85,7 +85,7 @@ function splitLargeUnit(unit, lines, maxChunkChars, minChunkChars) {
         lines: subLines,
         maxChunkChars,
         minChunkChars,
-        linesPerBlock: 50
+        linesPerBlock: 50,
     });
 
     return subRanges.map((r, idx) => ({
@@ -98,7 +98,7 @@ function splitLargeUnit(unit, lines, maxChunkChars, minChunkChars) {
         anchor: unit.anchor,
         imports: unit.imports,
         subchunkIndex: idx + 1,
-        subchunkTotal: subRanges.length
+        subchunkTotal: subRanges.length,
     }));
 }
 
@@ -115,7 +115,12 @@ function normalizeAndSplitUnits(units, lines, maxChunkChars) {
         normalized.push(...splitLargeUnit(unit, lines, maxChunkChars, minChunkChars));
     }
 
-    normalized.sort((a, b) => a.startLine - b.startLine || a.endLine - b.endLine || String(a.symbol || '').localeCompare(String(b.symbol || '')));
+    normalized.sort(
+        (a, b) =>
+            a.startLine - b.startLine ||
+            a.endLine - b.endLine ||
+            String(a.symbol || '').localeCompare(String(b.symbol || ''))
+    );
 
     // Remove overlap conservatively.
     const deduped = [];
@@ -126,7 +131,7 @@ function normalizeAndSplitUnits(units, lines, maxChunkChars) {
         }
         const prev = deduped[deduped.length - 1];
         if (unit.startLine <= prev.endLine) {
-            if ((unit.endLine - unit.startLine) > (prev.endLine - prev.startLine)) {
+            if (unit.endLine - unit.startLine > prev.endLine - prev.startLine) {
                 deduped[deduped.length - 1] = unit;
             }
             continue;
@@ -156,7 +161,8 @@ function collectUnits(ast, lines, maxChunkChars) {
     traverse(ast, {
         FunctionDeclaration(path) {
             if (!path.node?.loc) return;
-            const exported = path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
+            const exported =
+                path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
             const jsDocNode = exportTypes.has(path.parentPath?.node?.type) ? path.parentPath.node : path.node;
             const symbol = buildSymbolFromNode(path.node);
             const startLine = jsDocStartLine(jsDocNode, path.node.loc.start.line);
@@ -168,12 +174,13 @@ function collectUnits(ast, lines, maxChunkChars) {
                 exported: Boolean(exported),
                 jsdoc: readJsDoc(jsDocNode) || readJsDoc(path.node),
                 anchor: firstNonEmptyLine(lines, path.node.loc.start.line, path.node.loc.end.line),
-                imports: imported
+                imports: imported,
             });
         },
         ClassDeclaration(path) {
             if (!path.node?.loc) return;
-            const exported = path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
+            const exported =
+                path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
             const jsDocNode = exportTypes.has(path.parentPath?.node?.type) ? path.parentPath.node : path.node;
             const className = buildSymbolFromNode(path.node) || 'AnonymousClass';
             const classStartLine = jsDocStartLine(jsDocNode, path.node.loc.start.line);
@@ -185,7 +192,7 @@ function collectUnits(ast, lines, maxChunkChars) {
                 exported: Boolean(exported),
                 jsdoc: readJsDoc(jsDocNode) || readJsDoc(path.node),
                 anchor: firstNonEmptyLine(lines, path.node.loc.start.line, path.node.loc.end.line),
-                imports: imported
+                imports: imported,
             };
 
             const classLen = estimateCharsForLines(lines, classUnit.startLine - 1, classUnit.endLine - 1);
@@ -198,7 +205,12 @@ function collectUnits(ast, lines, maxChunkChars) {
             for (const method of methods) {
                 if (!method?.loc) continue;
                 if (method.type !== 'ClassMethod' && method.type !== 'ClassPrivateMethod') continue;
-                if (method.kind === 'constructor' || method.kind === 'method' || method.kind === 'get' || method.kind === 'set') {
+                if (
+                    method.kind === 'constructor' ||
+                    method.kind === 'method' ||
+                    method.kind === 'get' ||
+                    method.kind === 'set'
+                ) {
                     const methodName = buildSymbolFromNode(method) || 'anonymous';
                     const methodStartLine = jsDocStartLine(method, method.loc.start.line);
                     units.push({
@@ -209,14 +221,15 @@ function collectUnits(ast, lines, maxChunkChars) {
                         exported: Boolean(exported),
                         jsdoc: readJsDoc(method) || classUnit.jsdoc,
                         anchor: firstNonEmptyLine(lines, method.loc.start.line, method.loc.end.line),
-                        imports: imported
+                        imports: imported,
                     });
                 }
             }
         },
         VariableDeclaration(path) {
             if (!path.node?.loc) return;
-            const exported = path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
+            const exported =
+                path.parentPath?.isExportNamedDeclaration() || path.parentPath?.isExportDefaultDeclaration();
             const jsDocNode = exportTypes.has(path.parentPath?.node?.type) ? path.parentPath.node : path.node;
             const declarations = Array.isArray(path.node.declarations) ? path.node.declarations : [];
             for (const decl of declarations) {
@@ -233,10 +246,10 @@ function collectUnits(ast, lines, maxChunkChars) {
                     exported: Boolean(exported),
                     jsdoc: readJsDoc(jsDocNode) || readJsDoc(path.node),
                     anchor: firstNonEmptyLine(lines, decl.loc.start.line, decl.loc.end.line),
-                    imports: imported
+                    imports: imported,
                 });
             }
-        }
+        },
     });
 
     return units;
@@ -248,7 +261,7 @@ export function chunkJsAst({ relPath, lines, language = 'js', maxChunkChars = RA
         sourceType: 'module',
         errorRecovery: true,
         plugins: /** @type {any} */ (parserPlugins(language)),
-        attachComment: true
+        attachComment: true,
     });
 
     if (Array.isArray(ast.errors) && ast.errors.length > 0) {
@@ -259,7 +272,7 @@ export function chunkJsAst({ relPath, lines, language = 'js', maxChunkChars = RA
     if (!units.length) return [];
 
     const normalized = normalizeAndSplitUnits(units, lines, maxChunkChars);
-    return normalized.map((unit) => ({
+    return normalized.map(unit => ({
         startLine: unit.startLine,
         endLine: unit.endLine,
         kind: unit.kind,
@@ -269,6 +282,6 @@ export function chunkJsAst({ relPath, lines, language = 'js', maxChunkChars = RA
         anchor: unit.anchor || null,
         imports: unit.imports || [],
         subchunk_index: unit.subchunkIndex || null,
-        subchunk_total: unit.subchunkTotal || null
+        subchunk_total: unit.subchunkTotal || null,
     }));
 }

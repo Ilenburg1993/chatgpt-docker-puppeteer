@@ -8,16 +8,18 @@ import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
    Severidades Canônicas
 =========================== */
 
+/** Constante/valor exportado: TelemetrySeverity. */
 const TelemetrySeverity = Object.freeze({
     INFO: 'INFO',
     WARNING: 'WARNING',
-    CRITICAL: 'CRITICAL'
+    CRITICAL: 'CRITICAL',
 });
 
 /* ===========================
    Fábrica da Telemetria do Kernel
 =========================== */
 
+/** Classe exportada: KernelTelemetry. */
 class KernelTelemetry {
     /**
      * @param {Object} [config]
@@ -96,7 +98,7 @@ class KernelTelemetry {
             at: Date.now(),
             source: this.source,
             severity,
-            payload: Object.freeze(payload)
+            payload: Object.freeze(payload),
         });
 
         // Atualiza métricas internas
@@ -113,7 +115,7 @@ class KernelTelemetry {
                 try {
                     await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.TELEMETRY_DISCARDED, {
                         discardedAt: Date.now(),
-                        discardedEventType: discarded.type
+                        discardedEventType: discarded.type,
                     });
                 } catch (_) {
                     // Best-effort: don't crash telemetry on emit failures
@@ -211,7 +213,7 @@ class KernelTelemetry {
             retentionLimit: this.retention,
             counters: Object.freeze({ ...this.counters }),
             gauges: Object.freeze({ ...this.gauges }),
-            timestamps: Object.freeze({ ...this.timestamps })
+            timestamps: Object.freeze({ ...this.timestamps }),
         });
     }
 
@@ -264,7 +266,7 @@ class KernelTelemetry {
 
         this.info('telemetry_buffer_cleared', {
             clearedCount: count,
-            at: Date.now()
+            at: Date.now(),
         });
     }
 
@@ -277,7 +279,7 @@ class KernelTelemetry {
         this.timestamps = Object.create(null);
 
         this.info('telemetry_metrics_reset', {
-            at: Date.now()
+            at: Date.now(),
         });
     }
 

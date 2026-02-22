@@ -9,6 +9,7 @@ import { MIGRATIONS } from './migrations.js';
 /** @type {import('better-sqlite3').Database|null} */
 let singletonDb = null;
 
+/** Função exportada: resolveDbPath. */
 function resolveDbPath() {
     const fromEnv = process.env.MAESTRO_DB_PATH || process.env.DB_PATH || null;
     const fromConfig = typeof CONFIG?.all?.DB_PATH === 'string' ? CONFIG.all.DB_PATH : null;
@@ -45,7 +46,10 @@ function migrate(db) {
 
     /** @type {Set<number>} */
     const applied = new Set(
-        db.prepare('SELECT version FROM schema_migrations ORDER BY version ASC').all().map(r => Number(r.version))
+        db
+            .prepare('SELECT version FROM schema_migrations ORDER BY version ASC')
+            .all()
+            .map(r => Number(r.version))
     );
 
     for (const migration of MIGRATIONS) {
@@ -63,15 +67,18 @@ function migrate(db) {
             } else {
                 throw new Error(`[DB] Invalid migration shape for v${migration.version}: missing up/upFn`);
             }
-            db.prepare(
-                'INSERT INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)'
-            ).run(migration.version, migration.name, Date.now());
+            db.prepare('INSERT INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
+                migration.version,
+                migration.name,
+                Date.now()
+            );
         });
 
         tx();
     }
 }
 
+/** Função exportada: getDb. */
 function getDb() {
     if (singletonDb) {
         return singletonDb;
@@ -96,6 +103,7 @@ function getDb() {
     return singletonDb;
 }
 
+/** Função exportada: closeDb. */
 function closeDb() {
     if (!singletonDb) {
         return;

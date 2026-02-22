@@ -9,6 +9,7 @@ import { log } from '#core/logger';
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
 ========================================================================== */
 
+/** Constante/valor exportado: TARGETDRIVER_CONFIG. */
 const TARGETDRIVER_CONFIG = Object.freeze({
     // State Timeouts (ms)
     STATE_TIMEOUT_WARNING_MS: 30000, // 30s
@@ -70,6 +71,7 @@ const STATES = Object.freeze({
    STATE TRANSITION MATRIX (v2.0 - Validação de Transições)
 ========================================================================== */
 
+/** Constante/valor exportado: STATE_TRANSITIONS. */
 const STATE_TRANSITIONS = Object.freeze({
     [STATES.UNATTACHED]: [STATES.IDLE], // ✅ v3.0: UNATTACHED → IDLE (via attachContext)
     [STATES.IDLE]: [STATES.PREPARING, STATES.UNATTACHED], // ✅ v3.0: IDLE → UNATTACHED (via detachContext)
@@ -83,6 +85,7 @@ const STATE_TRANSITIONS = Object.freeze({
    CAPABILITIES SCHEMA (v2.0 - Validação de Capabilities)
 ========================================================================== */
 
+/** Constante/valor exportado: CAPABILITIES_SCHEMA. */
 const CAPABILITIES_SCHEMA = Object.freeze([
     'text_generation',
     'image_generation',
@@ -497,7 +500,11 @@ class TargetDriver extends EventEmitter {
             const currentUrl = page.url ? page.url() : '';
 
             // Skip validation for about:blank (not navigated yet)
-            if (currentUrl !== 'about:blank' && currentUrl !== '' && !isDomainMatch(currentUrl, this.config.expectedDomain)) {
+            if (
+                currentUrl !== 'about:blank' &&
+                currentUrl !== '' &&
+                !isDomainMatch(currentUrl, this.config.expectedDomain)
+            ) {
                 throw new Error(
                     `[${this.name}] Domain mismatch: expected ${this.config.expectedDomain}, got ${currentUrl}`
                 );

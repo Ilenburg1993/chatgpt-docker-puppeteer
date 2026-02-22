@@ -119,7 +119,9 @@ onMounted(refresh);
                             </div>
                             <div class="flex items-center gap-2">
                                 <Badge size="sm">{{ t.stage }}</Badge>
-                                <Badge size="sm" :variant="statusVariant(t.unified_status)">{{ t.unified_status }}</Badge>
+                                <Badge size="sm" :variant="statusVariant(t.unified_status)">{{
+                                    t.unified_status
+                                }}</Badge>
                             </div>
                         </div>
                     </div>
@@ -157,4 +159,3 @@ onMounted(refresh);
         </div>
     </div>
 </template>
-

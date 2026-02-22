@@ -82,4 +82,3 @@ test('wave1: env validator allows disabled server mode', async () => {
     const content = await read('src/core/env_validator.js');
     assert.match(content, /'disabled'/, 'SERVER_MODE validator must allow disabled');
 });
-

@@ -11,7 +11,7 @@ describe('ValidationService', () => {
     beforeEach(() => {
         mockNerv = {
             emit: () => {}, // Mock NERV
-            events: []
+            events: [],
         };
         mockNerv.emit = (event, payload) => {
             mockNerv.events.push({ event, payload });
@@ -27,9 +27,9 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'regex',
-                        config: { pattern: '\\d+' } // Tem números
-                    }
-                ]
+                        config: { pattern: '\\d+' }, // Tem números
+                    },
+                ],
             });
 
             assert.ok(result.passed, 'Deve passar validação');
@@ -44,9 +44,9 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'regex',
-                        config: { pattern: '\\d+' } // Não tem números
-                    }
-                ]
+                        config: { pattern: '\\d+' }, // Não tem números
+                    },
+                ],
             });
 
             assert.ok(!result.passed, 'Deve falhar validação');
@@ -62,9 +62,9 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'length',
-                        config: { min_length: 5, max_length: 100 }
-                    }
-                ]
+                        config: { min_length: 5, max_length: 100 },
+                    },
+                ],
             });
 
             assert.ok(result.passed, 'Deve passar validação');
@@ -77,10 +77,10 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'length',
-                        config: { min_length: 10 }
-                    }
+                        config: { min_length: 10 },
+                    },
                 ],
-                criteria: { min_quality_score: 70 }
+                criteria: { min_quality_score: 70 },
             });
 
             assert.ok(!result.passed, 'Deve falhar validação');
@@ -95,9 +95,9 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'schema',
-                        config: {}
-                    }
-                ]
+                        config: {},
+                    },
+                ],
             });
 
             assert.ok(result.passed, 'Deve passar validação');
@@ -110,9 +110,9 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'schema',
-                        config: {}
-                    }
-                ]
+                        config: {},
+                    },
+                ],
             });
 
             assert.ok(!result.passed, 'Deve falhar validação');
@@ -126,9 +126,9 @@ describe('ValidationService', () => {
                 validators: [
                     { type: 'schema', config: {} }, // Score 100
                     { type: 'length', config: { min_length: 5 } }, // Score 100
-                    { type: 'regex', config: { pattern: '\\d+' } } // Score 100
+                    { type: 'regex', config: { pattern: '\\d+' } }, // Score 100
                 ],
-                criteria: { min_quality_score: 70 }
+                criteria: { min_quality_score: 70 },
             });
 
             assert.ok(result.passed, 'Deve passar todos validators');
@@ -141,9 +141,9 @@ describe('ValidationService', () => {
             const result = await validationService.validate(output, {
                 validators: [
                     { type: 'length', config: { min_length: 100 } }, // Falha
-                    { type: 'regex', config: { pattern: '.*' } } // Passa
+                    { type: 'regex', config: { pattern: '.*' } }, // Passa
                 ],
-                criteria: { min_quality_score: 70 }
+                criteria: { min_quality_score: 70 },
             });
 
             assert.ok(!result.passed, 'Deve falhar validação');
@@ -158,17 +158,20 @@ describe('ValidationService', () => {
                 validators: [
                     {
                         type: 'llm_judge',
-                        config: { min_quality_score: 70 }
-                    }
+                        config: { min_quality_score: 70 },
+                    },
                 ],
-                criteria: { min_quality_score: 70 }
+                criteria: { min_quality_score: 70 },
             });
 
-            // Stub retorna score aleatório 75-95
-            assert.ok(result.overall_score >= 75 && result.overall_score <= 95);
+            // Bypass determinístico: não pontua, mas não deve bloquear fluxo.
+            assert.strictEqual(result.overall_score, 100);
             assert.strictEqual(result.validation_results.length, 1);
+            assert.strictEqual(result.validation_results[0].score, null);
+            assert.strictEqual(result.validation_results[0].passed, true);
             assert.ok(result.validation_results[0].strengths);
             assert.ok(result.validation_results[0].suggestions);
+            assert.ok(result.passed, 'bypass llm_judge não deve reprovar validação');
         });
     });
 });
@@ -182,7 +185,7 @@ describe('OrchestratorEngine', () => {
             events: [],
             emit: function (event, payload) {
                 this.events.push({ event, payload });
-            }
+            },
         };
 
         orchestrator = new OrchestratorEngine({ nerv: mockNerv });
@@ -193,8 +196,8 @@ describe('OrchestratorEngine', () => {
             const task = {
                 meta: { id: 'task-1' },
                 spec: {
-                    execution: { strategy: 'SINGLE_SHOT' }
-                }
+                    execution: { strategy: 'SINGLE_SHOT' },
+                },
             };
 
             assert.strictEqual(orchestrator.shouldOrchestrate(task), false);
@@ -204,8 +207,8 @@ describe('OrchestratorEngine', () => {
             const task = {
                 meta: { id: 'task-2' },
                 spec: {
-                    execution: { strategy: 'ITERATIVE' }
-                }
+                    execution: { strategy: 'ITERATIVE' },
+                },
             };
 
             assert.strictEqual(orchestrator.shouldOrchestrate(task), true);
@@ -215,8 +218,8 @@ describe('OrchestratorEngine', () => {
             const task = {
                 meta: { id: 'task-3' },
                 spec: {
-                    execution: { strategy: 'MULTI_STEP' }
-                }
+                    execution: { strategy: 'MULTI_STEP' },
+                },
             };
 
             assert.strictEqual(orchestrator.shouldOrchestrate(task), true);
@@ -232,12 +235,12 @@ describe('OrchestratorEngine', () => {
                     payload: { user_message: 'Test' },
                     execution: {
                         strategy: 'ITERATIVE',
-                        iterative_config: { max_iterations: 3 }
-                    }
+                        iterative_config: { max_iterations: 3 },
+                    },
                 },
                 state: { status: STATUS_VALUES.PENDING, attempts: 0 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             const result = await orchestrator.beforeExecution(task);
@@ -262,14 +265,20 @@ describe('OrchestratorEngine', () => {
                         strategy: 'MULTI_STEP',
                         workflow_config: {
                             steps: [
-                                { id: 'step-1', name: 'Step 1', action: 'execute_prompt', config: {}, dependencies: [] }
-                            ]
-                        }
-                    }
+                                {
+                                    id: 'step-1',
+                                    name: 'Step 1',
+                                    action: 'execute_prompt',
+                                    config: {},
+                                    dependencies: [],
+                                },
+                            ],
+                        },
+                    },
                 },
                 state: { status: STATUS_VALUES.PENDING, attempts: 0 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             const result = await orchestrator.beforeExecution(task);
@@ -285,12 +294,12 @@ describe('OrchestratorEngine', () => {
             const task = {
                 meta: { id: 'task-single' },
                 spec: {
-                    execution: { strategy: 'SINGLE_SHOT' }
-                }
+                    execution: { strategy: 'SINGLE_SHOT' },
+                },
             };
 
             const executionResult = {
-                output: 'Response from LLM'
+                output: 'Response from LLM',
             };
 
             const decision = await orchestrator.afterExecution(task, executionResult);
@@ -315,25 +324,23 @@ describe('OrchestratorEngine', () => {
                         strategy: 'ITERATIVE',
                         iterative_config: {
                             max_iterations: 3,
-                            validation_criteria: { min_quality_score: 70 }
-                        }
+                            validation_criteria: { min_quality_score: 70 },
+                        },
                     },
                     validation: {
-                        validators: [
-                            { type: 'length', config: { min_length: 10 } }
-                        ]
-                    }
+                        validators: [{ type: 'length', config: { min_length: 10 } }],
+                    },
                 },
                 state: { status: STATUS_VALUES.RUNNING, attempts: 1 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             // Inicializa iteration state
             const preparedTask = await orchestrator.beforeExecution(task);
 
             const executionResult = {
-                output: 'This is a good response with sufficient length and quality'
+                output: 'This is a good response with sufficient length and quality',
             };
 
             const decision = await orchestrator.afterExecution(preparedTask, executionResult);
@@ -353,24 +360,24 @@ describe('OrchestratorEngine', () => {
                         strategy: 'ITERATIVE',
                         iterative_config: {
                             max_iterations: 3,
-                            validation_criteria: { min_quality_score: 70 }
-                        }
+                            validation_criteria: { min_quality_score: 70 },
+                        },
                     },
                     validation: {
                         validators: [
-                            { type: 'length', config: { min_length: 100 } } // Output não vai passar
-                        ]
-                    }
+                            { type: 'length', config: { min_length: 100 } }, // Output não vai passar
+                        ],
+                    },
                 },
                 state: { status: STATUS_VALUES.RUNNING, attempts: 1 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             const preparedTask = await orchestrator.beforeExecution(task);
 
             const executionResult = {
-                output: 'Short' // Muito curto
+                output: 'Short', // Muito curto
             };
 
             const decision = await orchestrator.afterExecution(preparedTask, executionResult);
@@ -390,18 +397,18 @@ describe('OrchestratorEngine', () => {
                         strategy: 'ITERATIVE',
                         iterative_config: {
                             max_iterations: 2, // Apenas 2 iterações
-                            validation_criteria: { min_quality_score: 70 }
-                        }
+                            validation_criteria: { min_quality_score: 70 },
+                        },
                     },
                     validation: {
                         validators: [
-                            { type: 'length', config: { min_length: 1000 } } // Impossível passar
-                        ]
-                    }
+                            { type: 'length', config: { min_length: 1000 } }, // Impossível passar
+                        ],
+                    },
                 },
                 state: { status: STATUS_VALUES.RUNNING, attempts: 1 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             const preparedTask = await orchestrator.beforeExecution(task);
@@ -430,22 +437,34 @@ describe('OrchestratorEngine', () => {
                         strategy: 'MULTI_STEP',
                         workflow_config: {
                             steps: [
-                                { id: 'step-1', name: 'Step 1', action: 'execute_prompt', config: { prompt: 'Do step 1' }, dependencies: [] },
-                                { id: 'step-2', name: 'Step 2', action: 'execute_prompt', config: { prompt: 'Do step 2 with {step-1}' }, dependencies: ['step-1'] }
-                            ]
-                        }
-                    }
+                                {
+                                    id: 'step-1',
+                                    name: 'Step 1',
+                                    action: 'execute_prompt',
+                                    config: { prompt: 'Do step 1' },
+                                    dependencies: [],
+                                },
+                                {
+                                    id: 'step-2',
+                                    name: 'Step 2',
+                                    action: 'execute_prompt',
+                                    config: { prompt: 'Do step 2 with {step-1}' },
+                                    dependencies: ['step-1'],
+                                },
+                            ],
+                        },
+                    },
                 },
                 state: { status: STATUS_VALUES.RUNNING, attempts: 1 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             const preparedTask = await orchestrator.beforeExecution(task);
 
             // Executa step 1
             const executionResult = {
-                output: 'Result from step 1'
+                output: 'Result from step 1',
             };
 
             const decision = await orchestrator.afterExecution(preparedTask, executionResult);
@@ -471,14 +490,20 @@ describe('OrchestratorEngine', () => {
                         strategy: 'MULTI_STEP',
                         workflow_config: {
                             steps: [
-                                { id: 'step-1', name: 'Only Step', action: 'execute_prompt', config: { prompt: 'Do it' }, dependencies: [] }
-                            ]
-                        }
-                    }
+                                {
+                                    id: 'step-1',
+                                    name: 'Only Step',
+                                    action: 'execute_prompt',
+                                    config: { prompt: 'Do it' },
+                                    dependencies: [],
+                                },
+                            ],
+                        },
+                    },
                 },
                 state: { status: STATUS_VALUES.RUNNING, attempts: 1 },
                 policy: {},
-                result: {}
+                result: {},
             };
 
             const preparedTask = await orchestrator.beforeExecution(task);
@@ -496,12 +521,12 @@ describe('OrchestratorEngine', () => {
             const task1 = {
                 meta: { id: 'task-1' },
                 spec: { execution: { strategy: 'ITERATIVE' } },
-                state: {}
+                state: {},
             };
             const task2 = {
                 meta: { id: 'task-2', workflow_id: 'wf-1' },
                 spec: { execution: { strategy: 'MULTI_STEP', workflow_config: { steps: [] } } },
-                state: {}
+                state: {},
             };
 
             await orchestrator.beforeExecution(task1);

@@ -68,9 +68,10 @@ const routes = [
     },
 ];
 
+/** Constante/valor exportado: default. */
 const router = createRouter({
     history: createWebHistory('/dashboard/'),
-    routes: /** @type {import('vue-router').RouteRecordRaw[]} */ (routes)
+    routes: /** @type {import('vue-router').RouteRecordRaw[]} */ (routes),
 });
 
 // Navigation guards

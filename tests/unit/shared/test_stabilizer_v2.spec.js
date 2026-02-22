@@ -6,13 +6,13 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
     let mockPage;
     let stabilizerModule;
 
-	beforeEach(async () => {
+    beforeEach(async () => {
         // Mock page object
         mockPage = {
             evaluate: mock.fn(async () => true),
             waitForNetworkIdle: mock.fn(async () => {}),
             url: mock.fn(() => 'https://chat.openai.com'),
-            isClosed: mock.fn(() => false)
+            isClosed: mock.fn(() => false),
         };
 
         // Mock driver object
@@ -22,13 +22,13 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             currentTarget: 'chatgpt',
             correlationId: 'test-stabilizer-123',
             getMetrics: mock.fn(async () => ({
-                stream: { avg: 800, p95: 1200 }
-            }))
+                stream: { avg: 800, p95: 1200 },
+            })),
         };
 
-		// Import module fresh for each test (ESM)
-		stabilizerModule = await import('#shared/page_stability/stabilizer');
-	});
+        // Import module fresh for each test (ESM)
+        stabilizerModule = await import('#shared/page_stability/stabilizer');
+    });
 
     afterEach(() => {
         mock.restoreAll();
@@ -45,7 +45,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await waitForStability(null, 30000), {
                     name: 'TypeError',
-                    message: /driver is required/
+                    message: /driver is required/,
                 });
             });
 
@@ -54,7 +54,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await waitForStability({ page: null }, 30000), {
                     name: 'TypeError',
-                    message: /driver.page is required/
+                    message: /driver.page is required/,
                 });
             });
 
@@ -63,7 +63,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 await assert.rejects(async () => await waitForStability(mockDriver, -1000), {
                     name: 'TypeError',
-                    message: /timeoutMs must be a positive number/
+                    message: /timeoutMs must be a positive number/,
                 });
             });
 
@@ -364,7 +364,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 mockPage.isClosed = mock.fn(() => true);
 
                 await assert.rejects(async () => await waitForStability(mockDriver, 5000), {
-                    message: /page is closed/
+                    message: /page is closed/,
                 });
 
                 const calls = mockDriver._emitVital.mock.calls;
@@ -447,7 +447,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Mock metrics: slow stream (1000ms avg)
                 mockDriver.getMetrics = mock.fn(async () => ({
-                    stream: { avg: 1000, p95: 1500 }
+                    stream: { avg: 1000, p95: 1500 },
                 }));
 
                 mockPage.evaluate = mock.fn(async () => false);
@@ -464,7 +464,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Mock metrics: fast stream (400ms avg)
                 mockDriver.getMetrics = mock.fn(async () => ({
-                    stream: { avg: 400, p95: 600 }
+                    stream: { avg: 400, p95: 600 },
                 }));
 
                 mockPage.evaluate = mock.fn(async () => false);
@@ -585,7 +585,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 mockPage.isClosed = mock.fn(() => true);
 
                 await assert.rejects(async () => await waitForStability(mockDriver, 5000), {
-                    message: /page is closed/
+                    message: /page is closed/,
                 });
             });
 

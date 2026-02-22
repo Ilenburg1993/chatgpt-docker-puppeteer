@@ -17,7 +17,6 @@ import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#sh
  * @typedef {(input: { taskId: string, correlationId: string|null, decision: OrchestrationDecision }) => Promise<void>|void} TaskCompletedCallback
  */
 
-
 /**
  * TaskExecutionOrchestrator - Orquestra execução de tasks V5.
  *
@@ -46,7 +45,7 @@ class TaskExecutionOrchestrator {
         nervBridge,
         onTaskRetryRequested = null,
         onTaskPermanentFailure = null,
-        onTaskCompleted = null
+        onTaskCompleted = null,
     }) {
         if (!nerv) {
             throw new Error('TaskExecutionOrchestrator requer NERV');
@@ -96,7 +95,7 @@ class TaskExecutionOrchestrator {
         // Reinicia janela de idempotência para esta nova dispatch (retry / next-step etc)
         this.processedExecutionEvents.set(taskId, {
             correlationId: correlationId || null,
-            processed: new Set()
+            processed: new Set(),
         });
 
         let preparedTask;
@@ -105,7 +104,11 @@ class TaskExecutionOrchestrator {
             preparedTask = await this.nervBridge.beforeTaskExecution(task);
         } catch (err) {
             const msg = err?.message || String(err);
-            logger.log('ERROR', `[TaskExecutionOrchestrator] beforeTaskExecution falhou: ${taskId} - ${msg}`, correlationId);
+            logger.log(
+                'ERROR',
+                `[TaskExecutionOrchestrator] beforeTaskExecution falhou: ${taskId} - ${msg}`,
+                correlationId
+            );
 
             // Não mantém estado ativo (evita leak)
             this.activeExecutions.delete(taskId);
@@ -122,7 +125,7 @@ class TaskExecutionOrchestrator {
         this.activeExecutions.set(taskId, {
             task: preparedTask,
             correlationId: correlationId || null,
-            startedAt: Date.now()
+            startedAt: Date.now(),
         });
 
         // Emite comando para Driver executar task
@@ -132,8 +135,8 @@ class TaskExecutionOrchestrator {
                 correlationId,
                 payload: {
                     actionCode: ActionCode.DRIVER_EXECUTE_TASK,
-                    task: preparedTask
-                }
+                    task: preparedTask,
+                },
             });
         } catch (err) {
             const msg = err?.message || String(err);
@@ -163,7 +166,10 @@ class TaskExecutionOrchestrator {
             try {
                 this.unsubscribeNerv();
             } catch (unsubscribeError) {
-                logger.log('WARN', `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`);
+                logger.log(
+                    'WARN',
+                    `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`
+                );
             }
             this.unsubscribeNerv = null;
         }
@@ -180,20 +186,33 @@ class TaskExecutionOrchestrator {
             try {
                 correlationId = getCorrelationId(envelope) || null;
             } catch (correlationReadError) {
-                logger.log('DEBUG', `[TaskExecutionOrchestrator] Falha ao ler correlationId do envelope: ${correlationReadError?.message || String(correlationReadError)}`);
+                logger.log(
+                    'DEBUG',
+                    `[TaskExecutionOrchestrator] Falha ao ler correlationId do envelope: ${correlationReadError?.message || String(correlationReadError)}`
+                );
                 correlationId = envelope?.correlationId || envelope?.causality?.correlation_id || null;
             }
 
             if (actionCode === ActionCode.DRIVER_TASK_COMPLETED) {
-                this._handleTaskCompleted(/** @type {DriverTaskCompletedPayload} */ (payload), correlationId).catch(err => {
-                    logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_COMPLETED falhou: ${err?.message || String(err)}`, correlationId);
-                });
+                this._handleTaskCompleted(/** @type {DriverTaskCompletedPayload} */ (payload), correlationId).catch(
+                    err => {
+                        logger.log(
+                            'ERROR',
+                            `[TaskExecutionOrchestrator] Handler DRIVER_TASK_COMPLETED falhou: ${err?.message || String(err)}`,
+                            correlationId
+                        );
+                    }
+                );
                 return;
             }
 
             if (actionCode === ActionCode.DRIVER_TASK_FAILED) {
                 this._handleTaskFailed(/** @type {DriverTaskFailedPayload} */ (payload), correlationId).catch(err => {
-                    logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_FAILED falhou: ${err?.message || String(err)}`, correlationId);
+                    logger.log(
+                        'ERROR',
+                        `[TaskExecutionOrchestrator] Handler DRIVER_TASK_FAILED falhou: ${err?.message || String(err)}`,
+                        correlationId
+                    );
                 });
                 return;
             }
@@ -212,7 +231,11 @@ class TaskExecutionOrchestrator {
                     }),
                     correlationId
                 ).catch(err => {
-                    logger.log('ERROR', `[TaskExecutionOrchestrator] Handler DRIVER_TASK_ABORTED falhou: ${err?.message || String(err)}`, correlationId);
+                    logger.log(
+                        'ERROR',
+                        `[TaskExecutionOrchestrator] Handler DRIVER_TASK_ABORTED falhou: ${err?.message || String(err)}`,
+                        correlationId
+                    );
                 });
                 return;
             }
@@ -261,7 +284,7 @@ class TaskExecutionOrchestrator {
 
         const idempotency = this.processedExecutionEvents.get(taskId) || {
             correlationId: cached.correlationId || null,
-            processed: new Set()
+            processed: new Set(),
         };
 
         if (idempotency.correlationId && idempotency.correlationId !== correlationId) {
@@ -284,7 +307,11 @@ class TaskExecutionOrchestrator {
         const task = cached.task;
         const executionDuration = Date.now() - cached.startedAt;
 
-        logger.log('INFO', `[TaskExecutionOrchestrator] Task completada: ${taskId} (${executionDuration}ms)`, correlationId);
+        logger.log(
+            'INFO',
+            `[TaskExecutionOrchestrator] Task completada: ${taskId} (${executionDuration}ms)`,
+            correlationId
+        );
 
         let decision;
         try {
@@ -292,7 +319,11 @@ class TaskExecutionOrchestrator {
             decision = await this.nervBridge.afterTaskExecution(task, result);
         } catch (err) {
             const msg = err?.message || String(err);
-            logger.log('ERROR', `[TaskExecutionOrchestrator] afterTaskExecution falhou: ${taskId} - ${msg}`, correlationId);
+            logger.log(
+                'ERROR',
+                `[TaskExecutionOrchestrator] afterTaskExecution falhou: ${taskId} - ${msg}`,
+                correlationId
+            );
 
             // Trata como falha permanente do pipeline do kernel (não do driver)
             if (typeof this.onTaskPermanentFailure === 'function') {
@@ -300,7 +331,7 @@ class TaskExecutionOrchestrator {
                     taskId,
                     correlationId,
                     reason: `afterTaskExecution failed: ${msg}`,
-                    payload: { taskId, error: msg, reason: 'AFTER_EXECUTION_FAILED', retryable: false }
+                    payload: { taskId, error: msg, reason: 'AFTER_EXECUTION_FAILED', retryable: false },
                 });
             }
 
@@ -309,13 +340,21 @@ class TaskExecutionOrchestrator {
             return;
         }
 
-        logger.log('DEBUG', `[TaskExecutionOrchestrator] Decisão: ${decision?.action} para task ${taskId}`, correlationId);
+        logger.log(
+            'DEBUG',
+            `[TaskExecutionOrchestrator] Decisão: ${decision?.action} para task ${taskId}`,
+            correlationId
+        );
 
         try {
             await this.nervBridge.processOrchestrationDecision(decision, correlationId);
         } catch (err) {
             const msg = err?.message || String(err);
-            logger.log('ERROR', `[TaskExecutionOrchestrator] processOrchestrationDecision falhou: ${taskId} - ${msg}`, correlationId);
+            logger.log(
+                'ERROR',
+                `[TaskExecutionOrchestrator] processOrchestrationDecision falhou: ${taskId} - ${msg}`,
+                correlationId
+            );
 
             // Fail-safe: se não consegue processar a decisão, pede retry (quando possível)
             if (typeof this.onTaskRetryRequested === 'function') {
@@ -325,14 +364,20 @@ class TaskExecutionOrchestrator {
                     delayMs: 250,
                     reason: `Decision processing failed: ${msg}`,
                     nextAction: 'RETRY_LATER',
-                    payload: { taskId, error: msg, reason: 'DECISION_PROCESSING_FAILED', retryable: true, suggestedDelayMs: 250 }
+                    payload: {
+                        taskId,
+                        error: msg,
+                        reason: 'DECISION_PROCESSING_FAILED',
+                        retryable: true,
+                        suggestedDelayMs: 250,
+                    },
                 });
             } else if (typeof this.onTaskPermanentFailure === 'function') {
                 await this.onTaskPermanentFailure({
                     taskId,
                     correlationId,
                     reason: `Decision processing failed: ${msg}`,
-                    payload: { taskId, error: msg, reason: 'DECISION_PROCESSING_FAILED', retryable: false }
+                    payload: { taskId, error: msg, reason: 'DECISION_PROCESSING_FAILED', retryable: false },
                 });
             }
 
@@ -381,7 +426,7 @@ class TaskExecutionOrchestrator {
 
         const idempotency = this.processedExecutionEvents.get(taskId) || {
             correlationId: cached.correlationId || null,
-            processed: new Set()
+            processed: new Set(),
         };
 
         if (idempotency.correlationId && idempotency.correlationId !== correlationId) {
@@ -417,14 +462,14 @@ class TaskExecutionOrchestrator {
                 delayMs: suggestedDelayMs,
                 reason: reason || errorText,
                 nextAction,
-                payload: safePayload
+                payload: safePayload,
             });
         } else if (typeof this.onTaskPermanentFailure === 'function') {
             await this.onTaskPermanentFailure({
                 taskId,
                 correlationId,
                 reason: reason || errorText,
-                payload: safePayload
+                payload: safePayload,
             });
         }
 
@@ -450,8 +495,8 @@ class TaskExecutionOrchestrator {
                     operation: safePayload.operation || null,
                     isTimeout: safePayload.isTimeout ?? null,
                     errorClassification: safePayload.errorClassification || null,
-                    retriesAttempted: safePayload.retriesAttempted ?? null
-                }
+                    retriesAttempted: safePayload.retriesAttempted ?? null,
+                },
             });
         } catch (emitError) {
             logger.log(
@@ -481,7 +526,10 @@ class TaskExecutionOrchestrator {
             try {
                 this.unsubscribeNerv();
             } catch (unsubscribeError) {
-                logger.log('WARN', `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`);
+                logger.log(
+                    'WARN',
+                    `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`
+                );
             }
             this.unsubscribeNerv = null;
         }

@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
+/** Constante/valor exportado: RBAC_ROLES. */
 const RBAC_ROLES = Object.freeze({
     OWNER: 'owner',
     ADMIN: 'admin',
@@ -10,6 +11,7 @@ const RBAC_ROLES = Object.freeze({
     VIEWER: 'viewer',
 });
 
+/** Constante/valor exportado: RBAC_PERMISSIONS. */
 const RBAC_PERMISSIONS = Object.freeze({
     MISSION_READ: 'mission.read',
     MISSION_CREATE: 'mission.create',
@@ -36,6 +38,7 @@ const RBAC_PERMISSIONS = Object.freeze({
     USER_PREFS_WRITE: 'user_prefs.write',
 });
 
+/** Constante/valor exportado: ROLE_PERMISSION_MATRIX. */
 const ROLE_PERMISSION_MATRIX = Object.freeze({
     [RBAC_ROLES.OWNER]: Object.values(RBAC_PERMISSIONS),
     [RBAC_ROLES.ADMIN]: Object.values(RBAC_PERMISSIONS).filter(p => p !== RBAC_PERMISSIONS.RBAC_MANAGE),
@@ -65,7 +68,10 @@ function _now() {
 }
 
 function _hashPassword(raw) {
-    return crypto.createHash('sha256').update(String(raw || ''), 'utf8').digest('hex');
+    return crypto
+        .createHash('sha256')
+        .update(String(raw || ''), 'utf8')
+        .digest('hex');
 }
 
 function _normalizeUsername(username) {
@@ -74,6 +80,7 @@ function _normalizeUsername(username) {
         .toLowerCase();
 }
 
+/** Função exportada: ensureBaseRbacData. */
 function ensureBaseRbacData() {
     const db = getDb();
     const tx = db.transaction(() => {
@@ -210,6 +217,7 @@ function getRbacUserByUsername(username) {
     };
 }
 
+/** Função exportada: verifyRbacCredentials. */
 function verifyRbacCredentials(username, password) {
     const db = getDb();
     const name = _normalizeUsername(username);
@@ -229,6 +237,7 @@ function verifyRbacCredentials(username, password) {
     return getRbacUserByUsername(name);
 }
 
+/** Função exportada: bootstrapRbacFromEnv. */
 function bootstrapRbacFromEnv() {
     ensureBaseRbacData();
 
@@ -236,13 +245,23 @@ function bootstrapRbacFromEnv() {
     const ownerPassword = String(process.env.RBAC_BOOTSTRAP_OWNER_PASSWORD || '');
 
     if (ownerUsername && ownerPassword.length >= 12) {
-        upsertRbacUser({ username: ownerUsername, password: ownerPassword, role: /** @type {string} */ (RBAC_ROLES.OWNER), active: true });
+        upsertRbacUser({
+            username: ownerUsername,
+            password: ownerPassword,
+            role: /** @type {string} */ (RBAC_ROLES.OWNER),
+            active: true,
+        });
     }
 
     const dashboardUsername = _normalizeUsername(process.env.DASHBOARD_AUTH_USERNAME || 'admin');
     const dashboardPassword = String(process.env.DASHBOARD_AUTH_PASSWORD || 'admin123456789');
     if (dashboardUsername && dashboardPassword.length >= 12) {
-        upsertRbacUser({ username: dashboardUsername, password: dashboardPassword, role: /** @type {string} */ (RBAC_ROLES.ADMIN), active: true });
+        upsertRbacUser({
+            username: dashboardUsername,
+            password: dashboardPassword,
+            role: /** @type {string} */ (RBAC_ROLES.ADMIN),
+            active: true,
+        });
     }
 }
 

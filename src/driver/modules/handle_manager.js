@@ -20,7 +20,7 @@ const HANDLE_CONFIG = {
     DISPOSE_TIMEOUT_MS: parseInt(process.env.HANDLE_DISPOSE_TIMEOUT || '1000'),
 
     /** Máximo de handles simultâneos - Default: 1000 */
-    MAX_HANDLES: parseInt(process.env.HANDLE_MAX_HANDLES || '1000')
+    MAX_HANDLES: parseInt(process.env.HANDLE_MAX_HANDLES || '1000'),
 };
 
 /* ==========================================================================
@@ -46,7 +46,7 @@ const HANDLE_EVENTS = {
     CLEANUP_TIMEOUT: 'cleanup:timeout',
 
     /** Erro durante cleanup ou validação */
-    CLEANUP_ERROR: 'cleanup:error'
+    CLEANUP_ERROR: 'cleanup:error',
 };
 
 /* ==========================================================================
@@ -142,7 +142,7 @@ class HandleManager extends EventEmitter {
             lastClearAllDuration: 0,
 
             /** Duração máxima de clearAll (ms) */
-            maxClearAllDuration: 0
+            maxClearAllDuration: 0,
         };
 
         log('DEBUG', '[HandleManager] v2.0 initialized (EventEmitter + full observability)');
@@ -186,7 +186,7 @@ class HandleManager extends EventEmitter {
             this.emit(HANDLE_EVENTS.CLEANUP_ERROR, {
                 error,
                 handleType: typeof handle,
-                reason: 'INVALID_HANDLE'
+                reason: 'INVALID_HANDLE',
             });
 
             throw new Error(error);
@@ -201,7 +201,7 @@ class HandleManager extends EventEmitter {
                 error,
                 limit: HANDLE_CONFIG.MAX_HANDLES,
                 current: this.activeHandles.length,
-                reason: 'LIMIT_EXCEEDED'
+                reason: 'LIMIT_EXCEEDED',
             });
 
             throw new Error(`[HandleManager] ${error}`);
@@ -216,7 +216,7 @@ class HandleManager extends EventEmitter {
             count: this.activeHandles.length,
             total: this.stats.handlesRegistered,
             limit: HANDLE_CONFIG.MAX_HANDLES,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
 
         log('DEBUG', `[HandleManager] Handle registered (${this.activeHandles.length} active)`);
@@ -287,11 +287,7 @@ class HandleManager extends EventEmitter {
 
                 try {
                     // FIXED (P0-1.3): Usa withTimeout para garantir cleanup
-                    await withTimeout(
-                        () => h.dispose(),
-                        HANDLE_CONFIG.DISPOSE_TIMEOUT_MS,
-                        'HANDLE_DISPOSE_TIMEOUT'
-                    );
+                    await withTimeout(() => h.dispose(), HANDLE_CONFIG.DISPOSE_TIMEOUT_MS, 'HANDLE_DISPOSE_TIMEOUT');
 
                     cleanedCount++;
                     this.stats.handlesCleared++;
@@ -300,7 +296,7 @@ class HandleManager extends EventEmitter {
                     this.emit(HANDLE_EVENTS.HANDLE_CLEARED, {
                         cleanedCount,
                         remaining: this.activeHandles.length,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     });
                 } catch (disposeErr) {
                     errorsCount++;
@@ -315,7 +311,7 @@ class HandleManager extends EventEmitter {
                             error: disposeErr.message,
                             isTimeout: disposeErr.name === 'TimeoutError',
                             cleanedCount,
-                            remaining: this.activeHandles.length
+                            remaining: this.activeHandles.length,
                         });
                     }
                 }
@@ -339,7 +335,7 @@ class HandleManager extends EventEmitter {
                 errors: errorsCount,
                 timeout: false,
                 duration,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
 
             return { cleaned: cleanedCount, errors: errorsCount, timeout: false, duration };
@@ -367,7 +363,7 @@ class HandleManager extends EventEmitter {
                 remaining,
                 timeout,
                 duration,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
 
             // Esvazia array para liberar referências (GC do Puppeteer limpará)
@@ -412,11 +408,7 @@ class HandleManager extends EventEmitter {
         try {
             // FIXED (P0-1.3): Usa withTimeout para garantir cleanup do AbortController
             // Previne timeout leaks quando dispose() trava
-            await withTimeout(
-                () => handle.dispose(),
-                HANDLE_CONFIG.DISPOSE_TIMEOUT_MS,
-                'HANDLE_DISPOSE_TIMEOUT'
-            );
+            await withTimeout(() => handle.dispose(), HANDLE_CONFIG.DISPOSE_TIMEOUT_MS, 'HANDLE_DISPOSE_TIMEOUT');
 
             this.stats.handlesCleared++;
 
@@ -424,7 +416,7 @@ class HandleManager extends EventEmitter {
             this.emit(HANDLE_EVENTS.HANDLE_CLEARED, {
                 cleanedCount: this.stats.handlesCleared,
                 remaining: this.activeHandles.length,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
 
             log('DEBUG', `[HandleManager] Handle cleared (${this.activeHandles.length} remaining)`);
@@ -439,7 +431,7 @@ class HandleManager extends EventEmitter {
             this.emit(HANDLE_EVENTS.CLEANUP_ERROR, {
                 error: err.message,
                 isTimeout: err.code === 'TIMEOUT' || err.name === 'TimeoutError',
-                remaining: this.activeHandles.length
+                remaining: this.activeHandles.length,
             });
 
             // FIXED: Forçar dispose mesmo em timeout (best effort)
@@ -503,7 +495,7 @@ class HandleManager extends EventEmitter {
         return {
             ...this.stats,
             activeHandles: this.activeHandles.length,
-            config: { ...HANDLE_CONFIG }
+            config: { ...HANDLE_CONFIG },
         };
     }
 
@@ -534,7 +526,7 @@ class HandleManager extends EventEmitter {
     }
 }
 
- /**
+/**
  * Factory function para criar instância do HandleManager
  *
  * **Side-effects:** N/A
@@ -544,7 +536,7 @@ class HandleManager extends EventEmitter {
  * @param {object} driver - Instância do driver para gerenciar handles
  * @returns {HandleManager} Nova instância do HandleManager
  */
-export const create = (driver) => {
+export const create = driver => {
     return new HandleManager(driver);
 };
 

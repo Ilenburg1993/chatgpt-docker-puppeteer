@@ -12,7 +12,10 @@ import { insertTask } from '#infra/db/task_repo';
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
-    return path.join(dir, `maestro-wave18-cascade-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+    return path.join(
+        dir,
+        `maestro-wave18-cascade-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+    );
 }
 
 function makeTask(id, missionId, userMessage) {
@@ -57,9 +60,21 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
     const mission = createMission({ title: 'Wave18 Cascade', description: 'test' });
     updateMission(mission.id, { status: 'RUNNING' });
 
-    insertTask(makeTask('task-wave18-cascade-1', mission.id, 'pending'), { stage: 'READY', status: 'PENDING', actor: 'test' });
-    insertTask(makeTask('task-wave18-cascade-2', mission.id, 'running'), { stage: 'READY', status: 'RUNNING', actor: 'test' });
-    insertTask(makeTask('task-wave18-cascade-3', mission.id, 'done'), { stage: 'ARCHIVED', status: 'DONE', actor: 'test' });
+    insertTask(makeTask('task-wave18-cascade-1', mission.id, 'pending'), {
+        stage: 'READY',
+        status: 'PENDING',
+        actor: 'test',
+    });
+    insertTask(makeTask('task-wave18-cascade-2', mission.id, 'running'), {
+        stage: 'READY',
+        status: 'RUNNING',
+        actor: 'test',
+    });
+    insertTask(makeTask('task-wave18-cascade-3', mission.id, 'done'), {
+        stage: 'ARCHIVED',
+        status: 'DONE',
+        actor: 'test',
+    });
 
     const result = cancelMissionCommand({
         missionId: mission.id,

@@ -5,5 +5,7 @@ import { ensureInfrastructure } from './fs_utils.js';
 ensureInfrastructure();
 
 export * from './fs_utils.js';
+/** Reexport público: atomicWrite. */
 export { atomicWrite } from './atomic_write.js';
+/** Reexport público: safeReadJSON. */
 export { safeReadJSON } from './safe_read.js';

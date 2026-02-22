@@ -38,7 +38,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
      */
     function emitAck(envelope) {
         telemetry.emit('nerv:emission:attempt', {
-            kind: MessageType.ACK
+            kind: MessageType.ACK,
         });
 
         let normalized;
@@ -53,7 +53,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.ACK,
                 reason: 'estrutura',
-                message: error.message
+                message: error.message,
             });
             return;
         }
@@ -67,14 +67,14 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
 
         if (!accepted) {
             telemetry.emit('nerv:emission:enqueue_failed', {
-                kind: MessageType.ACK
+                kind: MessageType.ACK,
             });
             return;
         }
 
         // 5. Telemetria de sucesso técnico
         telemetry.emit('nerv:emission:success', {
-            kind: MessageType.ACK
+            kind: MessageType.ACK,
         });
     }
 
@@ -83,7 +83,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
   =========================== */
 
     return Object.freeze({
-        emitAck
+        emitAck,
     });
 }
 

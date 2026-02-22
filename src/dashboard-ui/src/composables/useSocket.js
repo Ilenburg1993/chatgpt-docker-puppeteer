@@ -39,7 +39,7 @@ function getSocketInstance(url = '', options = {}) {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             auth: cb => cb({ token: getDashboardToken() }),
-            ...options
+            ...options,
         });
     }
     return socketInstance;
@@ -108,14 +108,14 @@ export function useSocket(options = {}) {
             }
         });
 
-        socket.on('disconnect', (reason) => {
+        socket.on('disconnect', reason => {
             isConnected.value = false;
             if (import.meta.env.DEV) {
                 console.info('[Socket.io] Disconnected:', reason);
             }
         });
 
-        socket.on('connect_error', (err) => {
+        socket.on('connect_error', err => {
             error.value = err.message;
             isConnected.value = false;
             if (import.meta.env.DEV) {
@@ -123,7 +123,7 @@ export function useSocket(options = {}) {
             }
         });
 
-        socket.on('reconnect_attempt', (attempt) => {
+        socket.on('reconnect_attempt', attempt => {
             reconnectAttempts.value = attempt;
             if (import.meta.env.DEV) {
                 console.info('[Socket.io] Reconnect attempt:', attempt);
@@ -175,7 +175,7 @@ export function useSocket(options = {}) {
         disconnect,
         subscribe,
         unsubscribe,
-        emit
+        emit,
     };
 }
 

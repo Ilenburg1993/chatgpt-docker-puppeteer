@@ -355,6 +355,7 @@ function analyzeRuntimeBugs(results) {
 // EXECUÇÃO PRINCIPAL
 // ============================================================================
 
+/** Função exportada: huntRuntimeBugs. */
 async function main() {
     console.log('🐛 RUNTIME BUG HUNTER - Detecção de Bugs Críticos');
     console.log('=================================================\n');

@@ -43,7 +43,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         fileStream = fs.createReadStream(filePath, { signal });
         const rl = readline.createInterface({
             input: fileStream,
-            terminal: false
+            terminal: false,
         });
 
         // 4. LOOP DE VARREDURA (LINHA A LINHA)
@@ -59,7 +59,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
                 fileStream.destroy();
                 return {
                     ok: false,
-                    reason: `FORBIDDEN_CONTENT: Detectada recusa ou erro da IA: "${violation}"`
+                    reason: `FORBIDDEN_CONTENT: Detectada recusa ou erro da IA: "${violation}"`,
                 };
             }
 
@@ -76,7 +76,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         if (!shouldAccumulate && (formatRequired === 'json' || patternRequired)) {
             return {
                 ok: false,
-                reason: 'FILE_TOO_LARGE: Conteúdo excede o limite (1MB) para validação estrutural.'
+                reason: 'FILE_TOO_LARGE: Conteúdo excede o limite (1MB) para validação estrutural.',
             };
         }
 
@@ -113,7 +113,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
 
         return {
             ok: false,
-            reason: `VALIDATION_CRASH: Falha no motor de varredura. Erro: ${scanErr.message}`
+            reason: `VALIDATION_CRASH: Falha no motor de varredura. Erro: ${scanErr.message}`,
         };
     } finally {
         // [FIX] Garantia de fechamento de handle (Zero-Leak Policy)

@@ -73,7 +73,12 @@ function snapshotCpuTimes() {
         const times = cpu?.times;
         if (!times) continue;
         idle += Number(times.idle || 0);
-        total += Number(times.user || 0) + Number(times.nice || 0) + Number(times.sys || 0) + Number(times.idle || 0) + Number(times.irq || 0);
+        total +=
+            Number(times.user || 0) +
+            Number(times.nice || 0) +
+            Number(times.sys || 0) +
+            Number(times.idle || 0) +
+            Number(times.irq || 0);
     }
     if (total <= 0) return null;
     return { idle, total };
@@ -124,7 +129,7 @@ function getCPUStats() {
         usage_percent: usagePercent,
         load_1min: loadAvg[0].toFixed(2),
         load_5min: loadAvg[1].toFixed(2),
-        load_15min: loadAvg[2].toFixed(2)
+        load_15min: loadAvg[2].toFixed(2),
     };
 }
 
@@ -150,7 +155,7 @@ function getMemoryStats() {
         total_mb: Math.round(totalMem / 1024 / 1024),
         free_mb: Math.round(freeMem / 1024 / 1024),
         used_mb: Math.round(usedMem / 1024 / 1024),
-        usage_percent: Math.round((usedMem / totalMem) * 100)
+        usage_percent: Math.round((usedMem / totalMem) * 100),
     };
 }
 
@@ -176,7 +181,7 @@ function getSystemInfo() {
         hostname: os.hostname(),
         uptime_seconds: Math.round(os.uptime()),
         node_version: process.version,
-        pid: process.pid
+        pid: process.pid,
     };
 }
 
@@ -201,7 +206,7 @@ function getAllMetrics() {
         heap: getHeapStats(),
         memory: getMemoryStats(),
         cpu: getCPUStats(),
-        system: getSystemInfo()
+        system: getSystemInfo(),
     };
 }
 

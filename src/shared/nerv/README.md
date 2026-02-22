@@ -8,13 +8,15 @@
 
 ## 📋 VISÃO GERAL
 
-Este diretório contém a **linguagem universal** para comunicação entre todos os subsistemas da aplicação. É o **protocolo canônico** que substitui completamente o antigo IPC legado.
+Este diretório contém a **linguagem universal** para comunicação entre todos os subsistemas da
+aplicação. É o **protocolo canônico** que substitui completamente o antigo IPC legado.
 
 **Princípio arquitetural**:
 
 > "O NERV deve sempre, necessariamente, ser o 'veículo de transporte' de todo o sistema."
 
-**Todos os subsistemas** (KERNEL, DRIVER, SERVER, INFRA) comunicam-se **exclusivamente** através de envelopes NERV, sem acoplamento direto.
+**Todos os subsistemas** (KERNEL, DRIVER, SERVER, INFRA) comunicam-se **exclusivamente** através de
+envelopes NERV, sem acoplamento direto.
 
 ---
 
@@ -127,11 +129,11 @@ const { validateEnvelope } = require('../shared/nerv/schemas');
 
 ```javascript
 const envelope = createEnvelope({
-    actor: ActorRole.KERNEL,
-    target: ActorRole.DRIVER,
-    messageType: MessageType.COMMAND,
-    actionCode: ActionCode.TASK_START,
-    payload: { taskId: 'task-001', prompt: 'Pesquise sobre IA' }
+  actor: ActorRole.KERNEL,
+  target: ActorRole.DRIVER,
+  messageType: MessageType.COMMAND,
+  actionCode: ActionCode.TASK_START,
+  payload: { taskId: 'task-001', prompt: 'Pesquise sobre IA' },
 });
 ```
 
@@ -139,10 +141,10 @@ const envelope = createEnvelope({
 
 ```javascript
 try {
-    validateEnvelope(envelope);
-    console.log('Envelope válido!');
+  validateEnvelope(envelope);
+  console.log('Envelope válido!');
 } catch (error) {
-    console.error('[PROTOCOL VIOLATION]', error.message);
+  console.error('[PROTOCOL VIOLATION]', error.message);
 }
 ```
 
@@ -170,7 +172,7 @@ Erros detectados na **criação** (createEnvelope), não no transporte.
 
 - `msg_id`: UUID único do envelope
 - `correlation_id`: UUID da conversa/workflow
-    - Se omitido, `correlation_id = msg_id` (início de cadeia)
+  - Se omitido, `correlation_id = msg_id` (início de cadeia)
 
 ### **5. Extensibilidade Controlada**
 

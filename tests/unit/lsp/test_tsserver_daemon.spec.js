@@ -13,7 +13,7 @@ describe('TsserverDaemon', () => {
                 path.join(rootDir, 'jsconfig.json'),
                 JSON.stringify({
                     compilerOptions: { checkJs: true, allowJs: true, module: 'NodeNext', moduleResolution: 'NodeNext' },
-                    include: ['**/*.js']
+                    include: ['**/*.js'],
                 }),
                 'utf8'
             );
@@ -26,7 +26,7 @@ describe('TsserverDaemon', () => {
             const definitions = await daemon.execute('definition', {
                 filePath,
                 line: 2,
-                character: 13
+                character: 13,
             });
             assert.ok(Array.isArray(definitions));
             assert.ok(definitions.length >= 1);
@@ -34,7 +34,7 @@ describe('TsserverDaemon', () => {
             const references = await daemon.execute('references', {
                 filePath,
                 line: 2,
-                character: 13
+                character: 13,
             });
             assert.ok(Array.isArray(references));
             assert.ok(references.length >= 1);
@@ -42,7 +42,7 @@ describe('TsserverDaemon', () => {
             const hover = await daemon.execute('hover', {
                 filePath,
                 line: 2,
-                character: 13
+                character: 13,
             });
             assert.ok(hover);
             assert.ok(typeof hover.display === 'string');
@@ -72,14 +72,14 @@ describe('TsserverDaemon', () => {
                         filePath,
                         start: 0,
                         length: 5,
-                        newText: 'let  '
-                    }
-                ]
+                        newText: 'let  ',
+                    },
+                ],
             };
 
             const preview = await daemon.execute('apply_code_action', {
                 mode: 'preview',
-                action
+                action,
             });
             assert.strictEqual(preview.mode, 'preview');
             assert.strictEqual(preview.totalEdits, 1);
@@ -94,7 +94,7 @@ describe('TsserverDaemon', () => {
             const applied = await daemon.execute('apply_code_action', {
                 mode: 'apply',
                 action,
-                confirmationToken: 'ok-token'
+                confirmationToken: 'ok-token',
             });
             assert.strictEqual(applied.mode, 'apply');
             const text = await fs.readFile(filePath, 'utf8');

@@ -32,7 +32,7 @@ const PROTOCOL_VERSION = '2.0.0';
 const MessageType = Object.freeze({
     COMMAND: 'COMMAND', // Intenção declarada de ação futura
     EVENT: 'EVENT', // Observação registrada de algo ocorrido
-    ACK: 'ACK' // Confirmação técnica de transporte
+    ACK: 'ACK', // Confirmação técnica de transporte
 });
 
 /**
@@ -51,7 +51,6 @@ const ActionCode = Object.freeze({
     TASK_FAILED: 'TASK_FAILED', // Task execution failed
     TASK_REJECTED: 'TASK_REJECTED', // Task rejected by policy
     TASK_OBSERVED: 'TASK_OBSERVED', // Task observation event
-
 
     // ---- PROPOSAL / POLICY ----
     PROPOSE_TASK: 'PROPOSE_TASK', // Policy engine task proposal
@@ -165,7 +164,7 @@ const ActionCode = Object.freeze({
     MISSION_FAILED: 'MISSION_FAILED', // Mission failed
     MISSION_PAUSED: 'MISSION_PAUSED', // Mission paused
     MISSION_RESUMED: 'MISSION_RESUMED', // Mission resumed
-    MISSION_CANCELLED: 'MISSION_CANCELLED' // Mission cancelled by user
+    MISSION_CANCELLED: 'MISSION_CANCELLED', // Mission cancelled by user
 });
 
 /**
@@ -181,7 +180,7 @@ const ActorRole = Object.freeze({
     INFRA: 'INFRA',
     OBSERVER: 'OBSERVER',
     MAESTRO: 'MAESTRO', // Policy Engine (decision maker)
-    DRIVER: 'DRIVER' // Driver adapters (ChatGPT/Gemini)
+    DRIVER: 'DRIVER', // Driver adapters (ChatGPT/Gemini)
 });
 
 /**
@@ -196,7 +195,7 @@ const ChannelState = Object.freeze({
     HANDSHAKE: 'HANDSHAKE',
     ACTIVE: 'ACTIVE',
     DEGRADED: 'DEGRADED',
-    SILENT: 'SILENT'
+    SILENT: 'SILENT',
 });
 
 /**
@@ -211,7 +210,7 @@ const TechnicalCode = Object.freeze({
     REPLAYED: 'REPLAYED',
     DELIVERED: 'DELIVERED',
     DROPPED: 'DROPPED',
-    HANDSHAKE_FAILED: 'HANDSHAKE_FAILED'
+    HANDSHAKE_FAILED: 'HANDSHAKE_FAILED',
 });
 
 export { ActionCode, ActorRole, ChannelState, MessageType, PROTOCOL_VERSION, TechnicalCode };

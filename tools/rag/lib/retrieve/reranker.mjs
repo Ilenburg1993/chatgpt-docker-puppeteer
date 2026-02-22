@@ -19,13 +19,13 @@ export function rerank(results, query, options = {}) {
     const {
         intentScope: rawIntentScope = 'all',
         weights = {
-            semantic: 0.5,      // Base: vector distance (inverted)
-            lexical: 0.2,       // Exact term matches in text
-            recency: 0.1,       // Recent files (indexed_at)
-            fileType: 0.1,      // Code > config > docs
-            length: 0.05,       // Penalty for too short/long
-            position: 0.05      // Boost early chunks in file
-        }
+            semantic: 0.5, // Base: vector distance (inverted)
+            lexical: 0.2, // Exact term matches in text
+            recency: 0.1, // Recent files (indexed_at)
+            fileType: 0.1, // Code > config > docs
+            length: 0.05, // Penalty for too short/long
+            position: 0.05, // Boost early chunks in file
+        },
     } = options;
     const intentScope = normalizeIntentScope(rawIntentScope);
 
@@ -35,10 +35,12 @@ export function rerank(results, query, options = {}) {
     const queryTokens = tokenize(query.toLowerCase());
 
     // Find max indexed_at for recency calculation (convert BigInt to Number)
-    const maxIndexedAt = Math.max(...results.map(r => {
-        const ts = r.indexed_at;
-        return ts ? Number(ts) : 0;
-    }));
+    const maxIndexedAt = Math.max(
+        ...results.map(r => {
+            const ts = r.indexed_at;
+            return ts ? Number(ts) : 0;
+        })
+    );
 
     // Calculate rerank score for each result
     const scored = results.map(r => {
@@ -60,7 +62,7 @@ export function rerank(results, query, options = {}) {
         // 3. Recency score (newer files preferred)
         let recencyScore = 0;
         if (r.indexed_at && maxIndexedAt > 0) {
-            const ts = Number(r.indexed_at);  // Convert BigInt to Number
+            const ts = Number(r.indexed_at); // Convert BigInt to Number
             recencyScore = ts / maxIndexedAt;
             score += weights.recency * recencyScore;
         }
@@ -78,11 +80,11 @@ export function rerank(results, query, options = {}) {
             else if (contentClass === 'config') fileTypeScore = 0.8;
             else fileTypeScore = 0.2;
         } else if (r.language === 'javascript' || r.language === 'typescript') {
-            fileTypeScore = 1.0;  // Boost code files
+            fileTypeScore = 1.0; // Boost code files
         } else if (r.ext === '.json' || r.ext === '.yml' || r.ext === '.yaml') {
-            fileTypeScore = 0.5;  // Half boost for config
+            fileTypeScore = 0.5; // Half boost for config
         } else if (r.ext === '.md' || r.ext === '.txt') {
-            fileTypeScore = 0.3;  // Lower boost for docs
+            fileTypeScore = 0.3; // Lower boost for docs
         }
         score += weights.fileType * fileTypeScore;
         signals.fileType = fileTypeScore.toFixed(3);
@@ -104,7 +106,7 @@ export function rerank(results, query, options = {}) {
         return {
             ...r,
             rerank_score: score,
-            rerank_signals: signals
+            rerank_signals: signals,
         };
     });
 
@@ -123,6 +125,6 @@ export function rerank(results, query, options = {}) {
 function tokenize(text) {
     return text
         .split(/\s+/)
-        .filter(t => t.length > 2)  // Ignore very short tokens
-        .map(t => t.replace(/[^\w]/g, ''));  // Strip punctuation
+        .filter(t => t.length > 2) // Ignore very short tokens
+        .map(t => t.replace(/[^\w]/g, '')); // Strip punctuation
 }

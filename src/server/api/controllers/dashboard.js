@@ -13,6 +13,7 @@ import dashboardTasksRouter from './dashboard_tasks.js';
 import dashboardMissionsRouter from './dashboard_missions.js';
 import dashboardEventsRouter from './dashboard_events.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 const DASHBOARD_AUTH_PASSWORD_MIN_LENGTH = 12;
 let telemetryAggregatorPromise = null;
@@ -131,7 +132,10 @@ router.post('/auth/login', async (req, res) => {
             authUser = {
                 username: rbacUser.username,
                 role: rbacUser.role || 'viewer',
-                roles: Array.isArray(rbacUser.roles) && rbacUser.roles.length > 0 ? rbacUser.roles : [rbacUser.role || 'viewer'],
+                roles:
+                    Array.isArray(rbacUser.roles) && rbacUser.roles.length > 0
+                        ? rbacUser.roles
+                        : [rbacUser.role || 'viewer'],
                 permissions: Array.isArray(rbacUser.permissions) ? rbacUser.permissions : [],
             };
         }

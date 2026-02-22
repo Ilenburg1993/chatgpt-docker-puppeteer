@@ -8,24 +8,8 @@
       "connection lost",
       "error generating"
     ],
-    "close_actions": [
-      "ok",
-      "okay",
-      "next",
-      "close",
-      "dismiss",
-      "accept",
-      "skip",
-      "done",
-      "got it"
-    ],
-    "input_placeholders": [
-      "message",
-      "ask",
-      "prompt",
-      "type",
-      "search"
-    ]
+    "close_actions": ["ok", "okay", "next", "close", "dismiss", "accept", "skip", "done", "got it"],
+    "input_placeholders": ["message", "ask", "prompt", "type", "search"]
   },
   "pt": {
     "error_indicators": [
@@ -36,23 +20,8 @@
       "conexão perdida",
       "erro ao gerar"
     ],
-    "close_actions": [
-      "próximo",
-      "fechar",
-      "entendi",
-      "aceitar",
-      "pular",
-      "concluir",
-      "ok"
-    ],
-    "input_placeholders": [
-      "mensagem",
-      "pergunte",
-      "digite",
-      "conversar",
-      "envie",
-      "busca"
-    ]
+    "close_actions": ["próximo", "fechar", "entendi", "aceitar", "pular", "concluir", "ok"],
+    "input_placeholders": ["mensagem", "pergunte", "digite", "conversar", "envie", "busca"]
   },
   "blocked": [
     "search",

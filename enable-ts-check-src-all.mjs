@@ -8,9 +8,7 @@ const TS_CHECK_HEADER = '// @ts-check - Type checking rigoroso habilitado (arqui
 
 function shouldSkipDirectory(dir) {
     const basename = path.basename(dir);
-    return basename === 'dashboard-ui' ||
-           basename === 'node_modules' ||
-           basename === '.git';
+    return basename === 'dashboard-ui' || basename === 'node_modules' || basename === '.git';
 }
 
 function getAllJsFiles(dir, files = []) {

@@ -1,13 +1,14 @@
 # Análise: post-create.sh - Problemas de Idempotência e Reexecução
-**Data:** 03 de Fevereiro de 2026
-**Versão Script Atual:** v5.2.1
-**Status:** 🟡 PROBLEMA IDENTIFICADO - Correção Necessária
+
+**Data:** 03 de Fevereiro de 2026 **Versão Script Atual:** v5.2.1 **Status:** 🟡 PROBLEMA
+IDENTIFICADO - Correção Necessária
 
 ---
 
 ## 🔍 Problema Identificado
 
 ### Sintoma Reportado
+
 > "Quando o post-create dava erro após o container subir ele não rodava mais"
 
 ### Causa Raiz Confirmada
@@ -154,6 +155,7 @@ some_command_that_fails
 ### O Sistema JÁ SE RECUPERA, Mas Não Documenta
 
 **Linhas 428-431:**
+
 ```bash
 elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
     RUNTIME_MODE="replay"
@@ -162,6 +164,7 @@ elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
 ```
 
 **Isso significa:**
+
 1. ✅ Falhou na primeira vez → IN_PROGRESS fica órfão
 2. ✅ Segunda execução → Detecta IN_PROGRESS
 3. ✅ Mode = "replay" → Reexecução é AUTORIZADA
@@ -178,6 +181,7 @@ elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
 **Local:** Após linha 29 (logo após `set -euo pipefail`)
 
 **Implementação:**
+
 ```bash
 set -euo pipefail
 
@@ -227,6 +231,7 @@ trap cleanup_on_error ERR EXIT
 **Local:** Linhas 428-431
 
 **Antes:**
+
 ```bash
 elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
     RUNTIME_MODE="replay"
@@ -235,6 +240,7 @@ elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
 ```
 
 **Depois:**
+
 ```bash
 elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
     RUNTIME_MODE="replay"
@@ -262,6 +268,7 @@ elif [[ -f "${IN_PROGRESS_MARKER}" ]]; then
 **Local:** Antes da linha 1333 (antes do commit final)
 
 **Implementação:**
+
 ```bash
 # ---------------------------------------------------------------------------
 # 4 COMMIT FINAL DA TRANSAÇÃO DE BOOTSTRAP
@@ -405,9 +412,8 @@ cleanup_on_error() {
 
 ### Implementação Recomendada
 
-**Prioridade 1:** Trap Handler
-**Prioridade 2:** Logging de Replay
-**Prioridade 3:** Melhorias opcionais
+**Prioridade 1:** Trap Handler **Prioridade 2:** Logging de Replay **Prioridade 3:** Melhorias
+opcionais
 
 ### Teste Recomendado
 
@@ -428,4 +434,5 @@ exit 1  # TESTE: Forçar erro
 
 ---
 
-**Conclusão:** O sistema JÁ TEM a lógica de recovery (replay mode), mas falta logging adequado e trap handler para melhorar o diagnóstico e UX quando ocorrem erros.
+**Conclusão:** O sistema JÁ TEM a lógica de recovery (replay mode), mas falta logging adequado e
+trap handler para melhorar o diagnóstico e UX quando ocorrem erros.

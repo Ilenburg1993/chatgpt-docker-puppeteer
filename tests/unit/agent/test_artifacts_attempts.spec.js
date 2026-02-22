@@ -26,7 +26,12 @@ function makeDbPath() {
 }
 
 function makeArtifactsDir() {
-    const dir = path.join(process.cwd(), 'tmp', 'test-artifacts', `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const dir = path.join(
+        process.cwd(),
+        'tmp',
+        'test-artifacts',
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
 }
@@ -102,7 +107,9 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const worker = new QueueWorker({ kernel, workerId: 'w_test', intervalMs: 999999, maxConcurrentTasks: 1 });
         await worker.tick();
 
-        const taskRow = db.prepare('SELECT latest_attempt_id, latest_rendered_prompt_artifact_id FROM tasks WHERE id = ?').get(taskId);
+        const taskRow = db
+            .prepare('SELECT latest_attempt_id, latest_rendered_prompt_artifact_id FROM tasks WHERE id = ?')
+            .get(taskId);
         assert.ok(taskRow.latest_attempt_id, 'latest_attempt_id deve ser preenchido');
         assert.ok(taskRow.latest_rendered_prompt_artifact_id, 'latest_rendered_prompt_artifact_id deve ser preenchido');
 
@@ -221,7 +228,14 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const attemptId = 'att-planner-1';
         const responseText = JSON.stringify({
             proposals: [
-                { title: 't1', user_message: 'do x', target: 'auto', priority: 3, depends_on: [], tags: ['capitulo-1'] },
+                {
+                    title: 't1',
+                    user_message: 'do x',
+                    target: 'auto',
+                    priority: 3,
+                    depends_on: [],
+                    tags: ['capitulo-1'],
+                },
             ],
             needs_user_input: false,
             questions: [],
@@ -247,7 +261,12 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const count = db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(mission.id)?.c || 0;
         assert.ok(count >= 2, 'deve criar pelo menos uma nova task proposal na missão');
 
-        const rows = db.prepare("SELECT stage, status FROM tasks WHERE mission_id = ? AND id != ?").all(mission.id, plannerTaskId);
-        assert.ok(rows.some(r => r.stage === 'PROPOSED'), 'em LLM_SUGGEST, proposals devem entrar como PROPOSED');
+        const rows = db
+            .prepare('SELECT stage, status FROM tasks WHERE mission_id = ? AND id != ?')
+            .all(mission.id, plannerTaskId);
+        assert.ok(
+            rows.some(r => r.stage === 'PROPOSED'),
+            'em LLM_SUGGEST, proposals devem entrar como PROPOSED'
+        );
     });
 });

@@ -87,12 +87,7 @@
         <div v-if="alerts.length > 0" class="section alerts-section">
             <h2>Active Alerts ({{ alerts.length }})</h2>
             <div class="alerts-list">
-                <div
-                    v-for="alert in alerts"
-                    :key="alert.id"
-                    class="alert-item"
-                    :class="alert.severity"
-                >
+                <div v-for="alert in alerts" :key="alert.id" class="alert-item" :class="alert.severity">
                     <span class="alert-icon">{{ alert.severity === 'critical' ? '🚨' : '⚠️' }}</span>
                     <span class="alert-message">{{ alert.message }}</span>
                     <span class="alert-time">{{ formatTime(alert.triggered_at) }}</span>
@@ -149,7 +144,7 @@ export default {
             memoryUsage: telemetryStore.memoryUsage,
             cpuLoad: telemetryStore.cpuLoad,
             eventLoopLag: telemetryStore.eventLoopLag,
-            queueSize: telemetryStore.queueSize
+            queueSize: telemetryStore.queueSize,
         }));
 
         const taskCounts = computed(() => {
@@ -166,23 +161,23 @@ export default {
         const alerts = computed(() => systemStore.alerts);
         const components = computed(() => systemStore.componentsList);
         const system = computed(() => ({
-            uptimeFormatted: systemStore.uptimeFormatted
+            uptimeFormatted: systemStore.uptimeFormatted,
         }));
 
         // Methods
-        const getHealthClass = (value) => {
+        const getHealthClass = value => {
             if (value > 90) return 'critical';
             if (value > 70) return 'warning';
             return 'healthy';
         };
 
-        const getEventLoopClass = (value) => {
+        const getEventLoopClass = value => {
             if (value > 100) return 'critical';
             if (value > 50) return 'warning';
             return 'healthy';
         };
 
-        const formatTime = (timestamp) => {
+        const formatTime = timestamp => {
             if (!timestamp) return '';
             const date = new Date(timestamp);
             return date.toLocaleTimeString();
@@ -204,9 +199,9 @@ export default {
             telemetryStore,
             getHealthClass,
             getEventLoopClass,
-            formatTime
+            formatTime,
         };
-    }
+    },
 };
 </script>
 
@@ -256,8 +251,13 @@ export default {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 /* Metrics Grid */
@@ -275,7 +275,7 @@ export default {
     padding: 20px;
     background: white;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border-left: 4px solid #3498db;
 }
 
@@ -330,7 +330,7 @@ export default {
     padding: 20px;
     background: white;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     text-align: center;
 }
 
@@ -373,7 +373,7 @@ export default {
     padding: 16px;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .health-card.healthy {
@@ -384,11 +384,13 @@ export default {
     border-left: 4px solid #f59e0b;
 }
 
-.health-card.critical, .health-card.error {
+.health-card.critical,
+.health-card.error {
     border-left: 4px solid #ef4444;
 }
 
-.health-card.unknown, .health-card.degraded {
+.health-card.unknown,
+.health-card.degraded {
     border-left: 4px solid #94a3b8;
 }
 
@@ -467,7 +469,7 @@ export default {
     padding: 16px;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .info-label {

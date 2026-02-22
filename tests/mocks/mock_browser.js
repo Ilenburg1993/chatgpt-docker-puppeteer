@@ -30,7 +30,7 @@ function criarPaginaMock() {
                     this[key].resetHistory();
                 }
             });
-        }
+        },
     };
 }
 
@@ -57,7 +57,7 @@ function criarBrowserMock() {
             this.pages.resetHistory();
             this.close.resetHistory();
             this._pagina.limpar();
-        }
+        },
     };
 }
 
@@ -74,7 +74,7 @@ function criarBrowserPoolMock() {
         getStats: sinon.stub().returns({
             total: 1,
             available: 1,
-            inUse: 0
+            inUse: 0,
         }),
 
         // Referência ao browser
@@ -86,7 +86,7 @@ function criarBrowserPoolMock() {
             this.release.resetHistory();
             this.closeAll.resetHistory();
             this._browser.limpar();
-        }
+        },
     };
 }
 
@@ -103,7 +103,7 @@ function criarConnectionOrchestratorMock() {
         limpar: function () {
             this.connect.resetHistory();
             this.disconnect.resetHistory();
-        }
+        },
     };
 }
 

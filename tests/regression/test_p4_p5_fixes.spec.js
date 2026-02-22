@@ -8,7 +8,7 @@ const colors = {
     red: '\x1b[31m',
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
-    cyan: '\x1b[36m'
+    cyan: '\x1b[36m',
 };
 
 function log(type, message) {
@@ -34,26 +34,34 @@ async function test1_StabilizerCleanup() {
 
     log('INFO', 'Verificando código do stabilizer.js...');
 
-    const stabilizerPath = path.join(import.meta.dirname, '..', '..', 'src', 'shared', 'page_stability', 'stabilizer.js');
+    const stabilizerPath = path.join(
+        import.meta.dirname,
+        '..',
+        '..',
+        'src',
+        'shared',
+        'page_stability',
+        'stabilizer.js'
+    );
     const content = await fs.readFile(stabilizerPath, 'utf-8');
 
     const checks = [
         {
             name: 'Registra observers globalmente',
-            pass: content.includes('__STABILIZER_OBSERVERS')
+            pass: content.includes('__STABILIZER_OBSERVERS'),
         },
         {
             name: 'Cleanup local em finally',
-            pass: content.includes('finally {') && content.includes('observers.forEach')
+            pass: content.includes('finally {') && content.includes('observers.forEach'),
         },
         {
             name: 'Force cleanup global com best-effort',
-            pass: content.includes('window.__STABILIZER_OBSERVERS') && content.includes('.catch(() => {})')
+            pass: content.includes('window.__STABILIZER_OBSERVERS') && content.includes('.catch(() => {})'),
         },
         {
             name: 'Desconecta observers explicitamente',
-            pass: content.includes('obs.disconnect')
-        }
+            pass: content.includes('obs.disconnect'),
+        },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -80,20 +88,20 @@ async function test2_ServerShutdown() {
     const checks = [
         {
             name: 'Chama reconciler.stop()',
-            pass: content.includes("reconciler.stop")
+            pass: content.includes('reconciler.stop'),
         },
         {
             name: 'Chama hardwareTelemetry.stop()',
-            pass: content.includes('hardwareTelemetry.stop')
+            pass: content.includes('hardwareTelemetry.stop'),
         },
         {
             name: 'Tem error handling para reconciler',
-            pass: content.includes('Erro ao parar reconciler')
+            pass: content.includes('Erro ao parar reconciler'),
         },
         {
             name: 'Tem fallback de import/stop para telemetria',
-            pass: content.includes('hardwareTelemetry.stop falhou') || content.includes('hardwareTelemetry.stop threw')
-        }
+            pass: content.includes('hardwareTelemetry.stop falhou') || content.includes('hardwareTelemetry.stop threw'),
+        },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -120,24 +128,24 @@ async function test3_SignalGuard() {
     const checks = [
         {
             name: 'Guarda por _shutdownPromise declarada',
-            pass: content.includes('let _shutdownPromise = null')
+            pass: content.includes('let _shutdownPromise = null'),
         },
         {
             name: 'Guard check no início do triggerShutdown',
-            pass: content.includes('if (_shutdownPromise)')
+            pass: content.includes('if (_shutdownPromise)'),
         },
         {
             name: 'Signals concorrentes reutilizam mesma Promise',
-            pass: content.includes('shutdown já em andamento')
+            pass: content.includes('shutdown já em andamento'),
         },
         {
             name: 'Promise é criada como IIFE',
-            pass: content.includes('_shutdownPromise = (async () =>')
+            pass: content.includes('_shutdownPromise = (async () =>'),
         },
         {
             name: 'SIGHUP também tem guard',
-            pass: content.includes('SIGHUP') && content.includes('shutdown em andamento')
-        }
+            pass: content.includes('SIGHUP') && content.includes('shutdown em andamento'),
+        },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -158,30 +166,38 @@ async function test4_KernelLocking() {
 
     log('INFO', 'Verificando task_runtime.js...');
 
-    const taskRuntimePath = path.join(import.meta.dirname, '..', '..', 'src', 'kernel', 'task_runtime', 'task_runtime.js');
+    const taskRuntimePath = path.join(
+        import.meta.dirname,
+        '..',
+        '..',
+        'src',
+        'kernel',
+        'task_runtime',
+        'task_runtime.js'
+    );
     const content = await fs.readFile(taskRuntimePath, 'utf-8');
 
     const checks = [
         {
             name: 'P5.1 FIX presente',
-            pass: content.includes('P5.1 FIX')
+            pass: content.includes('P5.1 FIX'),
         },
         {
             name: 'expectedState capturado early',
-            pass: content.includes('const expectedState = task.state')
+            pass: content.includes('const expectedState = task.state'),
         },
         {
             name: 'Race detection check',
-            pass: content.includes('if (task.state !== expectedState)')
+            pass: content.includes('if (task.state !== expectedState)'),
         },
         {
             name: 'RACE error message',
-            pass: content.includes('[RACE]') && content.includes('State changed during transition')
+            pass: content.includes('[RACE]') && content.includes('State changed during transition'),
         },
         {
             name: 'usa expectedState no history',
-            pass: content.includes('from: expectedState')
-        }
+            pass: content.includes('from: expectedState'),
+        },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -233,16 +249,16 @@ async function test5_CacheInvalidation() {
     const checks = [
         {
             name: 'saveTask: markDirty ANTES de taskStore.saveTask',
-            pass: saveTaskOrderCorrect
+            pass: saveTaskOrderCorrect,
         },
         {
             name: 'deleteTask: markDirty ANTES de taskStore.deleteTask',
-            pass: deleteTaskOrderCorrect
+            pass: deleteTaskOrderCorrect,
         },
         {
             name: 'Invalidação antecipada documentada',
-            pass: content.includes('Invalida primeiro')
-        }
+            pass: content.includes('Invalida primeiro'),
+        },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -290,7 +306,7 @@ async function test6_ConcurrentSignals() {
         gracefulShutdown('SIGINT'),
         gracefulShutdown('SIGTERM'),
         gracefulShutdown('SIGINT'),
-        gracefulShutdown('SIGTERM')
+        gracefulShutdown('SIGTERM'),
     ]);
 
     const successCalls = results.filter(r => r).length;
@@ -303,7 +319,7 @@ async function test6_ConcurrentSignals() {
         { name: 'Apenas 1 shutdown executou', pass: shutdownCalls === 1 },
         { name: '1 chamada retornou true', pass: successCalls === 1 },
         { name: '4 chamadas bloqueadas', pass: blockedCalls === 4 },
-        { name: 'Flag ativada', pass: _shutdownInProgress === true }
+        { name: 'Flag ativada', pass: _shutdownInProgress === true },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -327,7 +343,7 @@ async function test7_OptimisticLock() {
     // Mock task
     const task = {
         id: 'test-001',
-        state: 'ACTIVE'
+        state: 'ACTIVE',
     };
 
     const applyTransition = (expectedState, newState) => {
@@ -391,7 +407,7 @@ async function runAllTests() {
         test4: await test4_KernelLocking(),
         test5: await test5_CacheInvalidation(),
         test6: await test6_ConcurrentSignals(),
-        test7: await test7_OptimisticLock()
+        test7: await test7_OptimisticLock(),
     };
 
     summary('                    SUMÁRIO DOS TESTES                        ');

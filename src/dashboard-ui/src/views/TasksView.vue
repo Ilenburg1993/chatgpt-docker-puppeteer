@@ -63,7 +63,9 @@ function resolveReason(defaultReason, errorMessage) {
     const typed = String(bulkReason.value || '').trim();
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-        const prompted = String(window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '').trim();
+        const prompted = String(
+            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || ''
+        ).trim();
         if (prompted) {
             bulkReason.value = prompted;
             return prompted;
@@ -176,7 +178,15 @@ async function createTask() {
         }
         await store.createTask(taskPayload, reason);
         showCreate.value = false;
-        createForm.value = { stage: 'READY', mission_id: '', target: 'auto', model: '', priority: 5, system_message: '', user_message: '' };
+        createForm.value = {
+            stage: 'READY',
+            mission_id: '',
+            target: 'auto',
+            model: '',
+            priority: 5,
+            system_message: '',
+            user_message: '',
+        };
         await refresh();
     } finally {
         creating.value = false;
@@ -204,10 +214,20 @@ onMounted(async () => {
             </div>
         </div>
 
-        <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-7 gap-3">
-            <Input v-model="store.filters.search" placeholder="Buscar (id/prompt)..." @keyup.enter="refresh" class="md:col-span-2" />
+        <div
+            class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-7 gap-3"
+        >
+            <Input
+                v-model="store.filters.search"
+                placeholder="Buscar (id/prompt)..."
+                @keyup.enter="refresh"
+                class="md:col-span-2"
+            />
             <Input v-model="store.filters.mission_id" placeholder="Filtrar por mission_id..." @keyup.enter="refresh" />
-            <select v-model="store.filters.status" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+            <select
+                v-model="store.filters.status"
+                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+            >
                 <option :value="null">Status (todos)</option>
                 <option value="PENDING">PENDING</option>
                 <option value="RUNNING">RUNNING</option>
@@ -217,7 +237,10 @@ onMounted(async () => {
                 <option value="CANCELLED">CANCELLED</option>
                 <option value="BLOCKED">BLOCKED</option>
             </select>
-            <select v-model="store.filters.stage" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+            <select
+                v-model="store.filters.stage"
+                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+            >
                 <option :value="null">Stage (todos)</option>
                 <option value="DRAFT">DRAFT</option>
                 <option value="PROPOSED">PROPOSED</option>
@@ -225,7 +248,10 @@ onMounted(async () => {
                 <option value="REJECTED">REJECTED</option>
                 <option value="ARCHIVED">ARCHIVED</option>
             </select>
-            <select v-model="store.filters.target" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+            <select
+                v-model="store.filters.target"
+                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+            >
                 <option :value="null">Target (todos)</option>
                 <option value="auto">auto</option>
                 <option value="chatgpt">chatgpt</option>
@@ -233,7 +259,10 @@ onMounted(async () => {
                 <option value="claude">claude</option>
                 <option value="ollama">ollama</option>
             </select>
-            <select v-model="store.filters.blocked" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+            <select
+                v-model="store.filters.blocked"
+                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+            >
                 <option :value="null">Bloqueio (todos)</option>
                 <option :value="true">Somente bloqueadas</option>
                 <option :value="false">Sem bloqueio</option>
@@ -247,12 +276,18 @@ onMounted(async () => {
             {{ store.error }}
         </div>
 
-        <div v-if="selectedIds.size > 0" class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 flex flex-col md:flex-row md:items-center gap-3">
+        <div
+            v-if="selectedIds.size > 0"
+            class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 flex flex-col md:flex-row md:items-center gap-3"
+        >
             <div class="text-sm text-slate-200">
                 Selecionadas: <span class="font-mono">{{ selectedIds.size }}</span>
             </div>
             <div class="flex-1 flex flex-col md:flex-row gap-2">
-                <select v-model="bulkAction" class="w-full md:w-64 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                <select
+                    v-model="bulkAction"
+                    class="w-full md:w-64 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                >
                     <option value="pause">Pausar</option>
                     <option value="resume">Retomar</option>
                     <option value="unblock">Desbloquear</option>
@@ -261,14 +296,17 @@ onMounted(async () => {
                     <option value="approve">Aprovar (PROPOSED→READY)</option>
                     <option value="reject">Rejeitar (PROPOSED→REJECTED)</option>
                     <option value="set_stage">Definir stage</option>
-                <option value="set_target">Definir target</option>
-                <option value="set_priority">Definir prioridade</option>
-                <option value="set_execute_after">Agendar (execute_after_ms)</option>
-                <option value="reassign_mission">Reatribuir missão</option>
-            </select>
+                    <option value="set_target">Definir target</option>
+                    <option value="set_priority">Definir prioridade</option>
+                    <option value="set_execute_after">Agendar (execute_after_ms)</option>
+                    <option value="reassign_mission">Reatribuir missão</option>
+                </select>
 
                 <template v-if="bulkAction === 'set_stage'">
-                    <select v-model="bulkStage" class="w-full md:w-48 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                    <select
+                        v-model="bulkStage"
+                        class="w-full md:w-48 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    >
                         <option value="DRAFT">DRAFT</option>
                         <option value="PROPOSED">PROPOSED</option>
                         <option value="READY">READY</option>
@@ -278,7 +316,10 @@ onMounted(async () => {
                 </template>
 
                 <template v-else-if="bulkAction === 'set_target'">
-                    <select v-model="bulkTarget" class="w-full md:w-48 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                    <select
+                        v-model="bulkTarget"
+                        class="w-full md:w-48 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    >
                         <option value="auto">auto</option>
                         <option value="chatgpt">chatgpt</option>
                         <option value="gemini">gemini</option>
@@ -288,14 +329,28 @@ onMounted(async () => {
                 </template>
 
                 <template v-else-if="bulkAction === 'set_priority'">
-                    <input v-model.number="bulkPriority" type="number" min="0" max="10" class="w-full md:w-32 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <input
+                        v-model.number="bulkPriority"
+                        type="number"
+                        min="0"
+                        max="10"
+                        class="w-full md:w-32 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </template>
 
                 <template v-else-if="bulkAction === 'set_execute_after'">
-                    <input v-model="bulkExecuteAfterMs" type="number" placeholder="ms (null=agora)" class="w-full md:w-56 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <input
+                        v-model="bulkExecuteAfterMs"
+                        type="number"
+                        placeholder="ms (null=agora)"
+                        class="w-full md:w-56 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </template>
                 <template v-else-if="bulkAction === 'reassign_mission'">
-                    <select v-model="bulkMissionId" class="w-full md:w-72 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                    <select
+                        v-model="bulkMissionId"
+                        class="w-full md:w-72 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    >
                         <option value="">Selecione missão destino...</option>
                         <option v-for="m in missionOptions" :key="m.id" :value="m.id">
                             {{ m.title || m.id }} ({{ m.status }})
@@ -304,13 +359,19 @@ onMounted(async () => {
                 </template>
             </div>
             <div class="w-full md:w-72">
-                <input v-model="bulkReason" type="text" placeholder="Motivo obrigatório (audit trail)" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                <input
+                    v-model="bulkReason"
+                    type="text"
+                    placeholder="Motivo obrigatório (audit trail)"
+                    class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                />
             </div>
             <div class="flex justify-end">
                 <Button variant="primary" size="sm" @click="runBulk">Aplicar</Button>
             </div>
             <div v-if="bulkEligibilityPreview" class="w-full text-xs text-slate-300 md:col-span-6">
-                Preview reassign: elegíveis {{ bulkEligibilityPreview.eligible }}/{{ bulkEligibilityPreview.total }} · bloqueadas {{ bulkEligibilityPreview.blocked }}.
+                Preview reassign: elegíveis {{ bulkEligibilityPreview.eligible }}/{{ bulkEligibilityPreview.total }} ·
+                bloqueadas {{ bulkEligibilityPreview.blocked }}.
             </div>
         </div>
 
@@ -319,7 +380,11 @@ onMounted(async () => {
                 <thead class="bg-slate-900/60 text-slate-300">
                     <tr>
                         <th class="p-3 w-10">
-                            <input type="checkbox" :checked="selectedIds.size === items.length && items.length > 0" @change="toggleAll" />
+                            <input
+                                type="checkbox"
+                                :checked="selectedIds.size === items.length && items.length > 0"
+                                @change="toggleAll"
+                            />
                         </th>
                         <th class="p-3 text-left">ID</th>
                         <th class="p-3 text-left">Prompt</th>
@@ -341,15 +406,24 @@ onMounted(async () => {
                         </td>
                         <td class="p-3 text-slate-300">
                             <div class="max-w-[36rem] truncate">{{ t.spec_user_message_preview }}</div>
-                            <div v-if="t.blocked_reason" class="text-xs text-amber-300 mt-1">BLOCKED: {{ t.blocked_reason }}</div>
+                            <div v-if="t.blocked_reason" class="text-xs text-amber-300 mt-1">
+                                BLOCKED: {{ t.blocked_reason }}
+                            </div>
                         </td>
-                        <td class="p-3"><Badge size="sm">{{ t.stage }}</Badge></td>
-                        <td class="p-3"><Badge size="sm" :variant="statusVariant(t.unified_status)">{{ t.unified_status }}</Badge></td>
+                        <td class="p-3">
+                            <Badge size="sm">{{ t.stage }}</Badge>
+                        </td>
+                        <td class="p-3">
+                            <Badge size="sm" :variant="statusVariant(t.unified_status)">{{ t.unified_status }}</Badge>
+                        </td>
                         <td class="p-3 font-mono text-slate-300">{{ t.target }}</td>
                         <td class="p-3 font-mono text-slate-300">{{ t.priority }}</td>
                         <td class="p-3">
                             <div v-if="t.mission_ref?.id" class="text-xs">
-                                <button class="font-mono text-sky-300 hover:underline" @click.stop="router.push(`/missions/${t.mission_ref.id}`)">
+                                <button
+                                    class="font-mono text-sky-300 hover:underline"
+                                    @click.stop="router.push(`/missions/${t.mission_ref.id}`)"
+                                >
                                     {{ t.mission_ref.title || t.mission_ref.id }}
                                 </button>
                                 <div class="text-slate-400 font-mono">{{ t.mission_ref.id }}</div>
@@ -359,12 +433,53 @@ onMounted(async () => {
                         </td>
                         <td class="p-3 text-right">
                             <div class="flex justify-end gap-2">
-                                <Button variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="router.push(`/tasks/${t.id}`)">Abrir</Button>
-                                <Button v-if="t.command_caps?.can_pause" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'pause')">Pausar</Button>
-                                <Button v-if="t.command_caps?.can_resume" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'resume')">Retomar</Button>
-                                <Button v-if="t.command_caps?.can_unblock" variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'unblock')">Desbloquear</Button>
-                                <Button v-if="t.command_caps?.can_retry" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'retry')">Reexecutar</Button>
-                                <Button v-if="t.command_caps?.can_cancel" variant="danger" size="sm" class="h-7 px-2 text-xs" @click="quickAction(t.id, 'cancel')">Cancelar</Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-7 px-2 text-xs"
+                                    @click="router.push(`/tasks/${t.id}`)"
+                                    >Abrir</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_pause"
+                                    variant="secondary"
+                                    size="sm"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickAction(t.id, 'pause')"
+                                    >Pausar</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_resume"
+                                    variant="secondary"
+                                    size="sm"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickAction(t.id, 'resume')"
+                                    >Retomar</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_unblock"
+                                    variant="secondary"
+                                    size="sm"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickAction(t.id, 'unblock')"
+                                    >Desbloquear</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_retry"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickAction(t.id, 'retry')"
+                                    >Reexecutar</Button
+                                >
+                                <Button
+                                    v-if="t.command_caps?.can_cancel"
+                                    variant="danger"
+                                    size="sm"
+                                    class="h-7 px-2 text-xs"
+                                    @click="quickAction(t.id, 'cancel')"
+                                    >Cancelar</Button
+                                >
                             </div>
                         </td>
                     </tr>
@@ -383,16 +498,27 @@ onMounted(async () => {
             <div class="space-y-4">
                 <div>
                     <label class="text-sm text-slate-300">User message</label>
-                    <textarea v-model="createForm.user_message" rows="4" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <textarea
+                        v-model="createForm.user_message"
+                        rows="4"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </div>
                 <div>
                     <label class="text-sm text-slate-300">System message</label>
-                    <textarea v-model="createForm.system_message" rows="2" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <textarea
+                        v-model="createForm.system_message"
+                        rows="2"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label class="text-sm text-slate-300">Stage</label>
-                        <select v-model="createForm.stage" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                        <select
+                            v-model="createForm.stage"
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        >
                             <option value="READY">READY</option>
                             <option value="DRAFT">DRAFT</option>
                             <option value="PROPOSED">PROPOSED</option>
@@ -400,7 +526,10 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="text-sm text-slate-300">Target</label>
-                        <select v-model="createForm.target" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                        <select
+                            v-model="createForm.target"
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        >
                             <option value="auto">auto</option>
                             <option value="chatgpt">chatgpt</option>
                             <option value="gemini">gemini</option>
@@ -410,7 +539,13 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="text-sm text-slate-300">Prioridade</label>
-                        <input v-model.number="createForm.priority" type="number" min="0" max="10" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                        <input
+                            v-model.number="createForm.priority"
+                            type="number"
+                            min="0"
+                            max="10"
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                        />
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">

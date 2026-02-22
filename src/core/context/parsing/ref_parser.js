@@ -57,7 +57,7 @@ function parseReferences(text) {
     return Array.from(text.matchAll(regex)).map(match => ({
         fullMatch: match[0], // A tag completa para substituição
         criteria: match[1], // ID, LAST ou TAG:name
-        transform: (match[2] || 'RAW').toUpperCase() // Transformador (Default: RAW)
+        transform: (match[2] || 'RAW').toUpperCase(), // Transformador (Default: RAW)
     }));
 }
 

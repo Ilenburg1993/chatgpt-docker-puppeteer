@@ -9,6 +9,7 @@ import TargetDriver from './TargetDriver.js';
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
 ========================================================================== */
 
+/** Constante/valor exportado: BASEDRIVER_CONFIG. */
 const BASEDRIVER_CONFIG = Object.freeze({
     // Retry Strategy
     MAX_RETRY_ATTEMPTS: 4,
@@ -25,26 +26,27 @@ const BASEDRIVER_CONFIG = Object.freeze({
     MODULE_INSTANTIATION_TIMEOUT_MS: 3000,
 
     // Domain Tracking
-    DOMAIN_UPDATE_INTERVAL_MS: 30000
+    DOMAIN_UPDATE_INTERVAL_MS: 30000,
 });
 
 /* ==========================================================================
    ERROR CLASSIFICATION (v2.0)
 ========================================================================== */
 
+/** Constante/valor exportado: ERROR_CLASSES. */
 const ERROR_CLASSES = Object.freeze({
-    ABORT: 'ABORT',           // User cancellation
-    FATAL: 'FATAL',           // Non-recoverable
-    TIMEOUT: 'TIMEOUT',       // Time-based failures
-    SELECTOR: 'SELECTOR',     // DOM/selector issues
-    TRANSIENT: 'TRANSIENT'    // Retryable errors
+    ABORT: 'ABORT', // User cancellation
+    FATAL: 'FATAL', // Non-recoverable
+    TIMEOUT: 'TIMEOUT', // Time-based failures
+    SELECTOR: 'SELECTOR', // DOM/selector issues
+    TRANSIENT: 'TRANSIENT', // Retryable errors
 });
 
 const ERROR_PATTERNS = Object.freeze({
     [ERROR_CLASSES.ABORT]: ['OPERATION_ABORTED'],
     [ERROR_CLASSES.FATAL]: ['TARGET_CLOSED', 'PAGE_DESTROYED', 'Browser closed'],
     [ERROR_CLASSES.TIMEOUT]: ['timeout', 'Navigation timeout', 'waitForSelector', 'Waiting failed'],
-    [ERROR_CLASSES.SELECTOR]: ['No node found', 'selector', 'querySelector', 'failed to find element']
+    [ERROR_CLASSES.SELECTOR]: ['No node found', 'selector', 'querySelector', 'failed to find element'],
 });
 
 import { BiomechanicsEngine } from '../modules/biomechanics_engine.js';
@@ -54,6 +56,7 @@ import { InputResolver } from '../modules/input_resolver.js';
 import { RecoverySystem } from '../modules/recovery_system.js';
 import { SubmissionController } from '../modules/submission_controller.js';
 
+/** Classe exportada: default. */
 class BaseDriver extends TargetDriver {
     /** @type {string} */
     name = '';
@@ -391,13 +394,13 @@ class BaseDriver extends TargetDriver {
             typeof taskId === 'string'
                 ? taskId
                 : taskId && typeof taskId === 'object' && typeof taskId.taskId === 'string'
-                    ? taskId.taskId
-                    : 'task-unknown';
+                  ? taskId.taskId
+                  : 'task-unknown';
 
         // ✅ v2.0: Timing metrics
         const startTime = Date.now();
         const timings = {};
-        let stepStart;  // ✅ BUG FIX: Declare stepStart to avoid global implicit variable
+        let stepStart; // ✅ BUG FIX: Declare stepStart to avoid global implicit variable
 
         // ✅ Phase 2 (P1-U1): Record turn start
         const turnNumber = this.sessionTracker.recordTurn();
@@ -427,7 +430,8 @@ class BaseDriver extends TargetDriver {
 
         timings.readinessCheck = Date.now() - stepStart;
 
-        const checksObj = readiness && typeof readiness.checks === 'object' && readiness.checks !== null ? readiness.checks : {};
+        const checksObj =
+            readiness && typeof readiness.checks === 'object' && readiness.checks !== null ? readiness.checks : {};
         const checksValues = Object.values(checksObj);
         const checksPass = checksValues.filter(Boolean).length;
         const checksFail = checksValues.length - checksPass;
@@ -501,7 +505,11 @@ class BaseDriver extends TargetDriver {
                 // CHECK DE INTERRUPÇÃO ENTRE TENTATIVAS
                 // ================================================================
                 if (signal?.aborted) {
-                    this._emitVital('EXECUTION_ABORTED', { stage: 'retry-loop', attempt: attempts, taskId: resolvedTaskId });
+                    this._emitVital('EXECUTION_ABORTED', {
+                        stage: 'retry-loop',
+                        attempt: attempts,
+                        taskId: resolvedTaskId,
+                    });
                     throw new Error('OPERATION_ABORTED');
                 }
 
@@ -797,4 +805,4 @@ export { BASEDRIVER_CONFIG };
  *
  * @type {Object<string, string>}
  */
-    export { ERROR_CLASSES };
+export { ERROR_CLASSES };

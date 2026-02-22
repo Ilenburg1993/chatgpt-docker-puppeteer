@@ -16,14 +16,14 @@ describe('Feedback Flow Integration Tests', () => {
     const mockKernel = {
         executeTask: async (task, correlationId) => {
             return { status: 'queued', task_id: task.meta.id };
-        }
+        },
     };
 
     const mockNERV = {
         onReceive: () => {},
         emit: () => {},
         emitCommand: () => {},
-        emitEvent: () => {}
+        emitEvent: () => {},
     };
 
     before(async () => {
@@ -37,7 +37,7 @@ describe('Feedback Flow Integration Tests', () => {
             kernel: mockKernel,
             nerv: mockNERV,
             contextManager,
-            feedbackProcessor
+            feedbackProcessor,
         });
 
         await missionManager.initialize();
@@ -59,8 +59,8 @@ describe('Feedback Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Feedback Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             testMissionId = mission.id;
@@ -137,8 +137,8 @@ describe('Feedback Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Injection Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             testMissionId = mission.id;
@@ -201,8 +201,8 @@ describe('Feedback Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Memory Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             testMissionId = mission.id;
@@ -244,14 +244,14 @@ describe('Feedback Flow Integration Tests', () => {
                 title: 'Mission 1',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Topic 1', num_chapters: 5 }
+                params: { topic: 'Topic 1', num_chapters: 5 },
             });
 
             const mission2 = await missionManager.createMission({
                 title: 'Mission 2',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Topic 2', num_chapters: 5 }
+                params: { topic: 'Topic 2', num_chapters: 5 },
             });
 
             await missionManager.addFeedback(mission1.id, 'Add examples for mission 1');
@@ -273,7 +273,7 @@ describe('Feedback Flow Integration Tests', () => {
                 title: 'Test Mission',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Categories', num_chapters: 5 }
+                params: { topic: 'Categories', num_chapters: 5 },
             });
 
             testMissionId = mission.id;

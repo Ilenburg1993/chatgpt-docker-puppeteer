@@ -116,7 +116,7 @@ class SupervisorReconciler {
                 prescription.command,
                 {
                     ...prescription.params,
-                    correlation_id: correlationId // Preserva o Fio de Ariadne para rastreabilidade
+                    correlation_id: correlationId, // Preserva o Fio de Ariadne para rastreabilidade
                 },
                 robotId
             );
@@ -132,7 +132,7 @@ class SupervisorReconciler {
             ActionCode.ENGINE_RESUME,
             {
                 reason: 'RECONCILER_HEARTBEAT_RECOVERY',
-                correlation_id: `sys-rec-${Date.now()}`
+                correlation_id: `sys-rec-${Date.now()}`,
             },
             robotId
         );
@@ -162,4 +162,5 @@ class SupervisorReconciler {
     }
 }
 
+/** Reexport público: default. */
 export default new SupervisorReconciler();

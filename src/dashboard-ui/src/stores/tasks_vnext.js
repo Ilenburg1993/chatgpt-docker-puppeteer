@@ -29,7 +29,8 @@ function _buildQueryParams(filters, cursor, limit) {
     if (search) params.search = search;
     if (blocked === true) params.blocked = true;
     if (blocked === false) params.blocked = false;
-    if (priorityGte !== null && priorityGte !== undefined && String(priorityGte) !== '') params.priority_gte = priorityGte;
+    if (priorityGte !== null && priorityGte !== undefined && String(priorityGte) !== '')
+        params.priority_gte = priorityGte;
 
     return params;
 }
@@ -67,6 +68,7 @@ async function _dispatchControlCommand(command, payload) {
     return res.data;
 }
 
+/** Constante/valor exportado: useTasksVNextStore. */
 export const useTasksVNextStore = defineStore('tasks_vnext', {
     state: () => ({
         items: /** @type {any[]} */ ([]),

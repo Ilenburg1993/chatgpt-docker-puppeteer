@@ -11,9 +11,7 @@ export const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text:latest';
 // Base URL for LOCAL Ollama (embeddings only - v5.0)
 // Generation models use cloud URL (https://ollama.com) - see OllamaClient
 // Fallback: Uses OLLAMA_LOCAL_BASE_URL env var if set
-export const DEFAULT_OLLAMA_BASE_URL =
-    process.env.OLLAMA_LOCAL_BASE_URL ||
-    'http://host.docker.internal:11434/v1';
+export const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_LOCAL_BASE_URL || 'http://host.docker.internal:11434/v1';
 
 function parsePositiveInt(rawValue, fallback) {
     const parsed = Number.parseInt(String(rawValue ?? ''), 10);

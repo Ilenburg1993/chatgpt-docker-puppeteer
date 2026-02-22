@@ -34,7 +34,7 @@ function errorHandler(err, req, res, next) {
         path: req.originalUrl,
         method: req.method,
         // Em produção, ocultamos o stack trace para evitar vazamento de infraestrutura
-        stack: process.env.NODE_ENV === 'production' ? '🥞 (Details hidden in production)' : err.stack
+        stack: process.env.NODE_ENV === 'production' ? '🥞 (Details hidden in production)' : err.stack,
     };
 
     // 3. Registro no Log Operacional (Para Diagnóstico Técnico)
@@ -48,7 +48,7 @@ function errorHandler(err, req, res, next) {
             msg: err.message,
             path: req.originalUrl,
             status: statusCode,
-            request_id: requestId
+            request_id: requestId,
         });
     }
 

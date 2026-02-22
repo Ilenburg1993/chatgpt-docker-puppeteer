@@ -25,7 +25,10 @@ function makeDbPath() {
 }
 
 function makeArtifactsDir() {
-    const dir = path.join(makeTmpDir('test-artifacts'), `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const dir = path.join(
+        makeTmpDir('test-artifacts'),
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
 }
@@ -136,7 +139,9 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
 
         const db = getDb();
         const rows = db.prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?').all('task-child');
-        assert.deepStrictEqual(rows.map(r => r.depends_on_task_id), ['task-parent']);
+        assert.deepStrictEqual(
+            rows.map(r => r.depends_on_task_id),
+            ['task-parent']
+        );
     });
 });
-

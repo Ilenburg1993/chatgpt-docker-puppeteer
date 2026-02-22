@@ -8,7 +8,7 @@ import { scanWorkspace } from '../../../tools/rag/lib/scan.mjs';
 describe('RAG Workspace Scanning', () => {
     it('scans allowed file types', async () => {
         const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
-        
+
         try {
             // Create test files
             await fs.writeFile(path.join(tmpDir, 'test.js'), 'export const x = 1;', 'utf8');
@@ -30,7 +30,7 @@ describe('RAG Workspace Scanning', () => {
 
     it('excludes node_modules directory', async () => {
         const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
-        
+
         try {
             await fs.mkdir(path.join(tmpDir, 'node_modules'));
             await fs.writeFile(path.join(tmpDir, 'node_modules', 'test.js'), 'code', 'utf8');
@@ -40,7 +40,10 @@ describe('RAG Workspace Scanning', () => {
 
             const paths = files.map(f => f.relPath);
             assert.ok(!paths.some(p => p.includes('node_modules')), 'Should exclude node_modules');
-            assert.ok(paths.some(p => p === 'valid.js'), 'Should include valid files');
+            assert.ok(
+                paths.some(p => p === 'valid.js'),
+                'Should include valid files'
+            );
         } finally {
             await fs.rm(tmpDir, { recursive: true, force: true });
         }
@@ -48,7 +51,7 @@ describe('RAG Workspace Scanning', () => {
 
     it('excludes .env but allows .env.example', async () => {
         const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
-        
+
         try {
             await fs.writeFile(path.join(tmpDir, '.env'), 'SECRET=abc', 'utf8');
             await fs.writeFile(path.join(tmpDir, '.env.local'), 'SECRET=xyz', 'utf8');
@@ -67,7 +70,7 @@ describe('RAG Workspace Scanning', () => {
 
     it('respects .gitignore', async () => {
         const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
-        
+
         try {
             await fs.writeFile(path.join(tmpDir, '.gitignore'), 'ignored.txt\n*.log\n', 'utf8');
             await fs.writeFile(path.join(tmpDir, 'ignored.txt'), 'data', 'utf8');
@@ -87,7 +90,7 @@ describe('RAG Workspace Scanning', () => {
 
     it('respects maxFileBytes limit', async () => {
         const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
-        
+
         try {
             // Create a small file
             await fs.writeFile(path.join(tmpDir, 'small.js'), 'x', 'utf8');
@@ -107,7 +110,7 @@ describe('RAG Workspace Scanning', () => {
 
     it('returns sorted results', async () => {
         const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-scan-'));
-        
+
         try {
             await fs.writeFile(path.join(tmpDir, 'z.js'), 'code', 'utf8');
             await fs.writeFile(path.join(tmpDir, 'a.js'), 'code', 'utf8');
@@ -152,7 +155,7 @@ describe('RAG Workspace Scanning', () => {
             const files = await scanWorkspace(tmpDir, {
                 profile: 'core',
                 includeGlobs: ['custom/**'],
-                excludeGlobs: ['custom/b.js']
+                excludeGlobs: ['custom/b.js'],
             });
             const paths = files.map(f => f.relPath);
             assert.ok(paths.includes('custom/a.js'));
@@ -170,7 +173,7 @@ describe('RAG Workspace Scanning', () => {
             await fs.writeFile(path.join(tmpDir, 'main.js'), 'export const x = 1;', 'utf8');
 
             const files = await scanWorkspace(tmpDir, { profile: 'full', docsMode: 'exclude' });
-            const paths = files.map((f) => f.relPath);
+            const paths = files.map(f => f.relPath);
             assert.ok(paths.includes('main.js'));
             assert.ok(!paths.includes('readme.md'));
         } finally {
@@ -187,7 +190,7 @@ describe('RAG Workspace Scanning', () => {
             await fs.writeFile(path.join(tmpDir, 'main.js'), 'export const x = 1;', 'utf8');
 
             const files = await scanWorkspace(tmpDir, { profile: 'full', docsMode: 'only' });
-            const paths = files.map((f) => f.relPath);
+            const paths = files.map(f => f.relPath);
             assert.ok(paths.includes('readme.md'));
             assert.ok(paths.includes('notes.mdx'));
             assert.ok(!paths.includes('main.js'));

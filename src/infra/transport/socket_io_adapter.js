@@ -23,7 +23,7 @@ function createSocketAdapter(config) {
             // Apenas emite no log interno, não propaga
             events.emit('log', {
                 level: 'DEBUG',
-                msg: `[TRANSPORT] Connection error: ${errorData.msg}`
+                msg: `[TRANSPORT] Connection error: ${errorData.msg}`,
             });
         }
     });
@@ -38,7 +38,9 @@ function createSocketAdapter(config) {
      * Inicia a conexão física.
      */
     function start() {
-        if (socket) {return;} // Já iniciado
+        if (socket) {
+            return;
+        } // Já iniciado
 
         // Configuração de robustez padrão
         const opts = {
@@ -48,7 +50,7 @@ function createSocketAdapter(config) {
             reconnectionDelayMax: 5000,
             timeout: 20000,
             transports: ['websocket'], // Força WebSocket para performance
-            ...config.options
+            ...config.options,
         };
 
         socket = io(config.url, opts);
@@ -75,11 +77,13 @@ function createSocketAdapter(config) {
         // 3. Erros de Conexão (silenciado durante shutdown)
         socket.on('connect_error', err => {
             // Ignora erros de conexão se já estamos desligando
-            if (_shuttingDown) {return;}
+            if (_shuttingDown) {
+                return;
+            }
 
             events.emit('error', {
                 code: 'CONNECTION_ERROR',
-                msg: err.message
+                msg: err.message,
             });
         });
 
@@ -92,7 +96,7 @@ function createSocketAdapter(config) {
                 } catch (err) {
                     events.emit('error', {
                         code: 'INBOUND_HANDLER_FAIL',
-                        msg: `Erro ao processar pacote de entrada: ${err.message}`
+                        msg: `Erro ao processar pacote de entrada: ${err.message}`,
                     });
                 }
             }
@@ -141,7 +145,7 @@ function createSocketAdapter(config) {
         stop,
         send,
         onReceive,
-        events // Exposto para o NERV ouvir 'connect', 'disconnect', etc.
+        events, // Exposto para o NERV ouvir 'connect', 'disconnect', etc.
     };
 }
 

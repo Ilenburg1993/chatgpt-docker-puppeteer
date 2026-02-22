@@ -40,10 +40,7 @@ function ok(cond, msg) {
 
     // sanity: expected ports are mentioned (best-effort)
     const chromeCfg = JSON.parse(fs.readFileSync(chromeCfgPath, 'utf8'));
-    ok(
-        chromeCfg?.connection?.ports?.includes(PROXY_PORT),
-        `chrome-config.json prioriza proxy port ${PROXY_PORT}`
-    );
+    ok(chromeCfg?.connection?.ports?.includes(PROXY_PORT), `chrome-config.json prioriza proxy port ${PROXY_PORT}`);
 
     console.log('\n✅ Boot sequence checks OK (E2E preflight)');
 })();

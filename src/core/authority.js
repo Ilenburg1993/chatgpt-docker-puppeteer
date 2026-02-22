@@ -11,7 +11,7 @@
  */
 const SERVER_AUTHORITIES = Object.freeze({
     STANDALONE: 'standalone',
-    DELEGATED: 'delegated'
+    DELEGATED: 'delegated',
 });
 
 /**

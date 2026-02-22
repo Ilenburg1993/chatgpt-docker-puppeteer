@@ -56,7 +56,7 @@ const ALIAS_MAP = {
     "'../../../logic/": "'@logic/",
     '"../../../logic/': '"@logic/',
     "'../logic/": "'@logic/",
-    '"../logic/': '"@logic/'
+    '"../logic/': '"@logic/',
 };
 
 // Arquivos para processar
@@ -81,7 +81,7 @@ function findJSFiles(dir) {
                     'profile',
                     'backups',
                     'analysis',
-                    '.git'
+                    '.git',
                 ].includes(file)
             ) {
                 findJSFiles(filePath);

@@ -1,3 +1,4 @@
+/** Função exportada: requireReason. */
 export function requireReason(reason, fallbackMessage = 'Motivo operacional é obrigatório para este comando.') {
     const normalized = String(reason || '').trim();
     if (!normalized) {
@@ -6,6 +7,7 @@ export function requireReason(reason, fallbackMessage = 'Motivo operacional é o
     return normalized;
 }
 
+/** Função exportada: confirmTwoStepAction. */
 export function confirmTwoStepAction({ actionLabel, reason, firstMessage = null, secondMessage = null }) {
     const normalizedReason = requireReason(reason);
     if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
@@ -13,8 +15,7 @@ export function confirmTwoStepAction({ actionLabel, reason, firstMessage = null,
     }
 
     const step1 =
-        firstMessage ||
-        `[Confirmação 1/2]\nExecutar: ${actionLabel}\nMotivo: ${normalizedReason}\n\nDeseja continuar?`;
+        firstMessage || `[Confirmação 1/2]\nExecutar: ${actionLabel}\nMotivo: ${normalizedReason}\n\nDeseja continuar?`;
     const step2 =
         secondMessage ||
         `[Confirmação 2/2]\nA ação "${actionLabel}" será registrada em auditoria.\n\nConfirmar execução?`;
@@ -23,4 +24,3 @@ export function confirmTwoStepAction({ actionLabel, reason, firstMessage = null,
     if (!window.confirm(step2)) return false;
     return true;
 }
-

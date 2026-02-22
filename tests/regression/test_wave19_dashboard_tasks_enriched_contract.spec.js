@@ -12,10 +12,7 @@ test('wave19: dashboard tasks/missions mantém contrato enriquecido de contexto'
         path.join(process.cwd(), 'src/server/api/controllers/dashboard_missions.js'),
         'utf8'
     );
-    const taskViews = await fs.readFile(
-        path.join(process.cwd(), 'src/server/api/utils/task_views.js'),
-        'utf8'
-    );
+    const taskViews = await fs.readFile(path.join(process.cwd(), 'src/server/api/utils/task_views.js'), 'utf8');
 
     assert.match(dashboardTasks, /LEFT JOIN missions/);
     assert.match(dashboardTasks, /include\.has\('mission_context'\)/);
@@ -28,4 +25,3 @@ test('wave19: dashboard tasks/missions mantém contrato enriquecido de contexto'
     assert.match(taskViews, /command_caps/);
     assert.match(taskViews, /buildTaskCommandCaps/);
 });
-

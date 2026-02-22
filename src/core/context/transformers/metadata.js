@@ -12,7 +12,7 @@
 const METADATA_TYPES = {
     STATUS: 'STATUS',
     METRICS: 'METRICS',
-    ERROR: 'ERROR'
+    ERROR: 'ERROR',
 };
 
 /**

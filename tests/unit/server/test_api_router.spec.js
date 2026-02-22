@@ -7,7 +7,7 @@ describe('API Router - Rotas e Controllers', () => {
             const routes = [
                 { method: 'GET', path: '/api/tasks' },
                 { method: 'POST', path: '/api/tasks' },
-                { method: 'GET', path: '/api/tasks/:id' }
+                { method: 'GET', path: '/api/tasks/:id' },
             ];
 
             const getRoute = routes.find(r => r.method === 'GET' && r.path === '/api/tasks');
@@ -32,12 +32,12 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve retornar lista de tarefas', () => {
             const mockTasks = [
                 { id: 'task-001', status: 'PENDING' },
-                { id: 'task-002', status: 'RUNNING' }
+                { id: 'task-002', status: 'RUNNING' },
             ];
 
             const response = {
                 status: 200,
-                data: mockTasks
+                data: mockTasks,
             };
 
             assert.strictEqual(response.status, 200);
@@ -58,8 +58,8 @@ describe('API Router - Rotas e Controllers', () => {
                 uptime: 3600,
                 memory: {
                     used: 100,
-                    total: 1000
-                }
+                    total: 1000,
+                },
             };
 
             assert.strictEqual(status.state, 'RUNNING');
@@ -70,7 +70,7 @@ describe('API Router - Rotas e Controllers', () => {
             const controlRoute = {
                 method: 'POST',
                 path: '/api/system/control',
-                body: { action: 'pause' }
+                body: { action: 'pause' },
             };
 
             assert.strictEqual(controlRoute.method, 'POST');
@@ -88,7 +88,7 @@ describe('API Router - Rotas e Controllers', () => {
             const dna = {
                 agentId: 'agent-12345',
                 version: '1.0.0',
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
             };
 
             assert.ok(dna.agentId);
@@ -100,7 +100,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve validar body ao criar tarefa', () => {
             const validBody = {
                 prompt: 'Teste',
-                target: 'gemini'
+                target: 'gemini',
             };
 
             const hasPrompt = 'prompt' in validBody;
@@ -111,7 +111,7 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve rejeitar body inválido', () => {
             const invalidBody = {
-                prompt: 'Teste'
+                prompt: 'Teste',
                 // target ausente
             };
 
@@ -124,7 +124,7 @@ describe('API Router - Rotas e Controllers', () => {
             const body = {
                 prompt: 'Texto válido',
                 target: 'gemini',
-                priority: 5
+                priority: 5,
             };
 
             assert.strictEqual(typeof body.prompt, 'string');
@@ -174,7 +174,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve aceitar paginação', () => {
             const query = {
                 page: 2,
-                limit: 10
+                limit: 10,
             };
 
             assert.strictEqual(query.page, 2);
@@ -184,7 +184,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve aceitar ordenação', () => {
             const query = {
                 sort: 'createdAt',
-                order: 'desc'
+                order: 'desc',
             };
 
             assert.strictEqual(query.sort, 'createdAt');
@@ -194,7 +194,7 @@ describe('API Router - Rotas e Controllers', () => {
     describe('7. Headers HTTP', () => {
         it('deve incluir Content-Type JSON', () => {
             const headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             };
 
             assert.strictEqual(headers['Content-Type'], 'application/json');
@@ -202,7 +202,7 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve incluir Request-ID', () => {
             const headers = {
-                'X-Request-ID': 'req-12345'
+                'X-Request-ID': 'req-12345',
             };
 
             assert.ok(headers['X-Request-ID']);
@@ -211,7 +211,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve incluir CORS headers', () => {
             const headers = {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE'
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE',
             };
 
             assert.ok(headers['Access-Control-Allow-Origin']);
@@ -224,9 +224,9 @@ describe('API Router - Rotas e Controllers', () => {
                 listTasks: () => {
                     return {
                         tasks: [{ id: 'task-001' }, { id: 'task-002' }],
-                        total: 2
+                        total: 2,
                     };
-                }
+                },
             };
 
             const result = controller.listTasks();
@@ -240,14 +240,14 @@ describe('API Router - Rotas e Controllers', () => {
                     return {
                         id: 'task-new',
                         ...body,
-                        status: 'PENDING'
+                        status: 'PENDING',
                     };
-                }
+                },
             };
 
             const task = controller.createTask({
                 prompt: 'Teste',
-                target: 'gemini'
+                target: 'gemini',
             });
 
             assert.strictEqual(task.status, 'PENDING');
@@ -257,10 +257,10 @@ describe('API Router - Rotas e Controllers', () => {
             const controller = {
                 getTask: id => {
                     const tasks = {
-                        'task-001': { id: 'task-001', status: 'DONE' }
+                        'task-001': { id: 'task-001', status: 'DONE' },
                     };
                     return tasks[id];
-                }
+                },
             };
 
             const task = controller.getTask('task-001');
@@ -276,8 +276,8 @@ describe('API Router - Rotas e Controllers', () => {
                 getStatus: () => ({
                     state: 'IDLE',
                     tasksInQueue: 5,
-                    tasksRunning: 0
-                })
+                    tasksRunning: 0,
+                }),
             };
 
             const status = controller.getStatus();
@@ -290,9 +290,9 @@ describe('API Router - Rotas e Controllers', () => {
                 controlAgent: command => {
                     return {
                         command,
-                        executed: true
+                        executed: true,
                     };
-                }
+                },
             };
 
             const result = controller.controlAgent('pause');
@@ -307,8 +307,8 @@ describe('API Router - Rotas e Controllers', () => {
                 getDNA: () => ({
                     agentId: 'agent-001',
                     version: '1.0.0',
-                    features: ['chatgpt', 'gemini']
-                })
+                    features: ['chatgpt', 'gemini'],
+                }),
             };
 
             const dna = controller.getDNA();
@@ -334,8 +334,8 @@ describe('API Router - Rotas e Controllers', () => {
                 status: 400,
                 error: {
                     message: 'Validation failed',
-                    fields: ['prompt', 'target']
-                }
+                    fields: ['prompt', 'target'],
+                },
             };
 
             assert.strictEqual(error.status, 400);
@@ -348,7 +348,7 @@ describe('API Router - Rotas e Controllers', () => {
             const response = {
                 success: true,
                 data: { id: 'task-001' },
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             };
 
             assert.ok(response.success);
@@ -362,8 +362,8 @@ describe('API Router - Rotas e Controllers', () => {
                     page: 1,
                     limit: 10,
                     total: 50,
-                    pages: 5
-                }
+                    pages: 5,
+                },
             };
 
             assert.strictEqual(response.pagination.pages, 5);
@@ -375,7 +375,7 @@ describe('API Router - Rotas e Controllers', () => {
             const routes = [
                 { method: 'GET', path: '/' },
                 { method: 'GET', path: '/dashboard' },
-                { method: 'GET', path: '/static/*' }
+                { method: 'GET', path: '/static/*' },
             ];
 
             const staticRoute = routes.find(r => r.path === '/static/*');
@@ -397,8 +397,8 @@ describe('API Router - Rotas e Controllers', () => {
                 uptime: 3600,
                 checks: {
                     nerv: 'ok',
-                    storage: 'ok'
-                }
+                    storage: 'ok',
+                },
             };
 
             assert.strictEqual(health.status, 'healthy');
@@ -408,7 +408,7 @@ describe('API Router - Rotas e Controllers', () => {
     describe('15. Rate Limiting', () => {
         it('deve limitar requisições por IP', () => {
             const requests = {
-                '192.168.1.1': 10
+                '192.168.1.1': 10,
             };
 
             const MAX_REQUESTS = 100;
@@ -420,7 +420,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve retornar 429 ao exceder limite', () => {
             const response = {
                 status: 429,
-                error: 'Too many requests'
+                error: 'Too many requests',
             };
 
             assert.strictEqual(response.status, 429);

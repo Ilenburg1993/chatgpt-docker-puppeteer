@@ -69,7 +69,9 @@
             <div class="chart-card">
                 <div class="chart-header">
                     <h3>CPU Usage</h3>
-                    <span class="chart-stat">Avg: {{ telemetry.averages.cpu }}% | Max: {{ telemetry.maxValues.cpu }}%</span>
+                    <span class="chart-stat"
+                        >Avg: {{ telemetry.averages.cpu }}% | Max: {{ telemetry.maxValues.cpu }}%</span
+                    >
                 </div>
                 <LineChart
                     :data="cpuChartData"
@@ -85,7 +87,9 @@
             <div class="chart-card">
                 <div class="chart-header">
                     <h3>Memory Usage</h3>
-                    <span class="chart-stat">Avg: {{ telemetry.averages.memory }}% | Max: {{ telemetry.maxValues.memory }}%</span>
+                    <span class="chart-stat"
+                        >Avg: {{ telemetry.averages.memory }}% | Max: {{ telemetry.maxValues.memory }}%</span
+                    >
                 </div>
                 <LineChart
                     :data="memoryChartData"
@@ -101,7 +105,9 @@
             <div class="chart-card">
                 <div class="chart-header">
                     <h3>Heap Usage</h3>
-                    <span class="chart-stat">Avg: {{ telemetry.averages.heap }}% | Max: {{ telemetry.maxValues.heap }}%</span>
+                    <span class="chart-stat"
+                        >Avg: {{ telemetry.averages.heap }}% | Max: {{ telemetry.maxValues.heap }}%</span
+                    >
                 </div>
                 <LineChart
                     :data="heapChartData"
@@ -117,7 +123,9 @@
             <div class="chart-card">
                 <div class="chart-header">
                     <h3>Event Loop Lag</h3>
-                    <span class="chart-stat">Avg: {{ telemetry.averages.eventLoop }}ms | Max: {{ telemetry.maxValues.eventLoop }}ms</span>
+                    <span class="chart-stat"
+                        >Avg: {{ telemetry.averages.eventLoop }}ms | Max: {{ telemetry.maxValues.eventLoop }}ms</span
+                    >
                 </div>
                 <LineChart
                     :data="eventLoopChartData"
@@ -219,7 +227,7 @@ export default {
     components: {
         LineChart,
         GaugeChart,
-        BarChart
+        BarChart,
     },
 
     setup() {
@@ -274,12 +282,7 @@ export default {
 
         const taskDistributionData = computed(() => {
             const counts = tasks.statusCounts || {};
-            return [
-                counts.RUNNING || 0,
-                counts.PENDING || 0,
-                counts.DONE || 0,
-                counts.FAILED || 0
-            ];
+            return [counts.RUNNING || 0, counts.PENDING || 0, counts.DONE || 0, counts.FAILED || 0];
         });
 
         const taskDistributionColors = ['#f39c12', '#3498db', '#27ae60', '#e74c3c'];
@@ -292,7 +295,7 @@ export default {
                 { key: 'pending', icon: '⏳', label: 'Pending', value: counts.PENDING || 0 },
                 { key: 'done', icon: '✓', label: 'Done', value: counts.DONE || 0 },
                 { key: 'failed', icon: '✗', label: 'Failed', value: counts.FAILED || 0 },
-                { key: 'queue', icon: '📋', label: 'Queue Size', value: telemetry.queueSize }
+                { key: 'queue', icon: '📋', label: 'Queue Size', value: telemetry.queueSize },
             ];
         });
 
@@ -359,9 +362,9 @@ export default {
             connectionLabel,
             lastUpdateLabel,
             formatMB,
-            refreshData
+            refreshData,
         };
-    }
+    },
 };
 </script>
 
@@ -556,11 +559,21 @@ export default {
     color: #1e293b;
 }
 
-.stat-running { color: #f39c12; }
-.stat-pending { color: #3498db; }
-.stat-done { color: #27ae60; }
-.stat-failed { color: #e74c3c; }
-.stat-queue { color: #64748b; }
+.stat-running {
+    color: #f39c12;
+}
+.stat-pending {
+    color: #3498db;
+}
+.stat-done {
+    color: #27ae60;
+}
+.stat-failed {
+    color: #e74c3c;
+}
+.stat-queue {
+    color: #64748b;
+}
 
 /* Info Table */
 .info-table {

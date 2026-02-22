@@ -63,18 +63,18 @@ function findChromeExecutable() {
             '/usr/bin/google-chrome-stable',
             '/usr/bin/chromium',
             '/usr/bin/chromium-browser',
-            '/snap/bin/chromium'
+            '/snap/bin/chromium',
         ];
     } else if (platform === 'darwin') {
         candidates = [
             '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-            '/Applications/Chromium.app/Contents/MacOS/Chromium'
+            '/Applications/Chromium.app/Contents/MacOS/Chromium',
         ];
     } else if (platform === 'win32') {
         candidates = [
             'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-            process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe'
+            process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
         ];
     }
 
@@ -112,7 +112,7 @@ module.exports = {
     // string = path para Chrome instalado no sistema
     //
     // Detecção automática:
-    executablePath: findChromeExecutable()
+    executablePath: findChromeExecutable(),
 
     // Ou hardcode por plataforma:
     // executablePath: process.platform === 'linux'

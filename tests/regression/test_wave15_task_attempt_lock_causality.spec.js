@@ -9,7 +9,10 @@ import { claimNextEligibleTask, insertTask, releaseTaskLock, updateTask } from '
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
-    return path.join(dir, `maestro-wave15-lock-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+    return path.join(
+        dir,
+        `maestro-wave15-lock-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+    );
 }
 
 test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando informado', async t => {

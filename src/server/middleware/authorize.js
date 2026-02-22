@@ -1,6 +1,7 @@
 // @ts-check
 import { hasPermission } from '#server/domain/rbac_policy';
 
+/** Função exportada: requirePermission. */
 function requirePermission(permission) {
     return (req, res, next) => {
         if (!req.user) {

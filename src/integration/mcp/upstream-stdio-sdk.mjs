@@ -22,6 +22,7 @@ function withTimeout(promise, timeoutMs, label) {
     return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(t));
 }
 
+/** Classe exportada: MCPStdioUpstreamClient. */
 export class MCPStdioUpstreamClient {
     /**
      * @param {{ alias: string, command: string, args: string[], env?: Record<string,string>, initTimeoutMs?: number, callTimeoutMs?: number }} opts
@@ -48,7 +49,7 @@ export class MCPStdioUpstreamClient {
             command: this.command,
             args: this.args,
             env: this.env,
-            stderr: 'pipe'
+            stderr: 'pipe',
         });
 
         const client = new Client(

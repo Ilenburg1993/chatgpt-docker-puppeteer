@@ -1,6 +1,7 @@
 # Padrões JSDoc para Node 24 ESM
 
 ## Tipar função simples
+
 ```js
 /**
  * @param {string} id
@@ -12,6 +13,7 @@ export async function loadById(id) {
 ```
 
 ## Typedef reutilizável
+
 ```js
 /**
  * @typedef {object} ShutdownResult
@@ -22,6 +24,7 @@ export async function loadById(id) {
 ```
 
 ## Callback/eventos
+
 ```js
 /**
  * @callback OnStateChange
@@ -31,6 +34,7 @@ export async function loadById(id) {
 ```
 
 ## Genéricos em JS
+
 ```js
 /**
  * @template T
@@ -43,17 +47,20 @@ export function identity(value) {
 ```
 
 ## Satisfies para shape de configuração
+
 ```js
 /** @satisfies {{ mode: 'quick'|'deep', retries: number }} */
 const AUDIT_OPTIONS = { mode: 'quick', retries: 2 };
 ```
 
 ## Import de tipo em JSDoc
+
 ```js
 /** @typedef {import('#server/engine/lifecycle.js').LifecycleState} LifecycleState */
 ```
 
 ## Regras práticas
+
 1. Tipar fronteiras: entrada/saída de módulo, handlers, adapters.
 2. Não tipar em excesso dentro de bloco local trivial.
 3. Extrair typedef quando o objeto aparece 2+ vezes.

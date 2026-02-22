@@ -54,12 +54,13 @@ function createMockPage() {
         },
         async setUserAgent() {
             return;
-        }
+        },
     };
 
     return page;
 }
 
+/** Função exportada: createMockBrowser. */
 function createMockBrowser() {
     const pages = [createMockPage()];
 
@@ -95,7 +96,7 @@ function createMockBrowser() {
                 }
             }
             return;
-        }
+        },
     };
 
     // Return a promise for parity with puppeteer.connect()

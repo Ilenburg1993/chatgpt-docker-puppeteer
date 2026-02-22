@@ -47,17 +47,15 @@ async function runTest(name, testFn) {
 await runTest('POST /v1/chat/completions (basic request)', async () => {
     const req = {
         model: 'qwen3-coder-next',
-        messages: [
-            { role: 'user', content: 'Say "test successful" in exactly 2 words' }
-        ],
+        messages: [{ role: 'user', content: 'Say "test successful" in exactly 2 words' }],
         temperature: 0.3,
-        max_tokens: 50
+        max_tokens: 50,
     };
 
     const resp = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req)
+        body: JSON.stringify(req),
     });
 
     if (!resp.ok) {
@@ -99,16 +97,16 @@ await runTest('POST /v1/chat/completions (multi-turn)', async () => {
             { role: 'system', content: 'You are a helpful assistant' },
             { role: 'user', content: 'What is 2+2?' },
             { role: 'assistant', content: '4' },
-            { role: 'user', content: 'What about 3+3?' }
+            { role: 'user', content: 'What about 3+3?' },
         ],
         temperature: 0.3,
-        max_tokens: 50
+        max_tokens: 50,
     };
 
     const resp = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req)
+        body: JSON.stringify(req),
     });
 
     if (!resp.ok) {
@@ -151,7 +149,7 @@ await runTest('Error Handling (empty messages)', async () => {
     const resp = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req)
+        body: JSON.stringify(req),
     });
 
     if (resp.status !== 400) {
@@ -178,16 +176,16 @@ await runTest('Error Handling (vision content)', async () => {
                 role: 'user',
                 content: [
                     { type: 'text', text: 'What is in this image?' },
-                    { type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } }
-                ]
-            }
-        ]
+                    { type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } },
+                ],
+            },
+        ],
     };
 
     const resp = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req)
+        body: JSON.stringify(req),
     });
 
     if (resp.status !== 400) {
@@ -207,13 +205,13 @@ await runTest('Error Handling (n > 1)', async () => {
     const req = {
         model: 'qwen3-coder-next',
         messages: [{ role: 'user', content: 'Hello' }],
-        n: 3
+        n: 3,
     };
 
     const resp = await fetch(`${BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req)
+        body: JSON.stringify(req),
     });
 
     if (resp.status !== 400) {

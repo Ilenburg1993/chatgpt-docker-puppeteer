@@ -10,7 +10,10 @@ import { getMissionById } from '#infra/db/mission_repo';
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
-    return path.join(dir, `maestro-wave17-stale-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+    return path.join(
+        dir,
+        `maestro-wave17-stale-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+    );
 }
 
 test('wave17: atualização stale (current_task_id divergente) é rejeitada sem mutar missão', async t => {

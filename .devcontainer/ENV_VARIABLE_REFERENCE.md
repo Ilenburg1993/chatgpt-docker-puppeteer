@@ -1,13 +1,13 @@
 # ENV Variable Reference Guide
-**Version**: 1.0
-**Date**: 2026-02-03
-**Status**: ✅ Comprehensive Audit Completed
+
+**Version**: 1.0 **Date**: 2026-02-03 **Status**: ✅ Comprehensive Audit Completed
 
 ---
 
 ## 📋 Executive Summary
 
-Este documento cataloga **TODAS** as variáveis utilizadas no sistema DevContainer, classificadas por camada de processamento e escopo de expansão.
+Este documento cataloga **TODAS** as variáveis utilizadas no sistema DevContainer, classificadas por
+camada de processamento e escopo de expansão.
 
 ### Camadas de Processamento
 
@@ -40,9 +40,8 @@ Este documento cataloga **TODAS** as variáveis utilizadas no sistema DevContain
 
 ### 1. VS Code DevContainer Variables
 
-**Source**: `.devcontainer/devcontainer.json`
-**Expansion**: VS Code Extension (Layer 1)
-**Usage**: Passadas como build args, container env, mounts source
+**Source**: `.devcontainer/devcontainer.json` **Expansion**: VS Code Extension (Layer 1) **Usage**:
+Passadas como build args, container env, mounts source
 
 | Variable                            | Type     | Usage                                | Example Value                                        |
 | ----------------------------------- | -------- | ------------------------------------ | ---------------------------------------------------- |
@@ -66,11 +65,13 @@ Este documento cataloga **TODAS** as variáveis utilizadas no sistema DevContain
 #### ⚠️ Critical Rules for VS Code Variables
 
 1. **Mounts `source=`**: ✅ **CAN** use VS Code variables
+
    ```jsonc
-   "source=${localWorkspaceFolder}/.env.development"  // ✅ VALID
+   "source=${localWorkspaceFolder}/.env.development" // ✅ VALID
    ```
 
 2. **Mounts `target=`**: ❌ **CANNOT** use VS Code variables
+
    ```jsonc
    "target=/home/node/.env"  // ✅ VALID (literal)
    "target=${containerWorkspaceFolder}/.env"  // ❌ INVALID (Docker doesn't expand)
@@ -86,9 +87,8 @@ Este documento cataloga **TODAS** as variáveis utilizadas no sistema DevContain
 
 ### 2. Dockerfile ARG Variables
 
-**Source**: `.devcontainer/Dockerfile`
-**Expansion**: Docker Build Engine (Layer 2)
-**Passed From**: `devcontainer.json` → `build.args`
+**Source**: `.devcontainer/Dockerfile` **Expansion**: Docker Build Engine (Layer 2) **Passed From**:
+`devcontainer.json` → `build.args`
 
 | ARG            | Source                            | Default                    | Used In                          | Purpose                           |
 | -------------- | --------------------------------- | -------------------------- | -------------------------------- | --------------------------------- |
@@ -118,6 +118,7 @@ ENV USER_NAME=${REMOTE_USER} \
 ```
 
 **Benefits**:
+
 - ✅ Image reusable with different users (`--build-arg REMOTE_USER=testuser`)
 - ✅ Single source of truth (`remoteUser: "node"` → `${containerUser}` → `ARG REMOTE_USER`)
 - ✅ No hardcoded "node" strings (DRY principle)
@@ -126,22 +127,21 @@ ENV USER_NAME=${REMOTE_USER} \
 
 ### 3. Container ENV Variables
 
-**Source**: `.devcontainer/Dockerfile` (Sections 6-8)
-**Expansion**: Container Runtime (Layer 3)
+**Source**: `.devcontainer/Dockerfile` (Sections 6-8) **Expansion**: Container Runtime (Layer 3)
 **Override**: `devcontainer.json` → `containerEnv` + `.env` files
 
 #### 3.1 STRUCTURAL ENV (Identity & Paths)
 
 | ENV                   | Source            | Default                                | Immutable | Purpose                                |
 | --------------------- | ----------------- | -------------------------------------- | --------- | -------------------------------------- |
-| `USER_NAME`           | ARG REMOTE_USER   | `node`                                 | ✅ Yes     | User identity (from devcontainer.json) |
-| `HOME_DIR`            | `${REMOTE_USER}`  | `/home/node`                           | ✅ Yes     | User home directory                    |
-| `APP_DIR`             | `${PROJECT_NAME}` | `/workspaces/chatgpt-docker-puppeteer` | ✅ Yes     | Workspace path                         |
-| `XDG_CONFIG_HOME`     | `${HOME_DIR}`     | `/home/node/.config`                   | ✅ Yes     | XDG config directory                   |
-| `XDG_CACHE_HOME`      | `${HOME_DIR}`     | `/home/node/.cache`                    | ✅ Yes     | XDG cache directory                    |
-| `XDG_DATA_HOME`       | `${HOME_DIR}`     | `/home/node/.local/share`              | ✅ Yes     | XDG data directory                     |
-| `XDG_STATE_HOME`      | `${HOME_DIR}`     | `/home/node/.local/state`              | ✅ Yes     | XDG state directory                    |
-| `PUPPETEER_CACHE_DIR` | `${HOME_DIR}`     | `/home/node/.cache/puppeteer`          | ✅ Yes     | Puppeteer cache                        |
+| `USER_NAME`           | ARG REMOTE_USER   | `node`                                 | ✅ Yes    | User identity (from devcontainer.json) |
+| `HOME_DIR`            | `${REMOTE_USER}`  | `/home/node`                           | ✅ Yes    | User home directory                    |
+| `APP_DIR`             | `${PROJECT_NAME}` | `/workspaces/chatgpt-docker-puppeteer` | ✅ Yes    | Workspace path                         |
+| `XDG_CONFIG_HOME`     | `${HOME_DIR}`     | `/home/node/.config`                   | ✅ Yes    | XDG config directory                   |
+| `XDG_CACHE_HOME`      | `${HOME_DIR}`     | `/home/node/.cache`                    | ✅ Yes    | XDG cache directory                    |
+| `XDG_DATA_HOME`       | `${HOME_DIR}`     | `/home/node/.local/share`              | ✅ Yes    | XDG data directory                     |
+| `XDG_STATE_HOME`      | `${HOME_DIR}`     | `/home/node/.local/state`              | ✅ Yes    | XDG state directory                    |
+| `PUPPETEER_CACHE_DIR` | `${HOME_DIR}`     | `/home/node/.cache/puppeteer`          | ✅ Yes    | Puppeteer cache                        |
 
 #### 3.2 INFRASTRUCTURE ENV (Ports & Connections)
 
@@ -182,6 +182,7 @@ ENV USER_NAME=${REMOTE_USER} \
 | **Container**  | `USER_NAME=node`                  | Runtime                          | Runtime          | "node"  |
 
 **Flow Diagram**:
+
 ```
 remoteUser: "node"
     ↓ (VS Code expands ${containerUser})
@@ -217,7 +218,8 @@ USER_NAME=node
 
 ### Path Consistency
 
-- [x] `workspaceFolder: "/workspaces/${localWorkspaceFolderBasename}"` → `/workspaces/chatgpt-docker-puppeteer`
+- [x] `workspaceFolder: "/workspaces/${localWorkspaceFolderBasename}"` →
+      `/workspaces/chatgpt-docker-puppeteer`
 - [x] `APP_DIR: "/workspaces/${PROJECT_NAME}"` → `/workspaces/chatgpt-docker-puppeteer`
 - [x] All mounts target= align with `remoteUser: "node"` → `/home/node/*`
 
@@ -290,8 +292,10 @@ ENV USER_NAME=${REMOTE_USER} \
 
 ## 📚 References
 
-- **Official Docker Docs**: [docker run --mount](https://docs.docker.com/reference/cli/docker/container/run/#mount)
-- **VS Code DevContainers**: [Variables Reference](https://code.visualstudio.com/docs/devcontainers/create-dev-container#_variables-in-devcontainerjson)
+- **Official Docker Docs**:
+  [docker run --mount](https://docs.docker.com/reference/cli/docker/container/run/#mount)
+- **VS Code DevContainers**:
+  [Variables Reference](https://code.visualstudio.com/docs/devcontainers/create-dev-container#_variables-in-devcontainerjson)
 - **DevContainers Spec**: [JSON Schema](https://containers.dev/implementors/json_reference/)
 - **ENV Taxonomy**: `ENV_ANALYSIS_V6.md` (v6.0 categorization)
 - **Architecture**: `ARCHITECTURE.md` (v3.0 variable flow)
@@ -302,7 +306,8 @@ ENV USER_NAME=${REMOTE_USER} \
 
 ### Future Improvements
 
-1. **ENV Schema Validation**: Automated validation via `.env.schema.json` (✅ Already implemented in v6.0)
+1. **ENV Schema Validation**: Automated validation via `.env.schema.json` (✅ Already implemented in
+   v6.0)
 2. **CI/CD Integration**: GitHub Actions workflow to validate variable consistency
 3. **Pre-commit Hook**: Block commits with invalid variable usage
 4. **Dashboard**: `/api/env/status` endpoint to inspect runtime variables
@@ -313,10 +318,10 @@ ENV USER_NAME=${REMOTE_USER} \
 - ✅ Schema validation (`scripts/validate-env.js`)
 - ✅ Post-create trap handler (ENV snapshot on errors)
 - ✅ Deprecation system (PORT → SERVER_PORT)
-- ✅ Semantic validation (BROWSER_MODE → CHROME_* dependencies)
+- ✅ Semantic validation (BROWSER*MODE → CHROME*\* dependencies)
 
 ---
 
-**Audit Completed**: 2026-02-03
-**Status**: ✅ All variables synchronized and validated
-**Recommendations**: No critical issues found. Documentation updated to reflect current best practices.
+**Audit Completed**: 2026-02-03 **Status**: ✅ All variables synchronized and validated
+**Recommendations**: No critical issues found. Documentation updated to reflect current best
+practices.

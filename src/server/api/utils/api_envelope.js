@@ -1,6 +1,7 @@
 // @ts-check
 import { Buffer } from 'node:buffer';
 
+/** Função exportada: ok. */
 function ok(res, req, data, meta = {}) {
     res.json({
         success: true,
@@ -10,6 +11,7 @@ function ok(res, req, data, meta = {}) {
     });
 }
 
+/** Função exportada: fail. */
 function fail(res, req, httpStatus, options = {}) {
     const { code, error, details } = /** @type {{code?: string, error?: string, details?: any}} */ (options);
     res.status(httpStatus).json({
@@ -21,6 +23,7 @@ function fail(res, req, httpStatus, options = {}) {
     });
 }
 
+/** Função exportada: encodeCursor. */
 function encodeCursor(obj) {
     if (!obj || typeof obj !== 'object') return null;
     try {
@@ -31,6 +34,7 @@ function encodeCursor(obj) {
     }
 }
 
+/** Função exportada: decodeCursor. */
 function decodeCursor(cursor) {
     if (!cursor) return null;
     try {
@@ -42,6 +46,7 @@ function decodeCursor(cursor) {
     }
 }
 
+/** Função exportada: parseIncludeParam. */
 function parseIncludeParam(raw) {
     const value = raw ? String(raw) : '';
     const set = new Set(

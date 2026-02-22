@@ -23,7 +23,7 @@ const MetaSchema = z.object({
     created_at: TIMESTAMP_SCHEMA,
     priority: PRIORITY_SCHEMA,
     source: SOURCE_SCHEMA,
-    tags: z.array(z.string()).default([])
+    tags: z.array(z.string()).default([]),
 });
 
 /**
@@ -36,7 +36,7 @@ const SpecSchema = z.object({
     payload: z.object({
         system_message: CLEAN_STRING_SCHEMA.default(''),
         user_message: CLEAN_STRING_SCHEMA, // Sanitização automática via shared_types
-        context: z.string().optional() // Buffer para injeções manuais
+        context: z.string().optional(), // Buffer para injeções manuais
     }),
 
     parameters: z
@@ -44,7 +44,7 @@ const SpecSchema = z.object({
             temperature: z.number().min(0).max(2).default(0.7),
             max_tokens: z.number().optional(),
             top_p: z.number().optional(),
-            stop_sequences: z.array(z.string()).default([])
+            stop_sequences: z.array(z.string()).default([]),
         })
         .default({}),
 
@@ -54,7 +54,7 @@ const SpecSchema = z.object({
             min_length: z.number().default(10),
             required_format: z.enum(['text', 'json', 'markdown', 'code']).default('text'),
             required_pattern: z.string().optional(), // Regex para o Validator
-            forbidden_terms: z.array(z.string()).default([])
+            forbidden_terms: z.array(z.string()).default([]),
         })
         .default({}),
 
@@ -62,9 +62,9 @@ const SpecSchema = z.object({
         .object({
             reset_context: z.boolean().default(false),
             require_history: z.boolean().default(true),
-            output_format: z.enum(['markdown', 'json', 'raw']).default('markdown')
+            output_format: z.enum(['markdown', 'json', 'raw']).default('markdown'),
         })
-        .default({})
+        .default({}),
 });
 
 /**
@@ -75,7 +75,7 @@ const PolicySchema = z.object({
     timeout_ms: z.union([z.number(), z.literal(CONNECTION_MODES.AUTO)]).default(CONNECTION_MODES.AUTO),
     dependencies: z.array(ID_SCHEMA).default([]),
     execute_after: TIMESTAMP_SCHEMA.nullable().default(null),
-    priority_weight: z.number().default(1.0)
+    priority_weight: z.number().default(1.0),
 });
 
 /**
@@ -94,7 +94,7 @@ const StateSchema = z.object({
         .object({
             duration_ms: z.number().default(0),
             token_estimate: z.number().default(0),
-            event_loop_lag_ms: z.number().default(0)
+            event_loop_lag_ms: z.number().default(0),
         })
         .default({}),
 
@@ -105,10 +105,10 @@ const StateSchema = z.object({
                 ts: TIMESTAMP_SCHEMA,
                 event: z.string(),
                 msg: z.string().optional(),
-                evidence: z.any().optional() // Para metadados do Triage
+                evidence: z.any().optional(), // Para metadados do Triage
             })
         )
-        .default([])
+        .default([]),
 });
 
 /**
@@ -118,7 +118,7 @@ const ResultSchema = z.object({
     file_path: z.string().nullable().default(null),
     session_url: z.string().url().nullable().default(null),
     finish_reason: z.enum(['stop', 'length', 'content_filter', 'error', 'manual', 'unknown']).default('unknown'),
-    raw_output_preview: z.string().optional()
+    raw_output_preview: z.string().optional(),
 });
 
 /**
@@ -130,7 +130,7 @@ const TaskSchema = z
         spec: SpecSchema,
         policy: PolicySchema,
         state: StateSchema,
-        result: ResultSchema
+        result: ResultSchema,
     })
     .passthrough();
 
@@ -145,4 +145,23 @@ import {
     ResultSchemaV5,
 } from './task_schema_v5.js';
 
-export { TaskSchema, MetaSchema, SpecSchema, PolicySchema, StateSchema, ResultSchema, TaskSchemaV5, MetaSchemaV5, SpecSchemaV5, PolicySchemaV5, ExecutionSchemaV5, MissionSchemaV5, StateSchemaV5, ResultSchemaV5 };
+/**
+ * Barrel de schemas de task (V4/V5) para compatibilidade de import no core.
+ * Reexporta contratos legados e canônicos usados por validação/migração.
+ */
+export {
+    TaskSchema,
+    MetaSchema,
+    SpecSchema,
+    PolicySchema,
+    StateSchema,
+    ResultSchema,
+    TaskSchemaV5,
+    MetaSchemaV5,
+    SpecSchemaV5,
+    PolicySchemaV5,
+    ExecutionSchemaV5,
+    MissionSchemaV5,
+    StateSchemaV5,
+    ResultSchemaV5,
+};

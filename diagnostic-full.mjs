@@ -24,13 +24,7 @@ if (configFile.error) {
 }
 
 // Parse config
-const parsedConfig = ts.parseJsonConfigFileContent(
-    configFile.config,
-    ts.sys,
-    ROOT,
-    {},
-    CONFIG_PATH
-);
+const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, ROOT, {}, CONFIG_PATH);
 
 console.log('\n📂 Arquivos incluídos:', parsedConfig.fileNames.length);
 console.log('─'.repeat(80));
@@ -39,14 +33,14 @@ console.log('─'.repeat(80));
 console.log('\n⏳ Criando programa TypeScript e analisando...\n');
 const program = ts.createProgram({
     rootNames: parsedConfig.fileNames,
-    options: parsedConfig.options
+    options: parsedConfig.options,
 });
 
 // Coletar todos os diagnósticos
 const allDiagnostics = [
     ...program.getSyntacticDiagnostics(),
     ...program.getSemanticDiagnostics(),
-    ...program.getGlobalDiagnostics()
+    ...program.getGlobalDiagnostics(),
 ];
 
 // Categorizar diagnósticos
@@ -54,7 +48,7 @@ const categories = {
     error: [],
     warning: [],
     suggestion: [],
-    message: []
+    message: [],
 };
 
 for (const diagnostic of allDiagnostics) {
@@ -97,7 +91,7 @@ if (categories.error.length > 0) {
             line: line + 1,
             column: character + 1,
             code,
-            message
+            message,
         });
     }
 
@@ -108,7 +102,9 @@ if (categories.error.length > 0) {
         const diagnostics = errorsByFile[file];
         console.log(`\n📄 ${file} (${diagnostics.length} erro(s))`);
         for (const d of diagnostics) {
-            console.log(`   ${d.line}:${d.column} - TS${d.code}: ${d.message.substring(0, 120)}${d.message.length > 120 ? '...' : ''}`);
+            console.log(
+                `   ${d.line}:${d.column} - TS${d.code}: ${d.message.substring(0, 120)}${d.message.length > 120 ? '...' : ''}`
+            );
         }
     }
 
@@ -149,10 +145,11 @@ const report = {
         errors: categories.error.length,
         warnings: categories.warning.length,
         suggestions: categories.suggestion.length,
-        messages: categories.message.length
+        messages: categories.message.length,
     },
     errors: categories.error.map(d => {
-        if (!d.file) return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
+        if (!d.file)
+            return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
 
         const fileName = path.relative(ROOT, d.file.fileName);
         const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
@@ -163,11 +160,12 @@ const report = {
             column: character + 1,
             code: d.code,
             message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
-            category: 'error'
+            category: 'error',
         };
     }),
     warnings: categories.warning.map(d => {
-        if (!d.file) return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
+        if (!d.file)
+            return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
 
         const fileName = path.relative(ROOT, d.file.fileName);
         const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
@@ -178,9 +176,9 @@ const report = {
             column: character + 1,
             code: d.code,
             message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
-            category: 'warning'
+            category: 'warning',
         };
-    })
+    }),
 };
 
 const reportPath = path.join(ROOT, 'typescript-diagnostics.json');

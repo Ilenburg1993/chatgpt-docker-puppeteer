@@ -168,7 +168,7 @@ function criarNERVMock() {
                     resolve(envelope);
                 });
             });
-        }
+        },
     };
 
     return mock;
@@ -196,7 +196,7 @@ function criarNERVSimples() {
             this.on.resetHistory();
             this.once.resetHistory();
             this.off.resetHistory();
-        }
+        },
     };
 }
 

@@ -45,6 +45,7 @@ async function _saveToServer(preset) {
     });
 }
 
+/** Função exportada: useUiPreferences. */
 export function useUiPreferences() {
     const { isAuthenticated } = useAuth();
 

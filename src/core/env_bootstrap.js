@@ -9,6 +9,11 @@ import fs from 'node:fs';
  */
 const BOOTSTRAP_FLAG = '__MAESTRO_ENV_BOOTSTRAPPED__';
 
+/**
+ * Executa bootstrap idempotente de variáveis de ambiente (`.env*`) e higieniza flags de cor.
+ *
+ * @returns {boolean} `true` quando bootstrap ocorre nesta chamada; `false` quando já estava aplicado.
+ */
 function ensureEnvBootstrap() {
     if (globalThis[BOOTSTRAP_FLAG]) {
         return false;

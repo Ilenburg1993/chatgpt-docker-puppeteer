@@ -1,10 +1,12 @@
 # Runtime Debug Suite - Detecção de Bugs Ocultos
 
-Esta suíte de ferramentas foi desenvolvida para identificar bugs de runtime que passam despercebidos pelos testes estáticos e unitários tradicionais.
+Esta suíte de ferramentas foi desenvolvida para identificar bugs de runtime que passam despercebidos
+pelos testes estáticos e unitários tradicionais.
 
 ## 🎯 Problema Alvo
 
 Bugs de runtime incluem:
+
 - **Memory Leaks**: Vazamentos de memória em operações de longa duração
 - **Race Conditions**: Condições de corrida em operações concorrentes
 - **Unhandled Rejections**: Promises rejeitadas não tratadas
@@ -18,21 +20,25 @@ Bugs de runtime incluem:
 **Propósito**: Cobertura abrangente com Node Inspect em todos os cenários possíveis.
 
 **O que faz**:
+
 - Executa todos os pontos de entrada com variações de configuração
 - Aplica diferentes tipos de profiling (CPU, Heap, Trace Events)
 - Gera relatórios detalhados de performance e erros
 - Detecta padrões de falha consistentes
 
 **Cenários cobertos**:
+
 - 2 pontos de entrada × 4 variações de config × 4 tipos de debug = 32 cenários
 - Cada cenário roda por tempo limitado com profiling ativo
 
 **Uso**:
+
 ```bash
 npm run debug:runtime-suite
 ```
 
 **Output**:
+
 - Relatório JSON: `debug-profiles/runtime-debug-report-{timestamp}.json`
 - Relatório HTML: `debug-profiles/runtime-debug-report-{timestamp}.html`
 - Perfis de debug: `debug-profiles/*.cpuprofile`, `*.heapprofile`
@@ -42,6 +48,7 @@ npm run debug:runtime-suite
 **Propósito**: Foco em cenários críticos específicos para bugs comuns.
 
 **Cenários especializados**:
+
 - **Memory Leak Detection**: Detecta vazamentos em operações normais
 - **Race Condition Stress**: Stress test para condições de corrida
 - **Promise Rejection Hunt**: Caça rejeições não tratadas
@@ -50,11 +57,13 @@ npm run debug:runtime-suite
 - **Error Propagation Test**: Testa propagação de erros forçados
 
 **Uso**:
+
 ```bash
 npm run debug:bug-hunter
 ```
 
 **Características**:
+
 - Monitor de runtime integrado
 - Análise de tendências de memória
 - Classificação automática de tipos de bug
@@ -65,6 +74,7 @@ npm run debug:bug-hunter
 **Propósito**: Monitoramento contínuo durante desenvolvimento.
 
 **Funcionalidades**:
+
 - Reinício automático a cada 5 minutos para detectar memory leaks
 - Monitoramento de erros e warnings em tempo real
 - Análise de tendências de memória
@@ -72,11 +82,13 @@ npm run debug:bug-hunter
 - Captura de erros críticos
 
 **Uso**:
+
 ```bash
 npm run debug:dev-monitor
 ```
 
 **Para desenvolvimento contínuo**:
+
 ```bash
 # Terminal 1: Monitor
 npm run debug:dev-monitor
@@ -103,22 +115,26 @@ npm run debug:performance
 ## 🔍 Estratégia de Detecção
 
 ### 1. **Cobertura Abrangente**
+
 - Todos os pontos de entrada possíveis
 - Variações de configuração do ambiente
 - Diferentes tipos de profiling simultâneo
 
 ### 2. **Análise de Padrões**
+
 - Padrões de erro recorrentes
 - Tendências de memória ao longo do tempo
 - Correlações entre tipos de falha
 
 ### 3. **Profiling Estratégico**
+
 - **CPU Profiling**: Detecta gargalos e operações blocking
 - **Heap Profiling**: Identifica vazamentos de memória
 - **Trace Events**: Captura eventos do Node.js e V8
 - **Async Stack Traces**: Stack traces completas para debugging
 
 ### 4. **Monitoramento Contínuo**
+
 - Reinícios programados para detectar leaks acumulados
 - Monitoramento de recursos em tempo real
 - Alertas para condições anômalas
@@ -126,6 +142,7 @@ npm run debug:performance
 ## 📊 Interpretação dos Resultados
 
 ### Relatórios JSON
+
 ```json
 {
   "summary": {
@@ -143,32 +160,38 @@ npm run debug:performance
 ```
 
 ### Análise de Memória
+
 - **Stable**: Memória consistente
 - **Increasing**: Possível vazamento (investigar)
 - **Decreasing**: Liberação adequada
 
 ### Padrões de Erro
+
 - **Frequência > 3**: Padrão crítico, investigar imediatamente
 - **Correlação com cenários**: Identificar condições triggers
 
 ## 🐛 Tipos de Bugs Detectados
 
 ### Memory Leaks
+
 - Sintomas: Tendência `increasing`, picos de memória crescentes
 - Causa comum: Event listeners não removidos, closures retendo referências
 - Debugging: Heap snapshots, trace de alocação
 
 ### Race Conditions
+
 - Sintomas: Erros intermitentes, estados inconsistentes
 - Causa comum: Acesso concorrente sem sincronização
 - Debugging: Async stack traces, trace events
 
 ### Unhandled Rejections
+
 - Sintomas: `UnhandledPromiseRejectionWarning`
 - Causa comum: Promises sem `.catch()`
 - Debugging: `--unhandled-rejections=strict`
 
 ### Event Loop Blocking
+
 - Sintomas: CPU profiling mostra operações síncronas longas
 - Causa comum: Loops grandes, operações I/O síncronas
 - Debugging: CPU profiles, `--trace-sync-io`
@@ -176,6 +199,7 @@ npm run debug:performance
 ## 🚀 Uso em CI/CD
 
 ### GitHub Actions
+
 ```yaml
 - name: Runtime Bug Detection
   run: npm run debug:bug-hunter
@@ -188,6 +212,7 @@ npm run debug:performance
 ```
 
 ### Thresholds de Qualidade
+
 ```bash
 # Sucesso se: erros < 5 E memory trend != increasing
 npm run debug:bug-hunter && node scripts/check-debug-thresholds.js
@@ -208,6 +233,7 @@ debug-profiles/
 ## 🔧 Configuração Avançada
 
 ### Variáveis de Ambiente
+
 ```bash
 # Controle de profiling
 DEBUG_PROFILE_DURATION=30000
@@ -220,6 +246,7 @@ DEBUG_WARNING_PATTERNS="deprecated,ExperimentalWarning"
 ```
 
 ### Custom Scenarios
+
 ```javascript
 // Adicionar cenários personalizados em runtime-debug-suite.js
 const CUSTOM_SCENARIOS = [
@@ -228,22 +255,25 @@ const CUSTOM_SCENARIOS = [
     script: 'src/main.js',
     args: ['--stress-test'],
     env: { STRESS_LEVEL: 'high' },
-    duration: 120000
-  }
+    duration: 120000,
+  },
 ];
 ```
 
 ## 🎯 Quando Usar
 
 ### Desenvolvimento
+
 - `npm run debug:dev-monitor` - Monitoramento contínuo
 - `npm run debug:bug-hunter` - Verificação rápida antes de commit
 
 ### CI/CD
+
 - `npm run debug:runtime-suite` - Cobertura completa em pipeline
 - `npm run debug:memory-leak` - Verificação específica de leaks
 
 ### Debugging de Produção
+
 - `npm run debug:performance` - Análise de performance
 - `npm run debug:race-condition` - Debugging de concorrência
 
@@ -253,4 +283,4 @@ const CUSTOM_SCENARIOS = [
 - **Detection Rate**: >90% de bugs de runtime identificados
 - **False Positives**: <5% com análise de padrões
 - **Performance Impact**: <10% overhead em desenvolvimento</content>
-<parameter name="filePath">/workspaces/chatgpt-docker-puppeteer/RUNTIME_DEBUG_README.md
+  <parameter name="filePath">/workspaces/chatgpt-docker-puppeteer/RUNTIME_DEBUG_README.md

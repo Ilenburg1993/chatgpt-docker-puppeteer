@@ -1,8 +1,4 @@
-import {
-    DEFAULT_OLLAMA_BASE_URL,
-    DEFAULT_EMBEDDING_MODEL,
-    DEFAULT_OLLAMA_EMBED_MAX_CHARS
-} from '../contract.mjs';
+import { DEFAULT_OLLAMA_BASE_URL, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_EMBED_MAX_CHARS } from '../contract.mjs';
 
 function normalizeEmbeddingBaseUrl(rawBaseUrl) {
     const raw = String(rawBaseUrl || '').trim();
@@ -27,7 +23,9 @@ function parsePositiveInt(rawValue, fallback) {
 }
 
 function parseBoolean(rawValue, fallback = true) {
-    const normalized = String(rawValue ?? '').trim().toLowerCase();
+    const normalized = String(rawValue ?? '')
+        .trim()
+        .toLowerCase();
     if (!normalized) return fallback;
     if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
     if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
@@ -65,7 +63,7 @@ function isTransientError(error) {
 }
 
 function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -103,7 +101,10 @@ export class OllamaEmbeddingsProvider {
         this.baseURL = resolveEmbeddingBaseUrl(options.baseURL);
         this.model = options.model || DEFAULT_EMBEDDING_MODEL;
         this.timeoutMs = options.timeoutMs || 30_000;
-        this.maxChars = parsePositiveInt(options.maxChars ?? process.env.OLLAMA_EMBED_MAX_CHARS, DEFAULT_OLLAMA_EMBED_MAX_CHARS);
+        this.maxChars = parsePositiveInt(
+            options.maxChars ?? process.env.OLLAMA_EMBED_MAX_CHARS,
+            DEFAULT_OLLAMA_EMBED_MAX_CHARS
+        );
         this.contextFastShrink = parseBoolean(
             options.contextFastShrink ?? process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK,
             true
@@ -125,16 +126,14 @@ export class OllamaEmbeddingsProvider {
             ok: Boolean(version) && Array.isArray(models?.data),
             version,
             models: modelIds,
-            hasModel
+            hasModel,
         };
     }
 
     async embed(text) {
         this.embedCalls++;
         const originalText = String(text ?? '');
-        const effectiveCap = this.runtimeSafeChars
-            ? Math.min(this.maxChars, this.runtimeSafeChars)
-            : this.maxChars;
+        const effectiveCap = this.runtimeSafeChars ? Math.min(this.maxChars, this.runtimeSafeChars) : this.maxChars;
         let truncatedText = originalText;
 
         if (truncatedText.length > effectiveCap) {
@@ -157,7 +156,7 @@ export class OllamaEmbeddingsProvider {
                 if (hadContextOverflow) {
                     console.warn(
                         `[RAG] Context limit adapted input ${initialInputLength} → ${currentInput.length} chars ` +
-                        `(${contextOverflowsThisCall} reductions, runtime_safe_chars=${this.runtimeSafeChars})`
+                            `(${contextOverflowsThisCall} reductions, runtime_safe_chars=${this.runtimeSafeChars})`
                     );
                 }
                 if (hadContextOverflow || this.embedCalls - this.lastStatsCall >= 100) {
@@ -212,7 +211,7 @@ export class OllamaEmbeddingsProvider {
             timeoutMs: this.timeoutMs,
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
         });
         const elapsed = Math.max(0, Date.now() - startTime);
 
@@ -228,7 +227,7 @@ export class OllamaEmbeddingsProvider {
         this.lastStatsCall = this.embedCalls;
         console.log(
             `[RAG] Embed context stats overflows=${this.contextOverflowCount} ` +
-            `max_ok_chars=${this.maxAcceptedChars} runtime_safe_chars=${this.runtimeSafeChars ?? 'n/a'}`
+                `max_ok_chars=${this.maxAcceptedChars} runtime_safe_chars=${this.runtimeSafeChars ?? 'n/a'}`
         );
     }
 }
@@ -241,7 +240,7 @@ async function fetchJson(url, options = {}) {
             method: options.method || 'GET',
             headers: options.headers,
             body: options.body,
-            signal: controller.signal
+            signal: controller.signal,
         });
         if (!res.ok) {
             const text = await res.text().catch(() => '');

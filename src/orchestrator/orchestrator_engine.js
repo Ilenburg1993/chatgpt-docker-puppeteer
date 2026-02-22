@@ -489,64 +489,70 @@ class OrchestratorEngine {
             // Adiciona output ao ContextManager (para contexto avançado)
             await this.contextManager.addStepOutput(workflow_id, currentStep.id, output);
 
-        const nextTask = this._withState(task, {
-            workflow_state: {
-                current_step_index: currentStepIndex + 1,
-                completed_steps: workflowState.completed_steps,
-                failed_steps: workflowState.failed_steps,
-                accumulated_context: workflowState.accumulated_context,
-            },
-        });
+            const nextTask = this._withState(task, {
+                workflow_state: {
+                    current_step_index: currentStepIndex + 1,
+                    completed_steps: workflowState.completed_steps,
+                    failed_steps: workflowState.failed_steps,
+                    accumulated_context: workflowState.accumulated_context,
+                },
+            });
 
-        await this._emitNervEvent('WORKFLOW_STEP_COMPLETED', {
-            workflow_id,
-            step_id: currentStep.id,
-            step_index: currentStepIndex,
-            total_steps: workflowState.steps.length,
-        });
-
-        // Verifica se tem próximo step
-        const nextStepIndex = currentStepIndex + 1;
-        if (nextStepIndex >= workflowState.steps.length) {
-            // Workflow completo
-            logger.info(`[OrchestratorEngine] Workflow ${workflow_id} completed (${workflowState.steps.length} steps)`);
-
-            this.activeWorkflows.delete(workflow_id);
-
-            // Limpa contexto do workflow
-            this.contextManager.clearContext(workflow_id);
-
-            await this._emitNervEvent('ORCHESTRATION_COMPLETED', {
-                task_id: task.meta.id,
+            await this._emitNervEvent('WORKFLOW_STEP_COMPLETED', {
                 workflow_id,
-                strategy: 'MULTI_STEP',
+                step_id: currentStep.id,
+                step_index: currentStepIndex,
                 total_steps: workflowState.steps.length,
             });
 
-            return {
-                action: 'DONE',
-                task: nextTask,
-                feedback: `Workflow completed: ${workflowState.completed_steps.length} steps`,
-            };
-        }
+            // Verifica se tem próximo step
+            const nextStepIndex = currentStepIndex + 1;
+            if (nextStepIndex >= workflowState.steps.length) {
+                // Workflow completo
+                logger.info(
+                    `[OrchestratorEngine] Workflow ${workflow_id} completed (${workflowState.steps.length} steps)`
+                );
 
-        // Tem próximo step: Prepara next step task
-        workflowState.current_step_index = nextStepIndex;
-        const nextStep = workflowState.steps[nextStepIndex];
+                this.activeWorkflows.delete(workflow_id);
 
-        logger.info(
-            `[OrchestratorEngine] Workflow ${workflow_id} moving to step ${nextStepIndex + 1}/${workflowState.steps.length}: ${nextStep.name}`
-        );
+                // Limpa contexto do workflow
+                this.contextManager.clearContext(workflow_id);
 
-        await this._emitNervEvent('WORKFLOW_STEP_STARTED', {
-            workflow_id,
-            step_id: nextStep.id,
-            step_index: nextStepIndex,
-            total_steps: workflowState.steps.length,
-        });
+                await this._emitNervEvent('ORCHESTRATION_COMPLETED', {
+                    task_id: task.meta.id,
+                    workflow_id,
+                    strategy: 'MULTI_STEP',
+                    total_steps: workflowState.steps.length,
+                });
 
-        // Prepara prompt do próximo step (injeta contexto acumulado + RAG auto-injection)
-        const nextStepPrompt = await this._buildStepPrompt(nextStep, workflowState.accumulated_context, workflow_id);
+                return {
+                    action: 'DONE',
+                    task: nextTask,
+                    feedback: `Workflow completed: ${workflowState.completed_steps.length} steps`,
+                };
+            }
+
+            // Tem próximo step: Prepara next step task
+            workflowState.current_step_index = nextStepIndex;
+            const nextStep = workflowState.steps[nextStepIndex];
+
+            logger.info(
+                `[OrchestratorEngine] Workflow ${workflow_id} moving to step ${nextStepIndex + 1}/${workflowState.steps.length}: ${nextStep.name}`
+            );
+
+            await this._emitNervEvent('WORKFLOW_STEP_STARTED', {
+                workflow_id,
+                step_id: nextStep.id,
+                step_index: nextStepIndex,
+                total_steps: workflowState.steps.length,
+            });
+
+            // Prepara prompt do próximo step (injeta contexto acumulado + RAG auto-injection)
+            const nextStepPrompt = await this._buildStepPrompt(
+                nextStep,
+                workflowState.accumulated_context,
+                workflow_id
+            );
 
             return {
                 action: 'NEXT_STEP',

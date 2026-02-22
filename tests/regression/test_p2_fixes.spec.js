@@ -7,6 +7,7 @@ import { HandleManager } from '#driver/modules/handle_manager';
 // TEST 1: Shutdown - Isolamento de Erros Por Fase
 // ============================================================================
 
+/** Função exportada: testShutdownPhaseIsolation. */
 async function testShutdownPhaseIsolation() {
     console.log('\n=== TEST 1: Shutdown - Isolamento de Erros ===');
 
@@ -24,14 +25,14 @@ async function testShutdownPhaseIsolation() {
                         await new Promise(resolve => {
                             setTimeout(resolve, 10);
                         });
-                    }
+                    },
                 },
                 {
                     name: 'Phase2-Fail',
                     fn: async () => {
                         // Fase que falha
                         throw new Error('SIMULATED_ERROR');
-                    }
+                    },
                 },
                 {
                     name: 'Phase3-Success',
@@ -40,14 +41,14 @@ async function testShutdownPhaseIsolation() {
                         await new Promise(resolve => {
                             setTimeout(resolve, 10);
                         });
-                    }
+                    },
                 },
                 {
                     name: 'Phase4-Fail',
                     fn: async () => {
                         // Segunda fase que falha
                         throw new Error('ANOTHER_ERROR');
-                    }
+                    },
                 },
                 {
                     name: 'Phase5-Success',
@@ -56,8 +57,8 @@ async function testShutdownPhaseIsolation() {
                         await new Promise(resolve => {
                             setTimeout(resolve, 10);
                         });
-                    }
-                }
+                    },
+                },
             ];
 
             // Executa com try-catch isolado
@@ -129,6 +130,7 @@ async function testShutdownPhaseIsolation() {
 // TEST 2: HandleManager - AbortController Funcionamento
 // ============================================================================
 
+/** Função exportada: testHandleManagerAbort. */
 async function testHandleManagerAbort() {
     console.log('\n=== TEST 2: HandleManager - AbortController ===');
 
@@ -146,7 +148,7 @@ async function testHandleManagerAbort() {
                     await new Promise(resolve => {
                         setTimeout(resolve, 500);
                     });
-                }
+                },
             });
         }
 
@@ -199,6 +201,7 @@ async function testHandleManagerAbort() {
 // TEST 3: HandleManager - Cleanup Completo (sem timeout)
 // ============================================================================
 
+/** Função exportada: testHandleManagerComplete. */
 async function testHandleManagerComplete() {
     console.log('\n=== TEST 3: HandleManager - Cleanup Completo ===');
 
@@ -214,7 +217,7 @@ async function testHandleManagerComplete() {
                     await new Promise(resolve => {
                         setTimeout(resolve, 50);
                     });
-                }
+                },
             });
         }
 
@@ -257,6 +260,7 @@ async function testHandleManagerComplete() {
 // TEST 4: HandleManager - Handles com Erro Individual
 // ============================================================================
 
+/** Função exportada: testHandleManagerWithErrors. */
 async function testHandleManagerWithErrors() {
     console.log('\n=== TEST 4: HandleManager - Handles com Erros Individuais ===');
 
@@ -269,28 +273,28 @@ async function testHandleManagerWithErrors() {
             {
                 dispose: async () => {
                     /* OK */
-                }
+                },
             },
             {
                 dispose: async () => {
                     throw new Error('DISPOSE_ERROR_1');
-                }
+                },
             },
             {
                 dispose: async () => {
                     /* OK */
-                }
+                },
             },
             {
                 dispose: async () => {
                     throw new Error('DISPOSE_ERROR_2');
-                }
+                },
             },
             {
                 dispose: async () => {
                     /* OK */
-                }
-            }
+                },
+            },
         ];
 
         mockHandles.forEach(h => manager.register(h));
@@ -321,11 +325,11 @@ async function testHandleManagerWithErrors() {
 // TEST 5: Validação de Código Modificado
 // ============================================================================
 
+/** Função exportada: testCodeValidation. */
 async function testCodeValidation() {
     console.log('\n=== TEST 5: Validação de Código Modificado ===');
 
     try {
-
         console.log('> Verificando arquivos modificados...');
 
         // Valida src/main.js
@@ -386,6 +390,7 @@ async function testCodeValidation() {
 // EXECUTOR PRINCIPAL
 // ============================================================================
 
+/** Função exportada: runAllTests. */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
     console.log('║  Suite de Testes - Correções P2 (Critical Cases Analysis)   ║');
@@ -396,7 +401,7 @@ async function runAllTests() {
         { name: 'HandleManager AbortController', fn: testHandleManagerAbort },
         { name: 'HandleManager Cleanup Completo', fn: testHandleManagerComplete },
         { name: 'HandleManager com Erros', fn: testHandleManagerWithErrors },
-        { name: 'Validação de Código', fn: testCodeValidation }
+        { name: 'Validação de Código', fn: testCodeValidation },
     ];
 
     const results = [];
@@ -444,4 +449,11 @@ if (import.meta.filename === process.argv[1]) {
     });
 }
 
-export { testShutdownPhaseIsolation, testHandleManagerAbort, testHandleManagerComplete, testHandleManagerWithErrors, testCodeValidation, runAllTests };
+export {
+    testShutdownPhaseIsolation,
+    testHandleManagerAbort,
+    testHandleManagerComplete,
+    testHandleManagerWithErrors,
+    testCodeValidation,
+    runAllTests,
+};

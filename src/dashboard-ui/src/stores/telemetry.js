@@ -53,6 +53,7 @@ class MetricBuffer {
     }
 }
 
+/** Constante/valor exportado: useTelemetryStore. */
 export const useTelemetryStore = defineStore('telemetry', {
     state: () => ({
         // Métricas atuais
@@ -64,7 +65,7 @@ export const useTelemetryStore = defineStore('telemetry', {
             event_loop: { lag_ms: 0 },
             nerv: { latency_ms: 0, throughput: 0, event_count: 0 },
             queue: { size: 0, hitRate: 0 },
-            system: {}
+            system: {},
         },
 
         // Buffers de histórico local
@@ -73,7 +74,7 @@ export const useTelemetryStore = defineStore('telemetry', {
             memory: new MetricBuffer(120),
             heap: new MetricBuffer(120),
             eventLoop: new MetricBuffer(120),
-            queueSize: new MetricBuffer(120)
+            queueSize: new MetricBuffer(120),
         },
 
         // Status de conexão
@@ -85,79 +86,79 @@ export const useTelemetryStore = defineStore('telemetry', {
         samplesReceived: 0,
 
         // Erro
-        error: null
+        error: null,
     }),
 
     getters: {
         /**
          * Uso de CPU atual (% real)
          */
-        cpuLoad: (state) => state.current.cpu.usage_percent,
+        cpuLoad: state => state.current.cpu.usage_percent,
 
         /**
          * Load average de 1 min (não percentual)
          */
-        cpuLoad1m: (state) => state.current.cpu.load_1min,
+        cpuLoad1m: state => state.current.cpu.load_1min,
 
         /**
          * Uso de memória em %
          */
-        memoryUsage: (state) => state.current.memory.usage_percent,
+        memoryUsage: state => state.current.memory.usage_percent,
 
         /**
          * Uso de heap em %
          */
-        heapUsage: (state) => state.current.heap.usage_percent,
+        heapUsage: state => state.current.heap.usage_percent,
 
         /**
          * Lag do event loop em ms
          */
-        eventLoopLag: (state) => state.current.event_loop.lag_ms,
+        eventLoopLag: state => state.current.event_loop.lag_ms,
 
         /**
          * Tamanho da fila
          */
-        queueSize: (state) => state.current.queue.size,
+        queueSize: state => state.current.queue.size,
 
         /**
          * Histórico de CPU (últimos 60 pontos)
          */
-        cpuHistory: (state) => state.history.cpu.getLast(60),
+        cpuHistory: state => state.history.cpu.getLast(60),
 
         /**
          * Histórico de memória (últimos 60 pontos)
          */
-        memoryHistory: (state) => state.history.memory.getLast(60),
+        memoryHistory: state => state.history.memory.getLast(60),
 
         /**
          * Histórico de heap (últimos 60 pontos)
          */
-        heapHistory: (state) => state.history.heap.getLast(60),
+        heapHistory: state => state.history.heap.getLast(60),
 
         /**
          * Médias
          */
-        averages: (state) => ({
+        averages: state => ({
             cpu: state.history.cpu.average.toFixed(2),
             memory: state.history.memory.average.toFixed(1),
             heap: state.history.heap.average.toFixed(1),
-            eventLoop: state.history.eventLoop.average.toFixed(1)
+            eventLoop: state.history.eventLoop.average.toFixed(1),
         }),
 
         /**
          * Máximos
          */
-        maxValues: (state) => ({
+        maxValues: state => ({
             cpu: state.history.cpu.max.toFixed(2),
             memory: state.history.memory.max.toFixed(1),
             heap: state.history.heap.max.toFixed(1),
-            eventLoop: state.history.eventLoop.max.toFixed(0)
+            eventLoop: state.history.eventLoop.max.toFixed(0),
         }),
 
         /**
          * Status de saúde baseado nas métricas
          */
-        healthStatus: (state) => {
+        healthStatus: state => {
             const heap = state.current.heap.usage_percent;
             const memory = state.current.memory.usage_percent;
             const eventLoop = state.current.event_loop.lag_ms;
@@ -169,7 +170,7 @@ export const useTelemetryStore = defineStore('telemetry', {
                 return 'warning';
             }
             return 'healthy';
-        }
+        },
     },
 
     actions: {
@@ -245,7 +246,7 @@ export const useTelemetryStore = defineStore('telemetry', {
         updateMetrics(metrics) {
             this.current = {
                 ...this.current,
-                ...metrics
+                ...metrics,
             };
 
             // Adiciona aos buffers locais
@@ -294,6 +295,6 @@ export const useTelemetryStore = defineStore('telemetry', {
          */
         clearError() {
             this.error = null;
-        }
-    }
+        },
+    },
 });

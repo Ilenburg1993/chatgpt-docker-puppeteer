@@ -23,7 +23,7 @@ const FRAME_NAV_CONFIG = {
     DISPOSE_RETRY_ATTEMPTS: parseInt(process.env.FRAME_NAV_DISPOSE_RETRIES || '3'),
 
     /** Delay entre retries de dispose (ms) - Default: 100ms */
-    DISPOSE_RETRY_DELAY_MS: parseInt(process.env.FRAME_NAV_DISPOSE_DELAY || '100')
+    DISPOSE_RETRY_DELAY_MS: parseInt(process.env.FRAME_NAV_DISPOSE_DELAY || '100'),
 };
 
 /**
@@ -55,7 +55,7 @@ const FRAME_NAV_EVENTS = {
     SECURITY_BARRIER_DETECTED: 'frame_nav:security_barrier_detected',
 
     /** Emitido quando max depth atingido */
-    MAX_DEPTH_REACHED: 'frame_nav:max_depth_reached'
+    MAX_DEPTH_REACHED: 'frame_nav:max_depth_reached',
 };
 
 /**
@@ -168,7 +168,7 @@ class FrameNavigator extends EventEmitter {
             totalSecurityBarriers: 0,
             totalInfraBarriers: 0,
             totalNavigationDuration: 0,
-            maxNavigationDuration: 0
+            maxNavigationDuration: 0,
         };
     }
 
@@ -224,7 +224,7 @@ class FrameNavigator extends EventEmitter {
             ctx: this.driver.page,
             offsetX: 0,
             offsetY: 0,
-            frameStack: []
+            frameStack: [],
         };
 
         // Caso base: Elemento está na raiz (Root)
@@ -252,7 +252,7 @@ class FrameNavigator extends EventEmitter {
         // [V500] Sinaliza início da navegação profunda
         this.driver._emitVital('PROGRESS_UPDATE', {
             step: 'FRAME_NAVIGATION_START',
-            path: protocol.framePath
+            path: protocol.framePath,
         });
 
         let currentLevel = this.driver.page;
@@ -264,7 +264,7 @@ class FrameNavigator extends EventEmitter {
             if (signal?.aborted) {
                 throw new FrameNavError('ABORTED', 'Navigation aborted', {
                     path: protocol.framePath,
-                    depth: result.frameStack.length
+                    depth: result.frameStack.length,
                 });
             }
 
@@ -274,13 +274,13 @@ class FrameNavigator extends EventEmitter {
 
                 this.emit(FRAME_NAV_EVENTS.MAX_DEPTH_REACHED, {
                     depth: result.frameStack.length,
-                    path: protocol.framePath
+                    path: protocol.framePath,
                 });
 
                 this.driver._emitVital('TRIAGE_ALERT', {
                     type: 'MAX_DEPTH_REACHED',
                     severity: 'MEDIUM',
-                    evidence: { depth: result.frameStack.length, path: protocol.framePath }
+                    evidence: { depth: result.frameStack.length, path: protocol.framePath },
                 });
 
                 this.stats.totalBarriersDetected++;
@@ -291,13 +291,13 @@ class FrameNavigator extends EventEmitter {
             if (part === 'barrier') {
                 this.emit(FRAME_NAV_EVENTS.INFRA_BARRIER_DETECTED, {
                     path: protocol.framePath,
-                    depth: result.frameStack.length
+                    depth: result.frameStack.length,
                 });
 
                 this.driver._emitVital('TRIAGE_ALERT', {
                     type: 'INFRA_BARRIER_DETECTED',
                     severity: 'HIGH',
-                    evidence: { reason: 'SADI_BARRIER_SIGNAL' }
+                    evidence: { reason: 'SADI_BARRIER_SIGNAL' },
                 });
 
                 this.stats.totalBarriersDetected++;
@@ -350,20 +350,20 @@ class FrameNavigator extends EventEmitter {
                         // [V500] Reporta sucesso na entrada do nível
                         this.emit(FRAME_NAV_EVENTS.FRAME_ENTERED, {
                             frame: targetSig,
-                            depth: result.frameStack.length
+                            depth: result.frameStack.length,
                         });
 
                         this.driver._emitVital('PROGRESS_UPDATE', {
                             step: 'FRAME_ENTERED',
                             frame: targetSig,
-                            depth: result.frameStack.length
+                            depth: result.frameStack.length,
                         });
                     } else {
                         log('WARN', `[FRAME_NAV] Falha ao acessar conteúdo do frame: ${targetSig}`, correlationId);
 
                         this.emit(FRAME_NAV_EVENTS.FRAME_ENTRY_FAILED, {
                             frame: targetSig,
-                            reason: 'CONTENT_FRAME_NULL'
+                            reason: 'CONTENT_FRAME_NULL',
                         });
 
                         await this._disposeWithRetry(element, 'element');
@@ -374,7 +374,7 @@ class FrameNavigator extends EventEmitter {
 
                     this.emit(FRAME_NAV_EVENTS.FRAME_ENTRY_FAILED, {
                         frame: targetSig,
-                        reason: 'ELEMENT_NOT_FOUND'
+                        reason: 'ELEMENT_NOT_FOUND',
                     });
 
                     break;
@@ -431,7 +431,7 @@ class FrameNavigator extends EventEmitter {
      */
     async getExecutionContext(protocol, signal) {
         this.emit(FRAME_NAV_EVENTS.NAVIGATION_STARTED, {
-            path: protocol?.framePath
+            path: protocol?.framePath,
         });
 
         this.stats.totalNavigations++;
@@ -441,7 +441,7 @@ class FrameNavigator extends EventEmitter {
             // ✅ BUG #4 fix: Timeout protection
             const result = await Promise.race([
                 this._executeGetExecutionContext(protocol, signal),
-                this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext')
+                this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext'),
             ]);
 
             const duration = Date.now() - startTime;
@@ -452,12 +452,12 @@ class FrameNavigator extends EventEmitter {
             this.emit(FRAME_NAV_EVENTS.NAVIGATION_COMPLETED, {
                 path: protocol?.framePath,
                 depth: result.frameStack.length,
-                duration
+                duration,
             });
 
             this.driver._emitVital('PROGRESS_UPDATE', {
                 step: 'FRAME_NAVIGATION_COMPLETE',
-                depth: result.frameStack.length
+                depth: result.frameStack.length,
             });
 
             return result;
@@ -468,7 +468,7 @@ class FrameNavigator extends EventEmitter {
 
             this.emit(FRAME_NAV_EVENTS.NAVIGATION_FAILED, {
                 path: protocol?.framePath,
-                error: lineageErr.message
+                error: lineageErr.message,
             });
 
             // [V500] Alerta de segurança: Provável bloqueio de Cross-Origin (CORS/CSP)
@@ -478,17 +478,17 @@ class FrameNavigator extends EventEmitter {
 
                 this.emit(FRAME_NAV_EVENTS.SECURITY_BARRIER_DETECTED, {
                     path: protocol?.framePath,
-                    error: lineageErr.message
+                    error: lineageErr.message,
                 });
 
                 this.driver._emitVital('TRIAGE_ALERT', {
                     type: 'SECURITY_BARRIER_HIT',
                     severity: 'HIGH',
-                    evidence: { error: lineageErr.message, path: protocol?.framePath }
+                    evidence: { error: lineageErr.message, path: protocol?.framePath },
                 });
 
                 throw new FrameNavError('SECURITY_BARRIER', lineageErr.message, {
-                    path: protocol?.framePath
+                    path: protocol?.framePath,
                 });
             }
 
@@ -536,7 +536,7 @@ class FrameNavigator extends EventEmitter {
                 this.stats.successfulNavigations > 0
                     ? (this.stats.totalFramesTraversed / this.stats.successfulNavigations).toFixed(2)
                     : '0',
-            config: { ...FRAME_NAV_CONFIG }
+            config: { ...FRAME_NAV_CONFIG },
         };
     }
 
@@ -553,7 +553,7 @@ class FrameNavigator extends EventEmitter {
             setTimeout(() => {
                 const error = new FrameNavError('TIMEOUT', `Timeout in ${operation} after ${ms}ms`, {
                     timeout: ms,
-                    operation
+                    operation,
                 });
                 reject(error);
             }, ms);

@@ -53,7 +53,7 @@ function createBackpressure({ telemetry }) {
         telemetry.emit('nerv:buffer:pressure', {
             buffer,
             size,
-            limit
+            limit,
         });
     }
 
@@ -63,13 +63,13 @@ function createBackpressure({ telemetry }) {
     function relief({ buffer, size }) {
         telemetry.emit('nerv:buffer:relief', {
             buffer,
-            size
+            size,
         });
     }
 
     return Object.freeze({
         signal,
-        relief
+        relief,
     });
 }
 

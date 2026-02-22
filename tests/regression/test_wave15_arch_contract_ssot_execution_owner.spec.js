@@ -17,7 +17,11 @@ test('wave15: contrato de ownership SSOT de dispatch está registrado em archite
     assert.equal(contract.kind, 'static');
     assert.equal(contract.enforcement?.level, 'warn');
 
-    assert.match(String(contract.matcher?.pattern || ''), /kernel\\\.executeTask/, 'matcher deve vigiar dispatch direto');
+    assert.match(
+        String(contract.matcher?.pattern || ''),
+        /kernel\\\.executeTask/,
+        'matcher deve vigiar dispatch direto'
+    );
     assert.ok(
         Array.isArray(contract.allowlist?.files) && contract.allowlist.files.includes('src/agent/queue_worker.js'),
         'QueueWorker deve estar explicitamente allowlisted como owner legítimo de dispatch'

@@ -1,33 +1,51 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mission Control Dashboard</title>
-    <script>
-      // DIAGNÓSTICO: captura erros no console
-      window.addEventListener('error', function(e) {
-        console.error('[ERROR]', e.message, e.filename, e.lineno);
-        document.body.innerHTML += '<div style="background:red;color:white;padding:20px;font-size:18px;">ERROR: ' + e.message + '</div>';
-      });
-      window.addEventListener('unhandledrejection', function(e) {
-        console.error('[UNHANDLED PROMISE]', e.reason);
-        document.body.innerHTML += '<div style="background:orange;color:white;padding:20px;font-size:18px;">PROMISE ERROR: ' + e.reason + '</div>';
-      });
-      console.info('[DIAGNÓSTICO] HTML carregado, aguardando Vue...');
-    </script>
-  </head>
-  <body>
-    <div id="app">
-      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0e1a;color:#fff;font-family:sans-serif;">
-        <div style="text-align:center;">
-          <div style="font-size:48px;margin-bottom:20px;">⏳</div>
-          <div style="font-size:24px;">Loading Vue App...</div>
-          <div style="font-size:14px;color:#94a3b8;margin-top:10px;">If this message persists, check browser console (F12)</div>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Mission Control Dashboard</title>
+        <script>
+            // DIAGNÓSTICO: captura erros no console
+            window.addEventListener('error', function (e) {
+                console.error('[ERROR]', e.message, e.filename, e.lineno);
+                document.body.innerHTML +=
+                    '<div style="background:red;color:white;padding:20px;font-size:18px;">ERROR: ' +
+                    e.message +
+                    '</div>';
+            });
+            window.addEventListener('unhandledrejection', function (e) {
+                console.error('[UNHANDLED PROMISE]', e.reason);
+                document.body.innerHTML +=
+                    '<div style="background:orange;color:white;padding:20px;font-size:18px;">PROMISE ERROR: ' +
+                    e.reason +
+                    '</div>';
+            });
+            console.info('[DIAGNÓSTICO] HTML carregado, aguardando Vue...');
+        </script>
+    </head>
+    <body>
+        <div id="app">
+            <div
+                style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    background: #0a0e1a;
+                    color: #fff;
+                    font-family: sans-serif;
+                "
+            >
+                <div style="text-align: center">
+                    <div style="font-size: 48px; margin-bottom: 20px">⏳</div>
+                    <div style="font-size: 24px">Loading Vue App...</div>
+                    <div style="font-size: 14px; color: #94a3b8; margin-top: 10px">
+                        If this message persists, check browser console (F12)
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+        <script type="module" src="/src/main.js"></script>
+    </body>
 </html>

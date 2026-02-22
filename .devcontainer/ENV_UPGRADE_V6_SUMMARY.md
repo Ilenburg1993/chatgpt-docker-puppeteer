@@ -1,9 +1,7 @@
 # ENV System Upgrade v6.0 - Summary
 
-**Documento**: ENV_UPGRADE_V6_SUMMARY.md
-**Data**: 2026-02-03
-**Versão**: 6.0
-**Status**: ✅ IMPLEMENTADO (Fase 1 completa)
+**Documento**: ENV_UPGRADE_V6_SUMMARY.md **Data**: 2026-02-03 **Versão**: 6.0 **Status**: ✅
+IMPLEMENTADO (Fase 1 completa)
 
 ---
 
@@ -12,6 +10,7 @@
 ### O Que Foi Feito
 
 Sistema de variáveis de ambiente completamente reestruturado com:
+
 - **Nova taxonomia** (4 categorias em vez de 2)
 - **Validação estratificada** por NODE_ENV
 - **Trap handler aprimorado** com snapshot de ENV
@@ -20,9 +19,9 @@ Sistema de variáveis de ambiente completamente reestruturado com:
 
 ### Impacto
 
-✅ **Desenvolvedor**: Mensagens de erro mais claras com diagnóstico preciso de ENVs
-✅ **Produção**: Validação mais rigorosa previne deployments com ENV incorreta
-✅ **Manutenção**: Categorização facilita entender qual ENV é crítica
+✅ **Desenvolvedor**: Mensagens de erro mais claras com diagnóstico preciso de ENVs ✅ **Produção**:
+Validação mais rigorosa previne deployments com ENV incorreta ✅ **Manutenção**: Categorização
+facilita entender qual ENV é crítica
 
 ---
 
@@ -31,12 +30,14 @@ Sistema de variáveis de ambiente completamente reestruturado com:
 ### 1. Nova Taxonomia de Variáveis (4 Categorias)
 
 #### Antes (v5.2.2):
+
 ```
 STRUCTURAL (1 variável) → NODE_ENV
 OPERATIONAL (4 variáveis) → SERVER_PORT, CHROME_HOST, CHROME_PORT, CHROME_PROXY_PORT
 ```
 
 #### Depois (v6.0):
+
 ```
 STRUCTURAL (4 variáveis)
   → NODE_ENV, SERVER_MODE, SERVER_AUTHORITY, BROWSER_MODE
@@ -54,6 +55,7 @@ FEATURE_FLAGS (3 variáveis)
 ### 2. Validação Estratificada por NODE_ENV
 
 #### Modo Production:
+
 ```bash
 STRUCTURAL     → FATAL (exit 1)
 INFRASTRUCTURE → FATAL (exit 1)
@@ -62,6 +64,7 @@ FEATURE_FLAGS  → INFO
 ```
 
 #### Modo Development/Test:
+
 ```bash
 STRUCTURAL     → FATAL (exit 1)
 INFRASTRUCTURE → WARNING
@@ -87,6 +90,7 @@ Implementadas:
 ### 4. Trap Handler com ENV Snapshot
 
 #### Antes (v5.2.2):
+
 ```bash
 cleanup_on_error() {
     echo "ERROR: Exit code ${exit_code}"
@@ -96,6 +100,7 @@ cleanup_on_error() {
 ```
 
 #### Depois (v6.0):
+
 ```bash
 cleanup_on_error() {
     # Cria snapshot completo de ENV
@@ -119,7 +124,9 @@ cleanup_on_error() {
 ### 5. Deprecação de PORT
 
 #### Arquivos Modificados:
+
 1. **.devcontainer/devcontainer.json**:
+
    ```jsonc
    // Antes
    "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
@@ -131,6 +138,7 @@ cleanup_on_error() {
    ```
 
 2. **.env.development**:
+
    ```bash
    # Antes
    SERVER_PORT=3008
@@ -152,6 +160,7 @@ cleanup_on_error() {
 ### 1. post-create.sh (v5.2.2 → v6.0)
 
 **Mudanças**:
+
 - Versão: v5.2.2 → v6.0
 - Linhas modificadas: ~180
 - Arrays expandidos: STRUCTURAL (1→4), INFRASTRUCTURE (novo, 6), OPERATIONAL (4→13), FLAGS (novo, 3)
@@ -161,6 +170,7 @@ cleanup_on_error() {
 - Referências atualizadas para ENV_ANALYSIS_V6.md
 
 **Seções alteradas**:
+
 - SECTION 3 (ENV VALIDATION): Completamente reestruturada
   - 3.1: STRUCTURAL_ENV_VARS (1→4 variáveis)
   - 3.2: INFRASTRUCTURE_ENV_VARS (novo, 6 variáveis)
@@ -182,30 +192,35 @@ cleanup_on_error() {
 ### 2. devcontainer.json (v5.3 → v5.4)
 
 **Mudanças**:
+
 - PORT removido de remoteEnv
 - Comentário explicativo sobre deprecação
 
 ### 3. .env.development (v5.x → v6.0)
 
 **Mudanças**:
+
 - PORT comentado com nota DEPRECATED
 - Referência a usar SERVER_PORT
 
 ### 4. .env.production (v5.x → v6.0)
 
 **Mudanças**:
+
 - PORT comentado com nota DEPRECATED
 - Referência a usar SERVER_PORT
 
 ### 5. .env.example (v5.x → v6.0)
 
 **Mudanças**:
+
 - PORT documentado como deprecated
 - Aviso para NÃO usar PORT
 
 ### 6. ENV_ANALYSIS_V6.md (NOVO)
 
 **Conteúdo**:
+
 - Análise completa do sistema ENV (8 seções)
 - Taxonomia detalhada (6 categorias)
 - Inventário completo (97+ variáveis)
@@ -216,6 +231,7 @@ cleanup_on_error() {
 ### 7. ENV_UPGRADE_V6_SUMMARY.md (NOVO - este arquivo)
 
 **Conteúdo**:
+
 - Resumo executivo das mudanças
 - Comparativo antes/depois
 - Lista de arquivos modificados
@@ -230,24 +246,28 @@ cleanup_on_error() {
 #### ✅ Testes Obrigatórios Antes de Commit
 
 1. **Syntax Check**:
+
    ```bash
    bash -n .devcontainer/scripts/post-create.sh
    # Expected: Nenhum erro de sintaxe
    ```
 
 2. **ENV Validation (Development)**:
+
    ```bash
    NODE_ENV=development bash .devcontainer/scripts/post-create.sh
    # Expected: ✓ Validação ENV concluída com sucesso (modelo estratificado v6.0)
    ```
 
 3. **ENV Validation (Production)**:
+
    ```bash
    NODE_ENV=production bash .devcontainer/scripts/post-create.sh
    # Expected: FATAL se INFRASTRUCTURE ausente
    ```
 
 4. **Semantic Validation (BROWSER_MODE)**:
+
    ```bash
    unset CHROME_PROXY_PORT
    BROWSER_MODE=wsEndpoint bash .devcontainer/scripts/post-create.sh
@@ -264,6 +284,7 @@ cleanup_on_error() {
 #### ✅ Testes Opcionais (CI/CD)
 
 6. **ShellCheck**:
+
    ```bash
    shellcheck .devcontainer/scripts/post-create.sh
    # Expected: SC2086, SC2154 podem ser ignorados (set -u safe)
@@ -278,6 +299,7 @@ cleanup_on_error() {
 ### Resultados Esperados
 
 #### Success Case (Development):
+
 ```
 Validando variáveis de ambiente (modelo estratificado v6.0)...
 Modo de validação: NODE_ENV=development → INFRAESTRUTURA=WARNING
@@ -297,6 +319,7 @@ Validando dependências semânticas...
 ```
 
 #### Error Case (Missing STRUCTURAL):
+
 ```
 ENV ESTRUTURAL AUSENTE (FATAL): SERVER_MODE
 ══════════════════════════════════════════════════════════
@@ -311,6 +334,7 @@ Referência: .devcontainer/ENV_ANALYSIS_V6.md
 ```
 
 #### Error Case (Trap Handler):
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FALHA NO POST-CREATE (EXIT CODE: 1)
@@ -342,11 +366,13 @@ DIAGNÓSTICO RECOMENDADO:
 ### Fase 2: Validação Semântica (Curto Prazo - 1 semana)
 
 🔲 **TAREFA 2.1**: Implementar `.env.schema.json`
+
 - [ ] Definir schema JSON completo com tipos, ranges, dependências
 - [ ] Criar script `validate-env.js` que lê schema e valida .env files
 - [ ] Adicionar ao Makefile: `make validate-env`
 
 🔲 **TAREFA 2.2**: Criar `.env.test`
+
 - [ ] Copiar valores de produção
 - [ ] Ajustar LOG_LEVEL=debug
 - [ ] Documentar diferenças vs .env.production
@@ -354,6 +380,7 @@ DIAGNÓSTICO RECOMENDADO:
 ### Fase 3: Reorganização (Médio Prazo - 2 semanas)
 
 🔲 **TAREFA 3.1**: Reorganizar .env Files
+
 - [ ] Adicionar metadata (version, schema, updated)
 - [ ] Reorganizar em seções: STRUCTURAL → INFRASTRUCTURE → OPERATIONAL → TUNING → FLAGS → DEBUG
 - [ ] Reduzir comentários verbose para manter manutenibilidade
@@ -361,11 +388,13 @@ DIAGNÓSTICO RECOMENDADO:
 ### Fase 4: Automação (Longo Prazo - 1 mês)
 
 🔲 **TAREFA 4.1**: CI/CD ENV Validation
+
 - [ ] GitHub Actions workflow para validar .env files contra schema
 - [ ] Pre-commit hook para validar .env antes de commit
 - [ ] Fail-fast se .env files divergem do schema
 
 🔲 **TAREFA 4.2**: Dashboard ENV Inspector
+
 - [ ] Endpoint `/api/env/status` no dashboard
 - [ ] UI para visualizar ENV atual vs esperado
 - [ ] Alertas para ENVs ausentes/inválidas
@@ -375,12 +404,14 @@ DIAGNÓSTICO RECOMENDADO:
 ## REFERÊNCIAS
 
 ### Documentos Relacionados
+
 - `.devcontainer/ENV_ANALYSIS_V6.md` (análise completa)
 - `.devcontainer/DEVCONTAINER_BUILD_ANALYSIS.md` (SSH problem diagnosis)
 - `.devcontainer/POST_CREATE_ANALYSIS.md` (idempotency analysis)
 - `.devcontainer/POST_CREATE_FIXES_V5.2.2.md` (trap handler v5.2.2)
 
 ### Arquivos Modificados (v6.0)
+
 1. `.devcontainer/scripts/post-create.sh` (v5.2.2 → v6.0)
 2. `.devcontainer/devcontainer.json` (v5.3 → v5.4)
 3. `.env.development` (PORT deprecated)
@@ -388,12 +419,11 @@ DIAGNÓSTICO RECOMENDADO:
 5. `.env.example` (PORT documented as deprecated)
 
 ### Arquivos Criados (v6.0)
+
 1. `.devcontainer/ENV_ANALYSIS_V6.md` (nova análise)
 2. `.devcontainer/ENV_UPGRADE_V6_SUMMARY.md` (este documento)
 
 ---
 
-**Status**: ✅ FASE 1 COMPLETA
-**Versão**: 6.0
-**Data**: 2026-02-03
-**Próxima Fase**: Fase 2 (Validação Semântica - .env.schema.json)
+**Status**: ✅ FASE 1 COMPLETA **Versão**: 6.0 **Data**: 2026-02-03 **Próxima Fase**: Fase 2
+(Validação Semântica - .env.schema.json)

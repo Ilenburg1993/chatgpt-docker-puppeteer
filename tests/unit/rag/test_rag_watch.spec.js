@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { RagWatchBatcher } from '../../../tools/rag/watch.mjs';
 
 function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 describe('RagWatchBatcher', () => {
@@ -13,9 +13,9 @@ describe('RagWatchBatcher', () => {
         const batcher = new RagWatchBatcher({
             debounceMs: 40,
             batchMax: 2,
-            onBatch: async (batch) => {
+            onBatch: async batch => {
                 batches.push(batch);
-            }
+            },
         });
 
         batcher.enqueue('src/a.ts');

@@ -37,27 +37,27 @@ export interface ProxyStats {
  */
 export default class ChromeProxyService {
     constructor(config?: ChromeProxyServiceConfig);
-    
+
     /**
      * Start the proxy server
      */
     start(): Promise<void>;
-    
+
     /**
      * Stop the proxy server gracefully
      */
     stop(): Promise<void>;
-    
+
     /**
      * Handle HTTP request proxying
      */
     handleHTTPRequest(req: IncomingMessage, res: ServerResponse): void;
-    
+
     /**
      * Handle WebSocket upgrade
      */
     handleWebSocketUpgrade(req: IncomingMessage, socket: Socket, head: Buffer): void;
-    
+
     /**
      * Rewrite WebSocket URL for proxy
      */

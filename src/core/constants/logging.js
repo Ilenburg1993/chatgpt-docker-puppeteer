@@ -162,7 +162,7 @@ const LOG_CATEGORIES = {
     GUARD: 'GUARD',
 
     /** Remediation operations */
-    REMEDIATION: 'REMEDIATION'
+    REMEDIATION: 'REMEDIATION',
 };
 
 /**

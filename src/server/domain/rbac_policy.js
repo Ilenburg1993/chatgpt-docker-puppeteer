@@ -6,6 +6,7 @@ function toArray(value) {
     return Array.isArray(value) ? value : [value];
 }
 
+/** Função exportada: hasPermission. */
 function hasPermission(user, permission) {
     if (!user) return false;
     const perms = new Set(toArray(user.permissions).map(p => String(p)));
@@ -18,6 +19,7 @@ function hasPermission(user, permission) {
     return false;
 }
 
+/** Função exportada: assertPermission. */
 function assertPermission(user, permission) {
     if (!hasPermission(user, permission)) {
         const error = new Error(`Permissão insuficiente: ${permission}`);
@@ -27,6 +29,7 @@ function assertPermission(user, permission) {
     }
 }
 
+/** Função exportada: normalizeActor. */
 function normalizeActor(user) {
     return {
         id: user?.id ? String(user.id) : null,

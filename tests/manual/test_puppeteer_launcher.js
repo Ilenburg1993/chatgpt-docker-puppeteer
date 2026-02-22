@@ -10,7 +10,7 @@ import puppeteer from 'puppeteer-core';
     const browser = await puppeteer.connect({
         browserURL,
         defaultViewport: { width: 1280, height: 800 },
-        ignoreHTTPSErrors: true
+        ignoreHTTPSErrors: true,
     });
 
     console.log('✅ Puppeteer conectado (connect-only)');

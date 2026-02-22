@@ -4,8 +4,8 @@ This is a test markdown file for chunking tests.
 
 ## Section 1: Introduction
 
-This section contains some introductory text about the RAG system.
-It should be chunked separately from other sections.
+This section contains some introductory text about the RAG system. It should be chunked separately
+from other sections.
 
 ### Subsection 1.1
 
@@ -14,7 +14,7 @@ More detailed information here.
 ```javascript
 // This code block should be preserved intact
 export function example() {
-  return "Hello World";
+  return 'Hello World';
 }
 ```
 
@@ -22,8 +22,7 @@ export function example() {
 
 ### Feature A
 
-Description of feature A with multiple lines
-that should stay together in the same chunk.
+Description of feature A with multiple lines that should stay together in the same chunk.
 
 ### Feature B
 

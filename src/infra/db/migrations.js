@@ -107,7 +107,7 @@ const MIGRATIONS = [
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup_key ON events(dedup_key);
             CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id, ts_ms);
-        `
+        `,
     },
     {
         version: 2,
@@ -162,7 +162,10 @@ const MIGRATIONS = [
 
             // tasks: add optional linkage columns (best-effort idempotent).
             const cols = new Set(
-                db.prepare("PRAGMA table_info('tasks')").all().map(r => String(r.name))
+                db
+                    .prepare("PRAGMA table_info('tasks')")
+                    .all()
+                    .map(r => String(r.name))
             );
 
             if (!cols.has('prompt_template_artifact_id')) {
@@ -188,7 +191,12 @@ const MIGRATIONS = [
         name: 'blocked_and_attempt_heartbeats',
         upFn: db => {
             // tasks: add BLOCKED metadata columns (idempotent).
-            const taskCols = new Set(db.prepare("PRAGMA table_info('tasks')").all().map(r => String(r.name)));
+            const taskCols = new Set(
+                db
+                    .prepare("PRAGMA table_info('tasks')")
+                    .all()
+                    .map(r => String(r.name))
+            );
             if (!taskCols.has('blocked_reason')) {
                 db.exec('ALTER TABLE tasks ADD COLUMN blocked_reason TEXT NULL;');
             }
@@ -201,7 +209,10 @@ const MIGRATIONS = [
 
             // task_attempts: add failure taxonomy + heartbeat fields (idempotent).
             const attemptCols = new Set(
-                db.prepare("PRAGMA table_info('task_attempts')").all().map(r => String(r.name))
+                db
+                    .prepare("PRAGMA table_info('task_attempts')")
+                    .all()
+                    .map(r => String(r.name))
             );
             if (!attemptCols.has('reason_class')) {
                 db.exec('ALTER TABLE task_attempts ADD COLUMN reason_class TEXT NULL;');
@@ -225,7 +236,10 @@ const MIGRATIONS = [
         name: 'attempt_diagnostics_and_failure_codes',
         upFn: db => {
             const attemptCols = new Set(
-                db.prepare("PRAGMA table_info('task_attempts')").all().map(r => String(r.name))
+                db
+                    .prepare("PRAGMA table_info('task_attempts')")
+                    .all()
+                    .map(r => String(r.name))
             );
             if (!attemptCols.has('reason_code')) {
                 db.exec('ALTER TABLE task_attempts ADD COLUMN reason_code TEXT NULL;');
@@ -250,7 +264,12 @@ const MIGRATIONS = [
         version: 5,
         name: 'tasks_workflow_fields',
         upFn: db => {
-            const taskCols = new Set(db.prepare("PRAGMA table_info('tasks')").all().map(r => String(r.name)));
+            const taskCols = new Set(
+                db
+                    .prepare("PRAGMA table_info('tasks')")
+                    .all()
+                    .map(r => String(r.name))
+            );
 
             if (!taskCols.has('parent_id')) {
                 db.exec('ALTER TABLE tasks ADD COLUMN parent_id TEXT NULL;');

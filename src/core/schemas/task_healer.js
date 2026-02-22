@@ -25,15 +25,15 @@ function healTask(raw) {
             payload: { ...raw.spec?.payload },
             parameters: { ...raw.spec?.parameters },
             validation: { ...raw.spec?.validation },
-            config: { ...raw.spec?.config }
+            config: { ...raw.spec?.config },
         },
         policy: { ...raw.policy },
         state: {
             ...raw.state,
             metrics: { ...raw.state?.metrics },
-            history: Array.isArray(raw.state?.history) ? [...raw.state.history] : []
+            history: Array.isArray(raw.state?.history) ? [...raw.state.history] : [],
         },
-        result: { ...raw.result }
+        result: { ...raw.result },
     };
 
     // 2. ADAPTADOR DE LEGADO (Mapeamento de campos V1/V2/V3)

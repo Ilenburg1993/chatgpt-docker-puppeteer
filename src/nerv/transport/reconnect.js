@@ -101,7 +101,7 @@ function createReconnect({ telemetry, start, stop, policy = {} }) {
 
         if (maxAttempts !== null && attempts >= maxAttempts) {
             telemetry.emit('nerv:transport:reconnect:exhausted', {
-                attempts
+                attempts,
             });
             return;
         }
@@ -110,7 +110,7 @@ function createReconnect({ telemetry, start, stop, policy = {} }) {
 
         telemetry.emit('nerv:transport:reconnect:attempt', {
             attempt: attempts,
-            timestamp: now()
+            timestamp: now(),
         });
 
         safeCall(stop);
@@ -156,7 +156,7 @@ function createReconnect({ telemetry, start, stop, policy = {} }) {
 
     return Object.freeze({
         start: startReconnecting,
-        stop: stopReconnecting
+        stop: stopReconnecting,
     });
 }
 

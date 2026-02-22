@@ -9,7 +9,7 @@ const TMP_DIRS = [
     path.join(import.meta.dirname, 'tmp', 'fila'),
     path.join(import.meta.dirname, 'tmp', 'respostas'),
     path.join(import.meta.dirname, 'tmp', 'logs'),
-    path.join(import.meta.dirname, 'tmp', 'profile')
+    path.join(import.meta.dirname, 'tmp', 'profile'),
 ];
 
 /**
@@ -19,7 +19,7 @@ const TEST_ENV = {
     NODE_ENV: 'test',
     LOG_LEVEL: 'ERROR', // Silenciar logs durante testes
     DISABLE_BROWSER: 'true', // Desabilitar browser real por padrão
-    TEST_MODE: 'true'
+    TEST_MODE: 'true',
 };
 
 /**
@@ -28,7 +28,7 @@ const TEST_ENV = {
 const GLOBAL_TEST_CONFIG = {
     timeout: 30000, // 30 segundos timeout padrão
     retries: 0, // Sem retries automáticos
-    bail: false // Continuar após falhas
+    bail: false, // Continuar após falhas
 };
 
 /**

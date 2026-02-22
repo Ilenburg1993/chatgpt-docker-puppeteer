@@ -32,12 +32,7 @@ import https from 'node:https';
  * });
  */
 export async function safeHttpRequest(url, options = {}) {
-    const {
-        timeout = 5000,
-        method = 'GET',
-        headers = {},
-        body = null
-    } = options;
+    const { timeout = 5000, method = 'GET', headers = {}, body = null } = options;
 
     return new Promise((resolve, reject) => {
         let timeoutId = null;
@@ -56,7 +51,7 @@ export async function safeHttpRequest(url, options = {}) {
         };
 
         // Completion handler to prevent duplicate resolution
-        const complete = (fn) => {
+        const complete = fn => {
             if (!requestCompleted) {
                 requestCompleted = true;
                 cleanup();
@@ -82,13 +77,13 @@ export async function safeHttpRequest(url, options = {}) {
         const requestOptions = {
             method,
             headers,
-            timeout // Also set native timeout as backup
+            timeout, // Also set native timeout as backup
         };
 
-        request = client.request(urlObj, requestOptions, (response) => {
+        request = client.request(urlObj, requestOptions, response => {
             const chunks = [];
 
-            response.on('data', (chunk) => {
+            response.on('data', chunk => {
                 chunks.push(chunk);
             });
 
@@ -97,17 +92,17 @@ export async function safeHttpRequest(url, options = {}) {
                     resolve({
                         statusCode: response.statusCode,
                         headers: response.headers,
-                        body: Buffer.concat(chunks).toString('utf8')
+                        body: Buffer.concat(chunks).toString('utf8'),
                     });
                 });
             });
 
-            response.on('error', (err) => {
+            response.on('error', err => {
                 complete(() => reject(err));
             });
         });
 
-        request.on('error', (err) => {
+        request.on('error', err => {
             complete(() => reject(err));
         });
 
@@ -150,7 +145,7 @@ export async function checkUrlHealth(url, timeout = 5000) {
     try {
         const { statusCode } = await safeHttpRequest(url, {
             method: 'HEAD',
-            timeout
+            timeout,
         });
 
         const latencyMs = Date.now() - startTime;
@@ -158,9 +153,8 @@ export async function checkUrlHealth(url, timeout = 5000) {
         return {
             ok: statusCode >= 200 && statusCode < 400,
             statusCode,
-            latencyMs
+            latencyMs,
         };
-
     } catch (err) {
         const latencyMs = Date.now() - startTime;
 
@@ -168,7 +162,7 @@ export async function checkUrlHealth(url, timeout = 5000) {
             ok: false,
             statusCode: err.code || 'ERROR',
             latencyMs,
-            error: err.message
+            error: err.message,
         };
     }
 }
@@ -189,9 +183,9 @@ export async function fetchJson(url, options = {}) {
     const { body } = await safeHttpRequest(url, {
         ...options,
         headers: {
-            'Accept': 'application/json',
-            ...options.headers
-        }
+            Accept: 'application/json',
+            ...options.headers,
+        },
     });
 
     try {
@@ -225,7 +219,7 @@ export async function retryHttpRequest(url, options = {}) {
     const {
         maxRetries = 3,
         backoffMs = 100,
-        shouldRetry = (err) => ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(err.code),
+        shouldRetry = err => ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(err.code),
         ...requestOptions
     } = options;
 
@@ -278,11 +272,7 @@ export async function retryHttpRequest(url, options = {}) {
  * }
  */
 export async function pollUntilHealthy(url, options = {}) {
-    const {
-        maxWaitMs = 30000,
-        intervalMs = 500,
-        requestTimeout = 2000
-    } = options;
+    const { maxWaitMs = 30000, intervalMs = 500, requestTimeout = 2000 } = options;
 
     const startTime = Date.now();
 
@@ -315,7 +305,5 @@ export async function pollUntilHealthy(url, options = {}) {
  * ]);
  */
 export async function batchHttpRequests(requests) {
-    return Promise.all(
-        requests.map(({ url, options = {} }) => safeHttpRequest(url, options))
-    );
+    return Promise.all(requests.map(({ url, options = {} }) => safeHttpRequest(url, options)));
 }

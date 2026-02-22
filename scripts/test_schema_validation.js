@@ -41,7 +41,7 @@ async function runTest() {
     injectRaw(`${ID_TYPE}.json`, {
         meta: { id: ID_TYPE, created_at: new Date().toISOString(), priority: 'MUITO_ALTA' },
         spec: { payload: { user_message: 'Erro de Tipo' } },
-        state: { status: 'PENDING' }
+        state: { status: 'PENDING' },
     });
 
     // Caso 4: Valor de Enum Inválido (Target inexistente)
@@ -49,7 +49,7 @@ async function runTest() {
     injectRaw(`${ID_ENUM}.json`, {
         meta: { id: ID_ENUM, created_at: new Date().toISOString() },
         spec: { target: 'IA-DA-NASA', payload: { user_message: 'Erro de Enum' } },
-        state: { status: 'PENDING' }
+        state: { status: 'PENDING' },
     });
 
     console.log(`> Injetados: 1 Corrompido, 1 Legado (OK), 2 Inválidos.`);

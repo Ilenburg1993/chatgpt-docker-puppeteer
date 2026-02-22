@@ -16,7 +16,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
     const mockKernel = {
         executeTask: async (task, correlationId) => {
             return { status: 'queued', task_id: task.meta.id };
-        }
+        },
     };
 
     const nervEvents = [];
@@ -26,7 +26,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
             nervEvents.push({ event: eventName, data });
         },
         emitCommand: () => {},
-        emitEvent: () => {}
+        emitEvent: () => {},
     };
 
     before(async () => {
@@ -38,7 +38,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
         const checkpointManager = new CheckpointManager({
             baseDir: testMissionsDir,
             keepLast: 5,
-            autoCleanup: true
+            autoCleanup: true,
         });
 
         missionManager = new MissionManager({
@@ -46,7 +46,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
             nerv: mockNERV,
             contextManager,
             feedbackProcessor,
-            checkpointManager
+            checkpointManager,
         });
 
         await missionManager.initialize();
@@ -134,8 +134,8 @@ describe('Phase 2 Integration Smoke Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Integration Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             assert.ok(mission);
@@ -168,12 +168,9 @@ describe('Phase 2 Integration Smoke Tests', () => {
             // Simulate step completion by manually calling checkpoint save
             const mission = await missionManager.getMission(testMissionId);
 
-            const checkpointId = await missionManager.checkpointManager.saveCheckpoint(
-                testMissionId,
-                1,
-                mission,
-                { reason: 'test_step_completed' }
-            );
+            const checkpointId = await missionManager.checkpointManager.saveCheckpoint(testMissionId, 1, mission, {
+                reason: 'test_step_completed',
+            });
 
             assert.ok(checkpointId);
             assert.ok(checkpointId.startsWith('checkpoint-'));
@@ -213,8 +210,8 @@ describe('Phase 2 Integration Smoke Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Recovery Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             crashMissionId = mission.id;
@@ -223,12 +220,9 @@ describe('Phase 2 Integration Smoke Tests', () => {
             await missionManager.stateManager.updateMission(crashMissionId, { status: MISSION_STATUS.RUNNING });
 
             const updatedMission = await missionManager.getMission(crashMissionId);
-            await missionManager.checkpointManager.saveCheckpoint(
-                crashMissionId,
-                2,
-                updatedMission,
-                { reason: 'test_before_crash' }
-            );
+            await missionManager.checkpointManager.saveCheckpoint(crashMissionId, 2, updatedMission, {
+                reason: 'test_before_crash',
+            });
         });
 
         it('should detect crashed mission on initialize', async () => {
@@ -304,11 +298,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
 
         it('✅ CheckpointManager: Save/Load', async () => {
             const testState = { id: 'test', status: 'RUNNING' };
-            const checkpointId = await missionManager.checkpointManager.saveCheckpoint(
-                'test-mission-id',
-                1,
-                testState
-            );
+            const checkpointId = await missionManager.checkpointManager.saveCheckpoint('test-mission-id', 1, testState);
             const loaded = await missionManager.checkpointManager.loadCheckpoint('test-mission-id');
 
             assert.ok(checkpointId);
@@ -318,11 +308,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
         it('✅ CheckpointManager: Cleanup (LRU)', async () => {
             // Create 6 checkpoints (keepLast=5)
             for (let i = 1; i <= 6; i++) {
-                await missionManager.checkpointManager.saveCheckpoint(
-                    'lru-test',
-                    i,
-                    { id: 'lru-test', step: i }
-                );
+                await missionManager.checkpointManager.saveCheckpoint('lru-test', i, { id: 'lru-test', step: i });
             }
 
             const checkpoints = await missionManager.checkpointManager.listCheckpoints('lru-test');
@@ -333,7 +319,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
             missionManager.contextManager.addPattern({
                 type: 'FEEDBACK',
                 content: 'Test pattern',
-                metadata: { source: 'test' }
+                metadata: { source: 'test' },
             });
 
             const patterns = missionManager.contextManager.getRelevantPatterns('test', 5);

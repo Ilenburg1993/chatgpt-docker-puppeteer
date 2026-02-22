@@ -43,4 +43,3 @@ export function estimateCharsForLines(lines, startIdx0, endIdx0Inclusive) {
     }
     return len;
 }
-

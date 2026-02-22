@@ -6,10 +6,10 @@
 // ============================================================
 
 // ✅ ERRO 1: no-undef (variável não declarada)
-console.log(variavel_nao_existe);  
+console.log(variavel_nao_existe);
 
 // ⚠️ WARNING 2: no-unused-vars (variável não usada)
-const variavelNaoUsada = 123;  
+const variavelNaoUsada = 123;
 
 // ⚠️ WARNING 3: no-shadow (sombreamento de variável)
 const x = 1;

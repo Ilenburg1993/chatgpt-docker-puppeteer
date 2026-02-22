@@ -141,12 +141,7 @@ function parseBindSafe(value, defaultValue) {
         return parts.every(part => {
             const num = parseInt(part, 10);
             // Validate: is numeric, no leading zeros (except "0" itself), range 0-255
-            return (
-                /^\d+$/.test(part) &&
-                (part === '0' || !part.startsWith('0')) &&
-                num >= 0 &&
-                num <= 255
-            );
+            return /^\d+$/.test(part) && (part === '0' || !part.startsWith('0')) && num >= 0 && num <= 255;
         });
     })();
 
@@ -382,14 +377,9 @@ function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
 
         try {
             // ✅ P1 FIX: Properly await svc.stop() with null-safe fallback
-            const stopPromise = typeof svc.stop === 'function'
-                ? svc.stop()
-                : Promise.resolve();
+            const stopPromise = typeof svc.stop === 'function' ? svc.stop() : Promise.resolve();
 
-            await Promise.race([
-                stopPromise,
-                new Promise(resolve => setTimeout(resolve, timeoutMs)),
-            ]);
+            await Promise.race([stopPromise, new Promise(resolve => setTimeout(resolve, timeoutMs))]);
         } catch (err) {
             console.error(`[ERROR][pm2:${tag}] Error during shutdown:`, err && err.stack ? err.stack : err);
         } finally {

@@ -9,7 +9,8 @@ Este documento explica, de ponta a ponta, como operar o stack atual de:
 - LSP/tsserver (navegacao semantica e code actions para JS/TS)
 - Ollama (politica cloud-first para nao-embedding, local-only para embedding)
 
-Tambem inclui, no final, um **template padrao para qualquer LLM** usar essas ferramentas com boa estrategia e qualidade.
+Tambem inclui, no final, um **template padrao para qualquer LLM** usar essas ferramentas com boa
+estrategia e qualidade.
 
 ---
 
@@ -121,9 +122,7 @@ Exemplo:
 
 ```json
 {
-  "content": [
-    { "type": "text", "text": "..." }
-  ],
+  "content": [{ "type": "text", "text": "..." }],
   "structuredContent": {
     "data": { "backend": "lexical", "degraded": true },
     "flags": { "degraded": true, "mutating": false, "partial": true }
@@ -378,16 +377,18 @@ Use este bloco como instrucao-base para LLMs que vao programar neste repositrio 
 ```md
 # Tool-Usage Policy (RAG + MCP + LSP)
 
-Voce esta conectado ao MCP HTTP deste projeto em:
-`http://localhost:3008/api/mcp`
+Voce esta conectado ao MCP HTTP deste projeto em: `http://localhost:3008/api/mcp`
 
 ## Objetivo
+
 Programar com precisao e velocidade, usando:
+
 - RAG para descoberta de contexto
 - LSP para navegacao semantica e impacto real
 - Ollama para geracao/embedding conforme politica
 
 ## Regras de uso (obrigatorias)
+
 1. Antes de propor mudanca, busque contexto com `rag_search`.
 2. Para simbolos JS/TS, prefira `lsp_definition` e `lsp_references` em vez de suposicoes.
 3. Sempre validar diagnosticos com `lsp_diagnostics` nos arquivos alterados.
@@ -399,24 +400,27 @@ Programar com precisao e velocidade, usando:
    - explicite limitacoes de confianca
 
 ## Politica Ollama
+
 - Embedding: sempre local (`ollama_embed`)
 - Nao-embedding: cloud-first por padrao (`ollama_generate runtime=auto`)
 - Fallback local para nao-embedding pode ocorrer se cloud falhar
 
 ## Estrategia recomendada por tarefa
-1) Descoberta:
+
+1. Descoberta:
    - `rag_search(query, profile=core, mode=auto, topK=8)`
-2) Aprofundamento:
+2. Aprofundamento:
    - `lsp_definition`, `lsp_references`, `lsp_hover`
-3) Correcao:
+3. Correcao:
    - `lsp_diagnostics` -> `lsp_code_actions`
-4) Mudanca controlada:
+4. Mudanca controlada:
    - `lsp_apply_code_action(mode=preview)`
    - se aprovado: `lsp_apply_code_action(mode=apply, confirmationToken=...)`
-5) Validacao:
+5. Validacao:
    - rodar lint/testes relevantes
 
 ## Qualidade de resposta
+
 - Sempre cite arquivos e linhas quando possivel.
 - Separe fato observado de inferencia.
 - Nao invente simbolos/metodos sem verificar no codigo.
@@ -437,4 +441,3 @@ Programar com precisao e velocidade, usando:
 - `src/integration/tools/ollama-tools.mjs`
 - `tools/ollama/client.mjs`
 - `.vscode/mcp.json`
-

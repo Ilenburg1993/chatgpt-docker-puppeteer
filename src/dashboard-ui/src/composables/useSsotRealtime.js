@@ -96,6 +96,7 @@ function _compactCommandStatuses(items) {
     return out;
 }
 
+/** Função exportada: useSsotRealtime. */
 export function useSsotRealtime() {
     const tasks = useTasksVNextStore();
     const missions = useMissionsVNextStore();

@@ -166,7 +166,11 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                         '';
                     if (typeof text === 'string' && text.trim()) {
                         if (retryCount > 0) {
-                            log('DEBUG', `[_readAttemptOutputText] Found output after ${retryCount} retries`, String(taskId));
+                            log(
+                                'DEBUG',
+                                `[_readAttemptOutputText] Found output after ${retryCount} retries`,
+                                String(taskId)
+                            );
                         }
                         return text;
                     }
@@ -183,7 +187,11 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                 const raw = await readText(textId);
                 if (typeof raw === 'string' && raw.trim()) {
                     if (retryCount > 0) {
-                        log('DEBUG', `[_readAttemptOutputText] Found output after ${retryCount} retries`, String(taskId));
+                        log(
+                            'DEBUG',
+                            `[_readAttemptOutputText] Found output after ${retryCount} retries`,
+                            String(taskId)
+                        );
                     }
                     return raw;
                 }
@@ -205,7 +213,11 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                 const raw = await fs.readFile(String(p), 'utf8');
                 if (typeof raw === 'string' && raw.trim()) {
                     if (retryCount > 0) {
-                        log('DEBUG', `[_readAttemptOutputText] Found output after ${retryCount} retries`, String(taskId));
+                        log(
+                            'DEBUG',
+                            `[_readAttemptOutputText] Found output after ${retryCount} retries`,
+                            String(taskId)
+                        );
                     }
                     return raw;
                 }
@@ -558,12 +570,16 @@ class TaskOrchestrationWorker {
         if (strategy !== 'ITERATIVE' && strategy !== 'MULTI_STEP') {
             // Safety: block unknown strategy.
             // ✅ P1-17: Safe update with OptimisticLockError handling
-            this._safeUpdateTask(taskId, {
-                status: 'BLOCKED',
-                blocked_reason: 'ORCH_STRATEGY_UNKNOWN',
-                blocked_at_ms: _now(),
-                blocked_details_json: _safeJsonString({ attemptId, strategy }),
-            }, { context: 'Block unknown strategy' });
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'BLOCKED',
+                    blocked_reason: 'ORCH_STRATEGY_UNKNOWN',
+                    blocked_at_ms: _now(),
+                    blocked_details_json: _safeJsonString({ attemptId, strategy }),
+                },
+                { context: 'Block unknown strategy' }
+            );
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -639,12 +655,16 @@ class TaskOrchestrationWorker {
         }
 
         // ✅ P1-17: Safe update with OptimisticLockError handling
-        this._safeUpdateTask(taskId, {
-            status: 'BLOCKED',
-            blocked_reason: 'ORCH_OUTPUT_MISSING',
-            blocked_at_ms: now,
-            blocked_details_json: _safeJsonString({ attemptId, recent, windowMs }),
-        }, { context: 'Block output missing' });
+        this._safeUpdateTask(
+            taskId,
+            {
+                status: 'BLOCKED',
+                blocked_reason: 'ORCH_OUTPUT_MISSING',
+                blocked_at_ms: now,
+                blocked_details_json: _safeJsonString({ attemptId, recent, windowMs }),
+            },
+            { context: 'Block output missing' }
+        );
 
         recordEvent({
             entityType: 'task',
@@ -738,18 +758,22 @@ class TaskOrchestrationWorker {
             });
 
             // ✅ P1-17: Safe update with OptimisticLockError handling
-            this._safeUpdateTask(taskId, {
-                status: 'BLOCKED',
-                blocked_reason: 'VALIDATION_MANUAL_REVIEW',
-                blocked_at_ms: now,
-                blocked_details_json: _safeJsonString({
-                    attemptId,
-                    iteration: nextIteration,
-                    overall_score: validationResult.overall_score,
-                    issues: _ensureArray(validationResult.issues).slice(0, 50),
-                    feedback_artifact_id: feedbackArtifactId,
-                }),
-            }, { context: 'Block for manual review' });
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'BLOCKED',
+                    blocked_reason: 'VALIDATION_MANUAL_REVIEW',
+                    blocked_at_ms: now,
+                    blocked_details_json: _safeJsonString({
+                        attemptId,
+                        iteration: nextIteration,
+                        overall_score: validationResult.overall_score,
+                        issues: _ensureArray(validationResult.issues).slice(0, 50),
+                        feedback_artifact_id: feedbackArtifactId,
+                    }),
+                },
+                { context: 'Block for manual review' }
+            );
 
             recordEvent({
                 entityType: 'task',
@@ -768,12 +792,16 @@ class TaskOrchestrationWorker {
         const MIN_SCORE_THRESHOLD = 0.3;
         if (validationResult.overall_score < MIN_SCORE_THRESHOLD && nextIteration > 1) {
             // ✅ P1-17: Safe update with OptimisticLockError handling
-            this._safeUpdateTask(taskId, {
-                status: 'FAILED',
-                stage: TASK_STAGES.ARCHIVED,
-                failed_at_ms: now,
-                last_error: `VALIDATION_HOPELESS: score ${validationResult.overall_score.toFixed(2)} < ${MIN_SCORE_THRESHOLD} after ${nextIteration} iterations`,
-            }, { context: 'Mark as failed (hopeless)' });
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'FAILED',
+                    stage: TASK_STAGES.ARCHIVED,
+                    failed_at_ms: now,
+                    last_error: `VALIDATION_HOPELESS: score ${validationResult.overall_score.toFixed(2)} < ${MIN_SCORE_THRESHOLD} after ${nextIteration} iterations`,
+                },
+                { context: 'Mark as failed (hopeless)' }
+            );
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -833,30 +861,34 @@ class TaskOrchestrationWorker {
 
         // Rearm the SAME taskId for SSOT dispatch (new attempt will be created).
         // ✅ P1-17: Safe update with OptimisticLockError handling (CRITICAL operation)
-        this._safeUpdateTask(taskId, {
-            task,
-            stage: TASK_STAGES.READY,
-            status: 'PENDING',
-            execute_after_ms: executeAfterMs,
-            last_error:
-                `ORCHESTRATION_RETRY_SCHEDULED(iter=${nextIteration}, score=${Number(validationResult.overall_score || 0).toFixed(1)})`.slice(
-                    0,
-                    2000
-                ),
-            started_at_ms: null,
-            completed_at_ms: null,
-            failed_at_ms: null,
-            paused_at_ms: null,
-            cancelled_at_ms: null,
-            blocked_reason: null,
-            blocked_at_ms: null,
-            blocked_details_json: null,
-            last_correlation_id: null,
-            latest_attempt_id: null,
-            latest_rendered_prompt_artifact_id: null,
-            latest_response_v2_json_artifact_id: null,
-            result_json: null,
-        }, { critical: true, context: 'Rearm task for retry' }); // CRITICAL: must succeed for retry
+        this._safeUpdateTask(
+            taskId,
+            {
+                task,
+                stage: TASK_STAGES.READY,
+                status: 'PENDING',
+                execute_after_ms: executeAfterMs,
+                last_error:
+                    `ORCHESTRATION_RETRY_SCHEDULED(iter=${nextIteration}, score=${Number(validationResult.overall_score || 0).toFixed(1)})`.slice(
+                        0,
+                        2000
+                    ),
+                started_at_ms: null,
+                completed_at_ms: null,
+                failed_at_ms: null,
+                paused_at_ms: null,
+                cancelled_at_ms: null,
+                blocked_reason: null,
+                blocked_at_ms: null,
+                blocked_details_json: null,
+                last_correlation_id: null,
+                latest_attempt_id: null,
+                latest_rendered_prompt_artifact_id: null,
+                latest_response_v2_json_artifact_id: null,
+                result_json: null,
+            },
+            { critical: true, context: 'Rearm task for retry' }
+        ); // CRITICAL: must succeed for retry
 
         // ✅ P0-14: Small delay para garantir artifact flush completo antes de próxima leitura
         await _sleep(100);
@@ -937,12 +969,16 @@ class TaskOrchestrationWorker {
         const steps = _ensureArray(wf?.steps);
         if (!steps.length) {
             // ✅ P1-17: Safe update with OptimisticLockError handling
-            this._safeUpdateTask(taskId, {
-                status: 'BLOCKED',
-                blocked_reason: 'WORKFLOW_CONFIG_MISSING',
-                blocked_at_ms: now,
-                blocked_details_json: _safeJsonString({ attemptId }),
-            }, { context: 'Block workflow config missing' });
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'BLOCKED',
+                    blocked_reason: 'WORKFLOW_CONFIG_MISSING',
+                    blocked_at_ms: now,
+                    blocked_details_json: _safeJsonString({ attemptId }),
+                },
+                { context: 'Block workflow config missing' }
+            );
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -964,12 +1000,16 @@ class TaskOrchestrationWorker {
         const action = currentStep?.action ? String(currentStep.action) : 'execute_prompt';
         if (action !== 'execute_prompt') {
             // ✅ P1-17: Safe update with OptimisticLockError handling
-            this._safeUpdateTask(taskId, {
-                status: 'BLOCKED',
-                blocked_reason: 'WORKFLOW_ACTION_UNSUPPORTED',
-                blocked_at_ms: now,
-                blocked_details_json: _safeJsonString({ attemptId, step_id: currentStepId, action }),
-            }, { context: 'Block workflow action unsupported' });
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'BLOCKED',
+                    blocked_reason: 'WORKFLOW_ACTION_UNSUPPORTED',
+                    blocked_at_ms: now,
+                    blocked_details_json: _safeJsonString({ attemptId, step_id: currentStepId, action }),
+                },
+                { context: 'Block workflow action unsupported' }
+            );
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -1032,12 +1072,16 @@ class TaskOrchestrationWorker {
         const nextAction = nextStep?.action ? String(nextStep.action) : 'execute_prompt';
         if (nextAction !== 'execute_prompt') {
             // ✅ P1-17: Safe update with OptimisticLockError handling
-            this._safeUpdateTask(taskId, {
-                status: 'BLOCKED',
-                blocked_reason: 'WORKFLOW_ACTION_UNSUPPORTED',
-                blocked_at_ms: now,
-                blocked_details_json: _safeJsonString({ attemptId, step_id: nextStepId, action: nextAction }),
-            }, { context: 'Block next step action unsupported' });
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'BLOCKED',
+                    blocked_reason: 'WORKFLOW_ACTION_UNSUPPORTED',
+                    blocked_at_ms: now,
+                    blocked_details_json: _safeJsonString({ attemptId, step_id: nextStepId, action: nextAction }),
+                },
+                { context: 'Block next step action unsupported' }
+            );
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,
@@ -1050,7 +1094,11 @@ class TaskOrchestrationWorker {
             return;
         }
 
-        const { childTask, childId, workflowId: rootWorkflowId } = buildWorkflowNextStepTask({
+        const {
+            childTask,
+            childId,
+            workflowId: rootWorkflowId,
+        } = buildWorkflowNextStepTask({
             parentTask: task,
             parentTaskId: String(taskId),
             attemptId: attemptId ? String(attemptId) : null,

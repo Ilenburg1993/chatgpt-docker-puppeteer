@@ -19,7 +19,11 @@
         <div class="alert-panel" v-if="system.alertCount > 0">
             <div class="alert-header">
                 <span class="alert-icon">⚠</span>
-                <span class="alert-title">{{ system.alertCount }} Alerta{{ system.alertCount > 1 ? 's' : '' }} Ativo{{ system.alertCount > 1 ? 's' : '' }}</span>
+                <span class="alert-title"
+                    >{{ system.alertCount }} Alerta{{ system.alertCount > 1 ? 's' : '' }} Ativo{{
+                        system.alertCount > 1 ? 's' : ''
+                    }}</span
+                >
             </div>
             <div class="alert-list">
                 <div
@@ -67,11 +71,7 @@
 
                     <!-- Component-specific metrics -->
                     <div class="card-metrics" v-if="component.metrics">
-                        <div
-                            v-for="(metric, key) in component.metrics"
-                            :key="key"
-                            class="metric-row"
-                        >
+                        <div v-for="(metric, key) in component.metrics" :key="key" class="metric-row">
                             <span class="metric-label">{{ formatMetricLabel(key) }}</span>
                             <span class="metric-value">{{ formatMetricValue(metric) }}</span>
                         </div>
@@ -169,7 +169,7 @@ export default {
                 warning: 'Atenção',
                 critical: 'Crítico',
                 error: 'Erro',
-                unknown: 'Desconhecido'
+                unknown: 'Desconhecido',
             };
             return map[system.overallStatus] || 'Desconhecido';
         });
@@ -206,7 +206,7 @@ export default {
                 kernel: 'Kernel Engine',
                 nerv: 'NERV Bus',
                 driver: 'Driver',
-                browser_pool: 'Browser Pool'
+                browser_pool: 'Browser Pool',
             };
             return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
         }
@@ -265,9 +265,9 @@ export default {
             formatMetricValue,
             formatUptime,
             formatTime,
-            refreshAll
+            refreshAll,
         };
-    }
+    },
 };
 </script>
 
@@ -307,11 +307,26 @@ export default {
     text-transform: uppercase;
 }
 
-.overall-badge.healthy { background: #dcfce7; color: #166534; }
-.overall-badge.warning { background: #fef9c3; color: #854d0e; }
-.overall-badge.critical { background: #fee2e2; color: #991b1b; }
-.overall-badge.error { background: #fee2e2; color: #991b1b; }
-.overall-badge.unknown { background: #f1f5f9; color: #64748b; }
+.overall-badge.healthy {
+    background: #dcfce7;
+    color: #166534;
+}
+.overall-badge.warning {
+    background: #fef9c3;
+    color: #854d0e;
+}
+.overall-badge.critical {
+    background: #fee2e2;
+    color: #991b1b;
+}
+.overall-badge.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+.overall-badge.unknown {
+    background: #f1f5f9;
+    color: #64748b;
+}
 
 .btn {
     padding: 6px 14px;
@@ -450,10 +465,18 @@ export default {
     transition: border-color 0.2s;
 }
 
-.health-card.card-healthy { border-color: #bbf7d0; }
-.health-card.card-warning { border-color: #fde68a; }
-.health-card.card-critical { border-color: #fecaca; }
-.health-card.card-error { border-color: #fecaca; }
+.health-card.card-healthy {
+    border-color: #bbf7d0;
+}
+.health-card.card-warning {
+    border-color: #fde68a;
+}
+.health-card.card-critical {
+    border-color: #fecaca;
+}
+.health-card.card-error {
+    border-color: #fecaca;
+}
 
 .card-header {
     display: flex;
@@ -470,11 +493,25 @@ export default {
     flex-shrink: 0;
 }
 
-.status-led.healthy { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
-.status-led.warning { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
-.status-led.critical { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
-.status-led.error { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
-.status-led.unknown { background: #94a3b8; }
+.status-led.healthy {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+.status-led.warning {
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+.status-led.critical {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+.status-led.error {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+.status-led.unknown {
+    background: #94a3b8;
+}
 
 .card-header h3 {
     flex: 1;
@@ -490,11 +527,21 @@ export default {
     text-transform: uppercase;
 }
 
-.status-text.healthy { color: #166534; }
-.status-text.warning { color: #854d0e; }
-.status-text.critical { color: #991b1b; }
-.status-text.error { color: #991b1b; }
-.status-text.unknown { color: #64748b; }
+.status-text.healthy {
+    color: #166534;
+}
+.status-text.warning {
+    color: #854d0e;
+}
+.status-text.critical {
+    color: #991b1b;
+}
+.status-text.error {
+    color: #991b1b;
+}
+.status-text.unknown {
+    color: #64748b;
+}
 
 .card-body {
     padding: 12px 16px;
@@ -610,10 +657,18 @@ export default {
     line-height: 1;
 }
 
-.healthy-count { color: #22c55e; }
-.warning-count { color: #f59e0b; }
-.critical-count { color: #ef4444; }
-.unknown-count { color: #94a3b8; }
+.healthy-count {
+    color: #22c55e;
+}
+.warning-count {
+    color: #f59e0b;
+}
+.critical-count {
+    color: #ef4444;
+}
+.unknown-count {
+    color: #94a3b8;
+}
 
 .summary-label {
     font-size: 0.7rem;

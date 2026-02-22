@@ -1,15 +1,15 @@
 # Page Stability Module - Orchestrated Stabilization
 
-**Location**: `src/shared/page_stability/stabilizer.js`
-**Version**: v4.0 (Migrated from driver/modules)
-**Status**: ✅ Production Ready
-**Category**: Universal Tool (Shared Layer)
+**Location**: `src/shared/page_stability/stabilizer.js` **Version**: v4.0 (Migrated from
+driver/modules) **Status**: ✅ Production Ready **Category**: Universal Tool (Shared Layer)
 
 ---
 
 ## Overview
 
-The **Page Stability Module** provides orchestrated page readiness validation through 6 progressive phases. It ensures the page is truly interactive before attempting any user actions, preventing false negatives from premature interaction attempts.
+The **Page Stability Module** provides orchestrated page readiness validation through 6 progressive
+phases. It ensures the page is truly interactive before attempting any user actions, preventing
+false negatives from premature interaction attempts.
 
 ### Why Shared Layer?
 
@@ -27,16 +27,19 @@ The **Page Stability Module** provides orchestrated page readiness validation th
 Orchestrates 6-phase stabilization to ensure page is fully loaded and interactive.
 
 **Parameters**:
+
 - `driver` {Object} - Driver instance with `page`, `emit()`, `logEvent()`, `config`
 - `timeoutMs` {number} - Maximum wait time (default: 30000ms)
 
 **Returns**: `Promise<string>` - Stability status:
+
 - `'ok'` - Page stable and ready
 - `'partial'` - Some phases failed but page usable
 - `'timeout'` - Exceeded timeout (force continue)
 - `'abort'` - Aborted by signal
 
 **Features**:
+
 - **Phase 1: Network Idle** (500ms)
   - Waits for `networkidle0` or `networkidle2`
   - Non-blocking (failure OK)
@@ -59,21 +62,22 @@ Orchestrates 6-phase stabilization to ensure page is fully loaded and interactiv
   - Threshold: < 150ms (healthy)
 
 **Example**:
+
 ```javascript
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 const driver = {
-    page: puppeteerPage,
-    emit: (event) => console.log(event),
-    logEvent: (msg) => console.log(msg),
-    config: { timeouts: { pageLoad: 30000 } }
+  page: puppeteerPage,
+  emit: event => console.log(event),
+  logEvent: msg => console.log(msg),
+  config: { timeouts: { pageLoad: 30000 } },
 };
 
 const status = await stabilizer.waitForStability(driver, 30000);
 if (status === 'ok') {
-    console.log('Page fully stable, ready for interaction');
+  console.log('Page fully stable, ready for interaction');
 } else {
-    console.warn(`Partial stability: ${status}`);
+  console.warn(`Partial stability: ${status}`);
 }
 ```
 
@@ -84,26 +88,29 @@ if (status === 'ok') {
 Measures event loop lag using MessageChannel (precise timing).
 
 **Parameters**:
+
 - `page` {Object} - Puppeteer Page instance
 
 **Returns**: `Promise<number>` - Lag in milliseconds
 
 **Features**:
+
 - Uses `MessageChannel` for accurate measurement
 - Injected script for browser context execution
 - Timeout: 1500ms (returns `Infinity` on timeout)
 
 **Example**:
+
 ```javascript
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 const lag = await stabilizer.measureEventLoopLag(page);
 if (lag < 150) {
-    console.log('Event loop healthy:', lag + 'ms');
+  console.log('Event loop healthy:', lag + 'ms');
 } else if (lag < 500) {
-    console.warn('Event loop stressed:', lag + 'ms');
+  console.warn('Event loop stressed:', lag + 'ms');
 } else {
-    console.error('Event loop blocked:', lag + 'ms');
+  console.error('Event loop blocked:', lag + 'ms');
 }
 ```
 
@@ -114,9 +121,11 @@ if (lag < 150) {
 Checks page load status (spinners, busy state).
 
 **Parameters**:
+
 - `page` {Object} - Puppeteer Page instance
 
 **Returns**: `Promise<Object>` - Status object:
+
 ```javascript
 {
     hasSpinner: false,      // True if loading spinner detected
@@ -126,22 +135,24 @@ Checks page load status (spinners, busy state).
 ```
 
 **Features**:
+
 - Scans 25+ spinner CSS selectors
 - Shadow DOM support (deep scan)
 - ARIA busy state detection
 - Visibility filtering (ignores hidden spinners)
 
 **Example**:
+
 ```javascript
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 const status = await stabilizer.getPageLoadStatus(page);
 if (status.status === 'ready') {
-    console.log('No spinners or busy states detected');
+  console.log('No spinners or busy states detected');
 } else if (status.hasSpinner) {
-    console.warn('Loading spinner visible');
+  console.warn('Loading spinner visible');
 } else if (status.hasBusyState) {
-    console.warn('ARIA busy state detected');
+  console.warn('ARIA busy state detected');
 }
 ```
 
@@ -195,27 +206,30 @@ if (status.status === 'ready') {
 ## Spinner Detection (Deep Scan)
 
 **25+ CSS Selectors**:
+
 ```javascript
 const SPINNER_SELECTORS = [
-    '[class*="spinner"]',
-    '[class*="loading"]',
-    '[class*="loader"]',
-    '[aria-label*="loading" i]',
-    '[aria-label*="carregando" i]',
-    '.fa-spinner',
-    'svg.spinner',
-    '[data-loading="true"]',
-    '[data-testid*="spinner"]',
-    // ... 17 more selectors
+  '[class*="spinner"]',
+  '[class*="loading"]',
+  '[class*="loader"]',
+  '[aria-label*="loading" i]',
+  '[aria-label*="carregando" i]',
+  '.fa-spinner',
+  'svg.spinner',
+  '[data-loading="true"]',
+  '[data-testid*="spinner"]',
+  // ... 17 more selectors
 ];
 ```
 
 **Shadow DOM Support**:
+
 - Recursively scans all `shadowRoot` trees
 - Extracts flattened list of shadow elements
 - Visibility filtering (ignores `display: none`, `visibility: hidden`)
 
 **Example**:
+
 ```javascript
 // Detected spinner types:
 // ✅ Bootstrap spinners (<div class="spinner-border">)
@@ -230,62 +244,66 @@ const SPINNER_SELECTORS = [
 ## Usage Patterns
 
 ### Pattern 1: Driver Execution (Default)
+
 ```javascript
 // src/driver/modules/biomechanics_engine.js
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 async function click(selector) {
-    const status = await stabilizer.waitForStability(this.driver, 30000);
-    if (status !== 'ok') {
-        this.driver.logEvent(`WARNING: Partial stability (${status}), continuing anyway`);
-    }
-    await this.humanClick(selector);
+  const status = await stabilizer.waitForStability(this.driver, 30000);
+  if (status !== 'ok') {
+    this.driver.logEvent(`WARNING: Partial stability (${status}), continuing anyway`);
+  }
+  await this.humanClick(selector);
 }
 ```
 
 ### Pattern 2: Triage System (Diagnostic)
+
 ```javascript
 // src/driver/modules/triage.js
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 async function diagnose() {
-    const lag = await stabilizer.measureEventLoopLag(this.driver.page);
-    const status = await stabilizer.getPageLoadStatus(this.driver.page);
+  const lag = await stabilizer.measureEventLoopLag(this.driver.page);
+  const status = await stabilizer.getPageLoadStatus(this.driver.page);
 
-    if (lag > 500 || status.status !== 'ready') {
-        return { issue: 'PAGE_NOT_READY', lag, status };
-    }
+  if (lag > 500 || status.status !== 'ready') {
+    return { issue: 'PAGE_NOT_READY', lag, status };
+  }
 }
 ```
 
 ### Pattern 3: Recovery System (Healing)
+
 ```javascript
 // src/driver/modules/recovery_system.js
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 async function recover() {
-    // Wait for full stability before retry
-    await stabilizer.waitForStability(this.driver, 60000);
+  // Wait for full stability before retry
+  await stabilizer.waitForStability(this.driver, 60000);
 
-    // Retry failed action
-    await this.retryLastAction();
+  // Retry failed action
+  await this.retryLastAction();
 }
 ```
 
 ### Pattern 4: Health Checks (Browser Pool)
+
 ```javascript
 // src/infra/browser_pool/pool_manager.js
 const stabilizer = require('@shared/page_stability/stabilizer');
 
 async function validateInstance(page) {
-    const lag = await stabilizer.measureEventLoopLag(page);
-    const status = await stabilizer.getPageLoadStatus(page);
+  const lag = await stabilizer.measureEventLoopLag(page);
+  const status = await stabilizer.getPageLoadStatus(page);
 
-    return {
-        healthy: lag < 150 && status.status === 'ready',
-        lag,
-        status
-    };
+  return {
+    healthy: lag < 150 && status.status === 'ready',
+    lag,
+    status,
+  };
 }
 ```
 
@@ -353,20 +371,23 @@ Stabilization behavior can be configured via `driver.config`:
 ## Troubleshooting
 
 ### Issue: False positives (page declared stable too early)
-**Cause**: Aggressive timeouts
-**Solution**: Increase `timeouts.spinnerWait` and `timeouts.domEntropy`
+
+**Cause**: Aggressive timeouts **Solution**: Increase `timeouts.spinnerWait` and
+`timeouts.domEntropy`
 
 ### Issue: False negatives (page never declared stable)
-**Cause**: Page has continuous animations or polling
-**Solution**: Lower `stability.domMutationThreshold` to 5-10 mutations/sec
+
+**Cause**: Page has continuous animations or polling **Solution**: Lower
+`stability.domMutationThreshold` to 5-10 mutations/sec
 
 ### Issue: Event loop lag always high
-**Cause**: Page has heavy JS execution (React dev mode, hot reload)
-**Solution**: Disable dev tools, use production builds for testing
+
+**Cause**: Page has heavy JS execution (React dev mode, hot reload) **Solution**: Disable dev tools,
+use production builds for testing
 
 ### Issue: Spinners not detected
-**Cause**: Custom spinner classes
-**Solution**: Add custom selectors to `SPINNER_SELECTORS` array
+
+**Cause**: Custom spinner classes **Solution**: Add custom selectors to `SPINNER_SELECTORS` array
 
 ---
 
@@ -393,6 +414,4 @@ make test-fast
 
 ---
 
-**Author**: GitHub Copilot
-**Last Updated**: Feb 2026
-**License**: Internal Use Only
+**Author**: GitHub Copilot **Last Updated**: Feb 2026 **License**: Internal Use Only

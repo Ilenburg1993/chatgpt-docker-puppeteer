@@ -14,7 +14,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve iniciar tarefa em PENDING', () => {
             const tarefa = {
                 id: 'task-001',
-                status: STATUS_VALUES.PENDING
+                status: STATUS_VALUES.PENDING,
             };
 
             assert.strictEqual(tarefa.status, STATUS_VALUES.PENDING);
@@ -23,7 +23,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve transicionar PENDING → RUNNING', () => {
             let tarefa = {
                 id: 'task-002',
-                status: STATUS_VALUES.PENDING
+                status: STATUS_VALUES.PENDING,
             };
 
             // Simular transição
@@ -35,7 +35,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve transicionar RUNNING → DONE', () => {
             let tarefa = {
                 id: 'task-003',
-                status: STATUS_VALUES.RUNNING
+                status: STATUS_VALUES.RUNNING,
             };
 
             tarefa = { ...tarefa, status: STATUS_VALUES.DONE };
@@ -46,7 +46,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve transicionar RUNNING → FAILED', () => {
             let tarefa = {
                 id: 'task-004',
-                status: STATUS_VALUES.RUNNING
+                status: STATUS_VALUES.RUNNING,
             };
 
             tarefa = { ...tarefa, status: STATUS_VALUES.FAILED };
@@ -59,7 +59,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('não deve transicionar DONE → RUNNING', () => {
             const tarefa = {
                 id: 'task-005',
-                status: STATUS_VALUES.DONE
+                status: STATUS_VALUES.DONE,
             };
 
             // Estado final não deve mudar
@@ -71,7 +71,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('não deve transicionar FAILED → RUNNING diretamente', () => {
             const tarefa = {
                 id: 'task-006',
-                status: STATUS_VALUES.FAILED
+                status: STATUS_VALUES.FAILED,
             };
 
             // Retry deve criar nova tentativa, não mudar status diretamente
@@ -84,7 +84,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             const tarefa = {
                 id: 'task-007',
                 status: STATUS_VALUES.RUNNING,
-                startedAt: new Date().toISOString()
+                startedAt: new Date().toISOString(),
             };
 
             assert.ok(tarefa.startedAt, 'Deve ter timestamp de início');
@@ -95,7 +95,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 id: 'task-008',
                 status: STATUS_VALUES.DONE,
                 startedAt: new Date(Date.now() - 1000).toISOString(),
-                completedAt: new Date().toISOString()
+                completedAt: new Date().toISOString(),
             };
 
             assert.ok(tarefa.completedAt, 'Deve ter timestamp de conclusão');
@@ -110,7 +110,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 id: 'task-009',
                 status: STATUS_VALUES.DONE,
                 startedAt: new Date(inicio).toISOString(),
-                completedAt: new Date(fim).toISOString()
+                completedAt: new Date(fim).toISOString(),
             };
 
             const duracao = new Date(tarefa.completedAt) - new Date(tarefa.startedAt);
@@ -123,7 +123,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve iniciar com 0 tentativas', () => {
             const tarefa = {
                 id: 'task-010',
-                attempts: 0
+                attempts: 0,
             };
 
             assert.strictEqual(tarefa.attempts, 0);
@@ -132,7 +132,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve incrementar tentativas após retry', () => {
             let tarefa = {
                 id: 'task-011',
-                attempts: 0
+                attempts: 0,
             };
 
             tarefa = { ...tarefa, attempts: tarefa.attempts + 1 };
@@ -145,7 +145,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
 
             const tarefa = {
                 id: 'task-012',
-                attempts: 3
+                attempts: 3,
             };
 
             const deveRetentar = tarefa.attempts < MAX_ATTEMPTS;
@@ -163,9 +163,9 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                     {
                         timestamp: new Date().toISOString(),
                         message: 'Timeout na execução',
-                        type: 'TIMEOUT'
-                    }
-                ]
+                        type: 'TIMEOUT',
+                    },
+                ],
             };
 
             assert.strictEqual(tarefa.errors.length, 1);
@@ -178,8 +178,8 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 errors: [
                     { message: 'Erro 1', type: 'NETWORK' },
                     { message: 'Erro 2', type: 'TIMEOUT' },
-                    { message: 'Erro 3', type: 'VALIDATION' }
-                ]
+                    { message: 'Erro 3', type: 'VALIDATION' },
+                ],
             };
 
             assert.strictEqual(tarefa.errors.length, 3);
@@ -191,7 +191,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             const tarefas = [
                 { id: 't1', priority: 3 },
                 { id: 't2', priority: 8 },
-                { id: 't3', priority: 5 }
+                { id: 't3', priority: 5 },
             ];
 
             const ordenadas = [...tarefas].sort((a, b) => b.priority - a.priority);
@@ -204,7 +204,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             const tarefas = [
                 { id: 't1', priority: 5, createdAt: '2026-01-20T10:00:00Z' },
                 { id: 't2', priority: 5, createdAt: '2026-01-20T10:00:01Z' },
-                { id: 't3', priority: 5, createdAt: '2026-01-20T10:00:02Z' }
+                { id: 't3', priority: 5, createdAt: '2026-01-20T10:00:02Z' },
             ];
 
             const ordenadas = [...tarefas].sort((a, b) => {
@@ -223,7 +223,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             const tarefa = {
                 id: 'task-015',
                 timeout: 30000, // 30 segundos
-                startedAt: new Date().toISOString()
+                startedAt: new Date().toISOString(),
             };
 
             assert.ok(tarefa.timeout, 'Timeout deve estar configurado');
@@ -233,7 +233,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             const tarefa = {
                 id: 'task-016',
                 timeout: 5000,
-                startedAt: new Date(Date.now() - 10000).toISOString() // 10s atrás
+                startedAt: new Date(Date.now() - 10000).toISOString(), // 10s atrás
             };
 
             const tempoDecorrido = Date.now() - new Date(tarefa.startedAt).getTime();

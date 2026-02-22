@@ -16,14 +16,14 @@ describe('Context Flow Integration Tests', () => {
         executeTask: async (task, correlationId) => {
             // Mock: retorna sucesso
             return { status: 'queued', task_id: task.meta.id };
-        }
+        },
     };
 
     const mockNERV = {
         onReceive: () => {},
         emit: () => {},
         emitCommand: () => {},
-        emitEvent: () => {}
+        emitEvent: () => {},
     };
 
     before(async () => {
@@ -33,7 +33,7 @@ describe('Context Flow Integration Tests', () => {
         // Cria ContextManager compartilhado
         contextManager = new ContextManager({
             chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW,
-            windowSize: 5
+            windowSize: 5,
         });
 
         // Cria MissionManager com ContextManager
@@ -42,7 +42,7 @@ describe('Context Flow Integration Tests', () => {
             kernel: mockKernel,
             nerv: mockNERV,
             stateManager,
-            contextManager
+            contextManager,
         });
 
         await missionManager.initialize();
@@ -62,8 +62,8 @@ describe('Context Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Context Testing',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             // Verifica que contexto foi inicializado
@@ -85,8 +85,8 @@ describe('Context Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Accumulation',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             testMissionId = mission.id;
@@ -94,8 +94,16 @@ describe('Context Flow Integration Tests', () => {
 
         it('should accumulate context as steps complete', async () => {
             // Simula outputs de 3 steps
-            await contextManager.addStepOutput(testMissionId, 'step-1', 'Chapter outline: Introduction, Chapter 1, Chapter 2');
-            await contextManager.addStepOutput(testMissionId, 'step-2', 'Chapter 1: This is the first chapter about Accumulation');
+            await contextManager.addStepOutput(
+                testMissionId,
+                'step-1',
+                'Chapter outline: Introduction, Chapter 1, Chapter 2'
+            );
+            await contextManager.addStepOutput(
+                testMissionId,
+                'step-2',
+                'Chapter 1: This is the first chapter about Accumulation'
+            );
             await contextManager.addStepOutput(testMissionId, 'step-3', 'Chapter 2: This continues the topic');
 
             // Obtém contexto para step 4
@@ -136,8 +144,8 @@ describe('Context Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Prompts',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             testMissionId = mission.id;
@@ -170,8 +178,8 @@ describe('Context Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Cleanup',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             // Adiciona contexto
@@ -196,8 +204,8 @@ describe('Context Flow Integration Tests', () => {
                 templateId: 'book_writing',
                 params: {
                     topic: 'Fail',
-                    num_chapters: 5
-                }
+                    num_chapters: 5,
+                },
             });
 
             await contextManager.addStepOutput(mission.id, 'step-1', 'Output');
@@ -216,7 +224,7 @@ describe('Context Flow Integration Tests', () => {
             const pattern = {
                 type: 'feedback',
                 content: 'Add more technical details and code examples',
-                metadata: { source: 'user' }
+                metadata: { source: 'user' },
             };
 
             contextManager.addPattern(pattern);
@@ -237,7 +245,7 @@ describe('Context Flow Integration Tests', () => {
 
             assert.ok(results.length > 0);
             // Deve priorizar patterns com "code" e "quality"
-            const hasRelevant = results.some((p) => p.content.toLowerCase().includes('code'));
+            const hasRelevant = results.some(p => p.content.toLowerCase().includes('code'));
             assert.ok(hasRelevant);
         });
     });
@@ -249,14 +257,14 @@ describe('Context Flow Integration Tests', () => {
                 title: 'Stats Test 1',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Stats1', num_chapters: 5 }
+                params: { topic: 'Stats1', num_chapters: 5 },
             });
 
             const mission2 = await missionManager.createMission({
                 title: 'Stats Test 2',
                 description: 'Test',
                 templateId: 'book_writing',
-                params: { topic: 'Stats2', num_chapters: 5 }
+                params: { topic: 'Stats2', num_chapters: 5 },
             });
 
             // Adiciona contexto

@@ -11,7 +11,7 @@ const colors = {
     red: '\x1b[31m',
     yellow: '\x1b[33m',
     blue: '\x1b[34m',
-    cyan: '\x1b[36m'
+    cyan: '\x1b[36m',
 };
 
 function log(level, message) {
@@ -21,7 +21,7 @@ function log(level, message) {
             SUCCESS: colors.green,
             ERROR: colors.red,
             WARN: colors.yellow,
-            TEST: colors.blue
+            TEST: colors.blue,
         }[level] || colors.reset;
 
     console.log(`${color}[${level}]${colors.reset} ${message}`);
@@ -33,7 +33,7 @@ function runCommand(cmd, options = {}) {
             cwd: ROOT,
             encoding: 'utf-8',
             stdio: options.silent ? 'pipe' : 'inherit',
-            ...options
+            ...options,
         });
         return { success: true, output };
     } catch (error) {
@@ -72,7 +72,7 @@ function testFilesExist() {
         { path: 'scripts/launcher-dashboard.html', desc: 'Dashboard HTML' },
 
         // FASE 6: Documentação
-        { path: 'DOCUMENTAÇÃO/LAUNCHER.md', desc: 'Launcher Documentation' }
+        { path: 'DOCUMENTAÇÃO/LAUNCHER.md', desc: 'Launcher Documentation' },
     ];
 
     let passed = 0;
@@ -140,7 +140,7 @@ function testLauncherContent() {
         { pattern: /Verificando dependências|dependencies.*check/i, desc: 'Validation 3: Dependencies check' },
         { pattern: /Verificando Chrome|Chrome.*config/i, desc: 'Validation 4: Chrome config check' },
         { pattern: /Verificando crashes|crash.*detect/i, desc: 'Validation 5: Crash detection check' },
-        { pattern: /localhost:2998|localhost:3000|health.*endpoint/i, desc: 'Health endpoint reference' }
+        { pattern: /localhost:2998|localhost:3000|health.*endpoint/i, desc: 'Health endpoint reference' },
     ];
 
     checks.forEach(check => {
@@ -259,7 +259,7 @@ function testDashboardHTML() {
         { pattern: /setInterval|auto.*refresh/i, desc: 'Auto-refresh mechanism' },
         { pattern: /localhost:2998|localhost:3000|api.*health/i, desc: 'API endpoint reference' },
         { pattern: /status.*badge|badge.*status/i, desc: 'Status badge styling' },
-        { pattern: /#1e1e1e|#2d2d2d|background.*#|dark.*theme/i, desc: 'Dark theme present' }
+        { pattern: /#1e1e1e|#2d2d2d|background.*#|dark.*theme/i, desc: 'Dark theme present' },
     ];
 
     checks.forEach(check => {
@@ -306,7 +306,7 @@ function testDocumentation() {
         { pattern: /\/api\/health\/pm2/i, desc: '/pm2 endpoint documented' },
         { pattern: /\/api\/health\/kernel/i, desc: '/kernel endpoint documented' },
         { pattern: /\/api\/health\/disk/i, desc: '/disk endpoint documented' },
-        { pattern: /PM2-First/i, desc: 'PM2-First strategy mentioned' }
+        { pattern: /PM2-First/i, desc: 'PM2-First strategy mentioned' },
     ];
 
     checks.forEach(check => {
@@ -359,7 +359,7 @@ function testRoadmapUpdated() {
         { pattern: /FASE 8.*Testes Integrados/i, desc: 'FASE 8 mentioned' },
         { pattern: /scripts\/quick-ops/i, desc: 'Quick-ops mentioned' },
         { pattern: /launcher-dashboard\.html/i, desc: 'Dashboard HTML mentioned' },
-        { pattern: /LAUNCHER\.md/i, desc: 'LAUNCHER.md mentioned' }
+        { pattern: /LAUNCHER\.md/i, desc: 'LAUNCHER.md mentioned' },
     ];
 
     checks.forEach(check => {
@@ -394,7 +394,7 @@ function testIOIntegration() {
     const checks = [
         { pattern: /loadAllTasks/i, desc: 'loadAllTasks function exported' },
         { pattern: /queueCache\.getQueue/i, desc: 'Uses queueCache.getQueue()' },
-        { pattern: /queue\.tasks/i, desc: 'Returns queue.tasks' }
+        { pattern: /queue\.tasks/i, desc: 'Returns queue.tasks' },
     ];
 
     checks.forEach(check => {
@@ -431,7 +431,7 @@ async function runAllTests() {
         'Dashboard HTML': false,
         Documentation: false,
         'Roadmap Updated': false,
-        'IO Integration': false
+        'IO Integration': false,
     };
 
     try {

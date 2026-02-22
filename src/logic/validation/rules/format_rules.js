@@ -80,7 +80,7 @@ function validateRegex(content, patternStr, signal = null) {
         if (!matches) {
             return {
                 ok: false,
-                reason: `PATTERN_MISMATCH: O conteúdo não atende ao padrão exigido.`
+                reason: `PATTERN_MISMATCH: O conteúdo não atende ao padrão exigido.`,
             };
         }
         return { ok: true, reason: null };

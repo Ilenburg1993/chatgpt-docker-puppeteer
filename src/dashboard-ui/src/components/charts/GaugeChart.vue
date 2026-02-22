@@ -11,12 +11,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import {
-    Chart,
-    DoughnutController,
-    ArcElement,
-    Tooltip
-} from 'chart.js';
+import { Chart, DoughnutController, ArcElement, Tooltip } from 'chart.js';
 
 // Register Chart.js components
 Chart.register(DoughnutController, ArcElement, Tooltip);
@@ -27,44 +22,44 @@ export default {
         value: {
             type: Number,
             required: true,
-            default: 0
+            default: 0,
         },
         max: {
             type: Number,
-            default: 100
+            default: 100,
         },
         label: {
             type: String,
-            default: ''
+            default: '',
         },
         unit: {
             type: String,
-            default: '%'
+            default: '%',
         },
         warningThreshold: {
             type: Number,
-            default: 70
+            default: 70,
         },
         criticalThreshold: {
             type: Number,
-            default: 90
+            default: 90,
         },
         colorHealthy: {
             type: String,
-            default: '#22c55e'
+            default: '#22c55e',
         },
         colorWarning: {
             type: String,
-            default: '#f59e0b'
+            default: '#f59e0b',
         },
         colorCritical: {
             type: String,
-            default: '#ef4444'
+            default: '#ef4444',
         },
         colorBackground: {
             type: String,
-            default: '#e2e8f0'
-        }
+            default: '#e2e8f0',
+        },
     },
     setup(props) {
         const chartCanvas = ref(null);
@@ -91,13 +86,15 @@ export default {
             chartInstance = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    datasets: [{
-                        data: [percentage, remaining],
-                        backgroundColor: [currentColor.value, props.colorBackground],
-                        borderWidth: 0,
-                        circumference: 270,
-                        rotation: 225
-                    }]
+                    datasets: [
+                        {
+                            data: [percentage, remaining],
+                            backgroundColor: [currentColor.value, props.colorBackground],
+                            borderWidth: 0,
+                            circumference: 270,
+                            rotation: 225,
+                        },
+                    ],
                 },
                 options: {
                     responsive: true,
@@ -105,12 +102,12 @@ export default {
                     cutout: '75%',
                     plugins: {
                         legend: { display: false },
-                        tooltip: { enabled: false }
+                        tooltip: { enabled: false },
                     },
                     animation: {
-                        duration: 500
-                    }
-                }
+                        duration: 500,
+                    },
+                },
             });
         };
 
@@ -125,9 +122,12 @@ export default {
             chartInstance.update('none');
         };
 
-        watch(() => props.value, () => {
-            updateChart();
-        });
+        watch(
+            () => props.value,
+            () => {
+                updateChart();
+            }
+        );
 
         onMounted(() => {
             createChart();
@@ -143,9 +143,9 @@ export default {
         return {
             chartCanvas,
             formattedValue,
-            currentColor
+            currentColor,
         };
-    }
+    },
 };
 </script>
 

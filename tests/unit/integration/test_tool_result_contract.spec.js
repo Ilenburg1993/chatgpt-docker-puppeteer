@@ -15,7 +15,7 @@ describe('Tool Result Contract', () => {
         const normalized = normalizeToolResultPayload({
             text: 'ok',
             json: { a: 1 },
-            flags: { degraded: true, mutating: false, partial: true }
+            flags: { degraded: true, mutating: false, partial: true },
         });
         assert.strictEqual(normalized.text, 'ok');
         assert.deepStrictEqual(normalized.json, { a: 1 });
@@ -29,12 +29,12 @@ describe('Tool Result Contract', () => {
             'test_structured',
             {
                 description: 'test tool',
-                inputSchema: { type: 'object', properties: {} }
+                inputSchema: { type: 'object', properties: {} },
             },
             async () => ({
                 text: 'structured-ok',
                 json: { healthy: true },
-                flags: { degraded: false, mutating: false, partial: false }
+                flags: { degraded: false, mutating: false, partial: false },
             })
         );
 
@@ -42,7 +42,7 @@ describe('Tool Result Contract', () => {
         app.use(express.json());
         setupMCPHandler(app, registry);
 
-        const server = await new Promise((resolve) => {
+        const server = await new Promise(resolve => {
             const s = app.listen(0, () => resolve(s));
         });
 
@@ -55,8 +55,8 @@ describe('Tool Result Contract', () => {
                     jsonrpc: '2.0',
                     id: 1,
                     method: 'tools/call',
-                    params: { name: 'test_structured', arguments: {} }
-                })
+                    params: { name: 'test_structured', arguments: {} },
+                }),
             });
             const payload = await response.json();
             assert.strictEqual(payload.result.content[0].text, 'structured-ok');

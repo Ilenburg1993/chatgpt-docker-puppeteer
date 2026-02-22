@@ -300,10 +300,7 @@ class TaskSyncBridge extends EventEmitter {
             const errorText =
                 typeof err === 'string'
                     ? err
-                    : err &&
-                        typeof err === 'object' &&
-                        err !== null &&
-                        typeof errView.message === 'string'
+                    : err && typeof err === 'object' && err !== null && typeof errView.message === 'string'
                       ? errView.message
                       : err
                         ? JSON.stringify(err)
@@ -348,10 +345,7 @@ class TaskSyncBridge extends EventEmitter {
             const errorText =
                 typeof err === 'string'
                     ? err
-                    : err &&
-                        typeof err === 'object' &&
-                        err !== null &&
-                        typeof errView.message === 'string'
+                    : err && typeof err === 'object' && err !== null && typeof errView.message === 'string'
                       ? errView.message
                       : err
                         ? JSON.stringify(err)
@@ -484,11 +478,7 @@ class TaskSyncBridge extends EventEmitter {
                 },
                 state: {
                     ...taskState,
-                    status:
-                        runtimeState.status ||
-                        taskState.status ||
-                        taskView.status ||
-                        UnifiedStatus.PENDING,
+                    status: runtimeState.status || taskState.status || taskView.status || UnifiedStatus.PENDING,
                     updated_at: Date.now(),
                 },
             };
@@ -701,6 +691,7 @@ class TaskSyncBridge extends EventEmitter {
 }
 
 // Singleton instance
+/** Constante/valor exportado: default. */
 const taskSyncBridge = new TaskSyncBridge();
 
 export default taskSyncBridge;

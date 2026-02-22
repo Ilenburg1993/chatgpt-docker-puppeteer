@@ -1,12 +1,13 @@
 # Migração SSH: v5.2 → v5.3
-**Data:** 03 de Fevereiro de 2026
-**Status:** ✅ Concluída
+
+**Data:** 03 de Fevereiro de 2026 **Status:** ✅ Concluída
 
 ---
 
 ## 🎯 Resumo da Mudança
 
 ### De (v5.2 - Configuração Manual)
+
 ```jsonc
 // remoteEnv
 "SSH_AUTH_SOCK": "/ssh-agent"
@@ -19,11 +20,11 @@
 ```
 
 ### Para (v5.3 - VS Code Native)
+
 ```jsonc
 // remoteEnv - SSH section REMOVIDA
 // mounts - Bind mount SSH REMOVIDO
 // containerEnv - Variável SSH REMOVIDA
-
 // VS Code gerencia SSH forwarding automaticamente
 ```
 
@@ -34,6 +35,7 @@
 ### Problema 1: Type Mismatch Fatal
 
 **Erro:**
+
 ```
 error mounting "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/..."
 to rootfs at "/ssh-agent": not a directory:
@@ -41,12 +43,14 @@ Are you trying to mount a directory onto a file (or vice-versa)?
 ```
 
 **Causa Técnica:**
+
 - `SSH_AUTH_SOCK` no host aponta para um **socket UNIX** (arquivo especial)
 - Exemplo: `/tmp/ssh-QOJ9LhH9C9Bd/agent.427`
 - Docker tentava montar como se fosse um diretório
 - Resultado: **Type mismatch → Container não inicia**
 
 **Diagrama do Problema:**
+
 ```
 Host WSL2:
   SSH_AUTH_SOCK=/tmp/ssh-abc123/agent.427  ← Socket UNIX (arquivo)
@@ -59,6 +63,7 @@ Container:
 ### Problema 2: Mount Obrigatório (Design Falho)
 
 **Configuração v5.2:**
+
 ```jsonc
 "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
 ```
@@ -73,6 +78,7 @@ Container:
    - Inconsistência conceitual
 
 **Cenários que quebravam:**
+
 - ❌ Rebuild sem SSH agent rodando no host
 - ❌ CI/CD environments (sem SSH)
 - ❌ Docker Desktop reiniciado (paths temporários mudam)
@@ -81,6 +87,7 @@ Container:
 ### Problema 3: Redundância e Complexidade
 
 **Configuração v5.2:**
+
 ```jsonc
 // 3 lugares diferentes definindo SSH:
 "DEVCONTAINER_SECRET_SURFACE_SSH": "forwarded-if-present",  // remoteEnv
@@ -89,6 +96,7 @@ Container:
 ```
 
 **Problemas:**
+
 - ✗ Duplicação conceitual
 - ✗ Path hardcoded (`/ssh-agent`)
 - ✗ Variáveis customizadas não documentadas
@@ -97,6 +105,7 @@ Container:
 ### Problema 4: Conflito com Filosofia do Projeto
 
 **Do `post-create.sh` Section 7 (linhas 641-680):**
+
 ```bash
 # Princípios invariantes:
 #   • post-create NÃO inicia ssh-agent
@@ -108,6 +117,7 @@ Container:
 ```
 
 **Inconsistência:**
+
 - Script tratava SSH ausente como **estado válido**
 - Mas mount obrigatório tratava SSH ausente como **erro fatal**
 - Conflito de design entre infraestrutura e runtime
@@ -119,6 +129,7 @@ Container:
 ### Vantagem 1: Fail-Safe por Design
 
 **Comportamento v5.3:**
+
 ```
 SSH agent disponível no host?
   ├─ SIM → VS Code faz forwarding automático ✅
@@ -128,6 +139,7 @@ Em ambos os casos: Container SEMPRE inicia 🎯
 ```
 
 **Antes (v5.2):**
+
 ```
 SSH agent disponível no host?
   ├─ SIM → Container inicia ✅
@@ -137,6 +149,7 @@ SSH agent disponível no host?
 ### Vantagem 2: Zero Configuração Manual
 
 **v5.2 (Manual):**
+
 ```jsonc
 // Você precisa:
 1. Definir SSH_AUTH_SOCK manualmente
@@ -147,6 +160,7 @@ SSH agent disponível no host?
 ```
 
 **v5.3 (Automático):**
+
 ```jsonc
 // VS Code faz tudo:
 1. Detecta SSH_AUTH_SOCK no host
@@ -160,9 +174,11 @@ SSH agent disponível no host?
 
 **v5.2:** Implementação customizada (não testada pela Microsoft)
 
-**v5.3:** Usa [VS Code Remote Containers built-in SSH forwarding](https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials)
+**v5.3:** Usa
+[VS Code Remote Containers built-in SSH forwarding](https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials)
 
 **Benefícios:**
+
 - ✅ Testado pela Microsoft em milhares de projetos
 - ✅ Documentado oficialmente
 - ✅ Recebe updates automáticos
@@ -171,12 +187,14 @@ SSH agent disponível no host?
 ### Vantagem 4: Cross-Platform
 
 **Suporte v5.3:**
+
 - ✅ **Windows + WSL2 + Docker Desktop** (nosso caso)
 - ✅ **Linux nativo + Docker**
 - ✅ **macOS + Docker Desktop**
 - ✅ **Remote SSH scenarios**
 
 **Antes (v5.2):**
+
 - ⚠️ Funcionava apenas em ambientes específicos
 - ⚠️ Paths hardcoded (`/ssh-agent`)
 - ⚠️ Docker Desktop specific workarounds
@@ -228,6 +246,7 @@ code .
 ```
 
 **Validação dentro do container:**
+
 ```bash
 echo $SSH_AUTH_SOCK
 # Saída esperada: vazio ou undefined
@@ -251,6 +270,7 @@ code .
 ```
 
 **Validação dentro do container:**
+
 ```bash
 # Verificar SSH forwarding
 echo $SSH_AUTH_SOCK
@@ -286,28 +306,28 @@ git push origin main  # Pedirá credenciais ou usará Git Credential Manager
 
 | Aspecto               | v5.2 (Manual)         | v5.3 (Native)     |
 | --------------------- | --------------------- | ----------------- |
-| **Container inicia?** | ❌ NÃO (mount error)   | ✅ SIM             |
+| **Container inicia?** | ❌ NÃO (mount error)  | ✅ SIM            |
 | **Erro visível**      | Type mismatch fatal   | Nenhum erro       |
-| **Git operations**    | N/A (container morto) | ✅ HTTPS funciona  |
-| **Developer UX**      | 😡 Frustrante          | 😊 Transparente    |
+| **Git operations**    | N/A (container morto) | ✅ HTTPS funciona |
+| **Developer UX**      | 😡 Frustrante         | 😊 Transparente   |
 | **Recovery**          | Rebuild + debugar     | Nenhum necessário |
 
 ### Cenário: SSH Agent Disponível
 
-| Aspecto               | v5.2 (Manual)           | v5.3 (Native)              |
-| --------------------- | ----------------------- | -------------------------- |
-| **Container inicia?** | ✅ SIM (se path correto) | ✅ SIM (sempre)             |
-| **SSH forwarding**    | ⚠️ Manual, frágil        | ✅ Automático, robusto      |
-| **Path do socket**    | Hardcoded `/ssh-agent`  | Dinâmico (VS Code managed) |
-| **Git operations**    | ✅ SSH funciona          | ✅ SSH funciona             |
-| **Developer UX**      | 😐 Funcional             | 😊 Transparente             |
+| Aspecto               | v5.2 (Manual)            | v5.3 (Native)              |
+| --------------------- | ------------------------ | -------------------------- |
+| **Container inicia?** | ✅ SIM (se path correto) | ✅ SIM (sempre)            |
+| **SSH forwarding**    | ⚠️ Manual, frágil        | ✅ Automático, robusto     |
+| **Path do socket**    | Hardcoded `/ssh-agent`   | Dinâmico (VS Code managed) |
+| **Git operations**    | ✅ SSH funciona          | ✅ SSH funciona            |
+| **Developer UX**      | 😐 Funcional             | 😊 Transparente            |
 
 ### Cenário: Rebuild após Host Restart
 
 | Aspecto                 | v5.2 (Manual)      | v5.3 (Native)         |
 | ----------------------- | ------------------ | --------------------- |
-| **SSH paths mudaram?**  | ⚠️ Provavelmente    | N/A (VS Code resolve) |
-| **Container inicia?**   | ❌ Pode falhar      | ✅ SIM                 |
+| **SSH paths mudaram?**  | ⚠️ Provavelmente   | N/A (VS Code resolve) |
+| **Container inicia?**   | ❌ Pode falhar     | ✅ SIM                |
 | **Intervenção manual?** | Sim (reconfigurar) | Não                   |
 
 ---
@@ -319,6 +339,7 @@ git push origin main  # Pedirá credenciais ou usará Git Credential Manager
 **Processo automático (invisível para o usuário):**
 
 1. **Detecção (Host):**
+
    ```bash
    VS Code Remote Containers extension detecta:
    - $SSH_AUTH_SOCK no host
@@ -326,12 +347,14 @@ git push origin main  # Pedirá credenciais ou usará Git Credential Manager
    ```
 
 2. **Criação de Proxy (Runtime):**
+
    ```bash
    VS Code cria socket proxy dentro do container:
    /tmp/vscode-ssh-auth-<random>.sock
    ```
 
 3. **Tunneling (Transparente):**
+
    ```bash
    Container socket → VS Code proxy → Host SSH agent
    Aplicações no container veem socket "local"
@@ -365,6 +388,7 @@ srwxr-xr-x  # 's' = socket (não é 'd' de directory ou '-' de file)
 ```
 
 **Solução correta:**
+
 - Usar **proxy/forwarding** (VS Code faz isso)
 - Não tentar bind mount direto
 
@@ -373,11 +397,13 @@ srwxr-xr-x  # 's' = socket (não é 'd' de directory ou '-' de file)
 ## 📚 Referências
 
 ### Oficial
+
 - [VS Code: Sharing Git credentials](https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials)
 - [Docker: Bind mounts](https://docs.docker.com/storage/bind-mounts/)
 - [SSH Agent Forwarding (GitHub)](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/using-ssh-agent-forwarding)
 
 ### Projeto
+
 - `DEVCONTAINER_BUILD_ANALYSIS.md` - Análise completa
 - `ARCHITECTURE.md` v3.0 - Arquitetura geral
 - `.devcontainer/devcontainer.json` - Configuração atual (v5.3)
@@ -388,18 +414,23 @@ srwxr-xr-x  # 's' = socket (não é 'd' de directory ou '-' de file)
 ## 🎓 Lições Aprendidas
 
 ### 1. Infraestrutura Oficial > Customização
+
 **Sempre preferir features nativas da plataforma antes de implementar soluções customizadas.**
 
 ### 2. Fail-Safe > Fail-Fast
+
 **Container que não inicia é pior que container sem feature opcional.**
 
 ### 3. Zero Configuração > Configuração Manual
+
 **Se a plataforma pode fazer algo automaticamente, deixe ela fazer.**
 
 ### 4. Observabilidade > Controle
+
 **post-create.sh observa SSH, não tenta controlá-lo. Filosofia correta.**
 
 ### 5. Documentação é Crítica
+
 **Este documento explica o "porquê" das mudanças. Essencial para manutenção.**
 
 ---
@@ -419,6 +450,4 @@ srwxr-xr-x  # 's' = socket (não é 'd' de directory ou '-' de file)
 
 ---
 
-**Fim da Documentação de Migração**
-**Versão:** v5.3
-**Data:** 03 de Fevereiro de 2026
+**Fim da Documentação de Migração** **Versão:** v5.3 **Data:** 03 de Fevereiro de 2026

@@ -12,8 +12,8 @@ const { values } = parseArgs({
         'exclude-glob': { type: 'string', multiple: true },
         'docs-mode': { type: 'string' },
         'max-file-bytes': { type: 'string' },
-        json: { type: 'boolean', default: false }
-    }
+        json: { type: 'boolean', default: false },
+    },
 });
 
 const maxFileBytes = values['max-file-bytes'] ? Number(values['max-file-bytes']) : undefined;
@@ -26,7 +26,7 @@ const report = await ragIndex({
     includeGlobs: values['include-glob'],
     excludeGlobs: values['exclude-glob'],
     docsMode: values['docs-mode'],
-    maxFileBytes
+    maxFileBytes,
 });
 
 if (values.json) {

@@ -9,7 +9,7 @@ const CHUNKING_STRATEGY = {
     NONE: 'none', // Sem chunking
     SLIDING_WINDOW: 'sliding_window', // Janela deslizante (últimos N steps)
     HIERARCHICAL: 'hierarchical', // Hierárquico (summarize old, keep recent)
-    TOKEN_LIMIT: 'token_limit' // Limite de tokens (truncate ou summarize)
+    TOKEN_LIMIT: 'token_limit', // Limite de tokens (truncate ou summarize)
 };
 
 /**
@@ -19,9 +19,10 @@ const SUMMARIZATION_POLICY = {
     DISABLED: 'disabled', // Nunca resumir
     ON_OVERFLOW: 'on_overflow', // Resumir apenas quando ultrapassar limite
     PERIODIC: 'periodic', // Resumir periodicamente (ex: a cada 10 steps)
-    ADAPTIVE: 'adaptive' // Decidir adaptativamente baseado em uso de tokens
+    ADAPTIVE: 'adaptive', // Decidir adaptativamente baseado em uso de tokens
 };
 
+/** Classe exportada: ContextManager. */
 class ContextManager {
     constructor(options = {}) {
         this.config = {
@@ -31,7 +32,7 @@ class ContextManager {
             summarizationPolicy: options.summarizationPolicy || SUMMARIZATION_POLICY.ON_OVERFLOW,
             summarizationInterval: options.summarizationInterval || 10, // Para periodic
             enableMemory: options.enableMemory !== false, // Memory store habilitado por padrão
-            memoryRetention: options.memoryRetention || 1000 // Quantos patterns manter
+            memoryRetention: options.memoryRetention || 1000, // Quantos patterns manter
         };
 
         // Cache de contextos ativos (por mission_id)
@@ -61,7 +62,7 @@ class ContextManager {
             metadata: initialContext.metadata || {},
             created_at: Date.now(),
             updated_at: Date.now(),
-            token_count: 0 // Estimativa de tokens
+            token_count: 0, // Estimativa de tokens
         };
 
         this.contextCache.set(missionId, context);
@@ -86,7 +87,7 @@ class ContextManager {
             step_id: stepId,
             output,
             timestamp: Date.now(),
-            tokens: this._estimateTokens(output)
+            tokens: this._estimateTokens(output),
         };
 
         context.steps.push(stepData);
@@ -163,7 +164,7 @@ class ContextManager {
         return {
             summary: context.summary,
             steps: context.steps,
-            metadata: context.metadata
+            metadata: context.metadata,
         };
     }
 
@@ -179,8 +180,8 @@ class ContextManager {
             metadata: {
                 ...context.metadata,
                 total_steps: context.steps.length,
-                showing_last: recentSteps.length
-            }
+                showing_last: recentSteps.length,
+            },
         };
     }
 
@@ -196,8 +197,8 @@ class ContextManager {
             metadata: {
                 ...context.metadata,
                 total_steps: context.steps.length,
-                summarized_steps: context.steps.length - recentSteps.length
-            }
+                summarized_steps: context.steps.length - recentSteps.length,
+            },
         };
     }
 
@@ -226,8 +227,8 @@ class ContextManager {
             metadata: {
                 ...context.metadata,
                 total_steps: context.steps.length,
-                token_count: totalTokens
-            }
+                token_count: totalTokens,
+            },
         };
     }
 
@@ -359,7 +360,7 @@ class ContextManager {
             active_missions: activeMissions,
             total_tokens: totalTokens,
             memory_store: memoryStats,
-            config: this.config
+            config: this.config,
         };
     }
 

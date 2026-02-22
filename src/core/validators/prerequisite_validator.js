@@ -14,23 +14,26 @@ const ValidationResult = {
     fail: (reason, details = {}) => ({
         valid: false,
         reason,
-        details
-    })
+        details,
+    }),
 };
 
-// Valida se página está em URL utilizável para LLM.
-// @param {PuppeteerPage} page - Puppeteer Page
-// @returns {Object} ValidationResult
+/**
+ * Valida se a página está em URL utilizável para um provedor LLM suportado.
+ *
+ * @param {PuppeteerPage} page - Puppeteer Page
+ * @returns {Promise<Object>} ValidationResult
+ */
 async function validateLLMPage(page) {
     if (!page) {
         return ValidationResult.fail('PAGE_NULL', {
-            message: 'Página é null/undefined'
+            message: 'Página é null/undefined',
         });
     }
 
     if (page.isClosed()) {
         return ValidationResult.fail('PAGE_CLOSED', {
-            message: 'Página foi fechada'
+            message: 'Página foi fechada',
         });
     }
 
@@ -40,7 +43,7 @@ async function validateLLMPage(page) {
     } catch (err) {
         return ValidationResult.fail('PAGE_ERROR', {
             message: 'Erro ao obter URL da página',
-            error: err.message
+            error: err.message,
         });
     }
 
@@ -51,7 +54,7 @@ async function validateLLMPage(page) {
         return ValidationResult.fail('INVALID_URL', {
             message: 'Página não está em URL utilizável',
             url,
-            expectedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai']
+            expectedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai'],
         });
     }
 
@@ -64,7 +67,7 @@ async function validateLLMPage(page) {
         return ValidationResult.fail('UNSUPPORTED_LLM', {
             message: 'Página não está em LLM suportada',
             url,
-            supportedDomains
+            supportedDomains,
         });
     }
 
@@ -100,9 +103,9 @@ async function validateLLMInterface(page) {
                     'Página ainda não carregou completamente',
                     'LLM mudou interface',
                     'Página está em estado de erro',
-                    'Login necessário'
+                    'Login necessário',
                 ],
-                sadiDetails: inputResult || {}
+                sadiDetails: inputResult || {},
             });
         }
 
@@ -117,8 +120,8 @@ async function validateLLMInterface(page) {
                     'Elemento oculto ou coberto por overlay',
                     'Campo desabilitado',
                     'Modal ou popup bloqueando interação',
-                    'Página em estado de carregamento'
-                ]
+                    'Página em estado de carregamento',
+                ],
             });
         }
 
@@ -137,7 +140,7 @@ async function validateLLMInterface(page) {
         return ValidationResult.fail('INTERFACE_CHECK_ERROR', {
             message: 'Erro ao verificar interface LLM usando SADI',
             error: err.message,
-            stack: err.stack
+            stack: err.stack,
         });
     }
 }
@@ -154,7 +157,7 @@ function validateBrowserPool(browserPool) {
             message: 'Browser Pool não inicializado',
             suggestion: 'Sistema em modo degradado - inicialize Chrome e reinicie',
             retryable: true,
-            suggestedDelayMs: 5000
+            suggestedDelayMs: 5000,
         });
     }
 
@@ -163,7 +166,7 @@ function validateBrowserPool(browserPool) {
             message: 'Browser Pool não foi inicializado',
             suggestion: 'Aguarde boot completo do sistema',
             retryable: true,
-            suggestedDelayMs: 2000
+            suggestedDelayMs: 2000,
         });
     }
 
@@ -172,7 +175,7 @@ function validateBrowserPool(browserPool) {
             message: 'Browser Pool está sendo desligado',
             suggestion: 'Operação não pode ser executada durante shutdown',
             retryable: true,
-            suggestedDelayMs: 5000
+            suggestedDelayMs: 5000,
         });
     }
 
@@ -189,7 +192,7 @@ function validateBrowserPool(browserPool) {
                         ? 'Reabra o Chrome com START-CHROME-SIMPLE.bat'
                         : 'Aguarde auto-recovery ou investigue causa',
                 retryable: true,
-                suggestedDelayMs: 10000
+                suggestedDelayMs: 10000,
             });
         }
     }
@@ -206,14 +209,14 @@ function validateBrowserPool(browserPool) {
 function validateBrowserConnection(browser) {
     if (!browser) {
         return ValidationResult.fail('BROWSER_NULL', {
-            message: 'Browser instance é null/undefined'
+            message: 'Browser instance é null/undefined',
         });
     }
 
-    if (!/** @type {any} */ (browser).isConnected()) {
+    if (!(/** @type {any} */ (browser).isConnected())) {
         return ValidationResult.fail('BROWSER_DISCONNECTED', {
             message: 'Browser não está conectado',
-            suggestion: 'Verifique se Chrome está rodando e acessível'
+            suggestion: 'Verifique se Chrome está rodando e acessível',
         });
     }
 
@@ -264,32 +267,43 @@ function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
     if (!executionEngine) {
         return ValidationResult.fail('EXECUTION_ENGINE_NULL', {
             message: 'ExecutionEngine não inicializado',
-            suggestion: 'Erro de boot - verifique inicialização do Kernel'
+            suggestion: 'Erro de boot - verifique inicialização do Kernel',
         });
     }
 
     if (typeof executionEngine.evaluate !== 'function') {
         return ValidationResult.fail('EXECUTION_ENGINE_INVALID', {
             message: 'ExecutionEngine.evaluate() não é função',
-            suggestion: 'Implementação incorreta do ExecutionEngine'
+            suggestion: 'Implementação incorreta do ExecutionEngine',
         });
     }
 
     if (!nervBridge) {
         return ValidationResult.fail('NERV_BRIDGE_NULL', {
             message: 'NERVBridge não inicializado',
-            suggestion: 'Erro de boot - NERV não foi configurado'
+            suggestion: 'Erro de boot - NERV não foi configurado',
         });
     }
 
     if (!telemetry || typeof telemetry.emit !== 'function') {
         return ValidationResult.fail('TELEMETRY_INVALID', {
             message: 'Telemetry não é válida',
-            suggestion: 'Telemetry deve ter método emit()'
+            suggestion: 'Telemetry deve ter método emit()',
         });
     }
 
     return ValidationResult.ok();
 }
 
-export { ValidationResult, validateLLMPage, validateLLMInterface, validateBrowserPool, validateBrowserConnection, validateDriverExecution, validateKernelExecution };
+/**
+ * API pública de validação de pré-requisitos para browser pool, drivers e kernel.
+ */
+export {
+    ValidationResult,
+    validateLLMPage,
+    validateLLMInterface,
+    validateBrowserPool,
+    validateBrowserConnection,
+    validateDriverExecution,
+    validateKernelExecution,
+};

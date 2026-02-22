@@ -20,9 +20,9 @@
  */
 export function normalizeQuery(query) {
     return query
-        .toLowerCase()              // Case-insensitive
-        .trim()                     // Remove leading/trailing whitespace
-        .replace(/\s+/g, ' ')       // Collapse multiple spaces to single space
+        .toLowerCase() // Case-insensitive
+        .trim() // Remove leading/trailing whitespace
+        .replace(/\s+/g, ' ') // Collapse multiple spaces to single space
         .replace(/[^\w\s.-]/g, ''); // Keep only alphanumeric + space + dot + dash
 }
 
@@ -39,19 +39,19 @@ export function normalizeQuery(query) {
 export function expandQuery(query) {
     // Code-specific synonyms mapping
     const CODE_SYNONYMS = {
-        'function': ['func', 'fn', 'method'],
-        'class': ['interface', 'type', 'struct'],
-        'error': ['exception', 'err', 'failure'],
-        'config': ['configuration', 'settings', 'options'],
-        'async': ['asynchronous', 'promise', 'await'],
-        'timeout': ['delay', 'wait', 'timer'],
-        'retry': ['backoff', 'reattempt', 'repeat'],
-        'cache': ['memoize', 'store', 'buffer'],
-        'server': ['service', 'daemon', 'backend'],
-        'client': ['frontend', 'browser', 'user'],
-        'api': ['endpoint', 'route', 'handler'],
-        'database': ['db', 'storage', 'datastore'],
-        'test': ['spec', 'unittest', 'suite']
+        function: ['func', 'fn', 'method'],
+        class: ['interface', 'type', 'struct'],
+        error: ['exception', 'err', 'failure'],
+        config: ['configuration', 'settings', 'options'],
+        async: ['asynchronous', 'promise', 'await'],
+        timeout: ['delay', 'wait', 'timer'],
+        retry: ['backoff', 'reattempt', 'repeat'],
+        cache: ['memoize', 'store', 'buffer'],
+        server: ['service', 'daemon', 'backend'],
+        client: ['frontend', 'browser', 'user'],
+        api: ['endpoint', 'route', 'handler'],
+        database: ['db', 'storage', 'datastore'],
+        test: ['spec', 'unittest', 'suite'],
     };
 
     const tokens = query.split(/\s+/);

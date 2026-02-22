@@ -23,9 +23,12 @@ const FAILURE_CATEGORIES = {
     TARGET_CLOSED: 'TARGET_CLOSED',
     CONNECTION_LOST: 'CONNECTION_LOST',
     BROWSER_FROZEN: 'BROWSER_FROZEN',
-    INFRA_TIMEOUT: 'INFRA_TIMEOUT'
+    INFRA_TIMEOUT: 'INFRA_TIMEOUT',
 };
 
+/**
+ * Política de escalonamento para falhas de infraestrutura do browser/protocolo.
+ */
 class InfraFailurePolicy {
     /**
      * Escala uma falha de infraestrutura conforme a severidade técnica.
@@ -90,7 +93,7 @@ class InfraFailurePolicy {
                         type: type,
                         pid: pid,
                         action: forceKill ? 'PROCESS_KILL' : 'CLEANUP',
-                        severity: 'CRITICAL'
+                        severity: 'CRITICAL',
                     },
                     correlationId
                 );
@@ -140,4 +143,7 @@ class InfraFailurePolicy {
     }
 }
 
+/**
+ * Política de falha de infraestrutura e injeção de dependência NERV para escalonamento.
+ */
 export { InfraFailurePolicy, setNERV };

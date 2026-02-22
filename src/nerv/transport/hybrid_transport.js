@@ -7,9 +7,9 @@ import EventEmitter from 'node:events';
  * Estados do Circuit Breaker
  */
 const CIRCUIT_STATES = {
-    CLOSED: 'CLOSED',     // Funcionando normalmente
-    OPEN: 'OPEN',         // Falhando, só local
-    HALF_OPEN: 'HALF_OPEN' // Testando recuperação
+    CLOSED: 'CLOSED', // Funcionando normalmente
+    OPEN: 'OPEN', // Falhando, só local
+    HALF_OPEN: 'HALF_OPEN', // Testando recuperação
 };
 
 /**
@@ -46,8 +46,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     let nextAttemptTime = 0;
 
     // Circuit Breaker Configuration
-    const FAILURE_THRESHOLD = 5;    // Falhas consecutivas para abrir
-    const TIMEOUT_MS = 60000;       // 1 minuto para tentar recuperação
+    const FAILURE_THRESHOLD = 5; // Falhas consecutivas para abrir
+    const TIMEOUT_MS = 60000; // 1 minuto para tentar recuperação
 
     /**
      * Atualiza estado do circuit breaker baseado em sucesso/falha.
@@ -69,7 +69,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                 telemetry.emit('circuit_breaker_open', {
                     state: circuitState,
                     failureCount,
-                    nextAttemptTime
+                    nextAttemptTime,
                 });
             }
         }

@@ -149,11 +149,7 @@ class DriverReadinessGuard {
                         details: stabilityResult,
                     });
 
-                    log(
-                        'WARN',
-                        `[DriverReadinessGuard] Page not stable: ${reason}`,
-                        this.driver.correlationId
-                    );
+                    log('WARN', `[DriverReadinessGuard] Page not stable: ${reason}`, this.driver.correlationId);
                 } else {
                     checks[CHECK_TYPES.PAGE_STABLE] = true;
                 }
@@ -259,7 +255,9 @@ class DriverReadinessGuard {
                         actual: currentUrl,
                     });
 
-                    throw new Error(`Domain validation failed: empty URL (expected ${this.driver.config.expectedDomain})`);
+                    throw new Error(
+                        `Domain validation failed: empty URL (expected ${this.driver.config.expectedDomain})`
+                    );
                 } else if (!isDomainMatch(currentUrl, this.driver.config.expectedDomain)) {
                     issues.push({
                         check: CHECK_TYPES.DOMAIN_VALID,
@@ -269,7 +267,9 @@ class DriverReadinessGuard {
                         actual: currentUrl,
                     });
 
-                    throw new Error(`Domain mismatch: expected ${this.driver.config.expectedDomain}, got ${currentUrl}`);
+                    throw new Error(
+                        `Domain mismatch: expected ${this.driver.config.expectedDomain}, got ${currentUrl}`
+                    );
                 } else {
                     checks[CHECK_TYPES.DOMAIN_VALID] = true;
                 }

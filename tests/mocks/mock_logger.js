@@ -31,7 +31,7 @@ function criarLoggerMock() {
         verificarChamado: function (nivel, mensagem) {
             const chamadas = this[nivel].getCalls();
             return chamadas.some(call => call.args.some(arg => typeof arg === 'string' && arg.includes(mensagem)));
-        }
+        },
     };
 }
 
@@ -45,7 +45,7 @@ function criarLoggerSilencioso() {
         info: () => {},
         warn: () => {},
         error: () => {},
-        debug: () => {}
+        debug: () => {},
     };
 }
 

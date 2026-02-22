@@ -55,7 +55,10 @@ function init() {
 
                 internalLog('INFO', '[LOG_TAIL] Streaming de telemetria textual ativo.');
             } catch (err) {
-                internalLog('ERROR', `[LOG_TAIL] Falha catastrófica no watcher: ${err && err.message ? err.message : String(err)}`);
+                internalLog(
+                    'ERROR',
+                    `[LOG_TAIL] Falha catastrófica no watcher: ${err && err.message ? err.message : String(err)}`
+                );
                 retryTimeout = setTimeout(init, 10000);
             }
         })
@@ -86,7 +89,7 @@ async function _streamLastChunk() {
         const stream = fs.createReadStream(LOG_FILE, {
             start,
             encoding: 'utf-8',
-            highWaterMark: bufferSize
+            highWaterMark: bufferSize,
         });
 
         stream.on('data', chunk => {

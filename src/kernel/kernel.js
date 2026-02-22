@@ -165,31 +165,35 @@ function createSsotGatewayKernel(config = {}) {
             const MAX_CONSECUTIVE_FAILURES = 5;
 
             timer = setInterval(() => {
-                step().catch(err => {
-                    consecutiveStepFailures++;
+                step()
+                    .catch(err => {
+                        consecutiveStepFailures++;
 
-                    telemetry.critical('kernel_step_unhandled_error', {
-                        error: err?.message || String(err),
-                        stack: err?.stack,
-                        consecutiveFailures: consecutiveStepFailures,
-                        at: Date.now(),
-                    });
-
-                    // Log to stderr para captura imediata
-                    console.error('[KERNEL_STEP_FATAL]', err);
-
-                    // Circuit breaker: parar kernel se muitas falhas consecutivas
-                    if (consecutiveStepFailures >= MAX_CONSECUTIVE_FAILURES) {
-                        telemetry.critical('kernel_circuit_breaker_triggered', {
-                            failures: consecutiveStepFailures
+                        telemetry.critical('kernel_step_unhandled_error', {
+                            error: err?.message || String(err),
+                            stack: err?.stack,
+                            consecutiveFailures: consecutiveStepFailures,
+                            at: Date.now(),
                         });
-                        console.error(`[KERNEL] Circuit breaker triggered after ${consecutiveStepFailures} consecutive failures`);
-                        stop(); // Parar kernel pump para evitar spam de erros
-                    }
-                }).then(() => {
-                    // Reset contador em caso de sucesso
-                    consecutiveStepFailures = 0;
-                });
+
+                        // Log to stderr para captura imediata
+                        console.error('[KERNEL_STEP_FATAL]', err);
+
+                        // Circuit breaker: parar kernel se muitas falhas consecutivas
+                        if (consecutiveStepFailures >= MAX_CONSECUTIVE_FAILURES) {
+                            telemetry.critical('kernel_circuit_breaker_triggered', {
+                                failures: consecutiveStepFailures,
+                            });
+                            console.error(
+                                `[KERNEL] Circuit breaker triggered after ${consecutiveStepFailures} consecutive failures`
+                            );
+                            stop(); // Parar kernel pump para evitar spam de erros
+                        }
+                    })
+                    .then(() => {
+                        // Reset contador em caso de sucesso
+                        consecutiveStepFailures = 0;
+                    });
             }, baseIntervalMs);
 
             // Allow process to exit gracefully
@@ -230,7 +234,8 @@ function createSsotGatewayKernel(config = {}) {
         }
 
         try {
-            await HighLevelNERV.sendCommand( // ✅ P1-4: Added await
+            await HighLevelNERV.sendCommand(
+                // ✅ P1-4: Added await
                 nerv,
                 ActorRole.KERNEL,
                 ActionCode.DRIVER_EXECUTE_TASK,
@@ -730,7 +735,7 @@ function createLegacyKernel({
  * Cria uma instância do kernel com base na configuração fornecida.
  * - Padrão: Gateway de execução SSOT-first + pump NERV
  * - Opcional: Kernel legado "decisor soberano" (mode='legacy')
- * 
+ *
  * @param {KernelOptions|SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
  * @returns {Object} Instância do kernel configurado.
  * Side-effects: Cria e inicializa os componentes do kernel conforme a configuração.

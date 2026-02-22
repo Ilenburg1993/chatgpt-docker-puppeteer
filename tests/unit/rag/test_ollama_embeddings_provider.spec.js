@@ -63,7 +63,7 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
                     ok: true,
                     async json() {
                         return { data: [{ embedding: [0.1, 0.2, 0.3] }] };
-                    }
+                    },
                 };
             };
             const provider = new OllamaEmbeddingsProvider();
@@ -113,21 +113,21 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
                         status: 400,
                         async text() {
                             return '{"error":{"message":"the input length exceeds the context length"}}';
-                        }
+                        },
                     };
                 }
                 return {
                     ok: true,
                     async json() {
                         return { data: [{ embedding: [0.1, 0.2, 0.3] }] };
-                    }
+                    },
                 };
             };
             const provider = new OllamaEmbeddingsProvider();
             const vector = await provider.embed('x'.repeat(6000));
             assert.deepStrictEqual(vector, [0.1, 0.2, 0.3]);
             assert.deepStrictEqual(
-                attempts.filter((size) => size > 2000),
+                attempts.filter(size => size > 2000),
                 [6000, 4200, 2940, 2058],
                 'context overflow must shrink immediately without retrying same size'
             );

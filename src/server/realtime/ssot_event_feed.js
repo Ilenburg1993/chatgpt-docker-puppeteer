@@ -29,7 +29,9 @@ function _asInt(raw, fallback) {
 }
 
 function _isCompatEmitEnabled() {
-    const raw = String(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT || '').trim().toLowerCase();
+    const raw = String(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT || '')
+        .trim()
+        .toLowerCase();
     return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
@@ -328,7 +330,10 @@ function start(options) {
             const minIntervalMs = 5000;
             if (now - _lastErrorLogAtMs >= minIntervalMs) {
                 _lastErrorLogAtMs = now;
-                log('ERROR', `[SSOTEventFeed] tick unhandled error (count=${_errorCount}): ${err?.message || String(err)}`);
+                log(
+                    'ERROR',
+                    `[SSOTEventFeed] tick unhandled error (count=${_errorCount}): ${err?.message || String(err)}`
+                );
             }
         });
     }, interval);

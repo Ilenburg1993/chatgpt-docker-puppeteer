@@ -11,7 +11,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
             const lock = {
                 taskId,
                 pid,
-                acquiredAt: Date.now()
+                acquiredAt: Date.now(),
             };
 
             locks.set(taskId, lock);
@@ -34,7 +34,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
             const lock = {
                 taskId: 'task-003',
                 pid: process.pid,
-                acquiredAt: Date.now()
+                acquiredAt: Date.now(),
             };
 
             assert.ok(lock.pid, 'Lock deve ter PID');
@@ -127,7 +127,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
             const lock = {
                 taskId: 'task-007',
                 pid: 1001,
-                acquiredAt: Date.now() - 7200000 // 2 horas atrás
+                acquiredAt: Date.now() - 7200000, // 2 horas atrás
             };
 
             const age = Date.now() - lock.acquiredAt;
@@ -141,7 +141,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
 
             const lock = {
                 taskId: 'task-008',
-                acquiredAt: Date.now() - 60000 // 1 minuto atrás
+                acquiredAt: Date.now() - 60000, // 1 minuto atrás
             };
 
             const age = Date.now() - lock.acquiredAt;
@@ -159,7 +159,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
             locks.set(key, {
                 taskId: 'task-009',
                 target: 'gemini',
-                pid: process.pid
+                pid: process.pid,
             });
 
             assert.ok(locks.has(key));
@@ -228,7 +228,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
             const lock = {
                 taskId: 'task-011',
                 pid: process.pid,
-                acquiredAt: Date.now()
+                acquiredAt: Date.now(),
             };
 
             assert.ok(lock.acquiredAt);
@@ -239,7 +239,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
             const lock = {
                 taskId: 'task-012',
                 target: 'gemini',
-                pid: process.pid
+                pid: process.pid,
             };
 
             assert.strictEqual(lock.target, 'gemini');
@@ -247,7 +247,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
 
         it('deve calcular idade do lock', () => {
             const lock = {
-                acquiredAt: Date.now() - 5000 // 5 segundos atrás
+                acquiredAt: Date.now() - 5000, // 5 segundos atrás
             };
 
             const age = Date.now() - lock.acquiredAt;
@@ -279,7 +279,7 @@ describe('Infra Lock Manager - Gerenciador de Locks', () => {
                 taskId: 'task-014',
                 target: 'chatgpt',
                 pid: process.pid,
-                acquiredAt: Date.now()
+                acquiredAt: Date.now(),
             };
 
             const json = JSON.stringify(lock);

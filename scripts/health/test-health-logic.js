@@ -57,7 +57,7 @@ async function testHealthLogic() {
                                 status: proc.pm2_env.status,
                                 pid: proc.pid,
                                 memory: Math.floor(proc.monit.memory / 1024 / 1024) + 'MB',
-                                cpu: proc.monit.cpu + '%'
+                                cpu: proc.monit.cpu + '%',
                             }))
                         );
                     }

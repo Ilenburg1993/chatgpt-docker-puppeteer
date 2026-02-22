@@ -48,12 +48,12 @@ if (JSON_OUTPUT) {
             used: usedActionCodes.length,
             missing: missing.length,
             unused: unused.length,
-            coverage: ((usedActionCodes.length / defined.length) * 100).toFixed(1) + '%'
+            coverage: ((usedActionCodes.length / defined.length) * 100).toFixed(1) + '%',
         },
         missing,
         unused,
         allDefined: defined,
-        allUsed: usedActionCodes
+        allUsed: usedActionCodes,
     };
     console.log(JSON.stringify(report, null, 2));
 } else {

@@ -49,11 +49,14 @@ async function createMission() {
         const normalizedReason = reason || promptedReason;
         requireReason(normalizedReason, 'Motivo obrigatório para criar missão.');
         if (!confirmTwoStepAction({ actionLabel: 'MISSION_CREATE', reason: normalizedReason })) return;
-        await store.createMission({
-            title: createForm.value.title,
-            description: createForm.value.description,
-            autonomy_mode: createForm.value.autonomy_mode,
-        }, normalizedReason);
+        await store.createMission(
+            {
+                title: createForm.value.title,
+                description: createForm.value.description,
+                autonomy_mode: createForm.value.autonomy_mode,
+            },
+            normalizedReason
+        );
         showCreate.value = false;
         commandReason.value = '';
         createForm.value = { title: '', description: '', autonomy_mode: 'USER_ONLY' };
@@ -82,9 +85,18 @@ onMounted(refresh);
             </div>
         </div>
 
-        <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Input v-model="store.filters.search" placeholder="Buscar (id, título, descrição)..." @keyup.enter="refresh" />
-            <select v-model="store.filters.status" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+        <div
+            class="rounded-xl border border-slate-700/50 bg-slate-950/40 backdrop-blur-sm p-4 grid grid-cols-1 md:grid-cols-3 gap-3"
+        >
+            <Input
+                v-model="store.filters.search"
+                placeholder="Buscar (id, título, descrição)..."
+                @keyup.enter="refresh"
+            />
+            <select
+                v-model="store.filters.status"
+                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+            >
                 <option :value="null">Status (todos)</option>
                 <option value="READY">READY</option>
                 <option value="RUNNING">RUNNING</option>
@@ -93,7 +105,10 @@ onMounted(refresh);
                 <option value="FAILED">FAILED</option>
                 <option value="CANCELLED">CANCELLED</option>
             </select>
-            <select v-model="store.filters.autonomy_mode" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+            <select
+                v-model="store.filters.autonomy_mode"
+                class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+            >
                 <option :value="null">Autonomia (todas)</option>
                 <option value="USER_ONLY">USER_ONLY</option>
                 <option value="LLM_SUGGEST">LLM_SUGGEST</option>
@@ -147,11 +162,18 @@ onMounted(refresh);
                 </div>
                 <div>
                     <label class="text-sm text-slate-300">Descrição</label>
-                    <textarea v-model="createForm.description" rows="3" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200" />
+                    <textarea
+                        v-model="createForm.description"
+                        rows="3"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    />
                 </div>
                 <div>
                     <label class="text-sm text-slate-300">Autonomia</label>
-                    <select v-model="createForm.autonomy_mode" class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200">
+                    <select
+                        v-model="createForm.autonomy_mode"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                    >
                         <option value="USER_ONLY">USER_ONLY</option>
                         <option value="LLM_SUGGEST">LLM_SUGGEST</option>
                         <option value="LLM_CREATE_DRAFTS">LLM_CREATE_DRAFTS</option>
@@ -167,9 +189,7 @@ onMounted(refresh);
             <template #footer>
                 <div class="flex justify-end gap-2 w-full">
                     <Button variant="ghost" size="sm" @click="showCreate = false">Cancelar</Button>
-                    <Button variant="primary" size="sm" @click="createMission" :disabled="creating">
-                        Criar
-                    </Button>
+                    <Button variant="primary" size="sm" @click="createMission" :disabled="creating"> Criar </Button>
                 </div>
             </template>
         </Modal>

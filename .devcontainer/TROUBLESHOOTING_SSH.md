@@ -1,6 +1,6 @@
 # Guia de Troubleshooting: SSH Forwarding v5.3
-**Versão:** 1.0
-**Data:** 03 de Fevereiro de 2026
+
+**Versão:** 1.0 **Data:** 03 de Fevereiro de 2026
 
 ---
 
@@ -11,6 +11,7 @@
 **Parabéns!** A migração v5.3 resolveu o problema de build.
 
 **Próximos passos:**
+
 1. [Verificar se SSH está funcionando](#verificar-ssh-funcionando)
 2. [Testar git operations](#testar-git-operations)
 
@@ -19,6 +20,7 @@
 ### ❌ NÃO - Container Ainda Não Inicia
 
 **Se você ainda vê erro de mount:**
+
 ```
 error mounting ... to rootfs at "/ssh-agent"
 ```
@@ -26,6 +28,7 @@ error mounting ... to rootfs at "/ssh-agent"
 **Causa:** Container antigo ainda existe (cache).
 
 **Solução:**
+
 ```bash
 # 1. Parar e remover container antigo
 docker ps -a
@@ -62,10 +65,12 @@ echo $SSH_AUTH_SOCK
 ### Se SSH_AUTH_SOCK Está Vazio
 
 **Isso é NORMAL e ESPERADO quando:**
+
 - SSH agent não está rodando no host
 - VS Code não detectou SSH agent ao iniciar container
 
 **Solução: Usar HTTPS para git**
+
 ```bash
 # Trocar remote para HTTPS
 git remote set-url origin https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
@@ -103,6 +108,7 @@ ssh -T git@github.com
 ### Sintoma 1: Container Inicia, Mas SSH Não Funciona
 
 **Verificar:**
+
 ```bash
 # No HOST (fora do container):
 echo $SSH_AUTH_SOCK
@@ -114,6 +120,7 @@ ssh-add -l
 ```
 
 **Se agent não está rodando no host:**
+
 ```bash
 # Iniciar SSH agent
 eval $(ssh-agent -s)
@@ -124,6 +131,7 @@ ssh-add ~/.ssh/id_ed25519
 ```
 
 **Se agent está rodando mas container não vê:**
+
 ```bash
 # VS Code pode não ter detectado
 # Solução: Fechar VS Code completamente e reabrir
@@ -143,6 +151,7 @@ code .
 **Causa:** SSH agent no host não inicia automaticamente.
 
 **Solução permanente (Linux/WSL):**
+
 ```bash
 # Adicionar ao ~/.bashrc ou ~/.zshrc:
 if [ -z "$SSH_AUTH_SOCK" ]; then
@@ -152,6 +161,7 @@ fi
 ```
 
 **Solução permanente (Windows + WSL):**
+
 ```powershell
 # Windows: Habilitar serviço OpenSSH Authentication Agent
 # 1. Abrir Services (services.msc)
@@ -165,6 +175,7 @@ fi
 **Causa:** SSH forwarding não está ativo, git tentando usar SSH sem agent.
 
 **Diagnóstico:**
+
 ```bash
 # Verificar remote URL
 git remote -v
@@ -178,6 +189,7 @@ origin  git@github.com:user/repo.git
 **Soluções:**
 
 **Opção A: Ativar SSH**
+
 ```bash
 # No host, garantir que agent está rodando
 eval $(ssh-agent -s)
@@ -187,6 +199,7 @@ ssh-add ~/.ssh/id_ed25519
 ```
 
 **Opção B: Mudar para HTTPS (mais simples)**
+
 ```bash
 git remote set-url origin https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
 
@@ -198,6 +211,7 @@ git config --global credential.helper store
 ### Sintoma 4: Erro "Permission Denied (publickey)"
 
 **Diagnóstico:**
+
 ```bash
 ssh -vT git@github.com
 
@@ -209,6 +223,7 @@ ssh -vT git@github.com
 **Soluções:**
 
 **Se nenhuma chave oferecida:**
+
 ```bash
 # No HOST:
 ssh-add ~/.ssh/id_ed25519
@@ -220,6 +235,7 @@ ssh-add -l
 ```
 
 **Se chave não está em ~/.ssh:**
+
 ```bash
 # Verificar onde está a chave
 ls -la ~/.ssh/
@@ -276,16 +292,19 @@ git status
 ### SSH (Requer SSH Agent)
 
 **Prós:**
+
 - ✅ Não pede senha
 - ✅ Mais seguro (chaves em vez de passwords)
 - ✅ Recomendado para uso intenso
 
 **Contras:**
+
 - ⚠️ Requer SSH agent rodando no host
 - ⚠️ Requer chave SSH configurada
 - ⚠️ Mais complexo de debugar
 
 **Quando usar:**
+
 - Você já tem SSH agent configurado no host
 - Faz muitos git push/pull por dia
 - Prefere não guardar passwords
@@ -293,20 +312,24 @@ git status
 ### HTTPS (Sempre Funciona)
 
 **Prós:**
+
 - ✅ Funciona SEMPRE (não depende de SSH)
 - ✅ Simples de configurar
 - ✅ Git Credential Manager salva senha
 
 **Contras:**
+
 - ⚠️ Pode pedir senha na primeira vez
 - ⚠️ Menos "elegante" (mas funcional)
 
 **Quando usar:**
+
 - SSH não está disponível/configurado
 - Quer simplicidade
 - Container deve funcionar em qualquer ambiente
 
 **Trocar para HTTPS:**
+
 ```bash
 git remote set-url origin https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
 ```
@@ -420,6 +443,7 @@ code .
 Parabéns! Migração v5.3 concluída com sucesso. 🎉
 
 **Próximos passos recomendados:**
+
 1. ⭐ Fazer commit das mudanças
 2. 📝 Atualizar CHANGELOG.md
 3. 🧪 Testar workflow completo de desenvolvimento
@@ -427,6 +451,4 @@ Parabéns! Migração v5.3 concluída com sucesso. 🎉
 
 ---
 
-**Fim do Guia de Troubleshooting**
-**Versão:** 1.0
-**Última Atualização:** 03 de Fevereiro de 2026
+**Fim do Guia de Troubleshooting** **Versão:** 1.0 **Última Atualização:** 03 de Fevereiro de 2026

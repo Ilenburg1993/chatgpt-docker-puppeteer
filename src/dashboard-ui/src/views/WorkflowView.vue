@@ -95,7 +95,16 @@ watch(workflowId, () => void fetchWorkflow());
                         </div>
                         <div class="flex items-center gap-2">
                             <Badge size="sm">{{ t.stage }}</Badge>
-                            <Badge size="sm" :variant="t.unified_status === 'DONE' ? 'success' : t.unified_status === 'FAILED' ? 'error' : 'default'">
+                            <Badge
+                                size="sm"
+                                :variant="
+                                    t.unified_status === 'DONE'
+                                        ? 'success'
+                                        : t.unified_status === 'FAILED'
+                                          ? 'error'
+                                          : 'default'
+                                "
+                            >
                                 {{ t.unified_status }}
                             </Badge>
                         </div>
@@ -105,4 +114,3 @@ watch(workflowId, () => void fetchWorkflow());
         </div>
     </div>
 </template>
-

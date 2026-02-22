@@ -15,7 +15,7 @@ describe('CheckpointManager Unit Tests', () => {
         checkpointManager = new CheckpointManager({
             baseDir: testBaseDir,
             keepLast: 5,
-            autoCleanup: false // Desabilitado para testar manualmente
+            autoCleanup: false, // Desabilitado para testar manualmente
         });
     });
 
@@ -44,7 +44,7 @@ describe('CheckpointManager Unit Tests', () => {
             const missionState = {
                 id: 'mission-123',
                 status: 'RUNNING',
-                progress: { current_step: 5 }
+                progress: { current_step: 5 },
             };
 
             const checkpointId = await checkpointManager.saveCheckpoint('mission-123', 5, missionState);
@@ -67,7 +67,7 @@ describe('CheckpointManager Unit Tests', () => {
             const missionState = { id: 'mission-123', status: 'RUNNING' };
             const metadata = {
                 reason: 'step_completed',
-                created_by: 'test'
+                created_by: 'test',
             };
 
             await checkpointManager.saveCheckpoint('mission-123', 1, missionState, metadata);
@@ -95,7 +95,7 @@ describe('CheckpointManager Unit Tests', () => {
                 id: 'mission-123',
                 status: 'RUNNING',
                 progress: { current_step: 5, percent: 50 },
-                workflow: { steps: [] }
+                workflow: { steps: [] },
             };
 
             await checkpointManager.saveCheckpoint('mission-123', 5, missionState);
@@ -246,7 +246,7 @@ describe('CheckpointManager Unit Tests', () => {
             const manager = new CheckpointManager({
                 baseDir: testBaseDir,
                 keepLast: 3,
-                autoCleanup: true
+                autoCleanup: true,
             });
 
             const missionState = { id: 'mission-456', status: 'RUNNING' };
@@ -267,7 +267,7 @@ describe('CheckpointManager Unit Tests', () => {
             const manager = new CheckpointManager({
                 baseDir: testBaseDir,
                 keepLast: 2,
-                autoCleanup: true
+                autoCleanup: true,
             });
 
             const missionState = { id: 'mission-456', status: 'RUNNING' };

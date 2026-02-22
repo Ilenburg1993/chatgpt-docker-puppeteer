@@ -56,7 +56,7 @@ describe('RAG scope config resolver', () => {
                 includeGlobs: ['docs/**'],
                 excludeGlobs: ['tmp/**'],
                 maxFileBytes: 3333,
-                profile: 'dev'
+                profile: 'dev',
             });
 
             assert.strictEqual(resolved.docsMode, 'only');
@@ -76,17 +76,16 @@ describe('RAG scope config resolver', () => {
             excludeGlobs: ['logs/**', 'coverage/**'],
             profile: 'full',
             docsMode: 'exclude',
-            maxFileBytes: 2_000_000
+            maxFileBytes: 2_000_000,
         });
         const b = resolveRagScopeConfig({
             includeGlobs: ['tests/**', 'src/**'],
             excludeGlobs: ['coverage/**', 'logs/**'],
             profile: 'full',
             docsMode: 'exclude',
-            maxFileBytes: 2_000_000
+            maxFileBytes: 2_000_000,
         });
 
         assert.strictEqual(a.scopeHash, b.scopeHash);
     });
 });
-

@@ -34,9 +34,9 @@ async function testChromeConnection() {
             browserURL: CHROME_URL,
             defaultViewport: {
                 width: 1920,
-                height: 1080
+                height: 1080,
             },
-            ignoreHTTPSErrors: true
+            ignoreHTTPSErrors: true,
         });
 
         console.log('   ✅ Puppeteer conectado!');
@@ -63,7 +63,7 @@ async function testChromeConnection() {
         console.log('5. Navegando para https://example.com...');
         await page.goto('https://example.com', {
             waitUntil: 'networkidle2',
-            timeout: 15000
+            timeout: 15000,
         });
 
         const title = await page.title();
@@ -81,7 +81,7 @@ async function testChromeConnection() {
             const p = document.querySelector('p');
             return {
                 heading: h1 ? h1.textContent : null,
-                paragraph: p ? p.textContent.substring(0, 100) : null
+                paragraph: p ? p.textContent.substring(0, 100) : null,
             };
         });
 

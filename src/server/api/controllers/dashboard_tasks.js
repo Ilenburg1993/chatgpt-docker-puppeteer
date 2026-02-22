@@ -6,6 +6,7 @@ import { listAttemptsByTask } from '#infra/db/task_attempt_repo';
 import { ok, fail, encodeCursor, decodeCursor, parseIncludeParam } from '../utils/api_envelope.js';
 import { taskRowToListItem, taskRowToDetailTask } from '../utils/task_views.js';
 
+/** Constante/valor exportado: default. */
 const router = express.Router();
 
 function _asInt(raw, fallback) {
@@ -157,10 +158,10 @@ router.get('/tasks', async (req, res) => {
             blockedRaw === undefined
                 ? null
                 : String(blockedRaw).toLowerCase().trim() === 'true'
-                    ? true
-                    : String(blockedRaw).toLowerCase().trim() === 'false'
-                        ? false
-                        : null;
+                  ? true
+                  : String(blockedRaw).toLowerCase().trim() === 'false'
+                    ? false
+                    : null;
 
         const { where, params } = _buildTasksWhere({
             status,
@@ -204,12 +205,19 @@ router.get('/tasks', async (req, res) => {
 
         const items = page.map(taskRowToListItem);
         const last = page.length ? page[page.length - 1] : null;
-        const nextCursor = hasMore && last ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id }) : null;
+        const nextCursor =
+            hasMore && last
+                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id })
+                : null;
 
         ok(res, req, { items }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] tasks list failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'TASKS_LIST_FAILED', error: 'Erro ao recuperar tasks', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'TASKS_LIST_FAILED',
+            error: 'Erro ao recuperar tasks',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -239,7 +247,11 @@ router.get('/tasks/:id', async (req, res) => {
             )
             .get(taskId);
         if (!row) {
-            return fail(res, req, 404, { code: 'TASK_NOT_FOUND', error: 'Task não encontrada', details: { task_id: taskId } });
+            return fail(res, req, 404, {
+                code: 'TASK_NOT_FOUND',
+                error: 'Task não encontrada',
+                details: { task_id: taskId },
+            });
         }
 
         const task = taskRowToDetailTask(row);
@@ -387,9 +399,12 @@ router.get('/tasks/:id', async (req, res) => {
             const artifactIds = new Set();
             if (row.prompt_template_artifact_id) artifactIds.add(String(row.prompt_template_artifact_id));
             if (row.latest_rendered_prompt_artifact_id) artifactIds.add(String(row.latest_rendered_prompt_artifact_id));
-            if (row.latest_response_v2_json_artifact_id) artifactIds.add(String(row.latest_response_v2_json_artifact_id));
+            if (row.latest_response_v2_json_artifact_id)
+                artifactIds.add(String(row.latest_response_v2_json_artifact_id));
 
-            const attempts = include.has('attempts') ? /** @type {any} */ (data).attempts : listAttemptsByTask(taskId, { limit: 50 });
+            const attempts = include.has('attempts')
+                ? /** @type {any} */ (data).attempts
+                : listAttemptsByTask(taskId, { limit: 50 });
             for (const a of attempts || []) {
                 for (const k of [
                     'rendered_prompt_artifact_id',
@@ -428,7 +443,11 @@ router.get('/tasks/:id', async (req, res) => {
         ok(res, req, data, { includes: Array.from(include) });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] task detail failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'TASK_DETAIL_FAILED', error: 'Erro ao recuperar task', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'TASK_DETAIL_FAILED',
+            error: 'Erro ao recuperar task',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -458,7 +477,11 @@ router.get('/tasks-stats', async (req, res) => {
         ok(res, req, { total, by_status: byStatus }, {});
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] tasks stats failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'TASKS_STATS_FAILED', error: 'Erro ao calcular estatísticas', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'TASKS_STATS_FAILED',
+            error: 'Erro ao calcular estatísticas',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -498,12 +521,19 @@ router.get('/tasks/:id/attempts', async (req, res) => {
         const hasMore = rows.length > limit;
         const page = hasMore ? rows.slice(0, limit) : rows;
         const last = page.length ? page[page.length - 1] : null;
-        const nextCursor = hasMore && last ? encodeCursor({ sort: 'created_desc', created_at_ms: last.created_at_ms, id: last.id }) : null;
+        const nextCursor =
+            hasMore && last
+                ? encodeCursor({ sort: 'created_desc', created_at_ms: last.created_at_ms, id: last.id })
+                : null;
 
         ok(res, req, { items: page }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] attempts list failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'ATTEMPTS_LIST_FAILED', error: 'Erro ao listar attempts', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'ATTEMPTS_LIST_FAILED',
+            error: 'Erro ao listar attempts',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -563,7 +593,11 @@ router.get('/tasks/:id/events', async (req, res) => {
         ok(res, req, { items: page }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] events list failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'EVENTS_LIST_FAILED', error: 'Erro ao listar eventos', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'EVENTS_LIST_FAILED',
+            error: 'Erro ao listar eventos',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -577,7 +611,11 @@ router.get('/tasks/:id/timeline', async (req, res) => {
         const taskId = String(req.params.id);
         const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
         if (!row) {
-            return fail(res, req, 404, { code: 'TASK_NOT_FOUND', error: 'Task não encontrada', details: { task_id: taskId } });
+            return fail(res, req, 404, {
+                code: 'TASK_NOT_FOUND',
+                error: 'Task não encontrada',
+                details: { task_id: taskId },
+            });
         }
 
         const task = taskRowToDetailTask(row);
@@ -608,7 +646,11 @@ router.get('/tasks/:id/timeline', async (req, res) => {
         ok(res, req, { task, attempts, events }, {});
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] timeline failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'TASK_TIMELINE_FAILED', error: 'Erro ao recuperar timeline', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'TASK_TIMELINE_FAILED',
+            error: 'Erro ao recuperar timeline',
+            details: err?.message || String(err),
+        });
     }
 });
 
@@ -651,7 +693,11 @@ router.get('/workflows/:workflow_id', async (req, res) => {
         ok(res, req, { workflow_id: workflowId, tasks: tasks.map(taskRowToListItem), edges: deps }, {});
     } catch (err) {
         log('ERROR', `[DASHBOARD_API] workflow view failed: ${err?.message || String(err)}`, req.id);
-        fail(res, req, 500, { code: 'WORKFLOW_VIEW_FAILED', error: 'Erro ao recuperar workflow', details: err?.message || String(err) });
+        fail(res, req, 500, {
+            code: 'WORKFLOW_VIEW_FAILED',
+            error: 'Erro ao recuperar workflow',
+            details: err?.message || String(err),
+        });
     }
 });
 

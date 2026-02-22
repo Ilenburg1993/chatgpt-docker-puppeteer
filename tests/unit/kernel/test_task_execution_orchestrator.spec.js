@@ -46,7 +46,7 @@ describe('TaskExecutionOrchestrator', () => {
                 this.decisions += 1;
                 return { action: 'DONE', task, feedback: null };
             },
-            async processOrchestrationDecision() {}
+            async processOrchestrationDecision() {},
         };
 
         orchestrator = new TaskExecutionOrchestrator({ nerv, nervBridge });
@@ -55,7 +55,7 @@ describe('TaskExecutionOrchestrator', () => {
     it('should ignore duplicated completion events for same task', async () => {
         const task = {
             meta: { id: 'task-dup' },
-            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } },
         };
 
         await orchestrator.executeTask(task, 'corr-dup');
@@ -65,7 +65,7 @@ describe('TaskExecutionOrchestrator', () => {
             messageType: MessageType.EVENT,
             actionCode: ActionCode.DRIVER_TASK_COMPLETED,
             payload: { taskId: 'task-dup', result: { output: 'ok' } },
-            correlationId: 'corr-dup'
+            correlationId: 'corr-dup',
         };
 
         nerv.receive(completion);
@@ -79,7 +79,7 @@ describe('TaskExecutionOrchestrator', () => {
     it('should forward driver failure metadata when emitting TASK_FAILED', async () => {
         const task = {
             meta: { id: 'task-fail-meta' },
-            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } },
         };
 
         await orchestrator.executeTask(task, 'corr-fail-meta');
@@ -100,8 +100,8 @@ describe('TaskExecutionOrchestrator', () => {
                 operation: 'execute',
                 isTimeout: false,
                 errorClassification: 'TRANSIENT',
-                retriesAttempted: 0
-            }
+                retriesAttempted: 0,
+            },
         });
 
         await new Promise(resolve => setTimeout(resolve, 20));
@@ -126,12 +126,10 @@ describe('TaskExecutionOrchestrator', () => {
         assert.strictEqual(eventPayload.retriesAttempted, 0);
     });
 
-
-
     it('should ignore completed event when correlationId is missing for active execution', async () => {
         const task = {
             meta: { id: 'task-missing-corr' },
-            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } },
         };
 
         await orchestrator.executeTask(task, 'corr-required');
@@ -139,7 +137,7 @@ describe('TaskExecutionOrchestrator', () => {
         nerv.receive({
             messageType: MessageType.EVENT,
             actionCode: ActionCode.DRIVER_TASK_COMPLETED,
-            payload: { taskId: 'task-missing-corr', result: { output: 'ok' } }
+            payload: { taskId: 'task-missing-corr', result: { output: 'ok' } },
         });
 
         await new Promise(resolve => setTimeout(resolve, 20));
@@ -150,7 +148,7 @@ describe('TaskExecutionOrchestrator', () => {
     it('should ignore failed event when correlationId mismatches active execution', async () => {
         const task = {
             meta: { id: 'task-stale-fail' },
-            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } }
+            spec: { payload: { user_message: 'x' }, execution: { strategy: 'SINGLE_SHOT' } },
         };
 
         await orchestrator.executeTask(task, 'corr-current');
@@ -159,7 +157,7 @@ describe('TaskExecutionOrchestrator', () => {
             messageType: MessageType.EVENT,
             actionCode: ActionCode.DRIVER_TASK_FAILED,
             correlationId: 'corr-stale',
-            payload: { taskId: 'task-stale-fail', reason: 'STALE', error: 'stale event' }
+            payload: { taskId: 'task-stale-fail', reason: 'STALE', error: 'stale event' },
         });
 
         await new Promise(resolve => setTimeout(resolve, 20));

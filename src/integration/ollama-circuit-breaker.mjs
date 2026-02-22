@@ -43,8 +43,8 @@ import { log } from '#core/logger';
  * @enum {string}
  */
 const CircuitState = Object.freeze({
-    CLOSED: 'CLOSED',       // Normal operation
-    OPEN: 'OPEN',           // Circuit open (reject calls)
+    CLOSED: 'CLOSED', // Normal operation
+    OPEN: 'OPEN', // Circuit open (reject calls)
     HALF_OPEN: 'HALF_OPEN', // Testing recovery
 });
 
@@ -62,12 +62,7 @@ export class OllamaCircuitBreaker {
      * @param {number} [options.timeout=60000] - Milliseconds before trying half-open (60s)
      * @param {number} [options.windowSize=10] - Number of recent calls to track for failure rate
      */
-    constructor({
-        failureThreshold = 5,
-        successThreshold = 2,
-        timeout = 60000,
-        windowSize = 10,
-    } = {}) {
+    constructor({ failureThreshold = 5, successThreshold = 2, timeout = 60000, windowSize = 10 } = {}) {
         /** @type {'CLOSED'|'OPEN'|'HALF_OPEN'} */
         this.state = CircuitState.CLOSED;
         this.failureCount = 0;
@@ -80,7 +75,7 @@ export class OllamaCircuitBreaker {
         this.nextAttemptTime = 0;
 
         // Sliding window for failure rate calculation
-        this.callHistory = [];  // Array of {timestamp, success: boolean}
+        this.callHistory = []; // Array of {timestamp, success: boolean}
         this.windowSize = windowSize;
     }
 
@@ -168,7 +163,7 @@ export class OllamaCircuitBreaker {
         log(
             'ERROR',
             `[OllamaCircuitBreaker] Circuit OPEN (${this.failureCount} consecutive failures, ` +
-            `${Math.round(failureRate * 100)}% failure rate, retry in ${this.timeout}ms)`
+                `${Math.round(failureRate * 100)}% failure rate, retry in ${this.timeout}ms)`
         );
     }
 
@@ -210,9 +205,7 @@ export class OllamaCircuitBreaker {
             successCount: this.successCount,
             failureRate: this._getFailureRate(),
             nextAttemptTime: this.nextAttemptTime,
-            nextAttemptIn: this.state === CircuitState.OPEN
-                ? Math.max(0, this.nextAttemptTime - now)
-                : 0,
+            nextAttemptIn: this.state === CircuitState.OPEN ? Math.max(0, this.nextAttemptTime - now) : 0,
             callHistorySize: this.callHistory.length,
             lastFailureTime: this.lastFailureTime,
         };

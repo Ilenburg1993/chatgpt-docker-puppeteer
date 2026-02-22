@@ -128,4 +128,9 @@ function releaseTaskLockForAttempt({
     return changes;
 }
 
-export { emitStaleAttemptIgnoredEvent, evaluateAttemptInvariants, getCurrentAttemptIdForTask, releaseTaskLockForAttempt };
+export {
+    emitStaleAttemptIgnoredEvent,
+    evaluateAttemptInvariants,
+    getCurrentAttemptIdForTask,
+    releaseTaskLockForAttempt,
+};

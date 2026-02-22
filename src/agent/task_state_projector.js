@@ -751,8 +751,7 @@ class TaskStateProjector {
                             payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null;
                         const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
                         const diagJson = JSON.stringify(diagIds);
-                        const summary =
-                            payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
+                        const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
                         const summaryJson = summary ? JSON.stringify(summary).slice(0, 10000) : null;
 
                         updateAttempt(attemptId, {
@@ -1056,8 +1055,8 @@ class TaskStateProjector {
                     }
                 }
 
-            // Operational TASK_ERRORs (e.g., LLM_TIMEOUT) and future no-count policies.
-            if (!countAttempt) {
+                // Operational TASK_ERRORs (e.g., LLM_TIMEOUT) and future no-count policies.
+                if (!countAttempt) {
                     const base = 30000;
                     const max = 120000;
                     const jitter = Math.floor(Math.random() * 500);

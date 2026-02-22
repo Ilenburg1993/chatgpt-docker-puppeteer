@@ -169,11 +169,7 @@ test(
             `SIGPIPE should not create shutdown promise, stdout=${stdout}, stderr=${stderr}`
         );
 
-        const [code, signal] = await waitForExitWithTimeout(
-            child,
-            20000,
-            'Timeout waiting child exit (wave9 SIGPIPE)'
-        );
+        const [code, signal] = await waitForExitWithTimeout(child, 20000, 'Timeout waiting child exit (wave9 SIGPIPE)');
 
         assert.equal(signal, null, `subprocess should exit by code, stderr=${stderr}`);
         assert.equal(code, 0, `expected graceful exit code 0, stdout=${stdout}, stderr=${stderr}`);

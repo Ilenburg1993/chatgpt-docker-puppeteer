@@ -127,7 +127,10 @@ test('split retry can gate connection on /health when SPLIT_WAIT_HEALTH=true', a
                 SPLIT_WAIT_HEALTH: 'true',
             },
             async () => {
-                const socketHub = await __mainTestHooks.connectSplitExternalWithRetry(fakeSocketModule, healthServer.port);
+                const socketHub = await __mainTestHooks.connectSplitExternalWithRetry(
+                    fakeSocketModule,
+                    healthServer.port
+                );
                 assert.ok(socketHub, 'split helper should connect when health endpoint is available');
             }
         );

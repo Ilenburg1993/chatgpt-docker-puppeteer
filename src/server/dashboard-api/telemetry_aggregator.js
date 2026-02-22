@@ -16,7 +16,7 @@ class RingBuffer {
     push(value) {
         this.buffer.push({
             value,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
 
         if (this.buffer.length > this.maxSize) {
@@ -33,9 +33,7 @@ class RingBuffer {
     }
 
     getRange(fromTimestamp, toTimestamp) {
-        return this.buffer.filter(item =>
-            item.timestamp >= fromTimestamp && item.timestamp <= toTimestamp
-        );
+        return this.buffer.filter(item => item.timestamp >= fromTimestamp && item.timestamp <= toTimestamp);
     }
 
     getAverage() {
@@ -110,7 +108,7 @@ class TelemetryAggregator {
             memory_percent: 95,
             heap_percent: 90,
             event_loop_lag_ms: 100,
-            queue_size: 1000
+            queue_size: 1000,
         };
 
         // Alertas ativos
@@ -175,7 +173,6 @@ class TelemetryAggregator {
 
             // Broadcast via Socket.io
             this._broadcast(metrics);
-
         } catch (err) {
             log('ERROR', `[TelemetryAggregator] Erro na coleta: ${err.message}`);
         }
@@ -193,7 +190,9 @@ class TelemetryAggregator {
         try {
             const db = getDb();
             queueMetrics = {
-                size: db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE stage='READY' AND status='PENDING'").get()?.c || 0,
+                size:
+                    db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE stage='READY' AND status='PENDING'").get()?.c ||
+                    0,
                 running: db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status='RUNNING'").get()?.c || 0,
             };
         } catch (_) {
@@ -207,7 +206,7 @@ class TelemetryAggregator {
         const nervMetrics = {
             latency_ms: 0,
             throughput: 0,
-            event_count: 0
+            event_count: 0,
         };
 
         return {
@@ -220,25 +219,25 @@ class TelemetryAggregator {
                 load_1min: parseFloat(hwMetrics.cpu.load_1min) || 0,
                 load_5min: parseFloat(hwMetrics.cpu.load_5min) || 0,
                 load_15min: parseFloat(hwMetrics.cpu.load_15min) || 0,
-                cores: hwMetrics.cpu.cores || 1
+                cores: hwMetrics.cpu.cores || 1,
             },
 
             memory: {
                 total_mb: hwMetrics.memory.total_mb,
                 used_mb: hwMetrics.memory.used_mb,
                 free_mb: hwMetrics.memory.free_mb,
-                usage_percent: hwMetrics.memory.usage_percent
+                usage_percent: hwMetrics.memory.usage_percent,
             },
 
             heap: {
                 used_mb: hwMetrics.heap.heap_used_mb,
                 total_mb: hwMetrics.heap.heap_total_mb,
                 limit_mb: hwMetrics.heap.heap_limit_mb,
-                usage_percent: hwMetrics.heap.heap_usage_percent
+                usage_percent: hwMetrics.heap.heap_usage_percent,
             },
 
             event_loop: {
-                lag_ms: eventLoopLag
+                lag_ms: eventLoopLag,
             },
 
             nerv: nervMetrics,
@@ -248,8 +247,8 @@ class TelemetryAggregator {
             system: {
                 platform: hwMetrics.system.platform,
                 node_version: hwMetrics.system.node_version,
-                pid: hwMetrics.system.pid
-            }
+                pid: hwMetrics.system.pid,
+            },
         };
     }
 
@@ -285,32 +284,32 @@ class TelemetryAggregator {
                 name: 'high_cpu',
                 condition: metrics.cpu.usage_percent > this.alertThresholds.cpu_percent,
                 message: `CPU usage at ${metrics.cpu.usage_percent}%`,
-                severity: 'warning'
+                severity: 'warning',
             },
             {
                 name: 'high_memory',
                 condition: metrics.memory.usage_percent > this.alertThresholds.memory_percent,
                 message: `Memory usage at ${metrics.memory.usage_percent}%`,
-                severity: 'warning'
+                severity: 'warning',
             },
             {
                 name: 'high_heap',
                 condition: metrics.heap.usage_percent > this.alertThresholds.heap_percent,
                 message: `Heap usage at ${metrics.heap.usage_percent}%`,
-                severity: 'warning'
+                severity: 'warning',
             },
             {
                 name: 'event_loop_lag',
                 condition: metrics.event_loop.lag_ms > this.alertThresholds.event_loop_lag_ms,
                 message: `Event loop lag: ${metrics.event_loop.lag_ms}ms`,
-                severity: 'warning'
+                severity: 'warning',
             },
             {
                 name: 'queue_overflow',
                 condition: metrics.queue.size > this.alertThresholds.queue_size,
                 message: `Queue size: ${metrics.queue.size} tasks`,
-                severity: 'critical'
-            }
+                severity: 'critical',
+            },
         ];
 
         for (const check of checks) {
@@ -322,7 +321,7 @@ class TelemetryAggregator {
                         name: check.name,
                         message: check.message,
                         severity: check.severity,
-                        triggered_at: Date.now()
+                        triggered_at: Date.now(),
                     };
 
                     this.activeAlerts.set(check.name, alert);
@@ -392,7 +391,7 @@ class TelemetryAggregator {
             event_loop: this.eventLoopLagHistory,
             nerv_latency: this.nervLatencyHistory,
             nerv_throughput: this.nervThroughputHistory,
-            queue: this.queueSizeHistory
+            queue: this.queueSizeHistory,
         };
 
         const buffer = bufferMap[metric];
@@ -407,13 +406,13 @@ class TelemetryAggregator {
             samples: data.length,
             data: data.map(item => ({
                 value: item.value,
-                timestamp: item.timestamp
+                timestamp: item.timestamp,
             })),
             stats: {
                 average: buffer.getAverage(),
                 max: buffer.getMax(),
-                min: buffer.getMin()
-            }
+                min: buffer.getMin(),
+            },
         };
     }
 
@@ -430,36 +429,36 @@ class TelemetryAggregator {
                 current: this.cpuHistory.buffer[this.cpuHistory.buffer.length - 1]?.value || 0,
                 average: this.cpuHistory.getAverage(),
                 max: this.cpuHistory.getMax(),
-                history: this.cpuHistory.getLast(60)
+                history: this.cpuHistory.getLast(60),
             },
 
             memory: {
                 current: this.memoryHistory.buffer[this.memoryHistory.buffer.length - 1]?.value || 0,
                 average: this.memoryHistory.getAverage(),
                 max: this.memoryHistory.getMax(),
-                history: this.memoryHistory.getLast(60)
+                history: this.memoryHistory.getLast(60),
             },
 
             heap: {
                 current: this.heapHistory.buffer[this.heapHistory.buffer.length - 1]?.value || 0,
                 average: this.heapHistory.getAverage(),
                 max: this.heapHistory.getMax(),
-                history: this.heapHistory.getLast(60)
+                history: this.heapHistory.getLast(60),
             },
 
             event_loop: {
                 current: this.eventLoopLagHistory.buffer[this.eventLoopLagHistory.buffer.length - 1]?.value || 0,
                 average: this.eventLoopLagHistory.getAverage(),
                 max: this.eventLoopLagHistory.getMax(),
-                history: this.eventLoopLagHistory.getLast(60)
+                history: this.eventLoopLagHistory.getLast(60),
             },
 
             queue: {
                 current: this.queueSizeHistory.buffer[this.queueSizeHistory.buffer.length - 1]?.value || 0,
                 average: this.queueSizeHistory.getAverage(),
                 max: this.queueSizeHistory.getMax(),
-                history: this.queueSizeHistory.getLast(60)
-            }
+                history: this.queueSizeHistory.getLast(60),
+            },
         };
     }
 
@@ -476,7 +475,7 @@ class TelemetryAggregator {
     setAlertThresholds(thresholds) {
         this.alertThresholds = {
             ...this.alertThresholds,
-            ...thresholds
+            ...thresholds,
         };
         log('INFO', `[TelemetryAggregator] Thresholds atualizados: ${JSON.stringify(thresholds)}`);
     }
@@ -500,6 +499,7 @@ class TelemetryAggregator {
 }
 
 // Singleton instance
+/** Constante/valor exportado: default. */
 const telemetryAggregator = new TelemetryAggregator();
 
 export default telemetryAggregator;
